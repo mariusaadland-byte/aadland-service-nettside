@@ -57,11 +57,12 @@ export async function POST(req) {
       ok: true,
       user: adminUser,
     });
-  } catch (error) {
+ } catch (error) {
   console.error("LOGIN ERROR:", error);
 
   return NextResponse.json(
     { error: "Kunne ikke logge inn." },
     { status: 500 }
   );
+}
 }
