@@ -44,6 +44,12 @@ export async function POST(req) {
       .eq("id", data.user.id)
       .single();
 
+    console.error("ADMIN LOOKUP:", {
+      userId: data.user.id,
+      adminError,
+      adminUser,
+    });
+
     if (adminError || !adminUser || !adminUser.active) {
       return NextResponse.json(
         { error: "Du har ikke tilgang til backoffice." },
@@ -57,12 +63,12 @@ export async function POST(req) {
       ok: true,
       user: adminUser,
     });
- } catch (error) {
-  console.error("LOGIN ERROR:", error);
+  } catch (error) {
+    console.error("LOGIN ERROR:", error);
 
-  return NextResponse.json(
-    { error: "Kunne ikke logge inn." },
-    { status: 500 }
-  );
-}
+    return NextResponse.json(
+      { error: "Kunne ikke logge inn." },
+      { status: 500 }
+    );
+  }
 }
