@@ -1,0 +1,2 @@
+import {NextResponse} from "next/server";import crypto from "crypto";import {setAdminCookie} from "../../../../lib/auth";
+export async function POST(req){const {password}=await req.json();const expected=process.env.ADMIN_PASSWORD||"";const a=Buffer.from(String(password||"")),b=Buffer.from(expected);if(!expected||a.length!==b.length||!crypto.timingSafeEqual(a,b))return NextResponse.json({error:"Feil passord."},{status:401});await setAdminCookie();return NextResponse.json({ok:true})}

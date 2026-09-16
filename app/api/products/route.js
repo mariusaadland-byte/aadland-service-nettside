@@ -1,0 +1,2 @@
+import {NextResponse} from "next/server";import {db,fromDbProduct} from "../../../lib/supabase";import {fallbackProducts} from "../../../lib/catalog";
+export async function GET(){const s=db();if(!s)return NextResponse.json({products:fallbackProducts});const {data,error}=await s.from("products").select("*").eq("active",true).order("created_at");if(error)return NextResponse.json({products:fallbackProducts});return NextResponse.json({products:(data||[]).map(fromDbProduct)})}
