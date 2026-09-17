@@ -36,6 +36,8 @@ export async function GET() {
     .order("created_at", { ascending: true });
 
   if (error) {
+    console.error("ADMIN USERS GET ERROR:", error);
+
     return NextResponse.json(
       { error: "Brukerne kunne ikke hentes." },
       { status: 500 }
@@ -102,8 +104,14 @@ export async function POST(req) {
     });
 
   if (authError || !authData.user) {
+    console.error("AUTH CREATE USER ERROR:", authError);
+
     return NextResponse.json(
-      { error: authError?.message || "Brukeren kunne ikke opprettes." },
+      {
+        error:
+          authError?.message ||
+          "Innloggingsbrukeren kunne ikke opprettes.",
+      },
       { status: 400 }
     );
   }
@@ -125,10 +133,21 @@ export async function POST(req) {
     .insert(record);
 
   if (profileError) {
+    console.error("ADMIN USER PROFILE INSERT ERROR:", {
+      code: profileError.code,
+      message: profileError.message,
+      details: profileError.details,
+      hint: profileError.hint,
+    });
+
     await s.auth.admin.deleteUser(authData.user.id);
 
     return NextResponse.json(
-      { error: "Brukerprofilen kunne ikke opprettes." },
+      {
+        error: `Brukerprofil kunne ikke opprettes: ${
+          profileError.message || "Ukjent databasefeil"
+        }`,
+      },
       { status: 500 }
     );
   }
@@ -193,8 +212,19 @@ export async function PATCH(req) {
     .eq("id", body.id);
 
   if (error) {
+    console.error("ADMIN USER UPDATE ERROR:", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+
     return NextResponse.json(
-      { error: "Brukeren kunne ikke oppdateres." },
+      {
+        error: `Brukeren kunne ikke oppdateres: ${
+          error.message || "Ukjent databasefeil"
+        }`,
+      },
       { status: 500 }
     );
   }
