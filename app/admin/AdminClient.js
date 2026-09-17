@@ -377,6 +377,7 @@ function NewUser({ reload, setError, close }) {
     <form
       className="card"
       onSubmit={create}
+      autoComplete="off"
       style={{ marginBottom: 20 }}
     >
       <h3>Ny bruker</h3>
@@ -384,6 +385,8 @@ function NewUser({ reload, setError, close }) {
       <div className="field">
         <label>Navn</label>
         <input
+          name="new-admin-name"
+          autoComplete="off"
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -394,6 +397,8 @@ function NewUser({ reload, setError, close }) {
         <label>E-post</label>
         <input
           type="email"
+          name="new-admin-email"
+          autoComplete="off"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -404,6 +409,8 @@ function NewUser({ reload, setError, close }) {
         <label>Midlertidig passord</label>
         <input
           type="password"
+          name="new-admin-password"
+          autoComplete="new-password"
           required
           minLength={8}
           value={password}
@@ -498,12 +505,7 @@ function UserCard({
       />
 
       {!owner && (
-        <label
-          style={{
-            display: "block",
-            marginBottom: 14,
-          }}
-        >
+        <label style={{ display: "block", marginBottom: 14 }}>
           <input
             type="checkbox"
             checked={values.active}
