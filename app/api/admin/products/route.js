@@ -1,39 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  getAdminUser,
-  hasPermission,
-} from "../../../../lib/auth";
-import {
-  db,
-  fromDbProduct,
-} from "../../../../lib/supabase";
-
-async function requireProductAccess() {
-  const currentUser = await getAdminUser();
-
-  if (!currentUser) {
-    return {
-      error: NextResponse.json(
-        { error: "Ikke innlogget." },
-        { status: 401 }
-      ),
-    };
-  }
-
-  if (!(await hasPermission("canManageProducts"))) {
-    return {
-      error: NextResponse.json(
-        {
-          error:
-            "Du har ikke tilgang til å administrere produkter.",
-        },
-        { status: 403 }
-      ),
-    };
-  }
-
-  return { currentUser };
-}
+import { db, fromDbProduct } from "../../../../lib/supabase";
+import { hasPermission } from "../../../../lib/auth";
 
 function cleanText(value) {
   return String(value || "").trim();
@@ -48,25 +15,74 @@ function cleanArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
-export async function GET() {
-  const access = await requireProductAccess();
-  if (access.error) return access.error;
+function makeSlug(value) {
+  return cleanText(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/æ/g, "ae")
+    .replace(/ø/g, "o")
+    .replace(/å/g, "a")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
 
-  const s = db();
+async function getCategory(s, categoryId) {
+  const id = cleanText(categoryId);
 
-  if (!s) {
-    return NextResponse.json(
-      { error: "Databasen er ikke tilgjengelig." },
-      { status: 500 }
-    );
+  if (!id) {
+    return null;
   }
 
   const { data, error } = await s
-    .from("products")
-    .select("*")
-    .order("created_at", { ascending: true });
+    .from("categories")
+    .select("id,name")
+    .eq("id", id)
+    .single();
 
-  if (error) {
+  if (error || !data) {
+    return null;
+  }
+
+  return data;
+}
+
+export async function GET() {
+  try {
+    if (!(await hasPermission("canManageProducts"))) {
+      return NextResponse.json(
+        { error: "Du har ikke tilgang til å administrere produkter." },
+        { status: 403 }
+      );
+    }
+
+    const s = db();
+
+    if (!s) {
+      return NextResponse.json(
+        { error: "Databasen er ikke tilgjengelig." },
+        { status: 500 }
+      );
+    }
+
+    const { data, error } = await s
+      .from("products")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("ADMIN PRODUCTS GET ERROR:", error);
+
+      return NextResponse.json(
+        { error: "Produktene kunne ikke hentes." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      products: (data || []).map(fromDbProduct),
+    });
+  } catch (error) {
     console.error("ADMIN PRODUCTS GET ERROR:", error);
 
     return NextResponse.json(
@@ -74,190 +90,137 @@ export async function GET() {
       { status: 500 }
     );
   }
-
-  return NextResponse.json({
-    products: (data || []).map(fromDbProduct),
-  });
-}
-
-export async function PATCH(req) {
-  const access = await requireProductAccess();
-  if (access.error) return access.error;
-
-  const p = await req.json();
-
-  if (!p.id) {
-    return NextResponse.json(
-      { error: "Produkt mangler." },
-      { status: 400 }
-    );
-  }
-
-  const name = cleanText(p.name);
-  const category =
-    cleanText(p.category) || "På bestilling";
-  const description = cleanText(p.description);
-  const dimensions = cleanText(p.dimensions);
-
-  const imageUrls = cleanArray(p.imageUrls)
-    .map(cleanText)
-    .filter(Boolean);
-
-  const imageUrl =
-    imageUrls[0] ||
-    cleanText(p.imageUrl) ||
-    null;
-
-  const specifications = cleanArray(
-    p.specifications
-  );
-
-  const options = cleanArray(p.options);
-
-  if (!name) {
-    return NextResponse.json(
-      { error: "Produktet må ha et navn." },
-      { status: 400 }
-    );
-  }
-
-  if (!validPrice(p.basePriceOre)) {
-    return NextResponse.json(
-      { error: "Produktet må ha en gyldig pris." },
-      { status: 400 }
-    );
-  }
-
-  const s = db();
-
-  if (!s) {
-    return NextResponse.json(
-      { error: "Databasen er ikke tilgjengelig." },
-      { status: 500 }
-    );
-  }
-
-  const { data, error } = await s
-    .from("products")
-    .update({
-      name,
-      category,
-      description,
-      dimensions,
-      base_price_ore: Math.round(
-        Number(p.basePriceOre)
-      ),
-      image_url: imageUrl,
-      image_urls: imageUrls,
-      specifications,
-      options,
-      active: p.active !== false,
-    })
-    .eq("id", p.id)
-    .select("*")
-    .single();
-
-  if (error) {
-    console.error(
-      "ADMIN PRODUCT UPDATE ERROR:",
-      error
-    );
-
-    return NextResponse.json(
-      { error: "Produktet kunne ikke lagres." },
-      { status: 500 }
-    );
-  }
-
-  return NextResponse.json({
-    ok: true,
-    product: fromDbProduct(data),
-  });
 }
 
 export async function POST(req) {
-  const access = await requireProductAccess();
-  if (access.error) return access.error;
+  try {
+    if (!(await hasPermission("canManageProducts"))) {
+      return NextResponse.json(
+        { error: "Du har ikke tilgang til å administrere produkter." },
+        { status: 403 }
+      );
+    }
 
-  const p = await req.json();
+    const body = await req.json();
 
-  const name = cleanText(p.name);
-  const category =
-    cleanText(p.category) || "På bestilling";
-  const description = cleanText(p.description);
-  const dimensions = cleanText(p.dimensions);
+    const name = cleanText(body.name);
 
-  const imageUrls = cleanArray(p.imageUrls)
-    .map(cleanText)
-    .filter(Boolean);
+    if (!name) {
+      return NextResponse.json(
+        { error: "Produktet må ha et navn." },
+        { status: 400 }
+      );
+    }
 
-  const imageUrl =
-    imageUrls[0] ||
-    cleanText(p.imageUrl) ||
-    null;
+    if (!validPrice(body.basePriceOre)) {
+      return NextResponse.json(
+        { error: "Produktet må ha en gyldig pris." },
+        { status: 400 }
+      );
+    }
 
-  const specifications = cleanArray(
-    p.specifications
-  );
+    const s = db();
 
-  const options = cleanArray(p.options);
+    if (!s) {
+      return NextResponse.json(
+        { error: "Databasen er ikke tilgjengelig." },
+        { status: 500 }
+      );
+    }
 
-  if (!name) {
-    return NextResponse.json(
-      { error: "Produktnavn mangler." },
-      { status: 400 }
+    const category = await getCategory(
+      s,
+      body.categoryId
     );
-  }
 
-  if (!validPrice(p.basePriceOre)) {
-    return NextResponse.json(
-      { error: "Produktet må ha en gyldig pris." },
-      { status: 400 }
-    );
-  }
+    if (!category) {
+      return NextResponse.json(
+        { error: "Velg en gyldig kategori." },
+        { status: 400 }
+      );
+    }
 
-  const slugBase =
-    name
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "") ||
-    "produkt";
+    const imageUrls = cleanArray(body.imageUrls)
+      .map(cleanText)
+      .filter(Boolean);
 
-  const id = `${slugBase}-${Date.now()}`;
+    const imageUrl =
+      imageUrls[0] ||
+      cleanText(body.imageUrl) ||
+      null;
 
-  const s = db();
+    const specifications =
+      cleanArray(body.specifications);
 
-  if (!s) {
-    return NextResponse.json(
-      { error: "Databasen er ikke tilgjengelig." },
-      { status: 500 }
-    );
-  }
+    const options =
+      cleanArray(body.options);
 
-  const { data, error } = await s
-    .from("products")
-    .insert({
-      id,
-      slug: id,
-      name,
-      category,
-      description,
-      dimensions,
-      base_price_ore: Math.round(
-        Number(p.basePriceOre)
-      ),
-      options,
-      image_url: imageUrl,
-      image_urls: imageUrls,
-      specifications,
-      active: p.active !== false,
-    })
-    .select("*")
-    .single();
+    const baseSlug =
+      makeSlug(name) || "produkt";
 
-  if (error) {
+    const id =
+      `${baseSlug}-${Date.now()}`;
+
+    const slug =
+      `${baseSlug}-${Date.now()}`;
+
+    const { data, error } = await s
+      .from("products")
+      .insert({
+        id,
+        slug,
+        name,
+
+        category_id:
+          category.id,
+
+        category:
+          category.name,
+
+        description:
+          cleanText(body.description),
+
+        dimensions:
+          cleanText(body.dimensions),
+
+        base_price_ore:
+          Math.round(
+            Number(body.basePriceOre)
+          ),
+
+        image_url:
+          imageUrl,
+
+        image_urls:
+          imageUrls,
+
+        specifications,
+
+        options,
+
+        active:
+          body.active !== false,
+      })
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error(
+        "ADMIN PRODUCT CREATE ERROR:",
+        error
+      );
+
+      return NextResponse.json(
+        { error: "Produktet kunne ikke opprettes." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      product: fromDbProduct(data),
+    });
+  } catch (error) {
     console.error(
       "ADMIN PRODUCT CREATE ERROR:",
       error
@@ -268,9 +231,146 @@ export async function POST(req) {
       { status: 500 }
     );
   }
+}
 
-  return NextResponse.json({
-    ok: true,
-    product: fromDbProduct(data),
-  });
+export async function PATCH(req) {
+  try {
+    if (!(await hasPermission("canManageProducts"))) {
+      return NextResponse.json(
+        { error: "Du har ikke tilgang til å administrere produkter." },
+        { status: 403 }
+      );
+    }
+
+    const body = await req.json();
+
+    const id =
+      cleanText(body.id);
+
+    const name =
+      cleanText(body.name);
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Produkt mangler." },
+        { status: 400 }
+      );
+    }
+
+    if (!name) {
+      return NextResponse.json(
+        { error: "Produktet må ha et navn." },
+        { status: 400 }
+      );
+    }
+
+    if (!validPrice(body.basePriceOre)) {
+      return NextResponse.json(
+        { error: "Produktet må ha en gyldig pris." },
+        { status: 400 }
+      );
+    }
+
+    const s = db();
+
+    if (!s) {
+      return NextResponse.json(
+        { error: "Databasen er ikke tilgjengelig." },
+        { status: 500 }
+      );
+    }
+
+    const category = await getCategory(
+      s,
+      body.categoryId
+    );
+
+    if (!category) {
+      return NextResponse.json(
+        { error: "Velg en gyldig kategori." },
+        { status: 400 }
+      );
+    }
+
+    const imageUrls = cleanArray(body.imageUrls)
+      .map(cleanText)
+      .filter(Boolean);
+
+    const imageUrl =
+      imageUrls[0] ||
+      cleanText(body.imageUrl) ||
+      null;
+
+    const specifications =
+      cleanArray(body.specifications);
+
+    const options =
+      cleanArray(body.options);
+
+    const { data, error } = await s
+      .from("products")
+      .update({
+        name,
+
+        category_id:
+          category.id,
+
+        category:
+          category.name,
+
+        description:
+          cleanText(body.description),
+
+        dimensions:
+          cleanText(body.dimensions),
+
+        base_price_ore:
+          Math.round(
+            Number(body.basePriceOre)
+          ),
+
+        image_url:
+          imageUrl,
+
+        image_urls:
+          imageUrls,
+
+        specifications,
+
+        options,
+
+        active:
+          body.active !== false,
+      })
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error(
+        "ADMIN PRODUCT UPDATE ERROR:",
+        error
+      );
+
+      return NextResponse.json(
+        { error: "Produktet kunne ikke lagres." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      product: fromDbProduct(data),
+    });
+  } catch (error) {
+    console.error(
+      "ADMIN PRODUCT UPDATE ERROR:",
+      error
+    );
+
+    return NextResponse.json(
+      { error: "Produktet kunne ikke lagres." },
+      { status: 500 }
+    );
+  }
 }
