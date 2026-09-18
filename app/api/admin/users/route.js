@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { getAdminUser, hasPermission } from "../../../../lib/auth";
+import {
+  getAdminUser,
+  hasPermission,
+} from "../../../../lib/auth";
 import { db } from "../../../../lib/supabase";
 
 export async function GET() {
@@ -39,7 +42,11 @@ export async function GET() {
     console.error("ADMIN USERS GET ERROR:", error);
 
     return NextResponse.json(
-      { error: "Brukerne kunne ikke hentes." },
+      {
+        error: `Brukerne kunne ikke hentes: ${
+          error.message || "Ukjent databasefeil"
+        }`,
+      },
       { status: 500 }
     );
   }
@@ -69,7 +76,10 @@ export async function POST(req) {
 
   const body = await req.json();
 
-  const email = String(body.email || "").trim().toLowerCase();
+  const email = String(body.email || "")
+    .trim()
+    .toLowerCase();
+
   const name = String(body.name || "").trim();
   const password = String(body.password || "");
 
@@ -104,7 +114,10 @@ export async function POST(req) {
     });
 
   if (authError || !authData.user) {
-    console.error("AUTH CREATE USER ERROR:", authError);
+    console.error(
+      "AUTH CREATE USER ERROR:",
+      authError
+    );
 
     return NextResponse.json(
       {
@@ -123,7 +136,9 @@ export async function POST(req) {
     role: "user",
     can_view_orders: Boolean(body.canViewOrders),
     can_update_orders: Boolean(body.canUpdateOrders),
-    can_manage_products: Boolean(body.canManageProducts),
+    can_manage_products: Boolean(
+      body.canManageProducts
+    ),
     can_manage_users: Boolean(body.canManageUsers),
     active: true,
   };
@@ -133,19 +148,20 @@ export async function POST(req) {
     .insert(record);
 
   if (profileError) {
-    console.error("ADMIN USER PROFILE INSERT ERROR:", {
-      code: profileError.code,
-      message: profileError.message,
-      details: profileError.details,
-      hint: profileError.hint,
-    });
+    console.error(
+      "ADMIN USER PROFILE INSERT ERROR:",
+      profileError
+    );
 
-    await s.auth.admin.deleteUser(authData.user.id);
+    await s.auth.admin.deleteUser(
+      authData.user.id
+    );
 
     return NextResponse.json(
       {
         error: `Brukerprofil kunne ikke opprettes: ${
-          profileError.message || "Ukjent databasefeil"
+          profileError.message ||
+          "Ukjent databasefeil"
         }`,
       },
       { status: 500 }
@@ -181,13 +197,6 @@ export async function PATCH(req) {
     );
   }
 
-  if (body.id === currentUser.id && body.active === false) {
-    return NextResponse.json(
-      { error: "Du kan ikke deaktivere din egen bruker." },
-      { status: 400 }
-    );
-  }
-
   const s = db();
 
   if (!s) {
@@ -197,12 +206,71 @@ export async function PATCH(req) {
     );
   }
 
+  /*
+   * Hent brukeren som forsøkes endret.
+   * Dette gjøres på serveren slik at beskyttelsen
+   * ikke kan omgås ved å sende API-kall manuelt.
+   */
+  const {
+    data: targetUser,
+    error: targetError,
+  } = await s
+    .from("admin_users")
+    .select("id,role,active")
+    .eq("id", body.id)
+    .single();
+
+  if (targetError || !targetUser) {
+    return NextResponse.json(
+      { error: "Brukeren finnes ikke." },
+      { status: 404 }
+    );
+  }
+
+  /*
+   * Eierkontoen kan ikke endres gjennom
+   * vanlig brukeradministrasjon.
+   */
+  if (targetUser.role === "owner") {
+    return NextResponse.json(
+      {
+        error:
+          "Eierkontoen er beskyttet og kan ikke endres her.",
+      },
+      { status: 403 }
+    );
+  }
+
+  /*
+   * Ingen kan deaktivere sin egen konto.
+   */
+  if (
+    body.id === currentUser.id &&
+    body.active === false
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "Du kan ikke deaktivere din egen bruker.",
+      },
+      { status: 400 }
+    );
+  }
+
   const update = {
     name: String(body.name || "").trim(),
-    can_view_orders: Boolean(body.canViewOrders),
-    can_update_orders: Boolean(body.canUpdateOrders),
-    can_manage_products: Boolean(body.canManageProducts),
-    can_manage_users: Boolean(body.canManageUsers),
+    can_view_orders: Boolean(
+      body.canViewOrders
+    ),
+    can_update_orders: Boolean(
+      body.canUpdateOrders
+    ),
+    can_manage_products: Boolean(
+      body.canManageProducts
+    ),
+    can_manage_users: Boolean(
+      body.canManageUsers
+    ),
     active: body.active !== false,
   };
 
@@ -212,17 +280,16 @@ export async function PATCH(req) {
     .eq("id", body.id);
 
   if (error) {
-    console.error("ADMIN USER UPDATE ERROR:", {
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-    });
+    console.error(
+      "ADMIN USER UPDATE ERROR:",
+      error
+    );
 
     return NextResponse.json(
       {
         error: `Brukeren kunne ikke oppdateres: ${
-          error.message || "Ukjent databasefeil"
+          error.message ||
+          "Ukjent databasefeil"
         }`,
       },
       { status: 500 }
