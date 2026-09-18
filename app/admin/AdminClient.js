@@ -17,6 +17,7 @@ export default function AdminClient({ user }) {
   const [tab, setTab] = useState("overview");
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [users, setUsers] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(user?.id || "");
   const [error, setError] = useState("");
@@ -78,6 +79,26 @@ export default function AdminClient({ user }) {
       }
     } else {
       setProducts([]);
+    }
+
+    if (canManageProducts) {
+      const response = await fetch("/api/admin/categories");
+
+      if (response.status === 401) {
+        router.replace("/admin/login");
+        return;
+      }
+
+      if (response.ok) {
+        const data = await response.json();
+        setCategories(data.categories || []);
+      } else {
+        const data = await response.json().catch(() => ({}));
+        setError(data.error || "Kategoriene kunne ikke hentes.");
+        setCategories([]);
+      }
+    } else {
+      setCategories([]);
     }
 
     if (canManageUsers) {
@@ -161,6 +182,7 @@ export default function AdminClient({ user }) {
 
   if (canViewOrders) tabs.push(["orders", "Bestillinger"]);
   if (canManageProducts) tabs.push(["products", "Produkter"]);
+  if (canManageProducts) tabs.push(["categories", "Kategorier"]);
   if (canManageUsers) tabs.push(["users", "Brukere"]);
 
   return (
@@ -197,6 +219,8 @@ export default function AdminClient({ user }) {
             ? "Bestillinger"
             : tab === "products"
             ? "Produkter"
+            : tab === "categories"
+            ? "Kategorier"
             : "Brukere"}
         </h1>
 
@@ -224,19 +248,35 @@ export default function AdminClient({ user }) {
               )}
 
               {canManageProducts && (
-                <div className="stat">
-                  <span className="muted">
-                    Aktive produkter
-                  </span>
-                  <br />
-                  <b>
-                    {
-                      products.filter(
-                        (product) => product.active !== false
-                      ).length
-                    }
-                  </b>
-                </div>
+                <>
+                  <div className="stat">
+                    <span className="muted">
+                      Aktive produkter
+                    </span>
+                    <br />
+                    <b>
+                      {
+                        products.filter(
+                          (product) => product.active !== false
+                        ).length
+                      }
+                    </b>
+                  </div>
+
+                  <div className="stat">
+                    <span className="muted">
+                      Aktive kategorier
+                    </span>
+                    <br />
+                    <b>
+                      {
+                        categories.filter(
+                          (category) => category.active !== false
+                        ).length
+                      }
+                    </b>
+                  </div>
+                </>
               )}
 
               {canViewOrders && (
@@ -281,6 +321,16 @@ export default function AdminClient({ user }) {
 
         {tab === "products" && canManageProducts && (
           <Products
+            products={products}
+            categories={categories}
+            reload={load}
+            setError={setError}
+          />
+        )}
+
+        {tab === "categories" && canManageProducts && (
+          <Categories
+            categories={categories}
             products={products}
             reload={load}
             setError={setError}
@@ -377,7 +427,12 @@ function Orders({ orders, status, canUpdateOrders }) {
   );
 }
 
-function Products({ products, reload, setError }) {
+function Products({
+  products,
+  categories,
+  reload,
+  setError,
+}) {
   const [showNew, setShowNew] = useState(false);
 
   return (
@@ -394,6 +449,7 @@ function Products({ products, reload, setError }) {
       {showNew && (
         <ProductEditor
           product={null}
+          categories={categories}
           reload={reload}
           setError={setError}
           close={() => setShowNew(false)}
@@ -405,6 +461,7 @@ function Products({ products, reload, setError }) {
           <ProductEditor
             key={product.id}
             product={product}
+            categories={categories}
             reload={reload}
             setError={setError}
           />
@@ -416,6 +473,7 @@ function Products({ products, reload, setError }) {
 
 function ProductEditor({
   product,
+  categories,
   reload,
   setError,
   close,
@@ -424,8 +482,8 @@ function ProductEditor({
 
   const [editing, setEditing] = useState(isNew);
   const [name, setName] = useState(product?.name || "");
-  const [category, setCategory] = useState(
-    product?.category || "På bestilling"
+  const [categoryId, setCategoryId] = useState(
+    product?.categoryId || ""
   );
   const [description, setDescription] = useState(
     product?.description || ""
@@ -472,7 +530,7 @@ function ProductEditor({
     if (!product) return;
 
     setName(product.name || "");
-    setCategory(product.category || "På bestilling");
+    setCategoryId(product.categoryId || "");
     setDescription(product.description || "");
     setDimensions(product.dimensions || "");
 
@@ -840,6 +898,11 @@ function ProductEditor({
       return;
     }
 
+    if (!categoryId) {
+      setError("Velg en kategori.");
+      return;
+    }
+
     setSaving(true);
 
     const response = await fetch(
@@ -861,9 +924,7 @@ function ProductEditor({
 
           name: name.trim(),
 
-          category:
-            category.trim() ||
-            "På bestilling",
+          categoryId,
 
           description:
             description.trim(),
@@ -943,9 +1004,8 @@ function ProductEditor({
           name:
             product.name || "",
 
-          category:
-            product.category ||
-            "På bestilling",
+          categoryId:
+            product.categoryId,
 
           description:
             product.description || "",
@@ -1140,21 +1200,42 @@ function ProductEditor({
       <div className="field">
         <label>Kategori</label>
 
-        <input
-          value={category}
+        <select
+          required
+          value={categoryId}
           onChange={(e) =>
-            setCategory(
-              e.target.value
-            )
+            setCategoryId(e.target.value)
           }
-          placeholder="F.eks. Benker"
-        />
+        >
+          <option value="">
+            Velg kategori
+          </option>
 
-        <small className="muted">
-          Produkter med samme
-          kategorinavn blir samlet
-          sammen i nettbutikken.
-        </small>
+          {categories
+            .filter(
+              (item) =>
+                item.active !== false ||
+                item.id === categoryId
+            )
+            .map((item) => (
+              <option
+                key={item.id}
+                value={item.id}
+              >
+                {item.name}
+                {item.active === false
+                  ? " (skjult)"
+                  : ""}
+              </option>
+            ))}
+        </select>
+
+        {!categories.length && (
+          <small className="muted">
+            Du må opprette en kategori under
+            Kategorier først.
+          </small>
+        )}
       </div>
 
       <div className="field">
@@ -1228,8 +1309,7 @@ function ProductEditor({
           opp flere bilder samtidig.
         </p>
 
-        {imageUrls.length >
-          0 && (
+        {imageUrls.length > 0 && (
           <div
             style={{
               display: "grid",
@@ -1268,8 +1348,7 @@ function ProductEditor({
                     {index === 0
                       ? "Hovedbilde"
                       : `Bilde ${
-                          index +
-                          1
+                          index + 1
                         }`}
                   </small>
 
@@ -1688,6 +1767,685 @@ function ProductEditor({
             className="btn alt"
             onClick={() => {
               resetFromProduct();
+              setEditing(false);
+            }}
+          >
+            Avbryt
+          </button>
+        )}
+
+        {isNew && close && (
+          <button
+            type="button"
+            className="btn alt"
+            onClick={close}
+          >
+            Avbryt
+          </button>
+        )}
+      </div>
+    </form>
+  );
+}
+
+function Categories({
+  categories,
+  products,
+  reload,
+  setError,
+}) {
+  const [showNew, setShowNew] = useState(false);
+
+  return (
+    <>
+      <div style={{ marginBottom: 20 }}>
+        <button
+          className="btn"
+          onClick={() => setShowNew(!showNew)}
+        >
+          {showNew ? "Avbryt" : "Legg til kategori"}
+        </button>
+      </div>
+
+      {showNew && (
+        <CategoryEditor
+          category={null}
+          products={products}
+          reload={reload}
+          setError={setError}
+          close={() => setShowNew(false)}
+        />
+      )}
+
+      {!categories.length && !showNew && (
+        <div className="card">
+          <h3>Ingen kategorier</h3>
+          <p className="muted">
+            Opprett den første kategorien for å organisere
+            produktene.
+          </p>
+        </div>
+      )}
+
+      <div className="grid">
+        {categories.map((category) => (
+          <CategoryEditor
+            key={category.id}
+            category={category}
+            products={products}
+            reload={reload}
+            setError={setError}
+          />
+        ))}
+      </div>
+    </>
+  );
+}
+
+function CategoryEditor({
+  category,
+  products,
+  reload,
+  setError,
+  close,
+}) {
+  const isNew = !category;
+
+  const [editing, setEditing] = useState(isNew);
+  const [name, setName] = useState(category?.name || "");
+  const [description, setDescription] = useState(
+    category?.description || ""
+  );
+  const [imageUrl, setImageUrl] = useState(
+    category?.image_url || category?.imageUrl || ""
+  );
+  const [sortOrder, setSortOrder] = useState(
+    String(
+      category?.sort_order ??
+        category?.sortOrder ??
+        0
+    )
+  );
+  const [active, setActive] = useState(
+    category?.active !== false
+  );
+
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  function resetFromCategory() {
+    if (!category) return;
+
+    setName(category.name || "");
+    setDescription(category.description || "");
+
+    setImageUrl(
+      category.image_url ||
+        category.imageUrl ||
+        ""
+    );
+
+    setSortOrder(
+      String(
+        category.sort_order ??
+          category.sortOrder ??
+          0
+      )
+    );
+
+    setActive(category.active !== false);
+  }
+
+  useEffect(() => {
+    resetFromCategory();
+  }, [category]);
+
+  async function uploadImage(file) {
+    if (!file) return;
+
+    setUploading(true);
+    setError("");
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(
+      "/api/admin/upload",
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    const data = await response
+      .json()
+      .catch(() => ({}));
+
+    setUploading(false);
+
+    if (!response.ok) {
+      setError(
+        data.error ||
+          "Bildet kunne ikke lastes opp."
+      );
+      return;
+    }
+
+    if (data.url) {
+      setImageUrl(data.url);
+    }
+  }
+
+  async function save(e) {
+    e?.preventDefault();
+
+    setError("");
+
+    if (!name.trim()) {
+      setError(
+        "Kategorien må ha et navn."
+      );
+      return;
+    }
+
+    const orderNumber =
+      Number(sortOrder);
+
+    if (
+      !Number.isFinite(
+        orderNumber
+      )
+    ) {
+      setError(
+        "Rekkefølge må være et tall."
+      );
+      return;
+    }
+
+    setSaving(true);
+
+    const response = await fetch(
+      "/api/admin/categories",
+      {
+        method: isNew
+          ? "POST"
+          : "PATCH",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+
+        body: JSON.stringify({
+          ...(isNew
+            ? {}
+            : {
+                id: category.id,
+              }),
+
+          name:
+            name.trim(),
+
+          description:
+            description.trim(),
+
+          imageUrl:
+            imageUrl || null,
+
+          sortOrder:
+            Math.round(
+              orderNumber
+            ),
+
+          active,
+        }),
+      }
+    );
+
+    const data = await response
+      .json()
+      .catch(() => ({}));
+
+    setSaving(false);
+
+    if (!response.ok) {
+      setError(
+        data.error ||
+          "Kategorien kunne ikke lagres."
+      );
+      return;
+    }
+
+    if (isNew && close) {
+      close();
+    } else {
+      setEditing(false);
+    }
+
+    await reload();
+  }
+
+  async function toggleActive() {
+    if (!category) return;
+
+    setSaving(true);
+    setError("");
+
+    const response = await fetch(
+      "/api/admin/categories",
+      {
+        method: "PATCH",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+
+        body: JSON.stringify({
+          id:
+            category.id,
+
+          name:
+            category.name,
+
+          description:
+            category.description ||
+            "",
+
+          imageUrl:
+            category.image_url ||
+            category.imageUrl ||
+            null,
+
+          sortOrder:
+            category.sort_order ??
+            category.sortOrder ??
+            0,
+
+          active:
+            category.active ===
+            false,
+        }),
+      }
+    );
+
+    const data = await response
+      .json()
+      .catch(() => ({}));
+
+    setSaving(false);
+
+    if (!response.ok) {
+      setError(
+        data.error ||
+          "Kategorien kunne ikke lagres."
+      );
+      return;
+    }
+
+    await reload();
+  }
+
+  async function removeCategory() {
+    if (!category) return;
+
+    const usedBy =
+      products.filter(
+        (product) =>
+          product.categoryId ===
+          category.id
+      ).length;
+
+    if (usedBy > 0) {
+      setError(
+        `Kategorien kan ikke slettes fordi ${usedBy} produkt${
+          usedBy === 1 ? "" : "er"
+        } ligger i kategorien. Flytt produktene først.`
+      );
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        `Vil du slette kategorien "${category.name}"?`
+      );
+
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setError("");
+
+    const response = await fetch(
+      "/api/admin/categories",
+      {
+        method: "DELETE",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+
+        body: JSON.stringify({
+          id: category.id,
+        }),
+      }
+    );
+
+    const data = await response
+      .json()
+      .catch(() => ({}));
+
+    setDeleting(false);
+
+    if (!response.ok) {
+      setError(
+        data.error ||
+          "Kategorien kunne ikke slettes."
+      );
+      return;
+    }
+
+    await reload();
+  }
+
+  const usedBy = category
+    ? products.filter(
+        (product) =>
+          product.categoryId ===
+          category.id
+      ).length
+    : 0;
+
+  if (!editing && category) {
+    const previewImage =
+      category.image_url ||
+      category.imageUrl;
+
+    return (
+      <div className="card">
+        {previewImage && (
+          <img
+            src={previewImage}
+            alt={category.name}
+            style={{
+              width: "100%",
+              height: 220,
+              objectFit: "cover",
+              borderRadius: 12,
+              marginBottom: 16,
+            }}
+          />
+        )}
+
+        <div className="kicker">
+          {category.active === false
+            ? "Skjult kategori"
+            : "Aktiv kategori"}
+        </div>
+
+        <h3>
+          {category.name}
+        </h3>
+
+        {category.description && (
+          <p>
+            {category.description}
+          </p>
+        )}
+
+        <p className="muted">
+          Rekkefølge:{" "}
+          {category.sort_order ??
+            category.sortOrder ??
+            0}
+          {" · "}
+          {usedBy} produkt
+          {usedBy === 1
+            ? ""
+            : "er"}
+        </p>
+
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            flexWrap: "wrap",
+            marginTop: 18,
+          }}
+        >
+          <button
+            className="btn"
+            onClick={() =>
+              setEditing(true)
+            }
+          >
+            Rediger
+          </button>
+
+          <button
+            className="btn alt"
+            onClick={
+              toggleActive
+            }
+            disabled={saving}
+          >
+            {category.active ===
+            false
+              ? "Vis kategori"
+              : "Skjul kategori"}
+          </button>
+
+          <button
+            className="btn alt"
+            onClick={
+              removeCategory
+            }
+            disabled={
+              deleting ||
+              usedBy > 0
+            }
+            title={
+              usedBy > 0
+                ? "Flytt produktene til en annen kategori før kategorien slettes."
+                : ""
+            }
+          >
+            {deleting
+              ? "Sletter..."
+              : "Slett"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      className="card"
+      onSubmit={save}
+      style={
+        isNew
+          ? {
+              marginBottom: 20,
+            }
+          : undefined
+      }
+    >
+      <div className="kicker">
+        {isNew
+          ? "Ny kategori"
+          : "Rediger kategori"}
+      </div>
+
+      <h3>
+        {isNew
+          ? "Legg til kategori"
+          : category.name}
+      </h3>
+
+      <div className="field">
+        <label>
+          Kategorinavn
+        </label>
+
+        <input
+          required
+          value={name}
+          onChange={(e) =>
+            setName(
+              e.target.value
+            )
+          }
+          placeholder="F.eks. Benker"
+        />
+      </div>
+
+      <div className="field">
+        <label>
+          Beskrivelse
+        </label>
+
+        <textarea
+          value={description}
+          onChange={(e) =>
+            setDescription(
+              e.target.value
+            )
+          }
+          rows={4}
+          placeholder="Kort beskrivelse av kategorien"
+          style={{
+            width: "100%",
+            resize: "vertical",
+          }}
+        />
+      </div>
+
+      <div className="field">
+        <label>
+          Kategoribilde
+        </label>
+
+        {imageUrl && (
+          <div
+            style={{
+              marginBottom: 12,
+            }}
+          >
+            <img
+              src={imageUrl}
+              alt="Kategoribilde"
+              style={{
+                width: "100%",
+                maxWidth: 420,
+                height: 220,
+                objectFit: "cover",
+                borderRadius: 12,
+                display: "block",
+                marginBottom: 10,
+              }}
+            />
+
+            <button
+              type="button"
+              className="btn alt"
+              onClick={() =>
+                setImageUrl("")
+              }
+            >
+              Fjern bilde
+            </button>
+          </div>
+        )}
+
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          disabled={uploading}
+          onChange={(e) => {
+            uploadImage(
+              e.target.files?.[0]
+            );
+
+            e.target.value = "";
+          }}
+        />
+
+        {uploading && (
+          <p className="muted">
+            Laster opp bilde...
+          </p>
+        )}
+      </div>
+
+      <div className="field">
+        <label>
+          Rekkefølge
+        </label>
+
+        <input
+          type="number"
+          step="1"
+          value={sortOrder}
+          onChange={(e) =>
+            setSortOrder(
+              e.target.value
+            )
+          }
+        />
+
+        <small className="muted">
+          Laveste tall vises først.
+        </small>
+      </div>
+
+      <label
+        style={{
+          display: "block",
+          margin: "16px 0",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={active}
+          onChange={(e) =>
+            setActive(
+              e.target.checked
+            )
+          }
+        />{" "}
+        Vis kategori i
+        nettbutikken
+      </label>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          flexWrap: "wrap",
+        }}
+      >
+        <button
+          className="btn"
+          disabled={
+            saving ||
+            uploading
+          }
+        >
+          {saving
+            ? "Lagrer..."
+            : isNew
+            ? "Opprett kategori"
+            : "Lagre endringer"}
+        </button>
+
+        {!isNew && (
+          <button
+            type="button"
+            className="btn alt"
+            onClick={() => {
+              resetFromCategory();
               setEditing(false);
             }}
           >
