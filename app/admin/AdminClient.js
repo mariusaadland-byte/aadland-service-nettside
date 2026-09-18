@@ -13,47 +13,90 @@ const labels = {
   cancelled: "Avbrutt",
 };
 
-export default function AdminClient() {
+export default function AdminClient({ user }) {
   const [tab, setTab] = useState("overview");
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [users, setUsers] = useState([]);
-  const [currentUserId, setCurrentUserId] = useState("");
-  const [canManageUsers, setCanManageUsers] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(user?.id || "");
   const [error, setError] = useState("");
 
   const router = useRouter();
 
+  const canViewOrders =
+    user?.role === "owner" || Boolean(user?.canViewOrders);
+
+  const canUpdateOrders =
+    user?.role === "owner" || Boolean(user?.canUpdateOrders);
+
+  const canManageProducts =
+    user?.role === "owner" || Boolean(user?.canManageProducts);
+
+  const canManageUsers =
+    user?.role === "owner" || Boolean(user?.canManageUsers);
+
   async function load() {
     setError("");
 
-    const [a, b] = await Promise.all([
-      fetch("/api/admin/orders"),
-      fetch("/api/admin/products"),
-    ]);
+    if (canViewOrders) {
+      const orderResponse = await fetch("/api/admin/orders");
 
-    if (a.status === 401 || b.status === 401) {
-      router.replace("/admin/login");
-      return;
+      if (orderResponse.status === 401) {
+        router.replace("/admin/login");
+        return;
+      }
+
+      if (orderResponse.ok) {
+        const data = await orderResponse.json();
+        setOrders(data.orders || []);
+      } else {
+        const data = await orderResponse.json().catch(() => ({}));
+        setError(data.error || "Bestillingene kunne ikke hentes.");
+        setOrders([]);
+      }
+    } else {
+      setOrders([]);
     }
 
-    const x = await a.json();
-    const y = await b.json();
+    if (canManageProducts) {
+      const productResponse = await fetch("/api/admin/products");
 
-    setOrders(x.orders || []);
-    setProducts(y.products || []);
+      if (productResponse.status === 401) {
+        router.replace("/admin/login");
+        return;
+      }
 
-    const u = await fetch("/api/admin/users");
-
-    if (u.status === 200) {
-      const z = await u.json();
-      setUsers(z.users || []);
-      setCurrentUserId(z.currentUserId || "");
-      setCanManageUsers(true);
-    } else if (u.status === 401) {
-      router.replace("/admin/login");
+      if (productResponse.ok) {
+        const data = await productResponse.json();
+        setProducts(data.products || []);
+      } else {
+        const data = await productResponse.json().catch(() => ({}));
+        setError(data.error || "Produktene kunne ikke hentes.");
+        setProducts([]);
+      }
     } else {
-      setCanManageUsers(false);
+      setProducts([]);
+    }
+
+    if (canManageUsers) {
+      const userResponse = await fetch("/api/admin/users");
+
+      if (userResponse.status === 401) {
+        router.replace("/admin/login");
+        return;
+      }
+
+      if (userResponse.ok) {
+        const data = await userResponse.json();
+        setUsers(data.users || []);
+        setCurrentUserId(data.currentUserId || user?.id || "");
+      } else {
+        const data = await userResponse.json().catch(() => ({}));
+        setError(data.error || "Brukerne kunne ikke hentes.");
+        setUsers([]);
+      }
+    } else {
+      setUsers([]);
     }
   }
 
@@ -61,47 +104,95 @@ export default function AdminClient() {
     load();
   }, []);
 
-  async function status(id, status) {
-    await fetch("/api/admin/orders", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status }),
-    });
+  async function status(id, newStatus) {
+    if (!canUpdateOrders) {
+      setError("Du har ikke tilgang til å endre bestillinger.");
+      return;
+    }
 
-    load();
-  }
+    setError("");
 
-  async function toggle(p) {
-    await fetch("/api/admin/products", {
+    const response = await fetch("/api/admin/orders", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
-        ...p,
-        active: p.active === false,
+        id,
+        status: newStatus,
       }),
     });
 
-    load();
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setError(data.error || "Status kunne ikke lagres.");
+      return;
+    }
+
+    await load();
+  }
+
+  async function toggle(product) {
+    if (!canManageProducts) {
+      setError("Du har ikke tilgang til å administrere produkter.");
+      return;
+    }
+
+    setError("");
+
+    const response = await fetch("/api/admin/products", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...product,
+        active: product.active === false,
+      }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setError(data.error || "Produktet kunne ikke lagres.");
+      return;
+    }
+
+    await load();
   }
 
   async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch("/api/auth/logout", {
+      method: "POST",
+    });
+
     router.replace("/admin/login");
+    router.refresh();
   }
 
-  const fresh = orders.filter((o) => o.status === "new").length;
-
-  const working = orders.filter((o) =>
-    ["confirmed", "in_progress", "ready"].includes(o.status)
+  const fresh = orders.filter(
+    (order) => order.status === "new"
   ).length;
 
-  const total = orders.reduce((s, o) => s + (o.totalOre || 0), 0);
+  const working = orders.filter((order) =>
+    ["confirmed", "in_progress", "ready"].includes(order.status)
+  ).length;
 
-  const tabs = [
-    ["overview", "Oversikt"],
-    ["orders", "Bestillinger"],
-    ["products", "Produkter"],
-  ];
+  const total = orders.reduce(
+    (sum, order) => sum + (order.totalOre || 0),
+    0
+  );
+
+  const tabs = [["overview", "Oversikt"]];
+
+  if (canViewOrders) {
+    tabs.push(["orders", "Bestillinger"]);
+  }
+
+  if (canManageProducts) {
+    tabs.push(["products", "Produkter"]);
+  }
 
   if (canManageUsers) {
     tabs.push(["users", "Brukere"]);
@@ -130,7 +221,9 @@ export default function AdminClient() {
       </aside>
 
       <section className="adminmain">
-        <div className="kicker">Aadland Service / Back office</div>
+        <div className="kicker">
+          Aadland Service / Back office
+        </div>
 
         <h1>
           {tab === "overview"
@@ -147,41 +240,84 @@ export default function AdminClient() {
         {tab === "overview" && (
           <>
             <div className="stats">
-              <div className="stat">
-                <span className="muted">Nye ordre</span>
-                <br />
-                <b>{fresh}</b>
-              </div>
+              {canViewOrders && (
+                <>
+                  <div className="stat">
+                    <span className="muted">Nye ordre</span>
+                    <br />
+                    <b>{fresh}</b>
+                  </div>
 
-              <div className="stat">
-                <span className="muted">Under behandling</span>
-                <br />
-                <b>{working}</b>
-              </div>
+                  <div className="stat">
+                    <span className="muted">
+                      Under behandling
+                    </span>
+                    <br />
+                    <b>{working}</b>
+                  </div>
+                </>
+              )}
 
-              <div className="stat">
-                <span className="muted">Aktive produkter</span>
-                <br />
-                <b>{products.filter((p) => p.active !== false).length}</b>
-              </div>
+              {canManageProducts && (
+                <div className="stat">
+                  <span className="muted">
+                    Aktive produkter
+                  </span>
+                  <br />
+                  <b>
+                    {
+                      products.filter(
+                        (product) => product.active !== false
+                      ).length
+                    }
+                  </b>
+                </div>
+              )}
 
-              <div className="stat">
-                <span className="muted">Ordreverdi</span>
-                <br />
-                <b>{nok(total)}</b>
-              </div>
+              {canViewOrders && (
+                <div className="stat">
+                  <span className="muted">
+                    Ordreverdi
+                  </span>
+                  <br />
+                  <b>{nok(total)}</b>
+                </div>
+              )}
             </div>
 
-            <Orders orders={orders.slice(0, 5)} status={status} />
+            {canViewOrders && (
+              <Orders
+                orders={orders.slice(0, 5)}
+                status={status}
+                canUpdateOrders={canUpdateOrders}
+              />
+            )}
+
+            {!canViewOrders && (
+              <div className="card">
+                <h3>Velkommen</h3>
+                <p className="muted">
+                  Du er logget inn i Aadland Service backoffice.
+                  Menyen viser funksjonene du har fått tilgang til.
+                </p>
+              </div>
+            )}
           </>
         )}
 
-        {tab === "orders" && (
-          <Orders orders={orders} status={status} />
+        {tab === "orders" && canViewOrders && (
+          <Orders
+            orders={orders}
+            status={status}
+            canUpdateOrders={canUpdateOrders}
+          />
         )}
 
-        {tab === "products" && (
-          <Products products={products} toggle={toggle} />
+        {tab === "products" && canManageProducts && (
+          <Products
+            products={products}
+            toggle={toggle}
+          />
         )}
 
         {tab === "users" && canManageUsers && (
@@ -197,7 +333,11 @@ export default function AdminClient() {
   );
 }
 
-function Orders({ orders, status }) {
+function Orders({
+  orders,
+  status,
+  canUpdateOrders,
+}) {
   return (
     <table className="table">
       <thead>
@@ -212,45 +352,62 @@ function Orders({ orders, status }) {
       </thead>
 
       <tbody>
-        {orders.map((o) => (
-          <tr key={o.id}>
+        {orders.map((order) => (
+          <tr key={order.id}>
             <td>
-              <b>{o.orderNumber}</b>
+              <b>{order.orderNumber}</b>
               <br />
               <small>
-                {new Date(o.createdAt).toLocaleString("nb-NO")}
+                {new Date(
+                  order.createdAt
+                ).toLocaleString("nb-NO")}
               </small>
             </td>
 
             <td>
-              {o.customerName}
+              {order.customerName}
               <br />
-              <small>{o.customerEmail}</small>
+              <small>{order.customerEmail}</small>
             </td>
 
             <td>
-              {o.orderType === "custom" ? "Forespørsel" : "Produkt"}
+              {order.orderType === "custom"
+                ? "Forespørsel"
+                : "Produkt"}
             </td>
 
             <td>
-              {o.fulfillmentType === "delivery"
+              {order.fulfillmentType === "delivery"
                 ? "Levering"
                 : "Henting"}
             </td>
 
-            <td>{nok(o.totalOre || 0)}</td>
+            <td>{nok(order.totalOre || 0)}</td>
 
             <td>
-              <select
-                value={o.status}
-                onChange={(e) => status(o.id, e.target.value)}
-              >
-                {Object.entries(labels).map(([value, label]) => (
-                  <option value={value} key={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+              {canUpdateOrders ? (
+                <select
+                  value={order.status}
+                  onChange={(e) =>
+                    status(order.id, e.target.value)
+                  }
+                >
+                  {Object.entries(labels).map(
+                    ([value, label]) => (
+                      <option
+                        value={value}
+                        key={value}
+                      >
+                        {label}
+                      </option>
+                    )
+                  )}
+                </select>
+              ) : (
+                <span>
+                  {labels[order.status] || order.status}
+                </span>
+              )}
             </td>
           </tr>
         ))}
@@ -262,19 +419,24 @@ function Orders({ orders, status }) {
 function Products({ products, toggle }) {
   return (
     <div className="grid">
-      {products.map((p) => (
-        <div className="card" key={p.id}>
-          <div className="kicker">{p.category}</div>
-          <h3>{p.name}</h3>
-          <p>{p.description}</p>
-          <b>{nok(p.basePriceOre)}</b>
+      {products.map((product) => (
+        <div className="card" key={product.id}>
+          <div className="kicker">
+            {product.category}
+          </div>
+
+          <h3>{product.name}</h3>
+
+          <p>{product.description}</p>
+
+          <b>{nok(product.basePriceOre)}</b>
 
           <p>
             <button
               className="btn alt"
-              onClick={() => toggle(p)}
+              onClick={() => toggle(product)}
             >
-              {p.active === false
+              {product.active === false
                 ? "Vis produkt"
                 : "Skjul produkt"}
             </button>
@@ -300,7 +462,9 @@ function Users({
           className="btn"
           onClick={() => setShowNew(!showNew)}
         >
-          {showNew ? "Avbryt" : "Legg til bruker"}
+          {showNew
+            ? "Avbryt"
+            : "Legg til bruker"}
         </button>
       </div>
 
@@ -313,10 +477,10 @@ function Users({
       )}
 
       <div className="grid">
-        {users.map((user) => (
+        {users.map((adminUser) => (
           <UserCard
-            key={user.id}
-            user={user}
+            key={adminUser.id}
+            user={adminUser}
             currentUserId={currentUserId}
             reload={reload}
             setError={setError}
@@ -327,7 +491,11 @@ function Users({
   );
 }
 
-function NewUser({ reload, setError, close }) {
+function NewUser({
+  reload,
+  setError,
+  close,
+}) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -347,25 +515,33 @@ function NewUser({ reload, setError, close }) {
     setSaving(true);
     setError("");
 
-    const r = await fetch("/api/admin/users", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name,
-        email,
-        password,
-        ...permissions,
-      }),
-    });
+    const response = await fetch(
+      "/api/admin/users",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          ...permissions,
+        }),
+      }
+    );
 
-    const data = await r.json();
+    const data = await response
+      .json()
+      .catch(() => ({}));
 
     setSaving(false);
 
-    if (!r.ok) {
-      setError(data.error || "Brukeren kunne ikke opprettes.");
+    if (!response.ok) {
+      setError(
+        data.error ||
+          "Brukeren kunne ikke opprettes."
+      );
       return;
     }
 
@@ -389,7 +565,9 @@ function NewUser({ reload, setError, close }) {
           autoComplete="off"
           required
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) =>
+            setName(e.target.value)
+          }
         />
       </div>
 
@@ -401,7 +579,9 @@ function NewUser({ reload, setError, close }) {
           autoComplete="off"
           required
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) =>
+            setEmail(e.target.value)
+          }
         />
       </div>
 
@@ -414,7 +594,9 @@ function NewUser({ reload, setError, close }) {
           required
           minLength={8}
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) =>
+            setPassword(e.target.value)
+          }
         />
       </div>
 
@@ -423,8 +605,13 @@ function NewUser({ reload, setError, close }) {
         setValues={setPermissions}
       />
 
-      <button className="btn" disabled={saving}>
-        {saving ? "Oppretter..." : "Opprett bruker"}
+      <button
+        className="btn"
+        disabled={saving}
+      >
+        {saving
+          ? "Oppretter..."
+          : "Opprett bruker"}
       </button>
     </form>
   );
@@ -440,10 +627,18 @@ function UserCard({
 
   const [values, setValues] = useState({
     name: user.name || "",
-    canViewOrders: Boolean(user.can_view_orders),
-    canUpdateOrders: Boolean(user.can_update_orders),
-    canManageProducts: Boolean(user.can_manage_products),
-    canManageUsers: Boolean(user.can_manage_users),
+    canViewOrders: Boolean(
+      user.can_view_orders
+    ),
+    canUpdateOrders: Boolean(
+      user.can_update_orders
+    ),
+    canManageProducts: Boolean(
+      user.can_manage_products
+    ),
+    canManageUsers: Boolean(
+      user.can_manage_users
+    ),
     active: user.active !== false,
   });
 
@@ -453,23 +648,31 @@ function UserCard({
     setSaving(true);
     setError("");
 
-    const r = await fetch("/api/admin/users", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        id: user.id,
-        ...values,
-      }),
-    });
+    const response = await fetch(
+      "/api/admin/users",
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: user.id,
+          ...values,
+        }),
+      }
+    );
 
-    const data = await r.json();
+    const data = await response
+      .json()
+      .catch(() => ({}));
 
     setSaving(false);
 
-    if (!r.ok) {
-      setError(data.error || "Brukeren kunne ikke oppdateres.");
+    if (!response.ok) {
+      setError(
+        data.error ||
+          "Brukeren kunne ikke oppdateres."
+      );
       return;
     }
 
@@ -483,7 +686,10 @@ function UserCard({
       </div>
 
       <h3>{user.name}</h3>
-      <p className="muted">{user.email}</p>
+
+      <p className="muted">
+        {user.email}
+      </p>
 
       <div className="field">
         <label>Navn</label>
@@ -505,7 +711,12 @@ function UserCard({
       />
 
       {!owner && (
-        <label style={{ display: "block", marginBottom: 14 }}>
+        <label
+          style={{
+            display: "block",
+            marginBottom: 14,
+          }}
+        >
           <input
             type="checkbox"
             checked={values.active}
@@ -515,7 +726,9 @@ function UserCard({
                 active: e.target.checked,
               })
             }
-            disabled={user.id === currentUserId}
+            disabled={
+              user.id === currentUserId
+            }
           />{" "}
           Aktiv bruker
         </label>
@@ -526,7 +739,9 @@ function UserCard({
         onClick={save}
         disabled={saving}
       >
-        {saving ? "Lagrer..." : "Lagre endringer"}
+        {saving
+          ? "Lagrer..."
+          : "Lagre endringer"}
       </button>
     </div>
   );
@@ -538,10 +753,22 @@ function PermissionChecks({
   disabled = false,
 }) {
   const permissions = [
-    ["canViewOrders", "Se bestillinger"],
-    ["canUpdateOrders", "Endre bestillinger"],
-    ["canManageProducts", "Administrere produkter"],
-    ["canManageUsers", "Administrere brukere"],
+    [
+      "canViewOrders",
+      "Se bestillinger",
+    ],
+    [
+      "canUpdateOrders",
+      "Endre bestillinger",
+    ],
+    [
+      "canManageProducts",
+      "Administrere produkter",
+    ],
+    [
+      "canManageUsers",
+      "Administrere brukere",
+    ],
   ];
 
   return (
