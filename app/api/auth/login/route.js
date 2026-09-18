@@ -24,10 +24,11 @@ export async function POST(req) {
       }
     );
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data, error } =
+      await supabase.auth.signInWithPassword({
+        email: String(email).trim().toLowerCase(),
+        password,
+      });
 
     if (error || !data.user) {
       return NextResponse.json(
@@ -36,7 +37,10 @@ export async function POST(req) {
       );
     }
 
-    const { data: adminUser, error: adminError } = await supabase
+    const {
+      data: adminUser,
+      error: adminError,
+    } = await supabase
       .from("admin_users")
       .select(
         "id,email,name,role,can_view_orders,can_update_orders,can_manage_products,can_manage_users,active"
@@ -44,15 +48,16 @@ export async function POST(req) {
       .eq("id", data.user.id)
       .single();
 
-    console.error("ADMIN LOOKUP:", {
-      userId: data.user.id,
-      adminError,
-      adminUser,
-    });
-
-    if (adminError || !adminUser || !adminUser.active) {
+    if (
+      adminError ||
+      !adminUser ||
+      !adminUser.active
+    ) {
       return NextResponse.json(
-        { error: "Du har ikke tilgang til backoffice." },
+        {
+          error:
+            "Du har ikke tilgang til backoffice.",
+        },
         { status: 403 }
       );
     }
@@ -63,9 +68,7 @@ export async function POST(req) {
       ok: true,
       user: adminUser,
     });
-  } catch (error) {
-    console.error("LOGIN ERROR:", error);
-
+  } catch {
     return NextResponse.json(
       { error: "Kunne ikke logge inn." },
       { status: 500 }
