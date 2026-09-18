@@ -1,16 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-
-import {
-  fallbackProducts,
-  nok,
-  productPrice,
-} from "../lib/catalog";
+import { useState } from "react";
 
 const emptyCustomer = {
   name: "",
@@ -24,17 +14,11 @@ const emptyCustomer = {
 };
 
 export default function Home() {
-  const [products, setProducts] =
-    useState(fallbackProducts);
-
-  const [cart, setCart] = useState([]);
-  const [open, setOpen] = useState(false);
-
   const [customer, setCustomer] =
     useState(emptyCustomer);
 
-  const [fulfillment, setFulfillment] =
-    useState("pickup");
+  const [custom, setCustom] =
+    useState("");
 
   const [message, setMessage] =
     useState(null);
@@ -42,159 +26,68 @@ export default function Home() {
   const [error, setError] =
     useState("");
 
-  const [custom, setCustom] =
-    useState("");
-
-  useEffect(() => {
-    fetch("/api/products")
-      .then((r) =>
-        r.ok ? r.json() : null
-      )
-      .then((d) => {
-        if (d?.products?.length) {
-          setProducts(d.products);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  const total = cart.reduce(
-    (sum, item) =>
-      sum +
-      item.unitPriceOre *
-        item.quantity,
-    0
-  );
-
-  function add(product, selected) {
-    const price = productPrice(
-      product,
-      selected
-    );
-
-    const key =
-      product.id +
-      JSON.stringify(selected);
-
-    setCart((current) => {
-      const found = current.find(
-        (item) => item.key === key
-      );
-
-      if (found) {
-        return current.map((item) =>
-          item.key === key
-            ? {
-                ...item,
-                quantity:
-                  item.quantity + 1,
-              }
-            : item
-        );
-      }
-
-      return [
-        ...current,
-        {
-          key,
-          productId: product.id,
-          name: product.name,
-          selectedOptions: selected,
-          unitPriceOre: price,
-          quantity: 1,
-        },
-      ];
-    });
-
-    setOpen(true);
-  }
-
-  async function order(e) {
-    e.preventDefault();
-    setError("");
-
-    const response = await fetch(
-      "/api/orders",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-        body: JSON.stringify({
-          orderType: "order",
-          customer,
-          fulfillmentType:
-            fulfillment,
-          deliveryWithinRadius:
-            customer.deliveryWithinRadius,
-          items: cart.map(
-            ({
-              productId,
-              quantity,
-              selectedOptions,
-            }) => ({
-              productId,
-              quantity,
-              selectedOptions,
-            })
-          ),
-        }),
-      }
-    );
-
-    const data =
-      await response.json();
-
-    if (!response.ok) {
-      setError(
-        data.error ||
-          "Noe gikk galt."
-      );
-      return;
-    }
-
-    setMessage(data);
-    setCart([]);
-  }
+  const [sending, setSending] =
+    useState(false);
 
   async function customOrder(e) {
     e.preventDefault();
+
     setError("");
+    setMessage(null);
+    setSending(true);
 
-    const response = await fetch(
-      "/api/orders",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-        body: JSON.stringify({
-          orderType: "custom",
-          customRequest: custom,
-          customer,
-          fulfillmentType:
-            fulfillment,
-          deliveryWithinRadius:
-            customer.deliveryWithinRadius,
-        }),
-      }
-    );
+    try {
+      const response = await fetch(
+        "/api/orders",
+        {
+          method: "POST",
 
-    const data =
-      await response.json();
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
 
-    if (!response.ok) {
-      setError(
-        data.error ||
-          "Noe gikk galt."
+          body: JSON.stringify({
+            orderType: "custom",
+
+            customRequest:
+              custom,
+
+            customer,
+
+            fulfillmentType:
+              "pickup",
+
+            deliveryWithinRadius:
+              customer.deliveryWithinRadius,
+          }),
+        }
       );
-      return;
-    }
 
-    setMessage(data);
-    setCustom("");
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        setError(
+          data.error ||
+            "Noe gikk galt."
+        );
+
+        return;
+      }
+
+      setMessage(data);
+      setCustom("");
+      setCustomer(
+        emptyCustomer
+      );
+    } catch {
+      setError(
+        "Noe gikk galt. Prøv igjen."
+      );
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -203,7 +96,7 @@ export default function Home() {
         <div className="wrap nav">
           <a
             className="brand"
-            href="#"
+            href="/"
           >
             <span className="mark">
               AS
@@ -217,7 +110,7 @@ export default function Home() {
           </a>
 
           <nav className="links">
-            <a href="#produkter">
+            <a href="/produkter">
               Produkter
             </a>
 
@@ -233,21 +126,12 @@ export default function Home() {
               Kontakt
             </a>
 
-            <button
+            <a
               className="btn"
-              onClick={() =>
-                setOpen(true)
-              }
+              href="/produkter"
             >
-              Handlekurv (
-              {cart.reduce(
-                (sum, item) =>
-                  sum +
-                  item.quantity,
-                0
-              )}
-              )
-            </button>
+              Se produkter
+            </a>
           </nav>
         </div>
       </header>
@@ -279,11 +163,12 @@ export default function Home() {
               display: "flex",
               gap: 12,
               marginTop: 28,
+              flexWrap: "wrap",
             }}
           >
             <a
               className="btn"
-              href="#produkter"
+              href="/produkter"
             >
               Se produkter
             </a>
@@ -307,15 +192,31 @@ export default function Home() {
           </strong>
 
           <p>
-            Henting eller levering
-            innen 15 km.
+            Velg blant produktene
+            våre eller få laget noe
+            etter egne mål og ønsker.
           </p>
+
+          <a
+            className="btn"
+            href="/produkter"
+            style={{
+              marginTop: 14,
+              display:
+                "inline-block",
+            }}
+          >
+            Utforsk produkter
+          </a>
         </div>
       </section>
 
       <section
-        id="produkter"
         className="section"
+        style={{
+          background:
+            "#f4f0e8",
+        }}
       >
         <div className="wrap">
           <div className="kicker">
@@ -323,28 +224,95 @@ export default function Home() {
           </div>
 
           <h2>
-            Velg, tilpass og bestill.
+            Finn riktig løsning.
           </h2>
 
-          <p className="muted">
-            Alle priser vises inkl.
-            mva.
+          <p
+            className="muted"
+            style={{
+              maxWidth: 680,
+            }}
+          >
+            Produktene våre er
+            samlet i kategorier slik
+            at du enkelt kan finne
+            det du ser etter. Velg
+            produkt, størrelse,
+            utførelse og andre
+            tilgjengelige varianter
+            på produktsiden.
           </p>
 
-          <div className="grid">
-            {products
-              .filter(
-                (product) =>
-                  product.active !==
-                  false
-              )
-              .map((product) => (
-                <Product
-                  key={product.id}
-                  p={product}
-                  add={add}
-                />
-              ))}
+          <div
+            className="grid"
+            style={{
+              marginTop: 30,
+            }}
+          >
+            <div className="card">
+              <div className="kicker">
+                01
+              </div>
+
+              <h3>
+                Velg kategori
+              </h3>
+
+              <p className="muted">
+                Finn for eksempel
+                benker,
+                plantekasser, bord
+                eller andre
+                produkter.
+              </p>
+            </div>
+
+            <div className="card">
+              <div className="kicker">
+                02
+              </div>
+
+              <h3>
+                Velg produkt
+              </h3>
+
+              <p className="muted">
+                Sammenlign ulike
+                modeller og
+                systemer innenfor
+                samme kategori.
+              </p>
+            </div>
+
+            <div className="card">
+              <div className="kicker">
+                03
+              </div>
+
+              <h3>
+                Tilpass
+              </h3>
+
+              <p className="muted">
+                Velg tilgjengelige
+                mål, overflate og
+                andre varianter før
+                bestilling.
+              </p>
+            </div>
+          </div>
+
+          <div
+            style={{
+              marginTop: 28,
+            }}
+          >
+            <a
+              className="btn"
+              href="/produkter"
+            >
+              Se alle produkter
+            </a>
           </div>
         </div>
       </section>
@@ -353,7 +321,8 @@ export default function Home() {
         id="slik"
         className="section"
         style={{
-          background: "#eee8dd",
+          background:
+            "#eee8dd",
         }}
       >
         <div className="wrap">
@@ -368,24 +337,50 @@ export default function Home() {
 
           <div className="grid">
             {[
-              "Velg eller beskriv",
-              "Vi bekrefter bestillingen",
-              "Hent eller få levert",
-            ].map((text, i) => (
+              {
+                number: "01",
+
+                title:
+                  "Velg eller beskriv",
+
+                text:
+                  "Velg et produkt fra nettbutikken og tilpass tilgjengelige varianter, eller send oss en egen forespørsel.",
+              },
+
+              {
+                number: "02",
+
+                title:
+                  "Vi bekrefter bestillingen",
+
+                text:
+                  "Vi går gjennom bestillingen og tar kontakt dersom noe må avklares før vi starter.",
+              },
+
+              {
+                number: "03",
+
+                title:
+                  "Hent eller få levert",
+
+                text:
+                  "Store produkter hentes etter avtale eller leveres innenfor avtalt område.",
+              },
+            ].map((item) => (
               <div
                 className="card"
-                key={text}
+                key={item.number}
               >
-                <b>0{i + 1}</b>
+                <b>
+                  {item.number}
+                </b>
 
-                <h3>{text}</h3>
+                <h3>
+                  {item.title}
+                </h3>
 
                 <p className="muted">
-                  {i === 0
-                    ? "Velg et produkt og tilpass størrelse og overflate, eller send en egen forespørsel."
-                    : i === 1
-                    ? "Vi går gjennom bestillingen og tar kontakt dersom noe må avklares."
-                    : "Store produkter hentes etter avtale eller leveres innenfor avtalt område."}
+                  {item.text}
                 </p>
               </div>
             ))}
@@ -407,16 +402,64 @@ export default function Home() {
             tankene?
           </h2>
 
+          <p
+            className="muted"
+            style={{
+              maxWidth: 680,
+              marginBottom: 28,
+            }}
+          >
+            Finner du ikke det du
+            trenger blant
+            produktene våre? Send
+            oss en beskrivelse av
+            det du ønsker, så tar
+            vi kontakt.
+          </p>
+
+          {message && (
+            <div
+              className="success"
+              style={{
+                maxWidth: 720,
+                marginBottom: 20,
+              }}
+            >
+              <b>
+                Forespørselen er
+                mottatt
+              </b>
+
+              {message.orderNumber && (
+                <p>
+                  Ordrenummer:{" "}
+                  {
+                    message.orderNumber
+                  }
+                </p>
+              )}
+
+              {message.message && (
+                <p>
+                  {message.message}
+                </p>
+              )}
+            </div>
+          )}
+
           <form
             className="card"
-            onSubmit={customOrder}
+            onSubmit={
+              customOrder
+            }
             style={{
               maxWidth: 720,
             }}
           >
             <div className="field">
               <label>
-                Beskriv hva du ønsker
+                Beskriv hva du
+                ønsker
               </label>
 
               <textarea
@@ -439,8 +482,19 @@ export default function Home() {
               }
             />
 
-            <button className="btn">
-              Send forespørsel
+            {error && (
+              <p className="notice">
+                {error}
+              </p>
+            )}
+
+            <button
+              className="btn"
+              disabled={sending}
+            >
+              {sending
+                ? "Sender..."
+                : "Send forespørsel"}
             </button>
           </form>
         </div>
@@ -450,7 +504,8 @@ export default function Home() {
         id="om"
         className="section"
         style={{
-          background: "#181613",
+          background:
+            "#181613",
           color: "white",
         }}
       >
@@ -461,6 +516,7 @@ export default function Home() {
 
           <h2>
             Praktiske løsninger.
+            <br />
             Solid utført.
           </h2>
 
@@ -472,8 +528,9 @@ export default function Home() {
             }}
           >
             Bygg, renovering,
-            vedlikehold og produkter
-            på bestilling i Bergen og
+            vedlikehold og
+            produkter på
+            bestilling i Bergen og
             omegn.
           </p>
         </div>
@@ -485,7 +542,9 @@ export default function Home() {
       >
         <div className="wrap row">
           <div>
-            <b>Aadland Service</b>
+            <b>
+              Aadland Service
+            </b>
 
             <p>
               Bygg • Renovering •
@@ -498,341 +557,19 @@ export default function Home() {
             <p>
               post@aadland-service.no
             </p>
-            <p>471 54 898</p>
+
             <p>
-              Org.nr. 937 781 873 MVA
+              471 54 898
+            </p>
+
+            <p>
+              Org.nr. 937 781 873
+              MVA
             </p>
           </div>
         </div>
       </footer>
-
-      {cart.length > 0 && (
-        <button
-          className="cart"
-          onClick={() =>
-            setOpen(true)
-          }
-        >
-          Handlekurv · {nok(total)}
-        </button>
-      )}
-
-      {open && (
-        <div
-          className="drawer"
-          onMouseDown={(e) =>
-            e.target ===
-              e.currentTarget &&
-            setOpen(false)
-          }
-        >
-          <div className="drawerPanel">
-            <div className="row">
-              <h2>Handlekurv</h2>
-
-              <button
-                className="btn alt"
-                onClick={() =>
-                  setOpen(false)
-                }
-              >
-                Lukk
-              </button>
-            </div>
-
-            {message && (
-              <div className="success">
-                <b>
-                  Bestilling mottatt
-                </b>
-
-                <p>
-                  Ordrenummer:{" "}
-                  {
-                    message.orderNumber
-                  }
-                </p>
-
-                <p>
-                  {message.message}
-                </p>
-              </div>
-            )}
-
-            {cart.map((item) => (
-              <div
-                className="card"
-                key={item.key}
-                style={{
-                  marginBottom: 10,
-                }}
-              >
-                <div className="row">
-                  <div>
-                    <b>{item.name}</b>
-
-                    <div className="muted">
-                      {Object.values(
-                        item.selectedOptions
-                      ).join(" · ")}
-                    </div>
-                  </div>
-
-                  <b>
-                    {nok(
-                      item.unitPriceOre *
-                        item.quantity
-                    )}
-                  </b>
-                </div>
-
-                <div
-                  className="row"
-                  style={{
-                    marginTop: 12,
-                  }}
-                >
-                  <span>
-                    Antall:{" "}
-                    {item.quantity}
-                  </span>
-
-                  <div>
-                    <button
-                      className="btn alt"
-                      onClick={() =>
-                        setCart(
-                          (current) =>
-                            current
-                              .map(
-                                (
-                                  x
-                                ) =>
-                                  x.key ===
-                                  item.key
-                                    ? {
-                                        ...x,
-                                        quantity:
-                                          x.quantity -
-                                          1,
-                                      }
-                                    : x
-                              )
-                              .filter(
-                                (
-                                  x
-                                ) =>
-                                  x.quantity >
-                                  0
-                              )
-                        )
-                      }
-                    >
-                      −
-                    </button>{" "}
-
-                    <button
-                      className="btn alt"
-                      onClick={() =>
-                        setCart(
-                          (current) =>
-                            current.map(
-                              (x) =>
-                                x.key ===
-                                item.key
-                                  ? {
-                                      ...x,
-                                      quantity:
-                                        x.quantity +
-                                        1,
-                                    }
-                                  : x
-                            )
-                        )
-                      }
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            <div className="row">
-              <b>Totalt</b>
-              <b>{nok(total)}</b>
-            </div>
-
-            <div className="line" />
-
-            <form onSubmit={order}>
-              <CustomerFields
-                customer={customer}
-                setCustomer={
-                  setCustomer
-                }
-              />
-
-              <div className="field">
-                <label>
-                  Henting eller
-                  levering
-                </label>
-
-                <select
-                  value={fulfillment}
-                  onChange={(e) =>
-                    setFulfillment(
-                      e.target.value
-                    )
-                  }
-                >
-                  <option value="pickup">
-                    Henting
-                  </option>
-
-                  <option value="delivery">
-                    Levering innen 15
-                    km
-                  </option>
-                </select>
-              </div>
-
-              {error && (
-                <p className="notice">
-                  {error}
-                </p>
-              )}
-
-              <button
-                className="btn"
-                disabled={!cart.length}
-              >
-                Send bestilling
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
     </main>
-  );
-}
-
-function Product({
-  p,
-  add,
-}) {
-  const initial =
-    Object.fromEntries(
-      (p.options || []).map(
-        (option) => [
-          option.id,
-          option.choices?.[0]
-            ?.value || "",
-        ]
-      )
-    );
-
-  const [sel, setSel] =
-    useState(initial);
-
-  const price = useMemo(
-    () => productPrice(p, sel),
-    [p, sel]
-  );
-
-  return (
-    <article className="card">
-      {p.imageUrl && (
-        <img
-          src={p.imageUrl}
-          alt={p.name}
-          style={{
-            width: "100%",
-            height: 260,
-            objectFit: "cover",
-            borderRadius: 14,
-            marginBottom: 18,
-            display: "block",
-          }}
-        />
-      )}
-
-      <div className="kicker">
-        {p.eyebrow ||
-          p.category ||
-          "På bestilling"}
-      </div>
-
-      <h3>{p.name}</h3>
-
-      <p className="muted">
-        {p.description}
-      </p>
-
-      <div className="options">
-        {(p.options || []).map(
-          (option) => (
-            <div
-              className="field"
-              key={option.id}
-            >
-              <label>
-                {option.label}
-              </label>
-
-              <select
-                value={
-                  sel[option.id]
-                }
-                onChange={(e) =>
-                  setSel((current) => ({
-                    ...current,
-                    [option.id]:
-                      e.target.value,
-                  }))
-                }
-              >
-                {option.choices.map(
-                  (choice) => (
-                    <option
-                      key={
-                        choice.value
-                      }
-                      value={
-                        choice.value
-                      }
-                    >
-                      {choice.label}
-                      {choice.extraOre
-                        ? ` (+${nok(
-                            choice.extraOre
-                          )})`
-                        : ""}
-                    </option>
-                  )
-                )}
-              </select>
-            </div>
-          )
-        )}
-      </div>
-
-      <div className="row">
-        <div className="price">
-          {nok(price)}
-        </div>
-
-        <button
-          className="btn"
-          onClick={() =>
-            add(p, sel)
-          }
-        >
-          Legg i kurv
-        </button>
-      </div>
-    </article>
   );
 }
 
