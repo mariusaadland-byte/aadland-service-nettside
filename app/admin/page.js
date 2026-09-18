@@ -1,13 +1,13 @@
 import { redirect } from "next/navigation";
-import { isAdmin } from "../../lib/auth";
+import { getAdminUser } from "../../lib/auth";
 import AdminClient from "./AdminClient";
 
 export default async function AdminPage() {
-  const admin = await isAdmin();
+  const admin = await getAdminUser();
 
   if (!admin) {
     redirect("/admin/login");
   }
 
-  return <AdminClient />;
+  return <AdminClient user={admin} />;
 }
