@@ -20,11 +20,7 @@ async function requireProductAccess() {
     };
   }
 
-  if (
-    !(await hasPermission(
-      "canManageProducts"
-    ))
-  ) {
+  if (!(await hasPermission("canManageProducts"))) {
     return {
       error: NextResponse.json(
         {
@@ -45,29 +41,22 @@ function cleanText(value) {
 
 function validPrice(value) {
   const number = Number(value);
+  return Number.isFinite(number) && number >= 0;
+}
 
-  return (
-    Number.isFinite(number) &&
-    number >= 0
-  );
+function cleanArray(value) {
+  return Array.isArray(value) ? value : [];
 }
 
 export async function GET() {
-  const access =
-    await requireProductAccess();
-
-  if (access.error) {
-    return access.error;
-  }
+  const access = await requireProductAccess();
+  if (access.error) return access.error;
 
   const s = db();
 
   if (!s) {
     return NextResponse.json(
-      {
-        error:
-          "Databasen er ikke tilgjengelig.",
-      },
+      { error: "Databasen er ikke tilgjengelig." },
       { status: 500 }
     );
   }
@@ -75,39 +64,25 @@ export async function GET() {
   const { data, error } = await s
     .from("products")
     .select("*")
-    .order("created_at", {
-      ascending: true,
-    });
+    .order("created_at", { ascending: true });
 
   if (error) {
-    console.error(
-      "ADMIN PRODUCTS GET ERROR:",
-      error
-    );
+    console.error("ADMIN PRODUCTS GET ERROR:", error);
 
     return NextResponse.json(
-      {
-        error:
-          "Produktene kunne ikke hentes.",
-      },
+      { error: "Produktene kunne ikke hentes." },
       { status: 500 }
     );
   }
 
   return NextResponse.json({
-    products: (data || []).map(
-      fromDbProduct
-    ),
+    products: (data || []).map(fromDbProduct),
   });
 }
 
 export async function PATCH(req) {
-  const access =
-    await requireProductAccess();
-
-  if (access.error) {
-    return access.error;
-  }
+  const access = await requireProductAccess();
+  if (access.error) return access.error;
 
   const p = await req.json();
 
@@ -120,31 +95,35 @@ export async function PATCH(req) {
 
   const name = cleanText(p.name);
   const category =
-    cleanText(p.category) ||
-    "På bestilling";
+    cleanText(p.category) || "På bestilling";
+  const description = cleanText(p.description);
+  const dimensions = cleanText(p.dimensions);
 
-  const description =
-    cleanText(p.description);
+  const imageUrls = cleanArray(p.imageUrls)
+    .map(cleanText)
+    .filter(Boolean);
 
   const imageUrl =
-    cleanText(p.imageUrl) || null;
+    imageUrls[0] ||
+    cleanText(p.imageUrl) ||
+    null;
+
+  const specifications = cleanArray(
+    p.specifications
+  );
+
+  const options = cleanArray(p.options);
 
   if (!name) {
     return NextResponse.json(
-      {
-        error:
-          "Produktet må ha et navn.",
-      },
+      { error: "Produktet må ha et navn." },
       { status: 400 }
     );
   }
 
   if (!validPrice(p.basePriceOre)) {
     return NextResponse.json(
-      {
-        error:
-          "Produktet må ha en gyldig pris.",
-      },
+      { error: "Produktet må ha en gyldig pris." },
       { status: 400 }
     );
   }
@@ -153,10 +132,7 @@ export async function PATCH(req) {
 
   if (!s) {
     return NextResponse.json(
-      {
-        error:
-          "Databasen er ikke tilgjengelig.",
-      },
+      { error: "Databasen er ikke tilgjengelig." },
       { status: 500 }
     );
   }
@@ -167,10 +143,14 @@ export async function PATCH(req) {
       name,
       category,
       description,
+      dimensions,
       base_price_ore: Math.round(
         Number(p.basePriceOre)
       ),
       image_url: imageUrl,
+      image_urls: imageUrls,
+      specifications,
+      options,
       active: p.active !== false,
     })
     .eq("id", p.id)
@@ -184,10 +164,7 @@ export async function PATCH(req) {
     );
 
     return NextResponse.json(
-      {
-        error:
-          "Produktet kunne ikke lagres.",
-      },
+      { error: "Produktet kunne ikke lagres." },
       { status: 500 }
     );
   }
@@ -199,43 +176,42 @@ export async function PATCH(req) {
 }
 
 export async function POST(req) {
-  const access =
-    await requireProductAccess();
-
-  if (access.error) {
-    return access.error;
-  }
+  const access = await requireProductAccess();
+  if (access.error) return access.error;
 
   const p = await req.json();
 
   const name = cleanText(p.name);
-
   const category =
-    cleanText(p.category) ||
-    "På bestilling";
+    cleanText(p.category) || "På bestilling";
+  const description = cleanText(p.description);
+  const dimensions = cleanText(p.dimensions);
 
-  const description =
-    cleanText(p.description);
+  const imageUrls = cleanArray(p.imageUrls)
+    .map(cleanText)
+    .filter(Boolean);
 
   const imageUrl =
-    cleanText(p.imageUrl) || null;
+    imageUrls[0] ||
+    cleanText(p.imageUrl) ||
+    null;
+
+  const specifications = cleanArray(
+    p.specifications
+  );
+
+  const options = cleanArray(p.options);
 
   if (!name) {
     return NextResponse.json(
-      {
-        error:
-          "Produktnavn mangler.",
-      },
+      { error: "Produktnavn mangler." },
       { status: 400 }
     );
   }
 
   if (!validPrice(p.basePriceOre)) {
     return NextResponse.json(
-      {
-        error:
-          "Produktet må ha en gyldig pris.",
-      },
+      { error: "Produktet må ha en gyldig pris." },
       { status: 400 }
     );
   }
@@ -244,25 +220,18 @@ export async function POST(req) {
     name
       .toLowerCase()
       .normalize("NFD")
-      .replace(
-        /[\u0300-\u036f]/g,
-        ""
-      )
+      .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "") ||
     "produkt";
 
-  const id =
-    `${slugBase}-${Date.now()}`;
+  const id = `${slugBase}-${Date.now()}`;
 
   const s = db();
 
   if (!s) {
     return NextResponse.json(
-      {
-        error:
-          "Databasen er ikke tilgjengelig.",
-      },
+      { error: "Databasen er ikke tilgjengelig." },
       { status: 500 }
     );
   }
@@ -275,11 +244,14 @@ export async function POST(req) {
       name,
       category,
       description,
+      dimensions,
       base_price_ore: Math.round(
         Number(p.basePriceOre)
       ),
-      options: [],
+      options,
       image_url: imageUrl,
+      image_urls: imageUrls,
+      specifications,
       active: p.active !== false,
     })
     .select("*")
@@ -292,10 +264,7 @@ export async function POST(req) {
     );
 
     return NextResponse.json(
-      {
-        error:
-          "Produktet kunne ikke opprettes.",
-      },
+      { error: "Produktet kunne ikke opprettes." },
       { status: 500 }
     );
   }
