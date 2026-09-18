@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { nok } from "../../../../lib/catalog";
+import { nok } from "../../../lib/catalog";
 
 export default function CategoryPage() {
   const params = useParams();
