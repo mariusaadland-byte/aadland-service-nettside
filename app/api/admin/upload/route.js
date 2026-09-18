@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import {
   getAdminUser,
   hasPermission,
-} from "../../../../../lib/auth";
-import { db } from "../../../../../lib/supabase";
+} from "../../../../lib/auth";
+import { db } from "../../../../lib/supabase";
 
 export async function POST(req) {
   try {
@@ -56,8 +56,7 @@ export async function POST(req) {
       );
     }
 
-    const maxSize =
-      10 * 1024 * 1024;
+    const maxSize = 10 * 1024 * 1024;
 
     if (file.size > maxSize) {
       return NextResponse.json(
@@ -90,20 +89,15 @@ export async function POST(req) {
     const fileName =
       `${crypto.randomUUID()}.${extension}`;
 
-    const bytes =
-      await file.arrayBuffer();
+    const bytes = await file.arrayBuffer();
 
     const { error: uploadError } =
       await s.storage
         .from("product-images")
-        .upload(
-          fileName,
-          bytes,
-          {
-            contentType: file.type,
-            upsert: false,
-          }
-        );
+        .upload(fileName, bytes, {
+          contentType: file.type,
+          upsert: false,
+        });
 
     if (uploadError) {
       console.error(
