@@ -18,28 +18,38 @@ export default function AdminClient({ user }) {
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [users, setUsers] = useState([]);
-  const [currentUserId, setCurrentUserId] = useState(user?.id || "");
+  const [currentUserId, setCurrentUserId] = useState(
+    user?.id || ""
+  );
   const [error, setError] = useState("");
 
   const router = useRouter();
 
   const canViewOrders =
-    user?.role === "owner" || Boolean(user?.canViewOrders);
+    user?.role === "owner" ||
+    Boolean(user?.canViewOrders);
 
   const canUpdateOrders =
-    user?.role === "owner" || Boolean(user?.canUpdateOrders);
+    user?.role === "owner" ||
+    Boolean(user?.canUpdateOrders);
 
   const canManageProducts =
-    user?.role === "owner" || Boolean(user?.canManageProducts);
+    user?.role === "owner" ||
+    Boolean(user?.canManageProducts);
 
   const canManageUsers =
-    user?.role === "owner" || Boolean(user?.canManageUsers);
+    user?.role === "owner" ||
+    Boolean(user?.canManageUsers);
+
+  const canEditUsers = user?.role === "owner";
 
   async function load() {
     setError("");
 
     if (canViewOrders) {
-      const orderResponse = await fetch("/api/admin/orders");
+      const orderResponse = await fetch(
+        "/api/admin/orders"
+      );
 
       if (orderResponse.status === 401) {
         router.replace("/admin/login");
@@ -50,8 +60,15 @@ export default function AdminClient({ user }) {
         const data = await orderResponse.json();
         setOrders(data.orders || []);
       } else {
-        const data = await orderResponse.json().catch(() => ({}));
-        setError(data.error || "Bestillingene kunne ikke hentes.");
+        const data = await orderResponse
+          .json()
+          .catch(() => ({}));
+
+        setError(
+          data.error ||
+            "Bestillingene kunne ikke hentes."
+        );
+
         setOrders([]);
       }
     } else {
@@ -59,7 +76,9 @@ export default function AdminClient({ user }) {
     }
 
     if (canManageProducts) {
-      const productResponse = await fetch("/api/admin/products");
+      const productResponse = await fetch(
+        "/api/admin/products"
+      );
 
       if (productResponse.status === 401) {
         router.replace("/admin/login");
@@ -70,8 +89,15 @@ export default function AdminClient({ user }) {
         const data = await productResponse.json();
         setProducts(data.products || []);
       } else {
-        const data = await productResponse.json().catch(() => ({}));
-        setError(data.error || "Produktene kunne ikke hentes.");
+        const data = await productResponse
+          .json()
+          .catch(() => ({}));
+
+        setError(
+          data.error ||
+            "Produktene kunne ikke hentes."
+        );
+
         setProducts([]);
       }
     } else {
@@ -79,7 +105,9 @@ export default function AdminClient({ user }) {
     }
 
     if (canManageUsers) {
-      const userResponse = await fetch("/api/admin/users");
+      const userResponse = await fetch(
+        "/api/admin/users"
+      );
 
       if (userResponse.status === 401) {
         router.replace("/admin/login");
@@ -88,11 +116,22 @@ export default function AdminClient({ user }) {
 
       if (userResponse.ok) {
         const data = await userResponse.json();
+
         setUsers(data.users || []);
-        setCurrentUserId(data.currentUserId || user?.id || "");
+
+        setCurrentUserId(
+          data.currentUserId || user?.id || ""
+        );
       } else {
-        const data = await userResponse.json().catch(() => ({}));
-        setError(data.error || "Brukerne kunne ikke hentes.");
+        const data = await userResponse
+          .json()
+          .catch(() => ({}));
+
+        setError(
+          data.error ||
+            "Brukerne kunne ikke hentes."
+        );
+
         setUsers([]);
       }
     } else {
@@ -106,27 +145,37 @@ export default function AdminClient({ user }) {
 
   async function status(id, newStatus) {
     if (!canUpdateOrders) {
-      setError("Du har ikke tilgang til å endre bestillinger.");
+      setError(
+        "Du har ikke tilgang til å endre bestillinger."
+      );
       return;
     }
 
     setError("");
 
-    const response = await fetch("/api/admin/orders", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        id,
-        status: newStatus,
-      }),
-    });
+    const response = await fetch(
+      "/api/admin/orders",
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id,
+          status: newStatus,
+        }),
+      }
+    );
 
-    const data = await response.json().catch(() => ({}));
+    const data = await response
+      .json()
+      .catch(() => ({}));
 
     if (!response.ok) {
-      setError(data.error || "Status kunne ikke lagres.");
+      setError(
+        data.error ||
+          "Status kunne ikke lagres."
+      );
       return;
     }
 
@@ -135,27 +184,37 @@ export default function AdminClient({ user }) {
 
   async function toggle(product) {
     if (!canManageProducts) {
-      setError("Du har ikke tilgang til å administrere produkter.");
+      setError(
+        "Du har ikke tilgang til å administrere produkter."
+      );
       return;
     }
 
     setError("");
 
-    const response = await fetch("/api/admin/products", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        ...product,
-        active: product.active === false,
-      }),
-    });
+    const response = await fetch(
+      "/api/admin/products",
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...product,
+          active: product.active === false,
+        }),
+      }
+    );
 
-    const data = await response.json().catch(() => ({}));
+    const data = await response
+      .json()
+      .catch(() => ({}));
 
     if (!response.ok) {
-      setError(data.error || "Produktet kunne ikke lagres.");
+      setError(
+        data.error ||
+          "Produktet kunne ikke lagres."
+      );
       return;
     }
 
@@ -176,11 +235,16 @@ export default function AdminClient({ user }) {
   ).length;
 
   const working = orders.filter((order) =>
-    ["confirmed", "in_progress", "ready"].includes(order.status)
+    [
+      "confirmed",
+      "in_progress",
+      "ready",
+    ].includes(order.status)
   ).length;
 
   const total = orders.reduce(
-    (sum, order) => sum + (order.totalOre || 0),
+    (sum, order) =>
+      sum + (order.totalOre || 0),
     0
   );
 
@@ -209,15 +273,21 @@ export default function AdminClient({ user }) {
         {tabs.map(([id, label]) => (
           <button
             key={id}
-            className={tab === id ? "active" : ""}
+            className={
+              tab === id ? "active" : ""
+            }
             onClick={() => setTab(id)}
           >
             {label}
-            {id === "orders" && fresh ? ` (${fresh})` : ""}
+            {id === "orders" && fresh
+              ? ` (${fresh})`
+              : ""}
           </button>
         ))}
 
-        <button onClick={logout}>Logg ut</button>
+        <button onClick={logout}>
+          Logg ut
+        </button>
       </aside>
 
       <section className="adminmain">
@@ -235,7 +305,9 @@ export default function AdminClient({ user }) {
             : "Brukere"}
         </h1>
 
-        {error && <p className="notice">{error}</p>}
+        {error && (
+          <p className="notice">{error}</p>
+        )}
 
         {tab === "overview" && (
           <>
@@ -243,7 +315,9 @@ export default function AdminClient({ user }) {
               {canViewOrders && (
                 <>
                   <div className="stat">
-                    <span className="muted">Nye ordre</span>
+                    <span className="muted">
+                      Nye ordre
+                    </span>
                     <br />
                     <b>{fresh}</b>
                   </div>
@@ -267,7 +341,9 @@ export default function AdminClient({ user }) {
                   <b>
                     {
                       products.filter(
-                        (product) => product.active !== false
+                        (product) =>
+                          product.active !==
+                          false
                       ).length
                     }
                   </b>
@@ -289,7 +365,9 @@ export default function AdminClient({ user }) {
               <Orders
                 orders={orders.slice(0, 5)}
                 status={status}
-                canUpdateOrders={canUpdateOrders}
+                canUpdateOrders={
+                  canUpdateOrders
+                }
               />
             )}
 
@@ -297,37 +375,49 @@ export default function AdminClient({ user }) {
               <div className="card">
                 <h3>Velkommen</h3>
                 <p className="muted">
-                  Du er logget inn i Aadland Service backoffice.
-                  Menyen viser funksjonene du har fått tilgang til.
+                  Du er logget inn i Aadland
+                  Service backoffice. Menyen
+                  viser funksjonene du har fått
+                  tilgang til.
                 </p>
               </div>
             )}
           </>
         )}
 
-        {tab === "orders" && canViewOrders && (
-          <Orders
-            orders={orders}
-            status={status}
-            canUpdateOrders={canUpdateOrders}
-          />
-        )}
+        {tab === "orders" &&
+          canViewOrders && (
+            <Orders
+              orders={orders}
+              status={status}
+              canUpdateOrders={
+                canUpdateOrders
+              }
+            />
+          )}
 
-        {tab === "products" && canManageProducts && (
-          <Products
-            products={products}
-            toggle={toggle}
-          />
-        )}
+        {tab === "products" &&
+          canManageProducts && (
+            <Products
+              products={products}
+              toggle={toggle}
+            />
+          )}
 
-        {tab === "users" && canManageUsers && (
-          <Users
-            users={users}
-            currentUserId={currentUserId}
-            reload={load}
-            setError={setError}
-          />
-        )}
+        {tab === "users" &&
+          canManageUsers && (
+            <Users
+              users={users}
+              currentUserId={
+                currentUserId
+              }
+              reload={load}
+              setError={setError}
+              canEditUsers={
+                canEditUsers
+              }
+            />
+          )}
       </section>
     </main>
   );
@@ -367,7 +457,9 @@ function Orders({
             <td>
               {order.customerName}
               <br />
-              <small>{order.customerEmail}</small>
+              <small>
+                {order.customerEmail}
+              </small>
             </td>
 
             <td>
@@ -377,22 +469,30 @@ function Orders({
             </td>
 
             <td>
-              {order.fulfillmentType === "delivery"
+              {order.fulfillmentType ===
+              "delivery"
                 ? "Levering"
                 : "Henting"}
             </td>
 
-            <td>{nok(order.totalOre || 0)}</td>
+            <td>
+              {nok(order.totalOre || 0)}
+            </td>
 
             <td>
               {canUpdateOrders ? (
                 <select
                   value={order.status}
                   onChange={(e) =>
-                    status(order.id, e.target.value)
+                    status(
+                      order.id,
+                      e.target.value
+                    )
                   }
                 >
-                  {Object.entries(labels).map(
+                  {Object.entries(
+                    labels
+                  ).map(
                     ([value, label]) => (
                       <option
                         value={value}
@@ -405,7 +505,8 @@ function Orders({
                 </select>
               ) : (
                 <span>
-                  {labels[order.status] || order.status}
+                  {labels[order.status] ||
+                    order.status}
                 </span>
               )}
             </td>
@@ -416,11 +517,17 @@ function Orders({
   );
 }
 
-function Products({ products, toggle }) {
+function Products({
+  products,
+  toggle,
+}) {
   return (
     <div className="grid">
       {products.map((product) => (
-        <div className="card" key={product.id}>
+        <div
+          className="card"
+          key={product.id}
+        >
           <div className="kicker">
             {product.category}
           </div>
@@ -429,12 +536,16 @@ function Products({ products, toggle }) {
 
           <p>{product.description}</p>
 
-          <b>{nok(product.basePriceOre)}</b>
+          <b>
+            {nok(product.basePriceOre)}
+          </b>
 
           <p>
             <button
               className="btn alt"
-              onClick={() => toggle(product)}
+              onClick={() =>
+                toggle(product)
+              }
             >
               {product.active === false
                 ? "Vis produkt"
@@ -452,27 +563,39 @@ function Users({
   currentUserId,
   reload,
   setError,
+  canEditUsers,
 }) {
-  const [showNew, setShowNew] = useState(false);
+  const [showNew, setShowNew] =
+    useState(false);
 
   return (
     <>
-      <div style={{ marginBottom: 20 }}>
-        <button
-          className="btn"
-          onClick={() => setShowNew(!showNew)}
+      {canEditUsers && (
+        <div
+          style={{
+            marginBottom: 20,
+          }}
         >
-          {showNew
-            ? "Avbryt"
-            : "Legg til bruker"}
-        </button>
-      </div>
+          <button
+            className="btn"
+            onClick={() =>
+              setShowNew(!showNew)
+            }
+          >
+            {showNew
+              ? "Avbryt"
+              : "Legg til bruker"}
+          </button>
+        </div>
+      )}
 
-      {showNew && (
+      {canEditUsers && showNew && (
         <NewUser
           reload={reload}
           setError={setError}
-          close={() => setShowNew(false)}
+          close={() =>
+            setShowNew(false)
+          }
         />
       )}
 
@@ -481,9 +604,12 @@ function Users({
           <UserCard
             key={adminUser.id}
             user={adminUser}
-            currentUserId={currentUserId}
+            currentUserId={
+              currentUserId
+            }
             reload={reload}
             setError={setError}
+            canEdit={canEditUsers}
           />
         ))}
       </div>
@@ -496,18 +622,27 @@ function NewUser({
   setError,
   close,
 }) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [name, setName] =
+    useState("");
 
-  const [permissions, setPermissions] = useState({
+  const [email, setEmail] =
+    useState("");
+
+  const [password, setPassword] =
+    useState("");
+
+  const [
+    permissions,
+    setPermissions,
+  ] = useState({
     canViewOrders: true,
     canUpdateOrders: false,
     canManageProducts: false,
     canManageUsers: false,
   });
 
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] =
+    useState(false);
 
   async function create(e) {
     e.preventDefault();
@@ -520,7 +655,8 @@ function NewUser({
       {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type":
+            "application/json",
         },
         body: JSON.stringify({
           name,
@@ -554,12 +690,15 @@ function NewUser({
       className="card"
       onSubmit={create}
       autoComplete="off"
-      style={{ marginBottom: 20 }}
+      style={{
+        marginBottom: 20,
+      }}
     >
       <h3>Ny bruker</h3>
 
       <div className="field">
         <label>Navn</label>
+
         <input
           name="new-admin-name"
           autoComplete="off"
@@ -573,6 +712,7 @@ function NewUser({
 
       <div className="field">
         <label>E-post</label>
+
         <input
           type="email"
           name="new-admin-email"
@@ -586,7 +726,10 @@ function NewUser({
       </div>
 
       <div className="field">
-        <label>Midlertidig passord</label>
+        <label>
+          Midlertidig passord
+        </label>
+
         <input
           type="password"
           name="new-admin-password"
@@ -595,7 +738,9 @@ function NewUser({
           minLength={8}
           value={password}
           onChange={(e) =>
-            setPassword(e.target.value)
+            setPassword(
+              e.target.value
+            )
           }
         />
       </div>
@@ -622,29 +767,38 @@ function UserCard({
   currentUserId,
   reload,
   setError,
+  canEdit,
 }) {
-  const owner = user.role === "owner";
+  const owner =
+    user.role === "owner";
 
-  const [values, setValues] = useState({
-    name: user.name || "",
-    canViewOrders: Boolean(
-      user.can_view_orders
-    ),
-    canUpdateOrders: Boolean(
-      user.can_update_orders
-    ),
-    canManageProducts: Boolean(
-      user.can_manage_products
-    ),
-    canManageUsers: Boolean(
-      user.can_manage_users
-    ),
-    active: user.active !== false,
-  });
+  const [values, setValues] =
+    useState({
+      name: user.name || "",
+      canViewOrders: Boolean(
+        user.can_view_orders
+      ),
+      canUpdateOrders: Boolean(
+        user.can_update_orders
+      ),
+      canManageProducts: Boolean(
+        user.can_manage_products
+      ),
+      canManageUsers: Boolean(
+        user.can_manage_users
+      ),
+      active:
+        user.active !== false,
+    });
 
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] =
+    useState(false);
 
   async function save() {
+    if (!canEdit || owner) {
+      return;
+    }
+
     setSaving(true);
     setError("");
 
@@ -653,7 +807,8 @@ function UserCard({
       {
         method: "PATCH",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type":
+            "application/json",
         },
         body: JSON.stringify({
           id: user.id,
@@ -691,58 +846,83 @@ function UserCard({
         {user.email}
       </p>
 
-      <div className="field">
-        <label>Navn</label>
-        <input
-          value={values.name}
-          onChange={(e) =>
-            setValues({
-              ...values,
-              name: e.target.value,
-            })
-          }
-        />
-      </div>
+      {canEdit && !owner ? (
+        <>
+          <div className="field">
+            <label>Navn</label>
 
-      <PermissionChecks
-        values={values}
-        setValues={setValues}
-        disabled={owner}
-      />
+            <input
+              value={values.name}
+              onChange={(e) =>
+                setValues({
+                  ...values,
+                  name: e.target.value,
+                })
+              }
+            />
+          </div>
 
-      {!owner && (
-        <label
-          style={{
-            display: "block",
-            marginBottom: 14,
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={values.active}
-            onChange={(e) =>
-              setValues({
-                ...values,
-                active: e.target.checked,
-              })
-            }
-            disabled={
-              user.id === currentUserId
-            }
-          />{" "}
-          Aktiv bruker
-        </label>
+          <PermissionChecks
+            values={values}
+            setValues={setValues}
+          />
+
+          <label
+            style={{
+              display: "block",
+              marginBottom: 14,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={values.active}
+              onChange={(e) =>
+                setValues({
+                  ...values,
+                  active:
+                    e.target.checked,
+                })
+              }
+              disabled={
+                user.id ===
+                currentUserId
+              }
+            />{" "}
+            Aktiv bruker
+          </label>
+
+          <button
+            className="btn alt"
+            onClick={save}
+            disabled={saving}
+          >
+            {saving
+              ? "Lagrer..."
+              : "Lagre endringer"}
+          </button>
+        </>
+      ) : (
+        <>
+          <p>
+            <b>Navn:</b>{" "}
+            {user.name}
+          </p>
+
+          <PermissionChecks
+            values={values}
+            setValues={setValues}
+            disabled
+          />
+
+          {!owner && (
+            <p className="muted">
+              {values.active
+                ? "Aktiv bruker"
+                : "Deaktivert bruker"}
+            </p>
+          )}
+        </>
       )}
-
-      <button
-        className="btn alt"
-        onClick={save}
-        disabled={saving}
-      >
-        {saving
-          ? "Lagrer..."
-          : "Lagre endringer"}
-      </button>
     </div>
   );
 }
@@ -772,29 +952,38 @@ function PermissionChecks({
   ];
 
   return (
-    <div style={{ margin: "16px 0" }}>
-      {permissions.map(([key, label]) => (
-        <label
-          key={key}
-          style={{
-            display: "block",
-            marginBottom: 8,
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={Boolean(values[key])}
-            disabled={disabled}
-            onChange={(e) =>
-              setValues({
-                ...values,
-                [key]: e.target.checked,
-              })
-            }
-          />{" "}
-          {label}
-        </label>
-      ))}
+    <div
+      style={{
+        margin: "16px 0",
+      }}
+    >
+      {permissions.map(
+        ([key, label]) => (
+          <label
+            key={key}
+            style={{
+              display: "block",
+              marginBottom: 8,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={Boolean(
+                values[key]
+              )}
+              disabled={disabled}
+              onChange={(e) =>
+                setValues({
+                  ...values,
+                  [key]:
+                    e.target.checked,
+                })
+              }
+            />{" "}
+            {label}
+          </label>
+        )
+      )}
     </div>
   );
 }
