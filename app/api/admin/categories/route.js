@@ -15,8 +15,7 @@ async function requireCategoryAccess() {
     return {
       error: NextResponse.json(
         {
-          error:
-            "Ikke innlogget.",
+          error: "Ikke innlogget.",
         },
         { status: 401 }
       ),
@@ -43,9 +42,7 @@ async function requireCategoryAccess() {
 }
 
 function cleanText(value) {
-  return String(
-    value || ""
-  ).trim();
+  return String(value || "").trim();
 }
 
 function makeSlug(value) {
@@ -346,7 +343,10 @@ export async function DELETE(req) {
   const body =
     await req.json();
 
-  if (!body.id) {
+  const categoryId =
+    cleanText(body.id);
+
+  if (!categoryId) {
     return NextResponse.json(
       {
         error:
@@ -368,11 +368,53 @@ export async function DELETE(req) {
     );
   }
 
+  const {
+    count,
+    error: countError,
+  } = await s
+    .from("products")
+    .select("id", {
+      count: "exact",
+      head: true,
+    })
+    .eq(
+      "category_id",
+      categoryId
+    );
+
+  if (countError) {
+    console.error(
+      "CATEGORY PRODUCT COUNT ERROR:",
+      countError
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          "Kunne ikke kontrollere om kategorien er i bruk.",
+      },
+      { status: 500 }
+    );
+  }
+
+  if ((count || 0) > 0) {
+    return NextResponse.json(
+      {
+        error:
+          `Kategorien kan ikke slettes fordi ${count} produkt${count === 1 ? "" : "er"} ligger i kategorien. Flytt produktene til en annen kategori først.`,
+      },
+      { status: 409 }
+    );
+  }
+
   const { error } =
     await s
       .from("categories")
       .delete()
-      .eq("id", body.id);
+      .eq(
+        "id",
+        categoryId
+      );
 
   if (error) {
     console.error(
