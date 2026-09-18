@@ -182,45 +182,6 @@ export default function AdminClient({ user }) {
     await load();
   }
 
-  async function toggle(product) {
-    if (!canManageProducts) {
-      setError(
-        "Du har ikke tilgang til å administrere produkter."
-      );
-      return;
-    }
-
-    setError("");
-
-    const response = await fetch(
-      "/api/admin/products",
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...product,
-          active: product.active === false,
-        }),
-      }
-    );
-
-    const data = await response
-      .json()
-      .catch(() => ({}));
-
-    if (!response.ok) {
-      setError(
-        data.error ||
-          "Produktet kunne ikke lagres."
-      );
-      return;
-    }
-
-    await load();
-  }
-
   async function logout() {
     await fetch("/api/auth/logout", {
       method: "POST",
@@ -400,7 +361,8 @@ export default function AdminClient({ user }) {
           canManageProducts && (
             <Products
               products={products}
-              toggle={toggle}
+              reload={load}
+              setError={setError}
             />
           )}
 
@@ -519,42 +481,592 @@ function Orders({
 
 function Products({
   products,
-  toggle,
+  reload,
+  setError,
 }) {
+  const [showNew, setShowNew] =
+    useState(false);
+
   return (
-    <div className="grid">
-      {products.map((product) => (
-        <div
-          className="card"
-          key={product.id}
+    <>
+      <div
+        style={{
+          marginBottom: 20,
+        }}
+      >
+        <button
+          className="btn"
+          onClick={() =>
+            setShowNew(!showNew)
+          }
         >
-          <div className="kicker">
-            {product.category}
-          </div>
+          {showNew
+            ? "Avbryt"
+            : "Legg til produkt"}
+        </button>
+      </div>
 
-          <h3>{product.name}</h3>
+      {showNew && (
+        <ProductEditor
+          product={null}
+          reload={reload}
+          setError={setError}
+          close={() =>
+            setShowNew(false)
+          }
+        />
+      )}
 
-          <p>{product.description}</p>
+      <div className="grid">
+        {products.map((product) => (
+          <ProductEditor
+            key={product.id}
+            product={product}
+            reload={reload}
+            setError={setError}
+          />
+        ))}
+      </div>
+    </>
+  );
+}
 
-          <b>
-            {nok(product.basePriceOre)}
-          </b>
+function ProductEditor({
+  product,
+  reload,
+  setError,
+  close,
+}) {
+  const isNew = !product;
 
-          <p>
+  const [editing, setEditing] =
+    useState(isNew);
+
+  const [name, setName] = useState(
+    product?.name || ""
+  );
+
+  const [category, setCategory] =
+    useState(
+      product?.category ||
+        "På bestilling"
+    );
+
+  const [description, setDescription] =
+    useState(
+      product?.description || ""
+    );
+
+  const [price, setPrice] = useState(
+    product
+      ? String(
+          (Number(
+            product.basePriceOre
+          ) || 0) / 100
+        )
+      : ""
+  );
+
+  const [imageUrl, setImageUrl] =
+    useState(
+      product?.imageUrl || ""
+    );
+
+  const [active, setActive] =
+    useState(
+      product?.active !== false
+    );
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [uploading, setUploading] =
+    useState(false);
+
+  useEffect(() => {
+    if (!product) return;
+
+    setName(product.name || "");
+    setCategory(
+      product.category ||
+        "På bestilling"
+    );
+    setDescription(
+      product.description || ""
+    );
+    setPrice(
+      String(
+        (Number(
+          product.basePriceOre
+        ) || 0) / 100
+      )
+    );
+    setImageUrl(
+      product.imageUrl || ""
+    );
+    setActive(
+      product.active !== false
+    );
+  }, [product]);
+
+  async function uploadImage(file) {
+    if (!file) return;
+
+    setUploading(true);
+    setError("");
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(
+      "/api/admin/upload",
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    const data = await response
+      .json()
+      .catch(() => ({}));
+
+    setUploading(false);
+
+    if (!response.ok) {
+      setError(
+        data.error ||
+          "Bildet kunne ikke lastes opp."
+      );
+      return;
+    }
+
+    setImageUrl(data.url || "");
+  }
+
+  async function save(e) {
+    e?.preventDefault();
+
+    setError("");
+
+    const priceNumber = Number(
+      String(price).replace(",", ".")
+    );
+
+    if (!name.trim()) {
+      setError(
+        "Produktet må ha et navn."
+      );
+      return;
+    }
+
+    if (
+      !Number.isFinite(priceNumber) ||
+      priceNumber < 0
+    ) {
+      setError(
+        "Skriv inn en gyldig pris."
+      );
+      return;
+    }
+
+    setSaving(true);
+
+    const response = await fetch(
+      "/api/admin/products",
+      {
+        method: isNew
+          ? "POST"
+          : "PATCH",
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+        body: JSON.stringify({
+          ...(isNew
+            ? {}
+            : { id: product.id }),
+          name: name.trim(),
+          category:
+            category.trim() ||
+            "På bestilling",
+          description:
+            description.trim(),
+          basePriceOre: Math.round(
+            priceNumber * 100
+          ),
+          imageUrl:
+            imageUrl || null,
+          active,
+        }),
+      }
+    );
+
+    const data = await response
+      .json()
+      .catch(() => ({}));
+
+    setSaving(false);
+
+    if (!response.ok) {
+      setError(
+        data.error ||
+          "Produktet kunne ikke lagres."
+      );
+      return;
+    }
+
+    if (isNew && close) {
+      close();
+    } else {
+      setEditing(false);
+    }
+
+    await reload();
+  }
+
+  async function toggleActive() {
+    setError("");
+    setSaving(true);
+
+    const response = await fetch(
+      "/api/admin/products",
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+        body: JSON.stringify({
+          id: product.id,
+          name:
+            product.name || "",
+          category:
+            product.category ||
+            "På bestilling",
+          description:
+            product.description ||
+            "",
+          basePriceOre:
+            Number(
+              product.basePriceOre
+            ) || 0,
+          imageUrl:
+            product.imageUrl ||
+            null,
+          active:
+            product.active === false,
+        }),
+      }
+    );
+
+    const data = await response
+      .json()
+      .catch(() => ({}));
+
+    setSaving(false);
+
+    if (!response.ok) {
+      setError(
+        data.error ||
+          "Produktet kunne ikke lagres."
+      );
+      return;
+    }
+
+    await reload();
+  }
+
+  if (!editing && product) {
+    return (
+      <div className="card">
+        {product.imageUrl && (
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            style={{
+              width: "100%",
+              height: 220,
+              objectFit: "cover",
+              borderRadius: 12,
+              marginBottom: 16,
+            }}
+          />
+        )}
+
+        <div className="kicker">
+          {product.category}
+        </div>
+
+        <h3>{product.name}</h3>
+
+        <p>
+          {product.description}
+        </p>
+
+        <b>
+          {nok(
+            product.basePriceOre
+          )}
+        </b>
+
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            flexWrap: "wrap",
+            marginTop: 18,
+          }}
+        >
+          <button
+            className="btn"
+            onClick={() =>
+              setEditing(true)
+            }
+          >
+            Rediger
+          </button>
+
+          <button
+            className="btn alt"
+            onClick={toggleActive}
+            disabled={saving}
+          >
+            {product.active === false
+              ? "Vis produkt"
+              : "Skjul produkt"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      className="card"
+      onSubmit={save}
+      style={
+        isNew
+          ? { marginBottom: 20 }
+          : undefined
+      }
+    >
+      <div className="kicker">
+        {isNew
+          ? "Nytt produkt"
+          : "Rediger produkt"}
+      </div>
+
+      <h3>
+        {isNew
+          ? "Legg til produkt"
+          : product.name}
+      </h3>
+
+      <div className="field">
+        <label>Produktnavn</label>
+
+        <input
+          required
+          value={name}
+          onChange={(e) =>
+            setName(e.target.value)
+          }
+          placeholder="F.eks. Spilebenk"
+        />
+      </div>
+
+      <div className="field">
+        <label>Kategori</label>
+
+        <input
+          value={category}
+          onChange={(e) =>
+            setCategory(
+              e.target.value
+            )
+          }
+          placeholder="F.eks. Benker"
+        />
+      </div>
+
+      <div className="field">
+        <label>Beskrivelse</label>
+
+        <textarea
+          value={description}
+          onChange={(e) =>
+            setDescription(
+              e.target.value
+            )
+          }
+          rows={5}
+          placeholder="Beskriv produktet"
+          style={{
+            width: "100%",
+            resize: "vertical",
+          }}
+        />
+      </div>
+
+      <div className="field">
+        <label>Pris i kroner</label>
+
+        <input
+          type="number"
+          min="0"
+          step="1"
+          required
+          value={price}
+          onChange={(e) =>
+            setPrice(e.target.value)
+          }
+          placeholder="2990"
+        />
+      </div>
+
+      <div className="field">
+        <label>Produktbilde</label>
+
+        {imageUrl && (
+          <div
+            style={{
+              marginBottom: 12,
+            }}
+          >
+            <img
+              src={imageUrl}
+              alt="Produktbilde"
+              style={{
+                width: "100%",
+                maxHeight: 280,
+                objectFit: "cover",
+                borderRadius: 12,
+              }}
+            />
+
             <button
+              type="button"
               className="btn alt"
               onClick={() =>
-                toggle(product)
+                setImageUrl("")
               }
+              style={{
+                marginTop: 10,
+              }}
             >
-              {product.active === false
-                ? "Vis produkt"
-                : "Skjul produkt"}
+              Fjern bilde
             </button>
+          </div>
+        )}
+
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          disabled={uploading}
+          onChange={(e) => {
+            const file =
+              e.target.files?.[0];
+
+            if (file) {
+              uploadImage(file);
+            }
+
+            e.target.value = "";
+          }}
+        />
+
+        {uploading && (
+          <p className="muted">
+            Laster opp bilde...
           </p>
-        </div>
-      ))}
-    </div>
+        )}
+      </div>
+
+      <label
+        style={{
+          display: "block",
+          margin: "16px 0",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={active}
+          onChange={(e) =>
+            setActive(
+              e.target.checked
+            )
+          }
+        />{" "}
+        Vis produkt i nettbutikken
+      </label>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          flexWrap: "wrap",
+        }}
+      >
+        <button
+          className="btn"
+          disabled={
+            saving || uploading
+          }
+        >
+          {saving
+            ? "Lagrer..."
+            : isNew
+            ? "Opprett produkt"
+            : "Lagre endringer"}
+        </button>
+
+        {!isNew && (
+          <button
+            type="button"
+            className="btn alt"
+            onClick={() => {
+              setEditing(false);
+              setName(
+                product.name || ""
+              );
+              setCategory(
+                product.category ||
+                  "På bestilling"
+              );
+              setDescription(
+                product.description ||
+                  ""
+              );
+              setPrice(
+                String(
+                  (Number(
+                    product.basePriceOre
+                  ) || 0) / 100
+                )
+              );
+              setImageUrl(
+                product.imageUrl || ""
+              );
+              setActive(
+                product.active !== false
+              );
+            }}
+          >
+            Avbryt
+          </button>
+        )}
+
+        {isNew && close && (
+          <button
+            type="button"
+            className="btn alt"
+            onClick={close}
+          >
+            Avbryt
+          </button>
+        )}
+      </div>
+    </form>
   );
 }
 
