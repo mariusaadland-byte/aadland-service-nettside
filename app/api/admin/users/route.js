@@ -42,11 +42,7 @@ export async function GET() {
     console.error("ADMIN USERS GET ERROR:", error);
 
     return NextResponse.json(
-      {
-        error: `Brukerne kunne ikke hentes: ${
-          error.message || "Ukjent databasefeil"
-        }`,
-      },
+      { error: "Brukerne kunne ikke hentes." },
       { status: 500 }
     );
   }
@@ -67,9 +63,17 @@ export async function POST(req) {
     );
   }
 
-  if (!(await hasPermission("canManageUsers"))) {
+  /*
+   * Bare eier kan opprette nye brukere.
+   * Dette hindrer en vanlig administrator i å opprette
+   * nye kontoer med utvidede rettigheter.
+   */
+  if (currentUser.role !== "owner") {
     return NextResponse.json(
-      { error: "Du har ikke tilgang til å opprette brukere." },
+      {
+        error:
+          "Bare eierkontoen kan opprette nye brukere.",
+      },
       { status: 403 }
     );
   }
@@ -159,10 +163,8 @@ export async function POST(req) {
 
     return NextResponse.json(
       {
-        error: `Brukerprofil kunne ikke opprettes: ${
-          profileError.message ||
-          "Ukjent databasefeil"
-        }`,
+        error:
+          "Brukerprofilen kunne ikke opprettes.",
       },
       { status: 500 }
     );
@@ -181,9 +183,15 @@ export async function PATCH(req) {
     );
   }
 
-  if (!(await hasPermission("canManageUsers"))) {
+  /*
+   * Bare eier kan endre brukere og rettigheter.
+   */
+  if (currentUser.role !== "owner") {
     return NextResponse.json(
-      { error: "Du har ikke tilgang til å endre brukere." },
+      {
+        error:
+          "Bare eierkontoen kan endre brukere og rettigheter.",
+      },
       { status: 403 }
     );
   }
@@ -206,11 +214,6 @@ export async function PATCH(req) {
     );
   }
 
-  /*
-   * Hent brukeren som forsøkes endret.
-   * Dette gjøres på serveren slik at beskyttelsen
-   * ikke kan omgås ved å sende API-kall manuelt.
-   */
   const {
     data: targetUser,
     error: targetError,
@@ -228,8 +231,7 @@ export async function PATCH(req) {
   }
 
   /*
-   * Eierkontoen kan ikke endres gjennom
-   * vanlig brukeradministrasjon.
+   * Eierkontoen kan ikke endres via brukeradministrasjonen.
    */
   if (targetUser.role === "owner") {
     return NextResponse.json(
@@ -238,22 +240,6 @@ export async function PATCH(req) {
           "Eierkontoen er beskyttet og kan ikke endres her.",
       },
       { status: 403 }
-    );
-  }
-
-  /*
-   * Ingen kan deaktivere sin egen konto.
-   */
-  if (
-    body.id === currentUser.id &&
-    body.active === false
-  ) {
-    return NextResponse.json(
-      {
-        error:
-          "Du kan ikke deaktivere din egen bruker.",
-      },
-      { status: 400 }
     );
   }
 
@@ -286,12 +272,7 @@ export async function PATCH(req) {
     );
 
     return NextResponse.json(
-      {
-        error: `Brukeren kunne ikke oppdateres: ${
-          error.message ||
-          "Ukjent databasefeil"
-        }`,
-      },
+      { error: "Brukeren kunne ikke oppdateres." },
       { status: 500 }
     );
   }
