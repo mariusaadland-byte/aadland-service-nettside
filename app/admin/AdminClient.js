@@ -18,28 +18,22 @@ export default function AdminClient({ user }) {
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [users, setUsers] = useState([]);
-  const [currentUserId, setCurrentUserId] = useState(
-    user?.id || ""
-  );
+  const [currentUserId, setCurrentUserId] = useState(user?.id || "");
   const [error, setError] = useState("");
 
   const router = useRouter();
 
   const canViewOrders =
-    user?.role === "owner" ||
-    Boolean(user?.canViewOrders);
+    user?.role === "owner" || Boolean(user?.canViewOrders);
 
   const canUpdateOrders =
-    user?.role === "owner" ||
-    Boolean(user?.canUpdateOrders);
+    user?.role === "owner" || Boolean(user?.canUpdateOrders);
 
   const canManageProducts =
-    user?.role === "owner" ||
-    Boolean(user?.canManageProducts);
+    user?.role === "owner" || Boolean(user?.canManageProducts);
 
   const canManageUsers =
-    user?.role === "owner" ||
-    Boolean(user?.canManageUsers);
+    user?.role === "owner" || Boolean(user?.canManageUsers);
 
   const canEditUsers = user?.role === "owner";
 
@@ -47,28 +41,19 @@ export default function AdminClient({ user }) {
     setError("");
 
     if (canViewOrders) {
-      const orderResponse = await fetch(
-        "/api/admin/orders"
-      );
+      const response = await fetch("/api/admin/orders");
 
-      if (orderResponse.status === 401) {
+      if (response.status === 401) {
         router.replace("/admin/login");
         return;
       }
 
-      if (orderResponse.ok) {
-        const data = await orderResponse.json();
+      if (response.ok) {
+        const data = await response.json();
         setOrders(data.orders || []);
       } else {
-        const data = await orderResponse
-          .json()
-          .catch(() => ({}));
-
-        setError(
-          data.error ||
-            "Bestillingene kunne ikke hentes."
-        );
-
+        const data = await response.json().catch(() => ({}));
+        setError(data.error || "Bestillingene kunne ikke hentes.");
         setOrders([]);
       }
     } else {
@@ -76,28 +61,19 @@ export default function AdminClient({ user }) {
     }
 
     if (canManageProducts) {
-      const productResponse = await fetch(
-        "/api/admin/products"
-      );
+      const response = await fetch("/api/admin/products");
 
-      if (productResponse.status === 401) {
+      if (response.status === 401) {
         router.replace("/admin/login");
         return;
       }
 
-      if (productResponse.ok) {
-        const data = await productResponse.json();
+      if (response.ok) {
+        const data = await response.json();
         setProducts(data.products || []);
       } else {
-        const data = await productResponse
-          .json()
-          .catch(() => ({}));
-
-        setError(
-          data.error ||
-            "Produktene kunne ikke hentes."
-        );
-
+        const data = await response.json().catch(() => ({}));
+        setError(data.error || "Produktene kunne ikke hentes.");
         setProducts([]);
       }
     } else {
@@ -105,33 +81,20 @@ export default function AdminClient({ user }) {
     }
 
     if (canManageUsers) {
-      const userResponse = await fetch(
-        "/api/admin/users"
-      );
+      const response = await fetch("/api/admin/users");
 
-      if (userResponse.status === 401) {
+      if (response.status === 401) {
         router.replace("/admin/login");
         return;
       }
 
-      if (userResponse.ok) {
-        const data = await userResponse.json();
-
+      if (response.ok) {
+        const data = await response.json();
         setUsers(data.users || []);
-
-        setCurrentUserId(
-          data.currentUserId || user?.id || ""
-        );
+        setCurrentUserId(data.currentUserId || user?.id || "");
       } else {
-        const data = await userResponse
-          .json()
-          .catch(() => ({}));
-
-        setError(
-          data.error ||
-            "Brukerne kunne ikke hentes."
-        );
-
+        const data = await response.json().catch(() => ({}));
+        setError(data.error || "Brukerne kunne ikke hentes.");
         setUsers([]);
       }
     } else {
@@ -145,37 +108,27 @@ export default function AdminClient({ user }) {
 
   async function status(id, newStatus) {
     if (!canUpdateOrders) {
-      setError(
-        "Du har ikke tilgang til å endre bestillinger."
-      );
+      setError("Du har ikke tilgang til å endre bestillinger.");
       return;
     }
 
     setError("");
 
-    const response = await fetch(
-      "/api/admin/orders",
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id,
-          status: newStatus,
-        }),
-      }
-    );
+    const response = await fetch("/api/admin/orders", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id,
+        status: newStatus,
+      }),
+    });
 
-    const data = await response
-      .json()
-      .catch(() => ({}));
+    const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      setError(
-        data.error ||
-          "Status kunne ikke lagres."
-      );
+      setError(data.error || "Status kunne ikke lagres.");
       return;
     }
 
@@ -196,32 +149,19 @@ export default function AdminClient({ user }) {
   ).length;
 
   const working = orders.filter((order) =>
-    [
-      "confirmed",
-      "in_progress",
-      "ready",
-    ].includes(order.status)
+    ["confirmed", "in_progress", "ready"].includes(order.status)
   ).length;
 
   const total = orders.reduce(
-    (sum, order) =>
-      sum + (order.totalOre || 0),
+    (sum, order) => sum + (order.totalOre || 0),
     0
   );
 
   const tabs = [["overview", "Oversikt"]];
 
-  if (canViewOrders) {
-    tabs.push(["orders", "Bestillinger"]);
-  }
-
-  if (canManageProducts) {
-    tabs.push(["products", "Produkter"]);
-  }
-
-  if (canManageUsers) {
-    tabs.push(["users", "Brukere"]);
-  }
+  if (canViewOrders) tabs.push(["orders", "Bestillinger"]);
+  if (canManageProducts) tabs.push(["products", "Produkter"]);
+  if (canManageUsers) tabs.push(["users", "Brukere"]);
 
   return (
     <main className="admin">
@@ -234,21 +174,15 @@ export default function AdminClient({ user }) {
         {tabs.map(([id, label]) => (
           <button
             key={id}
-            className={
-              tab === id ? "active" : ""
-            }
+            className={tab === id ? "active" : ""}
             onClick={() => setTab(id)}
           >
             {label}
-            {id === "orders" && fresh
-              ? ` (${fresh})`
-              : ""}
+            {id === "orders" && fresh ? ` (${fresh})` : ""}
           </button>
         ))}
 
-        <button onClick={logout}>
-          Logg ut
-        </button>
+        <button onClick={logout}>Logg ut</button>
       </aside>
 
       <section className="adminmain">
@@ -266,9 +200,7 @@ export default function AdminClient({ user }) {
             : "Brukere"}
         </h1>
 
-        {error && (
-          <p className="notice">{error}</p>
-        )}
+        {error && <p className="notice">{error}</p>}
 
         {tab === "overview" && (
           <>
@@ -276,9 +208,7 @@ export default function AdminClient({ user }) {
               {canViewOrders && (
                 <>
                   <div className="stat">
-                    <span className="muted">
-                      Nye ordre
-                    </span>
+                    <span className="muted">Nye ordre</span>
                     <br />
                     <b>{fresh}</b>
                   </div>
@@ -302,9 +232,7 @@ export default function AdminClient({ user }) {
                   <b>
                     {
                       products.filter(
-                        (product) =>
-                          product.active !==
-                          false
+                        (product) => product.active !== false
                       ).length
                     }
                   </b>
@@ -326,9 +254,7 @@ export default function AdminClient({ user }) {
               <Orders
                 orders={orders.slice(0, 5)}
                 status={status}
-                canUpdateOrders={
-                  canUpdateOrders
-                }
+                canUpdateOrders={canUpdateOrders}
               />
             )}
 
@@ -336,60 +262,46 @@ export default function AdminClient({ user }) {
               <div className="card">
                 <h3>Velkommen</h3>
                 <p className="muted">
-                  Du er logget inn i Aadland
-                  Service backoffice. Menyen
-                  viser funksjonene du har fått
-                  tilgang til.
+                  Du er logget inn i Aadland Service
+                  backoffice. Menyen viser funksjonene du
+                  har fått tilgang til.
                 </p>
               </div>
             )}
           </>
         )}
 
-        {tab === "orders" &&
-          canViewOrders && (
-            <Orders
-              orders={orders}
-              status={status}
-              canUpdateOrders={
-                canUpdateOrders
-              }
-            />
-          )}
+        {tab === "orders" && canViewOrders && (
+          <Orders
+            orders={orders}
+            status={status}
+            canUpdateOrders={canUpdateOrders}
+          />
+        )}
 
-        {tab === "products" &&
-          canManageProducts && (
-            <Products
-              products={products}
-              reload={load}
-              setError={setError}
-            />
-          )}
+        {tab === "products" && canManageProducts && (
+          <Products
+            products={products}
+            reload={load}
+            setError={setError}
+          />
+        )}
 
-        {tab === "users" &&
-          canManageUsers && (
-            <Users
-              users={users}
-              currentUserId={
-                currentUserId
-              }
-              reload={load}
-              setError={setError}
-              canEditUsers={
-                canEditUsers
-              }
-            />
-          )}
+        {tab === "users" && canManageUsers && (
+          <Users
+            users={users}
+            currentUserId={currentUserId}
+            reload={load}
+            setError={setError}
+            canEditUsers={canEditUsers}
+          />
+        )}
       </section>
     </main>
   );
 }
 
-function Orders({
-  orders,
-  status,
-  canUpdateOrders,
-}) {
+function Orders({ orders, status, canUpdateOrders }) {
   return (
     <table className="table">
       <thead>
@@ -410,18 +322,16 @@ function Orders({
               <b>{order.orderNumber}</b>
               <br />
               <small>
-                {new Date(
-                  order.createdAt
-                ).toLocaleString("nb-NO")}
+                {new Date(order.createdAt).toLocaleString(
+                  "nb-NO"
+                )}
               </small>
             </td>
 
             <td>
               {order.customerName}
               <br />
-              <small>
-                {order.customerEmail}
-              </small>
+              <small>{order.customerEmail}</small>
             </td>
 
             <td>
@@ -431,35 +341,24 @@ function Orders({
             </td>
 
             <td>
-              {order.fulfillmentType ===
-              "delivery"
+              {order.fulfillmentType === "delivery"
                 ? "Levering"
                 : "Henting"}
             </td>
 
-            <td>
-              {nok(order.totalOre || 0)}
-            </td>
+            <td>{nok(order.totalOre || 0)}</td>
 
             <td>
               {canUpdateOrders ? (
                 <select
                   value={order.status}
                   onChange={(e) =>
-                    status(
-                      order.id,
-                      e.target.value
-                    )
+                    status(order.id, e.target.value)
                   }
                 >
-                  {Object.entries(
-                    labels
-                  ).map(
+                  {Object.entries(labels).map(
                     ([value, label]) => (
-                      <option
-                        value={value}
-                        key={value}
-                      >
+                      <option value={value} key={value}>
                         {label}
                       </option>
                     )
@@ -467,8 +366,7 @@ function Orders({
                 </select>
               ) : (
                 <span>
-                  {labels[order.status] ||
-                    order.status}
+                  {labels[order.status] || order.status}
                 </span>
               )}
             </td>
@@ -479,30 +377,17 @@ function Orders({
   );
 }
 
-function Products({
-  products,
-  reload,
-  setError,
-}) {
-  const [showNew, setShowNew] =
-    useState(false);
+function Products({ products, reload, setError }) {
+  const [showNew, setShowNew] = useState(false);
 
   return (
     <>
-      <div
-        style={{
-          marginBottom: 20,
-        }}
-      >
+      <div style={{ marginBottom: 20 }}>
         <button
           className="btn"
-          onClick={() =>
-            setShowNew(!showNew)
-          }
+          onClick={() => setShowNew(!showNew)}
         >
-          {showNew
-            ? "Avbryt"
-            : "Legg til produkt"}
+          {showNew ? "Avbryt" : "Legg til produkt"}
         </button>
       </div>
 
@@ -511,9 +396,7 @@ function Products({
           product={null}
           reload={reload}
           setError={setError}
-          close={() =>
-            setShowNew(false)
-          }
+          close={() => setShowNew(false)}
         />
       )}
 
@@ -539,108 +422,396 @@ function ProductEditor({
 }) {
   const isNew = !product;
 
-  const [editing, setEditing] =
-    useState(isNew);
-
-  const [name, setName] = useState(
-    product?.name || ""
+  const [editing, setEditing] = useState(isNew);
+  const [name, setName] = useState(product?.name || "");
+  const [category, setCategory] = useState(
+    product?.category || "På bestilling"
   );
-
-  const [category, setCategory] =
-    useState(
-      product?.category ||
-        "På bestilling"
-    );
-
-  const [description, setDescription] =
-    useState(
-      product?.description || ""
-    );
+  const [description, setDescription] = useState(
+    product?.description || ""
+  );
+  const [dimensions, setDimensions] = useState(
+    product?.dimensions || ""
+  );
 
   const [price, setPrice] = useState(
     product
-      ? String(
-          (Number(
-            product.basePriceOre
-          ) || 0) / 100
-        )
+      ? String((Number(product.basePriceOre) || 0) / 100)
       : ""
   );
 
-  const [imageUrl, setImageUrl] =
-    useState(
-      product?.imageUrl || ""
-    );
+  const [imageUrls, setImageUrls] = useState(
+    Array.isArray(product?.imageUrls) &&
+      product.imageUrls.length
+      ? product.imageUrls
+      : product?.imageUrl
+      ? [product.imageUrl]
+      : []
+  );
 
-  const [active, setActive] =
-    useState(
-      product?.active !== false
-    );
+  const [specifications, setSpecifications] = useState(
+    Array.isArray(product?.specifications)
+      ? product.specifications
+      : []
+  );
 
-  const [saving, setSaving] =
-    useState(false);
+  const [options, setOptions] = useState(
+    Array.isArray(product?.options)
+      ? product.options
+      : []
+  );
 
-  const [uploading, setUploading] =
-    useState(false);
+  const [active, setActive] = useState(
+    product?.active !== false
+  );
 
-  useEffect(() => {
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  function resetFromProduct() {
     if (!product) return;
 
     setName(product.name || "");
-    setCategory(
-      product.category ||
-        "På bestilling"
-    );
-    setDescription(
-      product.description || ""
-    );
+    setCategory(product.category || "På bestilling");
+    setDescription(product.description || "");
+    setDimensions(product.dimensions || "");
+
     setPrice(
-      String(
-        (Number(
-          product.basePriceOre
-        ) || 0) / 100
-      )
+      String((Number(product.basePriceOre) || 0) / 100)
     );
-    setImageUrl(
-      product.imageUrl || ""
+
+    setImageUrls(
+      Array.isArray(product.imageUrls) &&
+        product.imageUrls.length
+        ? product.imageUrls
+        : product.imageUrl
+        ? [product.imageUrl]
+        : []
     );
-    setActive(
-      product.active !== false
+
+    setSpecifications(
+      Array.isArray(product.specifications)
+        ? product.specifications
+        : []
     );
+
+    setOptions(
+      Array.isArray(product.options)
+        ? product.options
+        : []
+    );
+
+    setActive(product.active !== false);
+  }
+
+  useEffect(() => {
+    resetFromProduct();
   }, [product]);
 
-  async function uploadImage(file) {
-    if (!file) return;
+  async function uploadImages(files) {
+    const selected = Array.from(files || []);
+
+    if (!selected.length) return;
 
     setUploading(true);
     setError("");
 
-    const formData = new FormData();
-    formData.append("file", file);
+    const uploaded = [];
 
-    const response = await fetch(
-      "/api/admin/upload",
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
+    for (const file of selected) {
+      const formData = new FormData();
+      formData.append("file", file);
 
-    const data = await response
-      .json()
-      .catch(() => ({}));
-
-    setUploading(false);
-
-    if (!response.ok) {
-      setError(
-        data.error ||
-          "Bildet kunne ikke lastes opp."
+      const response = await fetch(
+        "/api/admin/upload",
+        {
+          method: "POST",
+          body: formData,
+        }
       );
-      return;
+
+      const data = await response
+        .json()
+        .catch(() => ({}));
+
+      if (!response.ok) {
+        setUploading(false);
+        setError(
+          data.error ||
+            "Et av bildene kunne ikke lastes opp."
+        );
+        return;
+      }
+
+      if (data.url) {
+        uploaded.push(data.url);
+      }
     }
 
-    setImageUrl(data.url || "");
+    setImageUrls((current) => [
+      ...current,
+      ...uploaded,
+    ]);
+
+    setUploading(false);
+  }
+
+  function moveImage(index, direction) {
+    setImageUrls((current) => {
+      const next = [...current];
+      const target = index + direction;
+
+      if (
+        target < 0 ||
+        target >= next.length
+      ) {
+        return current;
+      }
+
+      [next[index], next[target]] = [
+        next[target],
+        next[index],
+      ];
+
+      return next;
+    });
+  }
+
+  function addSpecification() {
+    setSpecifications((current) => [
+      ...current,
+      {
+        label: "",
+        value: "",
+      },
+    ]);
+  }
+
+  function updateSpecification(
+    index,
+    key,
+    value
+  ) {
+    setSpecifications((current) =>
+      current.map((item, i) =>
+        i === index
+          ? {
+              ...item,
+              [key]: value,
+            }
+          : item
+      )
+    );
+  }
+
+  function removeSpecification(index) {
+    setSpecifications((current) =>
+      current.filter((_, i) => i !== index)
+    );
+  }
+
+  function addOption() {
+    setOptions((current) => [
+      ...current,
+      {
+        id: `variant-${Date.now()}-${current.length}`,
+        label: "",
+        choices: [],
+      },
+    ]);
+  }
+
+  function updateOption(index, key, value) {
+    setOptions((current) =>
+      current.map((option, i) =>
+        i === index
+          ? {
+              ...option,
+              [key]: value,
+            }
+          : option
+      )
+    );
+  }
+
+  function removeOption(index) {
+    setOptions((current) =>
+      current.filter((_, i) => i !== index)
+    );
+  }
+
+  function addChoice(optionIndex) {
+    setOptions((current) =>
+      current.map((option, i) =>
+        i === optionIndex
+          ? {
+              ...option,
+              choices: [
+                ...(Array.isArray(option.choices)
+                  ? option.choices
+                  : []),
+                {
+                  value: "",
+                  label: "",
+                  extraOre: 0,
+                },
+              ],
+            }
+          : option
+      )
+    );
+  }
+
+  function updateChoice(
+    optionIndex,
+    choiceIndex,
+    key,
+    value
+  ) {
+    setOptions((current) =>
+      current.map((option, i) => {
+        if (i !== optionIndex) {
+          return option;
+        }
+
+        const choices = Array.isArray(
+          option.choices
+        )
+          ? option.choices
+          : [];
+
+        return {
+          ...option,
+          choices: choices.map(
+            (choice, j) =>
+              j === choiceIndex
+                ? {
+                    ...choice,
+                    [key]: value,
+                  }
+                : choice
+          ),
+        };
+      })
+    );
+  }
+
+  function removeChoice(
+    optionIndex,
+    choiceIndex
+  ) {
+    setOptions((current) =>
+      current.map((option, i) => {
+        if (i !== optionIndex) {
+          return option;
+        }
+
+        return {
+          ...option,
+          choices: (
+            Array.isArray(option.choices)
+              ? option.choices
+              : []
+          ).filter(
+            (_, j) => j !== choiceIndex
+          ),
+        };
+      })
+    );
+  }
+
+  function cleanedSpecifications() {
+    return specifications
+      .map((item) => ({
+        label: String(
+          item.label || ""
+        ).trim(),
+        value: String(
+          item.value || ""
+        ).trim(),
+      }))
+      .filter(
+        (item) =>
+          item.label && item.value
+      );
+  }
+
+  function cleanedOptions() {
+    return options
+      .map((option, optionIndex) => {
+        const label = String(
+          option.label || ""
+        ).trim();
+
+        const id =
+          String(
+            option.id || ""
+          ).trim() ||
+          `variant-${optionIndex + 1}`;
+
+        const choices = (
+          Array.isArray(option.choices)
+            ? option.choices
+            : []
+        )
+          .map((choice) => {
+            const choiceLabel =
+              String(
+                choice.label || ""
+              ).trim();
+
+            const value =
+              String(
+                choice.value || ""
+              ).trim() ||
+              choiceLabel
+                .toLowerCase()
+                .replace(
+                  /[^a-z0-9æøå]+/gi,
+                  "-"
+                )
+                .replace(/^-|-$/g, "");
+
+            const extraNumber =
+              Number(
+                String(
+                  choice.extraNok !==
+                    undefined
+                    ? choice.extraNok
+                    : (Number(
+                        choice.extraOre
+                      ) || 0) / 100
+                ).replace(",", ".")
+              );
+
+            return {
+              value,
+              label: choiceLabel,
+              extraOre:
+                Number.isFinite(
+                  extraNumber
+                )
+                  ? Math.round(
+                      extraNumber * 100
+                    )
+                  : 0,
+            };
+          })
+          .filter(
+            (choice) => choice.label
+          );
+
+        return {
+          id,
+          label,
+          choices,
+        };
+      })
+      .filter(
+        (option) =>
+          option.label &&
+          option.choices.length
+      );
   }
 
   async function save(e) {
@@ -684,18 +855,38 @@ function ProductEditor({
         body: JSON.stringify({
           ...(isNew
             ? {}
-            : { id: product.id }),
+            : {
+                id: product.id,
+              }),
+
           name: name.trim(),
+
           category:
             category.trim() ||
             "På bestilling",
+
           description:
             description.trim(),
-          basePriceOre: Math.round(
-            priceNumber * 100
-          ),
+
+          dimensions:
+            dimensions.trim(),
+
+          basePriceOre:
+            Math.round(
+              priceNumber * 100
+            ),
+
           imageUrl:
-            imageUrl || null,
+            imageUrls[0] || null,
+
+          imageUrls,
+
+          specifications:
+            cleanedSpecifications(),
+
+          options:
+            cleanedOptions(),
+
           active,
         }),
       }
@@ -728,6 +919,16 @@ function ProductEditor({
     setError("");
     setSaving(true);
 
+    const existingImages =
+      Array.isArray(
+        product.imageUrls
+      ) &&
+      product.imageUrls.length
+        ? product.imageUrls
+        : product.imageUrl
+        ? [product.imageUrl]
+        : [];
+
     const response = await fetch(
       "/api/admin/products",
       {
@@ -738,21 +939,46 @@ function ProductEditor({
         },
         body: JSON.stringify({
           id: product.id,
+
           name:
             product.name || "",
+
           category:
             product.category ||
             "På bestilling",
+
           description:
-            product.description ||
-            "",
+            product.description || "",
+
+          dimensions:
+            product.dimensions || "",
+
           basePriceOre:
             Number(
               product.basePriceOre
             ) || 0,
+
           imageUrl:
-            product.imageUrl ||
+            existingImages[0] ||
             null,
+
+          imageUrls:
+            existingImages,
+
+          specifications:
+            Array.isArray(
+              product.specifications
+            )
+              ? product.specifications
+              : [],
+
+          options:
+            Array.isArray(
+              product.options
+            )
+              ? product.options
+              : [],
+
           active:
             product.active === false,
         }),
@@ -777,11 +1003,18 @@ function ProductEditor({
   }
 
   if (!editing && product) {
+    const previewImage =
+      (Array.isArray(
+        product.imageUrls
+      ) &&
+        product.imageUrls[0]) ||
+      product.imageUrl;
+
     return (
       <div className="card">
-        {product.imageUrl && (
+        {previewImage && (
           <img
-            src={product.imageUrl}
+            src={previewImage}
             alt={product.name}
             style={{
               width: "100%",
@@ -803,11 +1036,35 @@ function ProductEditor({
           {product.description}
         </p>
 
+        {product.dimensions && (
+          <p className="muted">
+            <b>Mål:</b>{" "}
+            {product.dimensions}
+          </p>
+        )}
+
         <b>
           {nok(
             product.basePriceOre
           )}
         </b>
+
+        <p
+          className="muted"
+          style={{
+            marginTop: 10,
+          }}
+        >
+          {product.imageUrls?.length ||
+            (product.imageUrl
+              ? 1
+              : 0)}{" "}
+          bilde(r)
+          {" · "}
+          {product.options?.length ||
+            0}{" "}
+          variantgruppe(r)
+        </p>
 
         <div
           style={{
@@ -831,7 +1088,8 @@ function ProductEditor({
             onClick={toggleActive}
             disabled={saving}
           >
-            {product.active === false
+            {product.active ===
+            false
               ? "Vis produkt"
               : "Skjul produkt"}
           </button>
@@ -846,7 +1104,9 @@ function ProductEditor({
       onSubmit={save}
       style={
         isNew
-          ? { marginBottom: 20 }
+          ? {
+              marginBottom: 20,
+            }
           : undefined
       }
     >
@@ -869,7 +1129,9 @@ function ProductEditor({
           required
           value={name}
           onChange={(e) =>
-            setName(e.target.value)
+            setName(
+              e.target.value
+            )
           }
           placeholder="F.eks. Spilebenk"
         />
@@ -887,6 +1149,12 @@ function ProductEditor({
           }
           placeholder="F.eks. Benker"
         />
+
+        <small className="muted">
+          Produkter med samme
+          kategorinavn blir samlet
+          sammen i nettbutikken.
+        </small>
       </div>
 
       <div className="field">
@@ -909,7 +1177,30 @@ function ProductEditor({
       </div>
 
       <div className="field">
-        <label>Pris i kroner</label>
+        <label>
+          Faste mål / produktmål
+        </label>
+
+        <textarea
+          value={dimensions}
+          onChange={(e) =>
+            setDimensions(
+              e.target.value
+            )
+          }
+          rows={3}
+          placeholder="F.eks. høyde 45 cm, dybde 40 cm"
+          style={{
+            width: "100%",
+            resize: "vertical",
+          }}
+        />
+      </div>
+
+      <div className="field">
+        <label>
+          Grunnpris i kroner
+        </label>
 
         <input
           type="number"
@@ -918,68 +1209,438 @@ function ProductEditor({
           required
           value={price}
           onChange={(e) =>
-            setPrice(e.target.value)
+            setPrice(
+              e.target.value
+            )
           }
           placeholder="2990"
         />
       </div>
 
       <div className="field">
-        <label>Produktbilde</label>
+        <label>
+          Produktbilder
+        </label>
 
-        {imageUrl && (
+        <p className="muted">
+          Første bilde blir
+          hovedbildet. Du kan laste
+          opp flere bilder samtidig.
+        </p>
+
+        {imageUrls.length >
+          0 && (
           <div
             style={{
-              marginBottom: 12,
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(150px, 1fr))",
+              gap: 12,
+              marginBottom: 14,
             }}
           >
-            <img
-              src={imageUrl}
-              alt="Produktbilde"
-              style={{
-                width: "100%",
-                maxHeight: 280,
-                objectFit: "cover",
-                borderRadius: 12,
-              }}
-            />
+            {imageUrls.map(
+              (url, index) => (
+                <div
+                  key={`${url}-${index}`}
+                  style={{
+                    border:
+                      "1px solid #ddd",
+                    borderRadius: 12,
+                    padding: 8,
+                  }}
+                >
+                  <img
+                    src={url}
+                    alt={`Produktbilde ${
+                      index + 1
+                    }`}
+                    style={{
+                      width: "100%",
+                      height: 130,
+                      objectFit:
+                        "cover",
+                      borderRadius: 8,
+                    }}
+                  />
 
-            <button
-              type="button"
-              className="btn alt"
-              onClick={() =>
-                setImageUrl("")
-              }
-              style={{
-                marginTop: 10,
-              }}
-            >
-              Fjern bilde
-            </button>
+                  <small className="muted">
+                    {index === 0
+                      ? "Hovedbilde"
+                      : `Bilde ${
+                          index +
+                          1
+                        }`}
+                  </small>
+
+                  <div
+                    style={{
+                      display:
+                        "flex",
+                      gap: 6,
+                      flexWrap:
+                        "wrap",
+                      marginTop: 8,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="btn alt"
+                      onClick={() =>
+                        moveImage(
+                          index,
+                          -1
+                        )
+                      }
+                      disabled={
+                        index === 0
+                      }
+                    >
+                      ←
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn alt"
+                      onClick={() =>
+                        moveImage(
+                          index,
+                          1
+                        )
+                      }
+                      disabled={
+                        index ===
+                        imageUrls.length -
+                          1
+                      }
+                    >
+                      →
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn alt"
+                      onClick={() =>
+                        setImageUrls(
+                          (current) =>
+                            current.filter(
+                              (
+                                _,
+                                i
+                              ) =>
+                                i !==
+                                index
+                            )
+                        )
+                      }
+                    >
+                      Fjern
+                    </button>
+                  </div>
+                </div>
+              )
+            )}
           </div>
         )}
 
         <input
           type="file"
+          multiple
           accept="image/jpeg,image/png,image/webp"
           disabled={uploading}
           onChange={(e) => {
-            const file =
-              e.target.files?.[0];
-
-            if (file) {
-              uploadImage(file);
-            }
-
+            uploadImages(
+              e.target.files
+            );
             e.target.value = "";
           }}
         />
 
         {uploading && (
           <p className="muted">
-            Laster opp bilde...
+            Laster opp bilde(r)...
           </p>
         )}
+      </div>
+
+      <div className="field">
+        <label>
+          Spesifikasjoner
+        </label>
+
+        <p className="muted">
+          Eksempel: Materiale –
+          impregnert tre, eller Maks
+          belastning – 250 kg.
+        </p>
+
+        {specifications.map(
+          (item, index) => (
+            <div
+              key={index}
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "1fr 1fr auto",
+                gap: 8,
+                marginBottom: 8,
+              }}
+            >
+              <input
+                value={
+                  item.label || ""
+                }
+                onChange={(e) =>
+                  updateSpecification(
+                    index,
+                    "label",
+                    e.target.value
+                  )
+                }
+                placeholder="Navn"
+              />
+
+              <input
+                value={
+                  item.value || ""
+                }
+                onChange={(e) =>
+                  updateSpecification(
+                    index,
+                    "value",
+                    e.target.value
+                  )
+                }
+                placeholder="Verdi"
+              />
+
+              <button
+                type="button"
+                className="btn alt"
+                onClick={() =>
+                  removeSpecification(
+                    index
+                  )
+                }
+              >
+                Fjern
+              </button>
+            </div>
+          )
+        )}
+
+        <button
+          type="button"
+          className="btn alt"
+          onClick={
+            addSpecification
+          }
+        >
+          + Legg til spesifikasjon
+        </button>
+      </div>
+
+      <div className="field">
+        <label>
+          Varianter /
+          rullegardinvalg
+        </label>
+
+        <p className="muted">
+          Eksempel: Lengde med
+          valgene 120 cm, 160 cm og
+          200 cm. Pristillegg er
+          valgfritt.
+        </p>
+
+        {options.map(
+          (
+            option,
+            optionIndex
+          ) => (
+            <div
+              key={
+                option.id ||
+                optionIndex
+              }
+              style={{
+                border:
+                  "1px solid #ddd",
+                borderRadius: 12,
+                padding: 14,
+                marginBottom: 14,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems:
+                    "end",
+                  flexWrap:
+                    "wrap",
+                }}
+              >
+                <div
+                  className="field"
+                  style={{
+                    flex:
+                      "1 1 220px",
+                    marginBottom: 0,
+                  }}
+                >
+                  <label>
+                    Navn på variant
+                  </label>
+
+                  <input
+                    value={
+                      option.label ||
+                      ""
+                    }
+                    onChange={(
+                      e
+                    ) =>
+                      updateOption(
+                        optionIndex,
+                        "label",
+                        e.target
+                          .value
+                      )
+                    }
+                    placeholder="F.eks. Lengde"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  className="btn alt"
+                  onClick={() =>
+                    removeOption(
+                      optionIndex
+                    )
+                  }
+                >
+                  Fjern variant
+                </button>
+              </div>
+
+              <div
+                style={{
+                  marginTop: 12,
+                }}
+              >
+                {(
+                  Array.isArray(
+                    option.choices
+                  )
+                    ? option.choices
+                    : []
+                ).map(
+                  (
+                    choice,
+                    choiceIndex
+                  ) => (
+                    <div
+                      key={
+                        choiceIndex
+                      }
+                      style={{
+                        display:
+                          "grid",
+                        gridTemplateColumns:
+                          "minmax(140px, 1fr) minmax(120px, 180px) auto",
+                        gap: 8,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <input
+                        value={
+                          choice.label ||
+                          ""
+                        }
+                        onChange={(
+                          e
+                        ) =>
+                          updateChoice(
+                            optionIndex,
+                            choiceIndex,
+                            "label",
+                            e
+                              .target
+                              .value
+                          )
+                        }
+                        placeholder="F.eks. 160 cm"
+                      />
+
+                      <input
+                        type="number"
+                        step="1"
+                        value={
+                          choice.extraNok !==
+                          undefined
+                            ? choice.extraNok
+                            : (Number(
+                                choice.extraOre
+                              ) ||
+                                0) /
+                              100
+                        }
+                        onChange={(
+                          e
+                        ) =>
+                          updateChoice(
+                            optionIndex,
+                            choiceIndex,
+                            "extraNok",
+                            e
+                              .target
+                              .value
+                          )
+                        }
+                        placeholder="Pristillegg kr"
+                      />
+
+                      <button
+                        type="button"
+                        className="btn alt"
+                        onClick={() =>
+                          removeChoice(
+                            optionIndex,
+                            choiceIndex
+                          )
+                        }
+                      >
+                        Fjern
+                      </button>
+                    </div>
+                  )
+                )}
+              </div>
+
+              <button
+                type="button"
+                className="btn alt"
+                onClick={() =>
+                  addChoice(
+                    optionIndex
+                  )
+                }
+              >
+                + Legg til valg
+              </button>
+            </div>
+          )
+        )}
+
+        <button
+          type="button"
+          className="btn alt"
+          onClick={addOption}
+        >
+          + Legg til variant
+        </button>
       </div>
 
       <label
@@ -997,7 +1658,8 @@ function ProductEditor({
             )
           }
         />{" "}
-        Vis produkt i nettbutikken
+        Vis produkt i
+        nettbutikken
       </label>
 
       <div
@@ -1025,31 +1687,8 @@ function ProductEditor({
             type="button"
             className="btn alt"
             onClick={() => {
+              resetFromProduct();
               setEditing(false);
-              setName(
-                product.name || ""
-              );
-              setCategory(
-                product.category ||
-                  "På bestilling"
-              );
-              setDescription(
-                product.description ||
-                  ""
-              );
-              setPrice(
-                String(
-                  (Number(
-                    product.basePriceOre
-                  ) || 0) / 100
-                )
-              );
-              setImageUrl(
-                product.imageUrl || ""
-              );
-              setActive(
-                product.active !== false
-              );
             }}
           >
             Avbryt
@@ -1091,7 +1730,9 @@ function Users({
           <button
             className="btn"
             onClick={() =>
-              setShowNew(!showNew)
+              setShowNew(
+                !showNew
+              )
             }
           >
             {showNew
@@ -1101,29 +1742,40 @@ function Users({
         </div>
       )}
 
-      {canEditUsers && showNew && (
-        <NewUser
-          reload={reload}
-          setError={setError}
-          close={() =>
-            setShowNew(false)
-          }
-        />
-      )}
-
-      <div className="grid">
-        {users.map((adminUser) => (
-          <UserCard
-            key={adminUser.id}
-            user={adminUser}
-            currentUserId={
-              currentUserId
-            }
+      {canEditUsers &&
+        showNew && (
+          <NewUser
             reload={reload}
             setError={setError}
-            canEdit={canEditUsers}
+            close={() =>
+              setShowNew(false)
+            }
           />
-        ))}
+        )}
+
+      <div className="grid">
+        {users.map(
+          (adminUser) => (
+            <UserCard
+              key={
+                adminUser.id
+              }
+              user={
+                adminUser
+              }
+              currentUserId={
+                currentUserId
+              }
+              reload={reload}
+              setError={
+                setError
+              }
+              canEdit={
+                canEditUsers
+              }
+            />
+          )
+        )}
       </div>
     </>
   );
@@ -1217,7 +1869,9 @@ function NewUser({
           required
           value={name}
           onChange={(e) =>
-            setName(e.target.value)
+            setName(
+              e.target.value
+            )
           }
         />
       </div>
@@ -1232,7 +1886,9 @@ function NewUser({
           required
           value={email}
           onChange={(e) =>
-            setEmail(e.target.value)
+            setEmail(
+              e.target.value
+            )
           }
         />
       </div>
@@ -1259,7 +1915,9 @@ function NewUser({
 
       <PermissionChecks
         values={permissions}
-        setValues={setPermissions}
+        setValues={
+          setPermissions
+        }
       />
 
       <button
@@ -1287,18 +1945,27 @@ function UserCard({
   const [values, setValues] =
     useState({
       name: user.name || "",
-      canViewOrders: Boolean(
-        user.can_view_orders
-      ),
-      canUpdateOrders: Boolean(
-        user.can_update_orders
-      ),
-      canManageProducts: Boolean(
-        user.can_manage_products
-      ),
-      canManageUsers: Boolean(
-        user.can_manage_users
-      ),
+
+      canViewOrders:
+        Boolean(
+          user.can_view_orders
+        ),
+
+      canUpdateOrders:
+        Boolean(
+          user.can_update_orders
+        ),
+
+      canManageProducts:
+        Boolean(
+          user.can_manage_products
+        ),
+
+      canManageUsers:
+        Boolean(
+          user.can_manage_users
+        ),
+
       active:
         user.active !== false,
     });
@@ -1349,7 +2016,9 @@ function UserCard({
   return (
     <div className="card">
       <div className="kicker">
-        {owner ? "Eier" : "Bruker"}
+        {owner
+          ? "Eier"
+          : "Bruker"}
       </div>
 
       <h3>{user.name}</h3>
@@ -1364,11 +2033,15 @@ function UserCard({
             <label>Navn</label>
 
             <input
-              value={values.name}
+              value={
+                values.name
+              }
               onChange={(e) =>
                 setValues({
                   ...values,
-                  name: e.target.value,
+                  name:
+                    e.target
+                      .value,
                 })
               }
             />
@@ -1376,7 +2049,9 @@ function UserCard({
 
           <PermissionChecks
             values={values}
-            setValues={setValues}
+            setValues={
+              setValues
+            }
           />
 
           <label
@@ -1387,12 +2062,15 @@ function UserCard({
           >
             <input
               type="checkbox"
-              checked={values.active}
+              checked={
+                values.active
+              }
               onChange={(e) =>
                 setValues({
                   ...values,
                   active:
-                    e.target.checked,
+                    e.target
+                      .checked,
                 })
               }
               disabled={
@@ -1422,7 +2100,9 @@ function UserCard({
 
           <PermissionChecks
             values={values}
-            setValues={setValues}
+            setValues={
+              setValues
+            }
             disabled
           />
 
@@ -1488,7 +2168,8 @@ function PermissionChecks({
                 setValues({
                   ...values,
                   [key]:
-                    e.target.checked,
+                    e.target
+                      .checked,
                 })
               }
             />{" "}
