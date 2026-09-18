@@ -1,285 +1,178 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-
-import {
-  fallbackProducts,
-  nok,
-  productPrice,
-} from "../../../lib/catalog";
-
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
+import { nok } from "../../../../lib/catalog";
 
-export default function ProductPage() {
+export default function CategoryPage() {
   const params = useParams();
+  const slug = params?.slug;
 
-  const slug = decodeURIComponent(
-    String(params?.slug || "")
-  );
-
-  const [products, setProducts] =
-    useState(fallbackProducts);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [selectedImage, setSelectedImage] =
-    useState(0);
-
-  const [selected, setSelected] =
-    useState({});
-
-  const [quantity, setQuantity] =
-    useState(1);
-
-  const [showOrder, setShowOrder] =
-    useState(false);
-
-  const [customer, setCustomer] =
-    useState({
-      name: "",
-      email: "",
-      phone: "",
-      address: "",
-      postalCode: "",
-      city: "",
-      note: "",
-      deliveryWithinRadius: true,
-    });
-
-  const [fulfillment, setFulfillment] =
-    useState("pickup");
-
-  const [sending, setSending] =
-    useState(false);
-
-  const [error, setError] =
-    useState("");
-
-  const [message, setMessage] =
-    useState(null);
+  const [category, setCategory] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/products")
-      .then((response) =>
-        response.ok
-          ? response.json()
-          : null
-      )
-      .then((data) => {
-        if (
-          Array.isArray(
-            data?.products
-          )
-        ) {
-          setProducts(
-            data.products
+    if (!slug) return;
+
+    async function load() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [
+          categoriesResponse,
+          productsResponse,
+        ] = await Promise.all([
+          fetch("/api/categories"),
+          fetch("/api/products"),
+        ]);
+
+        const categoriesData =
+          await categoriesResponse
+            .json()
+            .catch(() => ({}));
+
+        const productsData =
+          await productsResponse
+            .json()
+            .catch(() => ({}));
+
+        if (!categoriesResponse.ok) {
+          throw new Error(
+            categoriesData.error ||
+              "Kategorien kunne ikke hentes."
           );
         }
-      })
-      .catch(() => {})
-      .finally(() =>
-        setLoading(false)
-      );
-  }, []);
 
-  const product =
-    useMemo(
-      () =>
-        products.find(
-          (item) =>
-            String(
-              item.slug ||
-                item.id
-            ) === slug &&
-            item.active !== false
-        ),
-      [products, slug]
-    );
+        if (!productsResponse.ok) {
+          throw new Error(
+            productsData.error ||
+              "Produktene kunne ikke hentes."
+          );
+        }
 
-  const images =
-    useMemo(() => {
-      if (!product) {
-        return [];
-      }
-
-      if (
-        Array.isArray(
-          product.imageUrls
-        ) &&
-        product.imageUrls.length
-      ) {
-        return product.imageUrls;
-      }
-
-      if (product.imageUrl) {
-        return [
-          product.imageUrl,
-        ];
-      }
-
-      return [];
-    }, [product]);
-
-  useEffect(() => {
-    if (!product) {
-      return;
-    }
-
-    const initial =
-      Object.fromEntries(
-        (
-          product.options || []
-        ).map((option) => [
-          option.id,
-          option.choices?.[0]
-            ?.value || "",
-        ])
-      );
-
-    setSelected(initial);
-    setSelectedImage(0);
-  }, [product]);
-
-  const price =
-    useMemo(() => {
-      if (!product) {
-        return 0;
-      }
-
-      return productPrice(
-        product,
-        selected
-      );
-    }, [product, selected]);
-
-  const total =
-    price * quantity;
-
-  async function sendOrder(e) {
-    e.preventDefault();
-
-    if (!product) {
-      return;
-    }
-
-    setError("");
-    setMessage(null);
-    setSending(true);
-
-    try {
-      const response =
-        await fetch(
-          "/api/orders",
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body: JSON.stringify({
-              orderType:
-                "order",
-
-              customer,
-
-              fulfillmentType:
-                fulfillment,
-
-              deliveryWithinRadius:
-                customer.deliveryWithinRadius,
-
-              items: [
-                {
-                  productId:
-                    product.id,
-
-                  quantity,
-
-                  selectedOptions:
-                    selected,
-                },
-              ],
-            }),
-          }
+        const foundCategory = (
+          categoriesData.categories || []
+        ).find(
+          (item) => item.slug === slug
         );
 
-      const data =
-        await response.json();
+        if (!foundCategory) {
+          setCategory(null);
+          setProducts([]);
+          return;
+        }
 
-      if (!response.ok) {
+        setCategory(foundCategory);
+
+        const matchingProducts = (
+          productsData.products || []
+        ).filter(
+          (product) =>
+            product.active !== false &&
+            product.categoryId ===
+              foundCategory.id
+        );
+
+        setProducts(matchingProducts);
+      } catch (error) {
         setError(
-          data.error ||
-            "Bestillingen kunne ikke sendes."
+          error.message ||
+            "Innholdet kunne ikke hentes."
         );
-
-        return;
+      } finally {
+        setLoading(false);
       }
-
-      setMessage(data);
-      setShowOrder(false);
-    } catch {
-      setError(
-        "Bestillingen kunne ikke sendes. Prøv igjen."
-      );
-    } finally {
-      setSending(false);
     }
-  }
+
+    load();
+  }, [slug]);
 
   if (loading) {
     return (
       <main>
-        <Header />
+        <section
+          style={{
+            maxWidth: 1180,
+            margin: "0 auto",
+            padding: "70px 24px 100px",
+          }}
+        >
+          <p>Laster produkter...</p>
+        </section>
+      </main>
+    );
+  }
 
-        <section className="section">
-          <div className="wrap">
-            <p className="muted">
-              Henter produkt...
-            </p>
+  if (error) {
+    return (
+      <main>
+        <section
+          style={{
+            maxWidth: 1180,
+            margin: "0 auto",
+            padding: "70px 24px 100px",
+          }}
+        >
+          <Link
+            href="/produkter"
+            style={{
+              color: "inherit",
+              textDecoration: "none",
+            }}
+          >
+            ← Tilbake til produkter
+          </Link>
+
+          <div
+            className="card"
+            style={{
+              marginTop: 30,
+            }}
+          >
+            <h2>Noe gikk galt</h2>
+            <p>{error}</p>
           </div>
         </section>
       </main>
     );
   }
 
-  if (!product) {
+  if (!category) {
     return (
       <main>
-        <Header />
+        <section
+          style={{
+            maxWidth: 1180,
+            margin: "0 auto",
+            padding: "70px 24px 100px",
+          }}
+        >
+          <Link
+            href="/produkter"
+            style={{
+              color: "inherit",
+              textDecoration: "none",
+            }}
+          >
+            ← Tilbake til produkter
+          </Link>
 
-        <section className="section">
-          <div className="wrap">
-            <div className="card">
-              <div className="kicker">
-                Produkt
-              </div>
+          <div
+            className="card"
+            style={{
+              marginTop: 30,
+            }}
+          >
+            <h2>Kategorien finnes ikke</h2>
 
-              <h1>
-                Produktet ble
-                ikke funnet
-              </h1>
-
-              <p className="muted">
-                Produktet kan ha
-                blitt fjernet eller
-                skjult.
-              </p>
-
-              <a
-                className="btn"
-                href="/produkter"
-              >
-                Tilbake til
-                produkter
-              </a>
-            </div>
+            <p>
+              Kategorien kan ha blitt fjernet
+              eller skjult.
+            </p>
           </div>
         </section>
       </main>
@@ -288,984 +181,191 @@ export default function ProductPage() {
 
   return (
     <main>
-      <Header />
-
       <section
-        className="section"
         style={{
-          paddingTop: 45,
+          maxWidth: 1180,
+          margin: "0 auto",
+          padding: "70px 24px 100px",
         }}
       >
-        <div className="wrap">
-          <div
-            style={{
-              marginBottom: 28,
-            }}
-          >
-            <a
-              href="/produkter"
-              className="muted"
-              style={{
-                textDecoration:
-                  "none",
-              }}
-            >
-              ← Tilbake til
-              produkter
-            </a>
+        <Link
+          href="/produkter"
+          style={{
+            color: "inherit",
+            textDecoration: "none",
+            opacity: 0.7,
+          }}
+        >
+          ← Alle kategorier
+        </Link>
+
+        <div
+          style={{
+            marginTop: 30,
+            marginBottom: 42,
+          }}
+        >
+          <div className="kicker">
+            Produkter
           </div>
 
+          <h1
+            style={{
+              marginBottom: 12,
+            }}
+          >
+            {category.name}
+          </h1>
+
+          {category.description && (
+            <p
+              style={{
+                maxWidth: 700,
+                fontSize: 18,
+                lineHeight: 1.6,
+                opacity: 0.75,
+              }}
+            >
+              {category.description}
+            </p>
+          )}
+        </div>
+
+        {products.length === 0 ? (
+          <div className="card">
+            <h3>
+              Ingen produkter i denne
+              kategorien ennå
+            </h3>
+
+            <p>
+              Det er foreløpig ingen aktive
+              produkter i kategorien.
+            </p>
+          </div>
+        ) : (
           <div
             style={{
               display: "grid",
               gridTemplateColumns:
-                "minmax(0, 1.15fr) minmax(320px, 0.85fr)",
-              gap: 48,
-              alignItems: "start",
+                "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: 24,
             }}
-            className="productLayout"
           >
-            <div>
-              {images.length >
-              0 ? (
-                <>
-                  <div
+            {products.map((product) => {
+              const image =
+                (Array.isArray(
+                  product.imageUrls
+                ) &&
+                  product.imageUrls[0]) ||
+                product.imageUrl;
+
+              return (
+                <Link
+                  key={product.id}
+                  href={`/produkter/${product.slug}`}
+                  style={{
+                    color: "inherit",
+                    textDecoration: "none",
+                  }}
+                >
+                  <article
+                    className="card"
                     style={{
-                      background:
-                        "#f1ede5",
-                      borderRadius:
-                        18,
-                      overflow:
-                        "hidden",
+                      height: "100%",
+                      padding: 0,
+                      overflow: "hidden",
+                      cursor: "pointer",
                     }}
                   >
-                    <img
-                      src={
-                        images[
-                          selectedImage
-                        ] ||
-                        images[0]
-                      }
-                      alt={
-                        product.name
-                      }
-                      style={{
-                        width:
-                          "100%",
-                        height:
-                          520,
-                        objectFit:
-                          "cover",
-                        display:
-                          "block",
-                      }}
-                    />
-                  </div>
+                    {image ? (
+                      <img
+                        src={image}
+                        alt={product.name}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          height: 260,
+                          objectFit: "cover",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          height: 260,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background:
+                            "rgba(0,0,0,0.05)",
+                          fontSize: 54,
+                          fontWeight: 700,
+                          opacity: 0.25,
+                        }}
+                      >
+                        AS
+                      </div>
+                    )}
 
-                  {images.length >
-                    1 && (
                     <div
                       style={{
-                        display:
-                          "grid",
-                        gridTemplateColumns:
-                          "repeat(auto-fill, minmax(90px, 1fr))",
-                        gap: 10,
-                        marginTop: 12,
+                        padding: 24,
                       }}
                     >
-                      {images.map(
-                        (
-                          image,
-                          index
-                        ) => (
-                          <button
-                            key={`${image}-${index}`}
-                            type="button"
-                            onClick={() =>
-                              setSelectedImage(
-                                index
-                              )
-                            }
-                            style={{
-                              padding: 0,
-                              border:
-                                index ===
-                                selectedImage
-                                  ? "2px solid #181613"
-                                  : "2px solid transparent",
-                              borderRadius:
-                                10,
-                              overflow:
-                                "hidden",
-                              cursor:
-                                "pointer",
-                              background:
-                                "transparent",
-                            }}
-                          >
-                            <img
-                              src={
-                                image
-                              }
-                              alt={`${product.name} ${index + 1}`}
-                              style={{
-                                width:
-                                  "100%",
-                                height:
-                                  90,
-                                objectFit:
-                                  "cover",
-                                display:
-                                  "block",
-                              }}
-                            />
-                          </button>
-                        )
-                      )}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div
-                  style={{
-                    minHeight: 420,
-                    background:
-                      "#eee8dd",
-                    borderRadius: 18,
-                    display: "grid",
-                    placeItems:
-                      "center",
-                  }}
-                >
-                  <span className="muted">
-                    Produktbilde
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <div className="kicker">
-                {product.category ||
-                  "På bestilling"}
-              </div>
-
-              <h1
-                style={{
-                  marginBottom: 16,
-                }}
-              >
-                {product.name}
-              </h1>
-
-              {product.description && (
-                <p
-                  className="muted"
-                  style={{
-                    fontSize: 17,
-                    lineHeight: 1.7,
-                    whiteSpace:
-                      "pre-line",
-                  }}
-                >
-                  {
-                    product.description
-                  }
-                </p>
-              )}
-
-              <div
-                style={{
-                  margin:
-                    "28px 0",
-                }}
-              >
-                <small className="muted">
-                  Pris
-                </small>
-
-                <div
-                  className="price"
-                  style={{
-                    fontSize: 34,
-                  }}
-                >
-                  {nok(price)}
-                </div>
-
-                <small className="muted">
-                  inkl. mva.
-                </small>
-              </div>
-
-              {(
-                product.options ||
-                []
-              ).length > 0 && (
-                <div
-                  style={{
-                    marginBottom:
-                      26,
-                  }}
-                >
-                  <div
-                    className="kicker"
-                    style={{
-                      marginBottom:
-                        12,
-                    }}
-                  >
-                    Varianter
-                  </div>
-
-                  {(
-                    product.options ||
-                    []
-                  ).map(
-                    (option) => (
-                      <div
-                        className="field"
-                        key={
-                          option.id
-                        }
-                      >
-                        <label>
-                          {
-                            option.label
-                          }
-                        </label>
-
-                        <select
-                          value={
-                            selected[
-                              option
-                                .id
-                            ] || ""
-                          }
-                          onChange={(
-                            e
-                          ) =>
-                            setSelected(
-                              (
-                                current
-                              ) => ({
-                                ...current,
-
-                                [option.id]:
-                                  e
-                                    .target
-                                    .value,
-                              })
-                            )
-                          }
-                        >
-                          {(
-                            option.choices ||
-                            []
-                          ).map(
-                            (
-                              choice
-                            ) => (
-                              <option
-                                key={
-                                  choice.value
-                                }
-                                value={
-                                  choice.value
-                                }
-                              >
-                                {
-                                  choice.label
-                                }
-
-                                {choice.extraOre
-                                  ? ` (+${nok(
-                                      choice.extraOre
-                                    )})`
-                                  : ""}
-                              </option>
-                            )
-                          )}
-                        </select>
+                      <div className="kicker">
+                        {category.name}
                       </div>
-                    )
-                  )}
-                </div>
-              )}
 
-              <div
-                className="field"
-                style={{
-                  maxWidth: 140,
-                }}
-              >
-                <label>
-                  Antall
-                </label>
-
-                <select
-                  value={quantity}
-                  onChange={(e) =>
-                    setQuantity(
-                      Number(
-                        e.target
-                          .value
-                      )
-                    )
-                  }
-                >
-                  {[
-                    1, 2, 3, 4,
-                    5, 6, 7, 8,
-                    9, 10,
-                  ].map(
-                    (number) => (
-                      <option
-                        key={
-                          number
-                        }
-                        value={
-                          number
-                        }
+                      <h2
+                        style={{
+                          marginTop: 8,
+                          marginBottom: 10,
+                        }}
                       >
-                        {number}
-                      </option>
-                    )
-                  )}
-                </select>
-              </div>
+                        {product.name}
+                      </h2>
 
-              {quantity > 1 && (
-                <p
-                  style={{
-                    marginTop: 12,
-                  }}
-                >
-                  <b>
-                    Totalt:{" "}
-                    {nok(total)}
-                  </b>
-                </p>
-              )}
-
-              <button
-                className="btn"
-                onClick={() => {
-                  setError("");
-                  setMessage(
-                    null
-                  );
-                  setShowOrder(
-                    true
-                  );
-                }}
-                style={{
-                  marginTop: 14,
-                  width: "100%",
-                }}
-              >
-                Bestill
-              </button>
-
-              <p
-                className="muted"
-                style={{
-                  fontSize: 13,
-                  marginTop: 12,
-                }}
-              >
-                Henting etter
-                avtale eller
-                levering innenfor
-                avtalt område.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {(product.dimensions ||
-        (
-          product
-            .specifications ||
-          []
-        ).length > 0) && (
-        <section
-          className="section"
-          style={{
-            background:
-              "#eee8dd",
-          }}
-        >
-          <div className="wrap">
-            <div className="kicker">
-              Produktinformasjon
-            </div>
-
-            <h2>
-              Mål og
-              spesifikasjoner
-            </h2>
-
-            <div
-              className="grid"
-              style={{
-                marginTop: 28,
-              }}
-            >
-              {product.dimensions && (
-                <div className="card">
-                  <h3>Mål</h3>
-
-                  <p
-                    style={{
-                      whiteSpace:
-                        "pre-line",
-                      lineHeight:
-                        1.7,
-                    }}
-                  >
-                    {
-                      product.dimensions
-                    }
-                  </p>
-                </div>
-              )}
-
-              {(
-                product.specifications ||
-                []
-              ).length > 0 && (
-                <div className="card">
-                  <h3>
-                    Spesifikasjoner
-                  </h3>
-
-                  <div
-                    style={{
-                      marginTop:
-                        16,
-                    }}
-                  >
-                    {product.specifications.map(
-                      (
-                        item,
-                        index
-                      ) => (
-                        <div
-                          key={
-                            index
-                          }
-                          className="row"
+                      {product.description && (
+                        <p
                           style={{
-                            padding:
-                              "11px 0",
-                            borderBottom:
-                              "1px solid rgba(0,0,0,.1)",
-                            gap: 20,
+                            lineHeight: 1.6,
+                            opacity: 0.75,
                           }}
                         >
-                          <span className="muted">
-                            {
-                              item.label
-                            }
-                          </span>
-
-                          <b>
-                            {
-                              item.value
-                            }
-                          </b>
-                        </div>
-                      )
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
-
-      <section className="section">
-        <div className="wrap">
-          <div className="kicker">
-            Aadland Service
-          </div>
-
-          <h2>
-            Trenger du en annen
-            løsning?
-          </h2>
-
-          <p
-            className="muted"
-            style={{
-              maxWidth: 650,
-            }}
-          >
-            Vi kan også lage
-            produkter etter andre
-            mål og ønsker.
-          </p>
-
-          <a
-            className="btn alt"
-            href="/#custom"
-            style={{
-              display:
-                "inline-block",
-              marginTop: 18,
-            }}
-          >
-            Send forespørsel
-          </a>
-        </div>
-      </section>
-
-      <Footer />
-
-      {showOrder && (
-        <div
-          className="drawer"
-          onMouseDown={(e) =>
-            e.target ===
-              e.currentTarget &&
-            setShowOrder(false)
-          }
-        >
-          <div className="drawerPanel">
-            <div className="row">
-              <div>
-                <div className="kicker">
-                  Bestilling
-                </div>
-
-                <h2
-                  style={{
-                    marginBottom: 0,
-                  }}
-                >
-                  {product.name}
-                </h2>
-              </div>
-
-              <button
-                type="button"
-                className="btn alt"
-                onClick={() =>
-                  setShowOrder(
-                    false
-                  )
-                }
-              >
-                Lukk
-              </button>
-            </div>
-
-            <div
-              className="card"
-              style={{
-                margin:
-                  "20px 0",
-              }}
-            >
-              <div className="row">
-                <div>
-                  <b>
-                    {product.name}
-                  </b>
-
-                  {Object.keys(
-                    selected
-                  ).length >
-                    0 && (
-                    <div
-                      className="muted"
-                      style={{
-                        marginTop:
-                          5,
-                      }}
-                    >
-                      {selectedLabels(
-                        product,
-                        selected
+                          {product.description}
+                        </p>
                       )}
+
+                      <div
+                        style={{
+                          marginTop: 18,
+                          fontSize: 19,
+                          fontWeight: 700,
+                        }}
+                      >
+                        Fra{" "}
+                        {nok(
+                          product.basePriceOre ||
+                            0
+                        )}
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop: 16,
+                          fontWeight: 700,
+                        }}
+                      >
+                        Se produkt →
+                      </div>
                     </div>
-                  )}
-
-                  <div className="muted">
-                    Antall:{" "}
-                    {quantity}
-                  </div>
-                </div>
-
-                <b>
-                  {nok(total)}
-                </b>
-              </div>
-            </div>
-
-            <form
-              onSubmit={
-                sendOrder
-              }
-            >
-              <CustomerFields
-                customer={
-                  customer
-                }
-                setCustomer={
-                  setCustomer
-                }
-              />
-
-              <div className="field">
-                <label>
-                  Henting eller
-                  levering
-                </label>
-
-                <select
-                  value={
-                    fulfillment
-                  }
-                  onChange={(e) =>
-                    setFulfillment(
-                      e.target
-                        .value
-                    )
-                  }
-                >
-                  <option value="pickup">
-                    Henting
-                  </option>
-
-                  <option value="delivery">
-                    Levering innen
-                    15 km
-                  </option>
-                </select>
-              </div>
-
-              {error && (
-                <p className="notice">
-                  {error}
-                </p>
-              )}
-
-              <button
-                className="btn"
-                disabled={
-                  sending
-                }
-                style={{
-                  width: "100%",
-                }}
-              >
-                {sending
-                  ? "Sender..."
-                  : `Send bestilling · ${nok(
-                      total
-                    )}`}
-              </button>
-            </form>
+                  </article>
+                </Link>
+              );
+            })}
           </div>
-        </div>
-      )}
-
-      {message && (
-        <div
-          className="drawer"
-          onMouseDown={(e) =>
-            e.target ===
-              e.currentTarget &&
-            setMessage(null)
-          }
-        >
-          <div className="drawerPanel">
-            <div className="success">
-              <b>
-                Bestilling
-                mottatt
-              </b>
-
-              {message.orderNumber && (
-                <p>
-                  Ordrenummer:{" "}
-                  {
-                    message.orderNumber
-                  }
-                </p>
-              )}
-
-              {message.message && (
-                <p>
-                  {
-                    message.message
-                  }
-                </p>
-              )}
-            </div>
-
-            <button
-              className="btn"
-              onClick={() =>
-                setMessage(null)
-              }
-              style={{
-                marginTop: 20,
-              }}
-            >
-              Lukk
-            </button>
-          </div>
-        </div>
-      )}
+        )}
+      </section>
     </main>
-  );
-}
-
-function selectedLabels(
-  product,
-  selected
-) {
-  return (
-    product.options || []
-  )
-    .map((option) => {
-      const choice =
-        (
-          option.choices ||
-          []
-        ).find(
-          (item) =>
-            item.value ===
-            selected[
-              option.id
-            ]
-        );
-
-      return choice?.label;
-    })
-    .filter(Boolean)
-    .join(" · ");
-}
-
-function Header() {
-  return (
-    <header className="top">
-      <div className="wrap nav">
-        <a
-          className="brand"
-          href="/"
-        >
-          <span className="mark">
-            AS
-          </span>
-
-          <span>
-            Aadland
-            <br />
-            Service
-          </span>
-        </a>
-
-        <nav className="links">
-          <a href="/">
-            Forside
-          </a>
-
-          <a href="/produkter">
-            Produkter
-          </a>
-
-          <a href="/#om">
-            Om oss
-          </a>
-
-          <a href="/#kontakt">
-            Kontakt
-          </a>
-        </nav>
-      </div>
-    </header>
-  );
-}
-
-function Footer() {
-  return (
-    <footer className="footer">
-      <div className="wrap row">
-        <div>
-          <b>
-            Aadland Service
-          </b>
-
-          <p>
-            Bygg • Renovering •
-            Vedlikehold •
-            Hagearbeid
-          </p>
-        </div>
-
-        <div>
-          <p>
-            post@aadland-service.no
-          </p>
-
-          <p>
-            471 54 898
-          </p>
-
-          <p>
-            Org.nr. 937 781 873
-            MVA
-          </p>
-        </div>
-      </div>
-    </footer>
-  );
-}
-
-function CustomerFields({
-  customer,
-  setCustomer,
-}) {
-  const set = (
-    key,
-    value
-  ) =>
-    setCustomer(
-      (current) => ({
-        ...current,
-        [key]: value,
-      })
-    );
-
-  return (
-    <div className="options">
-      <div className="field">
-        <label>Navn</label>
-
-        <input
-          required
-          value={
-            customer.name
-          }
-          onChange={(e) =>
-            set(
-              "name",
-              e.target.value
-            )
-          }
-        />
-      </div>
-
-      <div className="field">
-        <label>E-post</label>
-
-        <input
-          type="email"
-          required
-          value={
-            customer.email
-          }
-          onChange={(e) =>
-            set(
-              "email",
-              e.target.value
-            )
-          }
-        />
-      </div>
-
-      <div className="field">
-        <label>Telefon</label>
-
-        <input
-          required
-          value={
-            customer.phone
-          }
-          onChange={(e) =>
-            set(
-              "phone",
-              e.target.value
-            )
-          }
-        />
-      </div>
-
-      <div className="field">
-        <label>Adresse</label>
-
-        <input
-          value={
-            customer.address
-          }
-          onChange={(e) =>
-            set(
-              "address",
-              e.target.value
-            )
-          }
-        />
-      </div>
-
-      <div className="field">
-        <label>
-          Postnummer
-        </label>
-
-        <input
-          value={
-            customer.postalCode
-          }
-          onChange={(e) =>
-            set(
-              "postalCode",
-              e.target.value
-            )
-          }
-        />
-      </div>
-
-      <div className="field">
-        <label>Sted</label>
-
-        <input
-          value={
-            customer.city
-          }
-          onChange={(e) =>
-            set(
-              "city",
-              e.target.value
-            )
-          }
-        />
-      </div>
-
-      <div className="field">
-        <label>
-          Merknad
-        </label>
-
-        <textarea
-          rows="3"
-          value={
-            customer.note
-          }
-          onChange={(e) =>
-            set(
-              "note",
-              e.target.value
-            )
-          }
-        />
-      </div>
-    </div>
   );
 }
