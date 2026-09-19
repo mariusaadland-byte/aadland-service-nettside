@@ -164,3 +164,21 @@
 .serviceVisual.serviceSlot2{background:url("https://images.unsplash.com/photo-1538688525198-9b88f6f53126?auto=format&fit=crop&w=900&q=84") center/cover no-repeat!important}
 .serviceVisual.serviceSlot3{background:url("https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=900&q=84") center/cover no-repeat!important}
 .serviceVisual.serviceSlot4{background:url("https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=900&q=84") center/cover no-repeat!important}
+
+/* Approved reference: gold line icons in service strip */
+.stripGrid>a{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
+.serviceIcon{width:31px;height:31px;display:block;position:relative;color:#d7a74e}
+.serviceIcon:before,.serviceIcon:after{content:"";position:absolute;box-sizing:border-box;border:2px solid currentColor}
+.serviceIcon.renovation:before{width:25px;height:19px;left:3px;top:9px;border-top:0}
+.serviceIcon.renovation:after{width:20px;height:20px;left:6px;top:1px;transform:rotate(45deg);border-right:0;border-bottom:0}
+.serviceIcon.outdoor:before{width:22px;height:25px;left:5px;top:3px;border-radius:50% 50% 45% 45%;transform:rotate(28deg)}
+.serviceIcon.outdoor:after{width:2px;height:22px;left:15px;top:8px;border:0;background:currentColor;transform:rotate(28deg)}
+.serviceIcon.products:before{width:27px;height:17px;left:2px;top:11px}
+.serviceIcon.products:after{width:23px;height:2px;left:4px;top:7px;border:0;background:currentColor;box-shadow:0 7px 0 currentColor,0 14px 0 currentColor}
+.serviceIcon.rental:before{width:27px;height:15px;left:2px;top:8px;border-radius:3px}
+.serviceIcon.rental:after{width:11px;height:6px;left:10px;top:3px;border-bottom:0;border-radius:3px 3px 0 0}
+.serviceIcon.maintenance:before{width:7px;height:27px;left:12px;top:2px;border-radius:5px;transform:rotate(42deg)}
+.serviceIcon.maintenance:after{width:12px;height:12px;left:2px;top:1px;border-radius:50%;border-right-color:transparent;transform:rotate(42deg)}
+.serviceIcon.survey:before{width:24px;height:24px;left:1px;top:1px;border-radius:50%}
+.serviceIcon.survey:after{width:11px;height:2px;right:0;bottom:3px;border:0;background:currentColor;transform:rotate(45deg);transform-origin:right center}
+@media(max-width:700px){.serviceStrip{display:block!important}.stripGrid{grid-template-columns:repeat(3,1fr)!important;gap:0!important}.stripGrid>a{min-height:92px!important;padding:12px 5px!important;font-size:10px!important}.serviceIcon{transform:scale(.82)}}
