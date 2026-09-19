@@ -182,3 +182,23 @@
 .serviceIcon.survey:before{width:24px;height:24px;left:1px;top:1px;border-radius:50%}
 .serviceIcon.survey:after{width:11px;height:2px;right:0;bottom:3px;border:0;background:currentColor;transform:rotate(45deg);transform-origin:right center}
 @media(max-width:700px){.serviceStrip{display:block!important}.stripGrid{grid-template-columns:repeat(3,1fr)!important;gap:0!important}.stripGrid>a{min-height:92px!important;padding:12px 5px!important;font-size:10px!important}.serviceIcon{transform:scale(.82)}}
+
+/* Approved reference: hero composition */
+.homeHero{min-height:680px!important;position:relative}
+.heroPhoto{background-image:url("https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1900&q=88")!important;background-position:center 58%!important}
+.heroShade{background:linear-gradient(90deg,rgba(10,10,10,.88) 0%,rgba(10,10,10,.62) 46%,rgba(10,10,10,.18) 76%,rgba(10,10,10,.08) 100%)!important}
+.heroContent{min-height:680px!important;display:flex!important;flex-direction:column;justify-content:center;align-items:flex-start;padding-top:92px!important;padding-bottom:70px!important}
+.heroContent h1{font-size:clamp(58px,7.2vw,104px)!important;line-height:.88!important;letter-spacing:-.045em!important;max-width:780px;margin:16px 0 26px!important}
+.heroContent h1 em{font-weight:400}
+.heroContent>p{max-width:620px!important;font-size:16px!important;line-height:1.7!important}
+.heroTrust{margin-top:38px!important;font-family:Georgia,serif;font-style:italic;color:#d7a74e!important}
+@media(max-width:700px){
+ .homeHero,.heroContent{min-height:650px!important}
+ .heroPhoto{background-position:64% center!important}
+ .heroShade{background:linear-gradient(90deg,rgba(8,8,8,.91) 0%,rgba(8,8,8,.72) 68%,rgba(8,8,8,.42) 100%)!important}
+ .heroContent{padding-top:105px!important;padding-bottom:44px!important;justify-content:center!important}
+ .heroContent h1{font-size:54px!important;line-height:.91!important;margin:12px 0 20px!important}
+ .heroContent>p{font-size:14px!important;line-height:1.6!important;max-width:92%!important}
+ .heroActions{gap:9px!important}
+ .heroTrust{margin-top:28px!important;font-size:14px!important}
+}
