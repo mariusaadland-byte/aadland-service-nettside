@@ -33,7 +33,7 @@ export default function Home(){
  return <main className="newHome">
   <header className="homeTop">
    <div className="homeWrap homeNav">
-    <a className="homeBrand" href="/"><span className="shield"><i>A</i><i>S</i></span><span className="brandWords">AADLAND<small>SERVICE</small></span></a>
+    <a className="homeBrand" href="/"><img className="brandLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></a>
     <nav className="homeLinks"><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a></nav>
     <a className="goldBtn navCta" href="#befaring">Be om befaring</a>
    </div>
@@ -103,7 +103,7 @@ export default function Home(){
    </form>
   </div></section>
 
-  <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="homeBrand"><span className="shield"><i>A</i><i>S</i></span><span className="brandWords">AADLAND<small>SERVICE</small></span></div><div><b>Kontakt</b><p>471 54 898<br/>post@aadland-service.no</p></div><div><b>Tjenester</b><p>Oppussing · Vedlikehold<br/>Uteområder · Produkter</p></div><div><b>Firma</b><p>Org.nr. 937 781 873 MVA<br/>Bergen og omegn</p></div></div></footer>
+  <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="homeBrand"><img className="brandLogo footerLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></div><div><b>Kontakt</b><p>471 54 898<br/>post@aadland-service.no</p></div><div><b>Tjenester</b><p>Oppussing · Vedlikehold<br/>Uteområder · Produkter</p></div><div><b>Firma</b><p>Org.nr. 937 781 873 MVA<br/>Bergen og omegn</p></div></div></footer>
  </main>;
 }
 function Field({label,children}){return <label className="homeField"><span>{label}</span>{children}</label>}
