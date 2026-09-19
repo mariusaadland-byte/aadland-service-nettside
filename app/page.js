@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const emptyCustomer={name:"",email:"",phone:"",address:"",postalCode:"",city:"",note:"",deliveryWithinRadius:true};
 
@@ -20,12 +20,7 @@ export default function Home(){
  const [error,setError]=useState("");
  const [sending,setSending]=useState(false);
  const [contactImages,setContactImages]=useState([]);
- const [publicGroups,setPublicGroups]=useState([]);
  const services=fallbackServices;
-
- useEffect(()=>{
-  fetch("/api/categories").then(r=>r.ok?r.json():null).then(data=>setPublicGroups(data?.categories||[])).catch(()=>{});
- },[]);
 
  async function customOrder(e){
   e.preventDefault(); setError(""); setMessage(null); setSending(true);
@@ -69,7 +64,7 @@ export default function Home(){
   </section>
 
   <section className="serviceStrip"><div className="homeWrap stripGrid">
-   {services.slice(0,6).map(([title,,type])=><a href={type==="products"?"/produkter":"#befaring"} key={type}><span className={"serviceIcon "+type} aria-hidden="true"></span><span>{title}</span></a>)}
+   {services.slice(0,6).map(([title,,type])=><a href={type==="products"?"/produkter":type==="rental"?"/utleie":"#befaring"} key={type}><span className={"serviceIcon "+type} aria-hidden="true"></span><span>{title}</span></a>)}
   </div></section>
 
   <section id="tjenester" className="homeSection light">
