@@ -42,3 +42,20 @@
  .contactSection{padding:34px 0}.contactGrid{gap:20px}.contactCopy p{font-size:13px}.contactDetails{margin-top:14px}.homeForm{padding:13px}.homeField{gap:5px;margin-bottom:8px}.homeField span{font-size:10px}.homeField input,.homeField textarea{padding:9px}.homeField input{min-height:40px}.homeField textarea{min-height:76px}.submitBtn{min-height:44px}.homeForm>small{font-size:9px;margin-top:8px}
  .homeFooter{padding:26px 0}.footerGrid{gap:18px}.footerLogo{width:150px}
 }
+
+/* Approved reference pass: denser, image-led composition */
+.serviceNumber{display:none!important}
+@media(min-width:901px){
+ .serviceCards{grid-template-columns:repeat(5,1fr);gap:14px}
+ .serviceCards .serviceCard:nth-child(5){grid-column:auto;display:block}
+ .serviceVisual{height:190px}
+ .serviceText{min-height:150px}
+}
+@media(max-width:600px){
+ .serviceNumber{display:none!important}
+ .serviceCards{gap:10px}
+ .serviceVisual{height:104px}
+ .serviceText{min-height:76px}
+ .projects .sectionIntro{margin-bottom:16px}
+ .projectGrid{gap:8px}
+}
