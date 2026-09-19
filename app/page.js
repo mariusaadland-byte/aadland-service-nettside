@@ -93,7 +93,7 @@ export default function Home(){
   </section>
 
   <section id="utleie" className="rentalTeaser"><div className="homeWrap rentalTeaserGrid"><div><span className="goldLabel">UTLEIE AV UTSTYR</span><h2>Utstyr når du trenger det.</h2><p>Lei utstyr til prosjektet uten å måtte kjøpe det selv. Utvalget og tilgjengelige datoer vil kunne styres direkte fra backoffice.</p></div><a className="goldBtn" href="#befaring">Spør om utleie →</a></div></section>\n\n  <section id="prosjekter" className="homeSection projects"><div className="homeWrap">
-   <div className="sectionIntro"><div><span className="goldLabel">UTVALGTE PROSJEKTER</span><h2>Resultater vi er stolte av</h2></div><p>Et utvalg av arbeid. Egne prosjektbilder kan legges inn her etter hvert.</p></div>
+   <div className="sectionIntro"><div><span className="goldLabel">UTVALGTE PROSJEKTER</span><h2>Resultater vi er stolte av</h2></div></div>
    <div className="projectGrid">
     <div className="projectTile projectDeck"><span>UTEOMRÅDE</span><strong>Terrasse og levegg</strong></div>
     <div className="projectTile projectBathroom"><span>OPPUSSING</span><strong>Oppusset bad</strong></div>
@@ -117,7 +117,7 @@ export default function Home(){
    </form>
   </div></section>
 
-  <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="homeBrand"><img className="brandLogo footerLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></div><div><b>Kontakt</b><p>471 54 898<br/>post@aadland-service.no</p></div><div><b>Tjenester</b><div className="footerServices">
+  <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="footerIdentity"><div className="homeBrand"><img className="brandLogo footerLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></div><p className="footerTagline">Lokalt håndverk – solide resultater</p></div><div><b>Kontakt</b><p>471 54 898<br/>post@aadland-service.no</p></div><div><b>Tjenester</b><div className="footerServices">
  {services.map(([title,,type])=><a key={type} href={type==="products"?"/produkter":"#befaring"}>{title}</a>)}
  </div></div><div><b>Firma</b><p>Org.nr. 937 781 873 MVA<br/>Bergen og omegn</p></div></div></footer>
  </main>;
