@@ -381,3 +381,16 @@ html{scroll-behavior:smooth}
 .contactBenefits span:before{display:none!important}
 .contactBenefits b{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;border:1px solid rgba(215,167,78,.65);border-radius:50%;color:#d7a74e;font-size:11px;flex:none}
 
+
+/* Approved reference: enquiry section scale and hierarchy */
+.contactSection{padding:82px 0!important}
+.contactCopy h2{font-size:clamp(44px,5vw,68px)!important;line-height:.94!important;letter-spacing:-.04em!important;margin:10px 0 22px!important}
+.contactCopy>p{max-width:510px!important;font-size:15px!important;line-height:1.7!important}
+.contactDetails{display:grid!important;gap:8px!important;margin-top:24px!important}
+.contactDetails a{text-decoration:none!important;font-weight:700!important}
+.contactDetails a:hover{color:#d7a74e!important}
+@media(max-width:700px){
+ .contactSection{padding:54px 0!important}
+ .contactCopy h2{font-size:40px!important}
+ .contactGrid{gap:30px!important}
+}
