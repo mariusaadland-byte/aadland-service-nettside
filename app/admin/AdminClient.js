@@ -2977,6 +2977,7 @@ function ServiceEditor({ service, reload, setError, close }) {
   const [ctaLabel,setCtaLabel]=useState(service?.ctaLabel||"Les mer");
   const [formTitle,setFormTitle]=useState(service?.formTitle||"Be om befaring");
   const [formPrompt,setFormPrompt]=useState(service?.formPrompt||"Beskriv kort hva du ønsker hjelp med.");
+  const [deleting,setDeleting]=useState(false);
   const [sortOrder,setSortOrder]=useState(service?.sortOrder??0);
   const [imageUrl,setImageUrl]=useState(service?.imageUrl||"");
   const [uploading,setUploading]=useState(false);
@@ -3009,7 +3010,17 @@ function ServiceEditor({ service, reload, setError, close }) {
     await reload();
   }
 
-  if(!editing&&service)return <div className="card"><div className="kicker">{service.active===false?"Skjult":"Publisert"}</div><h3>{service.title}</h3><p>{service.description}</p><p className="muted">{service.showOnHome?"Forside · ":""}{service.showInMenu?"Meny · ":""}{service.showInFooter?"Footer":""}</p><button className="btn" onClick={()=>setEditing(true)}>Rediger</button></div>;
+  async function removeService(){
+    if(!service?.id)return;
+    if(!window.confirm(`Slette tjenesten "${service.title}"? Dette kan ikke angres.`))return;
+    setDeleting(true); setError("");
+    const response=await fetch("/api/admin/services",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:service.id})});
+    const data=await response.json().catch(()=>({})); setDeleting(false);
+    if(!response.ok){setError(data.error||"Tjenesten kunne ikke slettes.");return;}
+    await reload();
+  }
+
+  if(!editing&&service)return <div className="card"><div className="kicker">{service.active===false?"Skjult":"Publisert"}</div><h3>{service.title}</h3><p>{service.description}</p><p className="muted">{service.showOnHome?"Forside · ":""}{service.showInMenu?"Meny · ":""}{service.showInFooter?"Footer":""}</p><div style={{display:"flex",gap:10,flexWrap:"wrap"}}><button className="btn" onClick={()=>setEditing(true)}>Rediger</button><button className="btn alt" onClick={removeService} disabled={deleting}>{deleting?"Sletter …":"Slett"}</button></div></div>;
 
   return <form className="card" onSubmit={save}>
     <div className="kicker">{isNew?"Ny tjeneste":"Rediger tjeneste"}</div>
