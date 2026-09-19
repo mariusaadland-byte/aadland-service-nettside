@@ -94,14 +94,15 @@ export default function Home(){
   <section id="prosjekter" className="homeSection projects"><div className="homeWrap">
    <div className="sectionIntro"><div><span className="goldLabel">UTVALGTE PROSJEKTER</span><h2>Resultater vi er stolte av</h2></div><p>Et utvalg av arbeid. Egne prosjektbilder kan legges inn her etter hvert.</p></div>
    <div className="projectGrid">
-    <div className="projectTile projectDeck large"><div className="deckScene"></div><span>UTEOMRÅDE</span><strong>Terrasse og trearbeid</strong></div>
-    <div className="projectTile projectBefore"><div className="beforeScene"></div><span>VEDLIKEHOLD</span><strong>Før og etter</strong></div>
-    <div className="projectTile projectBench"><div className="benchScene"></div><span>PÅ BESTILLING</span><strong>Tilpassede produkter</strong></div>
+    <div className="projectTile projectDeck"><span>UTEOMRÅDE</span><strong>Terrasse og levegg</strong></div>
+    <div className="projectTile projectBathroom"><span>OPPUSSING</span><strong>Oppusset bad</strong></div>
+    <div className="projectTile projectSlats"><span>INNVENDIG</span><strong>Spilevegg og trapp</strong></div>
+    <div className="projectTile projectPlanters"><span>PÅ BESTILLING</span><strong>Plantekasser</strong></div>
    </div>
   </div></section>
 
   <section id="befaring" className="contactSection"><div className="homeWrap contactGrid">
-   <div className="contactCopy"><span className="goldLabel">KONTAKT OSS</span><h2>Har du et prosjekt<br/>i tankene?</h2><p>Beskriv hva du ønsker hjelp med. Vi tar kontakt for å avklare prosjektet og om det er behov for befaring.</p><div className="contactDetails"><a href="tel:+4747154898">471 54 898</a><a href="mailto:post@aadland-service.no">post@aadland-service.no</a></div></div>
+   <div className="contactCopy"><span className="goldLabel">KONTAKT OSS</span><h2>Har du et prosjekt<br/>i tankene?</h2><p>Beskriv hva du ønsker hjelp med. Vi tar kontakt for å avklare prosjektet og om det er behov for befaring.</p><div className="contactBenefits"><span>Enkel befaring</span><span>Rask tilbakemelding</span><span>Bergen og omegn</span></div><div className="contactDetails"><a href="tel:+4747154898">471 54 898</a><a href="mailto:post@aadland-service.no">post@aadland-service.no</a></div></div>
    <form className="homeForm" onSubmit={customOrder}>
     {message&&<div className="success"><b>Forespørselen er mottatt</b>{message.orderNumber&&<p>Ordrenummer: {message.orderNumber}</p>}</div>}
     <div className="formTwo"><Field label="Navn *"><input required value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})}/></Field><Field label="Telefon *"><input required value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})}/></Field></div>
