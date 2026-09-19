@@ -94,3 +94,5 @@
  .craftVisual{min-height:180px;background-position:center!important}
  .projectGrid{grid-template-rows:150px 120px!important}
 }
+
+.contactUpload{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:8px 14px;border:1px dashed #b8aa95;padding:16px;margin:4px 0 14px;background:#fff}.contactUpload>span{grid-column:1/-1;font-size:11px;font-weight:800}.contactUpload>span small{font-weight:400;color:#777}.contactUpload input{position:absolute;opacity:0;pointer-events:none}.contactUpload strong{display:inline-flex;align-items:center;justify-content:center;background:#171717;color:#fff;padding:11px 16px;font-size:11px}.contactUpload em{font-style:normal;color:#777;font-size:11px}@media(max-width:600px){.contactUpload{padding:12px;grid-template-columns:auto 1fr}.contactUpload strong{padding:10px 12px}}
