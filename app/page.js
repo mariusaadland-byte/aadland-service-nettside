@@ -47,7 +47,7 @@ export default function Home(){
   <header className="homeTop">
    <div className="homeWrap homeNav">
     <a className="homeBrand" href="/"><img className="brandLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></a>
-    <button className="mobileMenuBtn" type="button" aria-label="Åpne meny" aria-expanded={menuOpen} onClick={()=>setMenuOpen(!menuOpen)}><span></span><span></span><span></span></button><nav className={"homeLinks "+(menuOpen?"menuOpen":"")} onClick={()=>setMenuOpen(false)}><a href="/">Hjem</a><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="#tjenester" onClick={()=>{setTimeout(()=>document.querySelector(".serviceCard3")?.scrollIntoView({behavior:"smooth",block:"center"}),50)}}>Utleie</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a></nav>
+    <button className="mobileMenuBtn" type="button" aria-label="Åpne meny" aria-expanded={menuOpen} onClick={()=>setMenuOpen(!menuOpen)}><span></span><span></span><span></span></button><nav className={"homeLinks "+(menuOpen?"menuOpen":"")} onClick={()=>setMenuOpen(false)}><a href="/">Hjem</a><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="#tjeneste-rental">Utleie</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a></nav>
     <a className="goldBtn navCta" href="#befaring">Be om befaring →</a>
    </div>
   </header>
@@ -72,7 +72,7 @@ export default function Home(){
    <div className="homeWrap">
     <div className="sectionIntro"><div><span className="goldLabel">VÅRE TJENESTER</span><h2>Små og store prosjekter</h2></div><a className="textLink" href="#befaring">Se alle tjenester →</a></div>
     <div className="serviceCards">
-     {services.slice(0,5).map(([title,text,type],index)=><article className={"serviceCard serviceCard"+index} key={type}>
+     {services.slice(0,5).map(([title,text,type],index)=><article id={"tjeneste-"+type} className={"serviceCard serviceCard"+index} key={type}>
       <div className={"serviceVisual serviceSlot"+index}><div className="visualScene"></div></div>
       <div className="serviceText"><h3>{title}</h3><p>{text}</p><a href={type==="products"?"/produkter":"#befaring"}>Les mer <b>→</b></a></div>
      </article>)}
