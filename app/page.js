@@ -87,7 +87,7 @@ export default function Home(){
   <section id="om" className="craftSection">
    <div className="homeWrap craftGrid">
     <div className="craftVisual"><span>GODT HÅNDVERK STARTER<br/>MED GODE FORBEREDELSER.</span></div>
-    <div className="craftCopy"><span className="goldLabel">AADLAND SERVICE</span><h2>Lokalt håndverk<br/>med stolthet.</h2><p>Vi hjelper med oppussing, vedlikehold, uteområder og spesialtilpassede løsninger. Målet er enkelt: ryddig kommunikasjon, praktiske valg og et resultat du kan være fornøyd med.</p><a className="textLink" href="#befaring">Fortell oss om prosjektet ditt →</a></div>
+    <div className="craftCopy"><span className="goldLabel">AADLAND SERVICE</span><h2>Lokalt håndverk<br/>med stolthet.</h2><p>Vi hjelper med oppussing, vedlikehold, uteområder og spesialtilpassede løsninger. Målet er enkelt: ryddig kommunikasjon, praktiske valg og et resultat du kan være fornøyd med.</p><ul className="craftChecks"><li>Kvalitet i alle ledd</li><li>Pålitelig og punktlig</li><li>Fleksible løsninger</li><li>Ryddig kommunikasjon</li><li>Lokalt i Bergen og omegn</li></ul><a className="goldBtn craftCta" href="#befaring">Be om befaring →</a></div>
    </div>
   </section>
 
@@ -97,15 +97,6 @@ export default function Home(){
     <div className="projectTile projectDeck large"><div className="deckScene"></div><span>UTEOMRÅDE</span><strong>Terrasse og trearbeid</strong></div>
     <div className="projectTile projectBefore"><div className="beforeScene"></div><span>VEDLIKEHOLD</span><strong>Før og etter</strong></div>
     <div className="projectTile projectBench"><div className="benchScene"></div><span>PÅ BESTILLING</span><strong>Tilpassede produkter</strong></div>
-   </div>
-  </div></section>
-
-  <section className="processSection"><div className="homeWrap">
-   <div className="processIntro"><span className="goldLabel">SLIK FUNGERER DET</span><h2>Enkelt å komme i gang.</h2></div>
-   <div className="processGrid">
-    <div className="processStep"><h3>Send forespørsel</h3><p>Fortell kort hva du ønsker hjelp med.</p></div>
-    <div className="processStep"><h3>Vi avklarer jobben</h3><p>Vi tar kontakt og avtaler befaring når det er nødvendig.</p></div>
-    <div className="processStep"><h3>Du får en tydelig avtale</h3><p>Omfang og pris avklares før arbeidet starter.</p></div>
    </div>
   </div></section>
 
