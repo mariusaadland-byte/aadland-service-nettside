@@ -60,6 +60,14 @@ export default function Home(){
  const [selectedService,setSelectedService]=useState("");
  const [apiServices,setApiServices]=useState(null);
  useEffect(()=>{
+  const storedService=sessionStorage.getItem("aadland-service");
+  if(storedService){
+   setSelectedService(storedService);
+   sessionStorage.removeItem("aadland-service");
+  }
+ },[]);
+
+ useEffect(()=>{
   let alive=true;
   fetch("/api/services").then(r=>r.ok?r.json():null).then(data=>{
    if(alive&&Array.isArray(data?.services)&&data.services.length)setApiServices(data.services);
