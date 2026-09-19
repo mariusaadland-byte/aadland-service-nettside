@@ -18,6 +18,7 @@ export default function AdminClient({ user }) {
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [services, setServices] = useState([]);
   const [users, setUsers] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(user?.id || "");
   const [error, setError] = useState("");
@@ -101,6 +102,13 @@ export default function AdminClient({ user }) {
       setCategories([]);
     }
 
+    if (canManageProducts) {
+      const response = await fetch("/api/admin/services");
+      if (response.status === 401) { router.replace("/admin/login"); return; }
+      if (response.ok) { const data = await response.json(); setServices(data.services || []); }
+      else { const data = await response.json().catch(() => ({})); setError(data.error || "Tjenestene kunne ikke hentes."); setServices([]); }
+    } else { setServices([]); }
+
     if (canManageUsers) {
       const response = await fetch("/api/admin/users");
 
@@ -183,6 +191,7 @@ export default function AdminClient({ user }) {
   if (canViewOrders) tabs.push(["orders", "Bestillinger"]);
   if (canManageProducts) tabs.push(["products", "Produkter"]);
   if (canManageProducts) tabs.push(["categories", "Kategorier"]);
+  if (canManageProducts) tabs.push(["services", "Tjenester"]);
   if (canManageUsers) tabs.push(["users", "Brukere"]);
 
   return (
@@ -221,6 +230,8 @@ export default function AdminClient({ user }) {
             ? "Produkter"
             : tab === "categories"
             ? "Kategorier"
+            : tab === "services"
+            ? "Tjenester"
             : "Brukere"}
         </h1>
 
@@ -335,6 +346,10 @@ export default function AdminClient({ user }) {
             reload={load}
             setError={setError}
           />
+        )}
+
+        {tab === "services" && canManageProducts && (
+          <Services services={services} reload={load} setError={setError} />
         )}
 
         {tab === "users" && canManageUsers && (
@@ -2937,4 +2952,58 @@ function PermissionChecks({
       )}
     </div>
   );
+}
+
+
+function Services({ services, reload, setError }) {
+  const [showNew, setShowNew] = useState(false);
+  return <>
+    <div style={{marginBottom:20}}><button className="btn" onClick={()=>setShowNew(!showNew)}>{showNew?"Avbryt":"Legg til tjeneste"}</button></div>
+    {showNew && <ServiceEditor service={null} reload={reload} setError={setError} close={()=>setShowNew(false)} />}
+    <div className="grid">{services.map(service=><ServiceEditor key={service.id} service={service} reload={reload} setError={setError} />)}</div>
+  </>;
+}
+
+function ServiceEditor({ service, reload, setError, close }) {
+  const isNew=!service;
+  const [editing,setEditing]=useState(isNew);
+  const [title,setTitle]=useState(service?.title||"");
+  const [description,setDescription]=useState(service?.description||"");
+  const [active,setActive]=useState(service?.active!==false);
+  const [showOnHome,setShowOnHome]=useState(service?.showOnHome!==false);
+  const [showInMenu,setShowInMenu]=useState(service?.showInMenu!==false);
+  const [showInFooter,setShowInFooter]=useState(service?.showInFooter!==false);
+  const [sortOrder,setSortOrder]=useState(service?.sortOrder??0);
+  const [saving,setSaving]=useState(false);
+
+  async function save(e){
+    e?.preventDefault(); setError("");
+    if(!title.trim()){setError("Tjenesten må ha et navn.");return;}
+    setSaving(true);
+    const response=await fetch("/api/admin/services",{method:isNew?"POST":"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+      ...(isNew?{}:{id:service.id}),title:title.trim(),description:description.trim(),active,showOnHome,showInMenu,showInFooter,sortOrder,
+      kind:service?.kind||"service",imageUrl:service?.imageUrl||"",hasPage:service?.hasPage||false,ctaLabel:service?.ctaLabel||"Les mer",
+      ctaHref:service?.ctaHref||"",formTitle:service?.formTitle||"Be om befaring",formPrompt:service?.formPrompt||"Beskriv kort hva du ønsker hjelp med.",
+      publishFrom:service?.publishFrom||null,publishUntil:service?.publishUntil||null
+    })});
+    const data=await response.json().catch(()=>({})); setSaving(false);
+    if(!response.ok){setError(data.error||"Tjenesten kunne ikke lagres.");return;}
+    if(isNew&&close)close(); else setEditing(false);
+    await reload();
+  }
+
+  if(!editing&&service)return <div className="card"><div className="kicker">{service.active===false?"Skjult":"Publisert"}</div><h3>{service.title}</h3><p>{service.description}</p><p className="muted">{service.showOnHome?"Forside · ":""}{service.showInMenu?"Meny · ":""}{service.showInFooter?"Footer":""}</p><button className="btn" onClick={()=>setEditing(true)}>Rediger</button></div>;
+
+  return <form className="card" onSubmit={save}>
+    <div className="kicker">{isNew?"Ny tjeneste":"Rediger tjeneste"}</div>
+    <h3>{isNew?"Legg til tjeneste":service.title}</h3>
+    <div className="field"><label>Navn</label><input required value={title} onChange={e=>setTitle(e.target.value)} placeholder="F.eks. Brøyting" /></div>
+    <div className="field"><label>Beskrivelse</label><textarea rows="4" value={description} onChange={e=>setDescription(e.target.value)} /></div>
+    <div className="field"><label>Rekkefølge</label><input type="number" value={sortOrder} onChange={e=>setSortOrder(e.target.value)} /></div>
+    <label><input type="checkbox" checked={active} onChange={e=>setActive(e.target.checked)} /> Publisert</label><br/>
+    <label><input type="checkbox" checked={showOnHome} onChange={e=>setShowOnHome(e.target.checked)} /> Vis på forsiden</label><br/>
+    <label><input type="checkbox" checked={showInMenu} onChange={e=>setShowInMenu(e.target.checked)} /> Vis i meny</label><br/>
+    <label><input type="checkbox" checked={showInFooter} onChange={e=>setShowInFooter(e.target.checked)} /> Vis i footer</label>
+    <div style={{display:"flex",gap:10,marginTop:18}}><button className="btn" disabled={saving}>{saving?"Lagrer …":"Lagre"}</button>{!isNew&&<button type="button" className="btn alt" onClick={()=>setEditing(false)}>Avbryt</button>}</div>
+  </form>;
 }
