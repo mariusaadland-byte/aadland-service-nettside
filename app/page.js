@@ -46,7 +46,7 @@ export default function Home(){
     <div className="eyebrow">Aadland Service · Bergen og omegn</div>
     <h1>Kvalitet<br/><em>som varer.</em></h1>
     <p>Oppussing, vedlikehold, uteområder og produkter på bestilling. Praktiske løsninger med fokus på solid utførelse.</p>
-    <div className="heroActions"><a className="goldBtn" href="#befaring">Be om befaring</a><a className="outlineBtn" href="#tjenester">Se våre tjenester</a></div>
+    <div className="heroActions"><a className="goldBtn" href="#befaring">Be om befaring</a><a className="outlineBtn" href="#tjenester">Se tjenester</a></div>
     <div className="heroTrust"><span><b>01</b> Lokalt i Bergen</span><span><b>02</b> Tydelig avtale</span><span><b>03</b> Solid utførelse</span></div>
    </div>
   </section>
@@ -75,7 +75,7 @@ export default function Home(){
   </section>
 
   <section id="prosjekter" className="homeSection projects"><div className="homeWrap">
-   <div className="sectionIntro"><div><span className="goldLabel">TIDLIGERE OPPDRAG</span><h2>Arbeid vi er stolte av.</h2></div><p>Et utvalg av arbeid. Egne prosjektbilder kan legges inn her etter hvert.</p></div>
+   <div className="sectionIntro"><div><span className="goldLabel">TIDLIGERE OPPDRAG</span><h2>Utvalgte oppdrag.</h2></div><p>Et utvalg av arbeid. Egne prosjektbilder kan legges inn her etter hvert.</p></div>
    <div className="projectGrid">
     <div className="projectTile projectDeck large"><div className="deckScene"></div><span>UTEOMRÅDE</span><strong>Terrasse og trearbeid</strong></div>
     <div className="projectTile projectBefore"><div className="beforeScene"></div><span>VEDLIKEHOLD</span><strong>Før og etter</strong></div>
@@ -84,7 +84,7 @@ export default function Home(){
   </div></section>
 
   <section className="processSection"><div className="homeWrap">
-   <div className="processIntro"><span className="goldLabel">ENKELT Å KOMME I GANG</span><h2>Fra idé til ferdig jobb.</h2></div>
+   <div className="processIntro"><span className="goldLabel">SLIK FUNGERER DET</span><h2>Enkelt å komme i gang.</h2></div>
    <div className="processGrid">
     <div className="processStep"><b>01</b><h3>Send forespørsel</h3><p>Fortell kort hva du ønsker hjelp med.</p></div>
     <div className="processStep"><b>02</b><h3>Vi avklarer jobben</h3><p>Vi tar kontakt og avtaler befaring når det er nødvendig.</p></div>
