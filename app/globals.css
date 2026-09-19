@@ -59,3 +59,38 @@
  .projects .sectionIntro{margin-bottom:16px}
  .projectGrid{gap:8px}
 }
+
+/* Approved mockup visual direction */
+.heroPhoto{background:
+ linear-gradient(90deg,rgba(0,0,0,.35),rgba(0,0,0,.05)),
+ url("https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1800&q=85") center/cover no-repeat!important}
+.serviceVisual.renovation{background:url("https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=900&q=82") center/cover!important}
+.serviceVisual.outdoor{background:url("https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=900&q=82") center/cover!important}
+.serviceVisual.products{background:url("https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=900&q=82") center/cover!important}
+.serviceVisual.rental{background:url("https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=900&q=82") center/cover!important}
+.serviceVisual.maintenance{background:url("https://images.unsplash.com/photo-1531835551805-16d864c8d311?auto=format&fit=crop&w=900&q=82") center/cover!important}
+.serviceVisual:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 48%,rgba(0,0,0,.35))}
+.visualScene{display:none!important}
+.craftVisual{background:linear-gradient(90deg,rgba(0,0,0,.08),rgba(0,0,0,.25)),url("https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?auto=format&fit=crop&w=1300&q=84") center/cover no-repeat!important}
+.craftVisual>*:not(span){display:none!important}
+.projectDeck{background:url("https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1000&q=82") center/cover!important}
+.projectBefore{background:url("https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=700&q=82") center/cover!important}
+.projectBench{background:url("https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=700&q=82") center/cover!important}
+.projectTile>div{display:none!important}
+.projectTile:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 48%,rgba(0,0,0,.68));z-index:0}
+.projectTile>span,.projectTile>strong{position:relative;z-index:1}
+.stripGrid a b,.cardNo,.serviceNumber{display:none!important}
+.stripGrid a{justify-content:center;text-align:center;gap:8px}
+.stripIcon{width:28px;height:28px;border:2px solid #d7a74e;border-radius:7px;display:block;position:relative}
+.stripIcon:after{content:"";position:absolute;width:8px;height:8px;border:2px solid #d7a74e;left:8px;top:8px}
+@media(max-width:600px){
+ .homeHero{min-height:510px}.heroContent{padding-top:42px}
+ .heroPhoto{background-position:62% center!important}
+ .serviceStrip{display:none}
+ .serviceCards{grid-template-columns:1fr 1fr!important}
+ .serviceCards .serviceCard:nth-child(5){grid-column:1/-1!important;grid-template-columns:42% 58%!important}
+ .serviceVisual{height:120px!important}
+ .serviceText p{display:none}
+ .craftVisual{min-height:180px;background-position:center!important}
+ .projectGrid{grid-template-rows:150px 120px!important}
+}
