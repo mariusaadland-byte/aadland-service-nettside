@@ -189,6 +189,7 @@ export default function AdminClient({ user }) {
   const tabs = [["overview", "Oversikt"]];
 
   if (canViewOrders) tabs.push(["orders", "Bestillinger"]);
+  if (canViewOrders) tabs.push(["surveys", "Befaringer"]);
   if (canManageProducts) tabs.push(["products", "Produkter"]);
   if (canManageProducts) tabs.push(["categories", "Kategorier"]);
   if (canManageProducts) tabs.push(["services", "Tjenester"]);
@@ -226,6 +227,8 @@ export default function AdminClient({ user }) {
             ? "Oversikt"
             : tab === "orders"
             ? "Bestillinger"
+            : tab === "surveys"
+            ? "Befaringer"
             : tab === "products"
             ? "Produkter"
             : tab === "categories"
@@ -330,7 +333,7 @@ export default function AdminClient({ user }) {
           />
         )}
 
-        {tab === "products" && canManageProducts && (
+        {tab === "surveys" && canViewOrders && (\n          <Surveys orders={orders.filter(order => order.orderType === "custom")} status={status} canUpdateOrders={canUpdateOrders} />\n        )}\n\n        {tab === "products" && canManageProducts && (
           <Products
             products={products}
             categories={categories}
@@ -440,6 +443,45 @@ function Orders({ orders, status, canUpdateOrders }) {
       </tbody>
     </table>
   );
+}
+
+function Surveys({ orders, status, canUpdateOrders }) {
+  const surveyLabels = {
+    new: "Ny forespørsel",
+    confirmed: "Avtalt",
+    in_progress: "Under arbeid",
+    ready: "Klar for oppfølging",
+    completed: "Ferdig",
+    cancelled: "Avbrutt",
+  };
+
+  if (!orders.length) {
+    return <div className="card"><h3>Ingen befaringer ennå</h3><p className="muted">Forespørsler fra befaring-skjemaet vil vises her automatisk.</p></div>;
+  }
+
+  return <div className="grid">
+    {orders.map(order => {
+      const customer = order.customer || {};
+      return <article className="card" key={order.id}>
+        <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"flex-start",flexWrap:"wrap"}}>
+          <div>
+            <small className="muted">{order.orderNumber} · {new Date(order.createdAt).toLocaleString("nb-NO")}</small>
+            <h3 style={{marginBottom:6}}>{order.customerName || "Ukjent kunde"}</h3>
+            <div className="muted">{order.customerPhone}{order.customerEmail ? " · "+order.customerEmail : ""}</div>
+          </div>
+          {canUpdateOrders ? <select value={order.status} onChange={e=>status(order.id,e.target.value)}>
+            {Object.entries(surveyLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}
+          </select> : <b>{surveyLabels[order.status] || order.status}</b>}
+        </div>
+        {(customer.address || customer.postalCode || customer.city) && <p><b>Adresse:</b> {[customer.address,customer.postalCode,customer.city].filter(Boolean).join(", ")}</p>}
+        <div style={{whiteSpace:"pre-wrap",lineHeight:1.55,marginTop:16}}>{order.customRequest || "Ingen beskrivelse."}</div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:18}}>
+          {order.customerPhone && <a className="btn" href={"tel:"+order.customerPhone}>Ring kunde</a>}
+          {order.customerEmail && <a className="btn alt" href={"mailto:"+order.customerEmail}>Send e-post</a>}
+        </div>
+      </article>;
+    })}
+  </div>;
 }
 
 function Products({
