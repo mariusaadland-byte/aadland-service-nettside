@@ -157,3 +157,10 @@
 .footerIdentity{display:flex;flex-direction:column;gap:18px}
 .footerTagline{font-family:Georgia,serif;font-style:italic;color:#d7a74e!important;font-size:16px!important;line-height:1.25;margin:0}
 @media(max-width:600px){.footerIdentity{grid-column:1/-1}.footerTagline{font-size:14px!important}}
+
+/* Approved reference service photography */
+.serviceVisual.serviceSlot0{background:url("https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=900&q=84") center/cover no-repeat!important}
+.serviceVisual.serviceSlot1{background:url("https://images.unsplash.com/photo-1591825729269-caeb344f6df2?auto=format&fit=crop&w=900&q=84") center/cover no-repeat!important}
+.serviceVisual.serviceSlot2{background:url("https://images.unsplash.com/photo-1538688525198-9b88f6f53126?auto=format&fit=crop&w=900&q=84") center/cover no-repeat!important}
+.serviceVisual.serviceSlot3{background:url("https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=900&q=84") center/cover no-repeat!important}
+.serviceVisual.serviceSlot4{background:url("https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=900&q=84") center/cover no-repeat!important}
