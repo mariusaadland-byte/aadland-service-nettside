@@ -104,7 +104,9 @@ export default function Home(){
   <header className="homeTop homeHeader">
    <div className="homeWrap homeNav homeHeaderInner">
     <a className="homeBrand homeLogo" href="/"><img className="brandLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></a>
-    <button className="mobileMenuBtn" type="button" aria-label={menuOpen?"Lukk meny":"Åpne meny"} aria-expanded={menuOpen} aria-controls="hovedmeny" onClick={()=>setMenuOpen(!menuOpen)}><span></span><span></span><span></span></button><nav id="hovedmeny" className={"homeLinks "+(menuOpen?"menuOpen":"")} onClick={()=>setMenuOpen(false)}><a href="/">Hjem</a><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="#tjeneste-rental">Utleie</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a></nav>
+    <button className="mobileMenuBtn" type="button" aria-label={menuOpen?"Lukk meny":"Åpne meny"} aria-expanded={menuOpen} aria-controls="hovedmeny" onClick={()=>setMenuOpen(!menuOpen)}><span></span><span></span><span></span></button><nav id="hovedmeny" className={"homeLinks "+(menuOpen?"menuOpen":"")} onClick={()=>setMenuOpen(false)}><a href="/">Hjem</a><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="#tjeneste-rental">Utleie</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a>{menuServices.filter(service=>service.hasPage && !["produkter","utleie"].includes(service.slug)).map(service=>(
+ <a key={service.id||service.slug} href={serviceHref(service)} onClick={()=>setMenuOpen(false)}>{service.title}</a>
+))}</nav>
     <a className="goldBtn navCta headerCta" href="#befaring" onClick={()=>setSelectedService(enquiryServiceName())}>Be om befaring →</a>
    </div>
   </header>
