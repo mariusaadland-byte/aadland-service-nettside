@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const emptyCustomer={name:"",email:"",phone:"",address:"",postalCode:"",city:"",note:"",deliveryWithinRadius:true};
 
@@ -20,6 +20,11 @@ export default function Home(){
  const [error,setError]=useState("");
  const [sending,setSending]=useState(false);
  const [contactImages,setContactImages]=useState([]);
+ const [publicGroups,setPublicGroups]=useState([]);
+
+ useEffect(()=>{
+  fetch("/api/categories").then(r=>r.ok?r.json():null).then(data=>setPublicGroups(data?.categories||[])).catch(()=>{});
+ },[]);
 
  async function customOrder(e){
   e.preventDefault(); setError(""); setMessage(null); setSending(true);
@@ -115,7 +120,10 @@ export default function Home(){
    </form>
   </div></section>
 
-  <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="homeBrand"><img className="brandLogo footerLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></div><div><b>Kontakt</b><p>471 54 898<br/>post@aadland-service.no</p></div><div><b>Tjenester</b><div className="footerServices">{services.map(([title,,type])=><a key={type} href={type==="products"?"/produkter":"#tjenester"}>{title}</a>)}</div></div><div><b>Firma</b><p>Org.nr. 937 781 873 MVA<br/>Bergen og omegn</p></div></div></footer>
+  <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="homeBrand"><img className="brandLogo footerLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></div><div><b>Kontakt</b><p>471 54 898<br/>post@aadland-service.no</p></div><div><b>Tjenester</b><div className="footerServices">
+ {services.slice(0,5).map(([title,,type])=><a key={type} href={type==="products"?"/produkter":"#tjenester"}>{title}</a>)}
+ {publicGroups.filter(group=>!services.some(([title])=>title.toLowerCase()===group.name.toLowerCase())).map(group=><a key={group.id} href={"/produkter/kategori/"+group.slug}>{group.name}</a>)}
+ </div></div><div><b>Firma</b><p>Org.nr. 937 781 873 MVA<br/>Bergen og omegn</p></div></div></footer>
  </main>;
 }
 function Field({label,children}){return <label className="homeField"><span>{label}</span>{children}</label>}
