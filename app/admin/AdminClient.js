@@ -113,10 +113,38 @@ export default function AdminClient({ user }) {
     } else { setServices([]); }
 
     if (canManageProducts) {
-      const response = await fetch("/api/admin/rental");
-      if (response.ok) { const data = await response.json(); setRentalItems(data.items || []); }
-      else { setRentalItems([]); }
-    } else { setRentalItems([]); }
+      const [itemsResponse, blocksResponse] = await Promise.all([
+        fetch("/api/admin/rental"),
+        fetch("/api/admin/rental/blocks"),
+      ]);
+      if (itemsResponse.ok) {
+        const data = await itemsResponse.json();
+        setRentalItems(data.items || []);
+      } else {
+        setRentalItems([]);
+      }
+      if (blocksResponse.ok) {
+        const data = await blocksResponse.json();
+        setRentalBlocks(data.blocks || []);
+      } else {
+        setRentalBlocks([]);
+      }
+    } else {
+      setRentalItems([]);
+      setRentalBlocks([]);
+    }
+
+    if (canViewOrders) {
+      const response = await fetch("/api/admin/rental-bookings");
+      if (response.ok) {
+        const data = await response.json();
+        setRentalBookings(data.bookings || []);
+      } else {
+        setRentalBookings([]);
+      }
+    } else {
+      setRentalBookings([]);
+    }
 
     if (canManageUsers) {
       const response = await fetch("/api/admin/users");
@@ -316,6 +344,21 @@ export default function AdminClient({ user }) {
                   <br />
                   <b>{nok(total)}</b>
                 </div>
+              )}
+
+              {canViewOrders && (
+                <>
+                  <div className="stat">
+                    <span className="muted">Aktive utleier</span>
+                    <br />
+                    <b>{rentalBookings.filter((booking) => ["confirmed", "active"].includes(booking.status)).length}</b>
+                  </div>
+                  <div className="stat">
+                    <span className="muted">Nye utleiebookinger</span>
+                    <br />
+                    <b>{rentalBookings.filter((booking) => booking.status === "new").length}</b>
+                  </div>
+                </>
               )}
             </div>
 
