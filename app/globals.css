@@ -464,3 +464,20 @@ html{scroll-behavior:smooth}
  .heroLead{font-size:14px!important;max-width:390px!important}
  .heroTrust{margin-top:38px!important}
 }
+
+/* Approved reference: compact black service strip below hero */
+.serviceStrip{background:#101010!important;border-top:1px solid rgba(255,255,255,.07)!important;border-bottom:1px solid rgba(255,255,255,.07)!important}
+.serviceStripInner{display:grid!important;grid-template-columns:repeat(6,1fr)!important;max-width:1180px!important;margin:0 auto!important}
+.serviceStripItem{min-height:126px!important;padding:22px 12px!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:11px!important;text-align:center!important;border-right:1px solid rgba(255,255,255,.08)!important;text-decoration:none!important}
+.serviceStripItem:first-child{border-left:1px solid rgba(255,255,255,.08)!important}
+.serviceStripItem span:last-child{font-size:11px!important;line-height:1.35!important;color:rgba(255,255,255,.88)!important;max-width:145px!important}
+.serviceStripItem:hover{background:rgba(215,167,78,.055)!important}
+.serviceIcon{width:31px!important;height:31px!important;color:#d7a74e!important}
+@media(max-width:700px){
+ .serviceStripInner{grid-template-columns:repeat(3,1fr)!important}
+ .serviceStripItem{min-height:105px!important;padding:16px 8px!important}
+ .serviceStripItem:nth-child(3n+1){border-left:1px solid rgba(255,255,255,.08)!important}
+ .serviceStripItem{border-bottom:1px solid rgba(255,255,255,.08)!important}
+ .serviceStripItem span:last-child{font-size:10px!important}
+ .serviceIcon{width:27px!important;height:27px!important}
+}
