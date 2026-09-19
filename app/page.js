@@ -5,12 +5,12 @@ import { useState } from "react";
 const emptyCustomer={name:"",email:"",phone:"",address:"",postalCode:"",city:"",note:"",deliveryWithinRadius:true};
 
 const fallbackServices=[
- {title:"Oppussing og renovering",description:"Fra mindre oppgraderinger til større fornyelser i hjemmet.",slug:"renovation",kind:"service",active:true,showInMenu:true},
- {title:"Uteområder og hage",description:"Terrasser, levegger, vedlikehold og praktiske løsninger ute.",slug:"outdoor",kind:"service",active:true,showInMenu:true},
- {title:"Produkter på bestilling",description:"Benker, plantekasser og andre produkter tilpasset dine ønsker.",slug:"products",kind:"products",active:true,showInMenu:true},
- {title:"Utleie av utstyr",description:"Lei utstyr til prosjektet når du trenger det.",slug:"rental",kind:"rental",active:true,showInMenu:true},
- {title:"Vedlikehold og småjobber",description:"Reparasjoner, montering og oppgaver som må bli gjort.",slug:"maintenance",kind:"service",active:true,showInMenu:true},
- {title:"Rådgivning og befaring",description:"Fortell oss om prosjektet, så finner vi en god vei videre.",slug:"survey",kind:"survey",active:true,showInMenu:true},
+ {title:"Oppussing og renovering",description:"Fra mindre oppgraderinger til større fornyelser i hjemmet.",slug:"renovation",kind:"service",active:true,showInMenu:true,showOnHome:true,sortOrder:10},
+ {title:"Uteområder og hage",description:"Terrasser, levegger, vedlikehold og praktiske løsninger ute.",slug:"outdoor",kind:"service",active:true,showInMenu:true,showOnHome:true,sortOrder:20},
+ {title:"Produkter på bestilling",description:"Benker, plantekasser og andre produkter tilpasset dine ønsker.",slug:"products",kind:"products",active:true,showInMenu:true,showOnHome:true,sortOrder:30},
+ {title:"Utleie av utstyr",description:"Lei utstyr til prosjektet når du trenger det.",slug:"rental",kind:"rental",active:true,showInMenu:true,showOnHome:true,sortOrder:40},
+ {title:"Vedlikehold og småjobber",description:"Reparasjoner, montering og oppgaver som må bli gjort.",slug:"maintenance",kind:"service",active:true,showInMenu:true,showOnHome:true,sortOrder:50},
+ {title:"Rådgivning og befaring",description:"Fortell oss om prosjektet, så finner vi en god vei videre.",slug:"survey",kind:"survey",active:true,showInMenu:true,showOnHome:false,sortOrder:60},
 ];
 
 function serviceHref(service){
@@ -28,7 +28,8 @@ export default function Home(){
  const [contactImages,setContactImages]=useState([]);
  const [imageError,setImageError]=useState("");
  const [menuOpen,setMenuOpen]=useState(false);
- const services=fallbackServices.filter(service=>service.active!==false);
+ const services=fallbackServices.filter(service=>service.active!==false).sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999));
+ const homeServices=services.filter(service=>service.showOnHome!==false);
  const menuServices=services.filter(service=>service.showInMenu!==false);
 
  async function customOrder(e){
@@ -80,7 +81,7 @@ export default function Home(){
    <div className="homeWrap">
     <div className="sectionIntro servicesHeader"><div><span className="goldLabel">VÅRE TJENESTER</span><h2>Små og store prosjekter</h2></div><a className="textLink" href="#befaring">Se alle tjenester →</a></div>
     <div className="serviceCards">
-     {services.slice(0,5).map((service,index)=><article id={"tjeneste-"+service.slug} data-service={service.slug} className={"serviceCard serviceCard"+index} key={service.slug}>
+     {homeServices.slice(0,5).map((service,index)=><article id={"tjeneste-"+service.slug} data-service={service.slug} className={"serviceCard serviceCard"+index} key={service.slug}>
       <div className={"serviceVisual serviceSlot"+index}><div className="visualScene"></div></div>
       <div className="serviceText serviceContent"><h3>{service.title}</h3><p>{service.description}</p><a href={service.kind==="products"?"/produkter":"#befaring"}>Les mer <b>→</b></a></div>
      </article>)}
