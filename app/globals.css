@@ -367,3 +367,5 @@ html{scroll-behavior:smooth}
 .outlineBtn:hover{border-color:#fff!important;background:rgba(255,255,255,.08)!important}
 .newHome a:focus-visible,.newHome button:focus-visible,.newHome input:focus-visible,.newHome textarea:focus-visible{outline:2px solid #d7a74e!important;outline-offset:3px!important}
 @media(max-width:700px){.goldBtn,.outlineBtn{min-height:44px;padding:0 17px!important}}
+
+.contactImageError{margin:-4px 0 12px!important;font-size:12px!important;line-height:1.45!important;color:#e8c47d!important}
