@@ -22,6 +22,7 @@ export default function AdminClient({ user }) {
   const [rentalItems, setRentalItems] = useState([]);
   const [rentalBookings, setRentalBookings] = useState([]);
   const [rentalBlocks, setRentalBlocks] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [users, setUsers] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(user?.id || "");
   const [error, setError] = useState("");
@@ -146,6 +147,12 @@ export default function AdminClient({ user }) {
       setRentalBookings([]);
     }
 
+    if (canManageProducts) {
+      const response = await fetch("/api/admin/projects");
+      if (response.ok) { const data = await response.json(); setProjects(data.projects || []); }
+      else setProjects([]);
+    } else setProjects([]);
+
     if (canManageUsers) {
       const response = await fetch("/api/admin/users");
 
@@ -232,6 +239,7 @@ export default function AdminClient({ user }) {
   if (canManageProducts) tabs.push(["services", "Tjenester"]);
   if (canManageProducts) tabs.push(["rental", "Utleieutstyr"]);
   if (canViewOrders) tabs.push(["rentalBookings", "Utleiebookinger"]);
+  if (canManageProducts) tabs.push(["projects", "Tidligere oppdrag"]);
   if (canManageUsers) tabs.push(["users", "Brukere"]);
 
   return (
@@ -278,6 +286,8 @@ export default function AdminClient({ user }) {
             ? "Utleieutstyr"
             : tab === "rentalBookings"
             ? "Utleiebookinger"
+            : tab === "projects"
+            ? "Tidligere oppdrag"
             : "Brukere"}
         </h1>
 
@@ -423,6 +433,10 @@ export default function AdminClient({ user }) {
 
         {tab === "rentalBookings" && canViewOrders && (
           <RentalBookings bookings={rentalBookings} reload={load} setError={setError} canUpdate={canUpdateOrders} />
+        )}
+
+        {tab === "projects" && canManageProducts && (
+          <Projects projects={projects} reload={load} setError={setError} />
         )}
 
         {tab === "users" && canManageUsers && (
@@ -3212,4 +3226,24 @@ function RentalBookings({bookings,reload,setError,canUpdate}){
  <div className="field"><label>Depositum</label><select disabled={!canUpdate} value={b.depositStatus} onChange={e=>patch(b.id,{depositStatus:e.target.value})}><option value="not_paid">Ikke mottatt</option><option value="held">Holdes</option><option value="released">Frigitt</option><option value="partially_charged">Delvis trukket</option><option value="charged">Trukket</option></select></div>
  <div className="field"><label>Internt notat</label><textarea defaultValue={b.adminNote} id={"rental-note-"+b.id}/></div>{canUpdate&&<button className="btn alt" onClick={()=>patch(b.id,{adminNote:document.getElementById("rental-note-"+b.id).value})}>Lagre notat</button>}
  </article>)}</div>;
+}
+
+function Projects({projects,reload,setError}){
+ const [showNew,setShowNew]=useState(false);
+ return <><div style={{marginBottom:20}}><button className="btn" onClick={()=>setShowNew(!showNew)}>{showNew?"Avbryt":"Legg til oppdrag"}</button></div>
+ {showNew&&<ProjectEditor project={null} reload={reload} setError={setError} close={()=>setShowNew(false)}/>}
+ <div className="grid">{projects.map(p=><ProjectEditor key={p.id} project={p} reload={reload} setError={setError}/>)}</div></>;
+}
+function ProjectEditor({project,reload,setError,close}){
+ const isNew=!project,[editing,setEditing]=useState(isNew),[saving,setSaving]=useState(false),[uploading,setUploading]=useState(false);
+ const [v,setV]=useState({title:project?.title||"",category:project?.category||"",description:project?.description||"",imageUrls:project?.imageUrls||[],featured:project?.featured!==false,active:project?.active!==false,sortOrder:project?.sortOrder||0});
+ const set=(k,x)=>setV({...v,[k]:x});
+ async function upload(files){setUploading(true);const urls=[];for(const file of Array.from(files||[])){const fd=new FormData();fd.append("file",file);const r=await fetch("/api/admin/upload",{method:"POST",body:fd}),d=await r.json().catch(()=>({}));if(r.ok&&d.url)urls.push(d.url);else setError(d.error||"Et bilde kunne ikke lastes opp.");}setV(x=>({...x,imageUrls:[...x.imageUrls,...urls]}));setUploading(false);}
+ async function save(e){e.preventDefault();setSaving(true);setError("");const r=await fetch("/api/admin/projects",{method:isNew?"POST":"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({...v,...(!isNew?{id:project.id}:{})})}),d=await r.json().catch(()=>({}));setSaving(false);if(!r.ok){setError(d.error||"Oppdraget kunne ikke lagres.");return;}if(close)close();else setEditing(false);await reload();}
+ async function remove(){if(!project?.id||!window.confirm('Slette "'+project.title+'"?'))return;const r=await fetch("/api/admin/projects",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:project.id})});if(!r.ok){setError("Oppdraget kunne ikke slettes.");return;}await reload();}
+ if(!editing&&project)return <article className="card">{project.imageUrls?.[0]&&<img src={project.imageUrls[0]} alt="" style={{width:"100%",height:200,objectFit:"cover",borderRadius:12}}/>}<div className="kicker">{project.category||"OPPDRAG"}</div><h3>{project.title}</h3><p>{project.description}</p><p className="muted">{project.active?"Publisert":"Skjult"} · {project.featured?"Vises på forsiden":"Ikke på forsiden"}</p><div style={{display:"flex",gap:10}}><button className="btn" onClick={()=>setEditing(true)}>Rediger</button><button className="btn alt" onClick={remove}>Slett</button></div></article>;
+ return <form className="card" onSubmit={save}><div className="kicker">{isNew?"NYTT OPPDRAG":"REDIGER OPPDRAG"}</div><div className="field"><label>Tittel</label><input required value={v.title} onChange={e=>set("title",e.target.value)}/></div><div className="field"><label>Kategori</label><input value={v.category} onChange={e=>set("category",e.target.value)} placeholder="F.eks. Uteområde"/></div><div className="field"><label>Beskrivelse</label><textarea rows="4" value={v.description} onChange={e=>set("description",e.target.value)}/></div>
+ <div className="field"><label>Bilder</label>{v.imageUrls.map((url,i)=><div key={url+i} style={{marginBottom:8}}><img src={url} alt="" style={{width:180,height:110,objectFit:"cover",borderRadius:10}}/><button type="button" className="btn alt" onClick={()=>set("imageUrls",v.imageUrls.filter((_,x)=>x!==i))}>Fjern</button></div>)}<input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={e=>{upload(e.target.files);e.target.value=""}}/></div>
+ <div className="field"><label>Sortering</label><input type="number" value={v.sortOrder} onChange={e=>set("sortOrder",e.target.value)}/></div><label><input type="checkbox" checked={v.featured} onChange={e=>set("featured",e.target.checked)}/> Vis på forsiden</label><br/><label><input type="checkbox" checked={v.active} onChange={e=>set("active",e.target.checked)}/> Publisert</label>
+ <div style={{display:"flex",gap:10,marginTop:18}}><button className="btn" disabled={saving||uploading}>{saving?"Lagrer …":"Lagre"}</button>{!isNew&&<button type="button" className="btn alt" onClick={()=>setEditing(false)}>Avbryt</button>}</div></form>;
 }
