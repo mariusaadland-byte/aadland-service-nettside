@@ -232,3 +232,12 @@
  .serviceText{padding:18px!important}
  .serviceText p{display:block!important}
 }
+
+/* Approved reference: photographic project cards */
+.projectTile{position:relative!important;overflow:hidden!important;display:flex!important;align-items:flex-end!important;padding:0!important}
+.projectTile:after{content:""!important;position:absolute!important;inset:0!important;background:linear-gradient(180deg,transparent 38%,rgba(8,8,8,.78) 100%)!important;z-index:0!important}
+.projectCaption{position:relative;z-index:1;padding:22px 20px;display:grid;gap:5px;color:#fff}
+.projectCaption span{font-size:10px!important;letter-spacing:.16em!important;color:#d7a74e!important;font-weight:800}
+.projectCaption strong{font-size:18px!important;line-height:1.15!important}
+.projectDeck{background:url("https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=900&q=84") center/cover no-repeat!important}
+@media(max-width:700px){.projectCaption{padding:13px 12px}.projectCaption strong{font-size:14px!important}.projectCaption span{font-size:8px!important}}
