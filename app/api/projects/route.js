@@ -1,0 +1,4 @@
+import {NextResponse} from "next/server";
+import {db} from "../../../lib/supabase";
+const map=p=>({id:p.id,title:p.title,slug:p.slug,category:p.category||"",description:p.description||"",imageUrls:Array.isArray(p.image_urls)?p.image_urls:[],featured:p.featured!==false,active:p.active!==false,sortOrder:p.sort_order||0});
+export async function GET(){const s=db();if(!s)return NextResponse.json({projects:[]});const {data,error}=await s.from("projects").select("*").eq("active",true).order("sort_order").order("created_at",{ascending:false});if(error){if(error.code==="42P01")return NextResponse.json({projects:[],setupRequired:true});return NextResponse.json({projects:[]})}return NextResponse.json({projects:(data||[]).map(map)})}
