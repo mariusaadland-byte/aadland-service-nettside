@@ -112,7 +112,13 @@ export default function AdminClient({ user }) {
       else { const data = await response.json().catch(() => ({})); setError(data.error || "Tjenestene kunne ikke hentes."); setServices([]); }
     } else { setServices([]); }
 
-    if (canManageProducts) {\n      const response = await fetch("/api/admin/rental");\n      if (response.ok) { const data = await response.json(); setRentalItems(data.items || []); }\n      else { setRentalItems([]); }\n    } else { setRentalItems([]); }\n\n    if (canManageUsers) {
+    if (canManageProducts) {
+      const response = await fetch("/api/admin/rental");
+      if (response.ok) { const data = await response.json(); setRentalItems(data.items || []); }
+      else { setRentalItems([]); }
+    } else { setRentalItems([]); }
+
+    if (canManageUsers) {
       const response = await fetch("/api/admin/users");
 
       if (response.status === 401) {
@@ -195,7 +201,8 @@ export default function AdminClient({ user }) {
   if (canViewOrders) tabs.push(["surveys", "Befaringer"]);
   if (canManageProducts) tabs.push(["products", "Produkter"]);
   if (canManageProducts) tabs.push(["categories", "Kategorier"]);
-  if (canManageProducts) tabs.push(["services", "Tjenester"]);\n  if (canManageProducts) tabs.push(["rental", "Utleieutstyr"]);
+  if (canManageProducts) tabs.push(["services", "Tjenester"]);
+  if (canManageProducts) tabs.push(["rental", "Utleieutstyr"]);
   if (canViewOrders) tabs.push(["rentalBookings", "Utleiebookinger"]);
   if (canManageUsers) tabs.push(["users", "Brukere"]);
 
@@ -341,7 +348,11 @@ export default function AdminClient({ user }) {
           />
         )}
 
-        {tab === "surveys" && canViewOrders && (\n          <Surveys orders={orders.filter(order => order.orderType === "custom")} status={status} canUpdateOrders={canUpdateOrders} />\n        )}\n\n        {tab === "products" && canManageProducts && (
+        {tab === "surveys" && canViewOrders && (
+          <Surveys orders={orders.filter(order => order.orderType === "custom")} status={status} canUpdateOrders={canUpdateOrders} />
+        )}
+
+        {tab === "products" && canManageProducts && (
           <Products
             products={products}
             categories={categories}
@@ -363,7 +374,11 @@ export default function AdminClient({ user }) {
           <Services services={services} reload={load} setError={setError} />
         )}
 
-        {tab === "rental" && canManageProducts && (\n          <RentalItems items={rentalItems} blocks={rentalBlocks} reload={load} setError={setError} />\n        )}\n\n        {tab === "rentalBookings" && canViewOrders && (
+        {tab === "rental" && canManageProducts && (
+          <RentalItems items={rentalItems} blocks={rentalBlocks} reload={load} setError={setError} />
+        )}
+
+        {tab === "rentalBookings" && canViewOrders && (
           <RentalBookings bookings={rentalBookings} reload={load} setError={setError} canUpdate={canUpdateOrders} />
         )}
 
@@ -3091,12 +3106,20 @@ function ServiceEditor({ service, reload, setError, close }) {
     <div className="kicker">{isNew?"Ny tjeneste":"Rediger tjeneste"}</div>
     <h3>{isNew?"Legg til tjeneste":service.title}</h3>
     <div className="field"><label>Navn</label><input required value={title} onChange={e=>setTitle(e.target.value)} placeholder="F.eks. Brøyting" /></div>
-    <div className="field"><label>Beskrivelse</label><textarea rows="4" value={description} onChange={e=>setDescription(e.target.value)} /></div>\n    <div className="field"><label>Type</label><select value={kind} onChange={e=>setKind(e.target.value)}><option value="service">Vanlig tjeneste</option><option value="rental">Utleie</option><option value="products">Produkter på bestilling</option><option value="survey">Befaring</option></select></div>
-    <div className="field"><label>Bilde</label>{imageUrl&&<img src={imageUrl} alt="" style={{width:"100%",height:180,objectFit:"cover",borderRadius:12,marginBottom:10}}/>}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={e=>uploadImage(e.target.files?.[0])}/>{uploading&&<small className="muted">Laster opp …</small>}</div>\n    <div className="field"><label>Rekkefølge</label><input type="number" value={sortOrder} onChange={e=>setSortOrder(e.target.value)} /></div>\n    <div className="field"><label>Publiser fra (valgfritt)</label><input type="date" value={publishFrom} onChange={e=>setPublishFrom(e.target.value)} /></div>\n    <div className="field"><label>Publiser til (valgfritt)</label><input type="date" value={publishUntil} onChange={e=>setPublishUntil(e.target.value)} /></div>
+    <div className="field"><label>Beskrivelse</label><textarea rows="4" value={description} onChange={e=>setDescription(e.target.value)} /></div>
+    <div className="field"><label>Type</label><select value={kind} onChange={e=>setKind(e.target.value)}><option value="service">Vanlig tjeneste</option><option value="rental">Utleie</option><option value="products">Produkter på bestilling</option><option value="survey">Befaring</option></select></div>
+    <div className="field"><label>Bilde</label>{imageUrl&&<img src={imageUrl} alt="" style={{width:"100%",height:180,objectFit:"cover",borderRadius:12,marginBottom:10}}/>}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={e=>uploadImage(e.target.files?.[0])}/>{uploading&&<small className="muted">Laster opp …</small>}</div>
+    <div className="field"><label>Rekkefølge</label><input type="number" value={sortOrder} onChange={e=>setSortOrder(e.target.value)} /></div>
+    <div className="field"><label>Publiser fra (valgfritt)</label><input type="date" value={publishFrom} onChange={e=>setPublishFrom(e.target.value)} /></div>
+    <div className="field"><label>Publiser til (valgfritt)</label><input type="date" value={publishUntil} onChange={e=>setPublishUntil(e.target.value)} /></div>
     <label><input type="checkbox" checked={active} onChange={e=>setActive(e.target.checked)} /> Publisert</label><br/>
     <label><input type="checkbox" checked={showOnHome} onChange={e=>setShowOnHome(e.target.checked)} /> Vis på forsiden</label><br/>
     <label><input type="checkbox" checked={showInMenu} onChange={e=>setShowInMenu(e.target.checked)} /> Vis i meny</label><br/>
-    <label><input type="checkbox" checked={showInFooter} onChange={e=>setShowInFooter(e.target.checked)} /> Vis i footer</label><br/>\n    <label><input type="checkbox" checked={hasPage} onChange={e=>setHasPage(e.target.checked)} /> Egen tjenesteside</label>\n    <div className="field" style={{marginTop:16}}><label>Tekst på knapp</label><input value={ctaLabel} onChange={e=>setCtaLabel(e.target.value)} placeholder="Les mer" /></div>\n    <div className="field"><label>Overskrift i forespørsel</label><input value={formTitle} onChange={e=>setFormTitle(e.target.value)} /></div>\n    <div className="field"><label>Hjelpetekst i forespørsel</label><textarea rows="3" value={formPrompt} onChange={e=>setFormPrompt(e.target.value)} /></div>
+    <label><input type="checkbox" checked={showInFooter} onChange={e=>setShowInFooter(e.target.checked)} /> Vis i footer</label><br/>
+    <label><input type="checkbox" checked={hasPage} onChange={e=>setHasPage(e.target.checked)} /> Egen tjenesteside</label>
+    <div className="field" style={{marginTop:16}}><label>Tekst på knapp</label><input value={ctaLabel} onChange={e=>setCtaLabel(e.target.value)} placeholder="Les mer" /></div>
+    <div className="field"><label>Overskrift i forespørsel</label><input value={formTitle} onChange={e=>setFormTitle(e.target.value)} /></div>
+    <div className="field"><label>Hjelpetekst i forespørsel</label><textarea rows="3" value={formPrompt} onChange={e=>setFormPrompt(e.target.value)} /></div>
     <div style={{display:"flex",gap:10,marginTop:18}}><button className="btn" disabled={saving}>{saving?"Lagrer …":"Lagre"}</button>{!isNew&&<button type="button" className="btn alt" onClick={()=>setEditing(false)}>Avbryt</button>}</div>
   </form>;
 }
