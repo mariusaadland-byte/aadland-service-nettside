@@ -673,6 +673,16 @@ function ProductEditor({
   const [active, setActive] = useState(
     product?.active !== false
   );
+  const [inventoryMode,setInventoryMode]=useState(product?.inventoryMode||"made_to_order");
+  const [stockQuantity,setStockQuantity]=useState(String(product?.stockQuantity??0));
+  const [restockDate,setRestockDate]=useState(product?.restockDate||"");
+  const [leadTimeText,setLeadTimeText]=useState(product?.leadTimeText||"");
+  const [shippable,setShippable]=useState(product?.shippable===true);
+  const [shippingPrice,setShippingPrice]=useState(product?String((Number(product.shippingPriceOre)||0)/100):"");
+  const [weightGrams,setWeightGrams]=useState(product?.weightGrams??"");
+  const [shippingLengthCm,setShippingLengthCm]=useState(product?.shippingLengthCm??"");
+  const [shippingWidthCm,setShippingWidthCm]=useState(product?.shippingWidthCm??"");
+  const [shippingHeightCm,setShippingHeightCm]=useState(product?.shippingHeightCm??"");
 
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -711,6 +721,7 @@ function ProductEditor({
     );
 
     setActive(product.active !== false);
+    setInventoryMode(product.inventoryMode||"made_to_order"); setStockQuantity(String(product.stockQuantity??0)); setRestockDate(product.restockDate||""); setLeadTimeText(product.leadTimeText||""); setShippable(product.shippable===true); setShippingPrice(String((Number(product.shippingPriceOre)||0)/100)); setWeightGrams(product.weightGrams??""); setShippingLengthCm(product.shippingLengthCm??""); setShippingWidthCm(product.shippingWidthCm??""); setShippingHeightCm(product.shippingHeightCm??"");
   }
 
   useEffect(() => {
@@ -1100,6 +1111,7 @@ function ProductEditor({
             cleanedOptions(),
 
           active,
+          inventoryMode, stockQuantity:Number(stockQuantity)||0, restockDate:restockDate||null, leadTimeText:leadTimeText.trim(), shippable, shippingPriceOre:Math.round((Number(String(shippingPrice).replace(",","."))||0)*100), weightGrams:weightGrams||null, shippingLengthCm:shippingLengthCm||null, shippingWidthCm:shippingWidthCm||null, shippingHeightCm:shippingHeightCm||null,
         }),
       }
     );
@@ -1192,6 +1204,7 @@ function ProductEditor({
 
           active:
             product.active === false,
+          inventoryMode:product.inventoryMode||"made_to_order", stockQuantity:product.stockQuantity||0, restockDate:product.restockDate||null, leadTimeText:product.leadTimeText||"", shippable:product.shippable===true, shippingPriceOre:product.shippingPriceOre||0, weightGrams:product.weightGrams||null, shippingLengthCm:product.shippingLengthCm||null, shippingWidthCm:product.shippingWidthCm||null, shippingHeightCm:product.shippingHeightCm||null,
         }),
       }
     );
@@ -1275,6 +1288,7 @@ function ProductEditor({
           {product.options?.length ||
             0}{" "}
           variantgruppe(r)
+          {" · "}{product.inventoryMode==="stock"?(product.stockQuantity>0?product.stockQuantity+" på lager":"Utsolgt"):"Produseres på bestilling"}
         </p>
 
         <div
@@ -1448,6 +1462,11 @@ function ProductEditor({
           placeholder="2990"
         />
       </div>
+
+      <div className="field"><label>Lagertype</label><select value={inventoryMode} onChange={e=>setInventoryMode(e.target.value)}><option value="made_to_order">Produseres på bestilling – ubegrenset</option><option value="stock">Lagervare – bruk lagerantall</option></select></div>
+      {inventoryMode==="stock"?<><div className="field"><label>Antall på lager</label><input type="number" min="0" step="1" value={stockQuantity} onChange={e=>setStockQuantity(e.target.value)}/></div><div className="field"><label>Forventet tilbake på lager</label><input type="date" value={restockDate} onChange={e=>setRestockDate(e.target.value)}/></div></>:<div className="field"><label>Forventet produksjons-/leveringstid</label><input value={leadTimeText} onChange={e=>setLeadTimeText(e.target.value)} placeholder="F.eks. 2–3 uker"/></div>}
+      <div className="field"><label><input type="checkbox" checked={shippable} onChange={e=>setShippable(e.target.checked)}/> Kan sendes med post/Bring</label></div>
+      {shippable&&<div style={{border:"1px solid #ddd",borderRadius:12,padding:14,marginBottom:18}}><div className="field"><label>Standard fraktpris i kroner</label><input type="number" min="0" step="1" value={shippingPrice} onChange={e=>setShippingPrice(e.target.value)} placeholder="0"/></div><p className="muted">Mål og vekt lagres også slik at vi senere kan koble på automatisk Bring-beregning.</p><div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}><input type="number" min="0" value={weightGrams} onChange={e=>setWeightGrams(e.target.value)} placeholder="Vekt gram"/><input type="number" min="0" step="0.1" value={shippingLengthCm} onChange={e=>setShippingLengthCm(e.target.value)} placeholder="Lengde cm"/><input type="number" min="0" step="0.1" value={shippingWidthCm} onChange={e=>setShippingWidthCm(e.target.value)} placeholder="Bredde cm"/><input type="number" min="0" step="0.1" value={shippingHeightCm} onChange={e=>setShippingHeightCm(e.target.value)} placeholder="Høyde cm"/></div></div>}
 
       <div className="field">
         <label>
