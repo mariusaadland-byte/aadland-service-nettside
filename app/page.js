@@ -13,6 +13,10 @@ const fallbackServices=[
  {title:"Rådgivning og befaring",description:"Fortell oss om prosjektet, så finner vi en god vei videre.",slug:"survey",kind:"survey",active:true,showInMenu:true,showInFooter:true,showOnHome:false,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:60},
 ];
 
+function enquiryServiceName(service){
+ return service?.title||"Generell befaring";
+}
+
 function serviceHref(service){
  if(service.ctaHref) return service.ctaHref;
  if(service.kind==="products") return "/produkter";
@@ -68,7 +72,7 @@ export default function Home(){
    <div className="homeWrap homeNav homeHeaderInner">
     <a className="homeBrand homeLogo" href="/"><img className="brandLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></a>
     <button className="mobileMenuBtn" type="button" aria-label={menuOpen?"Lukk meny":"Åpne meny"} aria-expanded={menuOpen} aria-controls="hovedmeny" onClick={()=>setMenuOpen(!menuOpen)}><span></span><span></span><span></span></button><nav id="hovedmeny" className={"homeLinks "+(menuOpen?"menuOpen":"")} onClick={()=>setMenuOpen(false)}><a href="/">Hjem</a><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="#tjeneste-rental">Utleie</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a></nav>
-    <a className="goldBtn navCta headerCta" href="#befaring" onClick={()=>setSelectedService("Generell befaring")}>Be om befaring →</a>
+    <a className="goldBtn navCta headerCta" href="#befaring" onClick={()=>setSelectedService(enquiryServiceName())}>Be om befaring →</a>
    </div>
   </header>
 
@@ -79,13 +83,13 @@ export default function Home(){
     <div className="eyebrow heroEyebrow">BYGG · RENOVERING · UTEOMRÅDER · VEDLIKEHOLD</div>
     <h1>Kvalitet<br/><em>som varer.</em></h1>
     <p className="heroLead">Aadland Service leverer solide løsninger innen bygg, oppussing, vedlikehold og uteområder. Vi kombinerer fagkunnskap, nøyaktighet og god oppfølging – tilpasset dine behov.</p>
-    <div className="heroActions"><a className="goldBtn" href="#befaring" onClick={()=>setSelectedService("Generell befaring")}>Be om befaring →</a><a className="outlineBtn" href="#tjenester">Se våre tjenester</a></div>
+    <div className="heroActions"><a className="goldBtn" href="#befaring" onClick={()=>setSelectedService(enquiryServiceName())}>Be om befaring →</a><a className="outlineBtn" href="#tjenester">Se våre tjenester</a></div>
     <div className="heroTrust"><span>Lokalt håndverk – solide resultater</span></div>
    </div>
   </section>
 
   <section className="serviceStrip"><div className="homeWrap stripGrid serviceStripInner">
-   {services.slice(0,6).map(service=><a href={serviceHref(service)} key={service.slug} className="serviceStripItem" onClick={()=>{if(service.kind==="survey")setSelectedService(service.title)}}><span className={"serviceIcon "+service.slug} aria-hidden="true"></span><span>{service.title}</span></a>)}
+   {services.slice(0,6).map(service=><a href={serviceHref(service)} key={service.slug} className="serviceStripItem" onClick={()=>{if(service.kind==="survey")setSelectedService(enquiryServiceName(service))}}><span className={"serviceIcon "+service.slug} aria-hidden="true"></span><span>{service.title}</span></a>)}
   </div></section>
 
   <section id="tjenester" className="homeSection light servicesSection">
@@ -94,7 +98,7 @@ export default function Home(){
     <div className="serviceCards">
      {homeServices.slice(0,5).map((service,index)=><article id={"tjeneste-"+service.slug} data-service={service.slug} className={"serviceCard serviceCard"+index} key={service.slug}>
       <div className={"serviceVisual serviceSlot"+index}><div className="visualScene"></div></div>
-      <div className="serviceText serviceContent"><h3>{service.title}</h3><p>{service.description}</p><a href={service.kind==="products"?"/produkter":service.ctaHref||"#befaring"} onClick={()=>{if(service.kind!=="products")setSelectedService(service.title)}}>{service.ctaLabel||"Les mer"} <b>→</b></a></div>
+      <div className="serviceText serviceContent"><h3>{service.title}</h3><p>{service.description}</p><a href={service.kind==="products"?"/produkter":service.ctaHref||"#befaring"} onClick={()=>{if(service.kind!=="products")setSelectedService(enquiryServiceName(service))}}>{service.ctaLabel||"Les mer"} <b>→</b></a></div>
      </article>)}
     </div>
    </div>
@@ -102,7 +106,7 @@ export default function Home(){
 
   <section id="om" className="craftSection">
    <div className="homeWrap craftGrid">
-    <div className="craftCopy"><span className="goldLabel">AADLAND SERVICE</span><h2>Lokalt håndverk<br/>med stolthet.</h2><p>Vi hjelper med oppussing, vedlikehold, uteområder og spesialtilpassede løsninger. Målet er enkelt: ryddig kommunikasjon, praktiske valg og et resultat du kan være fornøyd med.</p><a className="goldBtn craftCta" href="#befaring" onClick={()=>setSelectedService("Generell befaring")}>Be om befaring →</a></div>
+    <div className="craftCopy"><span className="goldLabel">AADLAND SERVICE</span><h2>Lokalt håndverk<br/>med stolthet.</h2><p>Vi hjelper med oppussing, vedlikehold, uteområder og spesialtilpassede løsninger. Målet er enkelt: ryddig kommunikasjon, praktiske valg og et resultat du kan være fornøyd med.</p><a className="goldBtn craftCta" href="#befaring" onClick={()=>setSelectedService(enquiryServiceName())}>Be om befaring →</a></div>
     <div className="craftVisual" aria-label="Håndverk og trearbeid"></div>
     <div className="craftChecklist"><ul className="craftChecks"><li>Kvalitet i alle ledd</li><li>Pålitelig og punktlig</li><li>Fleksible løsninger</li><li>Ryddig kommunikasjon</li><li>Lokalt i Bergen og omegn</li></ul></div>
    </div>
