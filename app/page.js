@@ -71,7 +71,7 @@ export default function Home(){
    <div className="homeWrap">
     <div className="sectionIntro"><div><span className="goldLabel">VÅRE TJENESTER</span><h2>Små og store prosjekter</h2></div><a className="textLink" href="#befaring">Se alle tjenester →</a></div>
     <div className="serviceCards">
-     {services.slice(0,5).map(([title,text,type],index)=><article className="serviceCard" key={type}>
+     {services.slice(0,5).map(([title,text,type],index)=><article className={"serviceCard serviceCard"+index} key={type}>
       <div className={"serviceVisual serviceSlot"+index}><div className="visualScene"></div></div>
       <div className="serviceText"><h3>{title}</h3><p>{text}</p><a href={type==="products"?"/produkter":"#befaring"}>Les mer <b>→</b></a></div>
      </article>)}
