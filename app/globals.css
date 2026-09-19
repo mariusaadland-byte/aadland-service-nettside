@@ -278,3 +278,18 @@
  .navCta{margin-left:8px}
 }
 @media(max-width:520px){.navCta{display:none!important}}
+
+/* Approved reference: dark craftsmanship band */
+.craftSection{background:#171717!important;color:#fff!important;overflow:hidden}
+.craftCopy .goldLabel{color:#d7a74e!important}
+.craftCopy h2{font-size:clamp(42px,4.6vw,66px)!important;line-height:.96!important;letter-spacing:-.035em!important;margin:10px 0 22px!important}
+.craftCopy p{color:rgba(255,255,255,.7)!important;line-height:1.7!important;max-width:500px}
+.craftChecklist{background:#111}
+.craftChecks li{color:rgba(255,255,255,.88)!important;border-bottom:1px solid rgba(255,255,255,.08);padding-top:11px;padding-bottom:11px}
+.craftChecks li:last-child{border-bottom:0}
+.craftVisual{background-image:url("https://images.unsplash.com/photo-1452860606245-08befc0ff44b?auto=format&fit=crop&w=1100&q=86")!important;background-size:cover!important;background-position:center!important}
+@media(max-width:900px){
+ .craftCopy{padding:44px 0 30px!important}
+ .craftCopy h2{font-size:40px!important}
+ .craftChecklist{padding:22px 18px 34px!important}
+}
