@@ -47,21 +47,21 @@ export default function Home(){
     <h1>Kvalitet<br/><em>som varer.</em></h1>
     <p>Oppussing, vedlikehold, uteområder og produkter på bestilling. Praktiske løsninger med fokus på solid utførelse.</p>
     <div className="heroActions"><a className="goldBtn" href="#befaring">Be om befaring</a><a className="outlineBtn" href="#tjenester">Se tjenester</a></div>
-    <div className="heroTrust"><span><b>01</b> Lokalt i Bergen</span><span><b>02</b> Tydelig avtale</span><span><b>03</b> Solid utførelse</span></div>
+    <div className="heroTrust"><span>Lokalt i Bergen</span><span>Tydelig avtale</span><span>Solid utførelse</span></div>
    </div>
   </section>
 
   <section className="serviceStrip"><div className="homeWrap stripGrid">
-   {services.map(([title,,n])=><a href={n==="03"?"/produkter":"#tjenester"} key={n}><b>{n}</b><span>{title}</span></a>)}
+   {services.map(([title,,type])=><a href={type==="products"?"/produkter":"#tjenester"} key={type}><span>{title}</span></a>)}
   </div></section>
 
   <section id="tjenester" className="homeSection light">
    <div className="homeWrap">
     <div className="sectionIntro"><div><span className="goldLabel">VÅRE TJENESTER</span><h2>Små og store prosjekter</h2></div><p>Små og store oppdrag – med løsninger tilpasset behovet ditt.</p></div>
     <div className="serviceCards">
-     {services.slice(0,5).map(([title,text,n,type])=><article className="serviceCard" key={n}>
+     {services.slice(0,5).map(([title,text,type])=><article className="serviceCard" key={type}>
       <div className={"serviceVisual "+type}><div className="visualScene"></div></div>
-      <div className="serviceText"><h3>{title}</h3><p>{text}</p><a href={n==="03"?"/produkter":"#befaring"}>Les mer <b>→</b></a></div>
+      <div className="serviceText"><h3>{title}</h3><p>{text}</p><a href={type==="products"?"/produkter":"#befaring"}>Les mer <b>→</b></a></div>
      </article>)}
     </div>
    </div>
@@ -86,9 +86,9 @@ export default function Home(){
   <section className="processSection"><div className="homeWrap">
    <div className="processIntro"><span className="goldLabel">SLIK FUNGERER DET</span><h2>Enkelt å komme i gang.</h2></div>
    <div className="processGrid">
-    <div className="processStep"><b>01</b><h3>Send forespørsel</h3><p>Fortell kort hva du ønsker hjelp med.</p></div>
-    <div className="processStep"><b>02</b><h3>Vi avklarer jobben</h3><p>Vi tar kontakt og avtaler befaring når det er nødvendig.</p></div>
-    <div className="processStep"><b>03</b><h3>Du får en tydelig avtale</h3><p>Omfang og pris avklares før arbeidet starter.</p></div>
+    <div className="processStep"><h3>Send forespørsel</h3><p>Fortell kort hva du ønsker hjelp med.</p></div>
+    <div className="processStep"><h3>Vi avklarer jobben</h3><p>Vi tar kontakt og avtaler befaring når det er nødvendig.</p></div>
+    <div className="processStep"><h3>Du får en tydelig avtale</h3><p>Omfang og pris avklares før arbeidet starter.</p></div>
    </div>
   </div></section>
 
