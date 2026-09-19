@@ -65,7 +65,7 @@ export default function Home(){
   </section>
 
   <section className="serviceStrip"><div className="homeWrap stripGrid">
-   {services.slice(0,6).map(([title,,type])=><a href={type==="products"?"/produkter":"#befaring"} key={type}><span className={"serviceIcon "+type} aria-hidden="true"></span><span>{title}</span></a>)}
+   {services.slice(0,6).map(([title,,type])=><a href={type==="products"?"/produkter":type==="survey"?"#befaring":"#tjeneste-"+type} key={type}><span className={"serviceIcon "+type} aria-hidden="true"></span><span>{title}</span></a>)}
   </div></section>
 
   <section id="tjenester" className="homeSection light">
@@ -74,7 +74,7 @@ export default function Home(){
     <div className="serviceCards">
      {services.slice(0,5).map(([title,text,type],index)=><article id={"tjeneste-"+type} className={"serviceCard serviceCard"+index} key={type}>
       <div className={"serviceVisual serviceSlot"+index}><div className="visualScene"></div></div>
-      <div className="serviceText"><h3>{title}</h3><p>{text}</p><a href={type==="products"?"/produkter":"#befaring"}>Les mer <b>→</b></a></div>
+      <div className="serviceText"><h3>{title}</h3><p>{text}</p><a href={type==="products"?"/produkter":type==="rental"?"#befaring":"#befaring"}>Les mer <b>→</b></a></div>
      </article>)}
     </div>
    </div>
