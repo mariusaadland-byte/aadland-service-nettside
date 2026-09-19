@@ -5,15 +5,16 @@ import { useState } from "react";
 const emptyCustomer={name:"",email:"",phone:"",address:"",postalCode:"",city:"",note:"",deliveryWithinRadius:true};
 
 const fallbackServices=[
- {title:"Oppussing og renovering",description:"Fra mindre oppgraderinger til større fornyelser i hjemmet.",slug:"renovation",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",publishFrom:null,publishUntil:null,sortOrder:10},
- {title:"Uteområder og hage",description:"Terrasser, levegger, vedlikehold og praktiske løsninger ute.",slug:"outdoor",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",publishFrom:null,publishUntil:null,sortOrder:20},
- {title:"Produkter på bestilling",description:"Benker, plantekasser og andre produkter tilpasset dine ønsker.",slug:"products",kind:"products",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",publishFrom:null,publishUntil:null,sortOrder:30},
- {title:"Utleie av utstyr",description:"Lei utstyr til prosjektet når du trenger det.",slug:"rental",kind:"rental",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",publishFrom:null,publishUntil:null,sortOrder:40},
- {title:"Vedlikehold og småjobber",description:"Reparasjoner, montering og oppgaver som må bli gjort.",slug:"maintenance",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",publishFrom:null,publishUntil:null,sortOrder:50},
- {title:"Rådgivning og befaring",description:"Fortell oss om prosjektet, så finner vi en god vei videre.",slug:"survey",kind:"survey",active:true,showInMenu:true,showInFooter:true,showOnHome:false,hasPage:false,imageUrl:"",publishFrom:null,publishUntil:null,sortOrder:60},
+ {title:"Oppussing og renovering",description:"Fra mindre oppgraderinger til større fornyelser i hjemmet.",slug:"renovation",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",publishFrom:null,publishUntil:null,sortOrder:10},
+ {title:"Uteområder og hage",description:"Terrasser, levegger, vedlikehold og praktiske løsninger ute.",slug:"outdoor",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",publishFrom:null,publishUntil:null,sortOrder:20},
+ {title:"Produkter på bestilling",description:"Benker, plantekasser og andre produkter tilpasset dine ønsker.",slug:"products",kind:"products",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",publishFrom:null,publishUntil:null,sortOrder:30},
+ {title:"Utleie av utstyr",description:"Lei utstyr til prosjektet når du trenger det.",slug:"rental",kind:"rental",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",publishFrom:null,publishUntil:null,sortOrder:40},
+ {title:"Vedlikehold og småjobber",description:"Reparasjoner, montering og oppgaver som må bli gjort.",slug:"maintenance",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",publishFrom:null,publishUntil:null,sortOrder:50},
+ {title:"Rådgivning og befaring",description:"Fortell oss om prosjektet, så finner vi en god vei videre.",slug:"survey",kind:"survey",active:true,showInMenu:true,showInFooter:true,showOnHome:false,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",publishFrom:null,publishUntil:null,sortOrder:60},
 ];
 
 function serviceHref(service){
+ if(service.ctaHref) return service.ctaHref;
  if(service.kind==="products") return "/produkter";
  if(service.kind==="survey") return "#befaring";
  if(service.hasPage) return "/tjenester/"+service.slug;
@@ -90,7 +91,7 @@ export default function Home(){
     <div className="serviceCards">
      {homeServices.slice(0,5).map((service,index)=><article id={"tjeneste-"+service.slug} data-service={service.slug} className={"serviceCard serviceCard"+index} key={service.slug}>
       <div className={"serviceVisual serviceSlot"+index}><div className="visualScene"></div></div>
-      <div className="serviceText serviceContent"><h3>{service.title}</h3><p>{service.description}</p><a href={service.kind==="products"?"/produkter":"#befaring"}>Les mer <b>→</b></a></div>
+      <div className="serviceText serviceContent"><h3>{service.title}</h3><p>{service.description}</p><a href={service.kind==="products"?"/produkter":service.ctaHref||"#befaring"}>{service.ctaLabel||"Les mer"} <b>→</b></a></div>
      </article>)}
     </div>
    </div>
