@@ -429,3 +429,20 @@ html{scroll-behavior:smooth}
  .craftCopy h2{font-size:38px!important}
  .craftVisual{min-height:260px!important}
 }
+
+/* Approved reference: service-card hierarchy */
+.servicesSection{padding:88px 0 96px!important}
+.servicesHeader{display:flex!important;justify-content:space-between!important;align-items:end!important;gap:24px!important;margin-bottom:34px!important}
+.servicesHeader h2{font-size:clamp(42px,4.8vw,64px)!important;line-height:.96!important;letter-spacing:-.045em!important;margin:8px 0 0!important}
+.serviceCard{overflow:hidden!important;background:#fff!important}
+.serviceVisual{min-height:270px!important;background-size:cover!important;background-position:center!important}
+.serviceContent{padding:22px 22px 24px!important}
+.serviceContent h3{font-size:20px!important;margin:0 0 9px!important}
+.serviceContent p{font-size:13px!important;line-height:1.65!important;margin:0 0 18px!important}
+.serviceContent a{font-size:12px!important;font-weight:800!important;letter-spacing:.04em!important;text-transform:uppercase!important}
+@media(max-width:700px){
+ .servicesSection{padding:58px 0 66px!important}
+ .servicesHeader{align-items:flex-start!important;flex-direction:column!important;gap:12px!important}
+ .servicesHeader h2{font-size:39px!important}
+ .serviceVisual{min-height:235px!important}
+}
