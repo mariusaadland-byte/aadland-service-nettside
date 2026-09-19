@@ -481,3 +481,18 @@ html{scroll-behavior:smooth}
  .serviceStripItem span:last-child{font-size:10px!important}
  .serviceIcon{width:27px!important;height:27px!important}
 }
+
+/* Approved reference: header proportions */
+.homeHeader{height:82px!important;background:#0d0d0d!important;border-bottom:1px solid rgba(255,255,255,.07)!important}
+.homeHeaderInner{height:100%!important;max-width:1240px!important;margin:0 auto!important;padding:0 28px!important;display:flex!important;align-items:center!important}
+.homeLogo{display:flex!important;align-items:center!important;flex:0 0 auto!important}
+.homeLogo img{display:block!important;width:auto!important;max-width:190px!important;max-height:58px!important;object-fit:contain!important}
+.homeLinks{margin-left:auto!important;display:flex!important;align-items:center!important;gap:25px!important}
+.homeLinks a{font-size:12px!important;font-weight:650!important;letter-spacing:.015em!important}
+.headerCta{margin-left:24px!important;white-space:nowrap!important}
+@media(max-width:900px){
+ .homeHeader{height:72px!important}
+ .homeHeaderInner{padding:0 18px!important}
+ .homeLogo img{max-width:158px!important;max-height:50px!important}
+ .headerCta{display:none!important}
+}
