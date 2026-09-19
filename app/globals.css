@@ -137,3 +137,18 @@
 .contactSection .contactUpload{background:#fff;color:#171717;border-color:#b8aa95}
 .contactSection .contactImageSelected{color:#fff}
 @media(max-width:700px){.contactPhoto{background-position:58% center}.contactShade{background:rgba(12,12,12,.84)}}
+
+/* Approved reference: copy + work photo + checklist */
+@media(min-width:901px){
+ .craftGrid{display:grid!important;grid-template-columns:1fr 1.05fr .85fr!important;align-items:stretch!important;gap:0!important}
+ .craftCopy{padding:72px 54px 72px 0!important;display:flex;flex-direction:column;justify-content:center}
+ .craftVisual{display:block!important;min-height:480px!important;margin:0!important}
+ .craftChecklist{display:flex;align-items:center;padding:50px 0 50px 48px}
+ .craftChecklist .craftChecks{margin:0}
+}
+@media(max-width:900px){
+ .craftGrid{display:grid!important}
+ .craftCopy{order:1}
+ .craftVisual{order:2;display:block!important;min-height:220px!important;margin:0!important}
+ .craftChecklist{order:3;padding:28px 0 44px}
+}
