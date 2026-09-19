@@ -19,6 +19,7 @@ export default function AdminClient({ user }) {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [services, setServices] = useState([]);
+  const [rentalItems, setRentalItems] = useState([]);
   const [users, setUsers] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(user?.id || "");
   const [error, setError] = useState("");
@@ -109,7 +110,7 @@ export default function AdminClient({ user }) {
       else { const data = await response.json().catch(() => ({})); setError(data.error || "Tjenestene kunne ikke hentes."); setServices([]); }
     } else { setServices([]); }
 
-    if (canManageUsers) {
+    if (canManageProducts) {\n      const response = await fetch("/api/admin/rental");\n      if (response.ok) { const data = await response.json(); setRentalItems(data.items || []); }\n      else { setRentalItems([]); }\n    } else { setRentalItems([]); }\n\n    if (canManageUsers) {
       const response = await fetch("/api/admin/users");
 
       if (response.status === 401) {
@@ -192,7 +193,7 @@ export default function AdminClient({ user }) {
   if (canViewOrders) tabs.push(["surveys", "Befaringer"]);
   if (canManageProducts) tabs.push(["products", "Produkter"]);
   if (canManageProducts) tabs.push(["categories", "Kategorier"]);
-  if (canManageProducts) tabs.push(["services", "Tjenester"]);
+  if (canManageProducts) tabs.push(["services", "Tjenester"]);\n  if (canManageProducts) tabs.push(["rental", "Utleie"]);
   if (canManageUsers) tabs.push(["users", "Brukere"]);
 
   return (
@@ -355,7 +356,7 @@ export default function AdminClient({ user }) {
           <Services services={services} reload={load} setError={setError} />
         )}
 
-        {tab === "users" && canManageUsers && (
+        {tab === "rental" && canManageProducts && (\n          <RentalItems items={rentalItems} reload={load} setError={setError} />\n        )}\n\n        {tab === "users" && canManageUsers && (
           <Users
             users={users}
             currentUserId={currentUserId}
@@ -3087,4 +3088,35 @@ function ServiceEditor({ service, reload, setError, close }) {
     <label><input type="checkbox" checked={showInFooter} onChange={e=>setShowInFooter(e.target.checked)} /> Vis i footer</label><br/>\n    <label><input type="checkbox" checked={hasPage} onChange={e=>setHasPage(e.target.checked)} /> Egen tjenesteside</label>\n    <div className="field" style={{marginTop:16}}><label>Tekst på knapp</label><input value={ctaLabel} onChange={e=>setCtaLabel(e.target.value)} placeholder="Les mer" /></div>\n    <div className="field"><label>Overskrift i forespørsel</label><input value={formTitle} onChange={e=>setFormTitle(e.target.value)} /></div>\n    <div className="field"><label>Hjelpetekst i forespørsel</label><textarea rows="3" value={formPrompt} onChange={e=>setFormPrompt(e.target.value)} /></div>
     <div style={{display:"flex",gap:10,marginTop:18}}><button className="btn" disabled={saving}>{saving?"Lagrer …":"Lagre"}</button>{!isNew&&<button type="button" className="btn alt" onClick={()=>setEditing(false)}>Avbryt</button>}</div>
   </form>;
+}
+
+function RentalItems({items,reload,setError}){
+ const [showNew,setShowNew]=useState(false);
+ return <><div style={{marginBottom:20}}><button className="btn" onClick={()=>setShowNew(!showNew)}>{showNew?"Avbryt":"Legg til utstyr"}</button></div>
+ {showNew&&<RentalEditor item={null} reload={reload} setError={setError} close={()=>setShowNew(false)}/>}
+ <div className="grid">{items.map(item=><RentalEditor key={item.id} item={item} reload={reload} setError={setError}/>)}</div></>;
+}
+function RentalEditor({item,reload,setError,close}){
+ const isNew=!item; const [editing,setEditing]=useState(isNew); const [saving,setSaving]=useState(false);
+ const [v,setV]=useState({name:item?.name||"",description:item?.description||"",status:item?.status||"available",quantity:item?.quantity||1,dailyPriceOre:item?.dailyPriceOre||0,weekendPriceOre:item?.weekendPriceOre??"",weeklyPriceOre:item?.weeklyPriceOre??"",longTermDays:item?.longTermDays??"",longTermDiscountPercent:item?.longTermDiscountPercent||0,depositOre:item?.depositOre||0,bufferDays:item?.bufferDays||0,pickupAvailable:item?.pickupAvailable!==false,deliveryAvailable:item?.deliveryAvailable===true,active:item?.active!==false,sortOrder:item?.sortOrder||0,imageUrls:item?.imageUrls||[]});
+ const set=(key,value)=>setV({...v,[key]:value});
+ async function save(e){e.preventDefault();setSaving(true);setError("");const response=await fetch("/api/admin/rental",{method:isNew?"POST":"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({...v,...(!isNew?{id:item.id}:{})})});const data=await response.json().catch(()=>({}));setSaving(false);if(!response.ok){setError(data.error||"Utstyret kunne ikke lagres.");return;}if(close)close();else setEditing(false);await reload();}
+ async function remove(){if(!item?.id||!window.confirm('Slette "'+item.name+'"?'))return;const response=await fetch("/api/admin/rental",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:item.id})});if(!response.ok){setError("Utstyret kunne ikke slettes.");return;}await reload();}
+ if(!editing&&item)return <div className="card"><div className="kicker">{item.status==="available"?"Tilgjengelig":item.status==="maintenance"?"Service":"Ikke tilgjengelig"}</div><h3>{item.name}</h3><p>{item.description}</p><p><b>{nok(item.dailyPriceOre)}</b> / dag · Depositum {nok(item.depositOre)}</p><div style={{display:"flex",gap:10}}><button className="btn" onClick={()=>setEditing(true)}>Rediger</button><button className="btn alt" onClick={remove}>Slett</button></div></div>;
+ return <form className="card" onSubmit={save}><div className="kicker">{isNew?"Nytt utleieutstyr":"Rediger utstyr"}</div><h3>{isNew?"Legg til utstyr":item.name}</h3>
+ <div className="field"><label>Navn</label><input required value={v.name} onChange={e=>set("name",e.target.value)}/></div>
+ <div className="field"><label>Beskrivelse</label><textarea rows="3" value={v.description} onChange={e=>set("description",e.target.value)}/></div>
+ <div className="field"><label>Status</label><select value={v.status} onChange={e=>set("status",e.target.value)}><option value="available">Tilgjengelig</option><option value="unavailable">Midlertidig utilgjengelig</option><option value="maintenance">Service/vedlikehold</option><option value="hidden">Skjult</option></select></div>
+ <div className="field"><label>Antall</label><input type="number" min="1" value={v.quantity} onChange={e=>set("quantity",e.target.value)}/></div>
+ <div className="field"><label>Døgnpris (øre)</label><input type="number" min="0" required value={v.dailyPriceOre} onChange={e=>set("dailyPriceOre",e.target.value)}/></div>
+ <div className="field"><label>Helgepris (øre)</label><input type="number" min="0" value={v.weekendPriceOre} onChange={e=>set("weekendPriceOre",e.target.value)}/></div>
+ <div className="field"><label>Ukepris (øre)</label><input type="number" min="0" value={v.weeklyPriceOre} onChange={e=>set("weeklyPriceOre",e.target.value)}/></div>
+ <div className="field"><label>Depositum (øre)</label><input type="number" min="0" value={v.depositOre} onChange={e=>set("depositOre",e.target.value)}/></div>
+ <div className="field"><label>Buffer mellom utleier (dager)</label><input type="number" min="0" value={v.bufferDays} onChange={e=>set("bufferDays",e.target.value)}/></div>
+ <div className="field"><label>Langtidsgrense (dager)</label><input type="number" min="1" value={v.longTermDays} onChange={e=>set("longTermDays",e.target.value)}/></div>
+ <div className="field"><label>Langtidsrabatt (%)</label><input type="number" min="0" max="100" value={v.longTermDiscountPercent} onChange={e=>set("longTermDiscountPercent",e.target.value)}/></div>
+ <label><input type="checkbox" checked={v.pickupAvailable} onChange={e=>set("pickupAvailable",e.target.checked)}/> Henting mulig</label><br/>
+ <label><input type="checkbox" checked={v.deliveryAvailable} onChange={e=>set("deliveryAvailable",e.target.checked)}/> Levering mulig</label><br/>
+ <label><input type="checkbox" checked={v.active} onChange={e=>set("active",e.target.checked)}/> Publisert</label>
+ <div style={{display:"flex",gap:10,marginTop:18}}><button className="btn" disabled={saving}>{saving?"Lagrer …":"Lagre"}</button>{!isNew&&<button type="button" className="btn alt" onClick={()=>setEditing(false)}>Avbryt</button>}</div></form>;
 }
