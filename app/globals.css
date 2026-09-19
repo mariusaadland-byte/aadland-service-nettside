@@ -123,3 +123,17 @@
  .projectTile{min-height:145px!important}
  .contactBenefits{display:grid;gap:9px;margin:18px 0}
 }
+
+/* Approved reference: photographic contact section */
+.contactSection{position:relative;isolation:isolate;overflow:hidden}
+.contactPhoto{position:absolute;inset:0;z-index:-2;background:url("https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?auto=format&fit=crop&w=1800&q=84") center/cover no-repeat}
+.contactShade{position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(12,12,12,.92) 0%,rgba(12,12,12,.78) 48%,rgba(12,12,12,.86) 100%)}
+.contactCopy{color:#fff}
+.contactCopy p{color:rgba(255,255,255,.78)}
+.contactDetails a{color:#fff}
+.contactSection .homeForm{background:rgba(20,20,20,.94);color:#fff;border:1px solid rgba(255,255,255,.12);box-shadow:0 24px 70px rgba(0,0,0,.28)}
+.contactSection .homeField span,.contactSection .homeForm>small{color:rgba(255,255,255,.72)}
+.contactSection .homeField input,.contactSection .homeField textarea{background:#fff;color:#171717;border-color:#d9d2c8}
+.contactSection .contactUpload{background:#fff;color:#171717;border-color:#b8aa95}
+.contactSection .contactImageSelected{color:#fff}
+@media(max-width:700px){.contactPhoto{background-position:58% center}.contactShade{background:rgba(12,12,12,.84)}}
