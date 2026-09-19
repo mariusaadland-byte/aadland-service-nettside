@@ -327,7 +327,7 @@ export default function AdminClient({ user }) {
 
         {tab === "orders" && canViewOrders && (
           <Orders
-            orders={orders}
+            orders={orders.filter(order => order.orderType !== "custom")}
             status={status}
             canUpdateOrders={canUpdateOrders}
           />
@@ -446,6 +446,13 @@ function Orders({ orders, status, canUpdateOrders }) {
 }
 
 function Surveys({ orders, status, canUpdateOrders }) {
+  const [savingId,setSavingId]=useState("");
+  async function saveSurvey(order, surveyDate, adminNote){
+    setSavingId(order.id);
+    const response=await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,surveyDate,adminNote})});
+    setSavingId("");
+    if(response.ok) window.location.reload();
+  }
   const surveyLabels = {
     new: "Ny forespørsel",
     confirmed: "Avtalt",
@@ -475,6 +482,9 @@ function Surveys({ orders, status, canUpdateOrders }) {
         </div>
         {(customer.address || customer.postalCode || customer.city) && <p><b>Adresse:</b> {[customer.address,customer.postalCode,customer.city].filter(Boolean).join(", ")}</p>}
         <div style={{whiteSpace:"pre-wrap",lineHeight:1.55,marginTop:16}}>{order.customRequest || "Ingen beskrivelse."}</div>
+        <div className="field" style={{marginTop:16}}><label>Dato og tid for befaring</label><input type="datetime-local" defaultValue={order.surveyDate ? String(order.surveyDate).slice(0,16) : ""} id={"survey-date-"+order.id}/></div>
+        <div className="field"><label>Internt notat</label><textarea rows="3" defaultValue={order.adminNote||""} id={"survey-note-"+order.id} placeholder="Kun synlig i backoffice"/></div>
+        {canUpdateOrders&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>saveSurvey(order,document.getElementById("survey-date-"+order.id).value,document.getElementById("survey-note-"+order.id).value)}>{savingId===order.id?"Lagrer …":"Lagre befaring"}</button>}
         <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:18}}>
           {order.customerPhone && <a className="btn" href={"tel:"+order.customerPhone}>Ring kunde</a>}
           {order.customerEmail && <a className="btn alt" href={"mailto:"+order.customerEmail}>Send e-post</a>}
