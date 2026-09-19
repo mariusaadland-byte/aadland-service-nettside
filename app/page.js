@@ -47,6 +47,7 @@ export default function Home(){
     <h1>Kvalitet<br/><em>som varer.</em></h1>
     <p>Oppussing, vedlikehold, uteområder og produkter på bestilling. Praktiske løsninger med fokus på solid utførelse.</p>
     <div className="heroActions"><a className="goldBtn" href="#befaring">Be om befaring</a><a className="outlineBtn" href="#tjenester">Se våre tjenester</a></div>
+    <div className="heroTrust"><span><b>01</b> Lokalt i Bergen</span><span><b>02</b> Tydelig avtale</span><span><b>03</b> Solid utførelse</span></div>
    </div>
   </section>
 
