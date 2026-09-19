@@ -358,3 +358,12 @@
  .footerGrid{max-width:1240px!important}
 }
 html{scroll-behavior:smooth}
+
+/* Approved reference: button system and focus states */
+.goldBtn,.outlineBtn{min-height:46px;padding:0 22px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-weight:800!important;font-size:12px!important;letter-spacing:.02em!important;text-decoration:none!important;transition:transform .18s ease,background .18s ease,border-color .18s ease}
+.goldBtn{background:#d7a74e!important;color:#111!important;border:1px solid #d7a74e!important}
+.goldBtn:hover{background:#e0b65f!important;border-color:#e0b65f!important;transform:translateY(-1px)}
+.outlineBtn{background:rgba(0,0,0,.12)!important;color:#fff!important;border:1px solid rgba(255,255,255,.58)!important}
+.outlineBtn:hover{border-color:#fff!important;background:rgba(255,255,255,.08)!important}
+.newHome a:focus-visible,.newHome button:focus-visible,.newHome input:focus-visible,.newHome textarea:focus-visible{outline:2px solid #d7a74e!important;outline-offset:3px!important}
+@media(max-width:700px){.goldBtn,.outlineBtn{min-height:44px;padding:0 17px!important}}
