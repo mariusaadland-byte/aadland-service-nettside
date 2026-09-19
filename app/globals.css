@@ -293,3 +293,16 @@
  .craftCopy h2{font-size:40px!important}
  .craftChecklist{padding:22px 18px 34px!important}
 }
+
+/* Approved reference: projects section typography and spacing */
+.projects{background:#f4f0e8!important}
+.projects .sectionIntro{margin-bottom:32px!important}
+.projects .sectionIntro h2{font-size:clamp(38px,4.5vw,62px)!important;line-height:.98!important;letter-spacing:-.035em!important;margin:8px 0 0!important}
+.projectGrid{gap:14px!important}
+.projectTile{transition:transform .22s ease,box-shadow .22s ease}
+.projectTile:hover{transform:translateY(-3px);box-shadow:0 14px 32px rgba(20,17,12,.13)}
+@media(max-width:700px){
+ .projects .sectionIntro{margin-bottom:20px!important}
+ .projects .sectionIntro h2{font-size:36px!important}
+ .projectGrid{gap:8px!important}
+}
