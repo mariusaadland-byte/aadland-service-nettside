@@ -380,3 +380,9 @@ html{scroll-behavior:smooth}
 .contactBenefits span{display:flex!important;align-items:center!important;gap:8px!important;padding-left:0!important}
 .contactBenefits span:before{display:none!important}
 .contactBenefits b{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;border:1px solid rgba(215,167,78,.65);border-radius:50%;color:#d7a74e;font-size:11px;flex:none}
+
+/* Mobile-only direct contact action */
+.mobileHeroCall{display:none}
+@media(max-width:520px){
+ .mobileHeroCall{display:inline-flex;margin-top:14px;color:rgba(255,255,255,.82);font-size:12px;font-weight:700;text-decoration:none;border-bottom:1px solid rgba(215,167,78,.7);padding-bottom:3px}
+}
