@@ -102,7 +102,7 @@ export default function Home(){
 
   <section id="befaring" className="contactSection"><div className="contactPhoto" aria-hidden="true"></div><div className="contactShade" aria-hidden="true"></div><div className="homeWrap contactGrid">
    <div className="contactCopy"><span className="goldLabel">KONTAKT OSS</span><h2>Har du et prosjekt<br/>i tankene?</h2><p>Beskriv hva du ønsker hjelp med. Vi tar kontakt for å avklare prosjektet og om det er behov for befaring.</p><div className="contactBenefits"><span>Enkel befaring</span><span>Rask tilbakemelding</span><span>Bergen og omegn</span></div><div className="contactDetails"><a href="tel:+4747154898">471 54 898</a><a href="mailto:post@aadland-service.no">post@aadland-service.no</a></div></div>
-   <form className="homeForm" onSubmit={customOrder}>
+   <form className="homeForm" onSubmit={customOrder} aria-busy={sending}>
     {message&&<div className="success"><b>Forespørselen er mottatt</b>{message.orderNumber&&<p>Ordrenummer: {message.orderNumber}</p>}</div>}
     <div className="formTwo"><Field label="Navn *"><input required value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})}/></Field><Field label="Telefon *"><input required value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})}/></Field></div>
     <Field label="E-post *"><input type="email" required value={customer.email} onChange={e=>setCustomer({...customer,email:e.target.value})}/></Field>
@@ -111,7 +111,7 @@ export default function Home(){
     <Field label="Hva gjelder det? *"><textarea rows="5" required value={custom} onChange={e=>setCustom(e.target.value)} placeholder="Beskriv kort hva du ønsker hjelp med …"/></Field>
     <label className="contactUpload"><span>Last opp bilder <small>(valgfritt)</small></span><input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>setContactImages(Array.from(e.target.files||[]).slice(0,8))}/><strong>Velg bilder</strong><em>{contactImages.length?`${contactImages.length} bilde${contactImages.length===1?"":"r"} valgt`:"Dra og slipp eller velg filer"}</em></label>
     {contactImages.length>0&&<div className="contactImageSelected"><b>{contactImages.length} bilde{contactImages.length===1?"":"r"} klare</b><button type="button" onClick={()=>setContactImages([])}>Fjern bilder</button></div>}
-    {error&&<p className="notice">{error}</p>}<button className="goldBtn submitBtn" disabled={sending}>{sending?"Sender...":"Send forespørsel →"}</button><small>Vi bruker opplysningene kun for å svare på forespørselen din.</small>
+    {error&&<p className="notice">{error}</p>}<button className="goldBtn submitBtn" disabled={sending} aria-disabled={sending}>{sending?"Sender forespørsel …":"Send forespørsel →"}</button><small>Vi bruker opplysningene kun for å svare på forespørselen din.</small>
    </form>
   </div></section>
 
