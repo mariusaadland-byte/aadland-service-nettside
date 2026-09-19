@@ -347,3 +347,16 @@
 /* Stable service anchors */
 .serviceCard{scroll-margin-top:96px}
 .serviceCard:target{outline:2px solid rgba(215,167,78,.55);outline-offset:3px}
+
+/* Approved reference: final desktop section rhythm */
+@media(min-width:901px){
+ .homeSection{padding-top:86px!important;padding-bottom:90px!important}
+ .serviceStrip .homeWrap{max-width:1240px!important}
+ .stripGrid>a{min-height:112px!important;padding:18px 12px!important;border-right:1px solid rgba(255,255,255,.08)}
+ .stripGrid>a:last-child{border-right:0}
+ .craftGrid{max-width:1240px!important}
+ .projects .homeWrap{max-width:1240px!important}
+ .contactGrid{max-width:1180px!important;gap:72px!important}
+ .footerGrid{max-width:1240px!important}
+}
+html{scroll-behavior:smooth}
