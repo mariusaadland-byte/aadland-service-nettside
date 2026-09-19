@@ -533,3 +533,23 @@ html{scroll-behavior:smooth}
   }
   .homeHeader .homeLinks a:last-child{border-bottom:0!important}
 }
+
+
+/* Service detail and legal pages */
+.serviceDetail,.legalPage{background:#f3efe7;color:#171512;min-height:100vh}
+.serviceDetailHeader{height:82px;background:#0d0d0d}
+.serviceDetailNav,.serviceDetailWrap,.legalWrap{max-width:1180px;margin:0 auto;padding-left:24px;padding-right:24px}
+.serviceDetailNav{height:100%;display:flex;align-items:center;justify-content:space-between}
+.serviceDetailNav img{width:auto;max-width:180px;max-height:58px;object-fit:contain}
+.serviceDetailHero{min-height:520px;background:#181818;color:#fff;background-size:cover;background-position:center;display:flex;align-items:center}
+.serviceDetailHero .serviceDetailWrap{width:100%;padding-top:70px;padding-bottom:70px}
+.serviceDetailHero h1{font-size:clamp(48px,7vw,82px);line-height:.95;max-width:800px;margin:12px 0 22px}
+.serviceDetailHero p{max-width:650px;font-size:18px;line-height:1.7;color:rgba(255,255,255,.82)}
+.serviceDetailBody{padding:80px 0}.serviceDetailGrid{display:grid;grid-template-columns:1.15fr .85fr;gap:70px}
+.serviceDetailGrid h2,.serviceDetailCta h2{font-size:clamp(34px,4vw,52px);line-height:1;margin:10px 0 20px}
+.serviceDetailGrid p{line-height:1.75;max-width:620px}.serviceDetailGrid ul{list-style:none;margin:0;padding:0}
+.serviceDetailGrid li{padding:17px 0;border-bottom:1px solid rgba(0,0,0,.12);font-weight:700}
+.serviceDetailCta{padding:70px 0;background:#151515;color:#fff}.serviceDetailCta p{color:rgba(255,255,255,.75);margin-bottom:24px}
+.legalWrap{max-width:860px;padding-top:60px;padding-bottom:90px}.legalWrap>a{color:inherit;text-decoration:none}
+.legalWrap h1{font-size:clamp(42px,6vw,68px);margin:20px 0}.legalWrap h2{font-size:24px;margin:34px 0 10px}.legalWrap p{line-height:1.75}.legalLead{font-size:18px}
+@media(max-width:700px){.serviceDetailHeader{height:72px}.serviceDetailNav img{max-width:145px}.serviceDetailHero{min-height:460px}.serviceDetailHero h1{font-size:48px}.serviceDetailGrid{grid-template-columns:1fr;gap:28px}.serviceDetailBody{padding:55px 0}.legalWrap{padding-top:38px}}
