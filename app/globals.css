@@ -265,3 +265,16 @@
  .homeSection.light .textLink{justify-self:start!important}
  .serviceCard{box-shadow:0 7px 20px rgba(24,20,14,.07)!important}
 }
+
+/* Mobile navigation for approved header */
+.mobileMenuBtn{display:none;background:transparent;border:0;padding:8px;cursor:pointer}
+.mobileMenuBtn span{display:block;width:24px;height:2px;background:#fff;margin:5px 0}
+@media(max-width:900px){
+ .homeNav{position:relative}
+ .mobileMenuBtn{display:block;margin-left:auto;z-index:30}
+ .homeLinks{display:none!important;position:absolute;left:0;right:0;top:100%;z-index:25;background:#111;padding:18px 5%;border-top:1px solid rgba(255,255,255,.1);box-shadow:0 18px 30px rgba(0,0,0,.28)}
+ .homeLinks.menuOpen{display:grid!important;gap:0}
+ .homeLinks.menuOpen a{padding:13px 0;border-bottom:1px solid rgba(255,255,255,.08);color:#fff!important;text-decoration:none}
+ .navCta{margin-left:8px}
+}
+@media(max-width:520px){.navCta{display:none!important}}
