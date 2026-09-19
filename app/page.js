@@ -92,7 +92,7 @@ export default function Home(){
    </div>
   </section>
 
-  <section id="prosjekter" className="homeSection projects"><div className="homeWrap">
+  <section id="utleie" className="rentalTeaser"><div className="homeWrap rentalTeaserGrid"><div><span className="goldLabel">UTLEIE AV UTSTYR</span><h2>Utstyr når du trenger det.</h2><p>Lei utstyr til prosjektet uten å måtte kjøpe det selv. Utvalget og tilgjengelige datoer vil kunne styres direkte fra backoffice.</p></div><a className="goldBtn" href="#befaring">Spør om utleie →</a></div></section>\n\n  <section id="prosjekter" className="homeSection projects"><div className="homeWrap">
    <div className="sectionIntro"><div><span className="goldLabel">UTVALGTE PROSJEKTER</span><h2>Resultater vi er stolte av</h2></div><p>Et utvalg av arbeid. Egne prosjektbilder kan legges inn her etter hvert.</p></div>
    <div className="projectGrid">
     <div className="projectTile projectDeck"><span>UTEOMRÅDE</span><strong>Terrasse og levegg</strong></div>
