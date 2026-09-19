@@ -5,12 +5,12 @@ import { useState } from "react";
 const emptyCustomer={name:"",email:"",phone:"",address:"",postalCode:"",city:"",note:"",deliveryWithinRadius:true};
 
 const fallbackServices=[
- ["Oppussing og renovering","Fra mindre oppgraderinger til større fornyelser i hjemmet.","renovation"],
- ["Uteområder og hage","Terrasser, levegger, vedlikehold og praktiske løsninger ute.","outdoor"],
- ["Produkter på bestilling","Benker, plantekasser og andre produkter tilpasset dine ønsker.","products"],
- ["Utleie av utstyr","Lei utstyr til prosjektet når du trenger det.","rental"],
- ["Vedlikehold og småjobber","Reparasjoner, montering og oppgaver som må bli gjort.","maintenance"],
- ["Rådgivning og befaring","Fortell oss om prosjektet, så finner vi en god vei videre.","survey"],
+ {title:"Oppussing og renovering",description:"Fra mindre oppgraderinger til større fornyelser i hjemmet.",slug:"renovation",kind:"service"},
+ {title:"Uteområder og hage",description:"Terrasser, levegger, vedlikehold og praktiske løsninger ute.",slug:"outdoor",kind:"service"},
+ {title:"Produkter på bestilling",description:"Benker, plantekasser og andre produkter tilpasset dine ønsker.",slug:"products",kind:"products"},
+ {title:"Utleie av utstyr",description:"Lei utstyr til prosjektet når du trenger det.",slug:"rental",kind:"rental"},
+ {title:"Vedlikehold og småjobber",description:"Reparasjoner, montering og oppgaver som må bli gjort.",slug:"maintenance",kind:"service"},
+ {title:"Rådgivning og befaring",description:"Fortell oss om prosjektet, så finner vi en god vei videre.",slug:"survey",kind:"survey"},
 ];
 
 export default function Home(){
@@ -66,16 +66,16 @@ export default function Home(){
   </section>
 
   <section className="serviceStrip"><div className="homeWrap stripGrid serviceStripInner">
-   {services.slice(0,6).map(([title,,type])=><a href={type==="products"?"/produkter":type==="survey"?"#befaring":"#tjeneste-"+type} key={type} className="serviceStripItem"><span className={"serviceIcon "+type} aria-hidden="true"></span><span>{title}</span></a>)}
+   {services.slice(0,6).map(service=><a href={service.kind==="products"?"/produkter":service.kind==="survey"?"#befaring":"#tjeneste-"+service.slug} key={service.slug} className="serviceStripItem"><span className={"serviceIcon "+service.slug} aria-hidden="true"></span><span>{service.title}</span></a>)}
   </div></section>
 
   <section id="tjenester" className="homeSection light servicesSection">
    <div className="homeWrap">
     <div className="sectionIntro servicesHeader"><div><span className="goldLabel">VÅRE TJENESTER</span><h2>Små og store prosjekter</h2></div><a className="textLink" href="#befaring">Se alle tjenester →</a></div>
     <div className="serviceCards">
-     {services.slice(0,5).map(([title,text,type],index)=><article id={"tjeneste-"+type} data-service={type} className={"serviceCard serviceCard"+index} key={type}>
+     {services.slice(0,5).map((service,index)=><article id={"tjeneste-"+service.slug} data-service={service.slug} className={"serviceCard serviceCard"+index} key={service.slug}>
       <div className={"serviceVisual serviceSlot"+index}><div className="visualScene"></div></div>
-      <div className="serviceText serviceContent"><h3>{title}</h3><p>{text}</p><a href={type==="products"?"/produkter":"#befaring"}>Les mer <b>→</b></a></div>
+      <div className="serviceText serviceContent"><h3>{service.title}</h3><p>{service.description}</p><a href={service.kind==="products"?"/produkter":"#befaring"}>Les mer <b>→</b></a></div>
      </article>)}
     </div>
    </div>
@@ -118,7 +118,7 @@ export default function Home(){
   </div></section>
 
   <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="footerIdentity"><div className="homeBrand"><img className="brandLogo footerLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></div><p className="footerTagline">Lokalt håndverk – solide resultater</p></div><div><b>Kontakt</b><div className="footerServices"><a href="tel:+4747154898">471 54 898</a><a href="mailto:post@aadland-service.no">post@aadland-service.no</a></div></div><div><b>Tjenester</b><div className="footerServices">
- {services.map(([title,,type])=><a key={type} href={type==="products"?"/produkter":type==="survey"?"#befaring":"#tjeneste-"+type}>{title}</a>)}
+ {services.map(service=><a key={service.slug} href={service.kind==="products"?"/produkter":service.kind==="survey"?"#befaring":"#tjeneste-"+service.slug}>{service.title}</a>)}
  </div></div><div><b>Firma</b><div className="footerServices"><a href="#om">Om oss</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#befaring">Be om befaring</a></div><p>Org.nr. 937 781 873 MVA<br/>Bergen og omegn</p></div></div><div className="homeWrap footerBottom"><span>© Aadland Service</span><div><a href="/produkter">Produkter</a><a href="#tjenester">Tjenester</a><a href="#kontakt">Kontakt</a></div></div></footer>
  </main>;
 }
