@@ -320,3 +320,9 @@
  .homeNav{min-height:68px!important}
  .brandLogo{max-height:46px!important}
 }
+
+/* Enquiry form interaction polish */
+.submitBtn:disabled{opacity:.62;cursor:wait;transform:none!important}
+.homeForm[aria-busy="true"]{pointer-events:none}
+.homeForm[aria-busy="true"] .submitBtn{pointer-events:auto}
+.success{border-left:3px solid #d7a74e!important;background:rgba(215,167,78,.12)!important;padding:14px 16px!important;color:inherit!important}
