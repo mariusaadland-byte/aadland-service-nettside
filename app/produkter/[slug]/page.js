@@ -599,14 +599,7 @@ function Header() {
   return (
     <header className="top">
       <div className="wrap nav">
-        <a className="brand" href="/">
-          <span className="mark">AS</span>
-          <span>
-            Aadland
-            <br />
-            Service
-          </span>
-        </a>
+        <a className="brand" href="/"><img src="/aadland-service-logo.png" alt="Aadland Service" style={{width:150,height:60,objectFit:"contain"}}/></a>
 
         <nav className="links">
           <a href="/">Forside</a>
@@ -631,7 +624,7 @@ function Footer() {
         <div>
           <p>post@aadland-service.no</p>
           <p>471 54 898</p>
-          <p>Org.nr. 937 781 873 MVA</p>
+          <p>Org.nr. 937 781 873 MVA</p><p><a href="/vilkar/salg">Salgsbetingelser</a> · <a href="/vilkar/utleie">Utleiebetingelser</a></p>
         </div>
       </div>
     </footer>
