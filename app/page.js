@@ -61,7 +61,7 @@ export default function Home(){
     <h1>Kvalitet<br/><em>som varer.</em></h1>
     <p>Aadland Service leverer solide løsninger innen bygg, oppussing, vedlikehold og uteområder. Vi kombinerer fagkunnskap, nøyaktighet og god oppfølging – tilpasset dine behov.</p>
     <div className="heroActions"><a className="goldBtn" href="#befaring">Be om befaring →</a><a className="outlineBtn" href="#tjenester">Se våre tjenester</a></div>
-    <div className="heroTrust"><span>Lokalt håndverk – solide resultater</span></div>
+    <div className="heroTrust"><span>Lokalt håndverk – solide resultater</span></div><a className="mobileHeroCall" href="tel:+4747154898">Ring 471 54 898</a>
    </div>
   </section>
 
