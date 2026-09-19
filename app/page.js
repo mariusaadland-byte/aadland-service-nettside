@@ -57,7 +57,7 @@ export default function Home(){
 
   <section id="tjenester" className="homeSection light">
    <div className="homeWrap">
-    <div className="sectionIntro"><div><span className="goldLabel">TJENESTER</span><h2>Hva kan vi hjelpe deg med?</h2></div><p>Små og store oppdrag – med løsninger tilpasset behovet ditt.</p></div>
+    <div className="sectionIntro"><div><span className="goldLabel">VÅRE TJENESTER</span><h2>Små og store prosjekter</h2></div><p>Små og store oppdrag – med løsninger tilpasset behovet ditt.</p></div>
     <div className="serviceCards">
      {services.slice(0,5).map(([title,text,n,type])=><article className="serviceCard" key={n}>
       <div className={"serviceVisual "+type}><span className="cardNo">{n}</span><div className="visualScene"></div></div>
@@ -75,7 +75,7 @@ export default function Home(){
   </section>
 
   <section id="prosjekter" className="homeSection projects"><div className="homeWrap">
-   <div className="sectionIntro"><div><span className="goldLabel">TIDLIGERE OPPDRAG</span><h2>Utvalgte oppdrag.</h2></div><p>Et utvalg av arbeid. Egne prosjektbilder kan legges inn her etter hvert.</p></div>
+   <div className="sectionIntro"><div><span className="goldLabel">UTVALGTE PROSJEKTER</span><h2>Resultater vi er stolte av</h2></div><p>Et utvalg av arbeid. Egne prosjektbilder kan legges inn her etter hvert.</p></div>
    <div className="projectGrid">
     <div className="projectTile projectDeck large"><div className="deckScene"></div><span>UTEOMRÅDE</span><strong>Terrasse og trearbeid</strong></div>
     <div className="projectTile projectBefore"><div className="beforeScene"></div><span>VEDLIKEHOLD</span><strong>Før og etter</strong></div>
