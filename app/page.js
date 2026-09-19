@@ -2,695 +2,105 @@
 
 import { useState } from "react";
 
-const emptyCustomer = {
-  name: "",
-  email: "",
-  phone: "",
-  address: "",
-  postalCode: "",
-  city: "",
-  note: "",
-  deliveryWithinRadius: true,
-};
-
-export default function Home() {
-  const [customer, setCustomer] =
-    useState(emptyCustomer);
-
-  const [custom, setCustom] =
-    useState("");
-
-  const [message, setMessage] =
-    useState(null);
-
-  const [error, setError] =
-    useState("");
-
-  const [sending, setSending] =
-    useState(false);
-
-  async function customOrder(e) {
-    e.preventDefault();
-
-    setError("");
-    setMessage(null);
-    setSending(true);
-
-    try {
-      const response = await fetch(
-        "/api/orders",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-
-          body: JSON.stringify({
-            orderType: "custom",
-
-            customRequest:
-              custom,
-
-            customer,
-
-            fulfillmentType:
-              "pickup",
-
-            deliveryWithinRadius:
-              customer.deliveryWithinRadius,
-          }),
-        }
-      );
-
-      const data =
-        await response.json();
-
-      if (!response.ok) {
-        setError(
-          data.error ||
-            "Noe gikk galt."
-        );
-
-        return;
-      }
-
-      setMessage(data);
-      setCustom("");
-      setCustomer(
-        emptyCustomer
-      );
-    } catch {
-      setError(
-        "Noe gikk galt. Prøv igjen."
-      );
-    } finally {
-      setSending(false);
-    }
-  }
-
-  return (
-    <main>
-      <header className="top">
-        <div className="wrap nav">
-          <a
-            className="brand"
-            href="/"
-          >
-            <span className="mark">
-              AS
-            </span>
-
-            <span>
-              Aadland
-              <br />
-              Service
-            </span>
-          </a>
-
-          <nav className="links">
-            <a href="/produkter">
-              Produkter
-            </a>
-
-            <a href="#slik">
-              Slik fungerer det
-            </a>
-
-            <a href="#om">
-              Om oss
-            </a>
-
-            <a href="#kontakt">
-              Kontakt
-            </a>
-
-            <a
-              className="btn"
-              href="/produkter"
-            >
-              Se produkter
-            </a>
-          </nav>
-        </div>
-      </header>
-
-      <section className="wrap hero">
-        <div>
-          <div className="kicker">
-            Bygget i Bergen · laget
-            for deg
-          </div>
-
-          <h1>
-            Kun
-            <br />
-            muligheter.
-          </h1>
-
-          <p>
-            Bygg, renovering,
-            vedlikehold og produkter
-            på bestilling. Vi lager
-            solide løsninger som
-            tilpasses plassen og
-            behovet ditt.
-          </p>
-
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              marginTop: 28,
-              flexWrap: "wrap",
-            }}
-          >
-            <a
-              className="btn"
-              href="/produkter"
-            >
-              Se produkter
-            </a>
-
-            <a
-              className="btn alt"
-              href="#custom"
-            >
-              Få noe laget
-            </a>
-          </div>
-        </div>
-
-        <div className="heroCard">
-          <span className="kicker">
-            Aadland Service
-          </span>
-
-          <strong>
-            Laget på bestilling.
-          </strong>
-
-          <p>
-            Velg blant produktene
-            våre eller få laget noe
-            etter egne mål og ønsker.
-          </p>
-
-          <a
-            className="btn"
-            href="/produkter"
-            style={{
-              marginTop: 14,
-              display:
-                "inline-block",
-            }}
-          >
-            Utforsk produkter
-          </a>
-        </div>
-      </section>
-
-      <section
-        className="section"
-        style={{
-          background:
-            "#f4f0e8",
-        }}
-      >
-        <div className="wrap">
-          <div className="kicker">
-            Produkter
-          </div>
-
-          <h2>
-            Finn riktig løsning.
-          </h2>
-
-          <p
-            className="muted"
-            style={{
-              maxWidth: 680,
-            }}
-          >
-            Produktene våre er
-            samlet i kategorier slik
-            at du enkelt kan finne
-            det du ser etter. Velg
-            produkt, størrelse,
-            utførelse og andre
-            tilgjengelige varianter
-            på produktsiden.
-          </p>
-
-          <div
-            className="grid"
-            style={{
-              marginTop: 30,
-            }}
-          >
-            <div className="card">
-              <div className="kicker">
-                01
-              </div>
-
-              <h3>
-                Velg kategori
-              </h3>
-
-              <p className="muted">
-                Finn for eksempel
-                benker,
-                plantekasser, bord
-                eller andre
-                produkter.
-              </p>
-            </div>
-
-            <div className="card">
-              <div className="kicker">
-                02
-              </div>
-
-              <h3>
-                Velg produkt
-              </h3>
-
-              <p className="muted">
-                Sammenlign ulike
-                modeller og
-                systemer innenfor
-                samme kategori.
-              </p>
-            </div>
-
-            <div className="card">
-              <div className="kicker">
-                03
-              </div>
-
-              <h3>
-                Tilpass
-              </h3>
-
-              <p className="muted">
-                Velg tilgjengelige
-                mål, overflate og
-                andre varianter før
-                bestilling.
-              </p>
-            </div>
-          </div>
-
-          <div
-            style={{
-              marginTop: 28,
-            }}
-          >
-            <a
-              className="btn"
-              href="/produkter"
-            >
-              Se alle produkter
-            </a>
-          </div>
-        </div>
-      </section>
-
-      <section
-        id="slik"
-        className="section"
-        style={{
-          background:
-            "#eee8dd",
-        }}
-      >
-        <div className="wrap">
-          <div className="kicker">
-            Slik fungerer det
-          </div>
-
-          <h2>
-            Fra idé til ferdig
-            produkt.
-          </h2>
-
-          <div className="grid">
-            {[
-              {
-                number: "01",
-
-                title:
-                  "Velg eller beskriv",
-
-                text:
-                  "Velg et produkt fra nettbutikken og tilpass tilgjengelige varianter, eller send oss en egen forespørsel.",
-              },
-
-              {
-                number: "02",
-
-                title:
-                  "Vi bekrefter bestillingen",
-
-                text:
-                  "Vi går gjennom bestillingen og tar kontakt dersom noe må avklares før vi starter.",
-              },
-
-              {
-                number: "03",
-
-                title:
-                  "Hent eller få levert",
-
-                text:
-                  "Store produkter hentes etter avtale eller leveres innenfor avtalt område.",
-              },
-            ].map((item) => (
-              <div
-                className="card"
-                key={item.number}
-              >
-                <b>
-                  {item.number}
-                </b>
-
-                <h3>
-                  {item.title}
-                </h3>
-
-                <p className="muted">
-                  {item.text}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section
-        id="custom"
-        className="section"
-      >
-        <div className="wrap">
-          <div className="kicker">
-            På bestilling
-          </div>
-
-          <h2>
-            Har du noe annet i
-            tankene?
-          </h2>
-
-          <p
-            className="muted"
-            style={{
-              maxWidth: 680,
-              marginBottom: 28,
-            }}
-          >
-            Finner du ikke det du
-            trenger blant
-            produktene våre? Send
-            oss en beskrivelse av
-            det du ønsker, så tar
-            vi kontakt.
-          </p>
-
-          {message && (
-            <div
-              className="success"
-              style={{
-                maxWidth: 720,
-                marginBottom: 20,
-              }}
-            >
-              <b>
-                Forespørselen er
-                mottatt
-              </b>
-
-              {message.orderNumber && (
-                <p>
-                  Ordrenummer:{" "}
-                  {
-                    message.orderNumber
-                  }
-                </p>
-              )}
-
-              {message.message && (
-                <p>
-                  {message.message}
-                </p>
-              )}
-            </div>
-          )}
-
-          <form
-            className="card"
-            onSubmit={
-              customOrder
-            }
-            style={{
-              maxWidth: 720,
-            }}
-          >
-            <div className="field">
-              <label>
-                Beskriv hva du
-                ønsker
-              </label>
-
-              <textarea
-                rows="6"
-                required
-                value={custom}
-                onChange={(e) =>
-                  setCustom(
-                    e.target.value
-                  )
-                }
-                placeholder="Mål, materiale, bruk og andre ønsker …"
-              />
-            </div>
-
-            <CustomerFields
-              customer={customer}
-              setCustomer={
-                setCustomer
-              }
-            />
-
-            {error && (
-              <p className="notice">
-                {error}
-              </p>
-            )}
-
-            <button
-              className="btn"
-              disabled={sending}
-            >
-              {sending
-                ? "Sender..."
-                : "Send forespørsel"}
-            </button>
-          </form>
-        </div>
-      </section>
-
-      <section
-        id="om"
-        className="section"
-        style={{
-          background:
-            "#181613",
-          color: "white",
-        }}
-      >
-        <div className="wrap">
-          <div className="kicker">
-            Om Aadland Service
-          </div>
-
-          <h2>
-            Praktiske løsninger.
-            <br />
-            Solid utført.
-          </h2>
-
-          <p
-            style={{
-              maxWidth: 720,
-              lineHeight: 1.7,
-              opacity: 0.8,
-            }}
-          >
-            Bygg, renovering,
-            vedlikehold og
-            produkter på
-            bestilling i Bergen og
-            omegn.
-          </p>
-        </div>
-      </section>
-
-      <footer
-        id="kontakt"
-        className="footer"
-      >
-        <div className="wrap row">
-          <div>
-            <b>
-              Aadland Service
-            </b>
-
-            <p>
-              Bygg • Renovering •
-              Vedlikehold •
-              Hagearbeid
-            </p>
-          </div>
-
-          <div>
-            <p>
-              post@aadland-service.no
-            </p>
-
-            <p>
-              471 54 898
-            </p>
-
-            <p>
-              Org.nr. 937 781 873
-              MVA
-            </p>
-          </div>
-        </div>
-      </footer>
-    </main>
-  );
-}
-
-function CustomerFields({
-  customer,
-  setCustomer,
-}) {
-  const set = (key, value) =>
-    setCustomer((current) => ({
-      ...current,
-      [key]: value,
-    }));
-
-  return (
-    <div className="options">
-      <div className="field">
-        <label>Navn</label>
-
-        <input
-          required
-          value={customer.name}
-          onChange={(e) =>
-            set(
-              "name",
-              e.target.value
-            )
-          }
-        />
-      </div>
-
-      <div className="field">
-        <label>E-post</label>
-
-        <input
-          type="email"
-          required
-          value={customer.email}
-          onChange={(e) =>
-            set(
-              "email",
-              e.target.value
-            )
-          }
-        />
-      </div>
-
-      <div className="field">
-        <label>Telefon</label>
-
-        <input
-          required
-          value={customer.phone}
-          onChange={(e) =>
-            set(
-              "phone",
-              e.target.value
-            )
-          }
-        />
-      </div>
-
-      <div className="field">
-        <label>Adresse</label>
-
-        <input
-          value={customer.address}
-          onChange={(e) =>
-            set(
-              "address",
-              e.target.value
-            )
-          }
-        />
-      </div>
-
-      <div className="field">
-        <label>
-          Postnummer
-        </label>
-
-        <input
-          value={
-            customer.postalCode
-          }
-          onChange={(e) =>
-            set(
-              "postalCode",
-              e.target.value
-            )
-          }
-        />
-      </div>
-
-      <div className="field">
-        <label>Sted</label>
-
-        <input
-          value={customer.city}
-          onChange={(e) =>
-            set(
-              "city",
-              e.target.value
-            )
-          }
-        />
-      </div>
-
-      <div className="field">
-        <label>Merknad</label>
-
-        <textarea
-          rows="3"
-          value={customer.note}
-          onChange={(e) =>
-            set(
-              "note",
-              e.target.value
-            )
-          }
-        />
-      </div>
+const emptyCustomer={name:"",email:"",phone:"",address:"",postalCode:"",city:"",note:"",deliveryWithinRadius:true};
+
+const services=[
+  ["Oppussing og renovering","Fra mindre oppgraderinger til større fornyelser i hjemmet.","01"],
+  ["Uteområder og hage","Terrasse, levegger, vedlikehold og praktiske løsninger ute.","02"],
+  ["Produkter på bestilling","Benker, plantekasser og andre produkter tilpasset dine ønsker.","03"],
+  ["Utleie av utstyr","Praktisk utstyr til prosjektet ditt. Utleie lanseres snart.","04"],
+  ["Vedlikehold og småjobber","Reparasjoner, montering og oppgaver som faktisk må bli gjort.","05"],
+  ["Rådgivning og befaring","Fortell oss om prosjektet, så finner vi en god vei videre.","06"],
+];
+
+export default function Home(){
+ const [customer,setCustomer]=useState(emptyCustomer);
+ const [custom,setCustom]=useState("");
+ const [message,setMessage]=useState(null);
+ const [error,setError]=useState("");
+ const [sending,setSending]=useState(false);
+
+ async function customOrder(e){
+  e.preventDefault(); setError(""); setMessage(null); setSending(true);
+  try{
+   const response=await fetch("/api/orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({orderType:"custom",customRequest:custom,customer,fulfillmentType:"pickup",deliveryWithinRadius:customer.deliveryWithinRadius})});
+   const data=await response.json();
+   if(!response.ok){setError(data.error||"Noe gikk galt.");return;}
+   setMessage(data);setCustom("");setCustomer(emptyCustomer);
+  }catch{setError("Noe gikk galt. Prøv igjen.");}finally{setSending(false);}
+ }
+
+ return <main className="newHome">
+  <header className="homeTop">
+   <div className="homeWrap homeNav">
+    <a className="homeBrand" href="/"><span className="shield">AS</span><span>AADLAND<small>SERVICE</small></span></a>
+    <nav className="homeLinks">
+     <a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a>
+    </nav>
+    <a className="goldBtn navCta" href="#befaring">Be om befaring</a>
+   </div>
+  </header>
+
+  <section className="homeHero">
+   <div className="heroTexture"></div>
+   <div className="homeWrap heroContent">
+    <div className="eyebrow">Aadland Service · Bergen og omegn</div>
+    <h1>Kvalitet<br/><em>som varer.</em></h1>
+    <p>Oppussing, vedlikehold, uteområder og produkter på bestilling. Praktiske løsninger med fokus på solid utførelse.</p>
+    <div className="heroActions"><a className="goldBtn" href="#befaring">Be om befaring</a><a className="outlineBtn" href="#tjenester">Se våre tjenester</a></div>
+   </div>
+   <div className="scrollHint">UTFORSK <span>↓</span></div>
+  </section>
+
+  <section className="serviceStrip">
+   <div className="homeWrap stripGrid">
+    {services.map(([title,,n])=><a href="#tjenester" key={n}><b>{n}</b><span>{title}</span></a>)}
+   </div>
+  </section>
+
+  <section id="tjenester" className="homeSection light">
+   <div className="homeWrap">
+    <div className="sectionIntro"><div><span className="goldLabel">TJENESTER</span><h2>Hva kan vi hjelpe deg med?</h2></div><p>Små og store oppdrag – med løsninger tilpasset behovet ditt.</p></div>
+    <div className="serviceCards">
+     {services.slice(0,5).map(([title,text,n])=><article className="serviceCard" key={n}><div className={"serviceVisual visual"+n}><span>{n}</span></div><div className="serviceText"><h3>{title}</h3><p>{text}</p><a href="#befaring">Les mer <b>→</b></a></div></article>)}
     </div>
-  );
+   </div>
+  </section>
+
+  <section id="om" className="craftSection">
+   <div className="homeWrap craftGrid">
+    <div className="craftVisual"><div className="measureLine"></div><span>GODT HÅNDVERK<br/>STARTER MED<br/>GODE FORBEREDELSER.</span></div>
+    <div className="craftCopy"><span className="goldLabel">AADLAND SERVICE</span><h2>Lokalt håndverk<br/>med stolthet.</h2><p>Vi hjelper med oppussing, vedlikehold, uteområder og spesialtilpassede løsninger. Målet er enkelt: ryddig kommunikasjon, praktiske valg og et resultat du kan være fornøyd med.</p><a className="textLink" href="#befaring">Fortell oss om prosjektet ditt →</a></div>
+   </div>
+  </section>
+
+  <section id="prosjekter" className="homeSection projects">
+   <div className="homeWrap">
+    <div className="sectionIntro"><div><span className="goldLabel">TIDLIGERE OPPDRAG</span><h2>Arbeid vi er stolte av.</h2></div><p>Her kommer bilder og historier fra utførte prosjekter.</p></div>
+    <div className="projectGrid">
+     <div className="projectTile large"><span>UTEOMRÅDE</span><strong>Terrasse og trearbeid</strong></div>
+     <div className="projectTile"><span>VEDLIKEHOLD</span><strong>Før og etter</strong></div>
+     <div className="projectTile"><span>PÅ BESTILLING</span><strong>Tilpassede produkter</strong></div>
+    </div>
+   </div>
+  </section>
+
+  <section id="befaring" className="contactSection">
+   <div className="homeWrap contactGrid">
+    <div className="contactCopy"><span className="goldLabel">KONTAKT OSS</span><h2>Har du et prosjekt<br/>i tankene?</h2><p>Beskriv hva du ønsker hjelp med. Vi tar kontakt for å avklare prosjektet og om det er behov for befaring.</p><div className="contactDetails"><a href="tel:+4747154898">471 54 898</a><a href="mailto:post@aadland-service.no">post@aadland-service.no</a></div></div>
+    <form className="homeForm" onSubmit={customOrder}>
+     {message&&<div className="success"><b>Forespørselen er mottatt</b>{message.orderNumber&&<p>Ordrenummer: {message.orderNumber}</p>}</div>}
+     <div className="formTwo"><Field label="Navn *"><input required value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})}/></Field><Field label="Telefon *"><input required value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})}/></Field></div>
+     <Field label="E-post *"><input type="email" required value={customer.email} onChange={e=>setCustomer({...customer,email:e.target.value})}/></Field>
+     <Field label="Hva kan vi hjelpe deg med? *"><textarea rows="5" required value={custom} onChange={e=>setCustom(e.target.value)} placeholder="Fortell kort om prosjektet, hvor det er og hva du ønsker gjort …"/></Field>
+     {error&&<p className="notice">{error}</p>}
+     <button className="goldBtn submitBtn" disabled={sending}>{sending?"Sender...":"Send forespørsel →"}</button>
+     <small>Vi bruker opplysningene kun for å svare på forespørselen din.</small>
+    </form>
+   </div>
+  </section>
+
+  <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="homeBrand"><span className="shield">AS</span><span>AADLAND<small>SERVICE</small></span></div><div><b>Kontakt</b><p>471 54 898<br/>post@aadland-service.no</p></div><div><b>Tjenester</b><p>Oppussing · Vedlikehold<br/>Uteområder · Produkter</p></div><div><b>Firma</b><p>Org.nr. 937 781 873 MVA<br/>Bergen og omegn</p></div></div></footer>
+ </main>;
 }
+function Field({label,children}){return <label className="homeField"><span>{label}</span>{children}</label>}
