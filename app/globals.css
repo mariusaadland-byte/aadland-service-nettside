@@ -306,3 +306,17 @@
  .projects .sectionIntro h2{font-size:36px!important}
  .projectGrid{gap:8px!important}
 }
+
+/* Approved reference: header proportions */
+.homeTop{background:#0d0d0d!important;border-bottom:1px solid rgba(255,255,255,.07)!important}
+.homeNav{min-height:78px!important;display:flex!important;align-items:center!important}
+.homeBrand{display:flex;align-items:center;flex:none}
+.brandLogo{display:block;max-height:56px!important;width:auto!important;object-fit:contain}
+.homeLinks{margin-left:auto!important;margin-right:26px!important;gap:24px!important}
+.homeLinks a{font-size:12px!important;letter-spacing:.02em!important;color:rgba(255,255,255,.82)!important;text-decoration:none!important;white-space:nowrap}
+.homeLinks a:hover{color:#d7a74e!important}
+.navCta{white-space:nowrap}
+@media(max-width:900px){
+ .homeNav{min-height:68px!important}
+ .brandLogo{max-height:46px!important}
+}
