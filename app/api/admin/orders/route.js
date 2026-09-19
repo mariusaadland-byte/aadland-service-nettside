@@ -20,6 +20,8 @@ const mapOrder = (o) => ({
   customRequest: o.custom_request,
   totalOre: o.total_ore,
   createdAt: o.created_at,
+  surveyDate: o.survey_date || null,
+  adminNote: o.admin_note || "",
 });
 
 export async function GET() {
@@ -93,7 +95,7 @@ export async function PATCH(req) {
     );
   }
 
-  const { id, status } = await req.json();
+  const { id, status, surveyDate, adminNote } = await req.json();
 
   const allowed = [
     "new",
@@ -111,7 +113,7 @@ export async function PATCH(req) {
     );
   }
 
-  if (!allowed.includes(status)) {
+  if (status !== undefined && !allowed.includes(status)) {
     return NextResponse.json(
       { error: "Ugyldig status." },
       { status: 400 }
@@ -129,7 +131,7 @@ export async function PATCH(req) {
 
   const { error } = await s
     .from("orders")
-    .update({ status })
+    .update({ ...(status !== undefined ? { status } : {}), ...(surveyDate !== undefined ? { survey_date: surveyDate || null } : {}), ...(adminNote !== undefined ? { admin_note: adminNote || null } : {}) })
     .eq("id", id);
 
   if (error) {
