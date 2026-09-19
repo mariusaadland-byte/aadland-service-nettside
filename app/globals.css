@@ -160,3 +160,8 @@
 .rentalTeaser p{max-width:680px;color:rgba(255,255,255,.7);line-height:1.65;margin:0}
 .rentalTeaser .goldBtn{flex:none}
 @media(max-width:700px){.rentalTeaser{padding:38px 0}.rentalTeaserGrid{display:grid;gap:22px}.rentalTeaser h2{font-size:32px}.rentalTeaser p{font-size:13px}.rentalTeaser .goldBtn{justify-self:start}}
+
+/* Approved reference footer identity */
+.footerIdentity{display:flex;flex-direction:column;gap:18px}
+.footerTagline{font-family:Georgia,serif;font-style:italic;color:#d7a74e!important;font-size:16px!important;line-height:1.25;margin:0}
+@media(max-width:600px){.footerIdentity{grid-column:1/-1}.footerTagline{font-size:14px!important}}
