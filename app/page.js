@@ -21,7 +21,7 @@ export default function Home(){
  const [sending,setSending]=useState(false);
  const [contactImages,setContactImages]=useState([]);
  const [publicGroups,setPublicGroups]=useState([]);
- const services=publicGroups.length?publicGroups.map(group=>[group.name,group.description||"Les mer om denne tjenesten.",group.slug]):fallbackServices;
+ const services=fallbackServices;
 
  useEffect(()=>{
   fetch("/api/categories").then(r=>r.ok?r.json():null).then(data=>setPublicGroups(data?.categories||[])).catch(()=>{});
@@ -51,7 +51,7 @@ export default function Home(){
   <header className="homeTop">
    <div className="homeWrap homeNav">
     <a className="homeBrand" href="/"><img className="brandLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></a>
-    <nav className="homeLinks"><a href="/">Hjem</a><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="#utleie">Utleie</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a></nav>
+    <nav className="homeLinks"><a href="/">Hjem</a><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="#tjenester">Utleie</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a></nav>
     <a className="goldBtn navCta" href="#befaring">Be om befaring →</a>
    </div>
   </header>
