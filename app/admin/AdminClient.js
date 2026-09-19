@@ -2974,7 +2974,20 @@ function ServiceEditor({ service, reload, setError, close }) {
   const [showInMenu,setShowInMenu]=useState(service?.showInMenu!==false);
   const [showInFooter,setShowInFooter]=useState(service?.showInFooter!==false);
   const [sortOrder,setSortOrder]=useState(service?.sortOrder??0);
+  const [imageUrl,setImageUrl]=useState(service?.imageUrl||"");
+  const [uploading,setUploading]=useState(false);
+  const [publishFrom,setPublishFrom]=useState(service?.publishFrom?String(service.publishFrom).slice(0,10):"");
+  const [publishUntil,setPublishUntil]=useState(service?.publishUntil?String(service.publishUntil).slice(0,10):"");
   const [saving,setSaving]=useState(false);
+
+  async function uploadImage(file){
+    if(!file)return; setUploading(true); setError("");
+    const formData=new FormData(); formData.append("file",file);
+    const response=await fetch("/api/admin/upload",{method:"POST",body:formData});
+    const data=await response.json().catch(()=>({})); setUploading(false);
+    if(!response.ok){setError(data.error||"Bildet kunne ikke lastes opp.");return;}
+    if(data.url)setImageUrl(data.url);
+  }
 
   async function save(e){
     e?.preventDefault(); setError("");
@@ -2982,9 +2995,9 @@ function ServiceEditor({ service, reload, setError, close }) {
     setSaving(true);
     const response=await fetch("/api/admin/services",{method:isNew?"POST":"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({
       ...(isNew?{}:{id:service.id}),title:title.trim(),description:description.trim(),active,showOnHome,showInMenu,showInFooter,sortOrder,
-      kind:service?.kind||"service",imageUrl:service?.imageUrl||"",hasPage:service?.hasPage||false,ctaLabel:service?.ctaLabel||"Les mer",
+      kind:service?.kind||"service",imageUrl,hasPage:service?.hasPage||false,ctaLabel:service?.ctaLabel||"Les mer",
       ctaHref:service?.ctaHref||"",formTitle:service?.formTitle||"Be om befaring",formPrompt:service?.formPrompt||"Beskriv kort hva du ønsker hjelp med.",
-      publishFrom:service?.publishFrom||null,publishUntil:service?.publishUntil||null
+      publishFrom:publishFrom?publishFrom+"T00:00:00":null,publishUntil:publishUntil?publishUntil+"T23:59:59":null
     })});
     const data=await response.json().catch(()=>({})); setSaving(false);
     if(!response.ok){setError(data.error||"Tjenesten kunne ikke lagres.");return;}
@@ -2999,7 +3012,7 @@ function ServiceEditor({ service, reload, setError, close }) {
     <h3>{isNew?"Legg til tjeneste":service.title}</h3>
     <div className="field"><label>Navn</label><input required value={title} onChange={e=>setTitle(e.target.value)} placeholder="F.eks. Brøyting" /></div>
     <div className="field"><label>Beskrivelse</label><textarea rows="4" value={description} onChange={e=>setDescription(e.target.value)} /></div>
-    <div className="field"><label>Rekkefølge</label><input type="number" value={sortOrder} onChange={e=>setSortOrder(e.target.value)} /></div>
+    <div className="field"><label>Bilde</label>{imageUrl&&<img src={imageUrl} alt="" style={{width:"100%",height:180,objectFit:"cover",borderRadius:12,marginBottom:10}}/>}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={e=>uploadImage(e.target.files?.[0])}/>{uploading&&<small className="muted">Laster opp …</small>}</div>\n    <div className="field"><label>Rekkefølge</label><input type="number" value={sortOrder} onChange={e=>setSortOrder(e.target.value)} /></div>\n    <div className="field"><label>Publiser fra (valgfritt)</label><input type="date" value={publishFrom} onChange={e=>setPublishFrom(e.target.value)} /></div>\n    <div className="field"><label>Publiser til (valgfritt)</label><input type="date" value={publishUntil} onChange={e=>setPublishUntil(e.target.value)} /></div>
     <label><input type="checkbox" checked={active} onChange={e=>setActive(e.target.checked)} /> Publisert</label><br/>
     <label><input type="checkbox" checked={showOnHome} onChange={e=>setShowOnHome(e.target.checked)} /> Vis på forsiden</label><br/>
     <label><input type="checkbox" checked={showInMenu} onChange={e=>setShowInMenu(e.target.checked)} /> Vis i meny</label><br/>
