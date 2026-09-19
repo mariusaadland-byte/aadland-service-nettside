@@ -446,3 +446,21 @@ html{scroll-behavior:smooth}
  .servicesHeader h2{font-size:39px!important}
  .serviceVisual{min-height:235px!important}
 }
+
+/* Approved reference: hero proportions and readability */
+.heroSection{min-height:690px!important;display:flex!important;align-items:center!important;background-position:center 46%!important}
+.heroShade{background:linear-gradient(90deg,rgba(8,8,8,.88) 0%,rgba(8,8,8,.64) 43%,rgba(8,8,8,.18) 72%,rgba(8,8,8,.08) 100%)!important}
+.heroContent{padding-top:72px!important;padding-bottom:72px!important}
+.heroEyebrow{font-size:11px!important;letter-spacing:.18em!important;font-weight:800!important}
+.heroContent h1{font-size:clamp(58px,7vw,92px)!important;line-height:.88!important;letter-spacing:-.055em!important;max-width:650px!important;margin:15px 0 22px!important}
+.heroLead{max-width:570px!important;font-size:15px!important;line-height:1.72!important}
+.heroActions{margin-top:28px!important;gap:12px!important}
+.heroTrust{margin-top:54px!important;font-size:15px!important;font-style:italic!important}
+@media(max-width:700px){
+ .heroSection{min-height:650px!important;background-position:62% center!important}
+ .heroShade{background:linear-gradient(90deg,rgba(8,8,8,.9) 0%,rgba(8,8,8,.69) 65%,rgba(8,8,8,.28) 100%)!important}
+ .heroContent{padding-top:62px!important;padding-bottom:50px!important}
+ .heroContent h1{font-size:54px!important;max-width:360px!important}
+ .heroLead{font-size:14px!important;max-width:390px!important}
+ .heroTrust{margin-top:38px!important}
+}
