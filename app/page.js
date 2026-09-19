@@ -13,6 +13,12 @@ const fallbackServices=[
  {title:"Rådgivning og befaring",description:"Fortell oss om prosjektet, så finner vi en god vei videre.",slug:"survey",kind:"survey"},
 ];
 
+function serviceHref(service){
+ if(service.kind==="products") return "/produkter";
+ if(service.kind==="survey") return "#befaring";
+ return "#tjeneste-"+service.slug;
+}
+
 export default function Home(){
  const [customer,setCustomer]=useState(emptyCustomer);
  const [custom,setCustom]=useState("");
@@ -66,7 +72,7 @@ export default function Home(){
   </section>
 
   <section className="serviceStrip"><div className="homeWrap stripGrid serviceStripInner">
-   {services.slice(0,6).map(service=><a href={service.kind==="products"?"/produkter":service.kind==="survey"?"#befaring":"#tjeneste-"+service.slug} key={service.slug} className="serviceStripItem"><span className={"serviceIcon "+service.slug} aria-hidden="true"></span><span>{service.title}</span></a>)}
+   {services.slice(0,6).map(service=><a href={serviceHref(service)} key={service.slug} className="serviceStripItem"><span className={"serviceIcon "+service.slug} aria-hidden="true"></span><span>{service.title}</span></a>)}
   </div></section>
 
   <section id="tjenester" className="homeSection light servicesSection">
@@ -118,7 +124,7 @@ export default function Home(){
   </div></section>
 
   <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="footerIdentity"><div className="homeBrand"><img className="brandLogo footerLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></div><p className="footerTagline">Lokalt håndverk – solide resultater</p></div><div><b>Kontakt</b><div className="footerServices"><a href="tel:+4747154898">471 54 898</a><a href="mailto:post@aadland-service.no">post@aadland-service.no</a></div></div><div><b>Tjenester</b><div className="footerServices">
- {services.map(service=><a key={service.slug} href={service.kind==="products"?"/produkter":service.kind==="survey"?"#befaring":"#tjeneste-"+service.slug}>{service.title}</a>)}
+ {services.map(service=><a key={service.slug} href={serviceHref(service)}>{service.title}</a>)}
  </div></div><div><b>Firma</b><div className="footerServices"><a href="#om">Om oss</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#befaring">Be om befaring</a></div><p>Org.nr. 937 781 873 MVA<br/>Bergen og omegn</p></div></div><div className="homeWrap footerBottom"><span>© Aadland Service</span><div><a href="/produkter">Produkter</a><a href="#tjenester">Tjenester</a><a href="#kontakt">Kontakt</a></div></div></footer>
  </main>;
 }
