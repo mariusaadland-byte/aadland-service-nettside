@@ -40,10 +40,10 @@ export default function Home(){
   </header>
 
   <section className="homeHero">
-   <div className="heroPhoto" aria-hidden="true"><div className="heroBeam"></div><div className="heroMeasure"></div><div className="heroHand"></div></div>
+   <div className="heroPhoto" aria-hidden="true"></div>
    <div className="heroShade"></div>
    <div className="homeWrap heroContent">
-    <div className="eyebrow">Aadland Service · Bergen og omegn</div>
+    <div className="eyebrow">BYGG · RENOVERING · UTEOMRÅDER · VEDLIKEHOLD</div>
     <h1>Kvalitet<br/><em>som varer.</em></h1>
     <p>Oppussing, vedlikehold, uteområder og produkter på bestilling. Praktiske løsninger med fokus på solid utførelse.</p>
     <div className="heroActions"><a className="goldBtn" href="#befaring">Be om befaring</a><a className="outlineBtn" href="#tjenester">Se tjenester</a></div>
@@ -60,7 +60,7 @@ export default function Home(){
     <div className="sectionIntro"><div><span className="goldLabel">VÅRE TJENESTER</span><h2>Små og store prosjekter</h2></div><p>Små og store oppdrag – med løsninger tilpasset behovet ditt.</p></div>
     <div className="serviceCards">
      {services.slice(0,5).map(([title,text,n,type])=><article className="serviceCard" key={n}>
-      <div className={"serviceVisual "+type}><span className="cardNo">{n}</span><div className="visualScene"></div></div>
+      <div className={"serviceVisual "+type}><div className="visualScene"></div></div>
       <div className="serviceText"><h3>{title}</h3><p>{text}</p><a href={n==="03"?"/produkter":"#befaring"}>Les mer <b>→</b></a></div>
      </article>)}
     </div>
@@ -69,7 +69,7 @@ export default function Home(){
 
   <section id="om" className="craftSection">
    <div className="homeWrap craftGrid">
-    <div className="craftVisual"><div className="woodPiece"></div><div className="ruler"></div><div className="pencil"></div><span>GODT HÅNDVERK STARTER<br/>MED GODE FORBEREDELSER.</span></div>
+    <div className="craftVisual"><span>GODT HÅNDVERK STARTER<br/>MED GODE FORBEREDELSER.</span></div>
     <div className="craftCopy"><span className="goldLabel">AADLAND SERVICE</span><h2>Lokalt håndverk<br/>med stolthet.</h2><p>Vi hjelper med oppussing, vedlikehold, uteområder og spesialtilpassede løsninger. Målet er enkelt: ryddig kommunikasjon, praktiske valg og et resultat du kan være fornøyd med.</p><a className="textLink" href="#befaring">Fortell oss om prosjektet ditt →</a></div>
    </div>
   </section>
