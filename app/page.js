@@ -5,12 +5,12 @@ import { useState } from "react";
 const emptyCustomer={name:"",email:"",phone:"",address:"",postalCode:"",city:"",note:"",deliveryWithinRadius:true};
 
 const fallbackServices=[
- {title:"Oppussing og renovering",description:"Fra mindre oppgraderinger til større fornyelser i hjemmet.",slug:"renovation",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,sortOrder:10},
- {title:"Uteområder og hage",description:"Terrasser, levegger, vedlikehold og praktiske løsninger ute.",slug:"outdoor",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,sortOrder:20},
- {title:"Produkter på bestilling",description:"Benker, plantekasser og andre produkter tilpasset dine ønsker.",slug:"products",kind:"products",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,sortOrder:30},
- {title:"Utleie av utstyr",description:"Lei utstyr til prosjektet når du trenger det.",slug:"rental",kind:"rental",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,sortOrder:40},
- {title:"Vedlikehold og småjobber",description:"Reparasjoner, montering og oppgaver som må bli gjort.",slug:"maintenance",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,sortOrder:50},
- {title:"Rådgivning og befaring",description:"Fortell oss om prosjektet, så finner vi en god vei videre.",slug:"survey",kind:"survey",active:true,showInMenu:true,showInFooter:true,showOnHome:false,hasPage:false,sortOrder:60},
+ {title:"Oppussing og renovering",description:"Fra mindre oppgraderinger til større fornyelser i hjemmet.",slug:"renovation",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",publishFrom:null,publishUntil:null,sortOrder:10},
+ {title:"Uteområder og hage",description:"Terrasser, levegger, vedlikehold og praktiske løsninger ute.",slug:"outdoor",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",publishFrom:null,publishUntil:null,sortOrder:20},
+ {title:"Produkter på bestilling",description:"Benker, plantekasser og andre produkter tilpasset dine ønsker.",slug:"products",kind:"products",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",publishFrom:null,publishUntil:null,sortOrder:30},
+ {title:"Utleie av utstyr",description:"Lei utstyr til prosjektet når du trenger det.",slug:"rental",kind:"rental",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",publishFrom:null,publishUntil:null,sortOrder:40},
+ {title:"Vedlikehold og småjobber",description:"Reparasjoner, montering og oppgaver som må bli gjort.",slug:"maintenance",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",publishFrom:null,publishUntil:null,sortOrder:50},
+ {title:"Rådgivning og befaring",description:"Fortell oss om prosjektet, så finner vi en god vei videre.",slug:"survey",kind:"survey",active:true,showInMenu:true,showInFooter:true,showOnHome:false,hasPage:false,imageUrl:"",publishFrom:null,publishUntil:null,sortOrder:60},
 ];
 
 function serviceHref(service){
@@ -29,7 +29,12 @@ export default function Home(){
  const [contactImages,setContactImages]=useState([]);
  const [imageError,setImageError]=useState("");
  const [menuOpen,setMenuOpen]=useState(false);
- const services=fallbackServices.filter(service=>service.active!==false).sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999));
+ const now=Date.now();
+ const services=fallbackServices
+  .filter(service=>service.active!==false)
+  .filter(service=>!service.publishFrom||new Date(service.publishFrom).getTime()<=now)
+  .filter(service=>!service.publishUntil||new Date(service.publishUntil).getTime()>=now)
+  .sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999));
  const homeServices=services.filter(service=>service.showOnHome!==false);
  const menuServices=services.filter(service=>service.showInMenu!==false);
  const footerServices=services.filter(service=>service.showInFooter!==false);
