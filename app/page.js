@@ -69,7 +69,7 @@ export default function Home(){
   </section>
 
   <section className="serviceStrip"><div className="homeWrap stripGrid">
-   {services.slice(0,6).map(([title,,type])=><a href={type==="products"?"/produkter":"#befaring"} key={type}><span>{title}</span></a>)}
+   {services.slice(0,6).map(([title,,type])=><a href={type==="products"?"/produkter":"#befaring"} key={type}><span className={"serviceIcon "+type} aria-hidden="true"></span><span>{title}</span></a>)}
   </div></section>
 
   <section id="tjenester" className="homeSection light">
