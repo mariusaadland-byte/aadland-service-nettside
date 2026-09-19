@@ -51,8 +51,8 @@ export default function Home(){
   <header className="homeTop">
    <div className="homeWrap homeNav">
     <a className="homeBrand" href="/"><img className="brandLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></a>
-    <nav className="homeLinks"><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a></nav>
-    <a className="goldBtn navCta" href="#befaring">Be om befaring</a>
+    <nav className="homeLinks"><a href="/">Hjem</a><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="#utleie">Utleie</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a></nav>
+    <a className="goldBtn navCta" href="#befaring">Be om befaring →</a>
    </div>
   </header>
 
@@ -62,9 +62,9 @@ export default function Home(){
    <div className="homeWrap heroContent">
     <div className="eyebrow">BYGG · RENOVERING · UTEOMRÅDER · VEDLIKEHOLD</div>
     <h1>Kvalitet<br/><em>som varer.</em></h1>
-    <p>Oppussing, vedlikehold, uteområder og produkter på bestilling. Praktiske løsninger med fokus på solid utførelse.</p>
-    <div className="heroActions"><a className="goldBtn" href="#befaring">Be om befaring</a><a className="outlineBtn" href="#tjenester">Se tjenester</a></div>
-    <div className="heroTrust"><span>Lokalt i Bergen</span><span>Tydelig avtale</span><span>Solid utførelse</span></div>
+    <p>Aadland Service leverer solide løsninger innen bygg, oppussing, vedlikehold og uteområder. Vi kombinerer fagkunnskap, nøyaktighet og god oppfølging – tilpasset dine behov.</p>
+    <div className="heroActions"><a className="goldBtn" href="#befaring">Be om befaring →</a><a className="outlineBtn" href="#tjenester">Se våre tjenester</a></div>
+    <div className="heroTrust"><span>Lokalt håndverk – solide resultater</span></div>
    </div>
   </section>
 
@@ -74,7 +74,7 @@ export default function Home(){
 
   <section id="tjenester" className="homeSection light">
    <div className="homeWrap">
-    <div className="sectionIntro"><div><span className="goldLabel">VÅRE TJENESTER</span><h2>Små og store prosjekter</h2></div><p>Små og store oppdrag – med løsninger tilpasset behovet ditt.</p></div>
+    <div className="sectionIntro"><div><span className="goldLabel">VÅRE TJENESTER</span><h2>Små og store prosjekter</h2></div><a className="textLink" href="#befaring">Se alle tjenester →</a></div>
     <div className="serviceCards">
      {services.slice(0,5).map(([title,text,type],index)=><article className="serviceCard" key={type}>
       <div className={"serviceVisual serviceSlot"+index}><div className="visualScene"></div></div>
