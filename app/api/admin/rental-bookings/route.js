@@ -1,0 +1,7 @@
+import {NextResponse} from "next/server";
+import {getAdminUser,hasPermission} from "../../../../lib/auth";
+import {db} from "../../../../lib/supabase";
+async function ok(){return (await getAdminUser())&&(await hasPermission("canViewOrders"))}
+const map=b=>({id:b.id,bookingNumber:b.booking_number,itemId:b.rental_item_id,itemName:b.rental_items?.name||"",customer:b.customer||{},startDate:b.start_date,endDate:b.end_date,status:b.status,totalOre:b.total_ore,depositOre:b.deposit_ore,createdAt:b.created_at});
+export async function GET(){if(!(await ok()))return NextResponse.json({error:"Ingen tilgang."},{status:403});const s=db();const {data,error}=await s.from("rental_bookings").select("*,rental_items(name)").order("created_at",{ascending:false});if(error)return NextResponse.json({error:error.message},{status:500});return NextResponse.json({bookings:(data||[]).map(map)})}
+export async function PATCH(req){if(!(await getAdminUser())||!(await hasPermission("canUpdateOrders")))return NextResponse.json({error:"Ingen tilgang."},{status:403});const {id,status}=await req.json(),allowed=["new","confirmed","active","returned","completed","cancelled"];if(!id||!allowed.includes(status))return NextResponse.json({error:"Ugyldig booking eller status."},{status:400});const s=db();const {error}=await s.from("rental_bookings").update({status,updated_at:new Date().toISOString()}).eq("id",id);if(error)return NextResponse.json({error:error.message},{status:500});return NextResponse.json({ok:true})}
