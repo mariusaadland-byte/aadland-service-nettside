@@ -60,6 +60,7 @@ export default function Home(){
  const [menuOpen,setMenuOpen]=useState(false);
  const [selectedService,setSelectedService]=useState("");
  const [apiServices,setApiServices]=useState(null);
+ const [apiProjects,setApiProjects]=useState([]);
  useEffect(()=>{
   const storedService=sessionStorage.getItem("aadland-service");
   if(storedService){
@@ -72,6 +73,14 @@ export default function Home(){
   let alive=true;
   fetch("/api/services").then(r=>r.ok?r.json():null).then(data=>{
    if(alive&&Array.isArray(data?.services)&&data.services.length)setApiServices(data.services);
+  }).catch(()=>{});
+  return()=>{alive=false};
+ },[]);
+
+ useEffect(()=>{
+  let alive=true;
+  fetch("/api/projects").then(r=>r.ok?r.json():null).then(data=>{
+   if(alive&&Array.isArray(data?.projects))setApiProjects(data.projects.filter(project=>project.active!==false&&project.featured!==false).slice(0,4));
   }).catch(()=>{});
   return()=>{alive=false};
  },[]);
@@ -161,10 +170,12 @@ export default function Home(){
   <section id="prosjekter" className="homeSection projects projectsSection"><div className="homeWrap">
    <div className="sectionIntro projectsHeader"><div><span className="goldLabel">UTVALGTE PROSJEKTER</span><h2>Resultater vi er stolte av</h2></div></div>
    <div className="projectGrid">
-    <div className="projectTile projectCard projectDeck"><div className="projectCaption"><span>UTEOMRÅDE</span><strong>Terrasse og levegg</strong></div></div>
-    <div className="projectTile projectCard projectBathroom"><div className="projectCaption"><span>OPPUSSING</span><strong>Oppusset bad</strong></div></div>
-    <div className="projectTile projectCard projectSlats"><div className="projectCaption"><span>INNVENDIG</span><strong>Spilevegg og trapp</strong></div></div>
-    <div className="projectTile projectCard projectPlanters"><div className="projectCaption"><span>PÅ BESTILLING</span><strong>Plantekasser</strong></div></div>
+    {apiProjects.length?apiProjects.map(project=><div className="projectTile projectCard" key={project.id} style={project.imageUrls?.[0]?{backgroundImage:"url("+project.imageUrls[0]+")",backgroundSize:"cover",backgroundPosition:"center"}:{}}><div className="projectCaption"><span>{(project.category||"OPPDRAG").toUpperCase()}</span><strong>{project.title}</strong>{project.description&&<p>{project.description}</p>}</div></div>):<>
+     <div className="projectTile projectCard projectDeck"><div className="projectCaption"><span>UTEOMRÅDE</span><strong>Terrasse og levegg</strong></div></div>
+     <div className="projectTile projectCard projectBathroom"><div className="projectCaption"><span>OPPUSSING</span><strong>Oppusset bad</strong></div></div>
+     <div className="projectTile projectCard projectSlats"><div className="projectCaption"><span>INNVENDIG</span><strong>Spilevegg og trapp</strong></div></div>
+     <div className="projectTile projectCard projectPlanters"><div className="projectCaption"><span>PÅ BESTILLING</span><strong>Plantekasser</strong></div></div>
+    </>}
    </div>
   </div></section>
 
