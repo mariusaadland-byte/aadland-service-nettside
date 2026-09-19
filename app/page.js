@@ -92,10 +92,10 @@ export default function Home(){
   <section id="prosjekter" className="homeSection projects"><div className="homeWrap">
    <div className="sectionIntro"><div><span className="goldLabel">UTVALGTE PROSJEKTER</span><h2>Resultater vi er stolte av</h2></div></div>
    <div className="projectGrid">
-    <div className="projectTile projectDeck"><span>UTEOMRÅDE</span><strong>Terrasse og levegg</strong></div>
-    <div className="projectTile projectBathroom"><span>OPPUSSING</span><strong>Oppusset bad</strong></div>
-    <div className="projectTile projectSlats"><span>INNVENDIG</span><strong>Spilevegg og trapp</strong></div>
-    <div className="projectTile projectPlanters"><span>PÅ BESTILLING</span><strong>Plantekasser</strong></div>
+    <div className="projectTile projectDeck"><div className="projectCaption"><span>UTEOMRÅDE</span><strong>Terrasse og levegg</strong></div></div>
+    <div className="projectTile projectBathroom"><div className="projectCaption"><span>OPPUSSING</span><strong>Oppusset bad</strong></div></div>
+    <div className="projectTile projectSlats"><div className="projectCaption"><span>INNVENDIG</span><strong>Spilevegg og trapp</strong></div></div>
+    <div className="projectTile projectPlanters"><div className="projectCaption"><span>PÅ BESTILLING</span><strong>Plantekasser</strong></div></div>
    </div>
   </div></section>
 
