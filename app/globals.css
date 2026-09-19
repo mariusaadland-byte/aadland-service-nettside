@@ -241,3 +241,13 @@
 .projectCaption strong{font-size:18px!important;line-height:1.15!important}
 .projectDeck{background:url("https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=900&q=84") center/cover no-repeat!important}
 @media(max-width:700px){.projectCaption{padding:13px 12px}.projectCaption strong{font-size:14px!important}.projectCaption span{font-size:8px!important}}
+
+/* Approved reference: compact premium enquiry form */
+.contactGrid{align-items:center!important}
+.contactSection .homeForm{padding:30px!important;border-radius:2px!important}
+.contactSection .homeField{gap:6px!important}
+.contactSection .homeField span{font-size:10px!important;letter-spacing:.04em!important;font-weight:700!important}
+.contactSection .homeField input,.contactSection .homeField textarea{border-radius:0!important;padding:12px 13px!important}
+.contactSection .contactUpload{min-height:74px!important;border-style:dashed!important}
+.contactSection .submitBtn{width:100%!important;justify-content:center!important;margin-top:4px!important}
+@media(max-width:700px){.contactSection .homeForm{padding:20px!important}.formTwo{grid-template-columns:1fr!important}}
