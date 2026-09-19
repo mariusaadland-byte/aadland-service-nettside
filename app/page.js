@@ -30,6 +30,7 @@ export default function Home(){
  const [contactImages,setContactImages]=useState([]);
  const [imageError,setImageError]=useState("");
  const [menuOpen,setMenuOpen]=useState(false);
+ const [selectedService,setSelectedService]=useState("");
  const now=Date.now();
  const services=fallbackServices
   .filter(service=>service.active!==false)
@@ -52,11 +53,13 @@ export default function Home(){
     if(!upload.ok) throw new Error(uploaded.error||"Kunne ikke laste opp bilder.");
     imageUrls=uploaded.urls||[];
    }
-   const requestText=imageUrls.length?custom+"\n\nBilder:\n"+imageUrls.join("\n"):custom;
+   const servicePrefix=selectedService?"Tjeneste: "+selectedService+"\n\n":"";
+   const requestBase=servicePrefix+custom;
+   const requestText=imageUrls.length?requestBase+"\n\nBilder:\n"+imageUrls.join("\n"):requestBase;
    const response=await fetch("/api/orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({orderType:"custom",customRequest:requestText,customer,fulfillmentType:"pickup",deliveryWithinRadius:customer.deliveryWithinRadius})});
    const data=await response.json();
    if(!response.ok){setError(data.error||"Noe gikk galt.");return;}
-   setMessage(data);setCustom("");setCustomer(emptyCustomer);setContactImages([]);setImageError("");
+   setMessage(data);setCustom("");setCustomer(emptyCustomer);setContactImages([]);setImageError("");setSelectedService("");
   }catch{setError("Noe gikk galt. Prøv igjen.");}finally{setSending(false);}
  }
 
@@ -91,7 +94,7 @@ export default function Home(){
     <div className="serviceCards">
      {homeServices.slice(0,5).map((service,index)=><article id={"tjeneste-"+service.slug} data-service={service.slug} className={"serviceCard serviceCard"+index} key={service.slug}>
       <div className={"serviceVisual serviceSlot"+index}><div className="visualScene"></div></div>
-      <div className="serviceText serviceContent"><h3>{service.title}</h3><p>{service.description}</p><a href={service.kind==="products"?"/produkter":service.ctaHref||"#befaring"}>{service.ctaLabel||"Les mer"} <b>→</b></a></div>
+      <div className="serviceText serviceContent"><h3>{service.title}</h3><p>{service.description}</p><a href={service.kind==="products"?"/produkter":service.ctaHref||"#befaring"} onClick={()=>{if(service.kind!=="products")setSelectedService(service.title)}}>{service.ctaLabel||"Les mer"} <b>→</b></a></div>
      </article>)}
     </div>
    </div>
@@ -120,6 +123,7 @@ export default function Home(){
   <section id="befaring" className="contactSection"><div className="contactPhoto" aria-hidden="true"></div><div className="contactShade" aria-hidden="true"></div><div className="homeWrap contactGrid">
    <div className="contactCopy"><span className="goldLabel">KONTAKT OSS</span><h2>Har du et prosjekt<br/>i tankene?</h2><p>Beskriv hva du ønsker hjelp med. Vi tar kontakt for å avklare prosjektet og om det er behov for befaring.</p><div className="contactBenefits"><span><b aria-hidden="true">✓</b>Enkel befaring</span><span><b aria-hidden="true">✓</b>Rask tilbakemelding</span><span><b aria-hidden="true">✓</b>Bergen og omegn</span></div><div className="contactDetails"><a href="tel:+4747154898">471 54 898</a><a href="mailto:post@aadland-service.no">post@aadland-service.no</a></div></div>
    <form className="homeForm" onSubmit={customOrder} aria-busy={sending}>
+    {selectedService&&<div className="selectedService">Gjelder: <b>{selectedService}</b></div>}
     {message&&<div className="success"><b>Forespørselen er mottatt</b>{message.orderNumber&&<p>Ordrenummer: {message.orderNumber}</p>}</div>}
     <div className="formTwo"><Field label="Navn *"><input autoComplete="name" required value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})}/></Field><Field label="Telefon *"><input type="tel" autoComplete="tel" required value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})}/></Field></div>
     <Field label="E-post *"><input type="email" autoComplete="email" required value={customer.email} onChange={e=>setCustomer({...customer,email:e.target.value})}/></Field>
