@@ -5,13 +5,36 @@ import { useState } from "react";
 const emptyCustomer={name:"",email:"",phone:"",address:"",postalCode:"",city:"",note:"",deliveryWithinRadius:true};
 
 const fallbackServices=[
- {title:"Oppussing og renovering",description:"Fra mindre oppgraderinger til større fornyelser i hjemmet.",slug:"renovation",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:10},
- {title:"Uteområder og hage",description:"Terrasser, levegger, vedlikehold og praktiske løsninger ute.",slug:"outdoor",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:20},
- {title:"Produkter på bestilling",description:"Benker, plantekasser og andre produkter tilpasset dine ønsker.",slug:"products",kind:"products",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:30},
- {title:"Utleie av utstyr",description:"Lei utstyr til prosjektet når du trenger det.",slug:"rental",kind:"rental",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:40},
- {title:"Vedlikehold og småjobber",description:"Reparasjoner, montering og oppgaver som må bli gjort.",slug:"maintenance",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:50},
- {title:"Rådgivning og befaring",description:"Fortell oss om prosjektet, så finner vi en god vei videre.",slug:"survey",kind:"survey",active:true,showInMenu:true,showInFooter:true,showOnHome:false,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:60},
+ {id:null,title:"Oppussing og renovering",description:"Fra mindre oppgraderinger til større fornyelser i hjemmet.",slug:"renovation",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:10},
+ {id:null,title:"Uteområder og hage",description:"Terrasser, levegger, vedlikehold og praktiske løsninger ute.",slug:"outdoor",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:20},
+ {id:null,title:"Produkter på bestilling",description:"Benker, plantekasser og andre produkter tilpasset dine ønsker.",slug:"products",kind:"products",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:30},
+ {id:null,title:"Utleie av utstyr",description:"Lei utstyr til prosjektet når du trenger det.",slug:"rental",kind:"rental",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:40},
+ {id:null,title:"Vedlikehold og småjobber",description:"Reparasjoner, montering og oppgaver som må bli gjort.",slug:"maintenance",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:50},
+ {id:null,title:"Rådgivning og befaring",description:"Fortell oss om prosjektet, så finner vi en god vei videre.",slug:"survey",kind:"survey",active:true,showInMenu:true,showInFooter:true,showOnHome:false,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:60},
 ];
+
+function normalizeService(service,index=0){
+ return {
+  id:service.id??null,
+  title:service.title||service.name||"Tjeneste",
+  description:service.description||"",
+  slug:service.slug||("tjeneste-"+index),
+  kind:service.kind||"service",
+  active:service.active!==false,
+  showInMenu:service.showInMenu!==false,
+  showInFooter:service.showInFooter!==false,
+  showOnHome:service.showOnHome!==false,
+  hasPage:service.hasPage===true,
+  imageUrl:service.imageUrl||service.image_url||"",
+  ctaLabel:service.ctaLabel||service.cta_label||"Les mer",
+  ctaHref:service.ctaHref||service.cta_href||"",
+  formTitle:service.formTitle||service.form_title||"Be om befaring",
+  formPrompt:service.formPrompt||service.form_prompt||"Beskriv kort hva du ønsker hjelp med.",
+  publishFrom:service.publishFrom||service.publish_from||null,
+  publishUntil:service.publishUntil||service.publish_until||null,
+  sortOrder:Number(service.sortOrder??service.sort_order??index)
+ };
+}
 
 function enquiryServiceName(service){
  return service?.title||"Generell befaring";
@@ -36,7 +59,7 @@ export default function Home(){
  const [menuOpen,setMenuOpen]=useState(false);
  const [selectedService,setSelectedService]=useState("");
  const now=Date.now();
- const services=fallbackServices
+ const services=fallbackServices.map(normalizeService)
   .filter(service=>service.active!==false)
   .filter(service=>!service.publishFrom||new Date(service.publishFrom).getTime()<=now)
   .filter(service=>!service.publishUntil||new Date(service.publishUntil).getTime()>=now)
