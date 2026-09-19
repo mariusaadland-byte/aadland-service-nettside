@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 const emptyCustomer={name:"",email:"",phone:"",address:"",postalCode:"",city:"",note:"",deliveryWithinRadius:true};
 
-const services=[
+const fallbackServices=[
  ["Oppussing og renovering","Fra mindre oppgraderinger til større fornyelser i hjemmet.","renovation"],
  ["Uteområder og hage","Terrasser, levegger, vedlikehold og praktiske løsninger ute.","outdoor"],
  ["Produkter på bestilling","Benker, plantekasser og andre produkter tilpasset dine ønsker.","products"],
@@ -21,6 +21,7 @@ export default function Home(){
  const [sending,setSending]=useState(false);
  const [contactImages,setContactImages]=useState([]);
  const [publicGroups,setPublicGroups]=useState([]);
+ const services=publicGroups.length?publicGroups.map(group=>[group.name,group.description||"Les mer om denne tjenesten.",group.slug]):fallbackServices;
 
  useEffect(()=>{
   fetch("/api/categories").then(r=>r.ok?r.json():null).then(data=>setPublicGroups(data?.categories||[])).catch(()=>{});
@@ -68,15 +69,15 @@ export default function Home(){
   </section>
 
   <section className="serviceStrip"><div className="homeWrap stripGrid">
-   {services.map(([title,,type])=><a href={type==="products"?"/produkter":"#tjenester"} key={type}><span>{title}</span></a>)}
+   {services.slice(0,6).map(([title,,type])=><a href={type==="products"?"/produkter":"#befaring"} key={type}><span>{title}</span></a>)}
   </div></section>
 
   <section id="tjenester" className="homeSection light">
    <div className="homeWrap">
     <div className="sectionIntro"><div><span className="goldLabel">VÅRE TJENESTER</span><h2>Små og store prosjekter</h2></div><p>Små og store oppdrag – med løsninger tilpasset behovet ditt.</p></div>
     <div className="serviceCards">
-     {services.slice(0,5).map(([title,text,type])=><article className="serviceCard" key={type}>
-      <div className={"serviceVisual "+type}><div className="visualScene"></div></div>
+     {services.slice(0,5).map(([title,text,type],index)=><article className="serviceCard" key={type}>
+      <div className={"serviceVisual serviceSlot"+index}><div className="visualScene"></div></div>
       <div className="serviceText"><h3>{title}</h3><p>{text}</p><a href={type==="products"?"/produkter":"#befaring"}>Les mer <b>→</b></a></div>
      </article>)}
     </div>
@@ -122,8 +123,7 @@ export default function Home(){
   </div></section>
 
   <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="homeBrand"><img className="brandLogo footerLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></div><div><b>Kontakt</b><p>471 54 898<br/>post@aadland-service.no</p></div><div><b>Tjenester</b><div className="footerServices">
- {services.slice(0,5).map(([title,,type])=><a key={type} href={type==="products"?"/produkter":"#tjenester"}>{title}</a>)}
- {publicGroups.filter(group=>!services.some(([title])=>title.toLowerCase()===group.name.toLowerCase())).map(group=><a key={group.id} href={"/produkter/kategori/"+group.slug}>{group.name}</a>)}
+ {services.map(([title,,type])=><a key={type} href={type==="products"?"/produkter":"#befaring"}>{title}</a>)}
  </div></div><div><b>Firma</b><p>Org.nr. 937 781 873 MVA<br/>Bergen og omegn</p></div></div></footer>
  </main>;
 }
