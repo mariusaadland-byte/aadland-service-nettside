@@ -496,3 +496,5 @@ html{scroll-behavior:smooth}
  .homeLogo img{max-width:158px!important;max-height:50px!important}
  .headerCta{display:none!important}
 }
+
+.selectedService{margin:0 0 14px;padding:10px 12px;border-left:3px solid #d7a74e;background:rgba(215,167,78,.1);font-size:12px}
