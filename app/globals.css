@@ -102,3 +102,9 @@
 .contactImageSelected{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px}
 .contactImageSelected button{border:0;background:transparent;text-decoration:underline;cursor:pointer;color:inherit}
 @media(max-width:700px){.contactImageUpload input[type=file]{width:100%;font-size:16px}}
+
+/* Approved reference: craft checklist */
+.craftChecks{list-style:none;padding:0;margin:24px 0;display:grid;gap:12px}
+.craftChecks li{position:relative;padding-left:30px;font-size:14px;line-height:1.45}
+.craftChecks li:before{content:"✓";position:absolute;left:0;top:-2px;color:#d7a74e;font-size:18px;font-weight:800}
+.craftCta{display:inline-flex;margin-top:4px}
