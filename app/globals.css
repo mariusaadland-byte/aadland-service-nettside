@@ -375,3 +375,8 @@ html{scroll-behavior:smooth}
 .mobileMenuBtn[aria-expanded="true"] span:nth-child(2){opacity:0}
 .mobileMenuBtn[aria-expanded="true"] span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
 .mobileMenuBtn span{transition:transform .18s ease,opacity .18s ease}
+
+/* Approved reference: enquiry benefit markers */
+.contactBenefits span{display:flex!important;align-items:center!important;gap:8px!important;padding-left:0!important}
+.contactBenefits span:before{display:none!important}
+.contactBenefits b{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;border:1px solid rgba(215,167,78,.65);border-radius:50%;color:#d7a74e;font-size:11px;flex:none}
