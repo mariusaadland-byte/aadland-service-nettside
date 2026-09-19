@@ -113,10 +113,38 @@ export default function AdminClient({ user }) {
     } else { setServices([]); }
 
     if (canManageProducts) {
-      const response = await fetch("/api/admin/rental");
-      if (response.ok) { const data = await response.json(); setRentalItems(data.items || []); }
-      else { setRentalItems([]); }
-    } else { setRentalItems([]); }
+      const [itemsResponse, blocksResponse] = await Promise.all([
+        fetch("/api/admin/rental"),
+        fetch("/api/admin/rental/blocks"),
+      ]);
+      if (itemsResponse.ok) {
+        const data = await itemsResponse.json();
+        setRentalItems(data.items || []);
+      } else {
+        setRentalItems([]);
+      }
+      if (blocksResponse.ok) {
+        const data = await blocksResponse.json();
+        setRentalBlocks(data.blocks || []);
+      } else {
+        setRentalBlocks([]);
+      }
+    } else {
+      setRentalItems([]);
+      setRentalBlocks([]);
+    }
+
+    if (canViewOrders) {
+      const response = await fetch("/api/admin/rental-bookings");
+      if (response.ok) {
+        const data = await response.json();
+        setRentalBookings(data.bookings || []);
+      } else {
+        setRentalBookings([]);
+      }
+    } else {
+      setRentalBookings([]);
+    }
 
     if (canManageUsers) {
       const response = await fetch("/api/admin/users");
@@ -316,6 +344,21 @@ export default function AdminClient({ user }) {
                   <br />
                   <b>{nok(total)}</b>
                 </div>
+              )}
+
+              {canViewOrders && (
+                <>
+                  <div className="stat">
+                    <span className="muted">Aktive utleier</span>
+                    <br />
+                    <b>{rentalBookings.filter((booking) => ["confirmed", "active"].includes(booking.status)).length}</b>
+                  </div>
+                  <div className="stat">
+                    <span className="muted">Nye utleiebookinger</span>
+                    <br />
+                    <b>{rentalBookings.filter((booking) => booking.status === "new").length}</b>
+                  </div>
+                </>
               )}
             </div>
 
@@ -3163,7 +3206,7 @@ function RentalBookings({bookings,reload,setError,canUpdate}){
  const statuses={new:"Ny",confirmed:"Bekreftet",active:"Utlevert",returned:"Returnert",completed:"Ferdig",cancelled:"Avbrutt"};
  async function patch(id,changes){const r=await fetch("/api/admin/rental-bookings",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,...changes})});const d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Bookingen kunne ikke oppdateres.");return;}await reload();}
  if(!bookings.length)return <div className="card"><h3>Ingen utleiebookinger ennå</h3><p className="muted">Nye bookinger fra utleiesiden vises her.</p></div>;
- return <div className="grid">{bookings.map(b=><article className="card" key={b.id}><div className="kicker">{b.bookingNumber}</div><h3>{b.itemName}</h3><p><b>{b.customer?.name}</b><br/>{b.customer?.phone} · {b.customer?.email}</p><p>{b.startDate} – {b.endDate}<br/><b>{nok(b.totalOre)}</b> + depositum {nok(b.depositOre)}</p>
+ return <div className="grid">{bookings.map(b=><article className="card" key={b.id}><div className="kicker">{b.bookingNumber}</div><h3>{b.itemName}</h3><p><b>{b.customer?.name}</b><br/>{b.customer?.phone} · {b.customer?.email}<br/>{b.customer?.fulfillment==="delivery"?"Levering":"Henting"}{b.customer?.address?" · "+b.customer.address:""}</p><p>{b.startDate} – {b.endDate}<br/><b>{nok(b.totalOre)}</b> + depositum {nok(b.depositOre)}</p>
  <div className="field"><label>Status</label><select disabled={!canUpdate} value={b.status} onChange={e=>patch(b.id,{status:e.target.value})}>{Object.entries(statuses).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></div>
  <div className="field"><label>Betaling</label><select disabled={!canUpdate} value={b.paymentStatus} onChange={e=>patch(b.id,{paymentStatus:e.target.value})}><option value="unpaid">Ikke betalt</option><option value="partial">Delvis betalt</option><option value="paid">Betalt</option><option value="refunded">Refundert</option></select></div>
  <div className="field"><label>Depositum</label><select disabled={!canUpdate} value={b.depositStatus} onChange={e=>patch(b.id,{depositStatus:e.target.value})}><option value="not_paid">Ikke mottatt</option><option value="held">Holdes</option><option value="released">Frigitt</option><option value="partially_charged">Delvis trukket</option><option value="charged">Trukket</option></select></div>
