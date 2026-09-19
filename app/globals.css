@@ -30,3 +30,15 @@
 
 .brandLogo{display:block;width:205px;height:66px;object-fit:contain;object-position:left center}.footerLogo{width:230px;height:auto}
 @media(max-width:600px){.brandLogo{width:145px;height:48px}.footerLogo{width:180px;height:auto}.homeSection{padding:40px 0}.sectionIntro h2,.craftCopy h2,.contactCopy h2{font-size:34px}.projects .sectionIntro>p{display:none}.projects{padding:40px 0}.craftCopy{padding:40px 0}.processSection{padding:38px 0}.contactSection{padding:40px 0}.contactCopy p{margin-bottom:12px}.homeForm{padding:15px}.homeField input{min-height:44px}.homeFooter{padding:30px 0}}
+
+/* Mobile pass 2: reduce scroll and visual bulk */
+@media(max-width:600px){
+ .homeHero{min-height:455px;padding-top:42px}.homeHero h1{font-size:46px;line-height:.9;margin:14px 0}.homeHero p{font-size:13px;line-height:1.5;margin:0;max-width:96%}.heroActions{margin-top:18px}.heroTrust{margin-top:16px;padding-top:12px}
+ .homeSection{padding:34px 0}.sectionIntro{margin-bottom:20px}.sectionIntro h2,.craftCopy h2,.contactCopy h2{font-size:31px;line-height:1}.sectionIntro>p{margin-top:12px}
+ .serviceVisual{height:88px}.serviceText{padding:11px}.serviceText h3{font-size:13px}.serviceText a{font-size:9px}.serviceCards{gap:8px}.serviceCards .serviceCard:nth-child(5){grid-template-columns:105px 1fr}
+ .craftCopy{padding:34px 0}.craftCopy p{margin:13px 0;line-height:1.55}.textLink{margin-top:8px}
+ .projects{padding:34px 0}.projectGrid{grid-template-rows:135px 135px}.projectTile{padding:12px}.projectTile>strong{font-size:13px}
+ .processSection{padding:32px 0}.processIntro{margin-bottom:18px}.processIntro h2{font-size:30px}.processStep{padding:14px 8px 14px 0}.processStep+.processStep{padding-left:8px}.processStep h3{font-size:12px}
+ .contactSection{padding:34px 0}.contactGrid{gap:20px}.contactCopy p{font-size:13px}.contactDetails{margin-top:14px}.homeForm{padding:13px}.homeField{gap:5px;margin-bottom:8px}.homeField span{font-size:10px}.homeField input,.homeField textarea{padding:9px}.homeField input{min-height:40px}.homeField textarea{min-height:76px}.submitBtn{min-height:44px}.homeForm>small{font-size:9px;margin-top:8px}
+ .homeFooter{padding:26px 0}.footerGrid{gap:18px}.footerLogo{width:150px}
+}
