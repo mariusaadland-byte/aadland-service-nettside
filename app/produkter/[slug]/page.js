@@ -34,6 +34,7 @@ export default function ProductPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState(null);
+  const [acceptedTerms,setAcceptedTerms]=useState(false);
 
   useEffect(() => {
     fetch("/api/products")
@@ -90,7 +91,10 @@ export default function ProductPage() {
     return productPrice(product, selected);
   }, [product, selected]);
 
-  const total = price * quantity;
+  const shippingOre = fulfillment === "shipping" && product?.shippable ? Number(product.shippingPriceOre)||0 : 0;
+  const total = price * quantity + shippingOre;
+  const soldOut = product?.inventoryMode === "stock" && Number(product.stockQuantity) <= 0;
+  const maxQuantity = product?.inventoryMode === "stock" ? Math.max(0,Math.min(10,Number(product.stockQuantity)||0)) : 10;
 
   async function sendOrder(e) {
     e.preventDefault();
@@ -112,6 +116,8 @@ export default function ProductPage() {
           customer,
           fulfillmentType: fulfillment,
           deliveryWithinRadius: customer.deliveryWithinRadius,
+          acceptedTerms,
+          termsVersion: "2026-09",
           items: [
             {
               productId: product.id,
@@ -348,7 +354,7 @@ export default function ProductPage() {
                   value={quantity}
                   onChange={(e) => setQuantity(Number(e.target.value))}
                 >
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((number) => (
+                  {Array.from({length:maxQuantity||1},(_,i)=>i+1).map((number) => (
                     <option key={number} value={number}>
                       {number}
                     </option>
@@ -362,8 +368,10 @@ export default function ProductPage() {
                 </p>
               )}
 
+              {product.inventoryMode==="stock"?<p style={{marginTop:14}}><b>{soldOut?"Utsolgt":product.stockQuantity+" på lager"}</b>{soldOut&&product.restockDate?<> · forventet tilbake {new Date(product.restockDate+"T12:00:00").toLocaleDateString("nb-NO")}</>:null}</p>:<p style={{marginTop:14}}><b>Produseres på bestilling</b>{product.leadTimeText?" · "+product.leadTimeText:""}</p>}
               <button
                 className="btn"
+                disabled={soldOut}
                 onClick={() => {
                   setError("");
                   setMessage(null);
@@ -522,11 +530,11 @@ export default function ProductPage() {
                   onChange={(e) => setFulfillment(e.target.value)}
                 >
                   <option value="pickup">Henting</option>
-                  <option value="delivery">Levering innen 15 km</option>
+                  <option value="delivery">Levering innen 15 km</option>{product.shippable&&<option value="shipping">Send med post/Bring{product.shippingPriceOre?` (+${nok(product.shippingPriceOre)})`:""}</option>}
                 </select>
               </div>
 
-              {error && <p className="notice">{error}</p>}
+              <label style={{display:"flex",gap:8,alignItems:"flex-start",margin:"14px 0"}}><input type="checkbox" required checked={acceptedTerms} onChange={e=>setAcceptedTerms(e.target.checked)}/><span>Jeg godtar <a href="/vilkar/salg" target="_blank" rel="noreferrer">salgsbetingelsene</a>.</span></label>\n\n              {error && <p className="notice">{error}</p>}
 
               <button
                 className="btn"
@@ -591,14 +599,7 @@ function Header() {
   return (
     <header className="top">
       <div className="wrap nav">
-        <a className="brand" href="/">
-          <span className="mark">AS</span>
-          <span>
-            Aadland
-            <br />
-            Service
-          </span>
-        </a>
+        <a className="brand" href="/"><img src="/aadland-service-logo.png" alt="Aadland Service" style={{width:150,height:60,objectFit:"contain"}}/></a>
 
         <nav className="links">
           <a href="/">Forside</a>
@@ -623,7 +624,7 @@ function Footer() {
         <div>
           <p>post@aadland-service.no</p>
           <p>471 54 898</p>
-          <p>Org.nr. 937 781 873 MVA</p>
+          <p>Org.nr. 937 781 873 MVA</p><p><a href="/vilkar/salg">Salgsbetingelser</a> · <a href="/vilkar/utleie">Utleiebetingelser</a></p>
         </div>
       </div>
     </footer>

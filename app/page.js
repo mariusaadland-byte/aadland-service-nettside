@@ -125,7 +125,7 @@ export default function Home(){
     <button className="mobileMenuBtn" type="button" aria-label={menuOpen?"Lukk meny":"Åpne meny"} aria-expanded={menuOpen} aria-controls="hovedmeny" onClick={()=>setMenuOpen(!menuOpen)}><span></span><span></span><span></span></button><nav id="hovedmeny" className={"homeLinks "+(menuOpen?"menuOpen":"")} onClick={()=>setMenuOpen(false)}><a href="/">Hjem</a><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="/utleie">Utleie</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a>{menuServices.filter(service=>service.hasPage && !["produkter","utleie"].includes(service.slug)).map(service=>(
  <a key={service.id||service.slug} href={serviceHref(service)} onClick={()=>setMenuOpen(false)}>{service.title}</a>
 ))}</nav>
-    <a className="goldBtn navCta headerCta" href="#befaring" onClick={()=>setSelectedService(enquiryServiceName())}>Be om befaring →</a>
+    <a className="goldBtn navCta headerCta" href="#befaring" onClick={()=>setSelectedService(enquiryServiceName())}>Gratis befaring →</a>
    </div>
   </header>
 
@@ -136,7 +136,7 @@ export default function Home(){
     <div className="eyebrow heroEyebrow">BYGG · RENOVERING · UTEOMRÅDER · VEDLIKEHOLD</div>
     <h1>Kvalitet<br/><em>som varer.</em></h1>
     <p className="heroLead">Aadland Service leverer solide løsninger innen bygg, oppussing, vedlikehold og uteområder. Vi kombinerer fagkunnskap, nøyaktighet og god oppfølging – tilpasset dine behov.</p>
-    <div className="heroActions"><a className="goldBtn" href="#befaring" onClick={()=>setSelectedService(enquiryServiceName())}>Be om befaring →</a><a className="outlineBtn" href="#tjenester">Se våre tjenester</a></div>
+    <div className="heroActions"><a className="goldBtn" href="#befaring" onClick={()=>setSelectedService(enquiryServiceName())}>Gratis befaring →</a><a className="outlineBtn" href="#tjenester">Se våre tjenester</a></div>
     <div className="heroTrust"><span>Lokalt håndverk – solide resultater</span></div>
    </div>
   </section>
@@ -151,7 +151,7 @@ export default function Home(){
     <div className="serviceCards">
      {homeServices.slice(0,5).map((service,index)=><article id={"tjeneste-"+service.slug} data-service={service.slug} className={"serviceCard serviceCard"+index} key={service.slug}>
       <div className={"serviceVisual serviceSlot"+index}><div className="visualScene"></div></div>
-      <div className="serviceText serviceContent"><h3>{service.title}</h3><p>{service.description}</p><a href={service.kind==="products"?"/produkter":service.ctaHref||"#befaring"} onClick={()=>{if(service.kind!=="products")setSelectedService(enquiryServiceName(service))}}>{service.ctaLabel||"Les mer"} <b>→</b></a></div>
+      <div className="serviceText serviceContent"><h3>{service.title}</h3><p>{service.description}</p><a href={serviceHref(service)}>{service.ctaLabel||"Les mer"} <b>→</b></a></div>
      </article>)}
     </div>
    </div>
@@ -159,7 +159,7 @@ export default function Home(){
 
   <section id="om" className="craftSection">
    <div className="homeWrap craftGrid">
-    <div className="craftCopy"><span className="goldLabel">AADLAND SERVICE</span><h2>Lokalt håndverk<br/>med stolthet.</h2><p>Vi hjelper med oppussing, vedlikehold, uteområder og spesialtilpassede løsninger. Målet er enkelt: ryddig kommunikasjon, praktiske valg og et resultat du kan være fornøyd med.</p><a className="goldBtn craftCta" href="#befaring" onClick={()=>setSelectedService(enquiryServiceName())}>Be om befaring →</a></div>
+    <div className="craftCopy"><span className="goldLabel">AADLAND SERVICE</span><h2>Lokalt håndverk<br/>med stolthet.</h2><p>Vi hjelper med oppussing, vedlikehold, uteområder og spesialtilpassede løsninger. Målet er enkelt: ryddig kommunikasjon, praktiske valg og et resultat du kan være fornøyd med.</p><a className="goldBtn craftCta" href="#befaring" onClick={()=>setSelectedService(enquiryServiceName())}>Gratis befaring →</a></div>
     <div className="craftVisual" aria-label="Håndverk og trearbeid"></div>
     <div className="craftChecklist"><ul className="craftChecks"><li>Kvalitet i alle ledd</li><li>Pålitelig og punktlig</li><li>Fleksible løsninger</li><li>Ryddig kommunikasjon</li><li>Lokalt i Bergen og omegn</li></ul></div>
    </div>
@@ -180,15 +180,15 @@ export default function Home(){
   </div></section>
 
   <section id="befaring" className="contactSection"><div className="contactPhoto" aria-hidden="true"></div><div className="contactShade" aria-hidden="true"></div><div className="homeWrap contactGrid">
-   <div className="contactCopy"><span className="goldLabel">KONTAKT OSS</span><h2>Har du et prosjekt<br/>i tankene?</h2><p>Beskriv hva du ønsker hjelp med. Vi tar kontakt for å avklare prosjektet og om det er behov for befaring.</p><div className="contactBenefits"><span><b aria-hidden="true">✓</b>Enkel befaring</span><span><b aria-hidden="true">✓</b>Rask tilbakemelding</span><span><b aria-hidden="true">✓</b>Bergen og omegn</span></div><div className="contactDetails"><a href="tel:+4747154898">471 54 898</a><a href="mailto:post@aadland-service.no">post@aadland-service.no</a></div></div>
+   <div className="contactCopy"><span className="goldLabel">KONTAKT OSS</span><h2>Har du et prosjekt<br/>i tankene?</h2><p>Beskriv hva du ønsker hjelp med. Befaringen er gratis og uforpliktende, og vi tar kontakt for å finne et tidspunkt som passer.</p><div className="contactBenefits"><span><b aria-hidden="true">✓</b>Gratis og uforpliktende befaring</span><span><b aria-hidden="true">✓</b>Rask tilbakemelding</span><span><b aria-hidden="true">✓</b>Bergen og omegn</span></div><div className="contactDetails"><a href="tel:+4747154898">471 54 898</a><a href="mailto:post@aadland-service.no">post@aadland-service.no</a></div></div>
    <form className="homeForm" onSubmit={customOrder} aria-busy={sending}>
-    {selectedService&&<div className="selectedService">Gjelder: <b>{selectedService}</b></div>}
+    <Field label="Hva gjelder det? *"><select required value={selectedService} onChange={e=>setSelectedService(e.target.value)}><option value="">Velg tjeneste</option>{services.filter(service=>service.kind!=="products"&&service.kind!=="rental").map(service=><option key={service.slug} value={service.title}>{service.title}</option>)}<option value="Annet">Annet</option></select></Field>
     {message&&<div className="success"><b>Forespørselen er mottatt</b>{message.orderNumber&&<p>Ordrenummer: {message.orderNumber}</p>}</div>}
     <div className="formTwo"><Field label="Navn *"><input autoComplete="name" required value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})}/></Field><Field label="Telefon *"><input type="tel" autoComplete="tel" required value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})}/></Field></div>
     <Field label="E-post *"><input type="email" autoComplete="email" required value={customer.email} onChange={e=>setCustomer({...customer,email:e.target.value})}/></Field>
     <Field label="Adresse"><input autoComplete="street-address" value={customer.address} onChange={e=>setCustomer({...customer,address:e.target.value})} placeholder="Adresse for prosjektet"/></Field>
     <div className="formTwo"><Field label="Postnummer"><input inputMode="numeric" autoComplete="postal-code" value={customer.postalCode} onChange={e=>setCustomer({...customer,postalCode:e.target.value})}/></Field><Field label="Sted"><input autoComplete="address-level2" value={customer.city} onChange={e=>setCustomer({...customer,city:e.target.value})}/></Field></div>
-    <Field label="Hva gjelder det? *"><textarea rows="5" required value={custom} onChange={e=>setCustom(e.target.value)} placeholder="Beskriv kort hva du ønsker hjelp med …"/></Field>
+    <Field label="Beskriv hva du ønsker hjelp med *"><textarea rows="5" required value={custom} onChange={e=>setCustom(e.target.value)} placeholder="Beskriv kort hva du ønsker hjelp med …"/></Field>
     <label className="contactUpload"><span>Last opp bilder <small>(valgfritt)</small></span><input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>{const picked=Array.from(e.target.files||[]);const valid=picked.filter(file=>["image/jpeg","image/png","image/webp"].includes(file.type)&&file.size<=10*1024*1024).slice(0,8);setContactImages(valid);setImageError(valid.length!==picked.length?"Noen bilder ble ikke lagt til. Bruk JPG, PNG eller WebP, maks 10 MB per bilde og maks 8 bilder.":"");}}/><strong>Velg bilder</strong><em>{contactImages.length?`${contactImages.length} bilde${contactImages.length===1?"":"r"} valgt`:"Dra og slipp eller velg filer · JPG, PNG eller WebP · maks 8 bilder"}</em></label>
     {imageError&&<p className="contactImageError">{imageError}</p>}
     {contactImages.length>0&&<div className="contactImageSelected"><b>{contactImages.length} bilde{contactImages.length===1?"":"r"} klare</b><button type="button" onClick={()=>setContactImages([])}>Fjern bilder</button></div>}
@@ -198,7 +198,7 @@ export default function Home(){
 
   <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="footerIdentity"><div className="homeBrand"><img className="brandLogo footerLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></div><p className="footerTagline">Lokalt håndverk – solide resultater</p></div><div><b>Kontakt</b><div className="footerServices"><a href="tel:+4747154898">471 54 898</a><a href="mailto:post@aadland-service.no">post@aadland-service.no</a></div></div><div><b>Tjenester</b><div className="footerServices">
  {footerServices.map(service=><a key={service.slug} href={serviceHref(service)}>{service.title}</a>)}
- </div></div><div><b>Firma</b><div className="footerServices"><a href="#om">Om oss</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#befaring">Be om befaring</a></div><p>Org.nr. 937 781 873 MVA<br/>Bergen og omegn</p></div></div><div className="homeWrap footerBottom"><span>© Aadland Service</span><div><a href="/produkter">Produkter</a><a href="#tjenester">Tjenester</a><a href="#kontakt">Kontakt</a></div></div></footer>
+ </div></div><div><b>Firma</b><div className="footerServices"><a href="#om">Om oss</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#befaring">Gratis befaring</a><a href="/vilkar/utleie">Utleiebetingelser</a><a href="/vilkar/salg">Salgsbetingelser</a></div><p>Org.nr. 937 781 873 MVA<br/>Bergen og omegn</p></div></div><div className="homeWrap footerBottom"><span>© Aadland Service</span><div><a href="/produkter">Produkter</a><a href="#tjenester">Tjenester</a><a href="#kontakt">Kontakt</a></div></div></footer>
  </main>;
 }
 function Field({label,children}){return <label className="homeField"><span>{label}</span>{children}</label>}

@@ -200,6 +200,16 @@ export async function POST(req) {
 
         active:
           body.active !== false,
+        inventory_mode: body.inventoryMode === "stock" ? "stock" : "made_to_order",
+        stock_quantity: Math.max(0, Math.floor(Number(body.stockQuantity) || 0)),
+        restock_date: body.restockDate || null,
+        lead_time_text: cleanText(body.leadTimeText),
+        shippable: body.shippable === true,
+        shipping_price_ore: Math.max(0, Math.round(Number(body.shippingPriceOre) || 0)),
+        weight_grams: body.weightGrams ? Math.max(0, Math.round(Number(body.weightGrams))) : null,
+        shipping_length_cm: body.shippingLengthCm ? Math.max(0, Number(body.shippingLengthCm)) : null,
+        shipping_width_cm: body.shippingWidthCm ? Math.max(0, Number(body.shippingWidthCm)) : null,
+        shipping_height_cm: body.shippingHeightCm ? Math.max(0, Number(body.shippingHeightCm)) : null,
       })
       .select("*")
       .single();
@@ -341,6 +351,16 @@ export async function PATCH(req) {
 
         active:
           body.active !== false,
+        inventory_mode: body.inventoryMode === "stock" ? "stock" : "made_to_order",
+        stock_quantity: Math.max(0, Math.floor(Number(body.stockQuantity) || 0)),
+        restock_date: body.restockDate || null,
+        lead_time_text: cleanText(body.leadTimeText),
+        shippable: body.shippable === true,
+        shipping_price_ore: Math.max(0, Math.round(Number(body.shippingPriceOre) || 0)),
+        weight_grams: body.weightGrams ? Math.max(0, Math.round(Number(body.weightGrams))) : null,
+        shipping_length_cm: body.shippingLengthCm ? Math.max(0, Number(body.shippingLengthCm)) : null,
+        shipping_width_cm: body.shippingWidthCm ? Math.max(0, Number(body.shippingWidthCm)) : null,
+        shipping_height_cm: body.shippingHeightCm ? Math.max(0, Number(body.shippingHeightCm)) : null,
       })
       .eq("id", id)
       .select("*")

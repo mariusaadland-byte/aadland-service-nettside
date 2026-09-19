@@ -1,32 +1,24 @@
 "use client";
+import {useEffect,useState} from "react";
+import {useParams} from "next/navigation";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-
+const fallback={
+ renovation:{title:"Oppussing og renovering",description:"Vi hjelper med oppgradering og fornyelse av hjemmet – fra mindre rom og overflater til større oppussingsjobber.",points:["Innvendig oppussing og fornyelse","Montering og praktiske byggearbeider","Tilpasninger og ferdigstilling"]},
+ outdoor:{title:"Uteområder og hage",description:"Vi bygger og forbedrer uteområder med praktiske løsninger som er laget for å brukes og vare.",points:["Terrasser og plattinger","Levegger, rekkverk og skjerming","Hagearbeid, vedlikehold og praktiske uteprosjekter"]},
+ maintenance:{title:"Vedlikehold og småjobber",description:"Vi tar hånd om reparasjoner, montering og de små og mellomstore jobbene som må bli gjort.",points:["Reparasjoner og vedlikehold","Montering og utskifting","Små bygge- og forbedringsjobber"]}
+};
 export default function ServicePage(){
- const {slug}=useParams();
- const [service,setService]=useState(null);
- const [loaded,setLoaded]=useState(false);
-
- useEffect(()=>{
-  fetch("/api/services").then(r=>r.json()).then(data=>{
-   setService((data.services||[]).find(item=>item.slug===slug)||null);
-   setLoaded(true);
-  }).catch(()=>setLoaded(true));
- },[slug]);
-
- if(!loaded)return <main style={{padding:"80px 24px"}}><p>Laster …</p></main>;
- if(!service)return <main style={{padding:"80px 24px"}}><h1>Tjenesten finnes ikke</h1><a href="/">Til forsiden</a></main>;
-
- return <main>
-  <section className="serviceDetailHero" style={{minHeight:"70vh",display:"grid",alignItems:"end",position:"relative",overflow:"hidden",background:"#171717",color:"#fff"}}>
-   {service.imageUrl&&<img src={service.imageUrl} alt={service.title} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",opacity:.45}}/>}
-   <div style={{position:"relative",zIndex:1,maxWidth:1100,width:"100%",margin:"0 auto",padding:"120px 24px 70px"}}>
-    <div className="kicker">AADLAND SERVICE</div>
-    <h1 style={{fontSize:"clamp(42px,7vw,78px)",margin:"12px 0"}}>{service.title}</h1>
-    <p style={{maxWidth:650,fontSize:20,lineHeight:1.6}}>{service.description}</p>
-    <a className="btn" href={"/#befaring"} onClick={()=>sessionStorage.setItem("aadland-service",service.title)}>Be om befaring →</a>
-   </div>
-  </section>
- </main>;
+ const params=useParams(),slug=decodeURIComponent(String(params?.slug||""));
+ const [service,setService]=useState(null),[loading,setLoading]=useState(true);
+ useEffect(()=>{fetch("/api/services").then(r=>r.ok?r.json():null).then(d=>{const found=(d?.services||[]).find(s=>s.slug===slug&&s.active!==false);setService(found||fallback[slug]||null)}).catch(()=>setService(fallback[slug]||null)).finally(()=>setLoading(false))},[slug]);
+ if(loading)return <main className="serviceDetail"><div className="serviceDetailWrap"><p>Laster …</p></div></main>;
+ if(!service)return <main className="serviceDetail"><div className="serviceDetailWrap"><a href="/">← Forsiden</a><h1>Tjenesten ble ikke funnet</h1></div></main>;
+ const details=fallback[slug],points=details?.points||["Vi avklarer behov og ønsket resultat","Du får ryddig oppfølging gjennom prosjektet","Løsningen tilpasses jobben og stedet"];
+ function survey(){sessionStorage.setItem("aadland-service",service.title)}
+ return <main className="serviceDetail">
+  <header className="serviceDetailHeader"><div className="serviceDetailNav"><a href="/"><img src="/aadland-service-logo.png" alt="Aadland Service"/></a><a className="goldBtn" href="/#befaring" onClick={survey}>Gratis befaring →</a></div></header>
+  <section className="serviceDetailHero" style={service.imageUrl?{backgroundImage:"linear-gradient(90deg,rgba(0,0,0,.82),rgba(0,0,0,.25)),url("+service.imageUrl+")"}:{}}><div className="serviceDetailWrap"><span className="goldLabel">AADLAND SERVICE · TJENESTE</span><h1>{service.title}</h1><p>{service.description||details?.description}</p><a className="goldBtn" href="/#befaring" onClick={survey}>Be om gratis befaring →</a></div></section>
+  <section className="serviceDetailBody"><div className="serviceDetailWrap serviceDetailGrid"><div><span className="goldLabel">DETTE KAN VI HJELPE MED</span><h2>En løsning tilpasset prosjektet ditt</h2><p>{details?.description||service.description}</p></div><ul>{points.map(p=><li key={p}>✓ {p}</li>)}</ul></div></section>
+  <section className="serviceDetailCta"><div className="serviceDetailWrap"><h2>Usikker på hva som trengs?</h2><p>Befaringen er gratis og uforpliktende. Fortell oss kort om prosjektet, så tar vi kontakt.</p><a className="goldBtn" href="/#befaring" onClick={survey}>Gratis befaring →</a></div></section>
+ </main>
 }
