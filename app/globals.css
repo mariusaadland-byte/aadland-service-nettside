@@ -326,3 +326,17 @@
 .homeForm[aria-busy="true"]{pointer-events:none}
 .homeForm[aria-busy="true"] .submitBtn{pointer-events:auto}
 .success{border-left:3px solid #d7a74e!important;background:rgba(215,167,78,.12)!important;padding:14px 16px!important;color:inherit!important}
+
+/* Approved reference: final mobile rhythm */
+@media(max-width:700px){
+ .homeSection{padding-top:48px!important;padding-bottom:48px!important}
+ .goldLabel,.eyebrow{letter-spacing:.14em!important}
+ .heroActions{display:flex!important;flex-wrap:wrap!important}
+ .heroActions .goldBtn,.heroActions .outlineBtn{min-height:44px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important}
+ .serviceStrip{border-top:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.08)}
+ .craftSection{padding:0!important}
+ .projects{padding-top:50px!important;padding-bottom:54px!important}
+ .contactSection{padding-top:54px!important;padding-bottom:54px!important}
+ .contactCopy h2{font-size:40px!important;line-height:.98!important}
+ .homeFooter{padding-top:42px!important}
+}
