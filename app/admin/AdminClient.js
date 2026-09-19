@@ -2973,6 +2973,10 @@ function ServiceEditor({ service, reload, setError, close }) {
   const [showOnHome,setShowOnHome]=useState(service?.showOnHome!==false);
   const [showInMenu,setShowInMenu]=useState(service?.showInMenu!==false);
   const [showInFooter,setShowInFooter]=useState(service?.showInFooter!==false);
+  const [hasPage,setHasPage]=useState(service?.hasPage===true);
+  const [ctaLabel,setCtaLabel]=useState(service?.ctaLabel||"Les mer");
+  const [formTitle,setFormTitle]=useState(service?.formTitle||"Be om befaring");
+  const [formPrompt,setFormPrompt]=useState(service?.formPrompt||"Beskriv kort hva du ønsker hjelp med.");
   const [sortOrder,setSortOrder]=useState(service?.sortOrder??0);
   const [imageUrl,setImageUrl]=useState(service?.imageUrl||"");
   const [uploading,setUploading]=useState(false);
@@ -2995,8 +2999,8 @@ function ServiceEditor({ service, reload, setError, close }) {
     setSaving(true);
     const response=await fetch("/api/admin/services",{method:isNew?"POST":"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({
       ...(isNew?{}:{id:service.id}),title:title.trim(),description:description.trim(),active,showOnHome,showInMenu,showInFooter,sortOrder,
-      kind:service?.kind||"service",imageUrl,hasPage:service?.hasPage||false,ctaLabel:service?.ctaLabel||"Les mer",
-      ctaHref:service?.ctaHref||"",formTitle:service?.formTitle||"Be om befaring",formPrompt:service?.formPrompt||"Beskriv kort hva du ønsker hjelp med.",
+      kind:service?.kind||"service",imageUrl,hasPage,ctaLabel,
+      ctaHref:service?.ctaHref||"",formTitle,formPrompt,
       publishFrom:publishFrom?publishFrom+"T00:00:00":null,publishUntil:publishUntil?publishUntil+"T23:59:59":null
     })});
     const data=await response.json().catch(()=>({})); setSaving(false);
@@ -3016,7 +3020,7 @@ function ServiceEditor({ service, reload, setError, close }) {
     <label><input type="checkbox" checked={active} onChange={e=>setActive(e.target.checked)} /> Publisert</label><br/>
     <label><input type="checkbox" checked={showOnHome} onChange={e=>setShowOnHome(e.target.checked)} /> Vis på forsiden</label><br/>
     <label><input type="checkbox" checked={showInMenu} onChange={e=>setShowInMenu(e.target.checked)} /> Vis i meny</label><br/>
-    <label><input type="checkbox" checked={showInFooter} onChange={e=>setShowInFooter(e.target.checked)} /> Vis i footer</label>
+    <label><input type="checkbox" checked={showInFooter} onChange={e=>setShowInFooter(e.target.checked)} /> Vis i footer</label><br/>\n    <label><input type="checkbox" checked={hasPage} onChange={e=>setHasPage(e.target.checked)} /> Egen tjenesteside</label>\n    <div className="field" style={{marginTop:16}}><label>Tekst på knapp</label><input value={ctaLabel} onChange={e=>setCtaLabel(e.target.value)} placeholder="Les mer" /></div>\n    <div className="field"><label>Overskrift i forespørsel</label><input value={formTitle} onChange={e=>setFormTitle(e.target.value)} /></div>\n    <div className="field"><label>Hjelpetekst i forespørsel</label><textarea rows="3" value={formPrompt} onChange={e=>setFormPrompt(e.target.value)} /></div>
     <div style={{display:"flex",gap:10,marginTop:18}}><button className="btn" disabled={saving}>{saving?"Lagrer …":"Lagre"}</button>{!isNew&&<button type="button" className="btn alt" onClick={()=>setEditing(false)}>Avbryt</button>}</div>
   </form>;
 }
