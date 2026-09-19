@@ -340,3 +340,6 @@
  .contactCopy h2{font-size:40px!important;line-height:.98!important}
  .homeFooter{padding-top:42px!important}
 }
+
+/* Navigation target feedback */
+.serviceCard3:target,.serviceCard3.navFocus{outline:2px solid rgba(215,167,78,.55);outline-offset:3px}
