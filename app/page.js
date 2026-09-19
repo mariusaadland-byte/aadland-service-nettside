@@ -20,6 +20,7 @@ export default function Home(){
  const [error,setError]=useState("");
  const [sending,setSending]=useState(false);
  const [contactImages,setContactImages]=useState([]);
+ const [menuOpen,setMenuOpen]=useState(false);
  const services=fallbackServices;
 
  async function customOrder(e){
@@ -46,7 +47,7 @@ export default function Home(){
   <header className="homeTop">
    <div className="homeWrap homeNav">
     <a className="homeBrand" href="/"><img className="brandLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></a>
-    <nav className="homeLinks"><a href="/">Hjem</a><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="#tjenester">Utleie</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a></nav>
+    <button className="mobileMenuBtn" type="button" aria-label="Åpne meny" aria-expanded={menuOpen} onClick={()=>setMenuOpen(!menuOpen)}><span></span><span></span><span></span></button><nav className={"homeLinks "+(menuOpen?"menuOpen":"")} onClick={()=>setMenuOpen(false)}><a href="/">Hjem</a><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="#tjenester">Utleie</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a></nav>
     <a className="goldBtn navCta" href="#befaring">Be om befaring →</a>
    </div>
   </header>
