@@ -5,12 +5,12 @@ import { useState } from "react";
 const emptyCustomer={name:"",email:"",phone:"",address:"",postalCode:"",city:"",note:"",deliveryWithinRadius:true};
 
 const services=[
- ["Oppussing og renovering","Fra mindre oppgraderinger til større fornyelser i hjemmet.","01","renovation"],
- ["Uteområder og hage","Terrasser, levegger, vedlikehold og praktiske løsninger ute.","02","outdoor"],
- ["Produkter på bestilling","Benker, plantekasser og andre produkter tilpasset dine ønsker.","03","products"],
- ["Utleie av utstyr","Lei utstyr til prosjektet når du trenger det.","04","rental"],
- ["Vedlikehold og småjobber","Reparasjoner, montering og oppgaver som må bli gjort.","05","maintenance"],
- ["Rådgivning og befaring","Fortell oss om prosjektet, så finner vi en god vei videre.","06","survey"],
+ ["Oppussing og renovering","Fra mindre oppgraderinger til større fornyelser i hjemmet.","renovation"],
+ ["Uteområder og hage","Terrasser, levegger, vedlikehold og praktiske løsninger ute.","outdoor"],
+ ["Produkter på bestilling","Benker, plantekasser og andre produkter tilpasset dine ønsker.","products"],
+ ["Utleie av utstyr","Lei utstyr til prosjektet når du trenger det.","rental"],
+ ["Vedlikehold og småjobber","Reparasjoner, montering og oppgaver som må bli gjort.","maintenance"],
+ ["Rådgivning og befaring","Fortell oss om prosjektet, så finner vi en god vei videre.","survey"],
 ];
 
 export default function Home(){
@@ -18,15 +18,26 @@ export default function Home(){
  const [custom,setCustom]=useState("");
  const [message,setMessage]=useState(null);
  const [error,setError]=useState("");
- const [sending,setSending]=useState(false);\n const [contactImages,setContactImages]=useState([]);
+ const [sending,setSending]=useState(false);
+ const [contactImages,setContactImages]=useState([]);
 
  async function customOrder(e){
   e.preventDefault(); setError(""); setMessage(null); setSending(true);
   try{
-   const response=await fetch("/api/orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({orderType:"custom",customRequest:custom,customer,fulfillmentType:"pickup",deliveryWithinRadius:customer.deliveryWithinRadius})});
+   let imageUrls=[];
+   if(contactImages.length){
+    const formData=new FormData();
+    contactImages.forEach(file=>formData.append("images",file));
+    const upload=await fetch("/api/contact-images",{method:"POST",body:formData});
+    const uploaded=await upload.json();
+    if(!upload.ok) throw new Error(uploaded.error||"Kunne ikke laste opp bilder.");
+    imageUrls=uploaded.urls||[];
+   }
+   const requestText=imageUrls.length?custom+"\n\nBilder:\n"+imageUrls.join("\n"):custom;
+   const response=await fetch("/api/orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({orderType:"custom",customRequest:requestText,customer,fulfillmentType:"pickup",deliveryWithinRadius:customer.deliveryWithinRadius})});
    const data=await response.json();
    if(!response.ok){setError(data.error||"Noe gikk galt.");return;}
-   setMessage(data);setCustom("");setCustomer(emptyCustomer);
+   setMessage(data);setCustom("");setCustomer(emptyCustomer);setContactImages([]);
   }catch{setError("Noe gikk galt. Prøv igjen.");}finally{setSending(false);}
  }
 
@@ -98,12 +109,13 @@ export default function Home(){
     {message&&<div className="success"><b>Forespørselen er mottatt</b>{message.orderNumber&&<p>Ordrenummer: {message.orderNumber}</p>}</div>}
     <div className="formTwo"><Field label="Navn *"><input required value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})}/></Field><Field label="Telefon *"><input required value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})}/></Field></div>
     <Field label="E-post *"><input type="email" required value={customer.email} onChange={e=>setCustomer({...customer,email:e.target.value})}/></Field>
-    <Field label="Hva kan vi hjelpe deg med? *"><textarea rows="5" required value={custom} onChange={e=>setCustom(e.target.value)} placeholder="Fortell kort om prosjektet, hvor det er og hva du ønsker gjort …"/></Field>\n    <label className="contactUpload"><span>Last opp bilder <small>(valgfritt)</small></span><input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>setContactImages(Array.from(e.target.files||[]))}/><strong>Velg bilder</strong><em>{contactImages.length?`${contactImages.length} bilde${contactImages.length===1?"":"r"} valgt`:"Du kan velge flere bilder"}</em></label>
+    <Field label="Hva kan vi hjelpe deg med? *"><textarea rows="5" required value={custom} onChange={e=>setCustom(e.target.value)} placeholder="Fortell kort om prosjektet, hvor det er og hva du ønsker gjort …"/></Field>
+    <label className="contactUpload"><span>Last opp bilder <small>(valgfritt)</small></span><input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>setContactImages(Array.from(e.target.files||[]))}/><strong>Velg bilder</strong><em>{contactImages.length?`${contactImages.length} bilde${contactImages.length===1?"":"r"} valgt`:"Du kan velge flere bilder"}</em></label>
     {error&&<p className="notice">{error}</p>}<button className="goldBtn submitBtn" disabled={sending}>{sending?"Sender...":"Send forespørsel →"}</button><small>Vi bruker opplysningene kun for å svare på forespørselen din.</small>
    </form>
   </div></section>
 
-  <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="homeBrand"><img className="brandLogo footerLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></div><div><b>Kontakt</b><p>471 54 898<br/>post@aadland-service.no</p></div><div><b>Tjenester</b><p>Oppussing · Vedlikehold<br/>Uteområder · Produkter</p></div><div><b>Firma</b><p>Org.nr. 937 781 873 MVA<br/>Bergen og omegn</p></div></div></footer>
+  <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="homeBrand"><img className="brandLogo footerLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></div><div><b>Kontakt</b><p>471 54 898<br/>post@aadland-service.no</p></div><div><b>Tjenester</b><div className="footerServices">{services.map(([title,,type])=><a key={type} href={type==="products"?"/produkter":"#tjenester"}>{title}</a>)}</div></div><div><b>Firma</b><p>Org.nr. 937 781 873 MVA<br/>Bergen og omegn</p></div></div></footer>
  </main>;
 }
 function Field({label,children}){return <label className="homeField"><span>{label}</span>{children}</label>}
