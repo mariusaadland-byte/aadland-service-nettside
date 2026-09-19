@@ -410,3 +410,22 @@ html{scroll-behavior:smooth}
  .projectCard{min-height:250px!important}
  .projectsHeader h2{font-size:38px!important}
 }
+
+/* Approved reference: dark craftsmanship band */
+.craftSection{padding:82px 0!important;background:#121212!important}
+.craftGrid{display:grid!important;grid-template-columns:1fr .9fr .82fr!important;gap:42px!important;align-items:center!important}
+.craftCopy h2{font-size:clamp(38px,4vw,58px)!important;line-height:.98!important;letter-spacing:-.04em!important;margin:10px 0 20px!important}
+.craftCopy p{max-width:430px!important;line-height:1.7!important}
+.craftVisual{min-height:430px!important;background-size:cover!important;background-position:center!important}
+.craftChecklist{display:grid!important;gap:0!important}
+.craftChecklist li{padding:16px 0!important;border-bottom:1px solid rgba(255,255,255,.11)!important;font-size:14px!important}
+.craftChecklist li:last-child{border-bottom:0!important}
+@media(max-width:850px){
+ .craftGrid{grid-template-columns:1fr!important;gap:28px!important}
+ .craftVisual{min-height:320px!important}
+}
+@media(max-width:520px){
+ .craftSection{padding:58px 0!important}
+ .craftCopy h2{font-size:38px!important}
+ .craftVisual{min-height:260px!important}
+}
