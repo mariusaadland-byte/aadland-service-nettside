@@ -202,3 +202,13 @@
  .heroActions{gap:9px!important}
  .heroTrust{margin-top:28px!important;font-size:14px!important}
 }
+
+/* Approved reference: structured footer */
+.homeFooter{padding-bottom:0!important}
+.footerServices{display:grid;gap:7px;margin-top:10px}
+.footerServices a{color:rgba(255,255,255,.68);text-decoration:none;font-size:13px;line-height:1.45}
+.footerServices a:hover{color:#d7a74e}
+.footerBottom{margin-top:42px;padding:20px 0;border-top:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;gap:24px;color:rgba(255,255,255,.42);font-size:11px}
+.footerBottom>div{display:flex;gap:22px}
+.footerBottom a{color:inherit;text-decoration:none}
+@media(max-width:600px){.footerBottom{margin-top:28px;display:grid;gap:12px}.footerBottom>div{gap:16px;flex-wrap:wrap}}
