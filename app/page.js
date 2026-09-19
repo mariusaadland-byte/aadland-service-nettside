@@ -45,37 +45,37 @@ export default function Home(){
  }
 
  return <main className="newHome">
-  <header className="homeTop">
-   <div className="homeWrap homeNav">
-    <a className="homeBrand" href="/"><img className="brandLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></a>
+  <header className="homeTop homeHeader">
+   <div className="homeWrap homeNav homeHeaderInner">
+    <a className="homeBrand homeLogo" href="/"><img className="brandLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></a>
     <button className="mobileMenuBtn" type="button" aria-label={menuOpen?"Lukk meny":"Åpne meny"} aria-expanded={menuOpen} aria-controls="hovedmeny" onClick={()=>setMenuOpen(!menuOpen)}><span></span><span></span><span></span></button><nav id="hovedmeny" className={"homeLinks "+(menuOpen?"menuOpen":"")} onClick={()=>setMenuOpen(false)}><a href="/">Hjem</a><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="#tjeneste-rental">Utleie</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a></nav>
-    <a className="goldBtn navCta" href="#befaring">Be om befaring →</a>
+    <a className="goldBtn navCta headerCta" href="#befaring">Be om befaring →</a>
    </div>
   </header>
 
-  <section className="homeHero">
+  <section className="homeHero heroSection">
    <div className="heroPhoto" aria-hidden="true"></div>
    <div className="heroShade"></div>
    <div className="homeWrap heroContent">
-    <div className="eyebrow">BYGG · RENOVERING · UTEOMRÅDER · VEDLIKEHOLD</div>
+    <div className="eyebrow heroEyebrow">BYGG · RENOVERING · UTEOMRÅDER · VEDLIKEHOLD</div>
     <h1>Kvalitet<br/><em>som varer.</em></h1>
-    <p>Aadland Service leverer solide løsninger innen bygg, oppussing, vedlikehold og uteområder. Vi kombinerer fagkunnskap, nøyaktighet og god oppfølging – tilpasset dine behov.</p>
+    <p className="heroLead">Aadland Service leverer solide løsninger innen bygg, oppussing, vedlikehold og uteområder. Vi kombinerer fagkunnskap, nøyaktighet og god oppfølging – tilpasset dine behov.</p>
     <div className="heroActions"><a className="goldBtn" href="#befaring">Be om befaring →</a><a className="outlineBtn" href="#tjenester">Se våre tjenester</a></div>
     <div className="heroTrust"><span>Lokalt håndverk – solide resultater</span></div>
    </div>
   </section>
 
-  <section className="serviceStrip"><div className="homeWrap stripGrid">
-   {services.slice(0,6).map(([title,,type])=><a href={type==="products"?"/produkter":type==="survey"?"#befaring":"#tjeneste-"+type} key={type}><span className={"serviceIcon "+type} aria-hidden="true"></span><span>{title}</span></a>)}
+  <section className="serviceStrip"><div className="homeWrap stripGrid serviceStripInner">
+   {services.slice(0,6).map(([title,,type])=><a href={type==="products"?"/produkter":type==="survey"?"#befaring":"#tjeneste-"+type} key={type} className="serviceStripItem"><span className={"serviceIcon "+type} aria-hidden="true"></span><span>{title}</span></a>)}
   </div></section>
 
-  <section id="tjenester" className="homeSection light">
+  <section id="tjenester" className="homeSection light servicesSection">
    <div className="homeWrap">
-    <div className="sectionIntro"><div><span className="goldLabel">VÅRE TJENESTER</span><h2>Små og store prosjekter</h2></div><a className="textLink" href="#befaring">Se alle tjenester →</a></div>
+    <div className="sectionIntro servicesHeader"><div><span className="goldLabel">VÅRE TJENESTER</span><h2>Små og store prosjekter</h2></div><a className="textLink" href="#befaring">Se alle tjenester →</a></div>
     <div className="serviceCards">
      {services.slice(0,5).map(([title,text,type],index)=><article id={"tjeneste-"+type} data-service={type} className={"serviceCard serviceCard"+index} key={type}>
       <div className={"serviceVisual serviceSlot"+index}><div className="visualScene"></div></div>
-      <div className="serviceText"><h3>{title}</h3><p>{text}</p><a href={type==="products"?"/produkter":"#befaring"}>Les mer <b>→</b></a></div>
+      <div className="serviceText serviceContent"><h3>{title}</h3><p>{text}</p><a href={type==="products"?"/produkter":"#befaring"}>Les mer <b>→</b></a></div>
      </article>)}
     </div>
    </div>
@@ -91,13 +91,13 @@ export default function Home(){
 
   
 
-  <section id="prosjekter" className="homeSection projects"><div className="homeWrap">
-   <div className="sectionIntro"><div><span className="goldLabel">UTVALGTE PROSJEKTER</span><h2>Resultater vi er stolte av</h2></div></div>
+  <section id="prosjekter" className="homeSection projects projectsSection"><div className="homeWrap">
+   <div className="sectionIntro projectsHeader"><div><span className="goldLabel">UTVALGTE PROSJEKTER</span><h2>Resultater vi er stolte av</h2></div></div>
    <div className="projectGrid">
-    <div className="projectTile projectDeck"><div className="projectCaption"><span>UTEOMRÅDE</span><strong>Terrasse og levegg</strong></div></div>
-    <div className="projectTile projectBathroom"><div className="projectCaption"><span>OPPUSSING</span><strong>Oppusset bad</strong></div></div>
-    <div className="projectTile projectSlats"><div className="projectCaption"><span>INNVENDIG</span><strong>Spilevegg og trapp</strong></div></div>
-    <div className="projectTile projectPlanters"><div className="projectCaption"><span>PÅ BESTILLING</span><strong>Plantekasser</strong></div></div>
+    <div className="projectTile projectCard projectDeck"><div className="projectCaption"><span>UTEOMRÅDE</span><strong>Terrasse og levegg</strong></div></div>
+    <div className="projectTile projectCard projectBathroom"><div className="projectCaption"><span>OPPUSSING</span><strong>Oppusset bad</strong></div></div>
+    <div className="projectTile projectCard projectSlats"><div className="projectCaption"><span>INNVENDIG</span><strong>Spilevegg og trapp</strong></div></div>
+    <div className="projectTile projectCard projectPlanters"><div className="projectCaption"><span>PÅ BESTILLING</span><strong>Plantekasser</strong></div></div>
    </div>
   </div></section>
 
