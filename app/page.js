@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const emptyCustomer={name:"",email:"",phone:"",address:"",postalCode:"",city:"",note:"",deliveryWithinRadius:true};
 
@@ -58,8 +58,18 @@ export default function Home(){
  const [imageError,setImageError]=useState("");
  const [menuOpen,setMenuOpen]=useState(false);
  const [selectedService,setSelectedService]=useState("");
+ const [apiServices,setApiServices]=useState(null);
+ useEffect(()=>{
+  let alive=true;
+  fetch("/api/services").then(r=>r.ok?r.json():null).then(data=>{
+   if(alive&&Array.isArray(data?.services)&&data.services.length)setApiServices(data.services);
+  }).catch(()=>{});
+  return()=>{alive=false};
+ },[]);
+
  const now=Date.now();
- const services=fallbackServices.map(normalizeService)
+ const serviceSource=apiServices||fallbackServices;
+ const services=serviceSource.map(normalizeService)
   .filter(service=>service.active!==false)
   .filter(service=>!service.publishFrom||new Date(service.publishFrom).getTime()<=now)
   .filter(service=>!service.publishUntil||new Date(service.publishUntil).getTime()>=now)
