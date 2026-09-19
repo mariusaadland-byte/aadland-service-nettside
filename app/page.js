@@ -83,6 +83,15 @@ export default function Home(){
    </div>
   </div></section>
 
+  <section className="processSection"><div className="homeWrap">
+   <div className="processIntro"><span className="goldLabel">ENKELT Å KOMME I GANG</span><h2>Fra idé til ferdig jobb.</h2></div>
+   <div className="processGrid">
+    <div className="processStep"><b>01</b><h3>Send forespørsel</h3><p>Fortell kort hva du ønsker hjelp med.</p></div>
+    <div className="processStep"><b>02</b><h3>Vi avklarer jobben</h3><p>Vi tar kontakt og avtaler befaring når det er nødvendig.</p></div>
+    <div className="processStep"><b>03</b><h3>Du får en tydelig avtale</h3><p>Omfang og pris avklares før arbeidet starter.</p></div>
+   </div>
+  </div></section>
+
   <section id="befaring" className="contactSection"><div className="homeWrap contactGrid">
    <div className="contactCopy"><span className="goldLabel">KONTAKT OSS</span><h2>Har du et prosjekt<br/>i tankene?</h2><p>Beskriv hva du ønsker hjelp med. Vi tar kontakt for å avklare prosjektet og om det er behov for befaring.</p><div className="contactDetails"><a href="tel:+4747154898">471 54 898</a><a href="mailto:post@aadland-service.no">post@aadland-service.no</a></div></div>
    <form className="homeForm" onSubmit={customOrder}>
