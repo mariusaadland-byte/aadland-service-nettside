@@ -15,6 +15,7 @@ const labels = {
 
 export default function AdminClient({ user }) {
   const [tab, setTab] = useState("overview");
+  const [menuOpen, setMenuOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -243,8 +244,18 @@ export default function AdminClient({ user }) {
   if (canManageProducts) tabs.push(["homepage", "Forside"]);
   if (canManageUsers) tabs.push(["users", "Brukere"]);
 
+  function chooseTab(id) {
+    setTab(id);
+    setMenuOpen(false);
+  }
+
   return (
-    <main className="admin">
+    <main className={`admin${menuOpen ? " adminMenuOpen" : ""}`}>
+      <header className="adminMobileHeader">
+        <div className="brand"><span className="mark">AS</span><span>Aadland</span></div>
+        <button className="adminMenuButton" type="button" aria-label={menuOpen ? "Lukk meny" : "Åpne meny"} aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>{menuOpen ? "×" : "☰"}</button>
+      </header>
+      {menuOpen && <button className="adminMenuBackdrop" type="button" aria-label="Lukk meny" onClick={() => setMenuOpen(false)} />}
       <aside className="side">
         <div className="brand">
           <span className="mark">AS</span>
@@ -255,14 +266,14 @@ export default function AdminClient({ user }) {
           <button
             key={id}
             className={tab === id ? "active" : ""}
-            onClick={() => setTab(id)}
+            onClick={() => chooseTab(id)}
           >
             {label}
             {id === "orders" && fresh ? ` (${fresh})` : ""}
           </button>
         ))}
 
-        <button onClick={logout}>Logg ut</button>
+        <button onClick={() => { setMenuOpen(false); logout(); }}>Logg ut</button>
       </aside>
 
       <section className="adminmain">

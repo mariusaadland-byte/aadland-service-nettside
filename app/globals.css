@@ -622,3 +622,26 @@ html{scroll-behavior:smooth}
  .serviceDetailLinks a{padding:14px 2px;border-bottom:1px solid rgba(255,255,255,.08);font-size:14px}
  .serviceDetailLinks a:last-child{border-bottom:0}
 }
+
+
+/* Backoffice navigation */
+.adminMobileHeader{display:none}
+.adminMenuBackdrop{display:none}
+@media(max-width:900px){
+ .admin{display:block;min-height:100vh}
+ .adminMobileHeader{height:68px;position:sticky;top:0;z-index:1200;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#eee8dd;border-bottom:1px solid #d9d0c5}
+ .adminMobileHeader .brand{display:flex;align-items:center;gap:10px;font-weight:800}
+ .adminMobileHeader .mark{width:36px;height:36px;display:grid;place-items:center}
+ .adminMenuButton{width:46px;height:46px;border:0;border-radius:12px;background:#181613;color:#fff;font-size:25px;line-height:1;display:grid;place-items:center}
+ .adminMenuBackdrop{display:block;position:fixed;inset:68px 0 0;z-index:1090;border:0;background:rgba(0,0,0,.38)}
+ .side{position:fixed;z-index:1100;top:68px;left:0;bottom:0;width:min(320px,86vw);padding:18px;display:flex;flex-direction:column;align-items:stretch;gap:6px;overflow-y:auto;overflow-x:hidden;border-right:1px solid #d9d0c5;border-bottom:0;box-shadow:18px 0 35px rgba(0,0,0,.18);transform:translateX(-105%);transition:transform .2s ease}
+ .adminMenuOpen .side{transform:translateX(0)}
+ .side>.brand{display:none}
+ .side button{flex:0 0 auto;width:100%;padding:14px 13px}
+ .adminmain{width:100%;min-width:0;padding:20px}
+ .table{max-width:100%;overflow-x:auto}
+}
+@media(max-width:600px){
+ .adminmain{padding:16px}
+ .adminmain>h1{font-size:34px}
+}
