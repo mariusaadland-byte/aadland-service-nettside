@@ -121,7 +121,7 @@ export default function Home(){
  return <main className="newHome">
   <header className="homeTop homeHeader">
    <div className="homeWrap homeNav homeHeaderInner">
-    <a className="homeBrand homeLogo" href="/"><img className="brandLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></a>
+    <a className="homeBrand homeLogo" href="/"><img className="brandLogo" src="/aadland-service-logo.webp" alt="Aadland Service"/></a>
     <button className="mobileMenuBtn" type="button" aria-label={menuOpen?"Lukk meny":"Åpne meny"} aria-expanded={menuOpen} aria-controls="hovedmeny" onClick={()=>setMenuOpen(!menuOpen)}><span></span><span></span><span></span></button><nav id="hovedmeny" className={"homeLinks "+(menuOpen?"menuOpen":"")} onClick={()=>setMenuOpen(false)}><a href="/">Hjem</a><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="/utleie">Utleie</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a>{menuServices.filter(service=>service.hasPage && !["produkter","utleie"].includes(service.slug)).map(service=>(
  <a key={service.id||service.slug} href={serviceHref(service)} onClick={()=>setMenuOpen(false)}>{service.title}</a>
 ))}</nav>
@@ -196,7 +196,7 @@ export default function Home(){
    </form>
   </div></section>
 
-  <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="footerIdentity"><div className="homeBrand"><img className="brandLogo footerLogo" src="/aadland-service-logo.png" alt="Aadland Service"/></div><p className="footerTagline">Lokalt håndverk – solide resultater</p></div><div><b>Kontakt</b><div className="footerServices"><a href="tel:+4747154898">471 54 898</a><a href="mailto:post@aadland-service.no">post@aadland-service.no</a></div></div><div><b>Tjenester</b><div className="footerServices">
+  <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="footerIdentity"><div className="homeBrand"><img className="brandLogo footerLogo" src="/aadland-service-logo.webp" alt="Aadland Service"/></div><p className="footerTagline">Lokalt håndverk – solide resultater</p></div><div><b>Kontakt</b><div className="footerServices"><a href="tel:+4747154898">471 54 898</a><a href="mailto:post@aadland-service.no">post@aadland-service.no</a></div></div><div><b>Tjenester</b><div className="footerServices">
  {footerServices.map(service=><a key={service.slug} href={serviceHref(service)}>{service.title}</a>)}
  </div></div><div><b>Firma</b><div className="footerServices"><a href="#om">Om oss</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#befaring">Gratis befaring</a><a href="/vilkar/utleie">Utleiebetingelser</a><a href="/vilkar/salg">Salgsbetingelser</a></div><p>Org.nr. 937 781 873 MVA<br/>Bergen og omegn</p></div></div><div className="homeWrap footerBottom"><span>© Aadland Service</span><div><a href="/produkter">Produkter</a><a href="#tjenester">Tjenester</a><a href="#kontakt">Kontakt</a></div></div></footer>
  </main>;

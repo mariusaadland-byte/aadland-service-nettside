@@ -599,7 +599,7 @@ function Header() {
   return (
     <header className="top">
       <div className="wrap nav">
-        <a className="brand" href="/"><img src="/aadland-service-logo.png" alt="Aadland Service" style={{width:150,height:60,objectFit:"contain"}}/></a>
+        <a className="brand" href="/"><img src="/aadland-service-logo.webp" alt="Aadland Service" style={{width:150,height:60,objectFit:"contain"}}/></a>
 
         <nav className="links">
           <a href="/">Forside</a>
