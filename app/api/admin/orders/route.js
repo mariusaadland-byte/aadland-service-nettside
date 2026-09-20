@@ -101,7 +101,7 @@ export async function PATCH(req) {
     );
   }
 
-  const { id, status, surveyDate, adminNote } = await req.json();
+  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl } = await req.json();
 
   const allowed = [
     "new",
@@ -137,7 +137,7 @@ export async function PATCH(req) {
 
   const { error } = await s
     .from("orders")
-    .update({ ...(status !== undefined ? { status } : {}), ...(surveyDate !== undefined ? { survey_date: surveyDate || null } : {}), ...(adminNote !== undefined ? { admin_note: adminNote || null } : {}) })
+    .update({ ...(status !== undefined ? { status } : {}), ...(surveyDate !== undefined ? { survey_date: surveyDate || null } : {}), ...(adminNote !== undefined ? { admin_note: adminNote || null } : {}), ...(trackingNumber !== undefined ? { tracking_number: String(trackingNumber||"").trim() || null } : {}), ...(trackingUrl !== undefined ? { tracking_url: String(trackingUrl||"").trim() || null } : {}) })
     .eq("id", id);
 
   if (error) {

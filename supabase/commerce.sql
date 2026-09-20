@@ -26,3 +26,11 @@ alter table public.orders add column if not exists terms_accepted_at timestamptz
 alter table public.orders add column if not exists dispatched_at timestamptz;
 alter table public.orders add column if not exists delivered_at timestamptz;
 create index if not exists products_inventory_mode_idx on public.products(inventory_mode,active);
+
+-- Klargjør eksplisitte ordrehandlinger uten å koble betalingsleverandør ennå.
+alter table public.orders add column if not exists confirmation_sent_at timestamptz;
+alter table public.orders add column if not exists receipt_sent_at timestamptz;
+alter table public.orders add column if not exists tracking_sent_at timestamptz;
+alter table public.orders add column if not exists updated_at timestamptz not null default now();
+create index if not exists orders_payment_status_idx on public.orders(payment_status);
+create index if not exists orders_status_idx on public.orders(status);

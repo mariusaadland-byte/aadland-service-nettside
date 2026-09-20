@@ -505,79 +505,25 @@ function Customers({orders,bookings}) {
 }
 
 function Orders({ orders, status, canUpdateOrders }) {
-  return (
-    <table className="table">
-      <thead>
-        <tr>
-          <th>Ordre</th>
-          <th>Kunde</th>
-          <th>Type</th>
-          <th>Levering</th>
-          <th>Sum</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-
-      <tbody>
-        {orders.map((order) => (
-          <tr key={order.id}>
-            <td>
-              <b>{order.orderNumber}</b>
-              <br />
-              <small>
-                {new Date(order.createdAt).toLocaleString(
-                  "nb-NO"
-                )}
-              </small>
-            </td>
-
-            <td>
-              {order.customerName}
-              <br />
-              <small>{order.customerEmail}</small>
-            </td>
-
-            <td>
-              {order.orderType === "custom"
-                ? "Forespørsel"
-                : "Produkt"}
-            </td>
-
-            <td>
-              {order.fulfillmentType === "delivery"
-                ? "Levering"
-                : "Henting"}
-            </td>
-
-            <td>{nok(order.totalOre || 0)}</td>
-
-            <td>
-              {canUpdateOrders ? (
-                <select
-                  value={order.status}
-                  onChange={(e) =>
-                    status(order.id, e.target.value)
-                  }
-                >
-                  {Object.entries(labels).map(
-                    ([value, label]) => (
-                      <option value={value} key={value}>
-                        {label}
-                      </option>
-                    )
-                  )}
-                </select>
-              ) : (
-                <span>
-                  {labels[order.status] || order.status}
-                </span>
-              )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
+ const [openId,setOpenId]=useState(null),[savingId,setSavingId]=useState(null);
+ async function saveTracking(order){
+  setSavingId(order.id);
+  const trackingNumber=document.getElementById("tracking-number-"+order.id)?.value||"",trackingUrl=document.getElementById("tracking-url-"+order.id)?.value||"";
+  await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,trackingNumber,trackingUrl})});
+  setSavingId(null);
+ }
+ return <div className="orderCards">{orders.length?orders.map(order=><article className="card orderCard" key={order.id}>
+  <div className="orderCardTop"><div><div className="kicker">{order.orderNumber}</div><h3>{order.customerName||"Ukjent kunde"}</h3><small className="muted">{new Date(order.createdAt).toLocaleString("nb-NO")}</small></div><b>{nok(order.totalOre||0)}</b></div>
+  <p>{order.customerPhone&&<>{order.customerPhone}<br/></>}{order.customerEmail}</p>
+  <div className="orderBadges"><span>{order.fulfillmentType==="delivery"?"Levering":order.fulfillmentType==="shipping"?"Sending":"Henting"}</span><span>Betaling: {order.paymentStatus==="pending"?"Venter":order.paymentStatus==="authorized"?"Reservert":order.paymentStatus==="paid"?"Betalt":order.paymentStatus==="refunded"?"Refundert":order.paymentStatus}</span></div>
+  <div className="field"><label>Status</label>{canUpdateOrders?<select value={order.status} onChange={e=>status(order.id,e.target.value)}>{Object.entries(labels).map(([value,label])=><option value={value} key={value}>{label}</option>)}</select>:<b>{labels[order.status]||order.status}</b>}</div>
+  <button className="btn alt" type="button" onClick={()=>setOpenId(openId===order.id?null:order.id)}>{openId===order.id?"Skjul detaljer":"Vis detaljer"}</button>
+  {openId===order.id&&<div className="orderDetails">
+   {(order.items||[]).length>0&&<div><h4>Varer</h4>{order.items.map((item,i)=><p key={i}>{item.quantity||1} × {item.name||"Produkt"} · {nok((item.unitPriceOre||0)*(item.quantity||1))}</p>)}</div>}
+   {order.customRequest&&<p style={{whiteSpace:"pre-wrap"}}>{order.customRequest}</p>}
+   {order.fulfillmentType==="shipping"&&<><div className="field"><label>Sporingsnummer</label><input id={"tracking-number-"+order.id} defaultValue={order.trackingNumber||""}/></div><div className="field"><label>Sporingslenke</label><input type="url" id={"tracking-url-"+order.id} defaultValue={order.trackingUrl||""}/></div>{canUpdateOrders&&<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>saveTracking(order)}>{savingId===order.id?"Lagrer …":"Lagre sporing"}</button>}</>}
+  </div>}
+ </article>):<div className="card"><p>Ingen bestillinger ennå.</p></div>}</div>;
 }
 
 function Surveys({ orders, status, canUpdateOrders }) {
