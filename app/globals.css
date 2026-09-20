@@ -553,3 +553,54 @@ html{scroll-behavior:smooth}
 .legalWrap{max-width:860px;padding-top:60px;padding-bottom:90px}.legalWrap>a{color:inherit;text-decoration:none}
 .legalWrap h1{font-size:clamp(42px,6vw,68px);margin:20px 0}.legalWrap h2{font-size:24px;margin:34px 0 10px}.legalWrap p{line-height:1.75}.legalLead{font-size:18px}
 @media(max-width:700px){.serviceDetailHeader{height:72px}.serviceDetailNav img{max-width:145px}.serviceDetailHero{min-height:460px}.serviceDetailHero h1{font-size:48px}.serviceDetailGrid{grid-template-columns:1fr;gap:28px}.serviceDetailBody{padding:55px 0}.legalWrap{padding-top:38px}}
+
+
+/* Homepage polish: uploaded service photography and cleaner mobile hero */
+.serviceVisual.hasServiceImage{
+ background-size:cover!important;
+ background-position:center!important;
+ background-repeat:no-repeat!important;
+}
+.serviceVisual.hasServiceImage .visualScene{display:none!important}
+.contactSection .homeField select{
+ width:100%;
+ min-height:46px;
+ padding:11px 12px;
+ border:1px solid #d9d2c8;
+ border-radius:0;
+ background:#fff;
+ color:#171717;
+ font:inherit;
+}
+@media(max-width:700px){
+ .heroSection{
+  min-height:590px!important;
+  align-items:flex-start!important;
+ }
+ .heroContent{
+  padding-top:82px!important;
+  padding-bottom:42px!important;
+ }
+ .heroContent h1{
+  font-size:52px!important;
+  margin-top:13px!important;
+  margin-bottom:20px!important;
+ }
+ .heroLead{
+  font-size:14px!important;
+  line-height:1.62!important;
+ }
+ .heroActions{
+  display:grid!important;
+  grid-template-columns:1fr!important;
+  width:100%!important;
+  gap:10px!important;
+  margin-top:22px!important;
+ }
+ .heroActions .goldBtn,.heroActions .outlineBtn{width:100%!important}
+ .heroTrust{margin-top:30px!important}
+}
+@media(max-width:390px){
+ .heroContent{padding-top:68px!important}
+ .heroContent h1{font-size:48px!important}
+}

@@ -150,7 +150,7 @@ export default function Home(){
     <div className="sectionIntro servicesHeader"><div><span className="goldLabel">VÅRE TJENESTER</span><h2>Små og store prosjekter</h2></div><a className="textLink" href="#befaring">Se alle tjenester →</a></div>
     <div className="serviceCards">
      {homeServices.slice(0,5).map((service,index)=><article id={"tjeneste-"+service.slug} data-service={service.slug} className={"serviceCard serviceCard"+index} key={service.slug}>
-      <div className={"serviceVisual serviceSlot"+index}><div className="visualScene"></div></div>
+      <div className={"serviceVisual serviceSlot"+index+(service.imageUrl?" hasServiceImage":"")} style={service.imageUrl?{backgroundImage:"linear-gradient(rgba(0,0,0,.08),rgba(0,0,0,.08)), url("+service.imageUrl+")"}:undefined}><div className="visualScene"></div></div>
       <div className="serviceText serviceContent"><h3>{service.title}</h3><p>{service.description}</p><a href={serviceHref(service)}>{service.ctaLabel||"Les mer"} <b>→</b></a></div>
      </article>)}
     </div>
