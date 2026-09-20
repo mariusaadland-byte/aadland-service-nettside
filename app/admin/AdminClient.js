@@ -240,6 +240,7 @@ export default function AdminClient({ user }) {
   const tabs = [["overview", "Oversikt"]];
 
   if (canViewOrders) tabs.push(["orders", "Bestillinger"]);
+  if (canViewOrders) tabs.push(["archive", "Arkiv"]);
   if (canViewOrders) tabs.push(["surveys", "Befaringer"]);
   if (canViewOrders) tabs.push(["customers", "Kunder"]);
   if (canManageProducts) tabs.push(["products", "Produkter"]);
@@ -294,6 +295,8 @@ export default function AdminClient({ user }) {
             ? "Oversikt"
             : tab === "orders"
             ? "Bestillinger"
+            : tab === "archive"
+            ? "Arkiv"
             : tab === "surveys"
             ? "Befaringer"
             : tab === "customers"
@@ -427,8 +430,12 @@ export default function AdminClient({ user }) {
           />
         )}
 
+        {tab === "archive" && canViewOrders && (
+          <Archive orders={orders} reload={load} setError={setError} canUpdate={canUpdateOrders} />
+        )}
+
         {tab === "surveys" && canViewOrders && (
-          <Surveys orders={orders.filter(order => order.orderType === "custom")} status={status} canUpdateOrders={canUpdateOrders} />
+          <Surveys orders={orders.filter(order => order.orderType === "custom" && !order.archivedAt)} status={status} canUpdateOrders={canUpdateOrders} />
         )}
 
         {tab === "customers" && canViewOrders && (
@@ -491,6 +498,12 @@ export default function AdminClient({ user }) {
   );
 }
 
+function Archive({orders,reload,setError,canUpdate}){
+ const archived=(orders||[]).filter(o=>o.archivedAt);
+ async function restore(id){const r=await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,action:"restore"})}),d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Kunne ikke gjenopprette.");return;}await reload()}
+ return <div className="orderCards">{archived.length?archived.map(o=><article className="card orderCard" key={o.id}><div className="kicker">{o.orderNumber}</div><h3>{o.customerName||"Ukjent kunde"}</h3><p>{o.orderType==="custom"?"Befaring/forespørsel":"Bestilling"} · {nok(o.totalOre||0)}<br/><small className="muted">Arkivert {new Date(o.archivedAt).toLocaleString("nb-NO")}</small></p>{canUpdate&&<button className="btn alt" onClick={()=>restore(o.id)}>Gjenopprett</button>}</article>):<div className="card"><h3>Arkivet er tomt</h3><p className="muted">Ferdige eller avbrutte saker kan flyttes hit uten at historikken slettes.</p></div>}</div>
+}
+
 function Customers({orders,bookings}) {
   const [query,setQuery]=useState("");
   const customers=new Map();
@@ -511,8 +524,9 @@ function Customers({orders,bookings}) {
   <div className="grid customerGrid">{list.map((c,i)=><article className="card" key={(c.email||c.phone||c.name)+i}><h3>{c.name}</h3><p>{c.phone&&<><a href={"tel:"+c.phone}>{c.phone}</a><br/></>}{c.email&&<><a href={"mailto:"+c.email}>{c.email}</a><br/></>}{c.address}</p><p><b>{c.orders}</b> bestilling/befaring · <b>{c.rentals}</b> utleie<br/>Registrert verdi: <b>{nok(c.totalOre)}</b></p><details><summary>Vis historikk ({c.history.length})</summary>{c.history.sort((x,y)=>String(y.date||"").localeCompare(String(x.date||""))).map((h,j)=><div key={h.number+j} className="customerHistory"><b>{h.label}</b> · {h.number}<br/><small>{h.date?new Date(h.date).toLocaleString("nb-NO"):""} · {nok(h.totalOre||0)}</small></div>)}</details></article>)}</div>{!list.length&&<div className="card"><p>Ingen kunder funnet.</p></div>}</>;
 }
 
-function Orders({ orders, status, canUpdateOrders }) {
+function Orders({ orders, status, canUpdateOrders, reload }) {
  const [openId,setOpenId]=useState(null),[savingId,setSavingId]=useState(null),[message,setMessage]=useState("");
+ async function archive(order){if(!confirm("Flytte denne til arkivet?"))return;setSavingId(order.id);const r=await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,action:"archive"})});setSavingId(null);if(r.ok)await reload();}
  async function saveTracking(order){
   setSavingId(order.id);
   const trackingNumber=document.getElementById("tracking-number-"+order.id)?.value||"",trackingUrl=document.getElementById("tracking-url-"+order.id)?.value||"";
@@ -531,7 +545,7 @@ function Orders({ orders, status, canUpdateOrders }) {
    {order.customRequest&&<p style={{whiteSpace:"pre-wrap"}}>{order.customRequest}</p>}
    {order.fulfillmentType==="shipping"&&<><div className="field"><label>Sporingsnummer</label><input id={"tracking-number-"+order.id} defaultValue={order.trackingNumber||""}/></div><div className="field"><label>Sporingslenke</label><input type="url" id={"tracking-url-"+order.id} defaultValue={order.trackingUrl||""}/></div>{canUpdateOrders&&<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>saveTracking(order)}>{savingId===order.id?"Lagrer …":"Lagre sporing"}</button>}</>}
   </div>}
- {canUpdateOrders&&order.orderType!=="custom"&&order.status!=="completed"&&<div className="orderActions">{order.fulfillmentType==="shipping"?<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-dispatched")}>Sendt til kunde</button>:<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-delivered")}>Levert til kunde</button>}</div>}
+ {canUpdateOrders&&<div className="orderActions">{["completed","cancelled"].includes(order.status)&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>archive(order)}>Arkiver</button>}{order.orderType!=="custom"&&order.status!=="completed"&&(order.fulfillmentType==="shipping"?<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-dispatched")}>Sendt til kunde</button>:<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-delivered")}>Levert til kunde</button>)}</div>}
  </article>):<div className="card"><p>Ingen bestillinger ennå.</p></div>}</div></>;
 }
 

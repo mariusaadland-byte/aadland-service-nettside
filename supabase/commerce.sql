@@ -36,3 +36,6 @@ create index if not exists orders_payment_status_idx on public.orders(payment_st
 create index if not exists orders_status_idx on public.orders(status);
 
 alter table public.orders add column if not exists delivery_notice_sent_at timestamptz;
+
+alter table public.orders add column if not exists archived_at timestamptz;
+create index if not exists orders_archived_at_idx on public.orders(archived_at);

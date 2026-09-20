@@ -28,6 +28,7 @@ const mapOrder = (o) => ({
   trackingUrl: o.tracking_url || "",
   dispatchedAt: o.dispatched_at || null,
   deliveredAt: o.delivered_at || null,
+  archivedAt: o.archived_at || null,
 });
 
 export async function GET() {
@@ -133,6 +134,12 @@ export async function PATCH(req) {
       { error: "Databasen er ikke tilgjengelig." },
       { status: 500 }
     );
+  }
+
+  if (action === "archive" || action === "restore") {
+    const {error:archiveError}=await s.from("orders").update({archived_at:action==="archive"?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("id",id);
+    if(archiveError)return NextResponse.json({error:"Arkivstatus kunne ikke lagres."},{status:500});
+    return NextResponse.json({ok:true});
   }
 
   if (action === "mark-dispatched" || action === "mark-delivered") {
