@@ -648,3 +648,6 @@ html{scroll-behavior:smooth}
 
 /* Backoffice homepage settings */
 .homepageSettings{max-width:920px}.homepageSettings .formTwo{display:grid;grid-template-columns:1fr 1fr;gap:14px}.homepageToggles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}.homepageQuick{grid-template-columns:1fr 1fr;margin-top:18px}@media(max-width:700px){.homepageSettings .formTwo,.homepageToggles,.homepageQuick{grid-template-columns:1fr}}
+
+/* Customer overview */
+.customerSearch{max-width:920px;margin-bottom:18px}.customerGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.customerHistory{padding:10px 0;border-top:1px solid #ddd}.customerHistory:first-of-type{margin-top:10px}@media(max-width:760px){.customerGrid{grid-template-columns:1fr}}

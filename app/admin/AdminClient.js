@@ -241,6 +241,7 @@ export default function AdminClient({ user }) {
 
   if (canViewOrders) tabs.push(["orders", "Bestillinger"]);
   if (canViewOrders) tabs.push(["surveys", "Befaringer"]);
+  if (canViewOrders) tabs.push(["customers", "Kunder"]);
   if (canManageProducts) tabs.push(["products", "Produkter"]);
   if (canManageProducts) tabs.push(["categories", "Kategorier"]);
   if (canManageProducts) tabs.push(["services", "Tjenester"]);
@@ -294,6 +295,8 @@ export default function AdminClient({ user }) {
             ? "Bestillinger"
             : tab === "surveys"
             ? "Befaringer"
+            : tab === "customers"
+            ? "Kunder"
             : tab === "products"
             ? "Produkter"
             : tab === "categories"
@@ -425,6 +428,10 @@ export default function AdminClient({ user }) {
           <Surveys orders={orders.filter(order => order.orderType === "custom")} status={status} canUpdateOrders={canUpdateOrders} />
         )}
 
+        {tab === "customers" && canViewOrders && (
+          <Customers orders={orders} bookings={rentalBookings} />
+        )}
+
         {tab === "products" && canManageProducts && (
           <Products
             products={products}
@@ -475,6 +482,26 @@ export default function AdminClient({ user }) {
       </section>
     </main>
   );
+}
+
+function Customers({orders,bookings}) {
+  const [query,setQuery]=useState("");
+  const customers=new Map();
+  function add(customer,entry){
+    const email=String(customer?.email||"").trim().toLowerCase(),phone=String(customer?.phone||"").replace(/\s/g,""),key=email||phone||String(customer?.name||"").trim().toLowerCase();
+    if(!key)return;
+    const current=customers.get(key)||{name:customer?.name||"Ukjent kunde",email:customer?.email||"",phone:customer?.phone||"",address:customer?.address||"",orders:0,rentals:0,totalOre:0,lastDate:null,history:[]};
+    if(customer?.name)current.name=customer.name;if(customer?.email)current.email=customer.email;if(customer?.phone)current.phone=customer.phone;if(customer?.address)current.address=customer.address;
+    if(entry.type==="order")current.orders+=1;else current.rentals+=1;
+    current.totalOre+=Number(entry.totalOre)||0;current.history.push(entry);
+    if(!current.lastDate||String(entry.date)>String(current.lastDate))current.lastDate=entry.date;
+    customers.set(key,current);
+  }
+  (orders||[]).forEach(o=>add(o.customer||{name:o.customerName,email:o.customerEmail,phone:o.customerPhone},{type:"order",number:o.orderNumber,date:o.createdAt,totalOre:o.totalOre||0,label:o.orderType==="custom"?"Befaring/forespørsel":"Bestilling"}));
+  (bookings||[]).forEach(b=>add(b.customer,{type:"rental",number:b.bookingNumber,date:b.createdAt,totalOre:b.totalOre||0,label:"Utleie"}));
+  const q=query.trim().toLowerCase(),list=[...customers.values()].filter(c=>!q||[c.name,c.email,c.phone,c.address].some(v=>String(v||"").toLowerCase().includes(q))).sort((x,y)=>String(y.lastDate||"").localeCompare(String(x.lastDate||"")));
+  return <><div className="card customerSearch"><div className="kicker">KUNDEREGISTER</div><h3>{customers.size} kunder fra bestillinger, befaringer og utleie</h3><div className="field"><label>Søk</label><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Navn, e-post, telefon eller adresse"/></div></div>
+  <div className="grid customerGrid">{list.map((c,i)=><article className="card" key={(c.email||c.phone||c.name)+i}><h3>{c.name}</h3><p>{c.phone&&<><a href={"tel:"+c.phone}>{c.phone}</a><br/></>}{c.email&&<><a href={"mailto:"+c.email}>{c.email}</a><br/></>}{c.address}</p><p><b>{c.orders}</b> bestilling/befaring · <b>{c.rentals}</b> utleie<br/>Registrert verdi: <b>{nok(c.totalOre)}</b></p><details><summary>Vis historikk ({c.history.length})</summary>{c.history.sort((x,y)=>String(y.date||"").localeCompare(String(x.date||""))).map((h,j)=><div key={h.number+j} className="customerHistory"><b>{h.label}</b> · {h.number}<br/><small>{h.date?new Date(h.date).toLocaleString("nb-NO"):""} · {nok(h.totalOre||0)}</small></div>)}</details></article>)}</div>{!list.length&&<div className="card"><p>Ingen kunder funnet.</p></div>}</>;
 }
 
 function Orders({ orders, status, canUpdateOrders }) {
