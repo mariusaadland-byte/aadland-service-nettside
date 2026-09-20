@@ -61,7 +61,7 @@ export default function Home(){
  const [selectedService,setSelectedService]=useState("");
  const [apiServices,setApiServices]=useState(null);
  const [apiProjects,setApiProjects]=useState([]);
- const [siteSettings,setSiteSettings]=useState({heroEyebrow:"BYGG · RENOVERING · UTEOMRÅDER · VEDLIKEHOLD",heroTitle:"Kvalitet som varer.",heroText:"Aadland Service leverer solide løsninger innen bygg, oppussing, vedlikehold og uteområder. Vi kombinerer fagkunnskap, nøyaktighet og god oppfølging – tilpasset dine behov.",aboutTitle:"Lokalt håndverk med stolthet.",aboutText:"Vi hjelper med oppussing, vedlikehold, uteområder og spesialtilpassede løsninger. Målet er enkelt: ryddig kommunikasjon, praktiske valg og et resultat du kan være fornøyd med.",phone:"471 54 898",email:"post@aadland-service.no",orgNumber:"937 781 873 MVA",location:"Bergen og omegn",showServices:true,showProjects:true,showAbout:true,showSurvey:true});
+ const [siteSettings,setSiteSettings]=useState({heroEyebrow:"BYGG · RENOVERING · UTEOMRÅDER · VEDLIKEHOLD",heroTitle:"Kvalitet som varer.",seasonalTitle:"",seasonalText:"",seasonalCtaLabel:"",seasonalCtaHref:"",seasonalFrom:null,seasonalUntil:null,showSeasonal:false,heroText:"Aadland Service leverer solide løsninger innen bygg, oppussing, vedlikehold og uteområder. Vi kombinerer fagkunnskap, nøyaktighet og god oppfølging – tilpasset dine behov.",aboutTitle:"Lokalt håndverk med stolthet.",aboutText:"Vi hjelper med oppussing, vedlikehold, uteområder og spesialtilpassede løsninger. Målet er enkelt: ryddig kommunikasjon, praktiske valg og et resultat du kan være fornøyd med.",phone:"471 54 898",email:"post@aadland-service.no",orgNumber:"937 781 873 MVA",location:"Bergen og omegn",showServices:true,showProjects:true,showAbout:true,showSurvey:true});
  useEffect(()=>{
   const storedService=sessionStorage.getItem("aadland-service");
   if(storedService){
@@ -89,6 +89,7 @@ export default function Home(){
  },[]);
 
  const now=Date.now();
+ const seasonalVisible=siteSettings.showSeasonal===true&&siteSettings.seasonalTitle&&(!siteSettings.seasonalFrom||new Date(siteSettings.seasonalFrom+"T00:00:00").getTime()<=now)&&(!siteSettings.seasonalUntil||new Date(siteSettings.seasonalUntil+"T23:59:59").getTime()>=now);
  const serviceSource=apiServices||fallbackServices;
  const services=serviceSource.map(normalizeService)
   .filter(service=>service.active!==false)
@@ -143,6 +144,8 @@ export default function Home(){
     <div className="heroTrust"><span>Lokalt håndverk – solide resultater</span></div>
    </div>
   </section>
+
+  {seasonalVisible&&<section className="seasonalBanner"><div className="homeWrap"><div><span className="goldLabel">AKTUELT</span><h2>{siteSettings.seasonalTitle}</h2>{siteSettings.seasonalText&&<p>{siteSettings.seasonalText}</p>}</div>{siteSettings.seasonalCtaLabel&&siteSettings.seasonalCtaHref&&<a className="goldBtn" href={siteSettings.seasonalCtaHref}>{siteSettings.seasonalCtaLabel} →</a>}</div></section>}
 
   <section className="serviceStrip"><div className="homeWrap stripGrid serviceStripInner">
    {services.slice(0,6).map(service=><a href={serviceHref(service)} key={service.slug} className="serviceStripItem" onClick={()=>{if(service.kind==="survey")setSelectedService(enquiryServiceName(service))}}><span className={"serviceIcon "+service.slug} aria-hidden="true"></span><span>{service.title}</span></a>)}
