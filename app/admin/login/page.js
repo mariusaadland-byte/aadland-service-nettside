@@ -8,8 +8,24 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [info, setInfo] = useState("");
 
   const router = useRouter();
+
+  async function resetPassword() {
+    setError("");
+    setInfo("");
+    if (!email.trim()) { setError("Skriv inn e-postadressen din først."); return; }
+    setResetting(true);
+    try {
+      const r = await fetch("/api/auth/reset-password", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});
+      const d = await r.json().catch(()=>({}));
+      if (!r.ok) { setError(d.error || "Kunne ikke sende e-post."); return; }
+      setInfo("Hvis e-postadressen er registrert, får du nå en e-post med lenke for å velge nytt passord.");
+    } catch { setError("Kunne ikke sende e-post."); }
+    finally { setResetting(false); }
+  }
 
   async function go(e) {
     e.preventDefault();
@@ -73,6 +89,7 @@ export default function Login() {
         </div>
 
         {error && <p className="notice">{error}</p>}
+        {info && <p className="success">{info}</p>}
 
         <button
           className="btn"
@@ -81,6 +98,7 @@ export default function Login() {
         >
           {loading ? "Logger inn..." : "Logg inn"}
         </button>
+        <button type="button" className="btn alt" style={{width:"100%",marginTop:10}} disabled={resetting||loading} onClick={resetPassword}>{resetting?"Sender …":"Glemt passord?"}</button>
       </form>
     </main>
   );
