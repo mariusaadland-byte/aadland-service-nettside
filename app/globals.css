@@ -645,3 +645,6 @@ html{scroll-behavior:smooth}
  .adminmain{padding:16px}
  .adminmain>h1{font-size:34px}
 }
+
+/* Backoffice homepage settings */
+.homepageSettings{max-width:920px}.homepageSettings .formTwo{display:grid;grid-template-columns:1fr 1fr;gap:14px}.homepageToggles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}.homepageQuick{grid-template-columns:1fr 1fr;margin-top:18px}@media(max-width:700px){.homepageSettings .formTwo,.homepageToggles,.homepageQuick{grid-template-columns:1fr}}

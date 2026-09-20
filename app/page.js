@@ -61,6 +61,7 @@ export default function Home(){
  const [selectedService,setSelectedService]=useState("");
  const [apiServices,setApiServices]=useState(null);
  const [apiProjects,setApiProjects]=useState([]);
+ const [siteSettings,setSiteSettings]=useState({heroEyebrow:"BYGG · RENOVERING · UTEOMRÅDER · VEDLIKEHOLD",heroTitle:"Kvalitet som varer.",heroText:"Aadland Service leverer solide løsninger innen bygg, oppussing, vedlikehold og uteområder. Vi kombinerer fagkunnskap, nøyaktighet og god oppfølging – tilpasset dine behov.",aboutTitle:"Lokalt håndverk med stolthet.",aboutText:"Vi hjelper med oppussing, vedlikehold, uteområder og spesialtilpassede løsninger. Målet er enkelt: ryddig kommunikasjon, praktiske valg og et resultat du kan være fornøyd med.",phone:"471 54 898",email:"post@aadland-service.no",orgNumber:"937 781 873 MVA",location:"Bergen og omegn",showServices:true,showProjects:true,showAbout:true,showSurvey:true});
  useEffect(()=>{
   const storedService=sessionStorage.getItem("aadland-service");
   if(storedService){
@@ -76,6 +77,8 @@ export default function Home(){
   }).catch(()=>{});
   return()=>{alive=false};
  },[]);
+
+ useEffect(()=>{fetch("/api/site-settings").then(r=>r.ok?r.json():null).then(d=>{if(d?.settings)setSiteSettings(d.settings)}).catch(()=>{})},[]);
 
  useEffect(()=>{
   let alive=true;
@@ -133,9 +136,9 @@ export default function Home(){
    <div className="heroPhoto" aria-hidden="true"></div>
    <div className="heroShade"></div>
    <div className="homeWrap heroContent">
-    <div className="eyebrow heroEyebrow">BYGG · RENOVERING · UTEOMRÅDER · VEDLIKEHOLD</div>
-    <h1>Kvalitet<br/><em>som varer.</em></h1>
-    <p className="heroLead">Aadland Service leverer solide løsninger innen bygg, oppussing, vedlikehold og uteområder. Vi kombinerer fagkunnskap, nøyaktighet og god oppfølging – tilpasset dine behov.</p>
+    <div className="eyebrow heroEyebrow">{siteSettings.heroEyebrow}</div>
+    <h1>{siteSettings.heroTitle}</h1>
+    <p className="heroLead">{siteSettings.heroText}</p>
     <div className="heroActions"><a className="goldBtn" href="#befaring" onClick={()=>setSelectedService(enquiryServiceName())}>Gratis befaring →</a><a className="outlineBtn" href="#tjenester">Se våre tjenester</a></div>
     <div className="heroTrust"><span>Lokalt håndverk – solide resultater</span></div>
    </div>
@@ -145,7 +148,7 @@ export default function Home(){
    {services.slice(0,6).map(service=><a href={serviceHref(service)} key={service.slug} className="serviceStripItem" onClick={()=>{if(service.kind==="survey")setSelectedService(enquiryServiceName(service))}}><span className={"serviceIcon "+service.slug} aria-hidden="true"></span><span>{service.title}</span></a>)}
   </div></section>
 
-  <section id="tjenester" className="homeSection light servicesSection">
+  {siteSettings.showServices!==false&&<section id="tjenester" className="homeSection light servicesSection">
    <div className="homeWrap">
     <div className="sectionIntro servicesHeader"><div><span className="goldLabel">VÅRE TJENESTER</span><h2>Små og store prosjekter</h2></div><a className="textLink" href="#befaring">Se alle tjenester →</a></div>
     <div className="serviceCards">
@@ -155,19 +158,19 @@ export default function Home(){
      </article>)}
     </div>
    </div>
-  </section>
+  </section>}
 
-  <section id="om" className="craftSection">
+  {siteSettings.showAbout!==false&&<section id="om" className="craftSection">
    <div className="homeWrap craftGrid">
-    <div className="craftCopy"><span className="goldLabel">AADLAND SERVICE</span><h2>Lokalt håndverk<br/>med stolthet.</h2><p>Vi hjelper med oppussing, vedlikehold, uteområder og spesialtilpassede løsninger. Målet er enkelt: ryddig kommunikasjon, praktiske valg og et resultat du kan være fornøyd med.</p><a className="goldBtn craftCta" href="#befaring" onClick={()=>setSelectedService(enquiryServiceName())}>Gratis befaring →</a></div>
+    <div className="craftCopy"><span className="goldLabel">AADLAND SERVICE</span><h2>{siteSettings.aboutTitle}</h2><p>{siteSettings.aboutText}</p><a className="goldBtn craftCta" href="#befaring" onClick={()=>setSelectedService(enquiryServiceName())}>Gratis befaring →</a></div>
     <div className="craftVisual" aria-label="Håndverk og trearbeid"></div>
     <div className="craftChecklist"><ul className="craftChecks"><li>Kvalitet i alle ledd</li><li>Pålitelig og punktlig</li><li>Fleksible løsninger</li><li>Ryddig kommunikasjon</li><li>Lokalt i Bergen og omegn</li></ul></div>
    </div>
-  </section>
+  </section>}
 
   
 
-  <section id="prosjekter" className="homeSection projects projectsSection"><div className="homeWrap">
+  {siteSettings.showProjects!==false&&<section id="prosjekter" className="homeSection projects projectsSection"><div className="homeWrap">
    <div className="sectionIntro projectsHeader"><div><span className="goldLabel">UTVALGTE PROSJEKTER</span><h2>Resultater vi er stolte av</h2></div></div>
    <div className="projectGrid">
     {apiProjects.length?apiProjects.filter(project=>project.featured!==false).slice(0,4).map(project=><div className="projectTile projectCard" key={project.id} style={project.imageUrls?.[0]?{backgroundImage:"url("+project.imageUrls[0]+")",backgroundSize:"cover",backgroundPosition:"center"}:{}}><div className="projectCaption"><span>{(project.category||"OPPDRAG").toUpperCase()}</span><strong>{project.title}</strong>{project.description&&<p>{project.description}</p>}</div></div>):<>
@@ -177,10 +180,10 @@ export default function Home(){
      <div className="projectTile projectCard projectPlanters"><div className="projectCaption"><span>PÅ BESTILLING</span><strong>Plantekasser</strong></div></div>
     </>}
    </div>
-  </div></section>
+  </div></section>}
 
-  <section id="befaring" className="contactSection"><div className="contactPhoto" aria-hidden="true"></div><div className="contactShade" aria-hidden="true"></div><div className="homeWrap contactGrid">
-   <div className="contactCopy"><span className="goldLabel">KONTAKT OSS</span><h2>Har du et prosjekt<br/>i tankene?</h2><p>Beskriv hva du ønsker hjelp med. Befaringen er gratis og uforpliktende, og vi tar kontakt for å finne et tidspunkt som passer.</p><div className="contactBenefits"><span><b aria-hidden="true">✓</b>Gratis og uforpliktende befaring</span><span><b aria-hidden="true">✓</b>Rask tilbakemelding</span><span><b aria-hidden="true">✓</b>Bergen og omegn</span></div><div className="contactDetails"><a href="tel:+4747154898">471 54 898</a><a href="mailto:post@aadland-service.no">post@aadland-service.no</a></div></div>
+  {siteSettings.showSurvey!==false&&<section id="befaring" className="contactSection"><div className="contactPhoto" aria-hidden="true"></div><div className="contactShade" aria-hidden="true"></div><div className="homeWrap contactGrid">
+   <div className="contactCopy"><span className="goldLabel">KONTAKT OSS</span><h2>Har du et prosjekt<br/>i tankene?</h2><p>Beskriv hva du ønsker hjelp med. Befaringen er gratis og uforpliktende, og vi tar kontakt for å finne et tidspunkt som passer.</p><div className="contactBenefits"><span><b aria-hidden="true">✓</b>Gratis og uforpliktende befaring</span><span><b aria-hidden="true">✓</b>Rask tilbakemelding</span><span><b aria-hidden="true">✓</b>Bergen og omegn</span></div><div className="contactDetails"><a href={"tel:"+siteSettings.phone.replace(/\s/g,"")}>{siteSettings.phone}</a><a href={"mailto:"+siteSettings.email}>{siteSettings.email}</a></div></div>
    <form className="homeForm" onSubmit={customOrder} aria-busy={sending}>
     <Field label="Hva gjelder det? *"><select required value={selectedService} onChange={e=>setSelectedService(e.target.value)}><option value="">Velg tjeneste</option>{services.filter(service=>service.kind!=="products"&&service.kind!=="rental").map(service=><option key={service.slug} value={service.title}>{service.title}</option>)}<option value="Annet">Annet</option></select></Field>
     {message&&<div className="success"><b>Forespørselen er mottatt</b>{message.orderNumber&&<p>Ordrenummer: {message.orderNumber}</p>}</div>}
@@ -194,11 +197,11 @@ export default function Home(){
     {contactImages.length>0&&<div className="contactImageSelected"><b>{contactImages.length} bilde{contactImages.length===1?"":"r"} klare</b><button type="button" onClick={()=>setContactImages([])}>Fjern bilder</button></div>}
     {error&&<p className="notice">{error}</p>}<button className="goldBtn submitBtn" disabled={sending} aria-disabled={sending}>{sending?"Sender forespørsel …":"Send forespørsel →"}</button><small>Vi bruker opplysningene kun for å svare på forespørselen din.</small>
    </form>
-  </div></section>
+  </div></section>}
 
-  <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="footerIdentity"><div className="homeBrand"><img className="brandLogo footerLogo" src="/aadland-service-logo.webp" alt="Aadland Service"/></div><p className="footerTagline">Lokalt håndverk – solide resultater</p></div><div><b>Kontakt</b><div className="footerServices"><a href="tel:+4747154898">471 54 898</a><a href="mailto:post@aadland-service.no">post@aadland-service.no</a></div></div><div><b>Tjenester</b><div className="footerServices">
+  <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="footerIdentity"><div className="homeBrand"><img className="brandLogo footerLogo" src="/aadland-service-logo.webp" alt="Aadland Service"/></div><p className="footerTagline">Lokalt håndverk – solide resultater</p></div><div><b>Kontakt</b><div className="footerServices"><a href={"tel:"+siteSettings.phone.replace(/\s/g,"")}>{siteSettings.phone}</a><a href={"mailto:"+siteSettings.email}>{siteSettings.email}</a></div></div><div><b>Tjenester</b><div className="footerServices">
  {footerServices.map(service=><a key={service.slug} href={serviceHref(service)}>{service.title}</a>)}
- </div></div><div><b>Firma</b><div className="footerServices"><a href="#om">Om oss</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#befaring">Gratis befaring</a><a href="/vilkar/utleie">Utleiebetingelser</a><a href="/vilkar/salg">Salgsbetingelser</a></div><p>Org.nr. 937 781 873 MVA<br/>Bergen og omegn</p></div></div><div className="homeWrap footerBottom"><span>© Aadland Service</span><div><a href="/produkter">Produkter</a><a href="#tjenester">Tjenester</a><a href="#kontakt">Kontakt</a></div></div></footer>
+ </div></div><div><b>Firma</b><div className="footerServices"><a href="#om">Om oss</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#befaring">Gratis befaring</a><a href="/vilkar/utleie">Utleiebetingelser</a><a href="/vilkar/salg">Salgsbetingelser</a></div><p>Org.nr. {siteSettings.orgNumber}<br/>{siteSettings.location}</p></div></div><div className="homeWrap footerBottom"><span>© Aadland Service</span><div><a href="/produkter">Produkter</a><a href="#tjenester">Tjenester</a><a href="#kontakt">Kontakt</a></div></div></footer>
  </main>;
 }
 function Field({label,children}){return <label className="homeField"><span>{label}</span>{children}</label>}

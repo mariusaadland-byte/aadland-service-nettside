@@ -27,6 +27,7 @@ export default function AdminClient({ user }) {
   const [users, setUsers] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(user?.id || "");
   const [error, setError] = useState("");
+  const [siteSettings, setSiteSettings] = useState(null);
 
   const router = useRouter();
 
@@ -153,6 +154,11 @@ export default function AdminClient({ user }) {
       if (response.ok) { const data = await response.json(); setProjects(data.projects || []); }
       else setProjects([]);
     } else setProjects([]);
+
+    if (canManageProducts) {
+      const response = await fetch("/api/admin/site-settings");
+      if (response.ok) { const data = await response.json(); setSiteSettings(data.settings || null); }
+    }
 
     if (canManageUsers) {
       const response = await fetch("/api/admin/users");
@@ -454,7 +460,7 @@ export default function AdminClient({ user }) {
         )}
 
         {tab === "homepage" && canManageProducts && (
-          <HomepageManager services={services} projects={projects} setTab={setTab} />
+          <HomepageManager services={services} projects={projects} settings={siteSettings} reload={load} setTab={setTab} setError={setError} />
         )}
 
         {tab === "users" && canManageUsers && (
@@ -3286,27 +3292,22 @@ function ProjectEditor({project,reload,setError,close}){
 }
 
 
-function HomepageManager({services,projects,setTab}){
- const visibleServices=(services||[]).filter(s=>s.active!==false&&s.showOnHome!==false);
- const featuredProjects=(projects||[]).filter(p=>p.active!==false&&p.featured!==false);
- return <div className="grid">
-  <article className="card">
-   <div className="kicker">FORSIDEN</div>
-   <h3>Tjenester på forsiden</h3>
-   <p className="muted">{visibleServices.length} tjeneste{visibleServices.length===1?"":"r"} vises nå. Bilder du laster opp på en tjeneste brukes automatisk på tjenestekortet.</p>
-   <button className="btn" onClick={()=>setTab("services")}>Administrer tjenester</button>
-  </article>
-  <article className="card">
-   <div className="kicker">UTVALGTE PROSJEKTER</div>
-   <h3>Tidligere oppdrag</h3>
-   <p className="muted">{featuredProjects.length} oppdrag er valgt for forsiden. Forsiden viser inntil fire av dem.</p>
-   <button className="btn" onClick={()=>setTab("projects")}>Administrer oppdrag</button>
-  </article>
-  <article className="card">
-   <div className="kicker">BEFARING</div>
-   <h3>Kontaktskjema</h3>
-   <p className="muted">Tjenestene som er publisert brukes i feltet «Hva gjelder det?». Kunden kan velge tjeneste før forespørselen sendes.</p>
-   <button className="btn" onClick={()=>setTab("services")}>Endre tjenestevalg</button>
-  </article>
- </div>;
+function HomepageManager({services,projects,settings,reload,setTab,setError}){
+ const defaults={heroEyebrow:"BYGG · RENOVERING · UTEOMRÅDER · VEDLIKEHOLD",heroTitle:"Kvalitet som varer.",heroText:"Aadland Service leverer solide løsninger innen bygg, oppussing, vedlikehold og uteområder. Vi kombinerer fagkunnskap, nøyaktighet og god oppfølging – tilpasset dine behov.",aboutTitle:"Lokalt håndverk med stolthet.",aboutText:"Vi hjelper med oppussing, vedlikehold, uteområder og spesialtilpassede løsninger. Målet er enkelt: ryddig kommunikasjon, praktiske valg og et resultat du kan være fornøyd med.",phone:"471 54 898",email:"post@aadland-service.no",orgNumber:"937 781 873 MVA",location:"Bergen og omegn",showServices:true,showProjects:true,showAbout:true,showSurvey:true};
+ const [v,setV]=useState(settings||defaults),[saving,setSaving]=useState(false);
+ useEffect(()=>{setV(settings||defaults)},[settings]);
+ const set=(k,x)=>setV(old=>({...old,[k]:x}));
+ async function save(e){e.preventDefault();setSaving(true);setError("");const r=await fetch("/api/admin/site-settings",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(v)}),d=await r.json().catch(()=>({}));setSaving(false);if(!r.ok){setError(d.error||"Forsiden kunne ikke lagres.");return;}await reload();}
+ const visibleServices=(services||[]).filter(s=>s.active!==false&&s.showOnHome!==false),featuredProjects=(projects||[]).filter(p=>p.active!==false&&p.featured!==false);
+ return <><form className="card homepageSettings" onSubmit={save}><div className="kicker">FORSIDEN</div><h3>Innhold og kontaktinformasjon</h3>
+ <div className="field"><label>Liten tekst over hovedoverskrift</label><input value={v.heroEyebrow||""} onChange={e=>set("heroEyebrow",e.target.value)}/></div>
+ <div className="field"><label>Hovedoverskrift</label><input value={v.heroTitle||""} onChange={e=>set("heroTitle",e.target.value)}/></div>
+ <div className="field"><label>Tekst i toppen</label><textarea rows="4" value={v.heroText||""} onChange={e=>set("heroText",e.target.value)}/></div>
+ <div className="field"><label>Overskrift Om oss</label><input value={v.aboutTitle||""} onChange={e=>set("aboutTitle",e.target.value)}/></div>
+ <div className="field"><label>Tekst Om oss</label><textarea rows="4" value={v.aboutText||""} onChange={e=>set("aboutText",e.target.value)}/></div>
+ <div className="formTwo"><div className="field"><label>Telefon</label><input value={v.phone||""} onChange={e=>set("phone",e.target.value)}/></div><div className="field"><label>E-post</label><input type="email" value={v.email||""} onChange={e=>set("email",e.target.value)}/></div></div>
+ <div className="formTwo"><div className="field"><label>Organisasjonsnummer</label><input value={v.orgNumber||""} onChange={e=>set("orgNumber",e.target.value)}/></div><div className="field"><label>Område</label><input value={v.location||""} onChange={e=>set("location",e.target.value)}/></div></div>
+ <div className="homepageToggles"><label><input type="checkbox" checked={v.showServices!==false} onChange={e=>set("showServices",e.target.checked)}/> Vis tjenester</label><label><input type="checkbox" checked={v.showProjects!==false} onChange={e=>set("showProjects",e.target.checked)}/> Vis tidligere oppdrag</label><label><input type="checkbox" checked={v.showAbout!==false} onChange={e=>set("showAbout",e.target.checked)}/> Vis Om oss</label><label><input type="checkbox" checked={v.showSurvey!==false} onChange={e=>set("showSurvey",e.target.checked)}/> Vis befaring/kontakt</label></div>
+ <button className="btn" disabled={saving}>{saving?"Lagrer …":"Lagre forside"}</button></form>
+ <div className="grid homepageQuick"><article className="card"><h3>Tjenester</h3><p className="muted">{visibleServices.length} vises på forsiden.</p><button className="btn alt" onClick={()=>setTab("services")}>Administrer tjenester</button></article><article className="card"><h3>Tidligere oppdrag</h3><p className="muted">{featuredProjects.length} er valgt for forsiden.</p><button className="btn alt" onClick={()=>setTab("projects")}>Administrer oppdrag</button></article></div></>;
 }

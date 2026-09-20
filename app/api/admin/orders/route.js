@@ -22,6 +22,12 @@ const mapOrder = (o) => ({
   createdAt: o.created_at,
   surveyDate: o.survey_date || null,
   adminNote: o.admin_note || "",
+  paymentStatus: o.payment_status || "unpaid",
+  paymentReference: o.payment_reference || "",
+  trackingNumber: o.tracking_number || "",
+  trackingUrl: o.tracking_url || "",
+  dispatchedAt: o.dispatched_at || null,
+  deliveredAt: o.delivered_at || null,
 });
 
 export async function GET() {
