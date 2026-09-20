@@ -240,6 +240,7 @@ export default function AdminClient({ user }) {
   if (canManageProducts) tabs.push(["rental", "Utleieutstyr"]);
   if (canViewOrders) tabs.push(["rentalBookings", "Utleiebookinger"]);
   if (canManageProducts) tabs.push(["projects", "Tidligere oppdrag"]);
+  if (canManageProducts) tabs.push(["homepage", "Forside"]);
   if (canManageUsers) tabs.push(["users", "Brukere"]);
 
   return (
@@ -288,6 +289,8 @@ export default function AdminClient({ user }) {
             ? "Utleiebookinger"
             : tab === "projects"
             ? "Tidligere oppdrag"
+            : tab === "homepage"
+            ? "Forside"
             : "Brukere"}
         </h1>
 
@@ -437,6 +440,10 @@ export default function AdminClient({ user }) {
 
         {tab === "projects" && canManageProducts && (
           <Projects projects={projects} reload={load} setError={setError} />
+        )}
+
+        {tab === "homepage" && canManageProducts && (
+          <HomepageManager services={services} projects={projects} setTab={setTab} />
         )}
 
         {tab === "users" && canManageUsers && (
@@ -3265,4 +3272,30 @@ function ProjectEditor({project,reload,setError,close}){
  <div className="field"><label>Bilder</label>{v.imageUrls.map((url,i)=><div key={url+i} style={{marginBottom:8}}><img src={url} alt="" style={{width:180,height:110,objectFit:"cover",borderRadius:10}}/><button type="button" className="btn alt" onClick={()=>set("imageUrls",v.imageUrls.filter((_,x)=>x!==i))}>Fjern</button></div>)}<input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={e=>{upload(e.target.files);e.target.value=""}}/></div>
  <div className="field"><label>Sortering</label><input type="number" value={v.sortOrder} onChange={e=>set("sortOrder",e.target.value)}/></div><label><input type="checkbox" checked={v.featured} onChange={e=>set("featured",e.target.checked)}/> Vis på forsiden</label><br/><label><input type="checkbox" checked={v.active} onChange={e=>set("active",e.target.checked)}/> Publisert</label>
  <div style={{display:"flex",gap:10,marginTop:18}}><button className="btn" disabled={saving||uploading}>{saving?"Lagrer …":"Lagre"}</button>{!isNew&&<button type="button" className="btn alt" onClick={()=>setEditing(false)}>Avbryt</button>}</div></form>;
+}
+
+
+function HomepageManager({services,projects,setTab}){
+ const visibleServices=(services||[]).filter(s=>s.active!==false&&s.showOnHome!==false);
+ const featuredProjects=(projects||[]).filter(p=>p.active!==false&&p.featured!==false);
+ return <div className="grid">
+  <article className="card">
+   <div className="kicker">FORSIDEN</div>
+   <h3>Tjenester på forsiden</h3>
+   <p className="muted">{visibleServices.length} tjeneste{visibleServices.length===1?"":"r"} vises nå. Bilder du laster opp på en tjeneste brukes automatisk på tjenestekortet.</p>
+   <button className="btn" onClick={()=>setTab("services")}>Administrer tjenester</button>
+  </article>
+  <article className="card">
+   <div className="kicker">UTVALGTE PROSJEKTER</div>
+   <h3>Tidligere oppdrag</h3>
+   <p className="muted">{featuredProjects.length} oppdrag er valgt for forsiden. Forsiden viser inntil fire av dem.</p>
+   <button className="btn" onClick={()=>setTab("projects")}>Administrer oppdrag</button>
+  </article>
+  <article className="card">
+   <div className="kicker">BEFARING</div>
+   <h3>Kontaktskjema</h3>
+   <p className="muted">Tjenestene som er publisert brukes i feltet «Hva gjelder det?». Kunden kan velge tjeneste før forespørselen sendes.</p>
+   <button className="btn" onClick={()=>setTab("services")}>Endre tjenestevalg</button>
+  </article>
+ </div>;
 }

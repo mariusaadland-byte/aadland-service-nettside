@@ -604,3 +604,21 @@ html{scroll-behavior:smooth}
  .heroContent{padding-top:68px!important}
  .heroContent h1{font-size:48px!important}
 }
+
+
+/* Service detail navigation aligned with the main site */
+.serviceDetailNav{position:relative;gap:24px}
+.serviceDetailLinks{display:flex;align-items:center;gap:24px;margin-left:auto}
+.serviceDetailLinks a{color:rgba(255,255,255,.82);font-size:12px;font-weight:650;text-decoration:none;white-space:nowrap}
+.serviceDetailLinks a:hover{color:#d7a74e}
+.serviceDetailMenu{display:none!important}
+.serviceDetailSurvey{margin-left:0}
+@media(max-width:900px){
+ .serviceDetailNav{padding-left:18px;padding-right:18px}
+ .serviceDetailSurvey{display:none!important}
+ .serviceDetailMenu{display:block!important;margin-left:auto!important}
+ .serviceDetailLinks{display:none;position:absolute;top:100%;left:0;right:0;margin:0;padding:10px 18px 18px;background:#0d0d0d;z-index:1001;flex-direction:column;align-items:stretch;gap:0;border-top:1px solid rgba(255,255,255,.08);box-shadow:0 18px 30px rgba(0,0,0,.35)}
+ .serviceDetailLinks.menuOpen{display:flex}
+ .serviceDetailLinks a{padding:14px 2px;border-bottom:1px solid rgba(255,255,255,.08);font-size:14px}
+ .serviceDetailLinks a:last-child{border-bottom:0}
+}
