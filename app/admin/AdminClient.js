@@ -512,14 +512,15 @@ function Customers({orders,bookings}) {
 }
 
 function Orders({ orders, status, canUpdateOrders }) {
- const [openId,setOpenId]=useState(null),[savingId,setSavingId]=useState(null);
+ const [openId,setOpenId]=useState(null),[savingId,setSavingId]=useState(null),[message,setMessage]=useState("");
  async function saveTracking(order){
   setSavingId(order.id);
   const trackingNumber=document.getElementById("tracking-number-"+order.id)?.value||"",trackingUrl=document.getElementById("tracking-url-"+order.id)?.value||"";
   await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,trackingNumber,trackingUrl})});
   setSavingId(null);
  }
- return <div className="orderCards">{orders.length?orders.map(order=><article className="card orderCard" key={order.id}>
+ async function finish(order,action){setSavingId(order.id);setMessage("");const r=await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,action})}),d=await r.json().catch(()=>({}));setSavingId(null);if(!r.ok){setMessage(d.error||"Handlingen kunne ikke utføres.");return;}setMessage(d.paymentCaptureRequired?"Status er lagret. Betalingen står fortsatt bare som reservert til betalingsleverandøren er koblet til.":"Status er lagret.");window.setTimeout(()=>window.location.reload(),700);}
+ return <><>{message&&<p className="notice">{message}</p>}</><div className="orderCards">{orders.length?orders.map(order=><article className="card orderCard" key={order.id}>
   <div className="orderCardTop"><div><div className="kicker">{order.orderNumber}</div><h3>{order.customerName||"Ukjent kunde"}</h3><small className="muted">{new Date(order.createdAt).toLocaleString("nb-NO")}</small></div><b>{nok(order.totalOre||0)}</b></div>
   <p>{order.customerPhone&&<>{order.customerPhone}<br/></>}{order.customerEmail}</p>
   <div className="orderBadges"><span>{order.fulfillmentType==="delivery"?"Levering":order.fulfillmentType==="shipping"?"Sending":"Henting"}</span><span>Betaling: {order.paymentStatus==="pending"?"Venter":order.paymentStatus==="authorized"?"Reservert":order.paymentStatus==="paid"?"Betalt":order.paymentStatus==="refunded"?"Refundert":order.paymentStatus}</span></div>
@@ -530,7 +531,8 @@ function Orders({ orders, status, canUpdateOrders }) {
    {order.customRequest&&<p style={{whiteSpace:"pre-wrap"}}>{order.customRequest}</p>}
    {order.fulfillmentType==="shipping"&&<><div className="field"><label>Sporingsnummer</label><input id={"tracking-number-"+order.id} defaultValue={order.trackingNumber||""}/></div><div className="field"><label>Sporingslenke</label><input type="url" id={"tracking-url-"+order.id} defaultValue={order.trackingUrl||""}/></div>{canUpdateOrders&&<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>saveTracking(order)}>{savingId===order.id?"Lagrer …":"Lagre sporing"}</button>}</>}
   </div>}
- </article>):<div className="card"><p>Ingen bestillinger ennå.</p></div>}</div>;
+ {canUpdateOrders&&order.orderType!=="custom"&&order.status!=="completed"&&<div className="orderActions">{order.fulfillmentType==="shipping"?<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-dispatched")}>Sendt til kunde</button>:<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-delivered")}>Levert til kunde</button>}</div>}
+ </article>):<div className="card"><p>Ingen bestillinger ennå.</p></div>}</div></>;
 }
 
 function Surveys({ orders, status, canUpdateOrders }) {

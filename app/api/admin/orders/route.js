@@ -101,7 +101,7 @@ export async function PATCH(req) {
     );
   }
 
-  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl } = await req.json();
+  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action } = await req.json();
 
   const allowed = [
     "new",
@@ -133,6 +133,26 @@ export async function PATCH(req) {
       { error: "Databasen er ikke tilgjengelig." },
       { status: 500 }
     );
+  }
+
+  if (action === "mark-dispatched" || action === "mark-delivered") {
+    const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+    if(order.order_type==="custom")return NextResponse.json({error:"Denne handlingen gjelder produktbestillinger."},{status:400});
+    if(action==="mark-dispatched"&&order.fulfillment_type!=="shipping")return NextResponse.json({error:"Bare bestillinger som sendes kan markeres som sendt."},{status:400});
+    if(action==="mark-delivered"&&order.fulfillment_type==="shipping")return NextResponse.json({error:"Bruk Sendt til kunde for bestillinger som sendes."},{status:400});
+    const now=new Date().toISOString(),patch=action==="mark-dispatched"?{status:"completed",dispatched_at:now}:{status:"completed",delivered_at:now};
+    const {error:updateError}=await s.from("orders").update(patch).eq("id",id);
+    if(updateError)return NextResponse.json({error:"Handlingen kunne ikke lagres."},{status:500});
+    if(process.env.RESEND_API_KEY&&order.customer?.email){
+      try{
+        const {Resend}=await import("resend"),resend=new Resend(process.env.RESEND_API_KEY),from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>",replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+        const sent=action==="mark-dispatched";
+        await resend.emails.send({from,to:order.customer.email,replyTo,subject:sent?"Bestillingen din er sendt – "+order.order_number:"Bestillingen din er levert – "+order.order_number,text:sent?`Hei ${order.customer.name||""}!\n\nBestillingen ${order.order_number} er sendt.${order.tracking_number?"\nSporingsnummer: "+order.tracking_number:""}${order.tracking_url?"\nSporing: "+order.tracking_url:""}\n\nAadland Service\npost@aadland-service.no`:`Hei ${order.customer.name||""}!\n\nBestillingen ${order.order_number} er registrert som levert.\n\nAadland Service\npost@aadland-service.no`});
+        await s.from("orders").update(sent?{tracking_sent_at:now}:{delivery_notice_sent_at:now}).eq("id",id);
+      }catch(e){console.error("ORDER STATUS EMAIL ERROR",e)}
+    }
+    return NextResponse.json({ok:true,paymentCaptureRequired:order.payment_status==="authorized"});
   }
 
   const { error } = await s

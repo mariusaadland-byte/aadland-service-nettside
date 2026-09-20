@@ -657,3 +657,5 @@ html{scroll-behavior:smooth}
 
 /* Seasonal homepage content */
 .seasonalBanner{background:#171717;color:#fff;padding:28px 0}.seasonalBanner .homeWrap{display:flex;align-items:center;justify-content:space-between;gap:28px}.seasonalBanner h2{margin:5px 0 6px}.seasonalBanner p{margin:0;max-width:720px}.seasonalAdmin{border:1px solid #ddd;border-radius:12px;padding:16px;margin:20px 0}.seasonalAdmin legend{font-weight:700;padding:0 6px}@media(max-width:700px){.seasonalBanner .homeWrap{align-items:flex-start;flex-direction:column}}
+
+.orderActions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid #ddd}

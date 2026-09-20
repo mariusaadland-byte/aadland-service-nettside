@@ -34,3 +34,5 @@ alter table public.orders add column if not exists tracking_sent_at timestamptz;
 alter table public.orders add column if not exists updated_at timestamptz not null default now();
 create index if not exists orders_payment_status_idx on public.orders(payment_status);
 create index if not exists orders_status_idx on public.orders(status);
+
+alter table public.orders add column if not exists delivery_notice_sent_at timestamptz;
