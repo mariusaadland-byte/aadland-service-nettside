@@ -246,6 +246,7 @@ export default function AdminClient({ user }) {
   if (canManageProducts) tabs.push(["categories", "Kategorier"]);
   if (canManageProducts) tabs.push(["services", "Tjenester"]);
   if (canManageProducts) tabs.push(["rental", "Utleieutstyr"]);
+  if (canViewOrders) tabs.push(["rentalCalendar", "Utleiekalender"]);
   if (canViewOrders) tabs.push(["rentalBookings", "Utleiebookinger"]);
   if (canManageProducts) tabs.push(["projects", "Tidligere oppdrag"]);
   if (canManageProducts) tabs.push(["homepage", "Forside"]);
@@ -305,6 +306,8 @@ export default function AdminClient({ user }) {
             ? "Tjenester"
             : tab === "rental"
             ? "Utleieutstyr"
+            : tab === "rentalCalendar"
+            ? "Utleiekalender"
             : tab === "rentalBookings"
             ? "Utleiebookinger"
             : tab === "projects"
@@ -456,6 +459,10 @@ export default function AdminClient({ user }) {
 
         {tab === "rental" && canManageProducts && (
           <RentalItems items={rentalItems} blocks={rentalBlocks} reload={load} setError={setError} />
+        )}
+
+        {tab === "rentalCalendar" && canViewOrders && (
+          <RentalCalendar items={rentalItems} bookings={rentalBookings} blocks={rentalBlocks} />
         )}
 
         {tab === "rentalBookings" && canViewOrders && (
@@ -3232,6 +3239,17 @@ function RentalEditor({item,reload,setError,close}){
  <label><input type="checkbox" checked={v.pickupAvailable} onChange={e=>set("pickupAvailable",e.target.checked)}/> Henting mulig</label><br/><label><input type="checkbox" checked={v.deliveryAvailable} onChange={e=>set("deliveryAvailable",e.target.checked)}/> Levering mulig</label><br/><label><input type="checkbox" checked={v.active} onChange={e=>set("active",e.target.checked)}/> Publisert</label>
  <div style={{display:"flex",gap:10,marginTop:18}}><button className="btn" disabled={saving||uploading}>{saving?"Lagrer …":"Lagre"}</button>{!isNew&&<button type="button" className="btn alt" onClick={()=>setEditing(false)}>Avbryt</button>}</div></form>;
 }
+function RentalCalendar({items,bookings,blocks}){
+ const [month,setMonth]=useState(()=>new Date().toISOString().slice(0,7));
+ const first=new Date(month+"-01T12:00:00"),year=first.getFullYear(),m=first.getMonth(),days=new Date(year,m+1,0).getDate(),offset=(new Date(year,m,1).getDay()+6)%7;
+ const cells=[...Array(offset).fill(null),...Array.from({length:days},(_,i)=>i+1)];
+ function iso(day){return month+"-"+String(day).padStart(2,"0")}
+ function events(day){const d=iso(day),out=[];(bookings||[]).filter(b=>b.status!=="cancelled"&&b.startDate<=d&&b.endDate>=d).forEach(b=>out.push({kind:"booking",label:(b.itemName||"Utstyr")+" · "+(b.customer?.name||"Kunde")}));(blocks||[]).filter(b=>b.startDate<=d&&b.endDate>=d).forEach(b=>out.push({kind:"block",label:(items||[]).find(i=>i.id===b.itemId)?.name||"Blokkert"}));return out}
+ function move(n){const d=new Date(year,m+n,1);setMonth(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"))}
+ return <div className="card rentalCalendar"><div className="calendarHead"><div><div className="kicker">UTLEIEKALENDER</div><h3>{first.toLocaleDateString("nb-NO",{month:"long",year:"numeric"})}</h3></div><div><button className="btn alt" onClick={()=>move(-1)}>←</button><button className="btn alt" onClick={()=>setMonth(new Date().toISOString().slice(0,7))}>I dag</button><button className="btn alt" onClick={()=>move(1)}>→</button></div></div>
+ <div className="calendarGrid">{["Man","Tir","Ons","Tor","Fre","Lør","Søn"].map(x=><b className="calendarWeekday" key={x}>{x}</b>)}{cells.map((day,i)=>day?<div className="calendarDay" key={i}><strong>{day}</strong>{events(day).map((e,j)=><span className={"calendarEvent "+e.kind} key={j}>{e.label}</span>)}</div>:<div className="calendarDay empty" key={i}/>)}</div><p className="muted">Bookinger og manuelt blokkerte perioder vises samlet. Serviceperioder kan fortsatt legges inn under Utleieutstyr.</p></div>;
+}
+
 function RentalBookings({bookings,reload,setError,canUpdate}){
  const statuses={new:"Ny",confirmed:"Bekreftet",active:"Utlevert",returned:"Returnert",completed:"Ferdig",cancelled:"Avbrutt"};
  async function patch(id,changes){const r=await fetch("/api/admin/rental-bookings",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,...changes})});const d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Bookingen kunne ikke oppdateres.");return;}await reload();}

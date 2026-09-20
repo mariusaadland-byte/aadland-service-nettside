@@ -651,3 +651,6 @@ html{scroll-behavior:smooth}
 
 /* Customer overview */
 .customerSearch{max-width:920px;margin-bottom:18px}.customerGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.customerHistory{padding:10px 0;border-top:1px solid #ddd}.customerHistory:first-of-type{margin-top:10px}@media(max-width:760px){.customerGrid{grid-template-columns:1fr}}
+
+/* Rental calendar */
+.calendarHead{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:18px}.calendarHead>div:last-child{display:flex;gap:6px}.calendarGrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-left:1px solid #ddd;border-top:1px solid #ddd}.calendarWeekday{padding:8px;text-align:center;border-right:1px solid #ddd;border-bottom:1px solid #ddd}.calendarDay{min-height:110px;padding:8px;border-right:1px solid #ddd;border-bottom:1px solid #ddd;overflow:hidden}.calendarDay.empty{background:rgba(0,0,0,.025)}.calendarEvent{display:block;margin-top:6px;padding:5px 6px;border-radius:7px;background:#eee;font-size:12px;line-height:1.25}.calendarEvent.block{border:1px dashed #999;background:transparent}@media(max-width:760px){.rentalCalendar{overflow-x:auto}.calendarGrid{min-width:760px}.calendarHead{min-width:760px}.calendarDay{min-height:90px}}
