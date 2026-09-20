@@ -170,7 +170,7 @@ export default function Home(){
   <section id="prosjekter" className="homeSection projects projectsSection"><div className="homeWrap">
    <div className="sectionIntro projectsHeader"><div><span className="goldLabel">UTVALGTE PROSJEKTER</span><h2>Resultater vi er stolte av</h2></div></div>
    <div className="projectGrid">
-    {apiProjects.length?apiProjects.map(project=><div className="projectTile projectCard" key={project.id} style={project.imageUrls?.[0]?{backgroundImage:"url("+project.imageUrls[0]+")",backgroundSize:"cover",backgroundPosition:"center"}:{}}><div className="projectCaption"><span>{(project.category||"OPPDRAG").toUpperCase()}</span><strong>{project.title}</strong>{project.description&&<p>{project.description}</p>}</div></div>):<>
+    {apiProjects.length?apiProjects.filter(project=>project.featured!==false).slice(0,4).map(project=><div className="projectTile projectCard" key={project.id} style={project.imageUrls?.[0]?{backgroundImage:"url("+project.imageUrls[0]+")",backgroundSize:"cover",backgroundPosition:"center"}:{}}><div className="projectCaption"><span>{(project.category||"OPPDRAG").toUpperCase()}</span><strong>{project.title}</strong>{project.description&&<p>{project.description}</p>}</div></div>):<>
      <div className="projectTile projectCard projectDeck"><div className="projectCaption"><span>UTEOMRÅDE</span><strong>Terrasse og levegg</strong></div></div>
      <div className="projectTile projectCard projectBathroom"><div className="projectCaption"><span>OPPUSSING</span><strong>Oppusset bad</strong></div></div>
      <div className="projectTile projectCard projectSlats"><div className="projectCaption"><span>INNVENDIG</span><strong>Spilevegg og trapp</strong></div></div>
