@@ -4,6 +4,7 @@ Nettsted og backoffice for Aadland Service.
 
 ## Funksjoner
 - Kundeside for tjenester, produkter, utleie og befaringer
+- Valgfri kundekonto på `/min-side` med bekreftet e-post og ordre-/utleiehistorikk
 - Produktvalg, handlekurv og bestilling
 - Henting, lokal levering og frakt for produkter som kan sendes
 - Utleie med datokontroll, blokkeringer og administrasjon
@@ -24,7 +25,7 @@ SQL-filene i `supabase/` beskriver databasegrunnlaget og senere utvidelser. De m
 1. Installer avhengigheter med `npm install`.
 2. Kjør `npm run build` og rett eventuelle byggefeil.
 3. Sett produksjonsverdier for Supabase, sessions og Resend.
-4. Kjør nødvendige SQL-oppgraderinger kontrollert mot riktig Supabase-prosjekt.
+4. Kjør nødvendige SQL-oppgraderinger kontrollert mot riktig Supabase-prosjekt, inkludert `customers.sql` før Min side aktiveres.
 5. Test innlogging og rettigheter i backoffice.
 6. Test befaring, produktbestilling, lager/frakt og alle kunde-e-poster.
 7. Test utleie for ledige og kolliderende datoer samt admin-bekreftelse.
