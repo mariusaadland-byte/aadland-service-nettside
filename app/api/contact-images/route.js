@@ -5,6 +5,7 @@ import { db } from "../../../lib/supabase";
 const allowed=new Set(["image/jpeg","image/png","image/webp"]);
 const maxFiles=8;
 const maxSize=10*1024*1024;
+const maxTotal=40*1024*1024;
 
 export async function POST(request){
  try{
@@ -14,6 +15,7 @@ export async function POST(request){
   const files=data.getAll("images").filter(f=>f&&typeof f.arrayBuffer==="function");
   if(!files.length) return NextResponse.json({urls:[]});
   if(files.length>maxFiles) return NextResponse.json({error:"Du kan laste opp maks 8 bilder."},{status:400});
+  if(files.reduce((sum,file)=>sum+(Number(file.size)||0),0)>maxTotal)return NextResponse.json({error:"Bildene kan være maks 40 MB totalt."},{status:413});
   const urls=[];
   for(const file of files){
    if(!allowed.has(file.type)) return NextResponse.json({error:"Bruk JPG, PNG eller WebP."},{status:400});
