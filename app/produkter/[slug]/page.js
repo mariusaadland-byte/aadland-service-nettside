@@ -87,7 +87,7 @@ export default function ProductPage() {
     return productPrice(product, selected);
   }, [product, selected]);
 
-  const shippingOre = fulfillment === "shipping" && product?.shippable ? Number(product.shippingPriceOre)||0 : 0;
+  const shippingOre = fulfillment === "shipping" && product?.shippable ? (Number(product.shippingPriceOre)||0)*quantity : 0;
   const total = price * quantity + shippingOre;
   const soldOut = product?.inventoryMode === "stock" && Number(product.stockQuantity) <= 0;
   const maxQuantity = product?.inventoryMode === "stock" ? Math.max(0,Math.min(10,Number(product.stockQuantity)||0)) : 10;
