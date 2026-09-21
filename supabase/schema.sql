@@ -71,3 +71,9 @@ null,'Planter','moss',true,true),
 '[{"id":"size","label":"Størrelse","choices":[{"label":"70 × 50 cm","value":"70 × 50 cm","extraOre":0},{"label":"90 × 60 cm","value":"90 × 60 cm","extraOre":80000},{"label":"120 × 70 cm","value":"120 × 70 cm","extraOre":150000}]},{"id":"finish","label":"Overflate","choices":[{"label":"Ubehandlet","value":"Ubehandlet","extraOre":0},{"label":"Oljet","value":"Oljet","extraOre":25000},{"label":"Svartbeiset","value":"Svartbeiset","extraOre":35000}]}]'::jsonb,
 null,'Table','clay',false,true)
 on conflict (id) do nothing;
+
+-- Private kundebilder fra kontaktskjema. Produktbilder bruker fortsatt offentlig product-images-bucket.
+insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types)
+values ('contact-images','contact-images',false,10485760,array['image/jpeg','image/png','image/webp'])
+on conflict (id) do update set public=false,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
+
