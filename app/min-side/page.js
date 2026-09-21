@@ -1,7 +1,6 @@
 "use client";
 import {useEffect,useState} from "react";
 import Link from "next/link";
-export const dynamic="force-dynamic";
 const orderStatus={new:"Mottatt",confirmed:"Bekreftet",processing:"Under behandling",completed:"Fullført",cancelled:"Kansellert"};
 const rentalStatus={new:"Mottatt",confirmed:"Bekreftet",active:"Pågående",returned:"Returnert",completed:"Fullført",cancelled:"Kansellert"};
 const paymentStatus={unpaid:"Ikke betalt",pending:"Avventer betaling",authorized:"Reservert",paid:"Betalt",refunded:"Refundert"};
