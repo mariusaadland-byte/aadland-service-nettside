@@ -2,7 +2,7 @@ import {NextResponse} from "next/server";
 import crypto from "crypto";
 import {getCustomerUserId} from "../../../lib/customer-auth";
 import {db,fromDbProduct} from "../../../lib/supabase";
-import {fallbackProducts,productPrice} from "../../../lib/catalog";
+import {productPrice} from "../../../lib/catalog";
 function num(){return "AS-"+Date.now().toString().slice(-8)+"-"+crypto.randomBytes(2).toString("hex").toUpperCase()}
 export async function POST(req){
  try{
@@ -21,10 +21,10 @@ export async function POST(req){
    const rawItems=Array.isArray(body.items)?body.items:[];if(rawItems.length>50)return NextResponse.json({error:"For mange varelinjer i samme bestilling."},{status:400});const ids=[...new Set(rawItems.map(i=>String(i.productId||"")).filter(Boolean))];
    const {data,error:productError}=await s.from("products").select("*").in("id",ids);
    if(productError)throw productError;
-   const products=(data?.length?data.map(fromDbProduct):fallbackProducts).filter(p=>ids.includes(p.id));
+   const products=(data||[]).map(fromDbProduct).filter(p=>ids.includes(p.id)&&p.active!==false);
    for(const i of rawItems){
     const p=products.find(p=>p.id===i.productId); if(!p)continue;
-    const quantity=Math.max(1,Math.floor(Number(i.quantity)||1));
+    const quantity=Math.max(1,Math.min(999,Math.floor(Number(i.quantity)||1)));
     if(p.inventoryMode==="stock"){
      if((Number(p.stockQuantity)||0)<quantity)return NextResponse.json({error:p.name+" har ikke nok på lager."},{status:409});
      stockUpdates.push({id:p.id,next:(Number(p.stockQuantity)||0)-quantity});
