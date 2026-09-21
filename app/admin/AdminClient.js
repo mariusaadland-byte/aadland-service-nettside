@@ -250,10 +250,12 @@ export default function AdminClient({ user }) {
   if (canViewOrders) tabs.push(["rentalCalendar", "Utleiekalender"]);
   if (canViewOrders) tabs.push(["rentalBookings", "Utleiebookinger"]);
   if (canManageProducts) tabs.push(["projects", "Tidligere oppdrag"]);
-  if (canManageProducts) tabs.push(["homepage", "Forside"]);\n  if (canManageProducts) tabs.push(["drawing", "Tegning & visualisering"]);
+  if (canManageProducts) tabs.push(["homepage", "Forside"]);
+  if (canManageProducts) tabs.push(["drawing", "Tegning & visualisering"]);
   if (canManageUsers) tabs.push(["users", "Brukere"]);
 
   function chooseTab(id) {
+    if (id === "drawing") { setMenuOpen(false); router.push("/admin/tegning"); return; }
     setTab(id);
     setMenuOpen(false);
   }
@@ -317,6 +319,8 @@ export default function AdminClient({ user }) {
             ? "Tidligere oppdrag"
             : tab === "homepage"
             ? "Forside"
+            : tab === "drawing"
+            ? "Tegning & visualisering"
             : "Brukere"}
         </h1>
 
