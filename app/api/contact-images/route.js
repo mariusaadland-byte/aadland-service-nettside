@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import { db } from "../../../lib/supabase";
 
 const allowed=new Set(["image/jpeg","image/png","image/webp"]);
