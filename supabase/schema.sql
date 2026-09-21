@@ -50,7 +50,12 @@ alter table public.products add column if not exists category_id uuid references
 alter table public.products add column if not exists image_urls jsonb not null default '[]'::jsonb;
 alter table public.products add column if not exists dimensions text;
 alter table public.products add column if not exists specifications jsonb not null default '[]'::jsonb;
+alter table public.products add column if not exists updated_at timestamptz not null default now();
 create index if not exists products_category_id_idx on public.products(category_id);
+alter table public.products enable row level security;
+alter table public.orders enable row level security;
+grant select,insert,update,delete on public.products to service_role;
+grant select,insert,update,delete on public.orders to service_role;
 
 insert into products
 (id,slug,name,category,eyebrow,description,base_price_ore,options,image_url,icon,accent,featured,active)
