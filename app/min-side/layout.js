@@ -1,0 +1,1 @@
+export const metadata={title:"Min side",description:"Kundekonto hos Aadland Service.",robots:{index:false,follow:false}};export default function CustomerLayout({children}){return children}
