@@ -22,7 +22,7 @@ function payload(b) {
   };
 }
 export async function GET() {
-  const a=await requireAccess(); if(a.error)return a.error; const s=db();
+  const a=await requireAccess(); if(a.error)return a.error; const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
   const {data,error}=await s.from("services").select("*").order("sort_order",{ascending:true}).order("created_at",{ascending:true});
   if(error)return NextResponse.json({error:"Tjenestene kunne ikke hentes."},{status:500});
   return NextResponse.json({services:(data||[]).map(fromDbService)});
@@ -30,8 +30,8 @@ export async function GET() {
 export async function POST(req) {
   const a=await requireAccess(); if(a.error)return a.error; const b=await req.json(); const p=payload(b);
   if(!p.title)return NextResponse.json({error:"Tjenesten må ha et navn."},{status:400});
-  p.slug=slugify(b.slug||p.title)+"-"+Date.now();
-  const {data,error}=await db().from("services").insert(p).select("*").single();
+  p.slug=slugify(b.slug||p.title)+"-"+Date.now();const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+  const {data,error}=await s.from("services").insert(p).select("*").single();
   if(error){console.error("SERVICE CREATE ERROR:",error);return NextResponse.json({error:"Tjenesten kunne ikke opprettes."},{status:500});}
   return NextResponse.json({ok:true,service:fromDbService(data)});
 }
@@ -39,15 +39,15 @@ export async function PATCH(req) {
   const a=await requireAccess(); if(a.error)return a.error; const b=await req.json();
   if(!b.id)return NextResponse.json({error:"Tjeneste mangler."},{status:400});
   const p=payload(b); if(!p.title)return NextResponse.json({error:"Tjenesten må ha et navn."},{status:400});
-  p.updated_at=new Date().toISOString();
-  const {data,error}=await db().from("services").update(p).eq("id",b.id).select("*").single();
+  p.updated_at=new Date().toISOString();const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+  const {data,error}=await s.from("services").update(p).eq("id",b.id).select("*").single();
   if(error){console.error("SERVICE UPDATE ERROR:",error);return NextResponse.json({error:"Tjenesten kunne ikke lagres."},{status:500});}
   return NextResponse.json({ok:true,service:fromDbService(data)});
 }
 export async function DELETE(req) {
   const a=await requireAccess(); if(a.error)return a.error; const b=await req.json();
-  if(!b.id)return NextResponse.json({error:"Tjeneste mangler."},{status:400});
-  const {error}=await db().from("services").delete().eq("id",b.id);
+  if(!b.id)return NextResponse.json({error:"Tjeneste mangler."},{status:400});const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+  const {error}=await s.from("services").delete().eq("id",b.id);
   if(error)return NextResponse.json({error:"Tjenesten kunne ikke slettes."},{status:500});
   return NextResponse.json({ok:true});
 }
