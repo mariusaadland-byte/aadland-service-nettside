@@ -13,9 +13,11 @@ export async function POST(req) {
       );
     }
 
+    const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if(!url||!key)return NextResponse.json({error:"Innlogging er ikke konfigurert."},{status:503});
     const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      url,
+      key,
       {
         auth: {
           persistSession: false,
