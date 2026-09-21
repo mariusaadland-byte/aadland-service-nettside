@@ -1,7 +1,8 @@
 import {NextResponse} from "next/server";
+import crypto from "crypto";
 import {db,fromDbProduct} from "../../../lib/supabase";
 import {fallbackProducts,productPrice} from "../../../lib/catalog";
-function num(){return "AS-"+Date.now().toString().slice(-8)}
+function num(){return "AS-"+Date.now().toString().slice(-8)+"-"+crypto.randomBytes(2).toString("hex").toUpperCase()}
 export async function POST(req){
  try{
   const body=await req.json();
@@ -10,20 +11,21 @@ export async function POST(req){
   let items=[],total=0,shipping=0,stockUpdates=[];
   if(body.orderType==="order"){
    if(body.acceptedTerms!==true)return NextResponse.json({error:"Du må godta salgsbetingelsene før bestilling."},{status:400});
-   const ids=(body.items||[]).map(i=>i.productId);
+   const rawItems=Array.isArray(body.items)?body.items:[];if(rawItems.length>50)return NextResponse.json({error:"For mange varelinjer i samme bestilling."},{status:400});const ids=[...new Set(rawItems.map(i=>String(i.productId||"")).filter(Boolean))];
    const {data,error:productError}=await s.from("products").select("*").in("id",ids);
    if(productError)throw productError;
    const products=(data?.length?data.map(fromDbProduct):fallbackProducts).filter(p=>ids.includes(p.id));
-   for(const i of body.items||[]){
+   for(const i of rawItems){
     const p=products.find(p=>p.id===i.productId); if(!p)continue;
     const quantity=Math.max(1,Math.floor(Number(i.quantity)||1));
     if(p.inventoryMode==="stock"){
      if((Number(p.stockQuantity)||0)<quantity)return NextResponse.json({error:p.name+" har ikke nok på lager."},{status:409});
      stockUpdates.push({id:p.id,next:(Number(p.stockQuantity)||0)-quantity});
     }
+    if(!["pickup","delivery","shipping"].includes(body.fulfillmentType))return NextResponse.json({error:"Velg gyldig leveringsmåte."},{status:400});
     if(body.fulfillmentType==="shipping"){
      if(!p.shippable)return NextResponse.json({error:p.name+" kan ikke sendes med post/Bring."},{status:400});
-     shipping+=(Number(p.shippingPriceOre)||0);
+     shipping+=(Number(p.shippingPriceOre)||0)*quantity;
     }
     const unit=productPrice(p,i.selectedOptions||{});
     items.push({...i,quantity,name:p.name,unitPriceOre:unit,inventoryMode:p.inventoryMode});
