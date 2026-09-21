@@ -103,6 +103,9 @@ export async function PATCH(req) {
   }
 
   const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action } = await req.json();
+  if(adminNote!==undefined&&String(adminNote||"").length>5000)return NextResponse.json({error:"Internt notat kan være maks 5000 tegn."},{status:400});
+  if(trackingNumber!==undefined&&String(trackingNumber||"").length>120)return NextResponse.json({error:"Sporingsnummeret er for langt."},{status:400});
+  if(trackingUrl!==undefined){const value=String(trackingUrl||"").trim();if(value.length>1000)return NextResponse.json({error:"Sporingslenken er for lang."},{status:400});if(value){try{const u=new URL(value);if(!["http:","https:"].includes(u.protocol))throw new Error()}catch{return NextResponse.json({error:"Skriv inn en gyldig sporingslenke."},{status:400})}}}
 
   const allowed = [
     "new",
