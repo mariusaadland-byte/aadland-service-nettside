@@ -112,6 +112,8 @@ export async function POST(req) {
       );
     }
 
+    if (name.length > 160 || cleanText(body.description).length > 5000 || cleanText(body.dimensions).length > 500 || cleanText(body.leadTimeText).length > 500) return NextResponse.json({ error: "Et eller flere produktfelt er for lange." }, { status: 400 });
+
     if (!validPrice(body.basePriceOre)) {
       return NextResponse.json(
         { error: "Produktet må ha en gyldig pris." },
@@ -200,6 +202,7 @@ export async function POST(req) {
 
         active:
           body.active !== false,
+        updated_at: new Date().toISOString(),
         inventory_mode: body.inventoryMode === "stock" ? "stock" : "made_to_order",
         stock_quantity: Math.max(0, Math.floor(Number(body.stockQuantity) || 0)),
         restock_date: body.restockDate || null,
@@ -273,6 +276,8 @@ export async function PATCH(req) {
         { status: 400 }
       );
     }
+
+    if (name.length > 160 || cleanText(body.description).length > 5000 || cleanText(body.dimensions).length > 500 || cleanText(body.leadTimeText).length > 500) return NextResponse.json({ error: "Et eller flere produktfelt er for lange." }, { status: 400 });
 
     if (!validPrice(body.basePriceOre)) {
       return NextResponse.json(
@@ -351,6 +356,7 @@ export async function PATCH(req) {
 
         active:
           body.active !== false,
+        updated_at: new Date().toISOString(),
         inventory_mode: body.inventoryMode === "stock" ? "stock" : "made_to_order",
         stock_quantity: Math.max(0, Math.floor(Number(body.stockQuantity) || 0)),
         restock_date: body.restockDate || null,
