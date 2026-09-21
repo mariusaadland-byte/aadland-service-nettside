@@ -18,13 +18,13 @@ export async function POST(req){
   let items=[],total=0,shipping=0,stockUpdates=[];
   if(body.orderType==="order"){
    if(body.acceptedTerms!==true)return NextResponse.json({error:"Du må godta salgsbetingelsene før bestilling."},{status:400});
-   const rawItems=Array.isArray(body.items)?body.items:[];if(!rawItems.length)return NextResponse.json({error:"Handlekurven er tom."},{status:400});if(rawItems.length>50)return NextResponse.json({error:"For mange varelinjer i samme bestilling."},{status:400});if(!["pickup","delivery","shipping"].includes(body.fulfillmentType))return NextResponse.json({error:"Velg gyldig leveringsmåte."},{status:400});for(const i of rawItems){const q=Number(i.quantity);if(!Number.isInteger(q)||q<1||q>999)return NextResponse.json({error:"Antall må være mellom 1 og 999."},{status:400})}const ids=[...new Set(rawItems.map(i=>String(i.productId||"")).filter(Boolean))];
+   const rawItems=Array.isArray(body.items)?body.items:[];if(!rawItems.length)return NextResponse.json({error:"Handlekurven er tom."},{status:400});if(rawItems.length>50)return NextResponse.json({error:"For mange varelinjer i samme bestilling."},{status:400});if(!["pickup","delivery","shipping"].includes(body.fulfillmentType))return NextResponse.json({error:"Velg gyldig leveringsmåte."},{status:400});for(const i of rawItems){const q=Number(i.quantity);if(!Number.isInteger(q)||q<1||q>999)return NextResponse.json({error:"Antall må være mellom 1 og 999."},{status:400})}const ids=[...new Set(rawItems.map(i=>String(i.productId||"")).filter(Boolean))];if(!ids.length||rawItems.some(i=>!String(i.productId||"")))return NextResponse.json({error:"Handlekurven inneholder en ugyldig vare."},{status:400});
    const {data,error:productError}=await s.from("products").select("*").in("id",ids);
    if(productError)throw productError;
    const products=(data||[]).map(fromDbProduct).filter(p=>ids.includes(p.id)&&p.active!==false);if(ids.length!==products.length)return NextResponse.json({error:"Et produkt er ikke tilgjengelig lenger. Oppdater handlekurven og prøv igjen."},{status:409});
    const requestedStock=new Map();for(const i of rawItems){const id=String(i.productId||"");requestedStock.set(id,(requestedStock.get(id)||0)+Number(i.quantity))}for(const p of products){if(p.inventoryMode==="stock"&&(Number(p.stockQuantity)||0)<(requestedStock.get(p.id)||0))return NextResponse.json({error:p.name+" har ikke nok på lager."},{status:409})}
    for(const i of rawItems){
-    const p=products.find(p=>p.id===i.productId); if(!p)continue;
+    const p=products.find(p=>String(p.id)===String(i.productId)); if(!p)return NextResponse.json({error:"Et produkt er ikke tilgjengelig lenger. Oppdater handlekurven og prøv igjen."},{status:409});
     const quantity=Number(i.quantity);
     if(body.fulfillmentType==="shipping"){
      if(!p.shippable)return NextResponse.json({error:p.name+" kan ikke sendes med post/Bring."},{status:400});
