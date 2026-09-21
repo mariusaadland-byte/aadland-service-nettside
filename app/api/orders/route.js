@@ -34,8 +34,12 @@ export async function POST(req){
      if(!p.shippable)return NextResponse.json({error:p.name+" kan ikke sendes med post/Bring."},{status:400});
      shipping+=(Number(p.shippingPriceOre)||0)*quantity;
     }
-    const unit=productPrice(p,i.selectedOptions||{});
-    items.push({...i,quantity,name:p.name,unitPriceOre:unit,inventoryMode:p.inventoryMode});
+    const submitted=i.selectedOptions&&typeof i.selectedOptions==="object"?i.selectedOptions:{};
+    const selectedOptions={};let invalidOption=false;
+    for(const option of (p.options||[])){const value=submitted[option.id]??option.choices?.[0]?.value;if(!option.choices?.some(choice=>choice.value===value)){invalidOption=true;break}selectedOptions[option.id]=value}
+    if(invalidOption)return NextResponse.json({error:"Et produktvalg er ikke gyldig lenger. Oppdater handlekurven og prøv igjen."},{status:400});
+    const unit=productPrice(p,selectedOptions);
+    items.push({productId:p.id,selectedOptions,quantity,name:p.name,unitPriceOre:unit,inventoryMode:p.inventoryMode});
     total+=unit*quantity;
    }
    if(!items.length)return NextResponse.json({error:"Handlekurven er tom."},{status:400});
