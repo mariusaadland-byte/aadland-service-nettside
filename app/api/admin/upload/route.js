@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import {
   getAdminUser,
   hasPermission,
@@ -80,11 +81,7 @@ export async function POST(req) {
       );
     }
 
-    const extension =
-      file.name
-        .split(".")
-        .pop()
-        ?.toLowerCase() || "jpg";
+    const extension = file.type==="image/png"?"png":file.type==="image/webp"?"webp":"jpg";
 
     const fileName =
       `${crypto.randomUUID()}.${extension}`;
