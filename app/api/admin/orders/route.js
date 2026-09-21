@@ -148,7 +148,7 @@ export async function PATCH(req) {
     if(order.order_type==="custom")return NextResponse.json({error:"Denne handlingen gjelder produktbestillinger."},{status:400});
     if(action==="mark-dispatched"&&order.fulfillment_type!=="shipping")return NextResponse.json({error:"Bare bestillinger som sendes kan markeres som sendt."},{status:400});
     if(action==="mark-delivered"&&order.fulfillment_type==="shipping")return NextResponse.json({error:"Bruk Sendt til kunde for bestillinger som sendes."},{status:400});
-    const now=new Date().toISOString(),patch=action==="mark-dispatched"?{status:"completed",dispatched_at:now}:{status:"completed",delivered_at:now};
+    const now=new Date().toISOString();if(action==="mark-dispatched"&&!String(order.tracking_number||"").trim()&&!String(order.tracking_url||"").trim())return NextResponse.json({error:"Legg inn sporingsnummer eller sporingslenke før bestillingen markeres som sendt."},{status:400});const patch=action==="mark-dispatched"?{status:"completed",dispatched_at:now}:{status:"completed",delivered_at:now};
     const {error:updateError}=await s.from("orders").update(patch).eq("id",id);
     if(updateError)return NextResponse.json({error:"Handlingen kunne ikke lagres."},{status:500});
     if(process.env.RESEND_API_KEY&&order.customer?.email){
@@ -159,7 +159,7 @@ export async function PATCH(req) {
         await s.from("orders").update(sent?{tracking_sent_at:now}:{delivery_notice_sent_at:now}).eq("id",id);
       }catch(e){console.error("ORDER STATUS EMAIL ERROR",e)}
     }
-    return NextResponse.json({ok:true,paymentCaptureRequired:order.payment_status==="authorized"});
+    return NextResponse.json({ok:true,paymentCaptureRequired:order.payment_status==="authorized",paymentStatus:order.payment_status||"unpaid"});
   }
 
   const { error } = await s
