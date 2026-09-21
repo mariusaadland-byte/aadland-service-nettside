@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import {
-  fallbackProducts,
   nok,
   productPrice,
 } from "../../../lib/catalog";
@@ -12,7 +11,8 @@ export default function ProductPage() {
   const params = useParams();
   const slug = decodeURIComponent(String(params?.slug || ""));
 
-  const [products, setProducts] = useState(fallbackProducts);
+  const [products, setProducts] = useState([]);
+  const [loadError,setLoadError]=useState("");
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
   const [selected, setSelected] = useState({});
@@ -38,13 +38,9 @@ export default function ProductPage() {
 
   useEffect(() => {
     fetch("/api/products")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => {
-        if (Array.isArray(data?.products)) {
-          setProducts(data.products);
-        }
-      })
-      .catch(() => {})
+      .then(async(response)=>{const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Produktet kunne ikke hentes.");return data})
+      .then((data) => { if (Array.isArray(data?.products)) setProducts(data.products); })
+      .catch((e) => setLoadError(e.message||"Produktet kunne ikke hentes."))
       .finally(() => setLoading(false));
   }, []);
 
@@ -156,6 +152,8 @@ export default function ProductPage() {
       </main>
     );
   }
+
+  if (loadError) {return <main><Header/><section className="section"><div className="wrap"><div className="card"><h1>Noe gikk galt</h1><p>{loadError}</p><a className="btn" href="/produkter">Tilbake til produkter</a></div></div></section></main>}
 
   if (!product) {
     return (
@@ -534,7 +532,9 @@ export default function ProductPage() {
                 </select>
               </div>
 
-              <label style={{display:"flex",gap:8,alignItems:"flex-start",margin:"14px 0"}}><input type="checkbox" required checked={acceptedTerms} onChange={e=>setAcceptedTerms(e.target.checked)}/><span>Jeg godtar <a href="/vilkar/salg" target="_blank" rel="noreferrer">salgsbetingelsene</a>.</span></label>\n\n              {error && <p className="notice">{error}</p>}
+              <label style={{display:"flex",gap:8,alignItems:"flex-start",margin:"14px 0"}}><input type="checkbox" required checked={acceptedTerms} onChange={e=>setAcceptedTerms(e.target.checked)}/><span>Jeg godtar <a href="/vilkar/salg" target="_blank" rel="noreferrer">salgsbetingelsene</a>.</span></label>
+
+              {error && <p className="notice">{error}</p>}
 
               <button
                 className="btn"
@@ -624,7 +624,7 @@ function Footer() {
         <div>
           <p>post@aadland-service.no</p>
           <p>471 54 898</p>
-          <p>Org.nr. 937 781 873 MVA</p><p><a href="/vilkar/salg">Salgsbetingelser</a> · <a href="/vilkar/utleie">Utleiebetingelser</a></p>
+          <p>Org.nr. 937 781 873 MVA</p><p><a href="/vilkar/salg">Salgsbetingelser</a> · <a href="/vilkar/utleie">Utleiebetingelser</a> · <a href="/personvern">Personvern</a></p>
         </div>
       </div>
     </footer>
