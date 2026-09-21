@@ -6,7 +6,7 @@ export async function POST(req){
   const {email}=await req.json();
   const value=String(email||"").trim().toLowerCase();
   if(!value)return NextResponse.json({error:"Skriv inn e-postadressen din."},{status:400});
-  const supabase=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+  const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.SUPABASE_SERVICE_ROLE_KEY;if(!url||!key)return NextResponse.json({error:"Passordgjenoppretting er ikke konfigurert."},{status:503});const supabase=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
   const redirectTo=new URL("/admin/nytt-passord",req.url).toString();
   const {error}=await supabase.auth.resetPasswordForEmail(value,{redirectTo});
   if(error)return NextResponse.json({error:"Kunne ikke sende e-post akkurat nå."},{status:500});
