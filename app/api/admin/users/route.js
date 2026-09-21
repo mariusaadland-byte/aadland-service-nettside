@@ -94,6 +94,8 @@ export async function POST(req) {
     );
   }
 
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length>254 || name.length>120) { return NextResponse.json({error:"Skriv inn gyldig navn og e-post."},{status:400}); }
+
   if (password.length < 8) {
     return NextResponse.json(
       { error: "Passordet må være minst 8 tegn." },
@@ -243,8 +245,9 @@ export async function PATCH(req) {
     );
   }
 
+  const cleanName=String(body.name||"").trim();if(!cleanName||cleanName.length>120)return NextResponse.json({error:"Navnet må være mellom 1 og 120 tegn."},{status:400});
   const update = {
-    name: String(body.name || "").trim(),
+    name: cleanName,
     can_view_orders: Boolean(
       body.canViewOrders
     ),
