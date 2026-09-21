@@ -29,6 +29,29 @@ create table if not exists orders (
   created_at timestamptz not null default now()
 );
 
+
+-- Kolonner som nyere produkt- og kategoriadministrasjon forventer.
+create table if not exists public.categories (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  slug text not null unique,
+  description text,
+  image_url text,
+  sort_order integer not null default 0,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.categories enable row level security;
+grant select,insert,update,delete on public.categories to service_role;
+create index if not exists categories_active_sort_idx on public.categories(active,sort_order);
+
+alter table public.products add column if not exists category_id uuid references public.categories(id) on delete set null;
+alter table public.products add column if not exists image_urls jsonb not null default '[]'::jsonb;
+alter table public.products add column if not exists dimensions text;
+alter table public.products add column if not exists specifications jsonb not null default '[]'::jsonb;
+create index if not exists products_category_id_idx on public.products(category_id);
+
 insert into products
 (id,slug,name,category,eyebrow,description,base_price_ore,options,image_url,icon,accent,featured,active)
 values
