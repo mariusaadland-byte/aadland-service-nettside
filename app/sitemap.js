@@ -1,0 +1,1 @@
+export default function sitemap(){const base="https://www.aadland-service.no",lastModified=new Date();return ["","/tjenester","/produkter","/utleie","/personvern","/vilkar/salg","/vilkar/utleie"].map(path=>({url:base+path,lastModified,changeFrequency:path===""?"weekly":"monthly",priority:path===""?1:0.7}))}
