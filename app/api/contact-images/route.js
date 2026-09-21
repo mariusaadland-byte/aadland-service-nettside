@@ -23,10 +23,10 @@ export async function POST(request){
    const ext=file.type==="image/png"?"png":file.type==="image/webp"?"webp":"jpg";
    const path="contact/"+new Date().toISOString().slice(0,10)+"/"+crypto.randomUUID()+"."+ext;
    const bytes=new Uint8Array(await file.arrayBuffer());
-   const {error}=await supabase.storage.from("product-images").upload(path,bytes,{contentType:file.type,upsert:false});
+   const bucket="contact-images";
+   const {error}=await supabase.storage.from(bucket).upload(path,bytes,{contentType:file.type,upsert:false});
    if(error) throw error;
-   const {data:publicData}=supabase.storage.from("product-images").getPublicUrl(path);
-   urls.push(publicData.publicUrl);
+   urls.push(`private-image:${bucket}:${path}`);
   }
   return NextResponse.json({urls});
  }catch(error){
