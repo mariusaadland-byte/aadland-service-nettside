@@ -5,7 +5,7 @@ import {
 } from "../../../../lib/auth";
 import { db } from "../../../../lib/supabase";
 
-const mapOrder = (o) => ({
+async function signPrivateImages(s,value){if(typeof value!=="string")return value;const matches=[...value.matchAll(/private-image:([a-z0-9_-]+):([^\s]+)/gi)];let out=value;for(const match of matches){const bucket=match[1],path=match[2];const {data,error}=await s.storage.from(bucket).createSignedUrl(path,3600);if(!error&&data?.signedUrl)out=out.replace(match[0],data.signedUrl)}return out}\n\nconst mapOrder = (o) => ({
   id: o.id,
   orderNumber: o.order_number,
   orderType: o.order_type,
@@ -81,7 +81,7 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    orders: (data || []).map(mapOrder),
+    orders: await Promise.all((data || []).map(async order=>{const mapped=mapOrder(order);mapped.customRequest=await signPrivateImages(s,mapped.customRequest);return mapped;})),
   });
 }
 
