@@ -1,22 +1,54 @@
 # Produksjonsrekkefølge for Supabase
 
-Kjør disse filene i denne rekkefølgen når testgrenen er godkjent. Ikke hopp over trinn.
+For et nytt/tomt Supabase-prosjekt kan `ALL_MIGRATIONS.sql` kjøres som samlet migrasjon. Den holdes synkron med filene under.
 
-1. `schema.sql` – produkter, ordre, kategorier og privat `contact-images`-bucket.
-2. `commerce.sql` – lager, frakt, betalings-/leveringsfelter og ordreindekser.
+Ved trinnvis kjøring brukes denne rekkefølgen:
+
+1. `schema.sql` – produkter, ordre, kategorier, `admin_users`, offentlig `product-images` og privat `contact-images`.
+2. `commerce.sql` – lager, frakt, betalings-/leveringsfelter og atomisk lagerreservasjon.
 3. `surveys.sql` – befaringstid og interne notater på ordre.
-4. `rental.sql` – utleieutstyr, blokkeringer og bookinger.
+4. `rental.sql` – utleieutstyr, blokkeringer, bookinger og atomisk booking.
 5. `customers.sql` – kundekontoer. Må kjøres etter både ordre og utleie fordi den refererer til begge.
 6. `projects.sql` – referanseprosjekter og prosjekttegninger.
 7. `services.sql` – administrerbare tjenester.
 8. `site-settings.sql` – innhold og kontaktdata for forsiden.
 
+## Første eierkonto
+
+Migrasjonen oppretter tabellen `admin_users`, men oppretter med vilje ikke en Auth-bruker eller et standardpassord. Før backoffice kan brukes må den første eieren finnes i Supabase Auth og kobles til `admin_users` med samme UUID:
+
+```sql
+insert into public.admin_users (
+  id,email,name,role,
+  can_view_orders,can_update_orders,can_manage_products,can_manage_users,active
+)
+select
+  id,email,'Marius Aadland','owner',
+  true,true,true,true,true
+from auth.users
+where lower(email)=lower('BYTT_TIL_EIERENS_EPOST')
+on conflict (id) do update set
+  email=excluded.email,
+  name=excluded.name,
+  role='owner',
+  can_view_orders=true,
+  can_update_orders=true,
+  can_manage_products=true,
+  can_manage_users=true,
+  active=true,
+  updated_at=now();
+```
+
+Kontroller at spørringen faktisk opprettet/oppdaterte én rad. Ikke legg e-postadresse, passord eller Auth-UUID inn som hemmelighet i repoet.
+
 ## Etter SQL
 
-- Bekreft at `contact-images` finnes og er privat. `product-images` skal fortsatt være offentlig for produktbilder.
-- Test produkt/kategori CRUD i backoffice.
+- Bekreft at `contact-images` er privat og `product-images` er offentlig.
+- Bekreft at første eier kan logge inn på `/admin` og at brukeradministrasjonen åpner.
+- Test produkt/kategori CRUD og produktbildeopplasting i backoffice.
 - Test forespørsel med bilde og at bildet bare kan vises via innlogget backoffice.
 - Test ordre, befaring, utleie og kundekonto.
+- Test passordgjenoppretting for både admin og kundekonto. Produksjons-URL-ene `/admin/nytt-passord` og `/min-side/nytt-passord` må være tillatt i Supabase Auth redirect URLs.
 - Test at eksisterende data fortsatt kan leses før testgrenen merges til `main`.
 
-SQL-filene er laget idempotente der det er praktisk, men produksjonskjøring skal fortsatt gjøres kontrollert og i rekkefølgen over.
+SQL-filene er laget idempotente der det er praktisk, men produksjonskjøring skal fortsatt gjøres kontrollert.
