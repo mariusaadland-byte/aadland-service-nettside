@@ -1855,3 +1855,40 @@ html{scroll-behavior:smooth}
 .quoteConvertedJob{display:grid;gap:5px;padding:12px 14px;border:1px solid #bfd5c1;background:#edf5ed;border-radius:12px}
 .quoteConvertedJob b{color:#2f6737}
 .quoteConvertedJob a{font-size:11px;font-weight:800;text-decoration:underline}
+
+
+/* Min side */
+.customerPage{max-width:1080px;margin:0 auto;padding:50px 20px 90px}
+.customerLoginPage{max-width:640px}
+.customerTopKicker{margin-top:28px}
+.customerLoginCard{margin-top:22px}
+.customerLoginActions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.customerDashboardHeader{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-top:28px;flex-wrap:wrap}
+.customerDashboardHeader h1{margin-bottom:6px}
+.customerDashboardHeader p{margin:0}
+.customerDashboardSection{margin-top:42px}
+.customerSectionHead{display:flex;align-items:end;justify-content:space-between;gap:15px;margin-bottom:16px}
+.customerSectionHead h2{margin:2px 0 0}
+.customerSectionHead>span{min-width:34px;height:34px;border-radius:999px;display:grid;place-items:center;background:rgba(190,149,69,.13);border:1px solid rgba(190,149,69,.28);font-weight:800}
+.customerGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.customerEmpty{padding:22px}
+.customerEmpty p{margin:0}
+.customerQuoteCard,.customerHistoryCard{display:grid;gap:18px;padding:22px}
+.customerCardTop{display:flex;align-items:start;justify-content:space-between;gap:16px}
+.customerCardTop small{display:block;opacity:.65;font-weight:800;letter-spacing:.05em;margin-bottom:4px}
+.customerCardTop h3{margin:0}
+.customerStatus{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;padding:7px 10px;border-radius:999px;border:1px solid rgba(190,149,69,.28);background:rgba(190,149,69,.1);font-size:12px;font-weight:800}
+.customerStatus-accepted{background:#edf5ed;border-color:#bfd5c1;color:#2f6737}
+.customerStatus-declined,.customerStatus-cancelled{background:#f8eded;border-color:#e1bcbc;color:#8a3535}
+.customerStatus-expired{background:#f3f0e9;border-color:#d7cdb9;color:#77684c}
+.customerCardMeta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.customerCardMeta span{display:grid;gap:3px;padding:12px;border-radius:12px;background:rgba(255,255,255,.35);border:1px solid rgba(0,0,0,.06)}
+.customerCardMeta small{opacity:.65}
+.customerQuoteMessage{margin:0;font-size:14px;opacity:.8}
+.quoteConvertedListBadge{display:inline-flex;width:max-content;padding:7px 10px;border-radius:999px;background:#edf5ed;border:1px solid #bfd5c1;color:#2f6737;font-size:12px;font-weight:800;margin-top:12px}
+@media(max-width:760px){
+ .customerPage{padding:32px 14px 70px}
+ .customerGrid{grid-template-columns:1fr}
+ .customerCardMeta{grid-template-columns:1fr}
+ .customerCardTop{align-items:flex-start}
+}
