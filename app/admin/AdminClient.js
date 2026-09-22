@@ -644,6 +644,7 @@ function Surveys({ orders, status, canUpdateOrders }) {
         <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:18}}>
           {order.customerPhone && <a className="btn" href={"tel:"+order.customerPhone}>Ring kunde</a>}
           {order.customerEmail && <a className="btn alt" href={"mailto:"+order.customerEmail}>Send e-post</a>}
+          {canUpdateOrders && <a className="btn alt" href={"/admin/tilbud/ny?orderId="+order.id}>Lag tilbud</a>}
         </div>
       </article>;
     })}
