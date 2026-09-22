@@ -171,7 +171,7 @@ export async function POST(req) {
         error:
           "Databasen er ikke tilgjengelig.",
       },
-      { status: 500 }
+      { status: 503 }
     );
   }
 
@@ -280,9 +280,12 @@ export async function PATCH(req) {
         error:
           "Databasen er ikke tilgjengelig.",
       },
-      { status: 500 }
+      { status: 503 }
     );
   }
+
+  const { data: existing, error: existingError } = await s.from("categories").select("name").eq("id", body.id).single();
+  if (existingError || !existing) return NextResponse.json({error:"Kategorien ble ikke funnet."},{status:404});
 
   const { data, error } =
     await s
@@ -314,6 +317,11 @@ export async function PATCH(req) {
       .eq("id", body.id)
       .select("*")
       .single();
+
+  if (!error && existing.name !== name) {
+    const {error: productUpdateError}=await s.from("products").update({category:name,updated_at:new Date().toISOString()}).eq("category_id",body.id);
+    if(productUpdateError) console.error("CATEGORY PRODUCT NAME SYNC ERROR:",productUpdateError);
+  }
 
   if (error) {
     console.error(
