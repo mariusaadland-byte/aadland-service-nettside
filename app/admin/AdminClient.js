@@ -3274,18 +3274,18 @@ function RentalItems({items,categories,blocks,reload,setError,categorySetupRequi
  return <>
   {categorySetupRequired&&<div className="adminProjectMigrationWarning">
    <b>Databaseoppdatering mangler for utleiekategorier</b>
-   <span>Kategorier og egne utleiesider er programmert, men migreringen må kjøres før kategorier kan lagres.</span>
-   <code>supabase/rental_categories.sql</code>
-   <small>Kjør innholdet i denne filen én gang i Supabase SQL Editor.</small>
+   <span>Kjør <code>supabase/rental_categories.sql</code> i Supabase før kategorier tas i bruk.</span>
   </div>}
 
-  <RentalCategoryManager categories={categories} items={items} reload={reload} setError={setError} disabled={categorySetupRequired}/>
-
   <div className="adminRentalToolbar">
-   <div><div className="kicker">UTLEIEUTSTYR</div><p className="muted">Velg kategori på hvert produkt. Når det publiseres får det automatisk eget kort i katalogen og egen side med kalender.</p></div>
-   <button className="btn" disabled={categorySetupRequired} onClick={()=>setShowNew(!showNew)}>{showNew?"Avbryt":"Legg til utstyr"}</button>
+   <div><div className="kicker">UTLEIEUTSTYR</div><p className="muted">Nye produkter får eget kort i katalogen og egen utleieside. Velg kategori når du oppretter eller redigerer produktet.</p></div>
+   <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+    <a className="btn alt" href="/admin/utleiekategorier">Administrer kategorier</a>
+    <button className="btn" disabled={categorySetupRequired} onClick={()=>setShowNew(!showNew)}>{showNew?"Avbryt":"Legg til utstyr"}</button>
+   </div>
   </div>
-  {showNew&&<RentalEditor item={null} categories={categories} reload={reload} setError={setError} close={()=>setShowNew(false)}/>} 
+
+  {showNew&&<RentalEditor item={null} categories={categories} reload={reload} setError={setError} close={()=>setShowNew(false)}/>}
   <div className="grid">{items.map(item=><RentalEditor key={item.id} item={item} categories={categories} reload={reload} setError={setError}/>)}</div>
 
   <div className="card" style={{marginTop:24}}><div className="kicker">Tilgjengelighet</div><h3>Blokker datoer manuelt</h3><p className="muted">Bruk dette ved service, eget bruk eller andre perioder utstyret ikke kan leies ut.</p>
@@ -3295,47 +3295,6 @@ function RentalItems({items,categories,blocks,reload,setError,categorySetupRequi
    {blocks.length>0&&<div style={{marginTop:18}}>{blocks.map(b=><div key={b.id} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"10px 0",borderTop:"1px solid #ddd"}}><span><b>{items.find(i=>i.id===b.itemId)?.name||"Utstyr"}</b> · {b.startDate} – {b.endDate}{b.reason?" · "+b.reason:""}</span><button className="btn alt" onClick={()=>removeBlock(b.id)}>Fjern</button></div>)}</div>}
   </div>
  </>;
-}
-
-function RentalCategoryManager({categories,items,reload,setError,disabled}){
- const [show,setShow]=useState(false);
- const [name,setName]=useState("");
- const [description,setDescription]=useState("");
- const [saving,setSaving]=useState(false);
-
- async function create(e){
-  e.preventDefault();
-  if(!name.trim())return;
-  setSaving(true);setError("");
-  const r=await fetch("/api/admin/rental/categories",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,description,active:true})});
-  const d=await r.json().catch(()=>({}));
-  setSaving(false);
-  if(!r.ok){setError(d.error||"Kategorien kunne ikke opprettes.");return;}
-  setName("");setDescription("");await reload();
- }
- async function remove(category){
-  if((items||[]).some(item=>item.categoryId===category.id)){setError("Flytt utleieproduktene ut av kategorien før den slettes.");return;}
-  if(!window.confirm('Slette kategorien "'+category.name+'"?'))return;
-  const r=await fetch("/api/admin/rental/categories",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:category.id})});
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok){setError(d.error||"Kategorien kunne ikke slettes.");return;}
-  await reload();
- }
- return <div className="card adminRentalCategories">
-  <div className="adminRentalCategoryHead">
-   <div><div className="kicker">UTLEIEKATEGORIER</div><h3>Hold utleien ryddig</h3><p className="muted">F.eks. Hengere, Maskiner, Verktøy og Hage.</p></div>
-   <button type="button" className="btn alt" disabled={disabled} onClick={()=>setShow(!show)}>{show?"Lukk":"Administrer kategorier"}</button>
-  </div>
-  {categories.length>0&&<div className="adminRentalCategoryChips">{categories.map(category=><span key={category.id}>{category.name} <small>{(items||[]).filter(item=>item.categoryId===category.id).length}</small></span>)}</div>}
-  {show&&!disabled&&<div className="adminRentalCategoryPanel">
-   <form onSubmit={create}>
-    <div className="field"><label>Ny kategori</label><input required value={name} onChange={e=>setName(e.target.value)} placeholder="F.eks. Hengere"/></div>
-    <div className="field"><label>Kort beskrivelse <span className="muted">(valgfritt)</span></label><input value={description} onChange={e=>setDescription(e.target.value)} placeholder="Kort tekst om kategorien"/></div>
-    <button className="btn" disabled={saving}>{saving?"Oppretter …":"Opprett kategori"}</button>
-   </form>
-   {categories.length>0&&<div className="adminRentalCategoryList">{categories.map(category=><div key={category.id}><span><b>{category.name}</b><small>{(items||[]).filter(item=>item.categoryId===category.id).length} produkter</small></span><button type="button" className="btn alt" onClick={()=>remove(category)}>Slett</button></div>)}</div>}
-  </div>}
- </div>;
 }
 
 function RentalEditor({item,categories=[],reload,setError,close}){
