@@ -37,8 +37,8 @@ export async function POST(req){
  const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin||"https://www.aadland-service.no");
  const link=base+"/tilbud/"+encodeURIComponent(quote.id)+"?token="+encodeURIComponent(token);
  const valid=quote.valid_until?new Date(quote.valid_until+"T12:00:00").toLocaleDateString("nb-NO"):"";
- const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
- const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+ const from="Aadland Service <post@aadland-service.no>";
+ const replyTo="post@aadland-service.no";
  const customerName=esc(quote.customer?.name||"");
  const title=esc(quote.title||"Tilbud");
  const number=esc(quote.quote_number||"");
