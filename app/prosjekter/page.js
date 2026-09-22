@@ -48,8 +48,8 @@ export default function ProjectsPage(){
     </div>
 
     {!loading&&!error&&categories.length>1&&<div className="projectGalleryFilters" aria-label="Filtrer prosjekter etter kategori">
-     <button type="button" className={categoryFilter==="all"?"isActive":""} onClick={()=>setCategoryFilter("all")}>Alle</button>
-     {categories.map(category=><button type="button" key={category} className={categoryFilter===category?"isActive":""} onClick={()=>setCategoryFilter(category)}>{category}</button>)}
+     <button type="button" aria-pressed={categoryFilter==="all"} className={categoryFilter==="all"?"isActive":""} onClick={()=>setCategoryFilter("all")}>Alle</button>
+     {categories.map(category=><button type="button" key={category} aria-pressed={categoryFilter===category} className={categoryFilter===category?"isActive":""} onClick={()=>setCategoryFilter(category)}>{category}</button>)}
     </div>}
 
     {loading&&<div className="catalogStatus">Laster prosjekter …</div>}
@@ -60,7 +60,7 @@ export default function ProjectsPage(){
     {!loading&&!error&&filteredProjects.length>0&&<div className="projectGalleryGrid">
      {filteredProjects.map((project,index)=>{
       const image=project.imageUrls?.[0];
-      return <Link href={"/prosjekter/"+project.slug} className="projectGalleryCard" key={project.id||project.slug}>
+      return <Link href={"/prosjekter/"+project.slug} className="projectGalleryCard" key={project.id||project.slug} aria-label={"Se prosjektet "+project.title}>
        <div className="projectGalleryMedia">
         {image?<img src={image} alt={project.title}/>:<CatalogPlaceholder label="Prosjektbilde kommer"/>}
         <span className="projectGalleryImageCount">{project.imageUrls?.length ? `${project.imageUrls.length} ${project.imageUrls.length===1?"bilde":"bilder"}` : "Bilder kommer"}</span>
