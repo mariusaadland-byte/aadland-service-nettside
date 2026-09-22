@@ -56,6 +56,21 @@ export default function ProjectDetailPage(){
   ? project.contentBlocks.filter(block=>block&&((block.type==="image"&&block.url)||(block.type==="text"&&(block.eyebrow||block.title||block.body))))
   : images.map((url,index)=>({id:"image-"+index,type:"image",url}));
 
+ const storySections=[];
+ let pendingImages=[];
+ storyBlocks.forEach((block,index)=>{
+  if(block.type==="image"){
+   pendingImages.push({...block,_storyIndex:index});
+   return;
+  }
+  if(pendingImages.length){
+   storySections.push({type:"images",id:"images-"+index,items:pendingImages});
+   pendingImages=[];
+  }
+  storySections.push({...block,_storyIndex:index});
+ });
+ if(pendingImages.length)storySections.push({type:"images",id:"images-end",items:pendingImages});
+
  function openStoryImage(url){
   const index=images.indexOf(url);
   if(index>=0)setActiveImage(index);
@@ -84,17 +99,27 @@ export default function ProjectDetailPage(){
      <div className="projectDetailPlaceholder"><CatalogPlaceholder label="Bilder kommer"/></div>
     ):(
      <div className="projectStory">
-      {storyBlocks.map((block,index)=>block.type==="text"?(
-       <section className="projectStoryText" key={block.id||("text-"+index)}>
-        {block.eyebrow&&<span className="catalogEyebrow">{block.eyebrow}</span>}
-        {block.title&&<h3>{block.title}</h3>}
-        {block.body&&<p>{block.body}</p>}
+      {storySections.map((section,index)=>section.type==="text"?(
+       <section className="projectStoryText" key={section.id||("text-"+index)}>
+        {section.eyebrow&&<span className="catalogEyebrow">{section.eyebrow}</span>}
+        {section.title&&<h3>{section.title}</h3>}
+        {section.body&&<p>{section.body}</p>}
        </section>
       ):(
-       <button className="projectStoryImage" key={block.id||block.url||index} type="button" onClick={()=>openStoryImage(block.url)} aria-label={"Åpne prosjektbilde "+(index+1)}>
-        <img src={block.url} alt={project.title+" – prosjektbilde"}/>
-        <span>Se bilde</span>
-       </button>
+       <div className={"projectStoryImageGroup imageCount"+section.items.length} key={section.id||("images-"+index)}>
+        {section.items.map((block,imageIndex)=>(
+         <button
+          className={"projectStoryImage "+(section.items.length%2===1&&imageIndex===section.items.length-1?"isLastOdd":"")}
+          key={block.id||block.url||imageIndex}
+          type="button"
+          onClick={()=>openStoryImage(block.url)}
+          aria-label={"Åpne prosjektbilde "+(images.indexOf(block.url)+1)}
+         >
+          <img src={block.url} alt={project.title+" – prosjektbilde "+(images.indexOf(block.url)+1)}/>
+          <span>Se bilde</span>
+         </button>
+        ))}
+       </div>
       ))}
      </div>
     )}
