@@ -76,6 +76,8 @@ export default function ProjectDetailPage(){
   if(index>=0)setActiveImage(index);
  }
 
+ const activeStoryImage=activeImage===null?null:storyBlocks.find(block=>block.type==="image"&&block.url===images[activeImage]);
+
  return <main className="catalogPage projectDetailPage">
   <CatalogHeader/>
 
@@ -115,8 +117,9 @@ export default function ProjectDetailPage(){
           onClick={()=>openStoryImage(block.url)}
           aria-label={"Åpne prosjektbilde "+(images.indexOf(block.url)+1)}
          >
-          <img src={block.url} alt={project.title+" – prosjektbilde "+(images.indexOf(block.url)+1)}/>
-          <span>Se bilde</span>
+          <img src={block.url} alt={block.alt||project.title+" – prosjektbilde "+(images.indexOf(block.url)+1)}/>
+          <span className="projectStoryOpen">Se bilde</span>
+          {block.caption&&<small className="projectStoryCaption">{block.caption}</small>}
          </button>
         ))}
        </div>
@@ -139,7 +142,8 @@ export default function ProjectDetailPage(){
    <div className="projectLightboxInner" role="dialog" aria-modal="true" aria-label={"Bilde "+(activeImage+1)+" av "+images.length} onClick={e=>e.stopPropagation()}>
     <button className="projectLightboxClose" type="button" aria-label="Lukk bilde" autoFocus onClick={()=>setActiveImage(null)}>×</button>
     {images.length>1&&<button className="projectLightboxPrev" type="button" aria-label="Forrige bilde" onClick={()=>setActiveImage((activeImage-1+images.length)%images.length)}>←</button>}
-    <img src={images[activeImage]} alt={project.title+" – bilde "+(activeImage+1)}/>
+    <img src={images[activeImage]} alt={activeStoryImage?.alt||project.title+" – bilde "+(activeImage+1)}/>
+    {activeStoryImage?.caption&&<div className="projectLightboxCaption">{activeStoryImage.caption}</div>}
     {images.length>1&&<button className="projectLightboxNext" type="button" aria-label="Neste bilde" onClick={()=>setActiveImage((activeImage+1)%images.length)}>→</button>}
     <div className="projectLightboxCount">{activeImage+1} / {images.length}</div>
    </div>

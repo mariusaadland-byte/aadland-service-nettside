@@ -3335,7 +3335,7 @@ function projectBlockId(){
 
 function defaultProjectBlocks(project){
  if(Array.isArray(project?.contentBlocks)&&project.contentBlocks.length)return project.contentBlocks;
- return (Array.isArray(project?.imageUrls)?project.imageUrls:[]).map(url=>({id:projectBlockId(),type:"image",url}));
+ return (Array.isArray(project?.imageUrls)?project.imageUrls:[]).map(url=>({id:projectBlockId(),type:"image",url,caption:"",alt:""}));
 }
 
 function ProjectEditor({project,reload,setError,close,storySetupRequired=false}){
@@ -3400,7 +3400,7 @@ function ProjectEditor({project,reload,setError,close,storySetupRequired=false})
    imageUrls:[...current.imageUrls,...urls].slice(0,30),
    contentBlocks:[
     ...current.contentBlocks,
-    ...urls.map(url=>({id:projectBlockId(),type:"image",url}))
+    ...urls.map(url=>({id:projectBlockId(),type:"image",url,caption:"",alt:""}))
    ].slice(0,80)
   }));
 
@@ -3470,7 +3470,7 @@ function ProjectEditor({project,reload,setError,close,storySetupRequired=false})
     ...current,
     contentBlocks:[
      ...current.contentBlocks,
-     ...missing.map(url=>({id:projectBlockId(),type:"image",url}))
+     ...missing.map(url=>({id:projectBlockId(),type:"image",url,caption:"",alt:""}))
     ].slice(0,80)
    };
   });
@@ -3647,8 +3647,13 @@ function ProjectEditor({project,reload,setError,close,storySetupRequired=false})
      </div>
 
      {block.type==="image"?<div className="adminProjectStoryImage">
-      <img src={block.url} alt=""/>
-      <div><b>Bilde</b><small>Vises i denne posisjonen på prosjektsiden.</small></div>
+      <img src={block.url} alt={block.alt||""}/>
+      <div className="adminProjectStoryImageFields">
+       <b>Bilde</b>
+       <small>Vises i denne posisjonen på prosjektsiden.</small>
+       <div className="field"><label>Bildetekst <span>(valgfritt)</span></label><input value={block.caption||""} onChange={e=>updateContentBlock(index,{caption:e.target.value})} placeholder="F.eks. Ny levegg og ferdig terrasse"/></div>
+       <div className="field"><label>Alternativ tekst <span>(valgfritt)</span></label><input value={block.alt||""} onChange={e=>updateContentBlock(index,{alt:e.target.value})} placeholder="Kort beskrivelse av bildet for tilgjengelighet"/></div>
+      </div>
      </div>:<div className="adminProjectStoryText">
       <div className="field"><label>Liten gulltekst</label><input value={block.eyebrow||""} onChange={e=>updateContentBlock(index,{eyebrow:e.target.value})} placeholder="F.eks. FØR ARBEIDET"/></div>
       <div className="field"><label>Overskrift</label><input value={block.title||""} onChange={e=>updateContentBlock(index,{title:e.target.value})} placeholder="Hva gjorde vi her?"/></div>
@@ -3676,7 +3681,7 @@ function ProjectEditor({project,reload,setError,close,storySetupRequired=false})
       {section.title&&<h4>{section.title}</h4>}
       {section.body&&<p>{section.body}</p>}
      </section>:<div className={"adminProjectPreviewImages "+(section.items.length===1?"single":"")} key={section.id||index}>
-      {section.items.map((block,imageIndex)=><img key={block.id||block.url||imageIndex} src={block.url} alt=""/>)}
+      {section.items.map((block,imageIndex)=><figure key={block.id||block.url||imageIndex}><img src={block.url} alt={block.alt||""}/>{block.caption&&<figcaption>{block.caption}</figcaption>}</figure>)}
      </div>)}
     </div>
    </div>

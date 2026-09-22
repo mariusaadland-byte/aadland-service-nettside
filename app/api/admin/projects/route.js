@@ -34,7 +34,13 @@ function cleanBlocks(input,imageUrls){
   }
   const url=String(block?.url||"").trim().slice(0,2000);
   if(!url||!allowedImages.has(url))return null;
-  return {id,type:"image",url};
+  return {
+   id,
+   type:"image",
+   url,
+   caption:String(block?.caption||"").trim().slice(0,300),
+   alt:String(block?.alt||"").trim().slice(0,300)
+  };
  }).filter(Boolean);
 }
 

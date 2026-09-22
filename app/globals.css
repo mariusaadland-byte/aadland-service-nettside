@@ -1269,3 +1269,22 @@ html{scroll-behavior:smooth}
  .projectGalleryFilters::-webkit-scrollbar{display:none}
  .projectGalleryFilters button{flex:0 0 auto}
 }
+
+
+/* Project image captions and accessible image descriptions */
+.adminProjectStoryImage{align-items:flex-start}
+.adminProjectStoryImageFields{display:grid;gap:5px;min-width:0;flex:1}
+.adminProjectStoryImageFields .field{margin-top:8px;margin-bottom:0}
+.adminProjectStoryImageFields .field label span{font-weight:400;color:#8a8175}
+.projectStoryImage>span.projectStoryOpen{left:auto;right:14px;top:14px;bottom:auto}
+.projectStoryCaption{position:absolute;z-index:2;left:14px;right:14px;bottom:14px;padding:10px 12px;background:rgba(8,8,8,.76);color:#fff;font-size:11px;font-weight:600;line-height:1.45;text-align:left}
+.projectStoryImage:has(.projectStoryCaption)>span.projectStoryOpen{top:14px}
+.projectLightboxCaption{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);max-width:min(760px,80%);padding:9px 12px;background:rgba(10,10,10,.78);color:#fff;font-size:12px;line-height:1.5;text-align:center}
+.adminProjectPreviewImages figure{margin:0;display:grid;background:#111}
+.adminProjectPreviewImages figure img{width:100%}
+.adminProjectPreviewImages figcaption{padding:9px 11px;background:#171717;color:rgba(255,255,255,.72);font-size:11px;line-height:1.45}
+@media(max-width:600px){
+ .adminProjectStoryImageFields{width:100%}
+ .projectStoryCaption{font-size:10px}
+ .projectLightboxCaption{bottom:42px;max-width:92%;font-size:11px}
+}
