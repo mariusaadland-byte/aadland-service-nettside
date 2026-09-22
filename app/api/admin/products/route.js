@@ -8,7 +8,7 @@ function cleanText(value) {
 
 function validPrice(value) {
   const number = Number(value);
-  return Number.isFinite(number) && number >= 0;
+  return Number.isInteger(number) && number >= 0 && number <= 100000000;
 }
 
 function cleanArray(value) {
@@ -27,6 +27,7 @@ function validateProductExtras(body) {
   const specs=cleanArray(body.specifications);
   const options=cleanArray(body.options);
   if(images.length>30||images.some(v=>cleanText(v).length>2000)) return "For mange bilder eller for lang bildeadresse.";
+  if(cleanText(body.imageUrl).length>2000) return "Bildeadressen er for lang.";
   if(specs.length>50||JSON.stringify(specs).length>20000) return "Produktspesifikasjonene er for omfattende.";
   if(options.length>20||JSON.stringify(options).length>30000) return "Produktvalgene er for omfattende.";
   const nums=[
