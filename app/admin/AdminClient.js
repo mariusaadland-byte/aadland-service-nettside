@@ -417,9 +417,10 @@ export default function AdminClient({ user }) {
 
             {canViewOrders && (
               <Orders
-                orders={orders.slice(0, 5)}
+                orders={orders.filter(order => !order.archivedAt).slice(0, 5)}
                 status={status}
                 canUpdateOrders={canUpdateOrders}
+                reload={load}
               />
             )}
 
@@ -438,9 +439,10 @@ export default function AdminClient({ user }) {
 
         {tab === "orders" && canViewOrders && (
           <Orders
-            orders={orders.filter(order => order.orderType !== "custom")}
+            orders={orders.filter(order => order.orderType !== "custom" && !order.archivedAt)}
             status={status}
             canUpdateOrders={canUpdateOrders}
+            reload={load}
           />
         )}
 
@@ -540,7 +542,21 @@ function Customers({orders,bookings}) {
 
 function Orders({ orders, status, canUpdateOrders, reload }) {
  const [openId,setOpenId]=useState(null),[savingId,setSavingId]=useState(null),[message,setMessage]=useState("");
- async function archive(order){if(!confirm("Flytte denne til arkivet?"))return;setSavingId(order.id);const r=await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,action:"archive"})});setSavingId(null);if(r.ok)await reload();}
+ async function archive(order){
+  if(!confirm("Flytte denne til arkivet?"))return;
+  setSavingId(order.id);
+  setMessage("");
+  const r=await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,action:"archive"})});
+  const d=await r.json().catch(()=>({}));
+  setSavingId(null);
+  if(!r.ok){
+   setMessage(d.error||"Oppdraget kunne ikke arkiveres.");
+   return;
+  }
+  setOpenId(null);
+  setMessage("Flyttet til arkivet.");
+  if(typeof reload==="function")await reload();
+ }
  async function saveTracking(order){
   setSavingId(order.id);
   const trackingNumber=document.getElementById("tracking-number-"+order.id)?.value||"",trackingUrl=document.getElementById("tracking-url-"+order.id)?.value||"";
