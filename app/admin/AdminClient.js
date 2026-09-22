@@ -3266,25 +3266,9 @@ function ServiceEditor({ service, reload, setError, close }) {
   </form>;
 }
 
-function RentalItems({items,blocks,reload,setError}){
+function RentalItems({items,categories=[],blocks,reload,setError,categorySetupRequired=false}){
  const [showNew,setShowNew]=useState(false);
- const [categories,setCategories]=useState([]);
- const [categoriesLoading,setCategoriesLoading]=useState(true);
  const [block,setBlock]=useState({itemId:"",startDate:"",endDate:"",reason:""});
-
- useEffect(()=>{
-  let cancelled=false;
-  fetch("/api/admin/rental/categories")
-   .then(async response=>{
-    const data=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(data.error||"Kategoriene kunne ikke lastes.");
-    return data;
-   })
-   .then(data=>{if(!cancelled)setCategories(data.categories||[])})
-   .catch(error=>{if(!cancelled)setError(error.message||"Kategoriene kunne ikke lastes.")})
-   .finally(()=>{if(!cancelled)setCategoriesLoading(false)});
-  return()=>{cancelled=true};
- },[]);
 
  async function addBlock(e){e.preventDefault();setError("");const r=await fetch("/api/admin/rental/blocks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(block)});const d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Perioden kunne ikke blokkeres.");return;}setBlock({itemId:"",startDate:"",endDate:"",reason:""});await reload();}
  async function removeBlock(id){const r=await fetch("/api/admin/rental/blocks",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});if(!r.ok){setError("Blokkeringen kunne ikke fjernes.");return;}await reload();}
@@ -3292,10 +3276,10 @@ function RentalItems({items,blocks,reload,setError}){
  return <>
   <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20}}>
    <a className="btn alt" href="/admin/utleiekategorier">Utleiekategorier</a>
-   <button className="btn" disabled={categoriesLoading||categories.length===0} onClick={()=>setShowNew(!showNew)}>{showNew?"Avbryt":"Legg til utstyr"}</button>
+   <button className="btn" disabled={categorySetupRequired||categories.length===0} onClick={()=>setShowNew(!showNew)}>{showNew?"Avbryt":"Legg til utstyr"}</button>
   </div>
 
-  {!categoriesLoading&&categories.length===0&&<div className="notice"><b>Lag en utleiekategori først.</b><p>Alle nye utleieprodukter må ha kategori før de kan lagres.</p></div>}
+  {categorySetupRequired?<div className="notice"><b>Databaseoppdatering mangler for utleiekategorier.</b><p>Kjør utleiekategori-migreringen i Supabase før nye utleieprodukter opprettes.</p></div>:categories.length===0&&<div className="notice"><b>Lag en utleiekategori først.</b><p>Alle nye utleieprodukter må ha kategori før de kan lagres.</p></div>}
 
   {showNew&&<RentalEditor item={null} categories={categories} reload={reload} setError={setError} close={()=>setShowNew(false)}/>}
   <div className="grid">{items.map(item=><RentalEditor key={item.id} item={item} categories={categories} reload={reload} setError={setError}/>)}</div>
