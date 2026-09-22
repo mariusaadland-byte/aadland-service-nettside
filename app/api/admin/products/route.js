@@ -140,7 +140,10 @@ export async function POST(req) {
 
     if (name.length > 160 || cleanText(body.description).length > 5000 || cleanText(body.dimensions).length > 500 || cleanText(body.leadTimeText).length > 500) return NextResponse.json({ error: "Et eller flere produktfelt er for lange." }, { status: 400 });
 
-    const extraError = validateProductExtras(body);\n    if (extraError) return NextResponse.json({ error: extraError }, { status: 400 });\n\n    if (!validPrice(body.basePriceOre)) {
+    const extraError = validateProductExtras(body);
+    if (extraError) return NextResponse.json({ error: extraError }, { status: 400 });
+
+    if (!validPrice(body.basePriceOre)) {
       return NextResponse.json(
         { error: "Produktet må ha en gyldig pris." },
         { status: 400 }
@@ -305,7 +308,10 @@ export async function PATCH(req) {
 
     if (name.length > 160 || cleanText(body.description).length > 5000 || cleanText(body.dimensions).length > 500 || cleanText(body.leadTimeText).length > 500) return NextResponse.json({ error: "Et eller flere produktfelt er for lange." }, { status: 400 });
 
-    const extraError = validateProductExtras(body);\n    if (extraError) return NextResponse.json({ error: extraError }, { status: 400 });\n\n    if (!validPrice(body.basePriceOre)) {
+    const extraError = validateProductExtras(body);
+    if (extraError) return NextResponse.json({ error: extraError }, { status: 400 });
+
+    if (!validPrice(body.basePriceOre)) {
       return NextResponse.json(
         { error: "Produktet må ha en gyldig pris." },
         { status: 400 }
