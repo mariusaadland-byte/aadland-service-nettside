@@ -32,11 +32,12 @@ export default async function sitemap(){
   const s=db();
   if(!s)return routes;
 
-  const [servicesResult,categoriesResult,productsResult,projectsResult]=await Promise.all([
+  const [servicesResult,categoriesResult,productsResult,projectsResult,rentalItemsResult]=await Promise.all([
    s.from("services").select("slug,has_page,publish_from,publish_until,updated_at,created_at").eq("active",true),
    s.from("categories").select("slug,updated_at,created_at").eq("active",true),
    s.from("products").select("slug,updated_at,created_at").eq("active",true),
-   s.from("projects").select("slug,updated_at,created_at").eq("active",true)
+   s.from("projects").select("slug,updated_at,created_at").eq("active",true),
+   s.from("rental_items").select("slug,status,updated_at,created_at").eq("active",true).neq("status","hidden")
   ]);
 
   const now=Date.now();
@@ -73,6 +74,17 @@ export default async function sitemap(){
      .76,
      "weekly",
      product.updated_at||product.created_at||undefined
+    )));
+  }
+
+  if(!rentalItemsResult.error&&Array.isArray(rentalItemsResult.data)){
+   rentalItemsResult.data
+    .filter(item=>validSlug(item.slug))
+    .forEach(item=>routes.push(route(
+     "/utleie/"+encodeURIComponent(item.slug),
+     .74,
+     "weekly",
+     item.updated_at||item.created_at||undefined
     )));
   }
 
