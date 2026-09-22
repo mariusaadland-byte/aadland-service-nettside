@@ -20,14 +20,15 @@ export async function generateMetadata({params}){
 
  if(!project){
   return {
-   title:"Prosjekt | Aadland Service",
+   title:"Prosjekt",
    description:"Tidligere oppdrag utført av Aadland Service.",
    robots:{index:false,follow:false}
   };
  }
 
- const title=`${project.title} | Aadland Service`;
- const description=String(project.description||`Se bilder og informasjon fra ${project.title}, utført av Aadland Service.`).slice(0,220);
+ const title=project.title;
+ const socialTitle=`${project.title} | Aadland Service`;
+ const description=String(project.description||`Se bilder og informasjon fra ${project.title}, utført av Aadland Service.`).slice(0,180);
  const image=Array.isArray(project.image_urls)&&project.image_urls[0]?project.image_urls[0]:null;
  const url=`https://www.aadland-service.no/prosjekter/${encodeURIComponent(project.slug)}`;
 
@@ -39,14 +40,14 @@ export async function generateMetadata({params}){
    type:"article",
    locale:"nb_NO",
    siteName:"Aadland Service",
-   title,
+   title:socialTitle,
    description,
    url,
    ...(image?{images:[{url:image,alt:project.title}]}:{})
   },
   twitter:{
    card:image?"summary_large_image":"summary",
-   title,
+   title:socialTitle,
    description,
    ...(image?{images:[image]}:{})
   }
