@@ -33,7 +33,11 @@ export default function Utleie(){
   return()=>{cancelled=true};
  },[]);
 
- const visible=useMemo(()=>filter==="all"?items:items.filter(item=>item.categoryId===filter),[items,filter]);
+ const visible=useMemo(()=>{
+  if(filter==="all")return items;
+  if(filter==="uncategorized")return items.filter(item=>!item.categoryId);
+  return items.filter(item=>item.categoryId===filter);
+ },[items,filter]);
  const uncategorized=items.some(item=>!item.categoryId);
 
  return <main className="catalogPage rentalPage">
@@ -71,7 +75,7 @@ export default function Utleie(){
      <div className="catalogNotice"><b>Ingen produkter her ennå</b><p>Prøv en annen kategori.</p></div>
     ):(
      <div className="rentalCatalogGrid">
-      {(filter==="uncategorized"?items.filter(item=>!item.categoryId):visible).map(item=>{
+      {visible.map(item=>{
        const image=item.imageUrls?.[0];
        return <Link href={"/utleie/"+item.slug} className="rentalCatalogCard" key={item.id} aria-label={"Se og lei "+item.name}>
         <div className="rentalCatalogMedia">
