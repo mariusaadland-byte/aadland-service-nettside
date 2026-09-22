@@ -6,10 +6,26 @@ import {CatalogFooter,CatalogHeader,CatalogPlaceholder} from "../produkter/Produ
 
 const kr=o=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",maximumFractionDigits:0}).format((Number(o)||0)/100);
 
+function mixRentalItems(items,categories){
+ const categoryIds=categories.map(category=>category.id);
+ const groups=categoryIds.map(id=>items.filter(item=>item.categoryId===id));
+ const extra=items.filter(item=>!categoryIds.includes(item.categoryId));
+ const mixed=[];
+ let index=0;
+ while(groups.some(group=>index<group.length)){
+  for(const group of groups){
+   if(index<group.length)mixed.push(group[index]);
+  }
+  index++;
+ }
+ return mixed.concat(extra);
+}
+
 export default function Utleie(){
  const [items,setItems]=useState([]);
  const [categories,setCategories]=useState([]);
- const [filter,setFilter]=useState("");
+ const [filter,setFilter]=useState("all");
+ const [visibleCount,setVisibleCount]=useState(12);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
  const [setup,setSetup]=useState(false);
@@ -28,12 +44,7 @@ export default function Utleie(){
     const nextItems=data.items||[];
     setCategories(nextCategories);
     setItems(nextItems);
-    setFilter(current=>{
-     if(current)return current;
-     if(nextCategories.length)return nextCategories[0].id;
-     if(nextItems.some(item=>!item.categoryId))return "uncategorized";
-     return "all";
-    });
+    setFilter("all");
     setSetup(!!data.setupRequired);
    })
    .catch(err=>{if(!cancelled)setError(err.message||"Utleie kunne ikke lastes.")})
@@ -41,12 +52,19 @@ export default function Utleie(){
   return()=>{cancelled=true};
  },[]);
 
- const visible=useMemo(()=>{
+ const mixedItems=useMemo(()=>mixRentalItems(items,categories),[items,categories]);
+ const filtered=useMemo(()=>{
   if(filter==="uncategorized")return items.filter(item=>!item.categoryId);
-  if(filter==="all"||!filter)return items;
+  if(filter==="all")return mixedItems;
   return items.filter(item=>item.categoryId===filter);
- },[items,filter]);
+ },[items,mixedItems,filter]);
+ const visible=filtered.slice(0,visibleCount);
  const uncategorized=items.some(item=>!item.categoryId);
+
+ function chooseFilter(value){
+  setFilter(value);
+  setVisibleCount(12);
+ }
 
  return <main className="catalogPage rentalPage">
   <CatalogHeader/>
@@ -67,12 +85,13 @@ export default function Utleie(){
       <span className="catalogEyebrow">UTLEIEKATALOG</span>
       <h2>Hva trenger du?</h2>
      </div>
-     {!loading&&!setup&&<span>{visible.length} {visible.length===1?"produkt":"produkter"}</span>}
+     {!loading&&!setup&&<span>{Math.min(visible.length,filtered.length)} av {filtered.length} {filtered.length===1?"produkt":"produkter"}</span>}
     </div>
 
     {categories.length>0&&<div className="rentalCategoryFilters" aria-label="Velg utleiekategori">
-     {categories.map(category=><button type="button" key={category.id} aria-pressed={filter===category.id} className={filter===category.id?"isActive":""} onClick={()=>setFilter(category.id)}>{category.name}</button>)}
-     {uncategorized&&<button type="button" aria-pressed={filter==="uncategorized"} className={filter==="uncategorized"?"isActive":""} onClick={()=>setFilter("uncategorized")}>Annet</button>}
+     <button type="button" aria-pressed={filter==="all"} className={filter==="all"?"isActive":""} onClick={()=>chooseFilter("all")}>Alle</button>
+     {categories.map(category=><button type="button" key={category.id} aria-pressed={filter===category.id} className={filter===category.id?"isActive":""} onClick={()=>chooseFilter(category.id)}>{category.name}</button>)}
+     {uncategorized&&<button type="button" aria-pressed={filter==="uncategorized"} className={filter==="uncategorized"?"isActive":""} onClick={()=>chooseFilter("uncategorized")}>Annet</button>}
     </div>}
 
     {error&&<div className="catalogNotice"><b>Noe gikk galt</b><p>{error}</p></div>}
@@ -103,6 +122,10 @@ export default function Utleie(){
       })}
      </div>
     )}
+    {!loading&&!setup&&visible.length<filtered.length&&<div className="rentalLoadMore">
+     <button type="button" className="catalogGoldButton" onClick={()=>setVisibleCount(count=>count+12)}>Vis flere produkter →</button>
+     <span>{filtered.length-visible.length} igjen</span>
+    </div>}
    </div>
   </section>
 
