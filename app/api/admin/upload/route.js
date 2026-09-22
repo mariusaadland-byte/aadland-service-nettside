@@ -87,6 +87,17 @@ export async function POST(req) {
       `${crypto.randomUUID()}.${extension}`;
 
     const bytes = await file.arrayBuffer();
+    const header = new Uint8Array(bytes.slice(0, 12));
+    const isJpeg = header.length >= 3 && header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff;
+    const isPng = header.length >= 8 && header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4e && header[3] === 0x47 && header[4] === 0x0d && header[5] === 0x0a && header[6] === 0x1a && header[7] === 0x0a;
+    const isWebp = header.length >= 12 && String.fromCharCode(...header.slice(0,4)) === "RIFF" && String.fromCharCode(...header.slice(8,12)) === "WEBP";
+    const signatureOk = file.type === "image/jpeg" ? isJpeg : file.type === "image/png" ? isPng : isWebp;
+    if (!signatureOk) {
+      return NextResponse.json(
+        { error: "Filen ser ikke ut til å være et gyldig bilde." },
+        { status: 400 }
+      );
+    }
 
     const { error: uploadError } =
       await s.storage
