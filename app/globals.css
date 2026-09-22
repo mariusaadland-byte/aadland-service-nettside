@@ -1257,3 +1257,15 @@ html{scroll-behavior:smooth}
  .adminProjectMigrationActions{display:grid}
  .adminProjectMigrationActions .btn{width:100%}
 }
+
+
+/* Project gallery category filters */
+.projectGalleryFilters{display:flex;gap:8px;flex-wrap:wrap;margin:-8px 0 28px}
+.projectGalleryFilters button{border:1px solid rgba(255,255,255,.13);background:#141414;color:rgba(255,255,255,.72);padding:9px 12px;font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;transition:border-color .18s ease,color .18s ease,background .18s ease}
+.projectGalleryFilters button:hover{border-color:rgba(215,167,78,.45);color:#fff}
+.projectGalleryFilters button.isActive{border-color:#d7a74e;background:rgba(215,167,78,.12);color:#e7c27b}
+@media(max-width:700px){
+ .projectGalleryFilters{flex-wrap:nowrap;overflow-x:auto;margin-left:-4px;margin-right:-4px;padding:0 4px 8px;scrollbar-width:none}
+ .projectGalleryFilters::-webkit-scrollbar{display:none}
+ .projectGalleryFilters button{flex:0 0 auto}
+}

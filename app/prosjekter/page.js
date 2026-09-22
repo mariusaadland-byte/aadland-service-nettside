@@ -8,6 +8,7 @@ export default function ProjectsPage(){
  const [projects,setProjects]=useState([]);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
+ const [categoryFilter,setCategoryFilter]=useState("all");
 
  useEffect(()=>{
   fetch("/api/projects?all=1")
@@ -20,6 +21,9 @@ export default function ProjectsPage(){
    .catch(err=>setError(err.message||"Prosjektene kunne ikke hentes."))
    .finally(()=>setLoading(false));
  },[]);
+
+ const categories=Array.from(new Set(projects.map(project=>String(project.category||"").trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b,"nb"));
+ const filteredProjects=categoryFilter==="all"?projects:projects.filter(project=>String(project.category||"").trim()===categoryFilter);
 
  return <main className="catalogPage projectGalleryPage">
   <CatalogHeader/>
@@ -40,15 +44,21 @@ export default function ProjectsPage(){
       <span className="catalogEyebrow">PROSJEKTER</span>
       <h2>Utførte oppdrag</h2>
      </div>
-     {!loading&&!error&&projects.length>0&&<span className="projectGalleryCount">{projects.length} {projects.length===1?"prosjekt":"prosjekter"}</span>}
+     {!loading&&!error&&projects.length>0&&<span className="projectGalleryCount">{filteredProjects.length} av {projects.length} {projects.length===1?"prosjekt":"prosjekter"}</span>}
     </div>
+
+    {!loading&&!error&&categories.length>1&&<div className="projectGalleryFilters" aria-label="Filtrer prosjekter etter kategori">
+     <button type="button" className={categoryFilter==="all"?"isActive":""} onClick={()=>setCategoryFilter("all")}>Alle</button>
+     {categories.map(category=><button type="button" key={category} className={categoryFilter===category?"isActive":""} onClick={()=>setCategoryFilter(category)}>{category}</button>)}
+    </div>}
 
     {loading&&<div className="catalogStatus">Laster prosjekter …</div>}
     {error&&<div className="catalogNotice"><b>Noe gikk galt</b><p>{error}</p></div>}
     {!loading&&!error&&projects.length===0&&<div className="catalogNotice"><b>Ingen prosjekter publisert ennå</b><p>Nye referanseprosjekter kommer her.</p></div>}
 
-    {!loading&&!error&&projects.length>0&&<div className="projectGalleryGrid">
-     {projects.map((project,index)=>{
+    {!loading&&!error&&projects.length>0&&filteredProjects.length===0&&<div className="catalogNotice"><b>Ingen prosjekter i denne kategorien</b><p>Velg en annen kategori for å se flere oppdrag.</p></div>}
+    {!loading&&!error&&filteredProjects.length>0&&<div className="projectGalleryGrid">
+     {filteredProjects.map((project,index)=>{
       const image=project.imageUrls?.[0];
       return <Link href={"/prosjekter/"+project.slug} className="projectGalleryCard" key={project.id||project.slug}>
        <div className="projectGalleryMedia">
