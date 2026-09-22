@@ -8,6 +8,7 @@ const map=p=>({
  category:p.category||"",
  description:p.description||"",
  imageUrls:Array.isArray(p.image_urls)?p.image_urls:[],
+ contentBlocks:Array.isArray(p.content_blocks)?p.content_blocks:[],
  featured:p.featured!==false,
  active:p.active!==false,
  sortOrder:p.sort_order||0

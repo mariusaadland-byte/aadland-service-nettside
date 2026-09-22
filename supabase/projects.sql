@@ -6,6 +6,7 @@ create table if not exists public.projects (
  category text,
  description text,
  image_urls jsonb not null default '[]'::jsonb,
+ content_blocks jsonb not null default '[]'::jsonb,
  featured boolean not null default true,
  active boolean not null default true,
  sort_order integer not null default 0,
@@ -32,3 +33,8 @@ create table if not exists public.project_drawings (
 alter table public.project_drawings enable row level security;
 grant select,insert,update,delete on public.project_drawings to service_role;
 create index if not exists project_drawings_project_idx on public.project_drawings(project_id,updated_at desc);
+
+
+-- Fleksibel prosjektfortelling med bilde- og tekstblokker.
+alter table public.projects
+ add column if not exists content_blocks jsonb not null default '[]'::jsonb;

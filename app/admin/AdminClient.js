@@ -3287,13 +3287,22 @@ function Projects({projects,reload,setError}){
  return <>
   <div className="adminProjectToolbar">
    <div>
-    <p className="muted">Legg inn ekte bilder fra utførte jobber. Første bilde brukes som hovedbilde på forsiden og i prosjektgalleriet.</p>
+    <p className="muted">Legg inn ekte bilder fra utførte jobber. Første bilde brukes som hovedbilde. Under «Prosjektfortelling» kan du blande bilder og tekst i akkurat den rekkefølgen kunden skal se dem.</p>
    </div>
    <button className="btn" onClick={()=>setShowNew(!showNew)}>{showNew?"Avbryt":"Legg til oppdrag"}</button>
   </div>
   {showNew&&<ProjectEditor project={null} reload={reload} setError={setError} close={()=>setShowNew(false)}/>}
   <div className="grid adminProjectsGrid">{projects.map(p=><ProjectEditor key={p.id} project={p} reload={reload} setError={setError}/>)}</div>
  </>;
+}
+
+function projectBlockId(){
+ return "block-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
+}
+
+function defaultProjectBlocks(project){
+ if(Array.isArray(project?.contentBlocks)&&project.contentBlocks.length)return project.contentBlocks;
+ return (Array.isArray(project?.imageUrls)?project.imageUrls:[]).map(url=>({id:projectBlockId(),type:"image",url}));
 }
 
 function ProjectEditor({project,reload,setError,close}){
@@ -3306,6 +3315,7 @@ function ProjectEditor({project,reload,setError,close}){
   category:project?.category||"",
   description:project?.description||"",
   imageUrls:Array.isArray(project?.imageUrls)?project.imageUrls:[],
+  contentBlocks:defaultProjectBlocks(project),
   featured:project?.featured!==false,
   active:project?.active!==false,
   sortOrder:project?.sortOrder||0
@@ -3318,6 +3328,7 @@ function ProjectEditor({project,reload,setError,close}){
    category:project.category||"",
    description:project.description||"",
    imageUrls:Array.isArray(project.imageUrls)?project.imageUrls:[],
+   contentBlocks:defaultProjectBlocks(project),
    featured:project.featured!==false,
    active:project.active!==false,
    sortOrder:project.sortOrder||0
@@ -3350,7 +3361,15 @@ function ProjectEditor({project,reload,setError,close}){
    }
   }
 
-  setV(current=>({...current,imageUrls:[...current.imageUrls,...urls].slice(0,30)}));
+  setV(current=>({
+   ...current,
+   imageUrls:[...current.imageUrls,...urls].slice(0,30),
+   contentBlocks:[
+    ...current.contentBlocks,
+    ...urls.map(url=>({id:projectBlockId(),type:"image",url}))
+   ].slice(0,80)
+  }));
+
   if(picked.length>room)setError("De første "+room+" bildene ble lagt til. Maks 30 bilder per oppdrag.");
   setUploading(false);
  }
@@ -3372,6 +3391,62 @@ function ProjectEditor({project,reload,setError,close}){
    next.unshift(chosen);
    return {...current,imageUrls:next};
   });
+ }
+
+ function removeImage(url,index){
+  setV(current=>({
+   ...current,
+   imageUrls:current.imageUrls.filter((_,imageIndex)=>imageIndex!==index),
+   contentBlocks:current.contentBlocks.filter(block=>!(block.type==="image"&&block.url===url))
+  }));
+ }
+
+ function addTextBlock(){
+  setV(current=>({
+   ...current,
+   contentBlocks:[
+    ...current.contentBlocks,
+    {id:projectBlockId(),type:"text",eyebrow:"",title:"",body:""}
+   ].slice(0,80)
+  }));
+ }
+
+ function syncImagesToStory(){
+  setV(current=>{
+   const used=new Set(current.contentBlocks.filter(block=>block.type==="image").map(block=>block.url));
+   const missing=current.imageUrls.filter(url=>!used.has(url));
+   return {
+    ...current,
+    contentBlocks:[
+     ...current.contentBlocks,
+     ...missing.map(url=>({id:projectBlockId(),type:"image",url}))
+    ].slice(0,80)
+   };
+  });
+ }
+
+ function moveContentBlock(index,direction){
+  setV(current=>{
+   const next=[...current.contentBlocks];
+   const target=index+direction;
+   if(target<0||target>=next.length)return current;
+   [next[index],next[target]]=[next[target],next[index]];
+   return {...current,contentBlocks:next};
+  });
+ }
+
+ function updateContentBlock(index,patch){
+  setV(current=>({
+   ...current,
+   contentBlocks:current.contentBlocks.map((block,blockIndex)=>blockIndex===index?{...block,...patch}:block)
+  }));
+ }
+
+ function removeContentBlock(index){
+  setV(current=>({
+   ...current,
+   contentBlocks:current.contentBlocks.filter((_,blockIndex)=>blockIndex!==index)
+  }));
  }
 
  async function save(e){
@@ -3403,7 +3478,7 @@ function ProjectEditor({project,reload,setError,close}){
    <div className="kicker">{project.category||"OPPDRAG"}</div>
    <h3>{project.title}</h3>
    {project.description&&<p>{project.description}</p>}
-   <p className="muted">{project.imageUrls?.length||0} {project.imageUrls?.length===1?"bilde":"bilder"} · {project.active?"Publisert":"Skjult"} · {project.featured?"Vises på forsiden":"Ikke på forsiden"}</p>
+   <p className="muted">{project.imageUrls?.length||0} {project.imageUrls?.length===1?"bilde":"bilder"} · {project.contentBlocks?.filter(block=>block.type==="text").length||0} tekstseksjoner · {project.active?"Publisert":"Skjult"} · {project.featured?"Vises på forsiden":"Ikke på forsiden"}</p>
    <div className="adminProjectActions">
     <button className="btn" onClick={()=>setEditing(true)}>Rediger</button>
     {project.active&&project.slug&&<a className="btn alt" href={"/prosjekter/"+project.slug} target="_blank" rel="noreferrer">Se offentlig side</a>}
@@ -3418,14 +3493,14 @@ function ProjectEditor({project,reload,setError,close}){
 
   <div className="field"><label>Tittel</label><input required value={v.title} onChange={e=>set("title",e.target.value)} placeholder="F.eks. Terrasse og levegg"/></div>
   <div className="field"><label>Kategori</label><input value={v.category} onChange={e=>set("category",e.target.value)} placeholder="F.eks. Uteområde"/></div>
-  <div className="field"><label>Beskrivelse</label><textarea rows="4" value={v.description} onChange={e=>set("description",e.target.value)} placeholder="Kort beskrivelse av jobben og resultatet."/></div>
+  <div className="field"><label>Kort introduksjon</label><textarea rows="4" value={v.description} onChange={e=>set("description",e.target.value)} placeholder="Kort tekst som vises på prosjektkortet og øverst på prosjektsiden."/></div>
 
   <div className="field adminProjectImagesField">
    <div className="adminProjectImagesHeader">
     <label>Bilder</label>
     <span>{v.imageUrls.length} / 30</span>
    </div>
-   <p className="muted adminProjectImageHelp">Første bilde er hovedbildet. Dra ikke – bruk pilene for å endre rekkefølgen. Kunden kan åpne alle bildene på prosjektets egen side.</p>
+   <p className="muted adminProjectImageHelp">Første bilde er hovedbildet på forsiden og i prosjektoversikten. Bildene du laster opp blir også lagt til nederst i prosjektfortellingen automatisk.</p>
 
    {v.imageUrls.length>0&&<div className="adminProjectImageGrid">
     {v.imageUrls.map((url,i)=><div key={url+i} className={"adminProjectImageItem "+(i===0?"isCover":"")}>
@@ -3438,7 +3513,7 @@ function ProjectEditor({project,reload,setError,close}){
       <button type="button" className="btn alt" disabled={i===0} onClick={()=>moveImage(i,-1)} aria-label="Flytt bilde til venstre">←</button>
       <button type="button" className="btn alt" disabled={i===v.imageUrls.length-1} onClick={()=>moveImage(i,1)} aria-label="Flytt bilde til høyre">→</button>
       {i!==0&&<button type="button" className="btn alt" onClick={()=>makeCover(i)}>Hoved</button>}
-      <button type="button" className="btn alt" onClick={()=>set("imageUrls",v.imageUrls.filter((_,x)=>x!==i))}>Fjern</button>
+      <button type="button" className="btn alt" onClick={()=>removeImage(url,i)}>Fjern</button>
      </div>
     </div>)}
    </div>}
@@ -3449,6 +3524,41 @@ function ProjectEditor({project,reload,setError,close}){
     <small>JPG, PNG eller WebP. Du kan velge flere bilder samtidig.</small>
    </label>
   </div>
+
+  <section className="adminProjectStory">
+   <div className="adminProjectStoryHead">
+    <div>
+     <div className="kicker">PROSJEKTFORTELLING</div>
+     <h4>Bygg siden med bilder og tekst</h4>
+     <p className="muted">Flytt blokkene opp og ned. Tekstblokker kan ligge mellom akkurat de bildene du ønsker.</p>
+    </div>
+    <div className="adminProjectStoryActions">
+     <button type="button" className="btn" onClick={addTextBlock}>+ Tekstseksjon</button>
+     <button type="button" className="btn alt" onClick={syncImagesToStory}>Legg inn manglende bilder</button>
+    </div>
+   </div>
+
+   {v.contentBlocks.length===0?<div className="adminProjectStoryEmpty">Ingen blokker ennå. Last opp bilder eller legg til en tekstseksjon.</div>:<div className="adminProjectStoryList">
+    {v.contentBlocks.map((block,index)=><div className={"adminProjectStoryBlock "+(block.type==="text"?"isText":"isImage")} key={block.id||index}>
+     <div className="adminProjectStoryOrder">
+      <span>{String(index+1).padStart(2,"0")}</span>
+      <button type="button" disabled={index===0} onClick={()=>moveContentBlock(index,-1)} aria-label="Flytt blokk opp">↑</button>
+      <button type="button" disabled={index===v.contentBlocks.length-1} onClick={()=>moveContentBlock(index,1)} aria-label="Flytt blokk ned">↓</button>
+     </div>
+
+     {block.type==="image"?<div className="adminProjectStoryImage">
+      <img src={block.url} alt=""/>
+      <div><b>Bilde</b><small>Vises i denne posisjonen på prosjektsiden.</small></div>
+     </div>:<div className="adminProjectStoryText">
+      <div className="field"><label>Liten gulltekst</label><input value={block.eyebrow||""} onChange={e=>updateContentBlock(index,{eyebrow:e.target.value})} placeholder="F.eks. FØR ARBEIDET"/></div>
+      <div className="field"><label>Overskrift</label><input value={block.title||""} onChange={e=>updateContentBlock(index,{title:e.target.value})} placeholder="Hva gjorde vi her?"/></div>
+      <div className="field"><label>Tekst</label><textarea rows="4" value={block.body||""} onChange={e=>updateContentBlock(index,{body:e.target.value})} placeholder="Fortell kort om denne delen av arbeidet."/></div>
+     </div>}
+
+     <button type="button" className="adminProjectStoryRemove" onClick={()=>removeContentBlock(index)}>{block.type==="text"?"Fjern tekstseksjon":"Fjern fra fortellingen"}</button>
+    </div>)}
+   </div>}
+  </section>
 
   <div className="field"><label>Sortering</label><input type="number" value={v.sortOrder} onChange={e=>set("sortOrder",e.target.value)}/></div>
   <div className="adminProjectToggles">

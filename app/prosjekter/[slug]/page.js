@@ -52,6 +52,14 @@ export default function ProjectDetailPage(){
  if(error||!project)return <main className="catalogPage projectDetailPage"><CatalogHeader/><section className="projectGallerySection"><div className="catalogWrap"><Link className="catalogBack" href="/prosjekter">← Tilbake til prosjekter</Link><div className="catalogNotice projectDetailNotice"><b>{error?"Noe gikk galt":"Prosjektet finnes ikke"}</b><p>{error||"Prosjektet kan ha blitt fjernet eller skjult."}</p><Link className="catalogGoldButton" href="/prosjekter">Se alle prosjekter →</Link></div></div></section><CatalogFooter/></main>;
 
  const images=Array.isArray(project.imageUrls)?project.imageUrls.filter(Boolean):[];
+ const storyBlocks=Array.isArray(project.contentBlocks)&&project.contentBlocks.length
+  ? project.contentBlocks.filter(block=>block&&((block.type==="image"&&block.url)||(block.type==="text"&&(block.eyebrow||block.title||block.body))))
+  : images.map((url,index)=>({id:"image-"+index,type:"image",url}));
+
+ function openStoryImage(url){
+  const index=images.indexOf(url);
+  if(index>=0)setActiveImage(index);
+ }
 
  return <main className="catalogPage projectDetailPage">
   <CatalogHeader/>
@@ -72,14 +80,20 @@ export default function ProjectDetailPage(){
      <div><span className="catalogEyebrow">BILDEGALLERI</span><h2>Fra prosjektet</h2></div>
     </div>
 
-    {images.length===0?(
+    {storyBlocks.length===0?(
      <div className="projectDetailPlaceholder"><CatalogPlaceholder label="Bilder kommer"/></div>
     ):(
-     <div className={"projectDetailGrid "+(images.length===1?"single":"")}>
-      {images.map((image,index)=>(
-       <button className="projectDetailImage" key={image+"-"+index} type="button" onClick={()=>setActiveImage(index)} aria-label={"Åpne bilde "+(index+1)+" av "+images.length}>
-        <img src={image} alt={project.title+" – bilde "+(index+1)}/>
-        <span>{String(index+1).padStart(2,"0")}</span>
+     <div className="projectStory">
+      {storyBlocks.map((block,index)=>block.type==="text"?(
+       <section className="projectStoryText" key={block.id||("text-"+index)}>
+        {block.eyebrow&&<span className="catalogEyebrow">{block.eyebrow}</span>}
+        {block.title&&<h3>{block.title}</h3>}
+        {block.body&&<p>{block.body}</p>}
+       </section>
+      ):(
+       <button className="projectStoryImage" key={block.id||block.url||index} type="button" onClick={()=>openStoryImage(block.url)} aria-label={"Åpne prosjektbilde "+(index+1)}>
+        <img src={block.url} alt={project.title+" – prosjektbilde"}/>
+        <span>Se bilde</span>
        </button>
       ))}
      </div>
