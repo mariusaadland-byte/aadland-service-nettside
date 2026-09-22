@@ -1,4 +1,45 @@
 import {NextResponse} from "next/server";
 import {db} from "../../../lib/supabase";
-const map=p=>({id:p.id,title:p.title,slug:p.slug,category:p.category||"",description:p.description||"",imageUrls:Array.isArray(p.image_urls)?p.image_urls:[],featured:p.featured!==false,active:p.active!==false,sortOrder:p.sort_order||0});
-export async function GET(){const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});const {data,error}=await s.from("projects").select("*").eq("active",true).eq("featured",true).order("sort_order").order("created_at",{ascending:false}).limit(4);if(error){console.error("PROJECTS GET ERROR:",error);if(error.code==="42P01")return NextResponse.json({projects:[],setupRequired:true},{status:503});return NextResponse.json({error:"Prosjektene kunne ikke hentes."},{status:500})}return NextResponse.json({projects:(data||[]).map(map)})}
+
+const map=p=>({
+ id:p.id,
+ title:p.title,
+ slug:p.slug,
+ category:p.category||"",
+ description:p.description||"",
+ imageUrls:Array.isArray(p.image_urls)?p.image_urls:[],
+ featured:p.featured!==false,
+ active:p.active!==false,
+ sortOrder:p.sort_order||0
+});
+
+export async function GET(request){
+ const s=db();
+ if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+
+ const {searchParams}=new URL(request.url);
+ const slug=String(searchParams.get("slug")||"").trim();
+ const all=searchParams.get("all")==="1";
+
+ if(slug){
+  const {data,error}=await s.from("projects").select("*").eq("active",true).eq("slug",slug).maybeSingle();
+  if(error){
+   console.error("PROJECT GET ERROR:",error);
+   if(error.code==="42P01")return NextResponse.json({project:null,setupRequired:true},{status:503});
+   return NextResponse.json({error:"Prosjektet kunne ikke hentes."},{status:500});
+  }
+  return NextResponse.json({project:data?map(data):null});
+ }
+
+ let query=s.from("projects").select("*").eq("active",true).order("sort_order").order("created_at",{ascending:false});
+ if(!all) query=query.eq("featured",true).limit(4);
+
+ const {data,error}=await query;
+ if(error){
+  console.error("PROJECTS GET ERROR:",error);
+  if(error.code==="42P01")return NextResponse.json({projects:[],setupRequired:true},{status:503});
+  return NextResponse.json({error:"Prosjektene kunne ikke hentes."},{status:500});
+ }
+
+ return NextResponse.json({projects:(data||[]).map(map)});
+}
