@@ -310,6 +310,12 @@ export default function AdminClient({ user }) {
           </button>
         ))}
 
+        {(canUpdateOrders || canManageProducts) && (
+          <button onClick={() => { setMenuOpen(false); router.push("/admin/tilbud"); }}>
+            Tilbud
+          </button>
+        )}
+
         <button onClick={() => { setMenuOpen(false); logout(); }}>Logg ut</button>
       </aside>
 
