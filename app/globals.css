@@ -802,3 +802,35 @@ html{scroll-behavior:smooth}
  .catalogMedia{height:220px}
  .productDetailPage .productLayout>div:first-child img{height:300px!important}
 }
+
+
+/* Premium product detail finishing pass */
+.productStateSection{min-height:52vh;display:flex;align-items:center}
+.productStateSection .catalogNotice{max-width:720px}
+.productStateSection .catalogGoldButton{margin-top:18px}
+.productDetailPlaceholder{min-height:520px;background:#111;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+.productDetailPlaceholder .catalogPlaceholder{min-height:520px}
+.productAvailability{display:flex;align-items:flex-start;gap:10px;margin:18px 0 0;padding:13px 14px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09);color:rgba(255,255,255,.82);font-size:13px;line-height:1.5}
+.productAvailabilityDot{width:8px;height:8px;margin-top:5px;border-radius:50%;background:#d7a74e;box-shadow:0 0 0 4px rgba(215,167,78,.12);flex:none}
+.productAvailability.isSoldOut .productAvailabilityDot{background:#b76a55;box-shadow:0 0 0 4px rgba(183,106,85,.12)}
+.productAssurances{display:grid;grid-template-columns:1fr;gap:7px;margin-top:16px;padding-top:15px;border-top:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.58);font-size:11px}
+.productAssurances span{display:flex;gap:7px}
+.productSpecsGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.productSpecsGrid .card{min-height:100%;padding:26px!important}
+.productSpecsGrid .card h3{margin-top:0;color:#fff;font-size:20px}
+.drawerCloseButton{width:42px;height:42px;border:1px solid rgba(255,255,255,.16);background:transparent;color:#fff;font-size:26px;line-height:1;display:grid;place-items:center}
+.drawerCloseButton:hover{border-color:#d7a74e;color:#d7a74e}
+.drawerSubmitButton{margin-top:8px}
+.productDetailPage .drawerPanel>.row{justify-content:space-between;align-items:flex-start}
+.productDetailPage .drawerPanel form>.field{margin-top:14px}
+.productDetailPage .drawerPanel .notice{background:#3a2019;color:#f3c6b8;border-left:3px solid #b76a55}
+.productDetailPage .drawerPanel .success{background:rgba(215,167,78,.11)!important;color:#fff!important;border-left-color:#d7a74e!important}
+.productDetailPage .drawerPanel input[type="checkbox"]{width:18px;height:18px;accent-color:#d7a74e;flex:none}
+
+@media(max-width:700px){
+ .productDetailPlaceholder,.productDetailPlaceholder .catalogPlaceholder{min-height:300px}
+ .productSpecsGrid{grid-template-columns:1fr}
+ .productDetailPage .drawer{padding:0;align-items:end}
+ .productDetailPage .drawerPanel{width:100%;max-height:92vh;padding:22px 18px;border-left:0;border-right:0;border-bottom:0}
+ .productAssurances{font-size:10px}
+}
