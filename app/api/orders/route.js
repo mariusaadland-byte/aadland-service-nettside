@@ -44,20 +44,15 @@ export async function POST(req){
   const orderNumber=num(),now=new Date().toISOString(),customerUserId=await getCustomerUserId();
   const safeCustomer={...body.customer,name,email,phone,address:String(body.customer?.address||"").trim().slice(0,300),postalCode:String(body.customer?.postalCode||"").trim().slice(0,20),city:String(body.customer?.city||"").trim().slice(0,120),note:String(body.customer?.note||"").trim().slice(0,2000)};const record={customer_user_id:customerUserId,order_number:orderNumber,order_type:body.orderType==="custom"?"custom":"order",status:"new",customer:safeCustomer,fulfillment_type:body.fulfillmentType||"pickup",delivery_within_radius:!!body.deliveryWithinRadius,items,custom_request:body.customRequest?String(body.customRequest).trim():null,total_ore:total,shipping_ore:shipping,payment_status:body.orderType==="order"?"pending":"unpaid",terms_version:body.orderType==="order"?(body.termsVersion||"2026-09"):null,terms_accepted_at:body.orderType==="order"?now:null};
   if(stockRequests.length){
-   const {error:stockError}=await s.rpc("reserve_product_stock",{stock_requests:stockRequests});
-   if(stockError){
-    console.error("STOCK RESERVATION ERROR",stockError);
-    if(String(stockError.message||"").includes("INSUFFICIENT_STOCK"))return NextResponse.json({error:"En vare ble nettopp utsolgt. Oppdater handlekurven og prøv igjen."},{status:409});
-    throw stockError;
+   const {error:orderError}=await s.rpc("create_order_with_stock",{order_record:record,stock_requests:stockRequests});
+   if(orderError){
+    console.error("ATOMIC ORDER ERROR",orderError);
+    if(String(orderError.message||"").includes("INSUFFICIENT_STOCK"))return NextResponse.json({error:"En vare ble nettopp utsolgt. Oppdater handlekurven og prøv igjen."},{status:409});
+    throw orderError;
    }
-  }
-  const {error}=await s.from("orders").insert(record);
-  if(error){
-   if(stockRequests.length){
-    const {error:releaseError}=await s.rpc("release_product_stock",{stock_requests:stockRequests});
-    if(releaseError)console.error("STOCK RELEASE ERROR",releaseError);
-   }
-   throw error;
+  }else{
+   const {error:orderError}=await s.from("orders").insert(record);
+   if(orderError)throw orderError;
   }
   if(process.env.RESEND_API_KEY){try{const {Resend}=await import("resend");const resend=new Resend(process.env.RESEND_API_KEY),from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>",replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";if(process.env.ORDER_EMAIL_TO)await resend.emails.send({from,to:process.env.ORDER_EMAIL_TO,replyTo,subject:`Ny bestilling ${orderNumber}`,text:`Ny bestilling fra ${safeCustomer.name}\nTelefon: ${safeCustomer.phone}\nE-post: ${safeCustomer.email}\nOrdre: ${orderNumber}`});await resend.emails.send({from,to:body.customer.email,replyTo,subject:body.orderType==="custom"?"Vi har mottatt forespørselen din":"Ordrebekreftelse "+orderNumber,text:body.orderType==="custom"?`Hei ${body.customer.name}!\n\nVi har mottatt forespørselen din hos Aadland Service. Referanse: ${orderNumber}.\nVi tar kontakt så snart vi kan.\n\nAadland Service\npost@aadland-service.no`:`Hei ${body.customer.name}!\n\nTakk for bestillingen. Ordrenummer: ${orderNumber}.\nSum: ${(total/100).toLocaleString("nb-NO")} kr.\nDette er en ordrebekreftelse. Kvittering sendes når betalingen senere er registrert/trukket.\n\nAadland Service\npost@aadland-service.no`})}catch(e){console.error("E-postfeil",e)}}
   return NextResponse.json({orderNumber,message:"Takk! Vi tar kontakt for å bekrefte bestillingen."});
