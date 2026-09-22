@@ -26,6 +26,27 @@ export default function ProjectDetailPage(){
    .finally(()=>setLoading(false));
  },[slug]);
 
+ useEffect(()=>{
+  if(activeImage===null)return;
+  const gallery=Array.isArray(project?.imageUrls)?project.imageUrls.filter(Boolean):[];
+  if(!gallery.length)return;
+
+  const previousOverflow=document.body.style.overflow;
+  document.body.style.overflow="hidden";
+
+  function onKeyDown(event){
+   if(event.key==="Escape")setActiveImage(null);
+   if(event.key==="ArrowLeft")setActiveImage(current=>current===null?null:(current-1+gallery.length)%gallery.length);
+   if(event.key==="ArrowRight")setActiveImage(current=>current===null?null:(current+1)%gallery.length);
+  }
+
+  window.addEventListener("keydown",onKeyDown);
+  return()=>{
+   window.removeEventListener("keydown",onKeyDown);
+   document.body.style.overflow=previousOverflow;
+  };
+ },[activeImage,project]);
+
  if(loading)return <main className="catalogPage projectDetailPage"><CatalogHeader/><section className="projectGallerySection"><div className="catalogWrap"><div className="catalogStatus">Laster prosjekt …</div></div></section><CatalogFooter/></main>;
 
  if(error||!project)return <main className="catalogPage projectDetailPage"><CatalogHeader/><section className="projectGallerySection"><div className="catalogWrap"><Link className="catalogBack" href="/prosjekter">← Tilbake til prosjekter</Link><div className="catalogNotice projectDetailNotice"><b>{error?"Noe gikk galt":"Prosjektet finnes ikke"}</b><p>{error||"Prosjektet kan ha blitt fjernet eller skjult."}</p><Link className="catalogGoldButton" href="/prosjekter">Se alle prosjekter →</Link></div></div></section><CatalogFooter/></main>;
@@ -77,7 +98,7 @@ export default function ProjectDetailPage(){
 
   {activeImage!==null&&images[activeImage]&&<div className="projectLightbox" role="presentation" onClick={()=>setActiveImage(null)}>
    <div className="projectLightboxInner" role="dialog" aria-modal="true" aria-label={"Bilde "+(activeImage+1)+" av "+images.length} onClick={e=>e.stopPropagation()}>
-    <button className="projectLightboxClose" type="button" aria-label="Lukk bilde" onClick={()=>setActiveImage(null)}>×</button>
+    <button className="projectLightboxClose" type="button" aria-label="Lukk bilde" autoFocus onClick={()=>setActiveImage(null)}>×</button>
     {images.length>1&&<button className="projectLightboxPrev" type="button" aria-label="Forrige bilde" onClick={()=>setActiveImage((activeImage-1+images.length)%images.length)}>←</button>}
     <img src={images[activeImage]} alt={project.title+" – bilde "+(activeImage+1)}/>
     {images.length>1&&<button className="projectLightboxNext" type="button" aria-label="Neste bilde" onClick={()=>setActiveImage((activeImage+1)%images.length)}>→</button>}
