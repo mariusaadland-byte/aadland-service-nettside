@@ -24,7 +24,6 @@ export default function Utleie(){
    })
    .then(data=>{
     if(cancelled)return;
-    setItems(data.items||[]);
     const nextCategories=data.categories||[];
     const nextItems=data.items||[];
     setCategories(nextCategories);
@@ -68,7 +67,7 @@ export default function Utleie(){
       <span className="catalogEyebrow">UTLEIEKATALOG</span>
       <h2>Hva trenger du?</h2>
      </div>
-     {!loading&&!setup&&<span>{items.length} {items.length===1?"produkt":"produkter"}</span>}
+     {!loading&&!setup&&<span>{visible.length} {visible.length===1?"produkt":"produkter"}</span>}
     </div>
 
     {categories.length>0&&<div className="rentalCategoryFilters" aria-label="Velg utleiekategori">
