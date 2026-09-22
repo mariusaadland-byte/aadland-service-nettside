@@ -126,7 +126,7 @@ export default function Home(){
   <header className="homeTop homeHeader">
    <div className="homeWrap homeNav homeHeaderInner">
     <a className="homeBrand homeLogo" href="/"><img className="brandLogo" src="/aadland-service-logo.webp" alt="Aadland Service"/></a>
-    <button className="mobileMenuBtn" type="button" aria-label={menuOpen?"Lukk meny":"Åpne meny"} aria-expanded={menuOpen} aria-controls="hovedmeny" onClick={()=>setMenuOpen(!menuOpen)}><span></span><span></span><span></span></button><nav id="hovedmeny" className={"homeLinks "+(menuOpen?"menuOpen":"")} onClick={()=>setMenuOpen(false)}><a href="/">Hjem</a><a href="/min-side">Min side</a><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="/utleie">Utleie</a><a href="#prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a>{menuServices.filter(service=>service.hasPage && !["produkter","utleie"].includes(service.slug)).map(service=>(
+    <button className="mobileMenuBtn" type="button" aria-label={menuOpen?"Lukk meny":"Åpne meny"} aria-expanded={menuOpen} aria-controls="hovedmeny" onClick={()=>setMenuOpen(!menuOpen)}><span></span><span></span><span></span></button><nav id="hovedmeny" className={"homeLinks "+(menuOpen?"menuOpen":"")} onClick={()=>setMenuOpen(false)}><a href="/">Hjem</a><a href="/min-side">Min side</a><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="/utleie">Utleie</a><a href="/prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a>{menuServices.filter(service=>service.hasPage && !["produkter","utleie"].includes(service.slug)).map(service=>(
  <a key={service.id||service.slug} href={serviceHref(service)} onClick={()=>setMenuOpen(false)}>{service.title}</a>
 ))}</nav>
     <a className="goldBtn navCta headerCta" href="#befaring" onClick={()=>setSelectedService(enquiryServiceName())}>Gratis befaring →</a>
@@ -174,7 +174,7 @@ export default function Home(){
   
 
   {siteSettings.showProjects!==false&&<section id="prosjekter" className="homeSection projects projectsSection"><div className="homeWrap">
-   <div className="sectionIntro projectsHeader"><div><span className="goldLabel">UTVALGTE PROSJEKTER</span><h2>Resultater vi er stolte av</h2></div></div>
+   <div className="sectionIntro projectsHeader"><div><span className="goldLabel">UTVALGTE PROSJEKTER</span><h2>Resultater vi er stolte av</h2></div><a className="textLink" href="/prosjekter">Se alle oppdrag →</a></div>
    <div className="projectGrid">
     {apiProjects.length?apiProjects.filter(project=>project.featured!==false).slice(0,4).map(project=><a href={"/prosjekter/"+project.slug} className="projectTile projectCard" key={project.id} style={project.imageUrls?.[0]?{backgroundImage:"url("+project.imageUrls[0]+")",backgroundSize:"cover",backgroundPosition:"center"}:{}} aria-label={"Se prosjektet "+project.title}><div className="projectCaption"><span>{(project.category||"OPPDRAG").toUpperCase()}</span><strong>{project.title}</strong>{project.description&&<p>{project.description}</p>}<em>Se hele prosjektet →</em></div></a>):<>
      <div className="projectTile projectCard projectDeck"><div className="projectCaption"><span>UTEOMRÅDE</span><strong>Terrasse og levegg</strong></div></div>
