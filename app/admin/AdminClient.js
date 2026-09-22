@@ -3401,14 +3401,16 @@ function ProjectEditor({project,reload,setError,close}){
   }));
  }
 
- function addTextBlock(){
-  setV(current=>({
-   ...current,
-   contentBlocks:[
-    ...current.contentBlocks,
-    {id:projectBlockId(),type:"text",eyebrow:"",title:"",body:""}
-   ].slice(0,80)
-  }));
+ function addTextBlock(afterIndex=null){
+  setV(current=>{
+   const block={id:projectBlockId(),type:"text",eyebrow:"",title:"",body:""};
+   if(afterIndex===null){
+    return {...current,contentBlocks:[...current.contentBlocks,block].slice(0,80)};
+   }
+   const next=[...current.contentBlocks];
+   next.splice(afterIndex+1,0,block);
+   return {...current,contentBlocks:next.slice(0,80)};
+  });
  }
 
  function syncImagesToStory(){
@@ -3533,7 +3535,7 @@ function ProjectEditor({project,reload,setError,close}){
      <p className="muted">Flytt blokkene opp og ned. Tekstblokker kan ligge mellom akkurat de bildene du ønsker.</p>
     </div>
     <div className="adminProjectStoryActions">
-     <button type="button" className="btn" onClick={addTextBlock}>+ Tekstseksjon</button>
+     <button type="button" className="btn" onClick={()=>addTextBlock()}>+ Tekstseksjon nederst</button>
      <button type="button" className="btn alt" onClick={syncImagesToStory}>Legg inn manglende bilder</button>
     </div>
    </div>
@@ -3555,7 +3557,10 @@ function ProjectEditor({project,reload,setError,close}){
       <div className="field"><label>Tekst</label><textarea rows="4" value={block.body||""} onChange={e=>updateContentBlock(index,{body:e.target.value})} placeholder="Fortell kort om denne delen av arbeidet."/></div>
      </div>}
 
-     <button type="button" className="adminProjectStoryRemove" onClick={()=>removeContentBlock(index)}>{block.type==="text"?"Fjern tekstseksjon":"Fjern fra fortellingen"}</button>
+     <div className="adminProjectStoryBlockActions">
+      <button type="button" className="adminProjectStoryInsert" onClick={()=>addTextBlock(index)}>+ Tekst under</button>
+      <button type="button" className="adminProjectStoryRemove" onClick={()=>removeContentBlock(index)}>{block.type==="text"?"Fjern tekstseksjon":"Fjern fra fortellingen"}</button>
+     </div>
     </div>)}
    </div>}
   </section>

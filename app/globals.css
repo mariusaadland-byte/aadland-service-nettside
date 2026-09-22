@@ -1157,3 +1157,14 @@ html{scroll-behavior:smooth}
  .adminProjectStoryImage img{width:100%;height:150px}
  .adminProjectStoryActions{display:grid;width:100%}
 }
+
+
+/* Story builder insertion controls */
+.adminProjectStoryBlockActions{display:grid;gap:7px;align-content:start;justify-items:end}
+.adminProjectStoryInsert{border:1px solid #c8bca9;background:#f7f2e9;color:#2c2925;padding:7px 9px;font-size:10px;font-weight:800;white-space:nowrap}
+.adminProjectStoryInsert:hover{border-color:#d7a74e;background:#fffaf0}
+.adminProjectStoryRemove{justify-self:end}
+@media(max-width:600px){
+ .adminProjectStoryBlockActions{grid-column:2;display:flex;flex-wrap:wrap;justify-items:start}
+ .adminProjectStoryInsert,.adminProjectStoryRemove{justify-self:start}
+}
