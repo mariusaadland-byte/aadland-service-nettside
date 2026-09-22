@@ -1796,3 +1796,44 @@ html{scroll-behavior:smooth}
  .quotePreviewShell{padding:0;background:#fff}
  .quoteDocument{width:210mm;min-height:297mm;margin:0;box-shadow:none;padding:16mm 15mm 14mm;break-after:page}
 }
+
+
+.quoteSendButton{background:#b98938}
+.quoteSendButton:hover{background:#cfa153}
+.quoteHistory{display:grid;gap:8px;padding-top:16px;border-top:1px solid #ddd7cd}
+.quoteHistory>span{display:flex;justify-content:space-between;gap:14px;font-size:11px}
+.quoteHistory small{color:#777;text-align:right}
+
+.customerQuoteShell{min-height:100vh;background:#ece7df;padding:22px}
+.customerQuoteTop{width:min(1000px,100%);margin:0 auto 16px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.customerQuoteTop>div{display:flex;align-items:center;gap:12px}
+.customerQuoteTop>div:first-child{display:grid;gap:3px}
+.customerQuoteTop>div:first-child b{font-size:13px;letter-spacing:.12em}
+.customerQuoteTop>div:first-child span{font-size:10px;color:#777}
+.customerQuoteStatus{display:inline-flex;align-items:center;min-height:32px;padding:0 11px;border-radius:999px;background:#ddd7ce;color:#554f47;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.05em}
+.customerQuoteStatus-accepted{background:#dcebdc;color:#296331}
+.customerQuoteStatus-declined{background:#f1dfda;color:#884130}
+.customerQuoteStatus-sent{background:#dde7f2;color:#355d86}
+.customerQuoteMessage{width:min(1000px,100%);margin:0 auto 14px}
+.customerQuoteDecision{width:min(1000px,100%);margin:18px auto 0;padding:24px;background:#fff;border:1px solid #d9d2c8;display:flex;align-items:center;justify-content:space-between;gap:28px}
+.customerQuoteDecision h2{margin:6px 0 7px}
+.customerQuoteDecision p{margin:0;color:#6b655d;line-height:1.55}
+.customerQuoteDecisionActions{display:flex;gap:10px;flex-wrap:wrap;flex:0 0 auto}
+.customerQuoteAccept{background:#2f6737}
+.customerQuoteAccept:hover{background:#3d7a46}
+.customerQuoteAccepted h2{color:#2f6737}
+.customerQuoteDocument{box-shadow:0 20px 60px #0002}
+
+@media(max-width:760px){
+ .customerQuoteShell{padding:10px}
+ .customerQuoteTop{align-items:stretch;flex-direction:column}
+ .customerQuoteTop>div:last-child{justify-content:space-between}
+ .customerQuoteDecision{align-items:stretch;flex-direction:column}
+ .customerQuoteDecisionActions{display:grid;grid-template-columns:1fr}
+ .customerQuoteDecisionActions .btn{text-align:center}
+}
+@media print{
+ .customerQuoteDecision{display:none!important}
+ .customerQuoteShell{padding:0;background:#fff}
+ .customerQuoteDocument{box-shadow:none}
+}
