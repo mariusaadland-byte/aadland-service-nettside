@@ -39,3 +39,46 @@ alter table public.orders add column if not exists delivery_notice_sent_at times
 
 alter table public.orders add column if not exists archived_at timestamptz;
 create index if not exists orders_archived_at_idx on public.orders(archived_at);
+
+
+-- Atomisk lagerreservasjon. API-et sender kun servervaliderte produkt-ID-er og antall.
+create or replace function public.reserve_product_stock(stock_requests jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  request jsonb;
+  requested_id text;
+  requested_quantity integer;
+  affected integer;
+begin
+  if stock_requests is null or jsonb_typeof(stock_requests) <> 'array' then
+    raise exception 'INVALID_STOCK_REQUEST';
+  end if;
+
+  for request in select value from jsonb_array_elements(stock_requests)
+  loop
+    requested_id := request->>'id';
+    requested_quantity := (request->>'quantity')::integer;
+    if requested_id is null or requested_quantity is null or requested_quantity <= 0 then
+      raise exception 'INVALID_STOCK_REQUEST';
+    end if;
+
+    update public.products
+      set stock_quantity = stock_quantity - requested_quantity,
+          updated_at = now()
+      where id = requested_id
+        and inventory_mode = 'stock'
+        and active = true
+        and stock_quantity >= requested_quantity;
+    get diagnostics affected = row_count;
+    if affected <> 1 then
+      raise exception 'INSUFFICIENT_STOCK:%', requested_id;
+    end if;
+  end loop;
+end;
+$$;
+revoke all on function public.reserve_product_stock(jsonb) from public, anon, authenticated;
+grant execute on function public.reserve_product_stock(jsonb) to service_role;
