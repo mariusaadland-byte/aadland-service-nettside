@@ -13,6 +13,12 @@ export async function POST(req) {
       );
     }
 
+    const normalizedEmail=String(email).trim().toLowerCase();
+    const normalizedPassword=String(password);
+    if(normalizedEmail.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)||normalizedPassword.length>128){
+      return NextResponse.json({error:"Feil e-post eller passord."},{status:401});
+    }
+
     const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.SUPABASE_SERVICE_ROLE_KEY;
     if(!url||!key||!process.env.SESSION_SECRET)return NextResponse.json({error:"Innlogging er ikke konfigurert."},{status:503});
     const supabase = createClient(
@@ -28,8 +34,8 @@ export async function POST(req) {
 
     const { data, error } =
       await supabase.auth.signInWithPassword({
-        email: String(email).trim().toLowerCase(),
-        password,
+        email: normalizedEmail,
+        password: normalizedPassword,
       });
 
     if (error || !data.user) {
