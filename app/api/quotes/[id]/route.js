@@ -79,8 +79,8 @@ export async function POST(req,{params}){
   try{
    const {Resend}=await import("resend");
    const resend=new Resend(process.env.RESEND_API_KEY);
-   const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
-   const to=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+   const from="Aadland Service <post@aadland-service.no>";
+   const to="post@aadland-service.no";
    const customerName=String(data.customer?.name||"Kunde");
    const accepted=action==="accept";
    await resend.emails.send({
