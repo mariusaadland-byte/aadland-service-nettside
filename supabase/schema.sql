@@ -89,6 +89,30 @@ set category_id=c.id
 from public.categories c
 where p.category_id is null and lower(trim(p.category))=lower(trim(c.name));
 
+-- Backoffice-brukere. Selve Auth-brukeren opprettes i Supabase Auth og kobles via samme UUID.
+create table if not exists public.admin_users (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text not null unique,
+  name text not null,
+  role text not null default 'user',
+  can_view_orders boolean not null default false,
+  can_update_orders boolean not null default false,
+  can_manage_products boolean not null default false,
+  can_manage_users boolean not null default false,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.admin_users add column if not exists updated_at timestamptz not null default now();
+alter table public.admin_users enable row level security;
+grant select,insert,update,delete on public.admin_users to service_role;
+create index if not exists admin_users_active_idx on public.admin_users(active);
+
+-- Produktbilder er offentlige fordi URL-ene brukes direkte på nettsiden.
+insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types)
+values ('product-images','product-images',true,10485760,array['image/jpeg','image/png','image/webp'])
+on conflict (id) do update set public=true,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
+
 -- Private kundebilder fra kontaktskjema. Produktbilder bruker fortsatt offentlig product-images-bucket.
 insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types)
 values ('contact-images','contact-images',false,10485760,array['image/jpeg','image/png','image/webp'])
