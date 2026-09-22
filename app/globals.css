@@ -1714,7 +1714,7 @@ html{scroll-behavior:smooth}
 .quotePreviewToolbar>span{font-size:12px;font-weight:800;color:#5e594f}
 .quoteDocument{width:210mm;min-height:297mm;margin:0 auto;background:#fff;color:#171512;padding:18mm 16mm 15mm;box-shadow:0 20px 60px #0002;font-family:Arial,Helvetica,sans-serif}
 .quoteDocHeader{display:flex;justify-content:space-between;gap:24px;padding-bottom:18px;border-bottom:2px solid #171512}
-.quoteDocBrand{display:flex;align-items:center;gap:13px}
+.quoteDocBrand{display:flex;align-items:center;gap:13px}.quoteDocLogo{display:block;width:175px;max-height:58px;object-fit:contain;object-position:left center}
 .quoteDocMark{display:grid;place-items:center;width:48px;height:54px;background:#171512;color:#d8ad5b;font-size:13px;font-weight:900;clip-path:polygon(50% 0,94% 15%,87% 74%,50% 100%,13% 74%,6% 15%)}
 .quoteDocBrand>div:last-child{display:grid;gap:4px}
 .quoteDocBrand b{font-size:16px;letter-spacing:.12em}
