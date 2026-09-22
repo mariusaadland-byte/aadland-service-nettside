@@ -53,7 +53,7 @@ export default function ProjectsPage(){
       return <Link href={"/prosjekter/"+project.slug} className="projectGalleryCard" key={project.id||project.slug}>
        <div className="projectGalleryMedia">
         {image?<img src={image} alt={project.title}/>:<CatalogPlaceholder label="Prosjektbilde kommer"/>}
-        <span className="projectGalleryImageCount">{project.imageUrls?.length||0} {project.imageUrls?.length===1?"bilde":"bilder"}</span>
+        <span className="projectGalleryImageCount">{project.imageUrls?.length ? `${project.imageUrls.length} ${project.imageUrls.length===1?"bilde":"bilder"}` : "Bilder kommer"}</span>
        </div>
        <div className="projectGalleryCardBody">
         <span className="catalogEyebrow">{(project.category||"OPPDRAG").toUpperCase()}</span>
