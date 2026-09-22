@@ -19,10 +19,11 @@ export default function QuotesClient(){
  const [setupRequired,setSetupRequired]=useState(false);
  const [error,setError]=useState("");
  const [filter,setFilter]=useState("all");
+ const [showArchived,setShowArchived]=useState(false);
 
  async function load(){
   setLoading(true);setError("");
-  const response=await fetch("/api/admin/quotes");
+  const response=await fetch("/api/admin/quotes"+(showArchived?"?archived=1":""));
   const data=await response.json().catch(()=>({}));
   setLoading(false);
   if(!response.ok){
@@ -34,7 +35,7 @@ export default function QuotesClient(){
   setSetupRequired(data.setupRequired===true);
  }
 
- useEffect(()=>{load()},[]);
+ useEffect(()=>{load()},[showArchived]);
 
  const visible=useMemo(()=>filter==="all"?quotes:quotes.filter(quote=>quote.status===filter),[quotes,filter]);
  const stats=useMemo(()=>({
@@ -68,15 +69,15 @@ export default function QuotesClient(){
   window.location.href="/admin/tilbud/"+data.quote.id;
  }
 
- async function archive(id){
-  if(!window.confirm("Arkivere dette tilbudet?"))return;
+ async function archive(id,restore=false){
+  if(!restore&&!window.confirm("Arkivere dette tilbudet?"))return;
   const response=await fetch("/api/admin/quotes",{
    method:"PATCH",
    headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({id,action:"archive"})
+   body:JSON.stringify({id,action:restore?"restore":"archive"})
   });
   const data=await response.json().catch(()=>({}));
-  if(!response.ok){setError(data.error||"Tilbudet kunne ikke arkiveres.");return;}
+  if(!response.ok){setError(data.error||(restore?"Tilbudet kunne ikke gjenopprettes.":"Tilbudet kunne ikke arkiveres."));return;}
   await load();
  }
 
@@ -89,7 +90,10 @@ export default function QuotesClient(){
      <h1>Tilbud</h1>
      <p className="muted">Lag, pris, følg opp og skriv ut profesjonelle tilbud.</p>
     </div>
-    <Link className="btn" href="/admin/tilbud/ny">Nytt tilbud</Link>
+    <div className="quoteAdminHeaderActions">
+     <button type="button" className="btn alt" onClick={()=>{setFilter("all");setShowArchived(value=>!value)}}>{showArchived?"Aktive tilbud":"Arkiv"}</button>
+     <Link className="btn" href="/admin/tilbud/ny">Nytt tilbud</Link>
+    </div>
    </div>
 
    {error&&<p className="notice">{error}</p>}
@@ -109,10 +113,12 @@ export default function QuotesClient(){
      <div className="stat"><span className="muted">Godkjent verdi</span><br/><b>{nok(stats.acceptedValue)}</b></div>
     </div>
 
-    <div className="quoteFilters">
+    {!showArchived&&<div className="quoteFilters">
      <button className={filter==="all"?"active":""} onClick={()=>setFilter("all")}>Alle</button>
      {Object.entries(statusLabels).map(([value,label])=><button key={value} className={filter===value?"active":""} onClick={()=>setFilter(value)}>{label}</button>)}
-    </div>
+    </div>}
+
+    {showArchived&&<div className="quoteArchiveHeading"><div><div className="kicker">ARKIV</div><h2>Arkiverte tilbud</h2></div><span>{quotes.length} tilbud</span></div>}
 
     {loading?<div className="card">Laster tilbud …</div>:visible.length?(
      <div className="quoteList">
@@ -134,7 +140,7 @@ export default function QuotesClient(){
         <Link className="btn" href={"/admin/tilbud/"+quote.id}>Åpne</Link>
         <Link className="btn alt" href={"/admin/tilbud/"+quote.id+"/preview"}>Forhåndsvis</Link>
         <button type="button" className="btn alt" onClick={()=>duplicate(quote)}>Kopier</button>
-        <button type="button" className="btn alt" onClick={()=>archive(quote.id)}>Arkiver</button>
+        {showArchived?<button type="button" className="btn alt" onClick={()=>archive(quote.id,true)}>Gjenopprett</button>:<button type="button" className="btn alt" onClick={()=>archive(quote.id)}>Arkiver</button>}
        </div>
       </article>)}
      </div>
