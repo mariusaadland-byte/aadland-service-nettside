@@ -60,6 +60,8 @@ export function CatalogFooter() {
           <Link href="/">Forside</Link>
           <Link href="/produkter">Produkter</Link>
           <Link href="/utleie">Utleie</Link>
+          <Link href="/vilkar/salg">Salgsbetingelser</Link>
+          <Link href="/vilkar/utleie">Utleiebetingelser</Link>
           <Link href="/personvern">Personvern</Link>
         </div>
       </div>
