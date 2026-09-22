@@ -1618,3 +1618,12 @@ html{scroll-behavior:smooth}
  .rentalCategoryAdminRow>div:last-child,.rentalCategoryAdminRow .btn{width:100%}
  .rentalCategoryAdminRow>div:last-child .btn{flex:1}
 }
+
+
+.rentalLoadMore{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:32px}
+.rentalLoadMore .catalogGoldButton{border:0}
+.rentalLoadMore>span{color:rgba(255,255,255,.45);font-size:10px;font-weight:750}
+@media(max-width:560px){
+ .rentalLoadMore{align-items:stretch;flex-direction:column;text-align:center}
+ .rentalLoadMore .catalogGoldButton{width:100%;justify-content:center}
+}
