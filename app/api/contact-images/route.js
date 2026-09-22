@@ -6,11 +6,17 @@ const allowed=new Set(["image/jpeg","image/png","image/webp"]);
 const maxFiles=8;
 const maxSize=10*1024*1024;
 const maxTotal=40*1024*1024;
+function matchesSignature(type,bytes){
+ if(type==="image/jpeg")return bytes.length>=3&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff;
+ if(type==="image/png")return bytes.length>=8&&[0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a].every((v,i)=>bytes[i]===v);
+ if(type==="image/webp")return bytes.length>=12&&String.fromCharCode(...bytes.slice(0,4))==="RIFF"&&String.fromCharCode(...bytes.slice(8,12))==="WEBP";
+ return false;
+}
 
 export async function POST(request){
  try{
   const supabase=db();
-  if(!supabase) return NextResponse.json({error:"Lagring er ikke konfigurert."},{status:500});
+  if(!supabase) return NextResponse.json({error:"Lagring er ikke konfigurert."},{status:503});
   const data=await request.formData();
   const files=data.getAll("images").filter(f=>f&&typeof f.arrayBuffer==="function");
   if(!files.length) return NextResponse.json({urls:[]});
@@ -20,9 +26,10 @@ export async function POST(request){
   for(const file of files){
    if(!allowed.has(file.type)) return NextResponse.json({error:"Bruk JPG, PNG eller WebP."},{status:400});
    if(file.size>maxSize) return NextResponse.json({error:"Hvert bilde kan være maks 10 MB."},{status:400});
+   const bytes=new Uint8Array(await file.arrayBuffer());
+   if(!matchesSignature(file.type,bytes)) return NextResponse.json({error:"En fil stemmer ikke med valgt bildeformat."},{status:400});
    const ext=file.type==="image/png"?"png":file.type==="image/webp"?"webp":"jpg";
    const path="contact/"+new Date().toISOString().slice(0,10)+"/"+crypto.randomUUID()+"."+ext;
-   const bytes=new Uint8Array(await file.arrayBuffer());
    const bucket="contact-images";
    const {error}=await supabase.storage.from(bucket).upload(path,bytes,{contentType:file.type,upsert:false});
    if(error) throw error;
