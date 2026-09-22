@@ -136,9 +136,10 @@ export async function GET(req){
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
  const params=new URL(req.url).searchParams;
  const id=clean(params.get("id"),100);
+ const archived=params.get("archived")==="1";
  let query=s.from("quotes").select("*");
  if(id)query=query.eq("id",id).maybeSingle();
- else query=query.is("archived_at",null).order("created_at",{ascending:false});
+ else query=(archived?query.not("archived_at","is",null):query.is("archived_at",null)).order("created_at",{ascending:false});
  const {data,error}=await query;
  if(error){
   if(SETUP_CODES.includes(error.code))return NextResponse.json({quotes:[],setupRequired:true});
