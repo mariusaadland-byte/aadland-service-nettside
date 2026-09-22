@@ -9,6 +9,8 @@ export default function ProjectDetailPage(){
  const params=useParams();
  const slug=decodeURIComponent(String(params?.slug||""));
  const [project,setProject]=useState(null);
+ const [previousProject,setPreviousProject]=useState(null);
+ const [nextProject,setNextProject]=useState(null);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
  const [activeImage,setActiveImage]=useState(null);
@@ -21,7 +23,11 @@ export default function ProjectDetailPage(){
     if(!response.ok)throw new Error(data.error||"Prosjektet kunne ikke hentes.");
     return data;
    })
-   .then(data=>setProject(data.project||null))
+   .then(data=>{
+    setProject(data.project||null);
+    setPreviousProject(data.previousProject||null);
+    setNextProject(data.nextProject||null);
+   })
    .catch(err=>setError(err.message||"Prosjektet kunne ikke hentes."))
    .finally(()=>setLoading(false));
  },[slug]);
@@ -128,6 +134,29 @@ export default function ProjectDetailPage(){
     )}
    </div>
   </section>
+
+  {(previousProject||nextProject)&&<section className="projectDetailMore">
+   <div className="catalogWrap">
+    <div className="projectGalleryIntro">
+     <div><span className="catalogEyebrow">FLERE OPPDRAG</span><h2>Se flere prosjekter</h2></div>
+     <Link href="/prosjekter" className="projectGalleryLink">Alle prosjekter <b>→</b></Link>
+    </div>
+    <div className="projectDetailNavGrid">
+     {previousProject&&<Link href={"/prosjekter/"+previousProject.slug} className="projectDetailNavCard previous">
+      <div className="projectDetailNavMedia">
+       {previousProject.imageUrl?<img src={previousProject.imageUrl} alt=""/>:<CatalogPlaceholder label="Prosjektbilde kommer"/>}
+      </div>
+      <div><span>← Forrige prosjekt</span><b>{previousProject.title}</b>{previousProject.category&&<small>{previousProject.category}</small>}</div>
+     </Link>}
+     {nextProject&&<Link href={"/prosjekter/"+nextProject.slug} className="projectDetailNavCard next">
+      <div><span>Neste prosjekt →</span><b>{nextProject.title}</b>{nextProject.category&&<small>{nextProject.category}</small>}</div>
+      <div className="projectDetailNavMedia">
+       {nextProject.imageUrl?<img src={nextProject.imageUrl} alt=""/>:<CatalogPlaceholder label="Prosjektbilde kommer"/>}
+      </div>
+     </Link>}
+    </div>
+   </div>
+  </section>}
 
   <section className="projectDetailCta">
    <div className="catalogWrap projectDetailCtaInner">

@@ -1288,3 +1288,31 @@ html{scroll-behavior:smooth}
  .projectStoryCaption{font-size:10px}
  .projectLightboxCaption{bottom:42px;max-width:92%;font-size:11px}
 }
+
+
+/* Previous / next project navigation */
+.projectDetailMore{padding:12px 0 72px;background:#0b0b0b;color:#fff}
+.projectDetailMore .projectGalleryIntro{align-items:end}
+.projectDetailNavGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.projectDetailNavCard{display:grid;grid-template-columns:150px 1fr;min-height:150px;overflow:hidden;border:1px solid rgba(255,255,255,.1);background:#121212;color:#fff;text-decoration:none;transition:transform .18s ease,border-color .18s ease,background .18s ease}
+.projectDetailNavCard.next{grid-template-columns:1fr 150px;text-align:right}
+.projectDetailNavCard:hover{transform:translateY(-2px);border-color:rgba(215,167,78,.42);background:#151515}
+.projectDetailNavCard>div:not(.projectDetailNavMedia){display:grid;align-content:center;gap:6px;padding:20px}
+.projectDetailNavCard span{color:#d7a74e;font-size:10px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+.projectDetailNavCard b{font-size:20px;line-height:1.1}
+.projectDetailNavCard small{color:rgba(255,255,255,.55);font-size:11px}
+.projectDetailNavMedia{min-width:0;background:#171717}
+.projectDetailNavMedia img{display:block;width:100%;height:100%;min-height:150px;object-fit:cover}
+.projectDetailNavMedia .catalogPlaceholder{height:100%;min-height:150px}
+@media(max-width:800px){
+ .projectDetailNavGrid{grid-template-columns:1fr}
+}
+@media(max-width:560px){
+ .projectDetailMore{padding-bottom:48px}
+ .projectDetailNavCard,.projectDetailNavCard.next{grid-template-columns:92px 1fr;min-height:112px;text-align:left}
+ .projectDetailNavCard.next>div:not(.projectDetailNavMedia){order:2}
+ .projectDetailNavCard.next .projectDetailNavMedia{order:1}
+ .projectDetailNavCard>div:not(.projectDetailNavMedia){padding:14px}
+ .projectDetailNavCard b{font-size:16px}
+ .projectDetailNavMedia img,.projectDetailNavMedia .catalogPlaceholder{min-height:112px}
+}

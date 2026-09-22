@@ -29,7 +29,36 @@ export async function GET(request){
    if(error.code==="42P01")return NextResponse.json({project:null,setupRequired:true},{status:503});
    return NextResponse.json({error:"Prosjektet kunne ikke hentes."},{status:500});
   }
-  return NextResponse.json({project:data?map(data):null});
+  if(!data)return NextResponse.json({project:null});
+
+  const {data:listData,error:listError}=await s
+   .from("projects")
+   .select("id,title,slug,category,image_urls,sort_order,created_at")
+   .eq("active",true)
+   .order("sort_order")
+   .order("created_at",{ascending:false});
+
+  let previousProject=null;
+  let nextProject=null;
+
+  if(!listError&&Array.isArray(listData)&&listData.length>1){
+   const currentIndex=listData.findIndex(item=>item.slug===data.slug);
+   if(currentIndex>=0){
+    const previous=currentIndex>0?listData[currentIndex-1]:null;
+    const next=currentIndex<listData.length-1?listData[currentIndex+1]:null;
+    const navMap=item=>item?{
+     id:item.id,
+     title:item.title,
+     slug:item.slug,
+     category:item.category||"",
+     imageUrl:Array.isArray(item.image_urls)?item.image_urls[0]||"":"" 
+    }:null;
+    previousProject=navMap(previous);
+    nextProject=navMap(next);
+   }
+  }
+
+  return NextResponse.json({project:map(data),previousProject,nextProject});
  }
 
  let query=s.from("projects").select("*").eq("active",true).order("sort_order").order("created_at",{ascending:false});
