@@ -74,5 +74,33 @@ export async function POST(req,{params}){
 
  const {data,error}=await loaded.s.from("quotes").update(patch).eq("id",id).select("*").single();
  if(error)return NextResponse.json({error:"Svaret kunne ikke lagres."},{status:500});
+
+ if(process.env.RESEND_API_KEY){
+  try{
+   const {Resend}=await import("resend");
+   const resend=new Resend(process.env.RESEND_API_KEY);
+   const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
+   const to=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+   const customerName=String(data.customer?.name||"Kunde");
+   const accepted=action==="accept";
+   await resend.emails.send({
+    from,
+    to,
+    replyTo:String(data.customer?.email||"").trim()||undefined,
+    subject:(accepted?"Tilbud godkjent – ":"Tilbud avslått – ")+data.quote_number,
+    text:[
+     customerName+" har "+(accepted?"godkjent":"avslått")+" tilbud "+data.quote_number+".",
+     "",
+     "Tilbud: "+data.title,
+     "Total inkl. MVA: "+new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(data.total_inc_vat_ore)||0)/100),
+     data.customer?.phone?"Telefon: "+data.customer.phone:"",
+     data.customer?.email?"E-post: "+data.customer.email:""
+    ].filter(Boolean).join("\n")
+   });
+  }catch(notificationError){
+   console.error("QUOTE RESPONSE NOTIFICATION ERROR",notificationError);
+  }
+ }
+
  return NextResponse.json({quote:{...mapQuote(data),isExpired:expired(data)}});
 }
