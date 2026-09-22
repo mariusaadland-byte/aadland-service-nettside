@@ -3417,9 +3417,15 @@ function ProjectEditor({project,reload,setError,close,storySetupRequired=false})
   }));
  }
 
- function addTextBlock(afterIndex=null){
+ function addTextBlock(afterIndex=null,preset=null){
   setV(current=>{
-   const block={id:projectBlockId(),type:"text",eyebrow:"",title:"",body:""};
+   const block={
+    id:projectBlockId(),
+    type:"text",
+    eyebrow:preset?.eyebrow||"",
+    title:preset?.title||"",
+    body:preset?.body||""
+   };
    if(afterIndex===null){
     return {...current,contentBlocks:[...current.contentBlocks,block].slice(0,80)};
    }
@@ -3427,6 +3433,15 @@ function ProjectEditor({project,reload,setError,close,storySetupRequired=false})
    next.splice(afterIndex+1,0,block);
    return {...current,contentBlocks:next.slice(0,80)};
   });
+ }
+
+ function addStoryPreset(kind){
+  const presets={
+   before:{eyebrow:"FØR ARBEIDET",title:"Utgangspunktet",body:""},
+   during:{eyebrow:"UNDER ARBEIDET",title:"Slik løste vi oppgaven",body:""},
+   after:{eyebrow:"FERDIG RESULTAT",title:"Resultatet",body:""}
+  };
+  addTextBlock(null,presets[kind]);
  }
 
  function syncImagesToStory(){
@@ -3487,6 +3502,20 @@ function ProjectEditor({project,reload,setError,close,storySetupRequired=false})
   if(close)close();else setEditing(false);
   await reload();
  }
+
+ useEffect(()=>{
+  if(!previewing)return;
+  const previousOverflow=document.body.style.overflow;
+  document.body.style.overflow="hidden";
+  function onKeyDown(event){
+   if(event.key==="Escape")setPreviewing(false);
+  }
+  window.addEventListener("keydown",onKeyDown);
+  return()=>{
+   window.removeEventListener("keydown",onKeyDown);
+   document.body.style.overflow=previousOverflow;
+  };
+ },[previewing]);
 
  const previewSections=[];
  let previewImages=[];
@@ -3575,10 +3604,23 @@ function ProjectEditor({project,reload,setError,close,storySetupRequired=false})
      <p className="muted">Flytt blokkene opp og ned. Tekstblokker kan ligge mellom akkurat de bildene du ønsker.</p>
     </div>
     <div className="adminProjectStoryActions">
-     <button type="button" className="btn" onClick={()=>addTextBlock()}>+ Tekstseksjon nederst</button>
+     <button type="button" className="btn" onClick={()=>addTextBlock()}>+ Tom tekstseksjon</button>
      <button type="button" className="btn alt" onClick={syncImagesToStory}>Legg inn manglende bilder</button>
      <button type="button" className="btn alt" disabled={!v.contentBlocks.length} onClick={()=>setPreviewing(true)}>Forhåndsvis</button>
     </div>
+   </div>
+   <div className="adminProjectStoryPresets">
+    <span>Hurtigseksjoner:</span>
+    <button type="button" onClick={()=>addStoryPreset("before")}>+ Før arbeidet</button>
+    <button type="button" onClick={()=>addStoryPreset("during")}>+ Under arbeidet</button>
+    <button type="button" onClick={()=>addStoryPreset("after")}>+ Ferdig resultat</button>
+   </div>
+
+   <div className="adminProjectStoryDivider">
+    <span>Rekkefølge på kundesiden</span>
+   </div>
+
+   {v.contentBlocks.length===0?
    </div>
 
    {v.contentBlocks.length===0?<div className="adminProjectStoryEmpty">Ingen blokker ennå. Last opp bilder eller legg til en tekstseksjon.</div>:<div className="adminProjectStoryList">

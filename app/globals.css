@@ -1232,3 +1232,17 @@ html{scroll-behavior:smooth}
  .adminProjectPreviewText{padding:26px 20px}
  .adminProjectPreviewText h4{font-size:28px}
 }
+
+
+/* Project story quick presets */
+.adminProjectStoryPresets{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 16px;padding:12px 0;border-top:1px solid #d9d0c5;border-bottom:1px solid #d9d0c5}
+.adminProjectStoryPresets>span{margin-right:4px;color:#6f675d;font-size:10px;font-weight:900;letter-spacing:.05em;text-transform:uppercase}
+.adminProjectStoryPresets button{border:1px solid #cbbda8;background:#fff;color:#2a2722;padding:8px 10px;font-size:10px;font-weight:800}
+.adminProjectStoryPresets button:hover{border-color:#d7a74e;background:#fffaf0}
+.adminProjectStoryDivider{display:flex;align-items:center;gap:10px;margin:0 0 10px;color:#85796a;font-size:10px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+.adminProjectStoryDivider:after{content:"";height:1px;flex:1;background:#d9d0c5}
+@media(max-width:600px){
+ .adminProjectStoryPresets{display:grid;grid-template-columns:1fr 1fr}
+ .adminProjectStoryPresets>span{grid-column:1/-1}
+ .adminProjectStoryPresets button:last-child{grid-column:1/-1}
+}
