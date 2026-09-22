@@ -1,8 +1,72 @@
 import {NextResponse} from "next/server";
 import {getAdminUser,hasPermission} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
-async function allowed(){return (await getAdminUser())&&(await hasPermission("canManageProducts"))}
-function validDate(v){if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(v||"")))return false;const d=new Date(v+"T12:00:00Z");return !Number.isNaN(d.valueOf())&&d.toISOString().slice(0,10)===v}
-export async function GET(req){if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});const id=new URL(req.url).searchParams.get("itemId");const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});let q=s.from("rental_blocks").select("*").order("start_date");if(id)q=q.eq("rental_item_id",id);const {data,error}=await q;if(error){if(error.code==="42P01")return NextResponse.json({blocks:[],setupRequired:true});return NextResponse.json({error:error.message},{status:500})}return NextResponse.json({blocks:(data||[]).map(x=>({id:x.id,itemId:x.rental_item_id,startDate:x.start_date,endDate:x.end_date,reason:x.reason||""}))})}
-export async function POST(req){if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});const b=await req.json();if(!b.itemId||!validDate(b.startDate)||!validDate(b.endDate)||b.endDate<b.startDate)return NextResponse.json({error:"Velg gyldig fra- og til-dato."},{status:400});const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});const {data:item,error:itemError}=await s.from("rental_items").select("id").eq("id",b.itemId).maybeSingle();if(itemError)return NextResponse.json({error:"Utstyret kunne ikke kontrolleres."},{status:500});if(!item)return NextResponse.json({error:"Utstyret ble ikke funnet."},{status:404});const {data,error}=await s.from("rental_blocks").insert({rental_item_id:b.itemId,start_date:b.startDate,end_date:b.endDate,reason:String(b.reason||"").trim().slice(0,1000)}).select("*").single();if(error)return NextResponse.json({error:"Blokkeringen kunne ikke opprettes."},{status:500});return NextResponse.json({block:{id:data.id,itemId:data.rental_item_id,startDate:data.start_date,endDate:data.end_date,reason:data.reason||""}})}
-export async function DELETE(req){if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});const {id}=await req.json();if(!id)return NextResponse.json({error:"Blokkering mangler."},{status:400});const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});const {error}=await s.from("rental_blocks").delete().eq("id",id);if(error)return NextResponse.json({error:error.message},{status:500});return NextResponse.json({ok:true})}
+
+async function allowed(){
+ return (await getAdminUser())&&(await hasPermission("canManageProducts"));
+}
+function validDate(value){
+ const v=String(value||"");
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;
+ const d=new Date(v+"T12:00:00Z");
+ return !Number.isNaN(d.valueOf())&&d.toISOString().slice(0,10)===v;
+}
+
+export async function GET(req){
+ if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
+ const id=new URL(req.url).searchParams.get("itemId");
+ const s=db();
+ if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+ let q=s.from("rental_blocks").select("*").order("start_date");
+ if(id)q=q.eq("rental_item_id",id);
+ const {data,error}=await q;
+ if(error){
+  if(error.code==="42P01")return NextResponse.json({blocks:[],setupRequired:true});
+  return NextResponse.json({error:error.message},{status:500});
+ }
+ return NextResponse.json({blocks:(data||[]).map(x=>({
+  id:x.id,
+  itemId:x.rental_item_id,
+  startDate:x.start_date,
+  endDate:x.end_date,
+  reason:x.reason||""
+ }))});
+}
+
+export async function POST(req){
+ if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
+ const b=await req.json();
+ if(!b.itemId||!validDate(b.startDate)||!validDate(b.endDate)||b.endDate<b.startDate){
+  return NextResponse.json({error:"Velg gyldig fra- og til-dato."},{status:400});
+ }
+ const s=db();
+ if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+ const {data:item,error:itemError}=await s.from("rental_items").select("id").eq("id",b.itemId).maybeSingle();
+ if(itemError)return NextResponse.json({error:"Utstyret kunne ikke kontrolleres."},{status:500});
+ if(!item)return NextResponse.json({error:"Utstyret ble ikke funnet."},{status:404});
+ const {data,error}=await s.from("rental_blocks").insert({
+  rental_item_id:b.itemId,
+  start_date:b.startDate,
+  end_date:b.endDate,
+  reason:String(b.reason||"").trim().slice(0,1000)
+ }).select("*").single();
+ if(error)return NextResponse.json({error:"Blokkeringen kunne ikke opprettes."},{status:500});
+ return NextResponse.json({block:{
+  id:data.id,
+  itemId:data.rental_item_id,
+  startDate:data.start_date,
+  endDate:data.end_date,
+  reason:data.reason||""
+ }});
+}
+
+export async function DELETE(req){
+ if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
+ const {id}=await req.json();
+ if(!id)return NextResponse.json({error:"Blokkering mangler."},{status:400});
+ const s=db();
+ if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+ const {error}=await s.from("rental_blocks").delete().eq("id",id);
+ if(error)return NextResponse.json({error:error.message},{status:500});
+ return NextResponse.json({ok:true});
+}
