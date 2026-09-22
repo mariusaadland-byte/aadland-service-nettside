@@ -3325,6 +3325,7 @@ function ProjectEditor({project,reload,setError,close,storySetupRequired=false})
  const [editing,setEditing]=useState(isNew);
  const [saving,setSaving]=useState(false);
  const [uploading,setUploading]=useState(false);
+ const [previewing,setPreviewing]=useState(false);
  const [v,setV]=useState({
   title:project?.title||"",
   category:project?.category||"",
@@ -3487,6 +3488,21 @@ function ProjectEditor({project,reload,setError,close,storySetupRequired=false})
   await reload();
  }
 
+ const previewSections=[];
+ let previewImages=[];
+ v.contentBlocks.forEach((block,index)=>{
+  if(block.type==="image"){
+   previewImages.push({...block,_index:index});
+   return;
+  }
+  if(previewImages.length){
+   previewSections.push({type:"images",id:"preview-images-"+index,items:previewImages});
+   previewImages=[];
+  }
+  previewSections.push({...block,_index:index});
+ });
+ if(previewImages.length)previewSections.push({type:"images",id:"preview-images-end",items:previewImages});
+
  async function remove(){
   if(!project?.id||!window.confirm('Slette "'+project.title+'"?'))return;
   const r=await fetch("/api/admin/projects",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:project.id})});
@@ -3561,6 +3577,7 @@ function ProjectEditor({project,reload,setError,close,storySetupRequired=false})
     <div className="adminProjectStoryActions">
      <button type="button" className="btn" onClick={()=>addTextBlock()}>+ Tekstseksjon nederst</button>
      <button type="button" className="btn alt" onClick={syncImagesToStory}>Legg inn manglende bilder</button>
+     <button type="button" className="btn alt" disabled={!v.contentBlocks.length} onClick={()=>setPreviewing(true)}>Forhåndsvis</button>
     </div>
    </div>
 
@@ -3588,6 +3605,25 @@ function ProjectEditor({project,reload,setError,close,storySetupRequired=false})
     </div>)}
    </div>}
   </section>
+
+  {previewing&&<div className="adminProjectPreview" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setPreviewing(false)}}>
+   <div className="adminProjectPreviewPanel" role="dialog" aria-modal="true" aria-label="Forhåndsvis prosjektfortelling">
+    <div className="adminProjectPreviewTop">
+     <div><span className="kicker">FORHÅNDSVISNING</span><h3>{v.title||"Prosjekt"}</h3></div>
+     <button type="button" className="adminProjectPreviewClose" onClick={()=>setPreviewing(false)} aria-label="Lukk forhåndsvisning">×</button>
+    </div>
+    {v.description&&<p className="adminProjectPreviewLead">{v.description}</p>}
+    <div className="adminProjectPreviewStory">
+     {previewSections.map((section,index)=>section.type==="text"?<section className="adminProjectPreviewText" key={section.id||index}>
+      {section.eyebrow&&<span>{section.eyebrow}</span>}
+      {section.title&&<h4>{section.title}</h4>}
+      {section.body&&<p>{section.body}</p>}
+     </section>:<div className={"adminProjectPreviewImages "+(section.items.length===1?"single":"")} key={section.id||index}>
+      {section.items.map((block,imageIndex)=><img key={block.id||block.url||imageIndex} src={block.url} alt=""/>)}
+     </div>)}
+    </div>
+   </div>
+  </div>}
 
   <div className="field"><label>Sortering</label><input type="number" value={v.sortOrder} onChange={e=>set("sortOrder",e.target.value)}/></div>
   <div className="adminProjectToggles">

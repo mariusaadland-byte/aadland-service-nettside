@@ -1204,3 +1204,31 @@ html{scroll-behavior:smooth}
 .adminProjectMigrationWarning span{max-width:760px;color:#6b6257;font-size:12px;line-height:1.55}
 .adminProjectMigrationWarning code{width:max-content;max-width:100%;padding:6px 8px;background:#2a2722;color:#f4d899;font-size:11px;overflow-wrap:anywhere}
 .adminProjectToolbar .btn:disabled,.adminProjectCard .btn:disabled{opacity:.45;cursor:not-allowed}
+
+
+/* Backoffice live project-story preview */
+.adminProjectPreview{position:fixed;inset:0;z-index:3000;display:grid;place-items:center;padding:22px;background:rgba(0,0,0,.78)}
+.adminProjectPreviewPanel{width:min(1100px,100%);max-height:90vh;overflow:auto;background:#0b0b0b;color:#fff;border:1px solid rgba(255,255,255,.12);box-shadow:0 30px 80px rgba(0,0,0,.55)}
+.adminProjectPreviewTop{position:sticky;top:0;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 24px;background:rgba(11,11,11,.96);border-bottom:1px solid rgba(255,255,255,.1)}
+.adminProjectPreviewTop h3{margin:5px 0 0;color:#fff;font-size:28px}
+.adminProjectPreviewClose{width:42px;height:42px;border:1px solid rgba(255,255,255,.2);background:#151515;color:#fff;font-size:26px}
+.adminProjectPreviewLead{max-width:760px;margin:24px auto 0;padding:0 24px;color:rgba(255,255,255,.66);font-size:14px;line-height:1.7}
+.adminProjectPreviewStory{display:grid;gap:18px;padding:24px}
+.adminProjectPreviewImages{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.adminProjectPreviewImages.single{grid-template-columns:1fr}
+.adminProjectPreviewImages img{display:block;width:100%;height:310px;object-fit:cover;background:#111}
+.adminProjectPreviewImages.single img{height:440px}
+.adminProjectPreviewText{padding:34px 36px;border-left:3px solid #d7a74e;background:#151515}
+.adminProjectPreviewText>span{color:#d7a74e;font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+.adminProjectPreviewText h4{margin:8px 0 12px;color:#fff;font-size:34px;line-height:1}
+.adminProjectPreviewText p{margin:0;color:rgba(255,255,255,.68);font-size:14px;line-height:1.75;white-space:pre-line}
+@media(max-width:700px){
+ .adminProjectPreview{padding:8px}
+ .adminProjectPreviewPanel{max-height:96vh}
+ .adminProjectPreviewTop{padding:16px}
+ .adminProjectPreviewImages{grid-template-columns:1fr}
+ .adminProjectPreviewImages img,.adminProjectPreviewImages.single img{height:250px}
+ .adminProjectPreviewStory{padding:14px}
+ .adminProjectPreviewText{padding:26px 20px}
+ .adminProjectPreviewText h4{font-size:28px}
+}
