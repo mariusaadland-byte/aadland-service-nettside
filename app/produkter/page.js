@@ -6,16 +6,23 @@ import { CatalogFooter, CatalogHeader, CatalogPlaceholder } from "./ProductChrom
 
 export default function ProdukterPage() {
   const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     async function loadCategories() {
       try {
-        const response = await fetch("/api/categories");
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.error || "Kategoriene kunne ikke hentes.");
-        setCategories(data.categories || []);
+        const [categoriesResponse, productsResponse] = await Promise.all([
+          fetch("/api/categories"),
+          fetch("/api/products"),
+        ]);
+        const categoriesData = await categoriesResponse.json().catch(() => ({}));
+        const productsData = await productsResponse.json().catch(() => ({}));
+        if (!categoriesResponse.ok) throw new Error(categoriesData.error || "Kategoriene kunne ikke hentes.");
+        if (!productsResponse.ok) throw new Error(productsData.error || "Produktene kunne ikke hentes.");
+        setCategories(categoriesData.categories || []);
+        setProducts(productsData.products || []);
       } catch (err) {
         setError(err.message || "Kategoriene kunne ikke hentes.");
       } finally {
@@ -69,7 +76,9 @@ export default function ProdukterPage() {
 
           {!loading && !error && categories.length > 0 && (
             <div className="catalogGrid categoryGrid">
-              {categories.map((category) => (
+              {categories.map((category) => {
+                const productCount = products.filter((product) => product.categoryId === category.id).length;
+                return (
                 <Link
                   key={category.id}
                   href={`/produkter/kategori/${category.slug}`}
@@ -83,13 +92,17 @@ export default function ProdukterPage() {
                     )}
                   </div>
                   <div className="catalogCardBody">
-                    <span className="catalogEyebrow">PRODUKTKATEGORI</span>
+                    <div className="catalogCardMeta">
+                      <span className="catalogEyebrow">PRODUKTKATEGORI</span>
+                      <span className="catalogCountBadge">{productCount} {productCount === 1 ? "produkt" : "produkter"}</span>
+                    </div>
                     <h3>{category.name}</h3>
                     {category.description && <p>{category.description}</p>}
                     <span className="catalogCardLink">Se produkter <b>→</b></span>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
