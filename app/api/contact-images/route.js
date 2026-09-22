@@ -23,6 +23,7 @@ export async function POST(request){
   if(files.length>maxFiles) return NextResponse.json({error:"Du kan laste opp maks 8 bilder."},{status:400});
   if(files.reduce((sum,file)=>sum+(Number(file.size)||0),0)>maxTotal)return NextResponse.json({error:"Bildene kan være maks 40 MB totalt."},{status:413});
   const urls=[];
+  const uploaded=[];
   for(const file of files){
    if(!allowed.has(file.type)) return NextResponse.json({error:"Bruk JPG, PNG eller WebP."},{status:400});
    if(file.size>maxSize) return NextResponse.json({error:"Hvert bilde kan være maks 10 MB."},{status:400});
@@ -32,7 +33,11 @@ export async function POST(request){
    const path="contact/"+new Date().toISOString().slice(0,10)+"/"+crypto.randomUUID()+"."+ext;
    const bucket="contact-images";
    const {error}=await supabase.storage.from(bucket).upload(path,bytes,{contentType:file.type,upsert:false});
-   if(error) throw error;
+   if(error) {
+    if(uploaded.length) await supabase.storage.from(bucket).remove(uploaded);
+    throw error;
+   }
+   uploaded.push(path);
    urls.push(`private-image:${bucket}:${path}`);
   }
   return NextResponse.json({urls});
