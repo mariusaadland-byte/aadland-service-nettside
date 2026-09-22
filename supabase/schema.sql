@@ -57,6 +57,13 @@ alter table public.orders enable row level security;
 grant select,insert,update,delete on public.products to service_role;
 grant select,insert,update,delete on public.orders to service_role;
 
+insert into public.categories (name,slug,sort_order,active)
+values
+('Benker','benker',10,true),
+('Uteplassen','uteplassen',20,true),
+('Bord','bord',30,true)
+on conflict (slug) do update set name=excluded.name,active=true;
+
 insert into products
 (id,slug,name,category,eyebrow,description,base_price_ore,options,image_url,icon,accent,featured,active)
 values
@@ -76,6 +83,11 @@ null,'Planter','moss',true,true),
 '[{"id":"size","label":"Størrelse","choices":[{"label":"70 × 50 cm","value":"70 × 50 cm","extraOre":0},{"label":"90 × 60 cm","value":"90 × 60 cm","extraOre":80000},{"label":"120 × 70 cm","value":"120 × 70 cm","extraOre":150000}]},{"id":"finish","label":"Overflate","choices":[{"label":"Ubehandlet","value":"Ubehandlet","extraOre":0},{"label":"Oljet","value":"Oljet","extraOre":25000},{"label":"Svartbeiset","value":"Svartbeiset","extraOre":35000}]}]'::jsonb,
 null,'Table','clay',false,true)
 on conflict (id) do nothing;
+
+update public.products p
+set category_id=c.id
+from public.categories c
+where p.category_id is null and lower(trim(p.category))=lower(trim(c.name));
 
 -- Private kundebilder fra kontaktskjema. Produktbilder bruker fortsatt offentlig product-images-bucket.
 insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types)
