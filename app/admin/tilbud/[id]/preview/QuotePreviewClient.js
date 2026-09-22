@@ -42,8 +42,7 @@ export default function QuotePreviewClient({quoteId}){
   <article className="quoteDocument">
    <header className="quoteDocHeader">
     <div className="quoteDocBrand">
-     <div className="quoteDocMark">AS</div>
-     <div><b>AADLAND SERVICE</b><span>Håndverk · Vedlikehold · Utleie</span></div>
+     <img className="quoteDocLogo" src="/aadland-service-logo.webp" alt="Aadland Service"/>
     </div>
     <div className="quoteDocCompany">
      <b>Marius Aadland</b>
