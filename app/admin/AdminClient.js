@@ -21,6 +21,8 @@ export default function AdminClient({ user }) {
   const [categories, setCategories] = useState([]);
   const [services, setServices] = useState([]);
   const [rentalItems, setRentalItems] = useState([]);
+  const [rentalCategories, setRentalCategories] = useState([]);
+  const [rentalCategorySetupRequired, setRentalCategorySetupRequired] = useState(false);
   const [rentalBookings, setRentalBookings] = useState([]);
   const [rentalBlocks, setRentalBlocks] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -117,9 +119,10 @@ export default function AdminClient({ user }) {
     } else { setServices([]); }
 
     if (canManageProducts) {
-      const [itemsResponse, blocksResponse] = await Promise.all([
+      const [itemsResponse, blocksResponse, rentalCategoriesResponse] = await Promise.all([
         fetch("/api/admin/rental"),
         fetch("/api/admin/rental/blocks"),
+        fetch("/api/admin/rental/categories"),
       ]);
       if (itemsResponse.ok) {
         const data = await itemsResponse.json();
@@ -133,8 +136,19 @@ export default function AdminClient({ user }) {
       } else {
         setRentalBlocks([]);
       }
+      if (rentalCategoriesResponse.ok) {
+        const data = await rentalCategoriesResponse.json();
+        setRentalCategories(data.categories || []);
+        setRentalCategorySetupRequired(data.setupRequired===true);
+      } else {
+        const data = await rentalCategoriesResponse.json().catch(() => ({}));
+        setRentalCategories([]);
+        setRentalCategorySetupRequired(data.setupRequired===true);
+      }
     } else {
       setRentalItems([]);
+      setRentalCategories([]);
+      setRentalCategorySetupRequired(false);
       setRentalBlocks([]);
     }
 
@@ -483,7 +497,7 @@ export default function AdminClient({ user }) {
         )}
 
         {tab === "rental" && canManageProducts && (
-          <RentalItems items={rentalItems} blocks={rentalBlocks} reload={load} setError={setError} />
+          <RentalItems items={rentalItems} categories={rentalCategories} blocks={rentalBlocks} reload={load} setError={setError} categorySetupRequired={rentalCategorySetupRequired} />
         )}
 
         {tab === "rentalCalendar" && canViewOrders && (
@@ -3257,8 +3271,7 @@ function RentalItems({items,blocks,reload,setError}){
  const [block,setBlock]=useState({itemId:"",startDate:"",endDate:"",reason:""});
  async function addBlock(e){e.preventDefault();setError("");const r=await fetch("/api/admin/rental/blocks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(block)});const d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Perioden kunne ikke blokkeres.");return;}setBlock({itemId:"",startDate:"",endDate:"",reason:""});await reload();}
  async function removeBlock(id){const r=await fetch("/api/admin/rental/blocks",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});if(!r.ok){setError("Blokkeringen kunne ikke fjernes.");return;}await reload();}
- return <><div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20}}><button className="btn" onClick={()=>setShowNew(!showNew)}>{showNew?"Avbryt":"Legg til utstyr"}</button></div>
- {showNew&&<RentalEditor item={null} reload={reload} setError={setError} close={()=>setShowNew(false)}/>}
+ return <><div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20}}><a className="btn alt" href="/admin/utleiekategorier">Utleiekategorier</a><a className="btn" href="/admin/utleie/ny">Legg til utstyr</a></div>
  <div className="grid">{items.map(item=><RentalEditor key={item.id} item={item} reload={reload} setError={setError}/>)}</div>
  <div className="card" style={{marginTop:24}}><div className="kicker">Tilgjengelighet</div><h3>Blokker datoer manuelt</h3><p className="muted">Bruk dette ved service, eget bruk eller andre perioder utstyret ikke kan leies ut.</p>
  <form onSubmit={addBlock}><div className="field"><label>Utstyr</label><select required value={block.itemId} onChange={e=>setBlock({...block,itemId:e.target.value})}><option value="">Velg utstyr</option>{items.map(i=><option key={i.id} value={i.id}>{i.name}</option>)}</select></div>
