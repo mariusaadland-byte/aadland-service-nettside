@@ -44,6 +44,30 @@ export default function QuotesClient(){
   acceptedValue:quotes.filter(q=>q.status==="accepted").reduce((sum,q)=>sum+(Number(q.totalIncVatOre)||0),0)
  }),[quotes]);
 
+ async function duplicate(quote){
+  setError("");
+  const valid=new Date();
+  valid.setDate(valid.getDate()+30);
+  const response=await fetch("/api/admin/quotes",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({
+    title:quote.title,
+    status:"draft",
+    customer:quote.customer,
+    lineItems:quote.lineItems,
+    paymentPlan:quote.paymentPlan,
+    introText:quote.introText,
+    notes:quote.notes,
+    terms:quote.terms,
+    validUntil:valid.toISOString().slice(0,10)
+   })
+  });
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok){setError(data.error||"Tilbudet kunne ikke kopieres.");return;}
+  window.location.href="/admin/tilbud/"+data.quote.id;
+ }
+
  async function archive(id){
   if(!window.confirm("Arkivere dette tilbudet?"))return;
   const response=await fetch("/api/admin/quotes",{
@@ -109,6 +133,7 @@ export default function QuotesClient(){
        <div className="quoteListActions">
         <Link className="btn" href={"/admin/tilbud/"+quote.id}>Åpne</Link>
         <Link className="btn alt" href={"/admin/tilbud/"+quote.id+"/preview"}>Forhåndsvis</Link>
+        <button type="button" className="btn alt" onClick={()=>duplicate(quote)}>Kopier</button>
         <button type="button" className="btn alt" onClick={()=>archive(quote.id)}>Arkiver</button>
        </div>
       </article>)}
