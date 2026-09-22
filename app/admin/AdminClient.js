@@ -551,7 +551,7 @@ export default function AdminClient({ user }) {
 function Archive({orders,reload,setError,canUpdate}){
  const archived=(orders||[]).filter(o=>o.archivedAt);
  async function restore(id){const r=await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,action:"restore"})}),d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Kunne ikke gjenopprette.");return;}await reload()}
- return <div className="orderCards">{archived.length?archived.map(o=><article className="card orderCard" key={o.id}><div className="kicker">{o.orderNumber}</div><h3>{o.customerName||"Ukjent kunde"}</h3><p>{o.orderType==="custom"?"Befaring/forespørsel":"Bestilling"} · {nok(o.totalOre||0)}<br/><small className="muted">Arkivert {new Date(o.archivedAt).toLocaleString("nb-NO")}</small></p>{canUpdate&&<button className="btn alt" onClick={()=>restore(o.id)}>Gjenopprett</button>}</article>):<div className="card"><h3>Arkivet er tomt</h3><p className="muted">Ferdige eller avbrutte saker kan flyttes hit uten at historikken slettes.</p></div>}</div>
+ return <div className="orderCards">{archived.length?archived.map(o=><article className="card orderCard" key={o.id}><div className="kicker">{o.orderNumber}</div><h3>{o.customerName||"Ukjent kunde"}</h3><p>{o.orderType==="custom"?(o.sourceQuoteId?"Oppdrag":"Befaring/forespørsel"):"Bestilling"} · {nok(o.totalOre||0)}<br/><small className="muted">Arkivert {new Date(o.archivedAt).toLocaleString("nb-NO")}</small></p>{canUpdate&&<button className="btn alt" onClick={()=>restore(o.id)}>Gjenopprett</button>}</article>):<div className="card"><h3>Arkivet er tomt</h3><p className="muted">Ferdige eller avbrutte saker kan flyttes hit uten at historikken slettes.</p></div>}</div>
 }
 
 function Customers({orders,bookings}) {
@@ -567,7 +567,7 @@ function Customers({orders,bookings}) {
     if(!current.lastDate||String(entry.date)>String(current.lastDate))current.lastDate=entry.date;
     customers.set(key,current);
   }
-  (orders||[]).forEach(o=>add(o.customer||{name:o.customerName,email:o.customerEmail,phone:o.customerPhone},{type:"order",number:o.orderNumber,date:o.createdAt,totalOre:o.totalOre||0,label:o.orderType==="custom"?"Befaring/forespørsel":"Bestilling"}));
+  (orders||[]).forEach(o=>add(o.customer||{name:o.customerName,email:o.customerEmail,phone:o.customerPhone},{type:"order",number:o.orderNumber,date:o.createdAt,totalOre:o.totalOre||0,label:o.orderType==="custom"?(o.sourceQuoteId?"Oppdrag":"Befaring/forespørsel"):"Bestilling"}));
   (bookings||[]).forEach(b=>add(b.customer,{type:"rental",number:b.bookingNumber,date:b.createdAt,totalOre:b.totalOre||0,label:"Utleie"}));
   const q=query.trim().toLowerCase(),list=[...customers.values()].filter(c=>!q||[c.name,c.email,c.phone,c.address].some(v=>String(v||"").toLowerCase().includes(q))).sort((x,y)=>String(y.lastDate||"").localeCompare(String(x.lastDate||"")));
   return <><div className="card customerSearch"><div className="kicker">KUNDEREGISTER</div><h3>{customers.size} kunder fra bestillinger, befaringer og utleie</h3><div className="field"><label>Søk</label><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Navn, e-post, telefon eller adresse"/></div></div>
