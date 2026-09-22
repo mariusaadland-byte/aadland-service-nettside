@@ -29,7 +29,9 @@ export async function POST(req){
  if(!process.env.RESEND_API_KEY)return NextResponse.json({error:"E-post er ikke konfigurert på serveren."},{status:503});
 
  const token=createQuoteToken(quote);
- const base=String(process.env.NEXT_PUBLIC_SITE_URL||"https://www.aadland-service.no").replace(/\/$/,"");
+ const requestOrigin=new URL(req.url).origin;
+ const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
+ const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin||"https://www.aadland-service.no");
  const link=base+"/tilbud/"+encodeURIComponent(quote.id)+"?token="+encodeURIComponent(token);
  const valid=quote.valid_until?new Date(quote.valid_until+"T12:00:00").toLocaleDateString("nb-NO"):"";
  const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
