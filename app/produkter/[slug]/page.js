@@ -161,16 +161,14 @@ export default function ProductPage() {
     return (
       <main className="catalogPage productDetailPage">
         <CatalogHeader />
-        <section className="section">
+        <section className="section productStateSection">
           <div className="wrap">
-            <div className="card">
-              <div className="kicker">Produkt</div>
+            <div className="catalogNotice catalogNoticeLarge">
+              <span className="catalogEyebrow">PRODUKT</span>
               <h1>Produktet ble ikke funnet</h1>
-              <p className="muted">
-                Produktet kan ha blitt fjernet eller skjult.
-              </p>
-              <a className="btn" href="/produkter">
-                Tilbake til produkter
+              <p>Produktet kan ha blitt fjernet eller skjult.</p>
+              <a className="catalogGoldButton" href="/produkter">
+                Tilbake til produkter →
               </a>
             </div>
           </div>
@@ -249,7 +247,7 @@ export default function ProductPage() {
                               index === selectedImage
                                 ? "2px solid #d7a74e"
                                 : "2px solid rgba(255,255,255,.12)",
-                            borderRadius: 10,
+                            borderRadius: 0,
                             overflow: "hidden",
                             cursor: "pointer",
                             background: "transparent",
@@ -467,11 +465,12 @@ export default function ProductPage() {
       {showOrder && (
         <div
           className="drawer"
+          role="presentation"
           onMouseDown={(e) =>
             e.target === e.currentTarget && setShowOrder(false)
           }
         >
-          <div className="drawerPanel">
+          <div className="drawerPanel" role="dialog" aria-modal="true" aria-label={"Bestill " + product.name}>
             <div className="row">
               <div>
                 <div className="kicker">Bestilling</div>
@@ -545,11 +544,12 @@ export default function ProductPage() {
       {message && (
         <div
           className="drawer"
+          role="presentation"
           onMouseDown={(e) =>
             e.target === e.currentTarget && setMessage(null)
           }
         >
-          <div className="drawerPanel">
+          <div className="drawerPanel" role="dialog" aria-modal="true" aria-label="Bestilling mottatt">
             <div className="success">
               <b>Bestilling mottatt</b>
 
