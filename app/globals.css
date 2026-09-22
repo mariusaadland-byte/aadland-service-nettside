@@ -1487,3 +1487,106 @@ html{scroll-behavior:smooth}
  .rentalSelectionSummary>div:first-child{grid-column:1/-1}
  .rentalCalendarLegend{gap:12px}
 }
+
+
+/* Rental catalog overview */
+.rentalCatalogSection{padding:72px 0 92px;background:#101010}
+.rentalCatalogHeading{display:flex;align-items:end;justify-content:space-between;gap:24px;margin-bottom:26px}
+.rentalCatalogHeading h2{margin:8px 0 0;font-size:clamp(38px,5vw,62px);line-height:.95;letter-spacing:-.045em}
+.rentalCatalogHeading>span{color:rgba(255,255,255,.44);font-size:11px}
+.rentalCategoryFilters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:30px}
+.rentalCategoryFilters button{min-height:42px;padding:0 16px;border:1px solid rgba(255,255,255,.13);background:#161616;color:rgba(255,255,255,.68);font-size:11px;font-weight:800}
+.rentalCategoryFilters button.isActive{border-color:#d7a74e;background:#d7a74e;color:#111}
+.rentalCatalogGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.rentalCatalogCard{display:block;overflow:hidden;border:1px solid rgba(255,255,255,.09);background:#171717;color:#fff;text-decoration:none;transition:transform .2s ease,border-color .2s ease}
+.rentalCatalogCard:hover{transform:translateY(-3px);border-color:rgba(215,167,78,.38)}
+.rentalCatalogMedia{position:relative;height:260px;overflow:hidden;background:#111}
+.rentalCatalogMedia>img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .35s ease}
+.rentalCatalogCard:hover .rentalCatalogMedia>img{transform:scale(1.025)}
+.rentalCatalogMedia .catalogPlaceholder{height:100%;min-height:260px}
+.rentalCatalogCategory{position:absolute;left:14px;top:14px;padding:7px 9px;background:rgba(12,12,12,.88);border:1px solid rgba(215,167,78,.36);color:#e8c67f;font-size:9px;font-weight:850;letter-spacing:.06em;text-transform:uppercase}
+.rentalCatalogBody{display:flex;flex-direction:column;min-height:255px;padding:22px}
+.rentalCatalogBody h3{margin:0 0 9px;font-size:28px;line-height:1.02}
+.rentalCatalogBody>p{display:-webkit-box;overflow:hidden;margin:0 0 20px;color:rgba(255,255,255,.56);font-size:13px;line-height:1.6;-webkit-box-orient:vertical;-webkit-line-clamp:3}
+.rentalCatalogMeta{display:flex;justify-content:space-between;gap:14px;margin-top:auto;padding-top:17px;border-top:1px solid rgba(255,255,255,.08)}
+.rentalCatalogMeta>div{display:grid;gap:4px}
+.rentalCatalogMeta small{color:rgba(255,255,255,.4);font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.rentalCatalogMeta b{font-size:17px}
+.rentalCatalogMeta span{color:rgba(255,255,255,.7);font-size:12px;font-weight:700}
+.rentalCatalogLink{margin-top:18px;color:#d7a74e;font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:.05em}
+
+/* Rental product detail */
+.rentalDetailState{padding-top:90px;padding-bottom:110px;min-height:520px}
+.rentalDetailHero{padding:44px 0 72px;background:#101010}
+.rentalBackLink{display:inline-block;margin-bottom:28px;color:rgba(255,255,255,.62);font-size:11px;font-weight:750;text-decoration:none}
+.rentalBackLink:hover{color:#d7a74e}
+.rentalDetailGrid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(340px,.85fr);gap:42px;align-items:start}
+.rentalDetailGallery{min-width:0}
+.rentalDetailMainImage{height:540px;overflow:hidden;background:#151515;border:1px solid rgba(255,255,255,.08)}
+.rentalDetailMainImage>img{display:block;width:100%;height:100%;object-fit:cover}
+.rentalDetailMainImage .catalogPlaceholder{height:100%;min-height:540px}
+.rentalDetailThumbs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:8px}
+.rentalDetailThumbs button{height:86px;padding:0;border:1px solid rgba(255,255,255,.09);background:#111;overflow:hidden}
+.rentalDetailThumbs button.isActive{border-color:#d7a74e}
+.rentalDetailThumbs img{display:block;width:100%;height:100%;object-fit:cover}
+.rentalDetailInfo{position:sticky;top:98px;padding:30px;border:1px solid rgba(255,255,255,.09);background:#171717}
+.rentalDetailInfo h1{margin:10px 0 18px;font-size:clamp(42px,5vw,68px);line-height:.91;letter-spacing:-.05em}
+.rentalDetailInfo>p{margin:0 0 26px;color:rgba(255,255,255,.62);font-size:14px;line-height:1.72}
+.rentalDetailPricing{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid rgba(255,255,255,.09);border-left:1px solid rgba(255,255,255,.09);margin:24px 0}
+.rentalDetailPricing>div{display:grid;gap:5px;padding:15px;border-right:1px solid rgba(255,255,255,.09);border-bottom:1px solid rgba(255,255,255,.09)}
+.rentalDetailPricing small{color:rgba(255,255,255,.42);font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.rentalDetailPricing b{font-size:17px}
+.rentalDetailCalendarWrap{padding-bottom:82px}
+.rentalDetailCalendar{padding:34px;border:1px solid rgba(255,255,255,.1);background:#101010}
+.rentalDetailCalendar .rentalCalendarTitle h2{margin:7px 0 6px;font-size:38px;line-height:1}
+.rentalDetailCalendar .rentalCalendarTitle p{margin:0;color:rgba(255,255,255,.58);text-transform:capitalize}
+
+/* Rental categories in backoffice */
+.adminRentalCategories{margin-bottom:24px}
+.adminRentalCategoryHead{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.adminRentalCategoryHead h3{margin:6px 0 4px}
+.adminRentalCategoryChips{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.adminRentalCategoryChips>span{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid #ddd;border-radius:999px;background:#fff;font-size:12px;font-weight:700}
+.adminRentalCategoryChips small{display:grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#171717;color:#fff;font-size:9px}
+.adminRentalCategoryPanel{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:22px;margin-top:20px;padding-top:20px;border-top:1px solid #ddd}
+.adminRentalCategoryList>div{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 0;border-top:1px solid #e5e0d9}
+.adminRentalCategoryList>div:first-child{border-top:0}
+.adminRentalCategoryList span{display:grid;gap:3px}
+.adminRentalCategoryList small{color:#777}
+.adminRentalToolbar{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin:28px 0 18px}
+.adminRentalToolbar p{max-width:720px;margin:7px 0 0}
+
+@media(max-width:950px){
+ .rentalCatalogGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .rentalDetailGrid{grid-template-columns:1fr}
+ .rentalDetailInfo{position:static}
+ .rentalDetailMainImage{height:460px}
+ .adminRentalCategoryPanel{grid-template-columns:1fr}
+}
+@media(max-width:650px){
+ .rentalCatalogSection{padding:48px 0 68px}
+ .rentalCatalogHeading{align-items:flex-start;flex-direction:column}
+ .rentalCategoryFilters{display:grid;grid-template-columns:1fr 1fr;width:100%}
+ .rentalCategoryFilters button{width:100%}
+ .rentalCatalogGrid{grid-template-columns:1fr}
+ .rentalCatalogMedia{height:235px}
+ .rentalCatalogMedia .catalogPlaceholder{min-height:235px}
+ .rentalCatalogBody{min-height:0}
+ .rentalDetailHero{padding-top:28px;padding-bottom:44px}
+ .rentalDetailMainImage{height:340px}
+ .rentalDetailMainImage .catalogPlaceholder{min-height:340px}
+ .rentalDetailThumbs{grid-template-columns:repeat(4,minmax(0,1fr))}
+ .rentalDetailThumbs button{height:70px}
+ .rentalDetailInfo{padding:22px 18px}
+ .rentalDetailInfo h1{font-size:46px}
+ .rentalDetailPricing{grid-template-columns:1fr 1fr}
+ .rentalDetailCalendarWrap{padding-bottom:58px}
+ .rentalDetailCalendar{padding:22px 14px}
+ .rentalDetailCalendar .rentalCalendarTitle h2{font-size:31px}
+ .adminRentalCategoryHead{align-items:stretch;flex-direction:column}
+ .adminRentalCategoryHead .btn{width:100%}
+ .adminRentalToolbar{align-items:stretch;flex-direction:column}
+ .adminRentalToolbar .btn{width:100%}
+ .adminRentalCategoryList>div{align-items:flex-start;flex-direction:column}
+ .adminRentalCategoryList .btn{width:100%}
+}
