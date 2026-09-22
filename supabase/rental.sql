@@ -22,6 +22,7 @@ create table if not exists public.rental_bookings (
 alter table public.rental_bookings add column if not exists payment_status text not null default 'unpaid';
 alter table public.rental_bookings add column if not exists deposit_status text not null default 'not_paid';
 alter table public.rental_bookings add column if not exists admin_note text;
+alter table public.rental_bookings add column if not exists customer_user_id uuid references auth.users(id) on delete set null;
 alter table public.rental_items enable row level security; alter table public.rental_blocks enable row level security; alter table public.rental_bookings enable row level security;
 grant select,insert,update,delete on public.rental_items to service_role; grant select,insert,update,delete on public.rental_blocks to service_role; grant select,insert,update,delete on public.rental_bookings to service_role;
 create index if not exists rental_blocks_item_dates_idx on public.rental_blocks(rental_item_id,start_date,end_date);
