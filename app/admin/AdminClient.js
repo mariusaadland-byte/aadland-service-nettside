@@ -3620,9 +3620,6 @@ function ProjectEditor({project,reload,setError,close,storySetupRequired=false})
     <span>Rekkefølge på kundesiden</span>
    </div>
 
-   {v.contentBlocks.length===0?
-   </div>
-
    {v.contentBlocks.length===0?<div className="adminProjectStoryEmpty">Ingen blokker ennå. Last opp bilder eller legg til en tekstseksjon.</div>:<div className="adminProjectStoryList">
     {v.contentBlocks.map((block,index)=><div className={"adminProjectStoryBlock "+(block.type==="text"?"isText":"isImage")} key={block.id||index}>
      <div className="adminProjectStoryOrder">
