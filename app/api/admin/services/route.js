@@ -12,11 +12,11 @@ const text = v => String(v || "").trim();
 const slugify = v => text(v).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/æ/g,"ae").replace(/ø/g,"o").replace(/å/g,"a").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
 function payload(b) {
   return {
-    title:text(b.title), description:text(b.description)||null, image_url:text(b.imageUrl)||null,
-    kind:text(b.kind)||"service", active:b.active!==false, show_on_home:b.showOnHome!==false,
+    title:text(b.title).slice(0,180), description:text(b.description).slice(0,8000)||null, image_url:text(b.imageUrl).slice(0,2000)||null,
+    kind:text(b.kind).slice(0,80)||"service", active:b.active!==false, show_on_home:b.showOnHome!==false,
     show_in_menu:b.showInMenu!==false, show_in_footer:b.showInFooter!==false, has_page:b.hasPage===true,
-    cta_label:text(b.ctaLabel)||"Les mer", cta_href:text(b.ctaHref)||null,
-    form_title:text(b.formTitle)||"Be om befaring", form_prompt:text(b.formPrompt)||"Beskriv kort hva du ønsker hjelp med.",
+    cta_label:text(b.ctaLabel).slice(0,120)||"Les mer", cta_href:text(b.ctaHref).slice(0,2000)||null,
+    form_title:text(b.formTitle).slice(0,180)||"Be om befaring", form_prompt:text(b.formPrompt).slice(0,2000)||"Beskriv kort hva du ønsker hjelp med.",
     publish_from:b.publishFrom||null, publish_until:b.publishUntil||null,
     sort_order:Number.isFinite(Number(b.sortOrder))?Math.round(Number(b.sortOrder)):0
   };
