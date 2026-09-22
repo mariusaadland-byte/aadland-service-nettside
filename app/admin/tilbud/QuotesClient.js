@@ -136,6 +136,7 @@ export default function QuotesClient(){
         <span><small>Opprettet</small><b>{quote.createdAt?new Date(quote.createdAt).toLocaleDateString("nb-NO"):"—"}</b></span>
         <span><small>Gyldig til</small><b>{quote.validUntil?new Date(quote.validUntil+"T12:00:00").toLocaleDateString("nb-NO"):"Ikke satt"}</b></span>
        </div>
+       {quote.convertedOrderId&&<div className="quoteConvertedListBadge">✓ Oppdrag opprettet</div>}
        <div className="quoteListActions">
         <Link className="btn" href={"/admin/tilbud/"+quote.id}>Åpne</Link>
         <Link className="btn alt" href={"/admin/tilbud/"+quote.id+"/preview"}>Forhåndsvis</Link>
