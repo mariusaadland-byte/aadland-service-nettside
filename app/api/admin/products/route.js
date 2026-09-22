@@ -18,8 +18,8 @@ function cleanArray(value) {
 function finiteOptional(value,{integer=false,max=10000000}={}) {
   if (value === undefined || value === null || value === "") return null;
   const n=Number(value);
-  if (!Number.isFinite(n) || n < 0 || n > max) return undefined;
-  return integer ? Math.round(n) : n;
+  if (!Number.isFinite(n) || n < 0 || n > max || (integer && !Number.isInteger(n))) return undefined;
+  return n;
 }
 
 function validateProductExtras(body) {
@@ -233,15 +233,15 @@ export async function POST(req) {
           body.active !== false,
         updated_at: new Date().toISOString(),
         inventory_mode: body.inventoryMode === "stock" ? "stock" : "made_to_order",
-        stock_quantity: Math.max(0, Math.floor(Number(body.stockQuantity) || 0)),
+        stock_quantity: finiteOptional(body.stockQuantity,{integer:true,max:1000000}) ?? 0,
         restock_date: body.restockDate || null,
         lead_time_text: cleanText(body.leadTimeText),
         shippable: body.shippable === true,
-        shipping_price_ore: Math.max(0, Math.round(Number(body.shippingPriceOre) || 0)),
-        weight_grams: body.weightGrams ? Math.max(0, Math.round(Number(body.weightGrams))) : null,
-        shipping_length_cm: body.shippingLengthCm ? Math.max(0, Number(body.shippingLengthCm)) : null,
-        shipping_width_cm: body.shippingWidthCm ? Math.max(0, Number(body.shippingWidthCm)) : null,
-        shipping_height_cm: body.shippingHeightCm ? Math.max(0, Number(body.shippingHeightCm)) : null,
+        shipping_price_ore: finiteOptional(body.shippingPriceOre,{integer:true,max:100000000}) ?? 0,
+        weight_grams: finiteOptional(body.weightGrams,{integer:true,max:10000000}),
+        shipping_length_cm: finiteOptional(body.shippingLengthCm,{max:100000}),
+        shipping_width_cm: finiteOptional(body.shippingWidthCm,{max:100000}),
+        shipping_height_cm: finiteOptional(body.shippingHeightCm,{max:100000}),
       })
       .select("*")
       .single();
@@ -390,15 +390,15 @@ export async function PATCH(req) {
           body.active !== false,
         updated_at: new Date().toISOString(),
         inventory_mode: body.inventoryMode === "stock" ? "stock" : "made_to_order",
-        stock_quantity: Math.max(0, Math.floor(Number(body.stockQuantity) || 0)),
+        stock_quantity: finiteOptional(body.stockQuantity,{integer:true,max:1000000}) ?? 0,
         restock_date: body.restockDate || null,
         lead_time_text: cleanText(body.leadTimeText),
         shippable: body.shippable === true,
-        shipping_price_ore: Math.max(0, Math.round(Number(body.shippingPriceOre) || 0)),
-        weight_grams: body.weightGrams ? Math.max(0, Math.round(Number(body.weightGrams))) : null,
-        shipping_length_cm: body.shippingLengthCm ? Math.max(0, Number(body.shippingLengthCm)) : null,
-        shipping_width_cm: body.shippingWidthCm ? Math.max(0, Number(body.shippingWidthCm)) : null,
-        shipping_height_cm: body.shippingHeightCm ? Math.max(0, Number(body.shippingHeightCm)) : null,
+        shipping_price_ore: finiteOptional(body.shippingPriceOre,{integer:true,max:100000000}) ?? 0,
+        weight_grams: finiteOptional(body.weightGrams,{integer:true,max:10000000}),
+        shipping_length_cm: finiteOptional(body.shippingLengthCm,{max:100000}),
+        shipping_width_cm: finiteOptional(body.shippingWidthCm,{max:100000}),
+        shipping_height_cm: finiteOptional(body.shippingHeightCm,{max:100000}),
       })
       .eq("id", id)
       .select("*")
