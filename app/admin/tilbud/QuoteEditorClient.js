@@ -48,6 +48,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
  const router=useRouter();
  const [v,setV]=useState(blankState);
  const [quoteNumber,setQuoteNumber]=useState("");
+ const [history,setHistory]=useState({createdAt:null,sentAt:null,acceptedAt:null,declinedAt:null});
  const [loading,setLoading]=useState(Boolean(quoteId));
  const [saving,setSaving]=useState(false);
  const [sending,setSending]=useState(false);
@@ -99,6 +100,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
    .then(quote=>{
     if(cancelled)return;
     setQuoteNumber(quote.quoteNumber||"");
+    setHistory({createdAt:quote.createdAt||null,sentAt:quote.sentAt||null,acceptedAt:quote.acceptedAt||null,declinedAt:quote.declinedAt||null});
     setV({
      title:quote.title||"",
      status:quote.status||"draft",
@@ -185,6 +187,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
   setSending(false);
   if(!response.ok){setError(data.error||"Tilbudet kunne ikke sendes.");return;}
   setV(current=>({...current,status:"sent"}));
+  setHistory(current=>({...current,sentAt:data.sentAt||new Date().toISOString()}));
   setSavedMessage("Tilbudet er sendt til "+(data.sentTo||v.customer.email)+".");
  }
 
@@ -290,6 +293,13 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
      {quoteId&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={sendQuote}>{sending?"Sender …":"Send tilbud"}</button>}
      <button type="button" className="btn" disabled={saving||sending} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>
      {quoteId&&<Link className="btn alt" href={"/admin/tilbud/"+quoteId+"/preview"}>Forhåndsvis / PDF</Link>}
+     {quoteId&&<div className="quoteHistory">
+      <div className="kicker">HISTORIKK</div>
+      {history.createdAt&&<span><b>Opprettet</b><small>{new Date(history.createdAt).toLocaleString("nb-NO")}</small></span>}
+      {history.sentAt&&<span><b>Sendt</b><small>{new Date(history.sentAt).toLocaleString("nb-NO")}</small></span>}
+      {history.acceptedAt&&<span><b>Godkjent</b><small>{new Date(history.acceptedAt).toLocaleString("nb-NO")}</small></span>}
+      {history.declinedAt&&<span><b>Avslått</b><small>{new Date(history.declinedAt).toLocaleString("nb-NO")}</small></span>}
+     </div>}
     </aside>
    </div>
   </section>
