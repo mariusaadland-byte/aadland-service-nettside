@@ -18,6 +18,7 @@ export function CatalogHeader() {
           type="button"
           aria-label={open ? "Lukk meny" : "Åpne meny"}
           aria-expanded={open}
+          aria-controls="catalog-menu"
           onClick={() => setOpen((value) => !value)}
         >
           <span />
@@ -25,12 +26,14 @@ export function CatalogHeader() {
           <span />
         </button>
 
-        <nav className={"catalogLinks " + (open ? "isOpen" : "")}>
+        <nav id="catalog-menu" className={"catalogLinks " + (open ? "isOpen" : "")}>
           <Link href="/" onClick={() => setOpen(false)}>Hjem</Link>
+          <Link href="/min-side" onClick={() => setOpen(false)}>Min side</Link>
+          <Link href="/#tjenester" onClick={() => setOpen(false)}>Tjenester</Link>
           <Link href="/produkter" onClick={() => setOpen(false)}>Produkter</Link>
           <Link href="/utleie" onClick={() => setOpen(false)}>Utleie</Link>
-          <Link href="/#tjenester" onClick={() => setOpen(false)}>Tjenester</Link>
           <Link href="/#prosjekter" onClick={() => setOpen(false)}>Tidligere oppdrag</Link>
+          <Link href="/#om" onClick={() => setOpen(false)}>Om oss</Link>
           <Link href="/#kontakt" onClick={() => setOpen(false)}>Kontakt</Link>
         </nav>
 
@@ -58,6 +61,8 @@ export function CatalogFooter() {
         <div>
           <b>Snarveier</b>
           <Link href="/">Forside</Link>
+          <Link href="/min-side">Min side</Link>
+          <Link href="/#tjenester">Tjenester</Link>
           <Link href="/produkter">Produkter</Link>
           <Link href="/utleie">Utleie</Link>
           <Link href="/vilkar/salg">Salgsbetingelser</Link>
