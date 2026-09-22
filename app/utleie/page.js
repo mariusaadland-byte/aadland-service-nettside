@@ -126,10 +126,12 @@ export default function Utleie(){
       {items.map(item=>{
        const image=item.imageUrls?.[0];
        const price=hasPeriod&&item.pricing?kr(item.pricing.totalOre):kr(item.dailyPriceOre)+" / dag";
-       return <article className={"rentalCard "+(hasPeriod&&!item.available?"isUnavailable":"")} key={item.id}>
+       const canFulfill=item.pickupAvailable||item.deliveryAvailable;
+       const selectable=hasPeriod&&item.available&&canFulfill;
+       return <article className={"rentalCard "+(hasPeriod&&(!item.available||!canFulfill)?"isUnavailable":"")} key={item.id}>
         <div className="rentalCardMedia">
          {image?<img src={image} alt={item.name}/>:<CatalogPlaceholder label="Utstyrsbilde kommer"/>}
-         {hasPeriod&&<span className={"rentalAvailabilityBadge "+(item.available?"available":"unavailable")}>{item.available?"Ledig":"Opptatt"}</span>}
+         {hasPeriod&&<span className={"rentalAvailabilityBadge "+(selectable?"available":"unavailable")}>{!item.available?"Opptatt":canFulfill?"Ledig":"Ikke bookbar"}</span>}
         </div>
         <div className="rentalCardBody">
          <span className="catalogEyebrow">UTLEIE</span>
@@ -141,8 +143,8 @@ export default function Utleie(){
           {item.deliveryAvailable&&<span>Levering</span>}
          </div>
          {hasPeriod?(
-          <button className="catalogGoldButton rentalChooseButton" type="button" disabled={!item.available} onClick={()=>{setChosen(item);setFulfillment(item.pickupAvailable?"pickup":"delivery");setErr("");setMsg("")}}>
-           {item.available?"Velg dette utstyret →":"Opptatt i perioden"}
+          <button className="catalogGoldButton rentalChooseButton" type="button" disabled={!selectable} onClick={()=>{setChosen(item);setFulfillment(item.pickupAvailable?"pickup":"delivery");setErr("");setMsg("")}}>
+           {!item.available?"Opptatt i perioden":canFulfill?"Velg dette utstyret →":"Kontakt oss for utlevering"}
           </button>
          ):<small className="rentalHint">Velg dato øverst for å se tilgjengelighet og totalpris.</small>}
         </div>
