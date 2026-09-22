@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { nok } from "../../../../lib/catalog";
+import { CatalogFooter, CatalogHeader, CatalogPlaceholder } from "../../ProductChrome";
 
 export default function CategoryPage() {
   const params = useParams();
   const slug = params?.slug;
-
   const [category, setCategory] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,259 +16,116 @@ export default function CategoryPage() {
 
   useEffect(() => {
     if (!slug) return;
-
     async function load() {
       try {
         setLoading(true);
         setError("");
-
         const [categoriesResponse, productsResponse] = await Promise.all([
           fetch("/api/categories"),
           fetch("/api/products"),
         ]);
-
         const categoriesData = await categoriesResponse.json().catch(() => ({}));
         const productsData = await productsResponse.json().catch(() => ({}));
+        if (!categoriesResponse.ok) throw new Error(categoriesData.error || "Kategorien kunne ikke hentes.");
+        if (!productsResponse.ok) throw new Error(productsData.error || "Produktene kunne ikke hentes.");
 
-        if (!categoriesResponse.ok) {
-          throw new Error(
-            categoriesData.error || "Kategorien kunne ikke hentes."
-          );
-        }
-
-        if (!productsResponse.ok) {
-          throw new Error(
-            productsData.error || "Produktene kunne ikke hentes."
-          );
-        }
-
-        const foundCategory = (categoriesData.categories || []).find(
-          (item) => item.slug === slug
-        );
-
-        if (!foundCategory) {
+        const found = (categoriesData.categories || []).find((item) => item.slug === slug);
+        if (!found) {
           setCategory(null);
           setProducts([]);
           return;
         }
-
-        setCategory(foundCategory);
-
-        setProducts(
-          (productsData.products || []).filter(
-            (product) => product.categoryId === foundCategory.id
-          )
-        );
+        setCategory(found);
+        setProducts((productsData.products || []).filter((product) => product.categoryId === found.id));
       } catch (err) {
         setError(err.message || "Innholdet kunne ikke hentes.");
       } finally {
         setLoading(false);
       }
     }
-
     load();
   }, [slug]);
 
   if (loading) {
     return (
-      <main>
-        <section
-          style={{
-            maxWidth: 1180,
-            margin: "0 auto",
-            padding: "70px 24px 100px",
-          }}
-        >
-          <p>Laster produkter...</p>
-        </section>
+      <main className="catalogPage">
+        <CatalogHeader />
+        <section className="catalogSection"><div className="catalogWrap"><div className="catalogStatus">Laster produkter …</div></div></section>
+        <CatalogFooter />
       </main>
     );
   }
 
   if (error || !category) {
     return (
-      <main>
-        <section
-          style={{
-            maxWidth: 1180,
-            margin: "0 auto",
-            padding: "70px 24px 100px",
-          }}
-        >
-          <Link
-            href="/produkter"
-            style={{ color: "inherit", textDecoration: "none" }}
-          >
-            ← Tilbake til produkter
-          </Link>
-
-          <div className="card" style={{ marginTop: 30 }}>
-            <h2>{error ? "Noe gikk galt" : "Kategorien finnes ikke"}</h2>
-            <p>
-              {error || "Kategorien kan ha blitt fjernet eller deaktivert."}
-            </p>
+      <main className="catalogPage">
+        <CatalogHeader />
+        <section className="catalogSection">
+          <div className="catalogWrap">
+            <Link className="catalogBack" href="/produkter">← Tilbake til produkter</Link>
+            <div className="catalogNotice catalogNoticeLarge">
+              <b>{error ? "Noe gikk galt" : "Kategorien finnes ikke"}</b>
+              <p>{error || "Kategorien kan ha blitt fjernet eller deaktivert."}</p>
+            </div>
           </div>
         </section>
+        <CatalogFooter />
       </main>
     );
   }
 
   return (
-    <main>
-      <section
-        style={{
-          maxWidth: 1180,
-          margin: "0 auto",
-          padding: "70px 24px 100px",
-        }}
-      >
-        <Link
-          href="/produkter"
-          style={{
-            color: "inherit",
-            textDecoration: "none",
-            opacity: 0.7,
-          }}
-        >
-          ← Alle kategorier
-        </Link>
+    <main className="catalogPage">
+      <CatalogHeader />
 
-        <div style={{ marginTop: 30, marginBottom: 42 }}>
-          <div className="kicker">Produkter</div>
+      <section className="catalogHero catalogHeroCategory">
+        <div className="catalogWrap catalogHeroInner">
+          <Link className="catalogBack" href="/produkter">← Alle kategorier</Link>
+          <div className="catalogEyebrow">PRODUKTER</div>
+          <h1>{category.name}</h1>
+          <p>{category.description || "Se våre tilgjengelige produkter i denne kategorien."}</p>
+        </div>
+      </section>
 
-          <h1 style={{ marginBottom: 12 }}>{category.name}</h1>
+      <section className="catalogSection">
+        <div className="catalogWrap">
+          <div className="catalogSectionHead compact">
+            <div>
+              <span className="catalogEyebrow">UTVALG</span>
+              <h2>{products.length ? `${products.length} produkt${products.length === 1 ? "" : "er"}` : "Produkter"}</h2>
+            </div>
+          </div>
 
-          {category.description && (
-            <p
-              style={{
-                maxWidth: 700,
-                fontSize: 18,
-                lineHeight: 1.6,
-                opacity: 0.75,
-              }}
-            >
-              {category.description}
-            </p>
+          {products.length === 0 ? (
+            <div className="catalogNotice">
+              <b>Ingen produkter i denne kategorien ennå</b>
+              <p>Det er foreløpig ingen aktive produkter i kategorien.</p>
+            </div>
+          ) : (
+            <div className="catalogGrid productGrid">
+              {products.map((product) => {
+                const image = (Array.isArray(product.imageUrls) && product.imageUrls[0]) || product.imageUrl;
+                return (
+                  <Link key={product.id} href={`/produkter/${product.slug}`} className="catalogCard productCard">
+                    <div className="catalogMedia">
+                      {image ? <img src={image} alt={product.name} /> : <CatalogPlaceholder label="Produktbilde kommer" />}
+                    </div>
+                    <div className="catalogCardBody">
+                      <span className="catalogEyebrow">{category.name.toUpperCase()}</span>
+                      <h3>{product.name}</h3>
+                      {product.description && <p>{product.description}</p>}
+                      <div className="catalogPrice">Fra {nok(product.basePriceOre || 0)}</div>
+                      <span className="catalogCardLink">Se produkt <b>→</b></span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
           )}
         </div>
-
-        {products.length === 0 ? (
-          <div className="card">
-            <h3>Ingen produkter i denne kategorien ennå</h3>
-            <p>Det er foreløpig ingen aktive produkter i kategorien.</p>
-          </div>
-        ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fit, minmax(280px, 1fr))",
-              gap: 24,
-            }}
-          >
-            {products.map((product) => {
-              const image =
-                (Array.isArray(product.imageUrls) &&
-                  product.imageUrls[0]) ||
-                product.imageUrl;
-
-              return (
-                <Link
-                  key={product.id}
-                  href={`/produkter/${product.slug}`}
-                  style={{
-                    color: "inherit",
-                    textDecoration: "none",
-                  }}
-                >
-                  <article
-                    className="card"
-                    style={{
-                      height: "100%",
-                      padding: 0,
-                      overflow: "hidden",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {image ? (
-                      <img
-                        src={image}
-                        alt={product.name}
-                        style={{
-                          display: "block",
-                          width: "100%",
-                          height: 260,
-                          objectFit: "cover",
-                        }}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          height: 260,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          background: "rgba(0,0,0,0.05)",
-                          fontSize: 54,
-                          fontWeight: 700,
-                          opacity: 0.25,
-                        }}
-                      >
-                        AS
-                      </div>
-                    )}
-
-                    <div style={{ padding: 24 }}>
-                      <div className="kicker">
-                        {category.name}
-                      </div>
-
-                      <h2
-                        style={{
-                          marginTop: 8,
-                          marginBottom: 10,
-                        }}
-                      >
-                        {product.name}
-                      </h2>
-
-                      {product.description && (
-                        <p
-                          style={{
-                            lineHeight: 1.6,
-                            opacity: 0.75,
-                          }}
-                        >
-                          {product.description}
-                        </p>
-                      )}
-
-                      <div
-                        style={{
-                          marginTop: 18,
-                          fontSize: 19,
-                          fontWeight: 700,
-                        }}
-                      >
-                        Fra {nok(product.basePriceOre || 0)}
-                      </div>
-
-                      <div
-                        style={{
-                          marginTop: 16,
-                          fontWeight: 700,
-                        }}
-                      >
-                        Se produkt →
-                      </div>
-                    </div>
-                  </article>
-                </Link>
-              );
-            })}
-          </div>
-        )}
       </section>
+
+      <CatalogFooter />
     </main>
   );
 }

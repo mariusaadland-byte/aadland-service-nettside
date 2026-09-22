@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { CatalogFooter, CatalogHeader } from "../ProductChrome";
 import {
   nok,
   productPrice,
@@ -142,8 +143,8 @@ export default function ProductPage() {
 
   if (loading) {
     return (
-      <main>
-        <Header />
+      <main className="catalogPage productDetailPage">
+        <CatalogHeader />
         <section className="section">
           <div className="wrap">
             <p className="muted">Henter produkt...</p>
@@ -153,12 +154,12 @@ export default function ProductPage() {
     );
   }
 
-  if (loadError) {return <main><Header/><section className="section"><div className="wrap"><div className="card"><h1>Noe gikk galt</h1><p>{loadError}</p><a className="btn" href="/produkter">Tilbake til produkter</a></div></div></section></main>}
+  if (loadError) {return <main className="catalogPage productDetailPage"><CatalogHeader/><section className="section"><div className="wrap"><div className="card"><h1>Noe gikk galt</h1><p>{loadError}</p><a className="btn" href="/produkter">Tilbake til produkter</a></div></div></section></main>}
 
   if (!product) {
     return (
-      <main>
-        <Header />
+      <main className="catalogPage productDetailPage">
+        <CatalogHeader />
         <section className="section">
           <div className="wrap">
             <div className="card">
@@ -178,10 +179,10 @@ export default function ProductPage() {
   }
 
   return (
-    <main>
-      <Header />
+    <main className="catalogPage productDetailPage">
+      <CatalogHeader />
 
-      <section className="section" style={{ paddingTop: 45 }}>
+      <section className="section productIntroSection" style={{ paddingTop: 45 }}>
         <div className="wrap">
           <div style={{ marginBottom: 28 }}>
             <a
@@ -194,7 +195,7 @@ export default function ProductPage() {
           </div>
 
           <div
-            className="productLayout"
+            className="productLayout premiumProductLayout"
             style={{
               display: "grid",
               gridTemplateColumns:
@@ -282,7 +283,7 @@ export default function ProductPage() {
               )}
             </div>
 
-            <div>
+            <div className="productPurchasePanel">
               <div className="kicker">
                 {product.category || "På bestilling"}
               </div>
@@ -368,7 +369,7 @@ export default function ProductPage() {
 
               {product.inventoryMode==="stock"?<p style={{marginTop:14}}><b>{soldOut?"Utsolgt":product.stockQuantity+" på lager"}</b>{soldOut&&product.restockDate?<> · forventet tilbake {new Date(product.restockDate+"T12:00:00").toLocaleDateString("nb-NO")}</>:null}</p>:<p style={{marginTop:14}}><b>Produseres på bestilling</b>{product.leadTimeText?" · "+product.leadTimeText:""}</p>}
               <button
-                className="btn"
+                className="btn catalogOrderButton"
                 disabled={soldOut}
                 onClick={() => {
                   setError("");
@@ -400,7 +401,7 @@ export default function ProductPage() {
       {(product.dimensions ||
         (product.specifications || []).length > 0) && (
         <section
-          className="section"
+          className="section productSpecsSection"
           style={{ background: "#eee8dd" }}
         >
           <div className="wrap">
@@ -449,7 +450,7 @@ export default function ProductPage() {
         </section>
       )}
 
-      <section className="section">
+      <section className="section productCustomSection">
         <div className="wrap">
           <div className="kicker">Aadland Service</div>
           <h2>Trenger du en annen løsning?</h2>
@@ -471,7 +472,7 @@ export default function ProductPage() {
         </div>
       </section>
 
-      <Footer />
+      <CatalogFooter />
 
       {showOrder && (
         <div
@@ -593,42 +594,6 @@ function selectedLabels(product, selected) {
     })
     .filter(Boolean)
     .join(" · ");
-}
-
-function Header() {
-  return (
-    <header className="top">
-      <div className="wrap nav">
-        <a className="brand" href="/"><img src="/aadland-service-logo.webp" alt="Aadland Service" style={{width:150,height:60,objectFit:"contain"}}/></a>
-
-        <nav className="links">
-          <a href="/">Forside</a>
-          <a href="/produkter">Produkter</a>
-          <a href="/#om">Om oss</a>
-          <a href="/#kontakt">Kontakt</a>
-        </nav>
-      </div>
-    </header>
-  );
-}
-
-function Footer() {
-  return (
-    <footer className="footer">
-      <div className="wrap row">
-        <div>
-          <b>Aadland Service</b>
-          <p>Bygg • Renovering • Vedlikehold • Hagearbeid</p>
-        </div>
-
-        <div>
-          <p>post@aadland-service.no</p>
-          <p>471 54 898</p>
-          <p>Org.nr. 937 781 873 MVA</p><p><a href="/vilkar/salg">Salgsbetingelser</a> · <a href="/vilkar/utleie">Utleiebetingelser</a> · <a href="/personvern">Personvern</a></p>
-        </div>
-      </div>
-    </footer>
-  );
 }
 
 function CustomerFields({ customer, setCustomer }) {
