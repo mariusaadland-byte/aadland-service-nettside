@@ -60,6 +60,18 @@ export default function RentalCategoriesClient(){
   await load();
  }
 
+ async function assign(itemId,categoryId){
+  setError("");
+  const response=await fetch("/api/admin/rental/category",{
+   method:"PATCH",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({itemId,categoryId})
+  });
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok){setError(data.error||"Kategorien kunne ikke lagres på produktet.");return;}
+  setItems(current=>current.map(item=>item.id===itemId?{...item,categoryId:categoryId||null}:item));
+ }
+
  async function remove(category){
   const count=items.filter(item=>item.categoryId===category.id).length;
   if(count){setError("Flytt de "+count+" utleieprodukt"+(count===1?"et":"ene")+" til en annen kategori før denne slettes.");return;}
@@ -109,6 +121,22 @@ export default function RentalCategoriesClient(){
       </div>;
      }):<p className="muted">Ingen kategorier ennå.</p>}
     </div>
+   </div>}
+
+   {!setupRequired&&<div className="card rentalCategoryAssignments">
+    <div className="kicker">FORDEL UTLEIEUTSTYR</div>
+    <h3>Velg kategori på produktene</h3>
+    <p className="muted">Endringen slår automatisk inn i utleiekatalogen. Produkter uten kategori vises under «Annet».</p>
+    {items.length?items.map(item=><div className="rentalCategoryAssignmentRow" key={item.id}>
+     <div>
+      {item.imageUrls?.[0]&&<img src={item.imageUrls[0]} alt=""/>}
+      <span><b>{item.name}</b><small>{item.status==="available"?"Tilgjengelig":"Ikke tilgjengelig"}</small></span>
+     </div>
+     <select value={item.categoryId||""} onChange={e=>assign(item.id,e.target.value)}>
+      <option value="">Ingen kategori</option>
+      {categories.map(category=><option key={category.id} value={category.id}>{category.name}</option>)}
+     </select>
+    </div>):<p className="muted">Ingen utleieprodukter ennå.</p>}
    </div>}
   </section>
  </main>;
