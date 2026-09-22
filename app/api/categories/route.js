@@ -14,7 +14,7 @@ export async function GET() {
           error:
             "Databasen er ikke tilgjengelig.",
         },
-        { status: 500 }
+        { status: 503 }
       );
     }
 
