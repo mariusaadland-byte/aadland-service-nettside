@@ -44,7 +44,7 @@ function sanitizeCustomer(value){
  const c=value&&typeof value==="object"?value:{};
  return {
   name:clean(c.name,180),
-  email:clean(c.email,240),
+  email:clean(c.email,240).toLowerCase(),
   phone:clean(c.phone,80),
   address:clean(c.address,500)
  };
