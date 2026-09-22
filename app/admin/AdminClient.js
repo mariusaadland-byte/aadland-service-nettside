@@ -3292,13 +3292,31 @@ function RentalBookings({bookings,reload,setError,canUpdate}){
  </article>)}</div>;
 }
 
+const projectStoryMigrationSql="alter table public.projects add column if not exists content_blocks jsonb not null default '[]'::jsonb;";
+
 function Projects({projects,reload,setError,storySetupRequired}){
  const [showNew,setShowNew]=useState(false);
+ const [migrationCopied,setMigrationCopied]=useState(false);
+
+ async function copyProjectMigration(){
+  try{
+   await navigator.clipboard.writeText(projectStoryMigrationSql);
+   setMigrationCopied(true);
+   window.setTimeout(()=>setMigrationCopied(false),1800);
+  }catch{
+   setError("Kunne ikke kopiere SQL automatisk. Åpne supabase/project_content_blocks.sql i prosjektet.");
+  }
+ }
+
  return <>
   {storySetupRequired&&<div className="adminProjectMigrationWarning">
    <b>Databaseoppdatering mangler</b>
    <span>Prosjektfortelling med tekst mellom bildene er ferdig programmert, men databasen må oppdateres før nye endringer kan lagres.</span>
-   <code>supabase/project_content_blocks.sql</code>
+   <code>{projectStoryMigrationSql}</code>
+   <div className="adminProjectMigrationActions">
+    <button type="button" className="btn alt" onClick={copyProjectMigration}>{migrationCopied?"Kopiert ✓":"Kopier SQL"}</button>
+    <small>Kjør denne én gang i Supabase SQL Editor. Deretter oppdager backoffice automatisk at prosjektfortelling er klar.</small>
+   </div>
   </div>}
   <div className="adminProjectToolbar">
    <div>

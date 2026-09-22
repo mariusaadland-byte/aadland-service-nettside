@@ -1246,3 +1246,14 @@ html{scroll-behavior:smooth}
  .adminProjectStoryPresets>span{grid-column:1/-1}
  .adminProjectStoryPresets button:last-child{grid-column:1/-1}
 }
+
+
+/* Project story migration helper */
+.adminProjectMigrationWarning code{display:block;width:100%;padding:10px 12px;white-space:pre-wrap}
+.adminProjectMigrationActions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:5px}
+.adminProjectMigrationActions .btn{padding:9px 12px}
+.adminProjectMigrationActions small{max-width:650px;color:#74695d;line-height:1.45}
+@media(max-width:600px){
+ .adminProjectMigrationActions{display:grid}
+ .adminProjectMigrationActions .btn{width:100%}
+}
