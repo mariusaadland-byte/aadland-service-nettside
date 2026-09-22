@@ -204,7 +204,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
     </div>
     <div className="quoteEditorHeaderActions">
      {quoteId&&<Link className="btn alt" href={"/admin/tilbud/"+quoteId+"/preview"}>Forhåndsvis / PDF</Link>}
-     {quoteId&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={sendQuote}>{sending?"Sender …":"Send tilbud"}</button>}
+     {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={sendQuote}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
      <button type="button" className="btn" disabled={saving||sending} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>
     </div>
    </div>
@@ -290,7 +290,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
      <div className="quoteSummaryPlan">
       {v.paymentPlan.map(row=><span key={row.id}><small>{row.label} · {row.percent}%</small><b>{nok(calc.total*(Number(row.percent)||0)/100)}</b></span>)}
      </div>
-     {quoteId&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={sendQuote}>{sending?"Sender …":"Send tilbud"}</button>}
+     {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={sendQuote}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
      <button type="button" className="btn" disabled={saving||sending} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>
      {quoteId&&<Link className="btn alt" href={"/admin/tilbud/"+quoteId+"/preview"}>Forhåndsvis / PDF</Link>}
      {quoteId&&<div className="quoteHistory">
