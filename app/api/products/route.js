@@ -8,7 +8,7 @@ export async function GET() {
     if (!s) {
       return NextResponse.json(
         { error: "Databasen er ikke tilgjengelig." },
-        { status: 500 }
+        { status: 503 }
       );
     }
 
