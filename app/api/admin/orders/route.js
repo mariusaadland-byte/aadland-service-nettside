@@ -5,7 +5,7 @@ import {
 } from "../../../../lib/auth";
 import { db } from "../../../../lib/supabase";
 
-async function signPrivateImages(s,value){if(typeof value!=="string")return value;const matches=[...value.matchAll(/private-image:([a-z0-9_-]+):([^\s]+)/gi)];let out=value;for(const match of matches){const bucket=match[1],path=match[2];const {data,error}=await s.storage.from(bucket).createSignedUrl(path,3600);if(!error&&data?.signedUrl)out=out.replace(match[0],data.signedUrl)}return out}
+async function privateImages(s,value){if(typeof value!=="string")return {text:value,images:[]};const matches=[...value.matchAll(/private-image:([a-z0-9_-]+):([^\\s]+)/gi)];let text=value;const images=[];for(const match of matches){const bucket=match[1],path=match[2];if(bucket!=="contact-images"||!path.startsWith("contact/")||path.includes("..")||path.startsWith("/"))continue;const {data,error}=await s.storage.from("contact-images").createSignedUrl(path,3600);if(!error&&data?.signedUrl){images.push({ref:match[0],url:data.signedUrl});text=text.replace(match[0],"[Vedlagt bilde]")}}return {text,images}}
 
 const mapOrder = (o) => ({
   id: o.id,
@@ -83,7 +83,7 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    orders: await Promise.all((data || []).map(async order=>{const mapped=mapOrder(order);mapped.customRequest=await signPrivateImages(s,mapped.customRequest);return mapped;})),
+    orders: await Promise.all((data || []).map(async order=>{const mapped=mapOrder(order);const privateData=await privateImages(s,mapped.customRequest);mapped.customRequest=privateData.text;mapped.contactImages=privateData.images;return mapped;})),
   });
 }
 
