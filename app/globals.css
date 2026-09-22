@@ -834,3 +834,57 @@ html{scroll-behavior:smooth}
  .productDetailPage .drawerPanel{width:100%;max-height:92vh;padding:22px 18px;border-left:0;border-right:0;border-bottom:0}
  .productAssurances{font-size:10px}
 }
+
+
+/* Premium catalogue visual refinement */
+.catalogHeroInner:before{content:"";display:block;width:54px;height:2px;margin-bottom:28px;background:#d7a74e;box-shadow:18px 0 0 rgba(215,167,78,.35)}
+.catalogCard{position:relative}
+.catalogCard:after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,#d7a74e,rgba(215,167,78,.08));transform:scaleX(0);transform-origin:left;transition:transform .24s ease}
+.catalogCard:hover:after{transform:scaleX(1)}
+.catalogMedia{position:relative}
+.catalogMedia:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,rgba(0,0,0,.18));pointer-events:none}
+.catalogCardBody>.catalogEyebrow{margin-bottom:1px}
+.catalogCardBody h3{max-width:92%}
+.catalogCardLink{display:flex;align-items:center;gap:7px}
+.catalogCardLink b{font-size:18px;line-height:1;transition:transform .18s ease}
+.catalogCard:hover .catalogCardLink b{transform:translateX(4px)}
+.catalogPrice{display:inline-flex;align-self:flex-start;padding-top:16px;border-top:1px solid rgba(255,255,255,.08)}
+.categoryCard .catalogCardBody{min-height:218px}
+.categoryCard .catalogMedia{height:320px}
+.productCard .catalogMedia{height:300px}
+.catalogSectionHead:after{content:"";display:block;position:absolute}
+.productPurchasePanel:before{content:"";display:block;width:46px;height:2px;margin-bottom:24px;background:#d7a74e}
+.productPurchasePanel .price{font-size:38px!important;line-height:1.05}
+.productPurchasePanel>p:first-of-type{max-width:520px}
+.productDetailPage .productLayout>div:first-child{min-width:0}
+.productDetailPage .productLayout>div:first-child>div:first-child{box-shadow:0 24px 60px rgba(0,0,0,.28)}
+.productDetailPage .productLayout>div:first-child>div:nth-child(2) button{transition:border-color .18s ease,transform .18s ease}
+.productDetailPage .productLayout>div:first-child>div:nth-child(2) button:hover{border-color:#d7a74e!important;transform:translateY(-1px)}
+.productCustomSection .wrap{padding-top:12px;padding-bottom:12px}
+.productCustomSection h2{max-width:650px;margin-bottom:14px}
+.productCustomSection p{font-size:15px;line-height:1.7}
+.catalogNotice{border-left:3px solid #d7a74e}
+.catalogStatus{position:relative;padding-left:52px}
+.catalogStatus:before{content:"";position:absolute;left:24px;top:50%;width:14px;height:14px;margin-top:-7px;border:2px solid rgba(255,255,255,.18);border-top-color:#d7a74e;border-radius:50%;animation:catalogSpin .8s linear infinite}
+@keyframes catalogSpin{to{transform:rotate(360deg)}}
+.catalogHeader,.catalogFooter,.catalogPage{font-family:Arial,Helvetica,sans-serif}
+.catalogPage ::selection{background:#d7a74e;color:#111}
+.catalogPage a:focus-visible,.catalogPage button:focus-visible,.catalogPage input:focus-visible,.catalogPage select:focus-visible,.catalogPage textarea:focus-visible{outline:2px solid #d7a74e;outline-offset:3px}
+
+@media(max-width:900px){
+ .catalogNav{position:relative}
+ .catalogLinks.isOpen{z-index:1001}
+ .categoryCard .catalogMedia,.productCard .catalogMedia{height:250px}
+}
+@media(max-width:700px){
+ .catalogHeroInner:before{width:42px;margin-bottom:22px}
+ .catalogHero .catalogBack{font-size:12px}
+ .catalogEyebrow{font-size:9px}
+ .catalogSectionHead>p{font-size:12px}
+ .categoryCard .catalogMedia,.productCard .catalogMedia{height:230px}
+ .categoryCard .catalogCardBody{min-height:0}
+ .catalogCardBody p{-webkit-line-clamp:4}
+ .catalogCardLink{padding-top:20px}
+ .catalogFooterLogo{width:175px}
+ .productPurchasePanel .price{font-size:34px!important}
+}
