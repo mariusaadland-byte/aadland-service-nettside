@@ -234,15 +234,17 @@ export default function AdminClient({ user }) {
     router.refresh();
   }
 
-  const fresh = orders.filter(
+  const activeOrders = orders.filter((order) => !order.archivedAt);
+
+  const fresh = activeOrders.filter(
     (order) => order.status === "new"
   ).length;
 
-  const working = orders.filter((order) =>
+  const working = activeOrders.filter((order) =>
     ["confirmed", "in_progress", "ready"].includes(order.status)
   ).length;
 
-  const total = orders.reduce(
+  const total = activeOrders.reduce(
     (sum, order) => sum + (order.totalOre || 0),
     0
   );
@@ -417,7 +419,7 @@ export default function AdminClient({ user }) {
 
             {canViewOrders && (
               <Orders
-                orders={orders.filter(order => !order.archivedAt).slice(0, 5)}
+                orders={activeOrders.slice(0, 5)}
                 status={status}
                 canUpdateOrders={canUpdateOrders}
                 reload={load}
@@ -439,7 +441,7 @@ export default function AdminClient({ user }) {
 
         {tab === "orders" && canViewOrders && (
           <Orders
-            orders={orders.filter(order => order.orderType !== "custom" && !order.archivedAt)}
+            orders={activeOrders.filter(order => order.orderType !== "custom")}
             status={status}
             canUpdateOrders={canUpdateOrders}
             reload={load}
@@ -451,7 +453,7 @@ export default function AdminClient({ user }) {
         )}
 
         {tab === "surveys" && canViewOrders && (
-          <Surveys orders={orders.filter(order => order.orderType === "custom" && !order.archivedAt)} status={status} canUpdateOrders={canUpdateOrders} />
+          <Surveys orders={activeOrders.filter(order => order.orderType === "custom")} status={status} canUpdateOrders={canUpdateOrders} />
         )}
 
         {tab === "customers" && canViewOrders && (
