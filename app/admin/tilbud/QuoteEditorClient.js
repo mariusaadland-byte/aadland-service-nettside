@@ -44,7 +44,7 @@ function calculate(lines){
  return {subtotal,vat,total:subtotal+vat};
 }
 
-export default function QuoteEditorClient({quoteId=null}){
+export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
  const router=useRouter();
  const [v,setV]=useState(blankState);
  const [quoteNumber,setQuoteNumber]=useState("");
@@ -54,6 +54,37 @@ export default function QuoteEditorClient({quoteId=null}){
  const [savedMessage,setSavedMessage]=useState("");
  const calc=useMemo(()=>calculate(v.lineItems),[v.lineItems]);
  const planSum=useMemo(()=>v.paymentPlan.reduce((sum,row)=>sum+(Number(row.percent)||0),0),[v.paymentPlan]);
+
+ useEffect(()=>{
+  if(quoteId||!sourceOrderId)return;
+  let cancelled=false;
+  fetch("/api/admin/orders")
+   .then(async response=>{
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||"Forespørselen kunne ikke lastes.");
+    return (data.orders||[]).find(order=>order.id===sourceOrderId)||null;
+   })
+   .then(order=>{
+    if(cancelled||!order)return;
+    const customer=order.customer||{};
+    const address=[customer.address,customer.postalCode,customer.city].filter(Boolean).join(", ");
+    setV(current=>({
+     ...current,
+     title:current.title||"Arbeid iht. forespørsel",
+     customer:{
+      name:customer.name||order.customerName||"",
+      email:customer.email||order.customerEmail||"",
+      phone:customer.phone||order.customerPhone||"",
+      address
+     },
+     introText:order.customRequest
+      ?"På bakgrunn av forespørselen tilbyr vi følgende arbeid:\n\n"+order.customRequest
+      :current.introText
+    }));
+   })
+   .catch(err=>{if(!cancelled)setError(err.message||"Forespørselen kunne ikke lastes.")});
+  return()=>{cancelled=true};
+ },[quoteId,sourceOrderId]);
 
  useEffect(()=>{
   if(!quoteId)return;
@@ -120,6 +151,7 @@ export default function QuoteEditorClient({quoteId=null}){
    body:JSON.stringify({
     ...(quoteId?{id:quoteId}:{}),
     ...v,
+    ...(sourceOrderId?{sourceOrderId}:{}),
     lineItems:v.lineItems.map(line=>({...line,unitPriceOre:Number(line.unitPriceOre)||0}))
    })
   });
