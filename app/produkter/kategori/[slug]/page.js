@@ -78,7 +78,10 @@ export default function CategoryPage() {
     <main className="catalogPage">
       <CatalogHeader />
 
-      <section className="catalogHero catalogHeroCategory">
+      <section
+        className={"catalogHero catalogHeroCategory " + (category.imageUrl ? "hasCatalogHeroImage" : "")}
+        style={category.imageUrl ? { "--catalog-hero-image": `url("${category.imageUrl}")` } : undefined}
+      >
         <div className="catalogWrap catalogHeroInner">
           <Link className="catalogBack" href="/produkter">← Alle kategorier</Link>
           <div className="catalogEyebrow">PRODUKTER</div>
@@ -111,10 +114,20 @@ export default function CategoryPage() {
                       {image ? <img src={image} alt={product.name} /> : <CatalogPlaceholder label="Produktbilde kommer" />}
                     </div>
                     <div className="catalogCardBody">
-                      <span className="catalogEyebrow">{category.name.toUpperCase()}</span>
+                      <div className="catalogCardMeta">
+                        <span className="catalogEyebrow">{category.name.toUpperCase()}</span>
+                        <span className={"catalogStockBadge " + (product.inventoryMode === "stock" && Number(product.stockQuantity) <= 0 ? "isSoldOut" : "")}>
+                          {product.inventoryMode === "stock"
+                            ? (Number(product.stockQuantity) > 0 ? `${product.stockQuantity} på lager` : "Utsolgt")
+                            : "På bestilling"}
+                        </span>
+                      </div>
                       <h3>{product.name}</h3>
                       {product.description && <p>{product.description}</p>}
                       <div className="catalogPrice">Fra {nok(product.basePriceOre || 0)}</div>
+                      {product.inventoryMode !== "stock" && product.leadTimeText && (
+                        <div className="catalogLeadTime">{product.leadTimeText}</div>
+                      )}
                       <span className="catalogCardLink">Se produkt <b>→</b></span>
                     </div>
                   </Link>
