@@ -284,8 +284,12 @@ export async function PATCH(req) {
     );
   }
 
-  const { data: existing, error: existingError } = await s.from("categories").select("name").eq("id", body.id).single();
-  if (existingError || !existing) return NextResponse.json({error:"Kategorien ble ikke funnet."},{status:404});
+  const { data: existing, error: existingError } = await s.from("categories").select("name").eq("id", body.id).maybeSingle();
+  if (existingError) {
+    console.error("CATEGORY LOOKUP ERROR:",existingError);
+    return NextResponse.json({error:"Kategorien kunne ikke kontrolleres."},{status:500});
+  }
+  if (!existing) return NextResponse.json({error:"Kategorien ble ikke funnet."},{status:404});
 
   const { data, error } =
     await s
@@ -320,7 +324,12 @@ export async function PATCH(req) {
 
   if (!error && existing.name !== name) {
     const {error: productUpdateError}=await s.from("products").update({category:name,updated_at:new Date().toISOString()}).eq("category_id",body.id);
-    if(productUpdateError) console.error("CATEGORY PRODUCT NAME SYNC ERROR:",productUpdateError);
+    if(productUpdateError) {
+      console.error("CATEGORY PRODUCT NAME SYNC ERROR:",productUpdateError);
+      const {error: rollbackError}=await s.from("categories").update({name:existing.name,updated_at:new Date().toISOString()}).eq("id",body.id);
+      if(rollbackError) console.error("CATEGORY NAME ROLLBACK ERROR:",rollbackError);
+      return NextResponse.json({error:"Kategorien ble ikke lagret fordi produktene ikke kunne oppdateres. Prøv igjen."},{status:500});
+    }
   }
 
   if (error) {
@@ -376,7 +385,7 @@ export async function DELETE(req) {
         error:
           "Databasen er ikke tilgjengelig.",
       },
-      { status: 500 }
+      { status: 503 }
     );
   }
 
