@@ -3462,7 +3462,12 @@ function ProjectEditor({project,reload,setError,close}){
   });
   const d=await r.json().catch(()=>({}));
   setSaving(false);
-  if(!r.ok){setError(d.error||"Oppdraget kunne ikke lagres.");return;}
+  if(!r.ok){
+   setError(d.setupRequired
+    ? "Databaseoppdatering mangler for prosjektfortelling. Kjør prosjektmigreringen før du lagrer denne funksjonen."
+    : (d.error||"Oppdraget kunne ikke lagres."));
+   return;
+  }
   if(close)close();else setEditing(false);
   await reload();
  }
@@ -3528,6 +3533,10 @@ function ProjectEditor({project,reload,setError,close}){
   </div>
 
   <section className="adminProjectStory">
+   <div className="adminProjectStoryInfo">
+    <b>Slik vises prosjektet for kunden</b>
+    <span>Forsiden bruker hovedbildet. Prosjektsiden følger rekkefølgen under, og tekstseksjonene deler bildene inn i tydelige deler.</span>
+   </div>
    <div className="adminProjectStoryHead">
     <div>
      <div className="kicker">PROSJEKTFORTELLING</div>

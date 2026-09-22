@@ -1190,3 +1190,9 @@ html{scroll-behavior:smooth}
  .projectStoryImageGroup.imageCount1 .projectStoryImage,
  .projectStoryImageGroup.imageCount1 .projectStoryImage img{min-height:260px}
 }
+
+
+/* Project story editor guidance and migration-safe feedback */
+.adminProjectStoryInfo{display:grid;gap:4px;margin:-4px 0 18px;padding:12px 14px;border-left:3px solid #d7a74e;background:#f8f5ef}
+.adminProjectStoryInfo b{font-size:12px}
+.adminProjectStoryInfo span{color:#6f675d;font-size:11px;line-height:1.5}
