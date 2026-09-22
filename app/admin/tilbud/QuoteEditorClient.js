@@ -50,6 +50,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
  const [quoteNumber,setQuoteNumber]=useState("");
  const [loading,setLoading]=useState(Boolean(quoteId));
  const [saving,setSaving]=useState(false);
+ const [sending,setSending]=useState(false);
  const [error,setError]=useState("");
  const [savedMessage,setSavedMessage]=useState("");
  const calc=useMemo(()=>calculate(v.lineItems),[v.lineItems]);
@@ -157,14 +158,34 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
   });
   const data=await response.json().catch(()=>({}));
   setSaving(false);
-  if(!response.ok){setError(data.error||"Tilbudet kunne ikke lagres.");return;}
+  if(!response.ok){setError(data.error||"Tilbudet kunne ikke lagres.");return null;}
   if(!quoteId){
    router.push("/admin/tilbud/"+data.quote.id);
-   return;
+   return data.quote;
   }
   setQuoteNumber(data.quote.quoteNumber||quoteNumber);
   setSavedMessage("Tilbudet er lagret.");
   window.setTimeout(()=>setSavedMessage(""),1800);
+  return data.quote;
+ }
+
+ async function sendQuote(){
+  if(!quoteId)return;
+  if(!String(v.customer.email||"").trim()){setError("Legg inn kundens e-postadresse før tilbudet sendes.");return;}
+  if(!window.confirm("Sende tilbudet til "+v.customer.email+"?"))return;
+  setSending(true);setError("");setSavedMessage("");
+  const saved=await save();
+  if(!saved){setSending(false);return;}
+  const response=await fetch("/api/admin/quotes/send",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({id:quoteId})
+  });
+  const data=await response.json().catch(()=>({}));
+  setSending(false);
+  if(!response.ok){setError(data.error||"Tilbudet kunne ikke sendes.");return;}
+  setV(current=>({...current,status:"sent"}));
+  setSavedMessage("Tilbudet er sendt til "+(data.sentTo||v.customer.email)+".");
  }
 
  if(loading)return <main className="admin quoteEditorPage"><section className="adminmain quoteEditorMain"><div className="card">Laster tilbud …</div></section></main>;
@@ -180,7 +201,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
     </div>
     <div className="quoteEditorHeaderActions">
      {quoteId&&<Link className="btn alt" href={"/admin/tilbud/"+quoteId+"/preview"}>Forhåndsvis / PDF</Link>}
-     <button type="button" className="btn" disabled={saving} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>
+     {quoteId&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={sendQuote}>{sending?"Sender …":"Send tilbud"}</button>}
+     <button type="button" className="btn" disabled={saving||sending} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>
     </div>
    </div>
 
@@ -265,7 +287,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
      <div className="quoteSummaryPlan">
       {v.paymentPlan.map(row=><span key={row.id}><small>{row.label} · {row.percent}%</small><b>{nok(calc.total*(Number(row.percent)||0)/100)}</b></span>)}
      </div>
-     <button type="button" className="btn" disabled={saving} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>
+     {quoteId&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={sendQuote}>{sending?"Sender …":"Send tilbud"}</button>}
+     <button type="button" className="btn" disabled={saving||sending} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>
      {quoteId&&<Link className="btn alt" href={"/admin/tilbud/"+quoteId+"/preview"}>Forhåndsvis / PDF</Link>}
     </aside>
    </div>
