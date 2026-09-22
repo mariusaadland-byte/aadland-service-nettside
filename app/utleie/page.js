@@ -9,7 +9,7 @@ const kr=o=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",maxim
 export default function Utleie(){
  const [items,setItems]=useState([]);
  const [categories,setCategories]=useState([]);
- const [filter,setFilter]=useState("all");
+ const [filter,setFilter]=useState("");
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
  const [setup,setSetup]=useState(false);
@@ -25,7 +25,16 @@ export default function Utleie(){
    .then(data=>{
     if(cancelled)return;
     setItems(data.items||[]);
-    setCategories(data.categories||[]);
+    const nextCategories=data.categories||[];
+    const nextItems=data.items||[];
+    setCategories(nextCategories);
+    setItems(nextItems);
+    setFilter(current=>{
+     if(current)return current;
+     if(nextCategories.length)return nextCategories[0].id;
+     if(nextItems.some(item=>!item.categoryId))return "uncategorized";
+     return "all";
+    });
     setSetup(!!data.setupRequired);
    })
    .catch(err=>{if(!cancelled)setError(err.message||"Utleie kunne ikke lastes.")})
@@ -34,8 +43,8 @@ export default function Utleie(){
  },[]);
 
  const visible=useMemo(()=>{
-  if(filter==="all")return items;
   if(filter==="uncategorized")return items.filter(item=>!item.categoryId);
+  if(filter==="all"||!filter)return items;
   return items.filter(item=>item.categoryId===filter);
  },[items,filter]);
  const uncategorized=items.some(item=>!item.categoryId);
@@ -62,8 +71,7 @@ export default function Utleie(){
      {!loading&&!setup&&<span>{items.length} {items.length===1?"produkt":"produkter"}</span>}
     </div>
 
-    {categories.length>0&&<div className="rentalCategoryFilters" aria-label="Filtrer utleie etter kategori">
-     <button type="button" aria-pressed={filter==="all"} className={filter==="all"?"isActive":""} onClick={()=>setFilter("all")}>Alle</button>
+    {categories.length>0&&<div className="rentalCategoryFilters" aria-label="Velg utleiekategori">
      {categories.map(category=><button type="button" key={category.id} aria-pressed={filter===category.id} className={filter===category.id?"isActive":""} onClick={()=>setFilter(category.id)}>{category.name}</button>)}
      {uncategorized&&<button type="button" aria-pressed={filter==="uncategorized"} className={filter==="uncategorized"?"isActive":""} onClick={()=>setFilter("uncategorized")}>Annet</button>}
     </div>}
