@@ -79,7 +79,7 @@ export async function GET() {
         error:
           "Databasen er ikke tilgjengelig.",
       },
-      { status: 500 }
+      { status: 503 }
     );
   }
 
@@ -130,6 +130,8 @@ export async function POST(req) {
 
   const name =
     cleanText(body.name);
+
+  if (name.length > 160 || cleanText(body.description).length > 5000 || cleanText(body.imageUrl).length > 2000) return NextResponse.json({error:"Et eller flere kategorifelt er for lange."},{status:400});
 
   if (!name) {
     return NextResponse.json(
@@ -244,6 +246,8 @@ export async function PATCH(req) {
 
   const name =
     cleanText(body.name);
+
+  if (name.length > 160 || cleanText(body.description).length > 5000 || cleanText(body.imageUrl).length > 2000) return NextResponse.json({error:"Et eller flere kategorifelt er for lange."},{status:400});
 
   if (!name) {
     return NextResponse.json(
