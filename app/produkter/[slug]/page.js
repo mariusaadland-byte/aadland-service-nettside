@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { CatalogFooter, CatalogHeader } from "../ProductChrome";
+import { CatalogFooter, CatalogHeader, CatalogPlaceholder } from "../ProductChrome";
 import {
   nok,
   productPrice,
@@ -145,16 +145,17 @@ export default function ProductPage() {
     return (
       <main className="catalogPage productDetailPage">
         <CatalogHeader />
-        <section className="section">
+        <section className="section productStateSection">
           <div className="wrap">
-            <p className="muted">Henter produkt...</p>
+            <div className="catalogStatus">Henter produkt …</div>
           </div>
         </section>
+        <CatalogFooter />
       </main>
     );
   }
 
-  if (loadError) {return <main className="catalogPage productDetailPage"><CatalogHeader/><section className="section"><div className="wrap"><div className="card"><h1>Noe gikk galt</h1><p>{loadError}</p><a className="btn" href="/produkter">Tilbake til produkter</a></div></div></section></main>}
+  if (loadError) {return <main className="catalogPage productDetailPage"><CatalogHeader/><section className="section productStateSection"><div className="wrap"><div className="catalogNotice catalogNoticeLarge"><b>Noe gikk galt</b><p>{loadError}</p><a className="catalogGoldButton" href="/produkter">Tilbake til produkter →</a></div></div></section><CatalogFooter/></main>}
 
   if (!product) {
     return (
@@ -174,6 +175,7 @@ export default function ProductPage() {
             </div>
           </div>
         </section>
+        <CatalogFooter />
       </main>
     );
   }
@@ -245,8 +247,8 @@ export default function ProductPage() {
                             padding: 0,
                             border:
                               index === selectedImage
-                                ? "2px solid #181613"
-                                : "2px solid transparent",
+                                ? "2px solid #d7a74e"
+                                : "2px solid rgba(255,255,255,.12)",
                             borderRadius: 10,
                             overflow: "hidden",
                             cursor: "pointer",
@@ -269,16 +271,8 @@ export default function ProductPage() {
                   )}
                 </>
               ) : (
-                <div
-                  style={{
-                    minHeight: 420,
-                    background: "#eee8dd",
-                    borderRadius: 18,
-                    display: "grid",
-                    placeItems: "center",
-                  }}
-                >
-                  <span className="muted">Produktbilde</span>
+                <div className="productDetailPlaceholder">
+                  <CatalogPlaceholder label="Produktbilde kommer" />
                 </div>
               )}
             </div>
@@ -367,7 +361,14 @@ export default function ProductPage() {
                 </p>
               )}
 
-              {product.inventoryMode==="stock"?<p style={{marginTop:14}}><b>{soldOut?"Utsolgt":product.stockQuantity+" på lager"}</b>{soldOut&&product.restockDate?<> · forventet tilbake {new Date(product.restockDate+"T12:00:00").toLocaleDateString("nb-NO")}</>:null}</p>:<p style={{marginTop:14}}><b>Produseres på bestilling</b>{product.leadTimeText?" · "+product.leadTimeText:""}</p>}
+              <div className={"productAvailability " + (soldOut ? "isSoldOut" : "")}>
+                <span className="productAvailabilityDot" />
+                <span>
+                  {product.inventoryMode==="stock"
+                    ? <><b>{soldOut?"Utsolgt":product.stockQuantity+" på lager"}</b>{soldOut&&product.restockDate?<> · forventet tilbake {new Date(product.restockDate+"T12:00:00").toLocaleDateString("nb-NO")}</>:null}</>
+                    : <><b>Produseres på bestilling</b>{product.leadTimeText?" · "+product.leadTimeText:""}</>}
+                </span>
+              </div>
               <button
                 className="btn catalogOrderButton"
                 disabled={soldOut}
@@ -384,15 +385,11 @@ export default function ProductPage() {
                 Bestill
               </button>
 
-              <p
-                className="muted"
-                style={{
-                  fontSize: 13,
-                  marginTop: 12,
-                }}
-              >
-                Henting etter avtale eller levering innenfor avtalt område.
-              </p>
+              <div className="productAssurances">
+                <span>✓ Henting etter avtale</span>
+                <span>✓ Levering etter tilgjengelighet</span>
+                <span>✓ Pris inkl. mva.</span>
+              </div>
             </div>
           </div>
         </div>
@@ -408,7 +405,7 @@ export default function ProductPage() {
             <div className="kicker">Produktinformasjon</div>
             <h2>Mål og spesifikasjoner</h2>
 
-            <div className="grid" style={{ marginTop: 28 }}>
+            <div className="grid productSpecsGrid" style={{ marginTop: 28 }}>
               {product.dimensions && (
                 <div className="card">
                   <h3>Mål</h3>
@@ -459,15 +456,8 @@ export default function ProductPage() {
             Vi kan også lage produkter etter andre mål og ønsker.
           </p>
 
-          <a
-            className="btn alt"
-            href="/#custom"
-            style={{
-              display: "inline-block",
-              marginTop: 18,
-            }}
-          >
-            Send forespørsel
+          <a className="catalogGoldButton" href="/#befaring" style={{ marginTop: 18 }}>
+            Send forespørsel →
           </a>
         </div>
       </section>
@@ -490,10 +480,11 @@ export default function ProductPage() {
 
               <button
                 type="button"
-                className="btn alt"
+                className="drawerCloseButton"
+                aria-label="Lukk bestilling"
                 onClick={() => setShowOrder(false)}
               >
-                Lukk
+                ×
               </button>
             </div>
 
@@ -538,7 +529,7 @@ export default function ProductPage() {
               {error && <p className="notice">{error}</p>}
 
               <button
-                className="btn"
+                className="btn drawerSubmitButton"
                 disabled={sending}
                 style={{ width: "100%" }}
               >
