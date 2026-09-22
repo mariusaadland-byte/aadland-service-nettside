@@ -3268,28 +3268,60 @@ function ServiceEditor({ service, reload, setError, close }) {
 
 function RentalItems({items,blocks,reload,setError}){
  const [showNew,setShowNew]=useState(false);
+ const [categories,setCategories]=useState([]);
+ const [categoriesLoading,setCategoriesLoading]=useState(true);
  const [block,setBlock]=useState({itemId:"",startDate:"",endDate:"",reason:""});
+
+ useEffect(()=>{
+  let cancelled=false;
+  fetch("/api/admin/rental/categories")
+   .then(async response=>{
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||"Kategoriene kunne ikke lastes.");
+    return data;
+   })
+   .then(data=>{if(!cancelled)setCategories(data.categories||[])})
+   .catch(error=>{if(!cancelled)setError(error.message||"Kategoriene kunne ikke lastes.")})
+   .finally(()=>{if(!cancelled)setCategoriesLoading(false)});
+  return()=>{cancelled=true};
+ },[]);
+
  async function addBlock(e){e.preventDefault();setError("");const r=await fetch("/api/admin/rental/blocks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(block)});const d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Perioden kunne ikke blokkeres.");return;}setBlock({itemId:"",startDate:"",endDate:"",reason:""});await reload();}
  async function removeBlock(id){const r=await fetch("/api/admin/rental/blocks",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});if(!r.ok){setError("Blokkeringen kunne ikke fjernes.");return;}await reload();}
- return <><div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20}}><a className="btn alt" href="/admin/utleiekategorier">Utleiekategorier</a><button className="btn" onClick={()=>setShowNew(!showNew)}>{showNew?"Avbryt":"Legg til utstyr"}</button></div>
- {showNew&&<RentalEditor item={null} reload={reload} setError={setError} close={()=>setShowNew(false)}/>}
- <div className="grid">{items.map(item=><RentalEditor key={item.id} item={item} reload={reload} setError={setError}/>)}</div>
- <div className="card" style={{marginTop:24}}><div className="kicker">Tilgjengelighet</div><h3>Blokker datoer manuelt</h3><p className="muted">Bruk dette ved service, eget bruk eller andre perioder utstyret ikke kan leies ut.</p>
- <form onSubmit={addBlock}><div className="field"><label>Utstyr</label><select required value={block.itemId} onChange={e=>setBlock({...block,itemId:e.target.value})}><option value="">Velg utstyr</option>{items.map(i=><option key={i.id} value={i.id}>{i.name}</option>)}</select></div>
- <div style={{display:"flex",gap:12,flexWrap:"wrap"}}><div className="field"><label>Fra</label><input required type="date" value={block.startDate} onChange={e=>setBlock({...block,startDate:e.target.value})}/></div><div className="field"><label>Til</label><input required type="date" min={block.startDate} value={block.endDate} onChange={e=>setBlock({...block,endDate:e.target.value})}/></div></div>
- <div className="field"><label>Årsak</label><input value={block.reason} onChange={e=>setBlock({...block,reason:e.target.value})} placeholder="F.eks. service"/></div><button className="btn">Blokker periode</button></form>
- {blocks.length>0&&<div style={{marginTop:18}}>{blocks.map(b=><div key={b.id} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"10px 0",borderTop:"1px solid #ddd"}}><span><b>{items.find(i=>i.id===b.itemId)?.name||"Utstyr"}</b> · {b.startDate} – {b.endDate}{b.reason?" · "+b.reason:""}</span><button className="btn alt" onClick={()=>removeBlock(b.id)}>Fjern</button></div>)}</div>}</div></>;
+
+ return <>
+  <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20}}>
+   <a className="btn alt" href="/admin/utleiekategorier">Utleiekategorier</a>
+   <button className="btn" disabled={categoriesLoading||categories.length===0} onClick={()=>setShowNew(!showNew)}>{showNew?"Avbryt":"Legg til utstyr"}</button>
+  </div>
+
+  {!categoriesLoading&&categories.length===0&&<div className="notice"><b>Lag en utleiekategori først.</b><p>Alle nye utleieprodukter må ha kategori før de kan lagres.</p></div>}
+
+  {showNew&&<RentalEditor item={null} categories={categories} reload={reload} setError={setError} close={()=>setShowNew(false)}/>}
+  <div className="grid">{items.map(item=><RentalEditor key={item.id} item={item} categories={categories} reload={reload} setError={setError}/>)}</div>
+
+  <div className="card" style={{marginTop:24}}><div className="kicker">Tilgjengelighet</div><h3>Blokker datoer manuelt</h3><p className="muted">Bruk dette ved service, eget bruk eller andre perioder utstyret ikke kan leies ut.</p>
+   <form onSubmit={addBlock}><div className="field"><label>Utstyr</label><select required value={block.itemId} onChange={e=>setBlock({...block,itemId:e.target.value})}><option value="">Velg utstyr</option>{items.map(i=><option key={i.id} value={i.id}>{i.name}</option>)}</select></div>
+   <div style={{display:"flex",gap:12,flexWrap:"wrap"}}><div className="field"><label>Fra</label><input required type="date" value={block.startDate} onChange={e=>setBlock({...block,startDate:e.target.value})}/></div><div className="field"><label>Til</label><input required type="date" min={block.startDate} value={block.endDate} onChange={e=>setBlock({...block,endDate:e.target.value})}/></div></div>
+   <div className="field"><label>Årsak</label><input value={block.reason} onChange={e=>setBlock({...block,reason:e.target.value)} placeholder="F.eks. service"/></div><button className="btn">Blokker periode</button></form>
+   {blocks.length>0&&<div style={{marginTop:18}}>{blocks.map(b=><div key={b.id} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"10px 0",borderTop:"1px solid #ddd"}}><span><b>{items.find(i=>i.id===b.itemId)?.name||"Utstyr"}</b> · {b.startDate} – {b.endDate}{b.reason?" · "+b.reason:""}</span><button className="btn alt" onClick={()=>removeBlock(b.id)}>Fjern</button></div>)}</div>}
+  </div>
+ </>;
 }
-function RentalEditor({item,reload,setError,close}){
+
+function RentalEditor({item,categories=[],reload,setError,close}){
  const isNew=!item,[editing,setEditing]=useState(isNew),[saving,setSaving]=useState(false),[uploading,setUploading]=useState(false);
- const [v,setV]=useState({name:item?.name||"",description:item?.description||"",status:item?.status||"available",quantity:item?.quantity||1,dailyPriceOre:item?.dailyPriceOre||0,weekendPriceOre:item?.weekendPriceOre??"",weeklyPriceOre:item?.weeklyPriceOre??"",longTermDays:item?.longTermDays??"",longTermDiscountPercent:item?.longTermDiscountPercent||0,depositOre:item?.depositOre||0,bufferDays:item?.bufferDays||0,pickupAvailable:item?.pickupAvailable!==false,deliveryAvailable:item?.deliveryAvailable===true,active:item?.active!==false,sortOrder:item?.sortOrder||0,imageUrls:item?.imageUrls||[]});
+ const [v,setV]=useState({name:item?.name||"",categoryId:item?.categoryId||"",description:item?.description||"",status:item?.status||"available",quantity:item?.quantity||1,dailyPriceOre:item?.dailyPriceOre||0,weekendPriceOre:item?.weekendPriceOre??"",weeklyPriceOre:item?.weeklyPriceOre??"",longTermDays:item?.longTermDays??"",longTermDiscountPercent:item?.longTermDiscountPercent||0,depositOre:item?.depositOre||0,bufferDays:item?.bufferDays||0,pickupAvailable:item?.pickupAvailable!==false,deliveryAvailable:item?.deliveryAvailable===true,active:item?.active!==false,sortOrder:item?.sortOrder||0,imageUrls:item?.imageUrls||[]});
  const set=(k,x)=>setV({...v,[k]:x});
  async function upload(files){const list=Array.from(files||[]);if(!list.length)return;setUploading(true);const urls=[];for(const file of list){const fd=new FormData();fd.append("file",file);const r=await fetch("/api/admin/upload",{method:"POST",body:fd});const d=await r.json().catch(()=>({}));if(r.ok&&d.url)urls.push(d.url);else setError(d.error||"Et bilde kunne ikke lastes opp.");}setV(x=>({...x,imageUrls:[...x.imageUrls,...urls]}));setUploading(false);}
- async function save(e){e.preventDefault();setSaving(true);setError("");const r=await fetch("/api/admin/rental",{method:isNew?"POST":"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({...v,...(!isNew?{id:item.id}:{})})});const d=await r.json().catch(()=>({}));setSaving(false);if(!r.ok){setError(d.error||"Utstyret kunne ikke lagres.");return;}if(close)close();else setEditing(false);await reload();}
+ async function save(e){e.preventDefault();if(!v.categoryId){setError("Velg kategori før utstyret lagres.");return;}setSaving(true);setError("");const r=await fetch("/api/admin/rental",{method:isNew?"POST":"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({...v,...(!isNew?{id:item.id}:{})})});const d=await r.json().catch(()=>({}));setSaving(false);if(!r.ok){setError(d.error||"Utstyret kunne ikke lagres.");return;}if(close)close();else setEditing(false);await reload();}
  async function remove(){if(!item?.id||!window.confirm('Slette "'+item.name+'"?'))return;const r=await fetch("/api/admin/rental",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:item.id})});const d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Utstyret kunne ikke slettes.");return;}await reload();}
- if(!editing&&item)return <div className="card">{item.imageUrls?.[0]&&<img src={item.imageUrls[0]} alt="" style={{width:"100%",height:190,objectFit:"cover",borderRadius:12}}/>}<div className="kicker">{item.status==="available"?"Tilgjengelig":item.status==="maintenance"?"Service":"Ikke tilgjengelig"}</div><h3>{item.name}</h3><p>{item.description}</p><p><b>{nok(item.dailyPriceOre)}</b> / dag · Depositum {nok(item.depositOre)}</p><div style={{display:"flex",gap:10}}><button className="btn" onClick={()=>setEditing(true)}>Rediger</button><button className="btn alt" onClick={remove}>Slett</button></div></div>;
+ const categoryName=categories.find(category=>category.id===item?.categoryId)?.name||"Mangler kategori";
+ if(!editing&&item)return <div className="card">{item.imageUrls?.[0]&&<img src={item.imageUrls[0]} alt="" style={{width:"100%",height:190,objectFit:"cover",borderRadius:12}}/>}<div className="kicker">{categoryName} · {item.status==="available"?"Tilgjengelig":item.status==="maintenance"?"Service":"Ikke tilgjengelig"}</div><h3>{item.name}</h3><p>{item.description}</p><p><b>{nok(item.dailyPriceOre)}</b> / dag · Depositum {nok(item.depositOre)}</p><div style={{display:"flex",gap:10}}><button className="btn" onClick={()=>setEditing(true)}>Rediger</button><button className="btn alt" onClick={remove}>Slett</button></div></div>;
  return <form className="card" onSubmit={save}><div className="kicker">{isNew?"Nytt utleieutstyr":"Rediger utstyr"}</div><h3>{isNew?"Legg til utstyr":item.name}</h3>
- <div className="field"><label>Navn</label><input required value={v.name} onChange={e=>set("name",e.target.value)}/></div><div className="field"><label>Beskrivelse</label><textarea rows="3" value={v.description} onChange={e=>set("description",e.target.value)}/></div>
+ <div className="field"><label>Navn</label><input required value={v.name} onChange={e=>set("name",e.target.value)}/></div>
+ <div className="field"><label>Kategori *</label><select required value={v.categoryId} onChange={e=>set("categoryId",e.target.value)}><option value="">Velg kategori</option>{categories.map(category=><option key={category.id} value={category.id}>{category.name}</option>)}</select></div>
+ <div className="field"><label>Beskrivelse</label><textarea rows="3" value={v.description} onChange={e=>set("description",e.target.value)}/></div>
  <div className="field"><label>Bilder</label>{v.imageUrls.map((url,i)=><div key={url+i} style={{marginBottom:8}}><img src={url} alt="" style={{width:180,height:110,objectFit:"cover",borderRadius:10}}/><button type="button" className="btn alt" onClick={()=>set("imageUrls",v.imageUrls.filter((_,x)=>x!==i))}>Fjern</button></div>)}<input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={e=>{upload(e.target.files);e.target.value=""}}/>{uploading&&<small>Laster opp …</small>}</div>
  <div className="field"><label>Status</label><select value={v.status} onChange={e=>set("status",e.target.value)}><option value="available">Tilgjengelig</option><option value="unavailable">Midlertidig utilgjengelig</option><option value="maintenance">Service/vedlikehold</option><option value="hidden">Skjult</option></select></div>
  <div className="field"><label>Antall</label><input type="number" min="1" value={v.quantity} onChange={e=>set("quantity",e.target.value)}/></div>
@@ -3301,6 +3333,7 @@ function RentalEditor({item,reload,setError,close}){
  <label><input type="checkbox" checked={v.pickupAvailable} onChange={e=>set("pickupAvailable",e.target.checked)}/> Henting mulig</label><br/><label><input type="checkbox" checked={v.deliveryAvailable} onChange={e=>set("deliveryAvailable",e.target.checked)}/> Levering mulig</label><br/><label><input type="checkbox" checked={v.active} onChange={e=>set("active",e.target.checked)}/> Publisert</label>
  <div style={{display:"flex",gap:10,marginTop:18}}><button className="btn" disabled={saving||uploading}>{saving?"Lagrer …":"Lagre"}</button>{!isNew&&<button type="button" className="btn alt" onClick={()=>setEditing(false)}>Avbryt</button>}</div></form>;
 }
+
 function RentalCalendar({items,bookings,blocks}){
  const [month,setMonth]=useState(()=>new Date().toISOString().slice(0,7));
  const first=new Date(month+"-01T12:00:00"),year=first.getFullYear(),m=first.getMonth(),days=new Date(year,m+1,0).getDate(),offset=(new Date(year,m,1).getDay()+6)%7;
