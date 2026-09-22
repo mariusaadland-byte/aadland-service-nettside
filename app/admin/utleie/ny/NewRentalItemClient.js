@@ -17,12 +17,12 @@ export default function NewRentalItemClient(){
   description:"",
   status:"available",
   quantity:1,
-  dailyPriceOre:0,
+  dailyPriceOre:"",
   weekendPriceOre:"",
   weeklyPriceOre:"",
   longTermDays:"",
   longTermDiscountPercent:0,
-  depositOre:0,
+  depositOre:"",
   bufferDays:0,
   pickupAvailable:true,
   deliveryAvailable:false,
@@ -111,10 +111,10 @@ export default function NewRentalItemClient(){
     <div className="rentalNewItemGrid">
      <div className="field"><label>Status</label><select value={v.status} onChange={e=>set("status",e.target.value)}><option value="available">Tilgjengelig</option><option value="unavailable">Midlertidig utilgjengelig</option><option value="maintenance">Service/vedlikehold</option><option value="hidden">Skjult</option></select></div>
      <div className="field"><label>Antall</label><input type="number" min="1" value={v.quantity} onChange={e=>set("quantity",e.target.value)}/></div>
-     <div className="field"><label>Døgnpris (kr)</label><input type="number" min="0" value={(Number(v.dailyPriceOre)||0)/100} onChange={e=>set("dailyPriceOre",Math.round(Number(e.target.value||0)*100))}/></div>
+     <div className="field"><label>Døgnpris (kr) *</label><input required type="number" min="0" step="1" value={v.dailyPriceOre===""?"":Number(v.dailyPriceOre)/100} onChange={e=>set("dailyPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="F.eks. 450"/></div>
      <div className="field"><label>Helgepris (kr)</label><input type="number" min="0" value={v.weekendPriceOre===""?"":Number(v.weekendPriceOre)/100} onChange={e=>set("weekendPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))}/></div>
      <div className="field"><label>Ukepris (kr)</label><input type="number" min="0" value={v.weeklyPriceOre===""?"":Number(v.weeklyPriceOre)/100} onChange={e=>set("weeklyPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))}/></div>
-     <div className="field"><label>Depositum (kr)</label><input type="number" min="0" value={(Number(v.depositOre)||0)/100} onChange={e=>set("depositOre",Math.round(Number(e.target.value||0)*100))}/></div>
+     <div className="field"><label>Depositum (kr)</label><input type="number" min="0" step="1" value={v.depositOre===""?"":Number(v.depositOre)/100} onChange={e=>set("depositOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="F.eks. 1500"/></div>
      <div className="field"><label>Buffer mellom utleier (dager)</label><input type="number" min="0" value={v.bufferDays} onChange={e=>set("bufferDays",e.target.value)}/></div>
      <div className="field"><label>Langtidsgrense (dager)</label><input type="number" min="1" value={v.longTermDays} onChange={e=>set("longTermDays",e.target.value)}/></div>
      <div className="field"><label>Langtidsrabatt (%)</label><input type="number" min="0" max="100" value={v.longTermDiscountPercent} onChange={e=>set("longTermDiscountPercent",e.target.value)}/></div>
