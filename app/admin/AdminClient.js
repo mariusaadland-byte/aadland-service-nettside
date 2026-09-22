@@ -24,6 +24,7 @@ export default function AdminClient({ user }) {
   const [rentalBookings, setRentalBookings] = useState([]);
   const [rentalBlocks, setRentalBlocks] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [projectStorySetupRequired, setProjectStorySetupRequired] = useState(false);
   const [users, setUsers] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(user?.id || "");
   const [error, setError] = useState("");
@@ -151,9 +152,18 @@ export default function AdminClient({ user }) {
 
     if (canManageProducts) {
       const response = await fetch("/api/admin/projects");
-      if (response.ok) { const data = await response.json(); setProjects(data.projects || []); }
-      else setProjects([]);
-    } else setProjects([]);
+      if (response.ok) {
+        const data = await response.json();
+        setProjects(data.projects || []);
+        setProjectStorySetupRequired(data.storySetupRequired===true);
+      } else {
+        setProjects([]);
+        setProjectStorySetupRequired(false);
+      }
+    } else {
+      setProjects([]);
+      setProjectStorySetupRequired(false);
+    }
 
     if (canManageProducts) {
       const response = await fetch("/api/admin/site-settings");
@@ -481,7 +491,7 @@ export default function AdminClient({ user }) {
         )}
 
         {tab === "projects" && canManageProducts && (
-          <Projects projects={projects} reload={load} setError={setError} />
+          <Projects projects={projects} reload={load} setError={setError} storySetupRequired={projectStorySetupRequired} />
         )}
 
         {tab === "homepage" && canManageProducts && (
@@ -3282,17 +3292,22 @@ function RentalBookings({bookings,reload,setError,canUpdate}){
  </article>)}</div>;
 }
 
-function Projects({projects,reload,setError}){
+function Projects({projects,reload,setError,storySetupRequired}){
  const [showNew,setShowNew]=useState(false);
  return <>
+  {storySetupRequired&&<div className="adminProjectMigrationWarning">
+   <b>Databaseoppdatering mangler</b>
+   <span>Prosjektfortelling med tekst mellom bildene er ferdig programmert, men databasen må oppdateres før nye endringer kan lagres.</span>
+   <code>supabase/project_content_blocks.sql</code>
+  </div>}
   <div className="adminProjectToolbar">
    <div>
     <p className="muted">Legg inn ekte bilder fra utførte jobber. Første bilde brukes som hovedbilde. Under «Prosjektfortelling» kan du blande bilder og tekst i akkurat den rekkefølgen kunden skal se dem.</p>
    </div>
-   <button className="btn" onClick={()=>setShowNew(!showNew)}>{showNew?"Avbryt":"Legg til oppdrag"}</button>
+   <button className="btn" disabled={storySetupRequired} onClick={()=>setShowNew(!showNew)}>{showNew?"Avbryt":"Legg til oppdrag"}</button>
   </div>
   {showNew&&<ProjectEditor project={null} reload={reload} setError={setError} close={()=>setShowNew(false)}/>}
-  <div className="grid adminProjectsGrid">{projects.map(p=><ProjectEditor key={p.id} project={p} reload={reload} setError={setError}/>)}</div>
+  <div className="grid adminProjectsGrid">{projects.map(p=><ProjectEditor key={p.id} project={p} reload={reload} setError={setError} storySetupRequired={storySetupRequired}/>)}</div>
  </>;
 }
 
@@ -3305,7 +3320,7 @@ function defaultProjectBlocks(project){
  return (Array.isArray(project?.imageUrls)?project.imageUrls:[]).map(url=>({id:projectBlockId(),type:"image",url}));
 }
 
-function ProjectEditor({project,reload,setError,close}){
+function ProjectEditor({project,reload,setError,close,storySetupRequired=false}){
  const isNew=!project;
  const [editing,setEditing]=useState(isNew);
  const [saving,setSaving]=useState(false);
@@ -3487,7 +3502,7 @@ function ProjectEditor({project,reload,setError,close}){
    {project.description&&<p>{project.description}</p>}
    <p className="muted">{project.imageUrls?.length||0} {project.imageUrls?.length===1?"bilde":"bilder"} · {project.contentBlocks?.filter(block=>block.type==="text").length||0} tekstseksjoner · {project.active?"Publisert":"Skjult"} · {project.featured?"Vises på forsiden":"Ikke på forsiden"}</p>
    <div className="adminProjectActions">
-    <button className="btn" onClick={()=>setEditing(true)}>Rediger</button>
+    <button className="btn" disabled={storySetupRequired} onClick={()=>setEditing(true)}>Rediger</button>
     {project.active&&project.slug&&<a className="btn alt" href={"/prosjekter/"+project.slug} target="_blank" rel="noreferrer">Se offentlig side</a>}
     <button className="btn alt" onClick={remove}>Slett</button>
    </div>

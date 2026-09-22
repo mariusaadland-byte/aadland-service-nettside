@@ -1196,3 +1196,11 @@ html{scroll-behavior:smooth}
 .adminProjectStoryInfo{display:grid;gap:4px;margin:-4px 0 18px;padding:12px 14px;border-left:3px solid #d7a74e;background:#f8f5ef}
 .adminProjectStoryInfo b{font-size:12px}
 .adminProjectStoryInfo span{color:#6f675d;font-size:11px;line-height:1.5}
+
+
+/* Project story database readiness */
+.adminProjectMigrationWarning{display:grid;gap:6px;margin:0 0 20px;padding:16px 18px;border:1px solid #c79a45;border-left:4px solid #d7a74e;background:#fff8e8;color:#2b2722}
+.adminProjectMigrationWarning b{font-size:14px}
+.adminProjectMigrationWarning span{max-width:760px;color:#6b6257;font-size:12px;line-height:1.55}
+.adminProjectMigrationWarning code{width:max-content;max-width:100%;padding:6px 8px;background:#2a2722;color:#f4d899;font-size:11px;overflow-wrap:anywhere}
+.adminProjectToolbar .btn:disabled,.adminProjectCard .btn:disabled{opacity:.45;cursor:not-allowed}

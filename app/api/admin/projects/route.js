@@ -52,7 +52,28 @@ function values(b){
   updated_at:new Date().toISOString()
  };
 }
-export async function GET(){if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});const {data,error}=await s.from("projects").select("*").order("sort_order").order("created_at",{ascending:false});if(error){if(error.code==="42P01")return NextResponse.json({projects:[],setupRequired:true});return NextResponse.json({error:error.message},{status:500})}return NextResponse.json({projects:(data||[]).map(map)})}
+export async function GET(){
+ if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
+ const s=db();
+ if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+
+ const probe=await s.from("projects").select("content_blocks").limit(1);
+ const probeMessage=String(probe.error?.message||"");
+ const storySetupRequired=Boolean(
+  probe.error&&(
+   probe.error.code==="42703"||
+   probe.error.code==="PGRST204"||
+   probeMessage.includes("content_blocks")
+  )
+ );
+
+ const {data,error}=await s.from("projects").select("*").order("sort_order").order("created_at",{ascending:false});
+ if(error){
+  if(error.code==="42P01")return NextResponse.json({projects:[],setupRequired:true,storySetupRequired:true});
+  return NextResponse.json({error:error.message},{status:500});
+ }
+ return NextResponse.json({projects:(data||[]).map(map),storySetupRequired});
+}
 export async function POST(req){if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});const b=await req.json();if(!String(b.title||"").trim())return NextResponse.json({error:"Oppdraget må ha en tittel."},{status:400});const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});const v=values(b);v.slug=slugify(v.title)+"-"+Date.now().toString().slice(-5);const {data,error}=await s.from("projects").insert(v).select("*").single();if(error)return projectApiError(error);return NextResponse.json({project:map(data)})}
 export async function PATCH(req){if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});const b=await req.json();if(!b.id)return NextResponse.json({error:"Oppdrag mangler."},{status:400});const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});const {data,error}=await s.from("projects").update(values(b)).eq("id",b.id).select("*").single();if(error)return projectApiError(error);return NextResponse.json({project:map(data)})}
 export async function DELETE(req){if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});const {id}=await req.json();if(!id)return NextResponse.json({error:"Oppdrag mangler."},{status:400});const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});const {error}=await s.from("projects").delete().eq("id",id);if(error)return NextResponse.json({error:error.message},{status:500});return NextResponse.json({ok:true})}
