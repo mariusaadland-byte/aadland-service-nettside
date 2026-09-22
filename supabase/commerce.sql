@@ -14,6 +14,9 @@ alter table public.products add constraint products_inventory_mode_check check (
 alter table public.products drop constraint if exists products_stock_quantity_check;
 alter table public.products add constraint products_stock_quantity_check check (stock_quantity >= 0);
 
+-- Kundekoblingen må finnes før den atomiske ordrefunksjonen opprettes.
+-- customers.sql beholder samme IF NOT EXISTS for trygg, idempotent kjøring.
+alter table public.orders add column if not exists customer_user_id uuid references auth.users(id) on delete set null;
 alter table public.orders add column if not exists payment_status text not null default 'pending';
 alter table public.orders add column if not exists payment_reference text;
 alter table public.orders add column if not exists payment_reserved_ore integer not null default 0;
