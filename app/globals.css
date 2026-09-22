@@ -1316,3 +1316,105 @@ html{scroll-behavior:smooth}
  .projectDetailNavCard b{font-size:16px}
  .projectDetailNavMedia img,.projectDetailNavMedia .catalogPlaceholder{min-height:112px}
 }
+
+
+/* Premium rental customer page */
+.rentalPage{min-height:100vh;background:#0b0b0b;color:#fff}
+.rentalHero{position:relative;overflow:hidden;background:
+ radial-gradient(circle at 78% 32%,rgba(215,167,78,.14),transparent 27%),
+ linear-gradient(135deg,#121212 0%,#090909 72%)}
+.rentalHero:after{content:"";position:absolute;inset:auto -8% -45% auto;width:520px;height:520px;border:1px solid rgba(215,167,78,.08);border-radius:50%;pointer-events:none}
+.rentalHeroInner{position:relative;z-index:1;padding-top:92px;padding-bottom:82px}
+.rentalHero h1{max-width:850px;margin:12px 0 20px;font-size:clamp(54px,7vw,88px);line-height:.9;letter-spacing:-.055em}
+.rentalHero p{max-width:690px;margin:0;color:rgba(255,255,255,.68);font-size:17px;line-height:1.72}
+.rentalHeroTrust{display:flex;gap:22px;flex-wrap:wrap;margin-top:32px;padding-top:24px;border-top:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.7);font-size:11px;font-weight:700}
+.rentalHeroTrust span:before{color:#d7a74e}
+
+.rentalAvailabilitySection{padding:68px 0 88px;background:#101010}
+.rentalDatePanel{display:grid;grid-template-columns:minmax(0,1fr) minmax(380px,.8fr);gap:54px;align-items:end;margin-bottom:58px;padding:30px;background:#171717;border:1px solid rgba(255,255,255,.1);box-shadow:0 24px 60px rgba(0,0,0,.24)}
+.rentalDatePanel h2{margin:8px 0 12px;font-size:34px;line-height:1}
+.rentalDatePanel p{max-width:530px;margin:0;color:rgba(255,255,255,.56);font-size:13px;line-height:1.65}
+.rentalDateFields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.rentalDateFields label,.rentalBookingFields>label,.rentalFormTwo label{display:grid;gap:7px}
+.rentalDateFields label>span,.rentalBookingFields label>span,.rentalFormTwo label>span{color:rgba(255,255,255,.64);font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.rentalDateFields input,.rentalBookingFields input,.rentalBookingFields select{width:100%;min-height:48px;border:1px solid rgba(255,255,255,.13);border-radius:0;background:#0f0f0f;color:#fff;padding:0 13px;font:inherit;color-scheme:dark}
+.rentalDateFields input:focus,.rentalBookingFields input:focus,.rentalBookingFields select:focus{outline:2px solid #d7a74e;outline-offset:2px;border-color:#d7a74e}
+
+.rentalMessage{margin:0 0 28px;padding:16px 18px;border-radius:0}
+.rentalMessage p{margin:5px 0 0}
+.rentalSectionHead{display:flex;align-items:end;justify-content:space-between;gap:22px;margin-bottom:24px}
+.rentalSectionHead h2{margin:7px 0 0;font-size:36px;line-height:1}
+.rentalSectionHead>span{color:rgba(255,255,255,.45);font-size:11px}
+
+.rentalGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.rentalCard{overflow:hidden;background:#171717;border:1px solid rgba(255,255,255,.09);transition:transform .2s ease,border-color .2s ease,opacity .2s ease}
+.rentalCard:hover{transform:translateY(-3px);border-color:rgba(215,167,78,.34)}
+.rentalCard.isUnavailable{opacity:.68}
+.rentalCardMedia{position:relative;height:260px;background:#111;overflow:hidden}
+.rentalCardMedia>img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .35s ease}
+.rentalCard:hover .rentalCardMedia>img{transform:scale(1.025)}
+.rentalCardMedia .catalogPlaceholder{height:100%;min-height:260px}
+.rentalAvailabilityBadge{position:absolute;top:14px;right:14px;padding:7px 9px;background:rgba(12,12,12,.88);border:1px solid rgba(255,255,255,.14);font-size:9px;font-weight:900;letter-spacing:.07em;text-transform:uppercase}
+.rentalAvailabilityBadge.available{border-color:rgba(215,167,78,.48);color:#e7c27b}
+.rentalAvailabilityBadge.unavailable{border-color:rgba(183,106,85,.48);color:#dfaa9b}
+.rentalCardBody{display:flex;flex-direction:column;min-height:310px;padding:23px}
+.rentalCardBody h3{margin:8px 0 10px;font-size:26px;line-height:1.02}
+.rentalCardBody>p{margin:0 0 20px;color:rgba(255,255,255,.58);font-size:13px;line-height:1.65}
+.rentalPrice{display:grid;gap:5px;margin-top:auto;padding-top:18px;border-top:1px solid rgba(255,255,255,.09)}
+.rentalPrice b{font-size:22px}
+.rentalPrice small{color:rgba(255,255,255,.5)}
+.rentalFulfillment{display:flex;gap:6px;flex-wrap:wrap;margin:13px 0 16px}
+.rentalFulfillment span{padding:5px 7px;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.58);font-size:9px;text-transform:uppercase;letter-spacing:.05em}
+.rentalChooseButton{width:100%;justify-content:center;border:0}
+.rentalChooseButton:disabled{background:#272727!important;color:rgba(255,255,255,.38)!important;cursor:not-allowed}
+.rentalHint{display:block;margin-top:15px;color:rgba(255,255,255,.45);line-height:1.5}
+
+.rentalBookingSection{padding:0 0 84px;background:#101010}
+.rentalBookingCard{display:grid;grid-template-columns:minmax(280px,.72fr) minmax(0,1.28fr);gap:0;background:#171717;border:1px solid rgba(215,167,78,.2);box-shadow:0 30px 70px rgba(0,0,0,.28)}
+.rentalBookingIntro{padding:38px;background:linear-gradient(145deg,#1e1b17,#121212);border-right:1px solid rgba(255,255,255,.09)}
+.rentalBookingIntro h2{margin:8px 0 10px;font-size:40px;line-height:.96}
+.rentalBookingIntro>p{color:rgba(255,255,255,.6)}
+.rentalBookingPrice{display:grid;gap:6px;margin-top:28px;padding-top:20px;border-top:1px solid rgba(255,255,255,.1)}
+.rentalBookingPrice b{font-size:30px}
+.rentalBookingPrice span{color:#d7a74e;font-size:11px;font-weight:700}
+.rentalBookingFields{display:grid;gap:14px;padding:38px}
+.rentalFormTwo{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.rentalTerms{display:flex!important;grid-template-columns:auto 1fr;align-items:flex-start;gap:10px!important;margin-top:4px;color:rgba(255,255,255,.68);font-size:12px}
+.rentalTerms input{width:18px!important;min-height:18px!important;margin-top:1px;accent-color:#d7a74e}
+.rentalTerms a{color:#d7a74e}
+.rentalBookingActions{display:flex;gap:10px;align-items:center;margin-top:6px}
+.rentalBookingActions .catalogGoldButton{border:0}
+.rentalCancelButton{min-height:44px;padding:0 18px;border:1px solid rgba(255,255,255,.14);background:transparent;color:#fff;font-weight:700}
+.rentalCancelButton:hover{border-color:#d7a74e;color:#d7a74e}
+.rentalCallout{border-top:1px solid rgba(255,255,255,.08)}
+
+.serviceDetail>.catalogHeader{position:relative;z-index:50}
+.serviceDetail>.catalogFooter{margin-top:0}
+
+@media(max-width:950px){
+ .rentalGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .rentalDatePanel{grid-template-columns:1fr;gap:26px}
+ .rentalBookingCard{grid-template-columns:1fr}
+ .rentalBookingIntro{border-right:0;border-bottom:1px solid rgba(255,255,255,.09)}
+}
+@media(max-width:700px){
+ .rentalHeroInner{padding-top:58px;padding-bottom:54px}
+ .rentalHero h1{font-size:52px}
+ .rentalHero p{font-size:14px}
+ .rentalHeroTrust{display:grid;gap:10px}
+ .rentalAvailabilitySection{padding:44px 0 62px}
+ .rentalDatePanel{margin-bottom:42px;padding:20px}
+ .rentalDatePanel h2{font-size:29px}
+ .rentalDateFields,.rentalFormTwo{grid-template-columns:1fr}
+ .rentalSectionHead{align-items:flex-start;flex-direction:column}
+ .rentalSectionHead h2{font-size:31px}
+ .rentalGrid{grid-template-columns:1fr}
+ .rentalCardMedia{height:240px}
+ .rentalCardMedia .catalogPlaceholder{min-height:240px}
+ .rentalCardBody{min-height:0;padding:20px}
+ .rentalBookingSection{padding-bottom:58px}
+ .rentalBookingIntro,.rentalBookingFields{padding:24px 20px}
+ .rentalBookingIntro h2{font-size:34px}
+ .rentalBookingActions{display:grid}
+ .rentalBookingActions .catalogGoldButton,.rentalCancelButton{width:100%;justify-content:center}
+}
