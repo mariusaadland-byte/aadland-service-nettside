@@ -15,6 +15,32 @@ function cleanArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function finiteOptional(value,{integer=false,max=10000000}={}) {
+  if (value === undefined || value === null || value === "") return null;
+  const n=Number(value);
+  if (!Number.isFinite(n) || n < 0 || n > max) return undefined;
+  return integer ? Math.round(n) : n;
+}
+
+function validateProductExtras(body) {
+  const images=cleanArray(body.imageUrls);
+  const specs=cleanArray(body.specifications);
+  const options=cleanArray(body.options);
+  if(images.length>30||images.some(v=>cleanText(v).length>2000)) return "For mange bilder eller for lang bildeadresse.";
+  if(specs.length>50||JSON.stringify(specs).length>20000) return "Produktspesifikasjonene er for omfattende.";
+  if(options.length>20||JSON.stringify(options).length>30000) return "Produktvalgene er for omfattende.";
+  const nums=[
+    finiteOptional(body.stockQuantity,{integer:true,max:1000000}),
+    finiteOptional(body.shippingPriceOre,{integer:true,max:100000000}),
+    finiteOptional(body.weightGrams,{integer:true,max:10000000}),
+    finiteOptional(body.shippingLengthCm,{max:100000}),
+    finiteOptional(body.shippingWidthCm,{max:100000}),
+    finiteOptional(body.shippingHeightCm,{max:100000})
+  ];
+  if(nums.some(v=>v===undefined)) return "Et eller flere lager- eller fraktfelt har ugyldig verdi.";
+  return null;
+}
+
 function makeSlug(value) {
   return cleanText(value)
     .toLowerCase()
@@ -114,7 +140,7 @@ export async function POST(req) {
 
     if (name.length > 160 || cleanText(body.description).length > 5000 || cleanText(body.dimensions).length > 500 || cleanText(body.leadTimeText).length > 500) return NextResponse.json({ error: "Et eller flere produktfelt er for lange." }, { status: 400 });
 
-    if (!validPrice(body.basePriceOre)) {
+    const extraError = validateProductExtras(body);\n    if (extraError) return NextResponse.json({ error: extraError }, { status: 400 });\n\n    if (!validPrice(body.basePriceOre)) {
       return NextResponse.json(
         { error: "Produktet må ha en gyldig pris." },
         { status: 400 }
@@ -279,7 +305,7 @@ export async function PATCH(req) {
 
     if (name.length > 160 || cleanText(body.description).length > 5000 || cleanText(body.dimensions).length > 500 || cleanText(body.leadTimeText).length > 500) return NextResponse.json({ error: "Et eller flere produktfelt er for lange." }, { status: 400 });
 
-    if (!validPrice(body.basePriceOre)) {
+    const extraError = validateProductExtras(body);\n    if (extraError) return NextResponse.json({ error: extraError }, { status: 400 });\n\n    if (!validPrice(body.basePriceOre)) {
       return NextResponse.json(
         { error: "Produktet må ha en gyldig pris." },
         { status: 400 }
