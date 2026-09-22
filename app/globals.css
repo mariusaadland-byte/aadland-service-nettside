@@ -1892,3 +1892,32 @@ html{scroll-behavior:smooth}
  .customerCardMeta{grid-template-columns:1fr}
  .customerCardTop{align-items:flex-start}
 }
+
+
+/* Oppdrag opprettet fra tilbud */
+.jobGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.jobCard{display:grid;gap:16px;padding:22px}
+.jobCardTop{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+.jobCardTop h3{margin:4px 0}
+.jobCardTop p{margin:0;opacity:.72}
+.jobCardTop>b{font-size:20px;white-space:nowrap}
+.jobQuoteLink{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:13px 14px;border-radius:12px;background:rgba(190,149,69,.09);border:1px solid rgba(190,149,69,.22)}
+.jobQuoteLink>div{display:grid;gap:2px}
+.jobQuoteLink small{opacity:.65}
+.jobMeta{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.jobMeta span{display:grid;gap:3px;padding:11px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.06);background:rgba(255,255,255,.28)}
+.jobMeta small{opacity:.62}
+.jobDetails{display:grid;gap:10px;padding-top:4px}
+.jobDetails p{margin:0}
+.jobDescription{white-space:pre-wrap;line-height:1.55;padding:14px;border-radius:12px;background:rgba(0,0,0,.035)}
+.jobPaymentPlan{display:grid;gap:8px;margin-top:4px}
+.jobPaymentPlan h4{margin:0 0 2px}
+.jobPaymentPlan>div{display:flex;justify-content:space-between;gap:18px;align-items:center;padding:11px 12px;border:1px solid rgba(0,0,0,.07);border-radius:10px}
+.jobPaymentPlan>div>span{display:grid;gap:2px}
+.jobPaymentPlan small{opacity:.62}
+@media(max-width:820px){
+ .jobGrid{grid-template-columns:1fr}
+ .jobMeta{grid-template-columns:1fr}
+ .jobQuoteLink{align-items:flex-start;flex-direction:column}
+ .jobPaymentPlan>div{align-items:flex-start;flex-direction:column}
+}
