@@ -87,7 +87,7 @@ export async function GET() {
     if (!s) {
       return NextResponse.json(
         { error: "Databasen er ikke tilgjengelig." },
-        { status: 500 }
+        { status: 503 }
       );
     }
 
@@ -155,7 +155,7 @@ export async function POST(req) {
     if (!s) {
       return NextResponse.json(
         { error: "Databasen er ikke tilgjengelig." },
-        { status: 500 }
+        { status: 503 }
       );
     }
 
@@ -323,7 +323,7 @@ export async function PATCH(req) {
     if (!s) {
       return NextResponse.json(
         { error: "Databasen er ikke tilgjengelig." },
-        { status: 500 }
+        { status: 503 }
       );
     }
 
