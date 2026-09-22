@@ -32,7 +32,7 @@ export function CatalogHeader() {
           <Link href="/#tjenester" onClick={() => setOpen(false)}>Tjenester</Link>
           <Link href="/produkter" onClick={() => setOpen(false)}>Produkter</Link>
           <Link href="/utleie" onClick={() => setOpen(false)}>Utleie</Link>
-          <Link href="/#prosjekter" onClick={() => setOpen(false)}>Tidligere oppdrag</Link>
+          <Link href="/prosjekter" onClick={() => setOpen(false)}>Tidligere oppdrag</Link>
           <Link href="/#om" onClick={() => setOpen(false)}>Om oss</Link>
           <Link href="/#kontakt" onClick={() => setOpen(false)}>Kontakt</Link>
         </nav>
