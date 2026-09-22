@@ -72,6 +72,7 @@ export async function POST(req){
 
  if(updateError){
   await s.from("orders").delete().eq("id",order.id);
+  if(String(updateError.code||"")==="42703")return NextResponse.json({error:"Databaseoppdatering mangler. Kjør supabase/quote_to_order.sql i Supabase først.",setupRequired:true},{status:409});
   return NextResponse.json({error:"Oppdraget kunne ikke kobles til tilbudet."},{status:500});
  }
 
