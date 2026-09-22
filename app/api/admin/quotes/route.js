@@ -31,6 +31,7 @@ function mapQuote(q){
   terms:q.terms||"",
   validUntil:q.valid_until||null,
   sourceOrderId:q.source_order_id||null,
+  convertedOrderId:q.converted_order_id||null,
   sentAt:q.sent_at||null,
   acceptedAt:q.accepted_at||null,
   declinedAt:q.declined_at||null,
