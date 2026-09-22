@@ -21,6 +21,8 @@ export default function AdminClient({ user }) {
   const [categories, setCategories] = useState([]);
   const [services, setServices] = useState([]);
   const [rentalItems, setRentalItems] = useState([]);
+  const [rentalCategories, setRentalCategories] = useState([]);
+  const [rentalCategorySetupRequired, setRentalCategorySetupRequired] = useState(false);
   const [rentalBookings, setRentalBookings] = useState([]);
   const [rentalBlocks, setRentalBlocks] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -117,9 +119,10 @@ export default function AdminClient({ user }) {
     } else { setServices([]); }
 
     if (canManageProducts) {
-      const [itemsResponse, blocksResponse] = await Promise.all([
+      const [itemsResponse, blocksResponse, rentalCategoriesResponse] = await Promise.all([
         fetch("/api/admin/rental"),
         fetch("/api/admin/rental/blocks"),
+        fetch("/api/admin/rental/categories"),
       ]);
       if (itemsResponse.ok) {
         const data = await itemsResponse.json();
@@ -133,8 +136,19 @@ export default function AdminClient({ user }) {
       } else {
         setRentalBlocks([]);
       }
+      if (rentalCategoriesResponse.ok) {
+        const data = await rentalCategoriesResponse.json();
+        setRentalCategories(data.categories || []);
+        setRentalCategorySetupRequired(data.setupRequired===true);
+      } else {
+        const data = await rentalCategoriesResponse.json().catch(() => ({}));
+        setRentalCategories([]);
+        setRentalCategorySetupRequired(data.setupRequired===true);
+      }
     } else {
       setRentalItems([]);
+      setRentalCategories([]);
+      setRentalCategorySetupRequired(false);
       setRentalBlocks([]);
     }
 
@@ -483,7 +497,7 @@ export default function AdminClient({ user }) {
         )}
 
         {tab === "rental" && canManageProducts && (
-          <RentalItems items={rentalItems} blocks={rentalBlocks} reload={load} setError={setError} />
+          <RentalItems items={rentalItems} categories={rentalCategories} blocks={rentalBlocks} reload={load} setError={setError} categorySetupRequired={rentalCategorySetupRequired} />
         )}
 
         {tab === "rentalCalendar" && canViewOrders && (
