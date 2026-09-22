@@ -49,6 +49,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
  const [v,setV]=useState(blankState);
  const [quoteNumber,setQuoteNumber]=useState("");
  const [history,setHistory]=useState({createdAt:null,sentAt:null,acceptedAt:null,declinedAt:null});
+ const [convertedOrderId,setConvertedOrderId]=useState(null);
+ const [converting,setConverting]=useState(false);
  const [loading,setLoading]=useState(Boolean(quoteId));
  const [saving,setSaving]=useState(false);
  const [sending,setSending]=useState(false);
@@ -101,6 +103,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
     if(cancelled)return;
     setQuoteNumber(quote.quoteNumber||"");
     setHistory({createdAt:quote.createdAt||null,sentAt:quote.sentAt||null,acceptedAt:quote.acceptedAt||null,declinedAt:quote.declinedAt||null});
+    setConvertedOrderId(quote.convertedOrderId||null);
     setV({
      title:quote.title||"",
      status:quote.status||"draft",
@@ -171,6 +174,26 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
   return data.quote;
  }
 
+ async function createJob(){
+  if(!quoteId||v.status!=="accepted"||convertedOrderId)return;
+  if(!window.confirm("Opprette et oppdrag fra dette godkjente tilbudet?"))return;
+  setConverting(true);setError("");setSavedMessage("");
+  const response=await fetch("/api/admin/quotes/convert",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({id:quoteId})
+  });
+  const data=await response.json().catch(()=>({}));
+  setConverting(false);
+  if(!response.ok){
+   setError(data.error||"Oppdraget kunne ikke opprettes.");
+   if(data.orderId)setConvertedOrderId(data.orderId);
+   return;
+  }
+  setConvertedOrderId(data.orderId||null);
+  setSavedMessage("Oppdrag "+(data.orderNumber||"")+" er opprettet i backoffice.");
+ }
+
  async function sendQuote(){
   if(!quoteId)return;
   if(!String(v.customer.email||"").trim()){setError("Legg inn kundens e-postadresse før tilbudet sendes.");return;}
@@ -204,8 +227,10 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
     </div>
     <div className="quoteEditorHeaderActions">
      {quoteId&&<Link className="btn alt" href={"/admin/tilbud/"+quoteId+"/preview"}>Forhåndsvis / PDF</Link>}
+     {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
+     {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href="/admin">Åpne backoffice</Link></div>}
      {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={sendQuote}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
-     <button type="button" className="btn" disabled={saving||sending} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>
+     <button type="button" className="btn" disabled={saving||sending||converting} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>
     </div>
    </div>
 
@@ -290,8 +315,10 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
      <div className="quoteSummaryPlan">
       {v.paymentPlan.map(row=><span key={row.id}><small>{row.label} · {row.percent}%</small><b>{nok(calc.total*(Number(row.percent)||0)/100)}</b></span>)}
      </div>
+     {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
+     {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href="/admin">Åpne backoffice</Link></div>}
      {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={sendQuote}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
-     <button type="button" className="btn" disabled={saving||sending} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>
+     <button type="button" className="btn" disabled={saving||sending||converting} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>
      {quoteId&&<Link className="btn alt" href={"/admin/tilbud/"+quoteId+"/preview"}>Forhåndsvis / PDF</Link>}
      {quoteId&&<div className="quoteHistory">
       <div className="kicker">HISTORIKK</div>
