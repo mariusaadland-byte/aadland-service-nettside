@@ -7,7 +7,8 @@ export async function GET() {
   const { data, error } = await s.from("services").select("*").eq("active", true).order("sort_order", { ascending: true }).order("created_at", { ascending: true });
   if (error) {
     console.error("SERVICES GET ERROR:", error);
-    return NextResponse.json({ services: [] });
+    if (error.code === "42P01") return NextResponse.json({ services: [], setupRequired: true }, { status: 503 });
+    return NextResponse.json({ error: "Tjenestene kunne ikke hentes." }, { status: 500 });
   }
   const now = Date.now();
   const services = (data || []).map(fromDbService).filter(service =>
