@@ -96,9 +96,9 @@ export async function POST(req) {
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length>254 || name.length>120) { return NextResponse.json({error:"Skriv inn gyldig navn og e-post."},{status:400}); }
 
-  if (password.length < 8) {
+  if (password.length < 8 || password.length > 128) {
     return NextResponse.json(
-      { error: "Passordet må være minst 8 tegn." },
+      { error: "Passordet må være mellom 8 og 128 tegn." },
       { status: 400 }
     );
   }
