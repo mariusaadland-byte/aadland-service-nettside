@@ -12,6 +12,8 @@ Ved trinnvis kjøring brukes denne rekkefølgen:
 6. `projects.sql` – referanseprosjekter og prosjekttegninger.
 7. `services.sql` – administrerbare tjenester.
 8. `site-settings.sql` – innhold og kontaktdata for forsiden.
+9. `quotes.sql` – tilbud, tilbudsnummer, betalingsplan og tilbudsstatus.
+10. `quote_to_order.sql` – kobler et godkjent tilbud til oppdraget som opprettes i backoffice.
 
 ## Første eierkonto
 
@@ -48,6 +50,7 @@ Kontroller at spørringen faktisk opprettet/oppdaterte én rad. Ikke legg e-post
 - Test produkt/kategori CRUD og produktbildeopplasting i backoffice.
 - Test forespørsel med bilde og at bildet bare kan vises via innlogget backoffice.
 - Test ordre, befaring, utleie og kundekonto.
+- Test tilbud fra kladd → sendt → kundegodkjenning → opprett oppdrag, og kontroller at tilbudet vises på kundens Min side.
 - Test passordgjenoppretting for både admin og kundekonto. Produksjons-URL-ene `/admin/nytt-passord` og `/min-side/nytt-passord` må være tillatt i Supabase Auth redirect URLs.
 - Test at eksisterende data fortsatt kan leses før testgrenen merges til `main`.
 
