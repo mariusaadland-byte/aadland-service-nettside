@@ -24,6 +24,7 @@ export default function AdminClient({ user }) {
   const [rentalBookings, setRentalBookings] = useState([]);
   const [rentalBlocks, setRentalBlocks] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [projectStorySetupRequired, setProjectStorySetupRequired] = useState(false);
   const [users, setUsers] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(user?.id || "");
   const [error, setError] = useState("");
@@ -151,9 +152,18 @@ export default function AdminClient({ user }) {
 
     if (canManageProducts) {
       const response = await fetch("/api/admin/projects");
-      if (response.ok) { const data = await response.json(); setProjects(data.projects || []); }
-      else setProjects([]);
-    } else setProjects([]);
+      if (response.ok) {
+        const data = await response.json();
+        setProjects(data.projects || []);
+        setProjectStorySetupRequired(data.storySetupRequired===true);
+      } else {
+        setProjects([]);
+        setProjectStorySetupRequired(false);
+      }
+    } else {
+      setProjects([]);
+      setProjectStorySetupRequired(false);
+    }
 
     if (canManageProducts) {
       const response = await fetch("/api/admin/site-settings");
@@ -485,7 +495,7 @@ export default function AdminClient({ user }) {
         )}
 
         {tab === "projects" && canManageProducts && (
-          <Projects projects={projects} reload={load} setError={setError} />
+          <Projects projects={projects} reload={load} setError={setError} storySetupRequired={projectStorySetupRequired} />
         )}
 
         {tab === "homepage" && canManageProducts && (
@@ -3300,26 +3310,413 @@ function RentalBookings({bookings,reload,setError,canUpdate}){
  </article>)}</div>;
 }
 
-function Projects({projects,reload,setError}){
+const projectStoryMigrationSql="alter table public.projects add column if not exists content_blocks jsonb not null default '[]'::jsonb;";
+
+function Projects({projects,reload,setError,storySetupRequired}){
  const [showNew,setShowNew]=useState(false);
- return <><div style={{marginBottom:20}}><button className="btn" onClick={()=>setShowNew(!showNew)}>{showNew?"Avbryt":"Legg til oppdrag"}</button></div>
- {showNew&&<ProjectEditor project={null} reload={reload} setError={setError} close={()=>setShowNew(false)}/>}
- <div className="grid">{projects.map(p=><ProjectEditor key={p.id} project={p} reload={reload} setError={setError}/>)}</div></>;
-}
-function ProjectEditor({project,reload,setError,close}){
- const isNew=!project,[editing,setEditing]=useState(isNew),[saving,setSaving]=useState(false),[uploading,setUploading]=useState(false);
- const [v,setV]=useState({title:project?.title||"",category:project?.category||"",description:project?.description||"",imageUrls:project?.imageUrls||[],featured:project?.featured!==false,active:project?.active!==false,sortOrder:project?.sortOrder||0});
- const set=(k,x)=>setV({...v,[k]:x});
- async function upload(files){setUploading(true);const urls=[];for(const file of Array.from(files||[])){const fd=new FormData();fd.append("file",file);const r=await fetch("/api/admin/upload",{method:"POST",body:fd}),d=await r.json().catch(()=>({}));if(r.ok&&d.url)urls.push(d.url);else setError(d.error||"Et bilde kunne ikke lastes opp.");}setV(x=>({...x,imageUrls:[...x.imageUrls,...urls]}));setUploading(false);}
- async function save(e){e.preventDefault();setSaving(true);setError("");const r=await fetch("/api/admin/projects",{method:isNew?"POST":"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({...v,...(!isNew?{id:project.id}:{})})}),d=await r.json().catch(()=>({}));setSaving(false);if(!r.ok){setError(d.error||"Oppdraget kunne ikke lagres.");return;}if(close)close();else setEditing(false);await reload();}
- async function remove(){if(!project?.id||!window.confirm('Slette "'+project.title+'"?'))return;const r=await fetch("/api/admin/projects",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:project.id})});if(!r.ok){setError("Oppdraget kunne ikke slettes.");return;}await reload();}
- if(!editing&&project)return <article className="card">{project.imageUrls?.[0]&&<img src={project.imageUrls[0]} alt="" style={{width:"100%",height:200,objectFit:"cover",borderRadius:12}}/>}<div className="kicker">{project.category||"OPPDRAG"}</div><h3>{project.title}</h3><p>{project.description}</p><p className="muted">{project.active?"Publisert":"Skjult"} · {project.featured?"Vises på forsiden":"Ikke på forsiden"}</p><div style={{display:"flex",gap:10}}><button className="btn" onClick={()=>setEditing(true)}>Rediger</button><button className="btn alt" onClick={remove}>Slett</button></div></article>;
- return <form className="card" onSubmit={save}><div className="kicker">{isNew?"NYTT OPPDRAG":"REDIGER OPPDRAG"}</div><div className="field"><label>Tittel</label><input required value={v.title} onChange={e=>set("title",e.target.value)}/></div><div className="field"><label>Kategori</label><input value={v.category} onChange={e=>set("category",e.target.value)} placeholder="F.eks. Uteområde"/></div><div className="field"><label>Beskrivelse</label><textarea rows="4" value={v.description} onChange={e=>set("description",e.target.value)}/></div>
- <div className="field"><label>Bilder</label>{v.imageUrls.map((url,i)=><div key={url+i} style={{marginBottom:8}}><img src={url} alt="" style={{width:180,height:110,objectFit:"cover",borderRadius:10}}/><button type="button" className="btn alt" onClick={()=>set("imageUrls",v.imageUrls.filter((_,x)=>x!==i))}>Fjern</button></div>)}<input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={e=>{upload(e.target.files);e.target.value=""}}/></div>
- <div className="field"><label>Sortering</label><input type="number" value={v.sortOrder} onChange={e=>set("sortOrder",e.target.value)}/></div><label><input type="checkbox" checked={v.featured} onChange={e=>set("featured",e.target.checked)}/> Vis på forsiden</label><br/><label><input type="checkbox" checked={v.active} onChange={e=>set("active",e.target.checked)}/> Publisert</label>
- <div style={{display:"flex",gap:10,marginTop:18}}><button className="btn" disabled={saving||uploading}>{saving?"Lagrer …":"Lagre"}</button>{!isNew&&<button type="button" className="btn alt" onClick={()=>setEditing(false)}>Avbryt</button>}</div></form>;
+ const [migrationCopied,setMigrationCopied]=useState(false);
+
+ async function copyProjectMigration(){
+  try{
+   await navigator.clipboard.writeText(projectStoryMigrationSql);
+   setMigrationCopied(true);
+   window.setTimeout(()=>setMigrationCopied(false),1800);
+  }catch{
+   setError("Kunne ikke kopiere SQL automatisk. Åpne supabase/project_content_blocks.sql i prosjektet.");
+  }
+ }
+
+ return <>
+  {storySetupRequired&&<div className="adminProjectMigrationWarning">
+   <b>Databaseoppdatering mangler</b>
+   <span>Prosjektfortelling med tekst mellom bildene er ferdig programmert, men databasen må oppdateres før nye endringer kan lagres.</span>
+   <code>{projectStoryMigrationSql}</code>
+   <div className="adminProjectMigrationActions">
+    <button type="button" className="btn alt" onClick={copyProjectMigration}>{migrationCopied?"Kopiert ✓":"Kopier SQL"}</button>
+    <small>Kjør denne én gang i Supabase SQL Editor. Deretter oppdager backoffice automatisk at prosjektfortelling er klar.</small>
+   </div>
+  </div>}
+  <div className="adminProjectToolbar">
+   <div>
+    <p className="muted">Legg inn ekte bilder fra utførte jobber. Første bilde brukes som hovedbilde. Under «Prosjektfortelling» kan du blande bilder og tekst i akkurat den rekkefølgen kunden skal se dem.</p>
+   </div>
+   <button className="btn" disabled={storySetupRequired} onClick={()=>setShowNew(!showNew)}>{showNew?"Avbryt":"Legg til oppdrag"}</button>
+  </div>
+  {showNew&&<ProjectEditor project={null} reload={reload} setError={setError} close={()=>setShowNew(false)}/>}
+  <div className="grid adminProjectsGrid">{projects.map(p=><ProjectEditor key={p.id} project={p} reload={reload} setError={setError} storySetupRequired={storySetupRequired}/>)}</div>
+ </>;
 }
 
+function projectBlockId(){
+ return "block-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
+}
+
+function defaultProjectBlocks(project){
+ if(Array.isArray(project?.contentBlocks)&&project.contentBlocks.length)return project.contentBlocks;
+ return (Array.isArray(project?.imageUrls)?project.imageUrls:[]).map(url=>({id:projectBlockId(),type:"image",url,caption:"",alt:""}));
+}
+
+function ProjectEditor({project,reload,setError,close,storySetupRequired=false}){
+ const isNew=!project;
+ const [editing,setEditing]=useState(isNew);
+ const [saving,setSaving]=useState(false);
+ const [uploading,setUploading]=useState(false);
+ const [previewing,setPreviewing]=useState(false);
+ const [v,setV]=useState({
+  title:project?.title||"",
+  category:project?.category||"",
+  description:project?.description||"",
+  imageUrls:Array.isArray(project?.imageUrls)?project.imageUrls:[],
+  contentBlocks:defaultProjectBlocks(project),
+  featured:project?.featured!==false,
+  active:project?.active!==false,
+  sortOrder:project?.sortOrder||0
+ });
+
+ useEffect(()=>{
+  if(!project)return;
+  setV({
+   title:project.title||"",
+   category:project.category||"",
+   description:project.description||"",
+   imageUrls:Array.isArray(project.imageUrls)?project.imageUrls:[],
+   contentBlocks:defaultProjectBlocks(project),
+   featured:project.featured!==false,
+   active:project.active!==false,
+   sortOrder:project.sortOrder||0
+  });
+ },[project]);
+
+ const set=(k,x)=>setV(current=>({...current,[k]:x}));
+
+ async function upload(files){
+  const picked=Array.from(files||[]);
+  if(!picked.length)return;
+  const room=Math.max(0,30-v.imageUrls.length);
+  const selected=picked.slice(0,room);
+  if(!selected.length){setError("Du kan ha maks 30 bilder per oppdrag.");return;}
+
+  setUploading(true);
+  setError("");
+  const urls=[];
+
+  for(const file of selected){
+   const fd=new FormData();
+   fd.append("file",file);
+   const r=await fetch("/api/admin/upload",{method:"POST",body:fd});
+   const d=await r.json().catch(()=>({}));
+   if(r.ok&&d.url)urls.push(d.url);
+   else{
+    setUploading(false);
+    setError(d.error||"Et bilde kunne ikke lastes opp.");
+    return;
+   }
+  }
+
+  setV(current=>({
+   ...current,
+   imageUrls:[...current.imageUrls,...urls].slice(0,30),
+   contentBlocks:[
+    ...current.contentBlocks,
+    ...urls.map(url=>({id:projectBlockId(),type:"image",url,caption:"",alt:""}))
+   ].slice(0,80)
+  }));
+
+  if(picked.length>room)setError("De første "+room+" bildene ble lagt til. Maks 30 bilder per oppdrag.");
+  setUploading(false);
+ }
+
+ function moveImage(index,direction){
+  setV(current=>{
+   const next=[...current.imageUrls];
+   const target=index+direction;
+   if(target<0||target>=next.length)return current;
+   [next[index],next[target]]=[next[target],next[index]];
+   return {...current,imageUrls:next};
+  });
+ }
+
+ function makeCover(index){
+  setV(current=>{
+   const next=[...current.imageUrls];
+   const [chosen]=next.splice(index,1);
+   next.unshift(chosen);
+   return {...current,imageUrls:next};
+  });
+ }
+
+ function removeImage(url,index){
+  setV(current=>({
+   ...current,
+   imageUrls:current.imageUrls.filter((_,imageIndex)=>imageIndex!==index),
+   contentBlocks:current.contentBlocks.filter(block=>!(block.type==="image"&&block.url===url))
+  }));
+ }
+
+ function addTextBlock(afterIndex=null,preset=null){
+  setV(current=>{
+   const block={
+    id:projectBlockId(),
+    type:"text",
+    eyebrow:preset?.eyebrow||"",
+    title:preset?.title||"",
+    body:preset?.body||""
+   };
+   if(afterIndex===null){
+    return {...current,contentBlocks:[...current.contentBlocks,block].slice(0,80)};
+   }
+   const next=[...current.contentBlocks];
+   next.splice(afterIndex+1,0,block);
+   return {...current,contentBlocks:next.slice(0,80)};
+  });
+ }
+
+ function addStoryPreset(kind){
+  const presets={
+   before:{eyebrow:"FØR ARBEIDET",title:"Utgangspunktet",body:""},
+   during:{eyebrow:"UNDER ARBEIDET",title:"Slik løste vi oppgaven",body:""},
+   after:{eyebrow:"FERDIG RESULTAT",title:"Resultatet",body:""}
+  };
+  addTextBlock(null,presets[kind]);
+ }
+
+ function syncImagesToStory(){
+  setV(current=>{
+   const used=new Set(current.contentBlocks.filter(block=>block.type==="image").map(block=>block.url));
+   const missing=current.imageUrls.filter(url=>!used.has(url));
+   return {
+    ...current,
+    contentBlocks:[
+     ...current.contentBlocks,
+     ...missing.map(url=>({id:projectBlockId(),type:"image",url,caption:"",alt:""}))
+    ].slice(0,80)
+   };
+  });
+ }
+
+ function moveContentBlock(index,direction){
+  setV(current=>{
+   const next=[...current.contentBlocks];
+   const target=index+direction;
+   if(target<0||target>=next.length)return current;
+   [next[index],next[target]]=[next[target],next[index]];
+   return {...current,contentBlocks:next};
+  });
+ }
+
+ function updateContentBlock(index,patch){
+  setV(current=>({
+   ...current,
+   contentBlocks:current.contentBlocks.map((block,blockIndex)=>blockIndex===index?{...block,...patch}:block)
+  }));
+ }
+
+ function removeContentBlock(index){
+  setV(current=>({
+   ...current,
+   contentBlocks:current.contentBlocks.filter((_,blockIndex)=>blockIndex!==index)
+  }));
+ }
+
+ async function save(e){
+  e.preventDefault();
+  setSaving(true);
+  setError("");
+  const r=await fetch("/api/admin/projects",{
+   method:isNew?"POST":"PATCH",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({...v,...(!isNew?{id:project.id}:{})})
+  });
+  const d=await r.json().catch(()=>({}));
+  setSaving(false);
+  if(!r.ok){
+   setError(d.setupRequired
+    ? "Databaseoppdatering mangler for prosjektfortelling. Kjør prosjektmigreringen før du lagrer denne funksjonen."
+    : (d.error||"Oppdraget kunne ikke lagres."));
+   return;
+  }
+  if(close)close();else setEditing(false);
+  await reload();
+ }
+
+ useEffect(()=>{
+  if(!previewing)return;
+  const previousOverflow=document.body.style.overflow;
+  document.body.style.overflow="hidden";
+  function onKeyDown(event){
+   if(event.key==="Escape")setPreviewing(false);
+  }
+  window.addEventListener("keydown",onKeyDown);
+  return()=>{
+   window.removeEventListener("keydown",onKeyDown);
+   document.body.style.overflow=previousOverflow;
+  };
+ },[previewing]);
+
+ const previewSections=[];
+ let previewImages=[];
+ v.contentBlocks.forEach((block,index)=>{
+  if(block.type==="image"){
+   previewImages.push({...block,_index:index});
+   return;
+  }
+  if(previewImages.length){
+   previewSections.push({type:"images",id:"preview-images-"+index,items:previewImages});
+   previewImages=[];
+  }
+  previewSections.push({...block,_index:index});
+ });
+ if(previewImages.length)previewSections.push({type:"images",id:"preview-images-end",items:previewImages});
+
+ async function remove(){
+  if(!project?.id||!window.confirm('Slette "'+project.title+'"?'))return;
+  const r=await fetch("/api/admin/projects",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:project.id})});
+  if(!r.ok){setError("Oppdraget kunne ikke slettes.");return;}
+  await reload();
+ }
+
+ if(!editing&&project)return <article className="card adminProjectCard">
+  {project.imageUrls?.[0]?<img className="adminProjectCover" src={project.imageUrls[0]} alt=""/>:<div className="adminProjectCoverPlaceholder">Ingen bilder ennå</div>}
+  <div className="adminProjectSummary">
+   <div className="kicker">{project.category||"OPPDRAG"}</div>
+   <h3>{project.title}</h3>
+   {project.description&&<p>{project.description}</p>}
+   <p className="muted">{project.imageUrls?.length||0} {project.imageUrls?.length===1?"bilde":"bilder"} · {project.contentBlocks?.filter(block=>block.type==="text").length||0} tekstseksjoner · {project.active?"Publisert":"Skjult"} · {project.featured?"Vises på forsiden":"Ikke på forsiden"}</p>
+   <div className="adminProjectActions">
+    <button className="btn" disabled={storySetupRequired} onClick={()=>setEditing(true)}>Rediger</button>
+    {project.active&&project.slug&&<a className="btn alt" href={"/prosjekter/"+project.slug} target="_blank" rel="noreferrer">Se offentlig side</a>}
+    <button className="btn alt" onClick={remove}>Slett</button>
+   </div>
+  </div>
+ </article>;
+
+ return <form className="card adminProjectEditor" onSubmit={save}>
+  <div className="kicker">{isNew?"NYTT OPPDRAG":"REDIGER OPPDRAG"}</div>
+  <h3>{isNew?"Nytt referanseprosjekt":v.title||"Oppdrag"}</h3>
+
+  <div className="field"><label>Tittel</label><input required value={v.title} onChange={e=>set("title",e.target.value)} placeholder="F.eks. Terrasse og levegg"/></div>
+  <div className="field"><label>Kategori</label><input value={v.category} onChange={e=>set("category",e.target.value)} placeholder="F.eks. Uteområde"/></div>
+  <div className="field"><label>Kort introduksjon</label><textarea rows="4" value={v.description} onChange={e=>set("description",e.target.value)} placeholder="Kort tekst som vises på prosjektkortet og øverst på prosjektsiden."/></div>
+
+  <div className="field adminProjectImagesField">
+   <div className="adminProjectImagesHeader">
+    <label>Bilder</label>
+    <span>{v.imageUrls.length} / 30</span>
+   </div>
+   <p className="muted adminProjectImageHelp">Første bilde er hovedbildet på forsiden og i prosjektoversikten. Bildene du laster opp blir også lagt til nederst i prosjektfortellingen automatisk.</p>
+
+   {v.imageUrls.length>0&&<div className="adminProjectImageGrid">
+    {v.imageUrls.map((url,i)=><div key={url+i} className={"adminProjectImageItem "+(i===0?"isCover":"")}>
+     <div className="adminProjectImageThumb">
+      <img src={url} alt={"Prosjektbilde "+(i+1)}/>
+      {i===0&&<span>Hovedbilde</span>}
+      <b>{i+1}</b>
+     </div>
+     <div className="adminProjectImageActions">
+      <button type="button" className="btn alt" disabled={i===0} onClick={()=>moveImage(i,-1)} aria-label="Flytt bilde til venstre">←</button>
+      <button type="button" className="btn alt" disabled={i===v.imageUrls.length-1} onClick={()=>moveImage(i,1)} aria-label="Flytt bilde til høyre">→</button>
+      {i!==0&&<button type="button" className="btn alt" onClick={()=>makeCover(i)}>Hoved</button>}
+      <button type="button" className="btn alt" onClick={()=>removeImage(url,i)}>Fjern</button>
+     </div>
+    </div>)}
+   </div>}
+
+   <label className="adminProjectUpload">
+    <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={uploading||v.imageUrls.length>=30} onChange={e=>{upload(e.target.files);e.target.value=""}}/>
+    <span>{uploading?"Laster opp bilder …":v.imageUrls.length>=30?"Maks 30 bilder":"Velg bilder"}</span>
+    <small>JPG, PNG eller WebP. Du kan velge flere bilder samtidig.</small>
+   </label>
+  </div>
+
+  <section className="adminProjectStory">
+   <div className="adminProjectStoryInfo">
+    <b>Slik vises prosjektet for kunden</b>
+    <span>Forsiden bruker hovedbildet. Prosjektsiden følger rekkefølgen under, og tekstseksjonene deler bildene inn i tydelige deler.</span>
+   </div>
+   <div className="adminProjectStoryHead">
+    <div>
+     <div className="kicker">PROSJEKTFORTELLING</div>
+     <h4>Bygg siden med bilder og tekst</h4>
+     <p className="muted">Flytt blokkene opp og ned. Tekstblokker kan ligge mellom akkurat de bildene du ønsker.</p>
+    </div>
+    <div className="adminProjectStoryActions">
+     <button type="button" className="btn" onClick={()=>addTextBlock()}>+ Tom tekstseksjon</button>
+     <button type="button" className="btn alt" onClick={syncImagesToStory}>Legg inn manglende bilder</button>
+     <button type="button" className="btn alt" disabled={!v.contentBlocks.length} onClick={()=>setPreviewing(true)}>Forhåndsvis</button>
+    </div>
+   </div>
+   <div className="adminProjectStoryPresets">
+    <span>Hurtigseksjoner:</span>
+    <button type="button" onClick={()=>addStoryPreset("before")}>+ Før arbeidet</button>
+    <button type="button" onClick={()=>addStoryPreset("during")}>+ Under arbeidet</button>
+    <button type="button" onClick={()=>addStoryPreset("after")}>+ Ferdig resultat</button>
+   </div>
+
+   <div className="adminProjectStoryDivider">
+    <span>Rekkefølge på kundesiden</span>
+   </div>
+
+   {v.contentBlocks.length===0?<div className="adminProjectStoryEmpty">Ingen blokker ennå. Last opp bilder eller legg til en tekstseksjon.</div>:<div className="adminProjectStoryList">
+    {v.contentBlocks.map((block,index)=><div className={"adminProjectStoryBlock "+(block.type==="text"?"isText":"isImage")} key={block.id||index}>
+     <div className="adminProjectStoryOrder">
+      <span>{String(index+1).padStart(2,"0")}</span>
+      <button type="button" disabled={index===0} onClick={()=>moveContentBlock(index,-1)} aria-label="Flytt blokk opp">↑</button>
+      <button type="button" disabled={index===v.contentBlocks.length-1} onClick={()=>moveContentBlock(index,1)} aria-label="Flytt blokk ned">↓</button>
+     </div>
+
+     {block.type==="image"?<div className="adminProjectStoryImage">
+      <img src={block.url} alt={block.alt||""}/>
+      <div className="adminProjectStoryImageFields">
+       <b>Bilde</b>
+       <small>Vises i denne posisjonen på prosjektsiden.</small>
+       <div className="field"><label>Bildetekst <span>(valgfritt)</span></label><input value={block.caption||""} onChange={e=>updateContentBlock(index,{caption:e.target.value})} placeholder="F.eks. Ny levegg og ferdig terrasse"/></div>
+       <div className="field"><label>Alternativ tekst <span>(valgfritt)</span></label><input value={block.alt||""} onChange={e=>updateContentBlock(index,{alt:e.target.value})} placeholder="Kort beskrivelse av bildet for tilgjengelighet"/></div>
+      </div>
+     </div>:<div className="adminProjectStoryText">
+      <div className="field"><label>Liten gulltekst</label><input value={block.eyebrow||""} onChange={e=>updateContentBlock(index,{eyebrow:e.target.value})} placeholder="F.eks. FØR ARBEIDET"/></div>
+      <div className="field"><label>Overskrift</label><input value={block.title||""} onChange={e=>updateContentBlock(index,{title:e.target.value})} placeholder="Hva gjorde vi her?"/></div>
+      <div className="field"><label>Tekst</label><textarea rows="4" value={block.body||""} onChange={e=>updateContentBlock(index,{body:e.target.value})} placeholder="Fortell kort om denne delen av arbeidet."/></div>
+     </div>}
+
+     <div className="adminProjectStoryBlockActions">
+      <button type="button" className="adminProjectStoryInsert" onClick={()=>addTextBlock(index)}>+ Tekst under</button>
+      <button type="button" className="adminProjectStoryRemove" onClick={()=>removeContentBlock(index)}>{block.type==="text"?"Fjern tekstseksjon":"Fjern fra fortellingen"}</button>
+     </div>
+    </div>)}
+   </div>}
+  </section>
+
+  {previewing&&<div className="adminProjectPreview" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setPreviewing(false)}}>
+   <div className="adminProjectPreviewPanel" role="dialog" aria-modal="true" aria-label="Forhåndsvis prosjektfortelling">
+    <div className="adminProjectPreviewTop">
+     <div><span className="kicker">FORHÅNDSVISNING</span><h3>{v.title||"Prosjekt"}</h3></div>
+     <button type="button" className="adminProjectPreviewClose" onClick={()=>setPreviewing(false)} aria-label="Lukk forhåndsvisning">×</button>
+    </div>
+    {v.description&&<p className="adminProjectPreviewLead">{v.description}</p>}
+    <div className="adminProjectPreviewStory">
+     {previewSections.map((section,index)=>section.type==="text"?<section className="adminProjectPreviewText" key={section.id||index}>
+      {section.eyebrow&&<span>{section.eyebrow}</span>}
+      {section.title&&<h4>{section.title}</h4>}
+      {section.body&&<p>{section.body}</p>}
+     </section>:<div className={"adminProjectPreviewImages "+(section.items.length===1?"single":"")} key={section.id||index}>
+      {section.items.map((block,imageIndex)=><figure key={block.id||block.url||imageIndex}><img src={block.url} alt={block.alt||""}/>{block.caption&&<figcaption>{block.caption}</figcaption>}</figure>)}
+     </div>)}
+    </div>
+   </div>
+  </div>}
+
+  <div className="field"><label>Sortering</label><input type="number" value={v.sortOrder} onChange={e=>set("sortOrder",e.target.value)}/></div>
+  <div className="adminProjectToggles">
+   <label><input type="checkbox" checked={v.featured} onChange={e=>set("featured",e.target.checked)}/> Vis på forsiden</label>
+   <label><input type="checkbox" checked={v.active} onChange={e=>set("active",e.target.checked)}/> Publisert</label>
+  </div>
+
+  <div className="adminProjectActions">
+   <button className="btn" disabled={saving||uploading}>{saving?"Lagrer …":uploading?"Laster opp …":"Lagre"}</button>
+   {!isNew&&<button type="button" className="btn alt" onClick={()=>setEditing(false)}>Avbryt</button>}
+  </div>
+ </form>;
+}
 
 function HomepageManager({services,projects,settings,reload,setTab,setError}){
  const defaults={heroEyebrow:"BYGG · RENOVERING · UTEOMRÅDER · VEDLIKEHOLD",heroTitle:"Kvalitet som varer.",seasonalTitle:"",seasonalText:"",seasonalCtaLabel:"",seasonalCtaHref:"",seasonalFrom:null,seasonalUntil:null,showSeasonal:false,heroText:"Aadland Service leverer solide løsninger innen bygg, oppussing, vedlikehold og uteområder. Vi kombinerer fagkunnskap, nøyaktighet og god oppfølging – tilpasset dine behov.",aboutTitle:"Lokalt håndverk med stolthet.",aboutText:"Vi hjelper med oppussing, vedlikehold, uteområder og spesialtilpassede løsninger. Målet er enkelt: ryddig kommunikasjon, praktiske valg og et resultat du kan være fornøyd med.",phone:"471 54 898",email:"post@aadland-service.no",orgNumber:"937 781 873 MVA",location:"Bergen og omegn",showServices:true,showProjects:true,showAbout:true,showSurvey:true};
