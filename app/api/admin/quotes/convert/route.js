@@ -26,6 +26,11 @@ export async function POST(req){
   const {data:source}=await s.from("orders").select("customer_user_id").eq("id",quote.source_order_id).maybeSingle();
   customerUserId=source?.customer_user_id||null;
  }
+ if(!customerUserId&&quote.customer?.email){
+  const email=String(quote.customer.email).trim().toLowerCase();
+  const {data:profile}=await s.from("customer_profiles").select("id").eq("email",email).maybeSingle();
+  customerUserId=profile?.id||null;
+ }
 
  const lineText=(Array.isArray(quote.line_items)?quote.line_items:[])
   .map(line=>`• ${line.description} — ${line.quantity} ${line.unit||""}`)
