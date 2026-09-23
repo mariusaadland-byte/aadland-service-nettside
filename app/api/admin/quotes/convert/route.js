@@ -36,9 +36,11 @@ export async function POST(req){
   .map(line=>`• ${line.description} — ${line.quantity} ${line.unit||""}`)
   .join("\n");
 
+ const plannedStart=quote.planned_start_date?new Date(quote.planned_start_date+"T12:00:00").toLocaleDateString("nb-NO"):"";
  const request=[
   `Godkjent tilbud ${quote.quote_number}`,
   quote.title||"",
+  plannedStart?"Planlagt oppstart: "+plannedStart:"",
   "",
   quote.intro_text||"",
   lineText?"\nArbeid og leveranser:\n"+lineText:"",
