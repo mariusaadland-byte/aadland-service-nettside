@@ -2150,3 +2150,137 @@ html{scroll-behavior:smooth}
 .homeSection.light.servicesSection{
   background:#111!important;
 }
+
+
+/* Min side dark customer theme */
+.customerPage{
+  min-height:100vh!important;
+  position:relative!important;
+  color:#f5f2ec!important;
+  background:#111!important;
+  box-shadow:0 0 0 100vmax #111!important;
+  clip-path:inset(0 -100vmax)!important;
+}
+.customerPage>a{
+  color:#d7a74e!important;
+  text-decoration:none!important;
+}
+.customerPage>a:hover{color:#efc66d!important}
+.customerPage .kicker,
+.customerPage .customerTopKicker{color:#d7a74e!important}
+.customerPage h1,
+.customerPage h2,
+.customerPage h3,
+.customerPage h4{color:#fff!important}
+.customerPage>p,
+.customerDashboardHeader p{color:rgba(255,255,255,.67)!important}
+
+.customerPage .card,
+.customerLoginCard,
+.customerQuoteCard,
+.customerHistoryCard,
+.customerJobCard,
+.customerEmpty{
+  background:#181818!important;
+  color:#f5f2ec!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  box-shadow:0 12px 30px rgba(0,0,0,.18)!important;
+}
+.customerLoginCard .field label{color:#f2eee6!important}
+.customerLoginCard .field input,
+.customerLoginCard .field select,
+.customerLoginCard .field textarea{
+  background:#0f0f0f!important;
+  color:#fff!important;
+  border:1px solid rgba(255,255,255,.18)!important;
+}
+.customerLoginCard .field input:focus,
+.customerLoginCard .field select:focus,
+.customerLoginCard .field textarea:focus{
+  outline:none!important;
+  border-color:#d7a74e!important;
+  box-shadow:0 0 0 2px rgba(215,167,78,.12)!important;
+}
+.customerLoginCard .field input::placeholder,
+.customerLoginCard .field textarea::placeholder{color:rgba(255,255,255,.38)!important}
+
+.customerPage .btn{
+  background:#d7a74e!important;
+  color:#111!important;
+  border:1px solid #d7a74e!important;
+}
+.customerPage .btn:hover{background:#e3b85f!important}
+.customerPage .btn.alt{
+  background:transparent!important;
+  color:#f5f2ec!important;
+  border:1px solid rgba(255,255,255,.23)!important;
+}
+.customerPage .btn.alt:hover{
+  border-color:#d7a74e!important;
+  color:#d7a74e!important;
+}
+
+.customerSectionHead>span{
+  color:#d7a74e!important;
+  background:rgba(215,167,78,.10)!important;
+  border-color:rgba(215,167,78,.32)!important;
+}
+.customerStatus{
+  color:#e7c47d!important;
+  background:rgba(215,167,78,.10)!important;
+  border-color:rgba(215,167,78,.28)!important;
+}
+.customerStatus-accepted{
+  background:rgba(65,145,83,.16)!important;
+  border-color:rgba(96,184,116,.35)!important;
+  color:#91d39e!important;
+}
+.customerStatus-declined,
+.customerStatus-cancelled{
+  background:rgba(158,62,62,.16)!important;
+  border-color:rgba(213,105,105,.30)!important;
+  color:#e49a9a!important;
+}
+.customerStatus-expired{
+  background:rgba(255,255,255,.06)!important;
+  border-color:rgba(255,255,255,.12)!important;
+  color:rgba(255,255,255,.62)!important;
+}
+.customerCardMeta span,
+.customerJobPaymentPlan>div{
+  background:#101010!important;
+  border-color:rgba(255,255,255,.09)!important;
+}
+.customerCardMeta small,
+.customerJobPaymentPlan small,
+.customerCardTop small,
+.customerJobAgreement>span{color:rgba(255,255,255,.50)!important}
+
+.customerJobStart{
+  background:rgba(215,167,78,.11)!important;
+  border-color:rgba(215,167,78,.42)!important;
+}
+.customerJobStart small,
+.customerJobAgreement>small{color:#d7a74e!important}
+.customerJobStart span{color:rgba(255,255,255,.60)!important}
+.customerJobStartPending{
+  background:rgba(255,255,255,.04)!important;
+  border-color:rgba(255,255,255,.10)!important;
+}
+.customerJobAgreement{
+  background:#101010!important;
+  border-color:rgba(255,255,255,.09)!important;
+}
+.customerQuoteMessage{color:rgba(255,255,255,.70)!important}
+.customerEmpty p{color:rgba(255,255,255,.58)!important}
+
+.customerPage .success{
+  color:#c8eccf!important;
+  background:rgba(62,137,78,.14)!important;
+  border-left-color:#74bd83!important;
+}
+.customerPage .notice{
+  color:#efc4ad!important;
+  background:rgba(155,74,42,.16)!important;
+  border-color:rgba(211,125,88,.24)!important;
+}
