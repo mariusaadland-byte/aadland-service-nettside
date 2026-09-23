@@ -241,6 +241,12 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
 
   let surveyOrder=null;
   let surveyDateChanged=false;
+  let normalizedSurveyDate=surveyDate===undefined?undefined:"";
+  if(surveyDate){
+    const parsedSurveyDate=new Date(surveyDate);
+    if(Number.isNaN(parsedSurveyDate.getTime()))return NextResponse.json({error:"Velg gyldig dato og klokkeslett for befaring."},{status:400});
+    normalizedSurveyDate=parsedSurveyDate.toISOString();
+  }
   if(surveyDate!==undefined||sendSurveyConfirmation===true){
     if(sendSurveyConfirmation===true&&!surveyDate)return NextResponse.json({error:"Velg dato og klokkeslett før bekreftelsen sendes."},{status:400});
     const {data:found,error:findError}=await s.from("orders").select("*").eq("id",id).maybeSingle();
@@ -249,14 +255,14 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     if(sendSurveyConfirmation===true&&!String(found.customer?.email||"").trim())return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
     surveyOrder=found;
     const previousSurvey=found.survey_date?new Date(found.survey_date).toISOString():"";
-    const nextSurvey=surveyDate?new Date(surveyDate).toISOString():"";
+    const nextSurvey=normalizedSurveyDate||"";
     surveyDateChanged=previousSurvey!==nextSurvey;
   }
 
   const updatePatch={
     ...(status !== undefined ? { status } : {}),
     ...(surveyDate !== undefined ? {
-      survey_date:surveyDate||null,
+      survey_date:normalizedSurveyDate||null,
       ...(surveyDateChanged?{survey_confirmation_sent_at:null,survey_reminder_sent_at:null}:{})
     } : {}),
     ...(adminNote !== undefined ? { admin_note: adminNote || null } : {}),
