@@ -2612,3 +2612,21 @@ body:has(.customerPage) .customerPage{
  .surveySaveActions{display:grid;grid-template-columns:1fr}
  .surveySaveActions .btn{text-align:center}
 }
+
+
+.surveyDeliveryState{
+ display:flex;
+ gap:8px;
+ flex-wrap:wrap;
+ margin-top:10px;
+}
+.surveyDeliveryState span{
+ display:inline-flex;
+ padding:7px 10px;
+ border-radius:999px;
+ border:1px solid rgba(47,103,55,.22);
+ background:rgba(47,103,55,.10);
+ color:#2f6737;
+ font-size:10px;
+ font-weight:800;
+}
