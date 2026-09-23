@@ -65,6 +65,7 @@ export default function BekreftEpost(){
     </button>
    </>}
    {state==="success"&&<p className="success">{message}</p>}
+   {state==="error"&&<p style={{marginTop:14,fontSize:14}}><Link href="/min-side">Gå til Min side</Link> og velg «Send bekreftelsesmail på nytt» hvis lenken har utløpt.</p>}
   </section>
 
   <p style={{marginTop:18,color:"#71675d",fontSize:14}}>
