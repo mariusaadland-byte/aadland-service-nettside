@@ -657,3 +657,12 @@ alter table public.quotes
 create unique index if not exists quotes_converted_order_unique_idx
 on public.quotes(converted_order_id)
 where converted_order_id is not null;
+
+
+-- ============================================================
+-- supabase/quote_start_date.sql
+-- ============================================================
+
+-- Planlagt oppstart som vises i tilbudet til kunden
+alter table public.quotes
+ add column if not exists planned_start_date date;
