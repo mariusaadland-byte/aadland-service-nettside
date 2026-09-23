@@ -89,7 +89,7 @@ export async function GET() {
   if(orderIds.length){
     const {data:linkedQuotes,error:quoteError}=await s
       .from("quotes")
-      .select("id,quote_number,title,status,total_inc_vat_ore,payment_plan,accepted_at,converted_order_id")
+      .select("id,quote_number,title,status,total_inc_vat_ore,payment_plan,accepted_at,planned_start_date,converted_order_id")
       .in("converted_order_id",orderIds);
 
     if(!quoteError){
@@ -114,6 +114,7 @@ export async function GET() {
         mapped.sourceQuoteTitle=quote.title||"";
         mapped.sourceQuoteStatus=quote.status||"accepted";
         mapped.sourceQuoteAcceptedAt=quote.accepted_at||null;
+        mapped.sourceQuotePlannedStartDate=quote.planned_start_date||null;
         mapped.sourceQuoteTotalOre=Number(quote.total_inc_vat_ore)||0;
         mapped.sourceQuotePaymentPlan=Array.isArray(quote.payment_plan)?quote.payment_plan:[];
       }
