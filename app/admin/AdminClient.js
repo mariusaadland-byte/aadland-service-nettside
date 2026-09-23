@@ -13,6 +13,14 @@ const labels = {
   cancelled: "Avbrutt",
 };
 
+function localDateTimeInput(value){
+  if(!value)return "";
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime()))return "";
+  const pad=n=>String(n).padStart(2,"0");
+  return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes());
+}
+
 export default function AdminClient({ user }) {
   const [tab, setTab] = useState("overview");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -866,7 +874,7 @@ function Surveys({ orders, status, canUpdateOrders }) {
         </div>
         {(customer.address || customer.postalCode || customer.city) && <p><b>Adresse:</b> {[customer.address,customer.postalCode,customer.city].filter(Boolean).join(", ")}</p>}
         <div style={{whiteSpace:"pre-wrap",lineHeight:1.55,marginTop:16}}>{order.customRequest || "Ingen beskrivelse."}</div>{Array.isArray(order.contactImages)&&order.contactImages.length>0&&<div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12}}>{order.contactImages.map((image,i)=><a className="btn alt" key={image.ref||i} href={image.url} target="_blank" rel="noopener noreferrer">Åpne bilde {i+1}</a>)}</div>}
-        <div className="field" style={{marginTop:16}}><label>Dato og tid for befaring</label><input type="datetime-local" defaultValue={order.surveyDate ? String(order.surveyDate).slice(0,16) : ""} id={"survey-date-"+order.id}/></div>
+        <div className="field" style={{marginTop:16}}><label>Dato og tid for befaring</label><input type="datetime-local" defaultValue={localDateTimeInput(order.surveyDate)} id={"survey-date-"+order.id}/></div>
         <div className="field"><label>Internt notat</label><textarea rows="3" defaultValue={order.adminNote||""} id={"survey-note-"+order.id} placeholder="Kun synlig i backoffice"/></div>
         {canUpdateOrders&&<div className="surveySaveActions">
           <button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>saveSurvey(order,document.getElementById("survey-date-"+order.id).value,document.getElementById("survey-note-"+order.id).value,false)}>{savingId===order.id?"Lagrer …":"Lagre befaring"}</button>
