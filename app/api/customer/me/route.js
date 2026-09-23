@@ -27,6 +27,20 @@ export async function GET(){
  const s=db();
  if(!s)return NextResponse.json({error:"Kundekonto er ikke tilgjengelig akkurat nå."},{status:503});
 
+ const customerEmail=String(customer.email||"").trim().toLowerCase();
+ if(customerEmail){
+  const [orderLink,rentalLink]=await Promise.all([
+   s.from("orders").update({customer_user_id:customer.id})
+    .is("customer_user_id",null)
+    .contains("customer",{email:customerEmail}),
+   s.from("rental_bookings").update({customer_user_id:customer.id})
+    .is("customer_user_id",null)
+    .contains("customer",{email:customerEmail})
+  ]);
+  if(orderLink.error&&!["42703","42P01"].includes(String(orderLink.error.code||"")))console.error("CUSTOMER ORDER AUTO LINK",orderLink.error);
+  if(rentalLink.error&&!["42703","42P01"].includes(String(rentalLink.error.code||"")))console.error("CUSTOMER RENTAL AUTO LINK",rentalLink.error);
+ }
+
  const [ordersResult,rentalsResult,quotesResult]=await Promise.all([
   s.from("orders")
    .select("id,order_number,order_type,status,total_ore,payment_status,fulfillment_type,created_at,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at")
@@ -40,7 +54,7 @@ export async function GET(){
    .limit(100),
   s.from("quotes")
    .select("id,quote_number,status,title,total_inc_vat_ore,valid_until,planned_start_date,sent_at,accepted_at,declined_at,created_at,customer")
-   .contains("customer",{email:String(customer.email||"").trim().toLowerCase()})
+   .contains("customer",{email:customerEmail})
    .in("status",["sent","accepted","declined","expired","cancelled"])
    .order("created_at",{ascending:false})
    .limit(100)
