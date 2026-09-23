@@ -36,6 +36,7 @@ export default function AdminClient({ user }) {
   const [rentalBookings, setRentalBookings] = useState([]);
   const [rentalBlocks, setRentalBlocks] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [projectDraft, setProjectDraft] = useState(null);
   const [projectStorySetupRequired, setProjectStorySetupRequired] = useState(false);
   const [users, setUsers] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(user?.id || "");
@@ -538,6 +539,15 @@ export default function AdminClient({ user }) {
             status={status}
             canUpdateOrders={canUpdateOrders}
             reload={load}
+            onCreateProject={canManageProducts?(order)=>{
+              setProjectDraft({
+                title:order.sourceQuoteTitle||"Oppdrag",
+                category:"",
+                description:"",
+                sourceOrderNumber:order.orderNumber||""
+              });
+              setTab("projects");
+            }:null}
           />
         )}
 
@@ -588,7 +598,7 @@ export default function AdminClient({ user }) {
         )}
 
         {tab === "projects" && canManageProducts && (
-          <Projects projects={projects} reload={load} setError={setError} storySetupRequired={projectStorySetupRequired} />
+          <Projects projects={projects} reload={load} setError={setError} storySetupRequired={projectStorySetupRequired} initialProject={projectDraft} clearInitialProject={()=>setProjectDraft(null)} />
         )}
 
         {tab === "homepage" && canManageProducts && (
@@ -726,7 +736,7 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
  </article>):<div className="card"><p>Ingen bestillinger ennå.</p></div>}</div></>;
 }
 
-function Jobs({orders,status,canUpdateOrders,reload}){
+function Jobs({orders,status,canUpdateOrders,reload,onCreateProject=null}){
  const [openId,setOpenId]=useState(null);
  const [savingId,setSavingId]=useState("");
  const [message,setMessage]=useState("");
@@ -812,6 +822,7 @@ function Jobs({orders,status,canUpdateOrders,reload}){
      </div>}
     </div>}
 
+    {order.status==="completed"&&onCreateProject&&<button className="btn" type="button" onClick={()=>onCreateProject(order)}>Lag referanseprosjekt</button>}
     {canUpdateOrders&&["completed","cancelled"].includes(order.status)&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>archive(order)}>{savingId===order.id?"Flytter …":"Arkiver oppdrag"}</button>}
    </article>)}
   </div>
@@ -3517,7 +3528,7 @@ function ServiceEditor({ service, reload, setError, close }) {
 }
 
 function RentalItems({items,blocks,reload,setError}){
- const [showNew,setShowNew]=useState(false);
+ const [showNew,setShowNew]=useState(Boolean(initialProject));
  const [block,setBlock]=useState({itemId:"",startDate:"",endDate:"",reason:""});
  async function addBlock(e){e.preventDefault();setError("");const r=await fetch("/api/admin/rental/blocks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(block)});const d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Perioden kunne ikke blokkeres.");return;}setBlock({itemId:"",startDate:"",endDate:"",reason:""});await reload();}
  async function removeBlock(id){const r=await fetch("/api/admin/rental/blocks",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});if(!r.ok){setError("Blokkeringen kunne ikke fjernes.");return;}await reload();}
@@ -3575,9 +3586,13 @@ function RentalBookings({bookings,reload,setError,canUpdate}){
 
 const projectStoryMigrationSql="alter table public.projects add column if not exists content_blocks jsonb not null default '[]'::jsonb;";
 
-function Projects({projects,reload,setError,storySetupRequired}){
+function Projects({projects,reload,setError,storySetupRequired,initialProject=null,clearInitialProject=()=>{}}){
  const [showNew,setShowNew]=useState(false);
  const [migrationCopied,setMigrationCopied]=useState(false);
+
+ useEffect(()=>{
+  if(initialProject)setShowNew(true);
+ },[initialProject]);
 
  async function copyProjectMigration(){
   try{
@@ -3603,9 +3618,9 @@ function Projects({projects,reload,setError,storySetupRequired}){
    <div>
     <p className="muted">Legg inn ekte bilder fra utførte jobber. Første bilde brukes som hovedbilde. Under «Prosjektfortelling» kan du blande bilder og tekst i akkurat den rekkefølgen kunden skal se dem.</p>
    </div>
-   <button className="btn" disabled={storySetupRequired} onClick={()=>setShowNew(!showNew)}>{showNew?"Avbryt":"Legg til oppdrag"}</button>
+   <button className="btn" disabled={storySetupRequired} onClick={()=>{if(showNew){setShowNew(false);clearInitialProject();}else setShowNew(true)}}>{showNew?"Avbryt":"Legg til oppdrag"}</button>
   </div>
-  {showNew&&<ProjectEditor project={null} reload={reload} setError={setError} close={()=>setShowNew(false)}/>}
+  {showNew&&<ProjectEditor project={null} initialProject={initialProject} reload={reload} setError={setError} close={()=>{setShowNew(false);clearInitialProject();}}/>}
   <div className="grid adminProjectsGrid">{projects.map(p=><ProjectEditor key={p.id} project={p} reload={reload} setError={setError} storySetupRequired={storySetupRequired}/>)}</div>
  </>;
 }
@@ -3619,16 +3634,16 @@ function defaultProjectBlocks(project){
  return (Array.isArray(project?.imageUrls)?project.imageUrls:[]).map(url=>({id:projectBlockId(),type:"image",url,caption:"",alt:""}));
 }
 
-function ProjectEditor({project,reload,setError,close,storySetupRequired=false}){
+function ProjectEditor({project,initialProject=null,reload,setError,close,storySetupRequired=false}){
  const isNew=!project;
  const [editing,setEditing]=useState(isNew);
  const [saving,setSaving]=useState(false);
  const [uploading,setUploading]=useState(false);
  const [previewing,setPreviewing]=useState(false);
  const [v,setV]=useState({
-  title:project?.title||"",
-  category:project?.category||"",
-  description:project?.description||"",
+  title:project?.title||initialProject?.title||"",
+  category:project?.category||initialProject?.category||"",
+  description:project?.description||initialProject?.description||"",
   imageUrls:Array.isArray(project?.imageUrls)?project.imageUrls:[],
   contentBlocks:defaultProjectBlocks(project),
   featured:project?.featured!==false,
@@ -3855,6 +3870,7 @@ function ProjectEditor({project,reload,setError,close,storySetupRequired=false})
 
  return <form className="card adminProjectEditor" onSubmit={save}>
   <div className="kicker">{isNew?"NYTT OPPDRAG":"REDIGER OPPDRAG"}</div>
+  {isNew&&initialProject?.sourceOrderNumber&&<div className="projectDraftSource">Hentet fra fullført oppdrag {initialProject.sourceOrderNumber}</div>}
   <h3>{isNew?"Nytt referanseprosjekt":v.title||"Oppdrag"}</h3>
 
   <div className="field"><label>Tittel</label><input required value={v.title} onChange={e=>set("title",e.target.value)} placeholder="F.eks. Terrasse og levegg"/></div>

@@ -2630,3 +2630,14 @@ body:has(.customerPage) .customerPage{
  font-size:10px;
  font-weight:800;
 }
+
+
+.projectDraftSource{
+ margin:10px 0 16px;
+ padding:10px 12px;
+ border-left:3px solid #cfa153;
+ background:rgba(207,161,83,.10);
+ color:#6f5426;
+ font-size:12px;
+ font-weight:800;
+}
