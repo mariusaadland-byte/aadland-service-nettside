@@ -56,7 +56,6 @@ export async function GET(req){
   planningUpdatedAt:o.job_planning_updated_at||null,
   confirmationSentAt:o.job_confirmation_sent_at||null,
   reminderSentAt:o.job_reminder_sent_at||null,
-  reminderSentAt:o.job_reminder_sent_at||null,
   quote:loaded.quote?{
    id:loaded.quote.id,
    quoteNumber:loaded.quote.quote_number,
