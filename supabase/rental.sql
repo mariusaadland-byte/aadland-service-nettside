@@ -24,6 +24,7 @@ alter table public.rental_bookings add column if not exists deposit_status text 
 alter table public.rental_bookings add column if not exists admin_note text;
 alter table public.rental_bookings add column if not exists confirmation_sent_at timestamptz;
 alter table public.rental_bookings add column if not exists cancellation_sent_at timestamptz;
+alter table public.rental_bookings add column if not exists reminder_sent_at timestamptz;
 alter table public.rental_bookings add column if not exists customer_user_id uuid references auth.users(id) on delete set null;
 alter table public.rental_items enable row level security; alter table public.rental_blocks enable row level security; alter table public.rental_bookings enable row level security;
 grant select,insert,update,delete on public.rental_items to service_role; grant select,insert,update,delete on public.rental_blocks to service_role; grant select,insert,update,delete on public.rental_bookings to service_role;
@@ -120,3 +121,10 @@ create index if not exists rental_items_category_idx on public.rental_items(cate
 create index if not exists rental_bookings_notification_idx
 on public.rental_bookings(status, start_date)
 where status in ('new','confirmed','cancelled');
+
+
+create index if not exists rental_bookings_reminder_due_idx
+on public.rental_bookings(start_date)
+where status='confirmed'
+  and confirmation_sent_at is not null
+  and reminder_sent_at is null;
