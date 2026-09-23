@@ -1124,6 +1124,7 @@ function ProductEditor({
 
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   function resetFromProduct() {
     if (!product) return;
@@ -1663,6 +1664,34 @@ function ProductEditor({
 
     await reload();
   }
+  async function removeProduct() {
+    if (!product) return;
+
+    const confirmed=window.confirm(
+      `Vil du slette produktet "${product.name}" permanent? Produktet kan ikke slettes dersom det finnes i tidligere bestillinger.`
+    );
+    if(!confirmed)return;
+
+    setDeleting(true);
+    setError("");
+
+    const response=await fetch("/api/admin/products",{
+      method:"DELETE",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({id:product.id})
+    });
+
+    const data=await response.json().catch(()=>({}));
+    setDeleting(false);
+
+    if(!response.ok){
+      setError(data.error||"Produktet kunne ikke slettes.");
+      return;
+    }
+
+    await reload();
+  }
+
 
   if (!editing && product) {
     const previewImage =
@@ -1755,6 +1784,16 @@ function ProductEditor({
             false
               ? "Vis produkt"
               : "Skjul produkt"}
+          </button>
+
+          <button
+            className="btn alt productDeleteButton"
+            type="button"
+            onClick={removeProduct}
+            disabled={saving||deleting}
+            title="Sletter bare produkter som ikke finnes i tidligere bestillinger."
+          >
+            {deleting?"Sletter…":"Slett permanent"}
           </button>
         </div>
       </div>
