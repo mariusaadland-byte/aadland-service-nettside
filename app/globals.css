@@ -2294,3 +2294,22 @@ body:has(.customerPage){
 body:has(.customerPage) .customerPage{
   background:#111!important;
 }
+
+
+/* Min side account settings */
+.customerAccountCard{display:grid;gap:18px;padding:22px}
+.customerAccountFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.customerAccountFacts span{display:grid;gap:4px;padding:13px 14px;border-radius:12px;background:#101010;border:1px solid rgba(255,255,255,.09)}
+.customerAccountFacts small{color:rgba(255,255,255,.48);font-size:11px}
+.customerAccountFacts b{overflow-wrap:anywhere}
+.customerAccountActions{display:flex;gap:10px;flex-wrap:wrap}
+.customerAccountForm{grid-template-columns:repeat(2,minmax(0,1fr))}
+.customerAccountForm .customerAccountActions{grid-column:1/-1}
+.customerAccountForm .field input:disabled{opacity:.62;cursor:not-allowed}
+.customerEditProfileButton{padding:10px 17px!important}
+@media(max-width:700px){
+ .customerAccountFacts,.customerAccountForm{grid-template-columns:1fr}
+ .customerAccountForm .customerAccountActions{grid-column:auto}
+ .customerAccountActions{display:grid;grid-template-columns:1fr}
+ .customerAccountActions .btn{text-align:center}
+}
