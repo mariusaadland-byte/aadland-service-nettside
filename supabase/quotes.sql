@@ -20,6 +20,7 @@ create table if not exists public.quotes (
   notes text,
   terms text,
   valid_until date,
+  planned_start_date date,
   source_order_id uuid references public.orders(id) on delete set null,
   created_by uuid references public.admin_users(id) on delete set null,
   sent_at timestamptz,
@@ -53,3 +54,6 @@ $$;
 
 revoke all on function public.next_quote_number() from public,anon,authenticated;
 grant execute on function public.next_quote_number() to service_role;
+
+
+alter table public.quotes add column if not exists planned_start_date date;
