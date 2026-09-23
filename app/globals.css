@@ -1980,3 +1980,167 @@ html{scroll-behavior:smooth}
  .customerJobPaymentPlan>div{align-items:flex-start;flex-direction:column}
  .customerJobStart b{font-size:18px}
 }
+
+
+/* Final homepage section consistency: desktop follows the approved black/gold mobile direction */
+.servicesSection,
+.projectsSection{
+  background:#111!important;
+  color:#fff!important;
+}
+.servicesSection .goldLabel,
+.projectsSection .goldLabel{
+  color:#d7a74e!important;
+}
+.servicesSection .servicesHeader h2,
+.projectsSection .projectsHeader h2{
+  color:#fff!important;
+}
+.servicesSection .textLink,
+.projectsSection .textLink{
+  color:#d7a74e!important;
+  text-decoration:none!important;
+}
+
+/* Services: one consistent card system, no 3+2 staggered desktop composition */
+.servicesSection .serviceCards{
+  display:grid!important;
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;
+  gap:14px!important;
+  align-items:stretch!important;
+}
+.servicesSection .serviceCard,
+.servicesSection .serviceCard0,
+.servicesSection .serviceCard1,
+.servicesSection .serviceCard2,
+.servicesSection .serviceCard3,
+.servicesSection .serviceCard4{
+  grid-column:auto!important;
+  display:flex!important;
+  flex-direction:column!important;
+  min-width:0!important;
+  background:#181818!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  box-shadow:none!important;
+}
+.servicesSection .serviceCard:hover{
+  transform:translateY(-3px)!important;
+  border-color:rgba(215,167,78,.55)!important;
+  box-shadow:0 16px 34px rgba(0,0,0,.24)!important;
+}
+.servicesSection .serviceVisual{
+  width:100%!important;
+  height:auto!important;
+  min-height:190px!important;
+  aspect-ratio:4/3!important;
+  flex:0 0 auto!important;
+  background-size:cover!important;
+  background-position:center!important;
+}
+.servicesSection .serviceText,
+.servicesSection .serviceContent{
+  display:flex!important;
+  flex:1!important;
+  flex-direction:column!important;
+  padding:18px 18px 20px!important;
+  background:#181818!important;
+}
+.servicesSection .serviceText h3,
+.servicesSection .serviceContent h3{
+  color:#fff!important;
+  font-size:18px!important;
+  line-height:1.18!important;
+  margin:0 0 8px!important;
+}
+.servicesSection .serviceText p,
+.servicesSection .serviceContent p{
+  display:block!important;
+  min-height:0!important;
+  margin:0 0 16px!important;
+  color:rgba(255,255,255,.64)!important;
+  font-size:12px!important;
+  line-height:1.55!important;
+}
+.servicesSection .serviceText a,
+.servicesSection .serviceContent a{
+  margin-top:auto!important;
+  color:#d7a74e!important;
+  font-size:10px!important;
+  letter-spacing:.08em!important;
+  text-transform:uppercase!important;
+}
+
+/* Projects: same dark section language as mobile, with an even desktop grid */
+.projectsSection .projectGrid{
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  grid-template-rows:none!important;
+  gap:14px!important;
+}
+.projectsSection .projectCard{
+  min-height:300px!important;
+  background-color:#181818!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  box-shadow:none!important;
+}
+.projectsSection .projectCard:hover{
+  transform:translateY(-3px)!important;
+  border-color:rgba(215,167,78,.55)!important;
+  box-shadow:0 16px 34px rgba(0,0,0,.24)!important;
+}
+.projectsSection .projectCaption{
+  color:#fff!important;
+}
+.projectsSection .projectCaption p{
+  color:rgba(255,255,255,.68)!important;
+}
+
+/* Tablet keeps the same visual build, only changes column count */
+@media(max-width:1100px){
+  .servicesSection .serviceCards{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+  .servicesSection .serviceCard5{
+    grid-column:auto!important;
+  }
+  .projectsSection .projectGrid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+}
+
+/* Mobile keeps the same dark cards and stacks the service cards */
+@media(max-width:700px){
+  .servicesSection,
+  .projectsSection{
+    background:#111!important;
+  }
+  .servicesSection .serviceCards{
+    grid-template-columns:1fr!important;
+    gap:14px!important;
+  }
+  .servicesSection .serviceCard,
+  .servicesSection .serviceCards .serviceCard:nth-child(5){
+    grid-column:auto!important;
+    display:flex!important;
+    grid-template-columns:none!important;
+  }
+  .servicesSection .serviceVisual{
+    min-height:190px!important;
+    aspect-ratio:16/10!important;
+  }
+  .servicesSection .serviceText,
+  .servicesSection .serviceContent{
+    padding:17px!important;
+  }
+  .servicesSection .serviceText p,
+  .servicesSection .serviceContent p{
+    display:block!important;
+  }
+  .projectsSection .projectGrid{
+    grid-template-columns:1fr 1fr!important;
+    gap:9px!important;
+  }
+  .projectsSection .projectCard{
+    min-height:190px!important;
+  }
+}
