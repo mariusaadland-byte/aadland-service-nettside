@@ -2,6 +2,10 @@ import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {verifyQuoteToken} from "../../../../lib/quoteLinks";
 
+function esc(value){
+ return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
+}
+
 function mapQuote(q){
  return {
   id:q.id,
@@ -85,22 +89,62 @@ export async function POST(req,{params}){
    const resend=new Resend(resendKey);
    const from="Aadland Service <post@aadland-service.no>";
    const to="post@aadland-service.no";
+   const customerEmail=String(data.customer?.email||"").trim().toLowerCase();
    const customerName=String(data.customer?.name||"Kunde");
    const accepted=action==="accept";
+   const totalText=new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(data.total_inc_vat_ore)||0)/100);
    await resend.emails.send({
     from,
     to,
-    replyTo:String(data.customer?.email||"").trim()||undefined,
+    replyTo:customerEmail||undefined,
     subject:(accepted?"Tilbud godkjent – ":"Tilbud avslått – ")+data.quote_number,
     text:[
      customerName+" har "+(accepted?"godkjent":"avslått")+" tilbud "+data.quote_number+".",
      "",
      "Tilbud: "+data.title,
-     "Total inkl. MVA: "+new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(data.total_inc_vat_ore)||0)/100),
+     "Total inkl. MVA: "+totalText,
      data.customer?.phone?"Telefon: "+data.customer.phone:"",
-     data.customer?.email?"E-post: "+data.customer.email:""
+     customerEmail?"E-post: "+customerEmail:""
     ].filter(Boolean).join("\n")
    });
+
+   if(customerEmail){
+    const requestOrigin=new URL(req.url).origin;
+    const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
+    const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
+    let hasCustomerAccount=false;
+    try{
+     const {data:profile}=await loaded.s.from("customer_profiles").select("id").eq("email",customerEmail).maybeSingle();
+     hasCustomerAccount=Boolean(profile?.id);
+    }catch{}
+    const minSideUrl=base+"/min-side";
+    const plannedStart=data.planned_start_date?new Date(data.planned_start_date+"T12:00:00").toLocaleDateString("nb-NO"):"";
+    const customerHtml=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111;padding:28px 12px"><tr><td align="center">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#181818;border:1px solid #34312b">
+<tr><td style="padding:28px 30px;background:#0d0d0d;color:#fff"><div style="font-size:18px;font-weight:900;letter-spacing:.13em">AADLAND SERVICE</div><div style="margin-top:5px;color:#d9b365;font-size:11px;letter-spacing:.08em">TILBUD ${esc(data.quote_number)}</div></td></tr>
+<tr><td style="padding:30px">
+<div style="color:#d9b365;font-size:11px;font-weight:800;letter-spacing:.12em">${accepted?"GODKJENT":"AVSLÅTT"}</div>
+<h1 style="font-size:27px;line-height:1.15;margin:9px 0 14px;color:#fff">${accepted?"Takk – tilbudet er godkjent":"Tilbakemeldingen er registrert"}</h1>
+<p style="color:#c9c3b8;line-height:1.65;margin:0 0 20px">Hei ${esc(customerName)}. ${accepted?"Vi har registrert at du har godkjent tilbudet om "+esc(data.title)+". Vi tar kontakt om videre plan og endelig oppstart.":"Vi har registrert at du har avslått tilbudet om "+esc(data.title)+". Takk for tilbakemeldingen."}</p>
+<div style="padding:16px;background:#101010;border:1px solid #2d2d2d">
+<div style="color:#8e887f;font-size:11px">Total inkl. MVA</div><div style="margin-top:5px;color:#fff;font-size:22px;font-weight:900">${esc(totalText)}</div>
+${accepted&&plannedStart?`<div style="margin-top:12px;color:#8e887f;font-size:11px">Tidligst oppstart</div><div style="margin-top:4px;color:#fff;font-weight:800">${esc(plannedStart)}</div>`:""}
+</div>
+${hasCustomerAccount?`<a href="${esc(minSideUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:""}
+<p style="margin:24px 0 0;color:#8e887f;font-size:11px;line-height:1.55">${accepted?"Du kan svare direkte på denne e-posten dersom noe må avklares før oppstart.":"Hvis du ønsker å ta opp tilbudet igjen senere, kan du svare direkte på denne e-posten."}</p>
+</td></tr>
+<tr><td style="padding:18px 30px;border-top:1px solid #34312b;color:#8e887f;font-size:11px">Aadland Service · 471 54 898 · post@aadland-service.no</td></tr>
+</table></td></tr></table></body></html>`;
+
+    await resend.emails.send({
+     from,
+     to:customerEmail,
+     replyTo:"post@aadland-service.no",
+     subject:accepted?"Bekreftelse: tilbud "+data.quote_number+" er godkjent":"Bekreftelse: tilbud "+data.quote_number+" er avslått",
+     html:customerHtml
+    });
+   }
   }catch(notificationError){
    console.error("QUOTE RESPONSE NOTIFICATION ERROR",notificationError);
   }
