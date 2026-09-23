@@ -4,6 +4,7 @@ import {getCustomerUserId} from "../../../lib/customer-auth";
 import {db,fromDbProduct} from "../../../lib/supabase";
 import {productPrice} from "../../../lib/catalog";
 function num(){return "AS-"+Date.now().toString().slice(-8)+"-"+crypto.randomBytes(2).toString("hex").toUpperCase()}
+function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 export async function POST(req){
  try{
   const body=await req.json();
@@ -54,7 +55,52 @@ export async function POST(req){
    const {error:orderError}=await s.from("orders").insert(record);
    if(orderError)throw orderError;
   }
-  if(process.env.RESEND_API_KEY){try{const {Resend}=await import("resend");const resend=new Resend(process.env.RESEND_API_KEY),from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>",replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";if(process.env.ORDER_EMAIL_TO)await resend.emails.send({from,to:process.env.ORDER_EMAIL_TO,replyTo,subject:`Ny bestilling ${orderNumber}`,text:`Ny bestilling fra ${safeCustomer.name}\nTelefon: ${safeCustomer.phone}\nE-post: ${safeCustomer.email}\nOrdre: ${orderNumber}`});await resend.emails.send({from,to:body.customer.email,replyTo,subject:body.orderType==="custom"?"Vi har mottatt forespørselen din":"Ordrebekreftelse "+orderNumber,text:body.orderType==="custom"?`Hei ${body.customer.name}!\n\nVi har mottatt forespørselen din hos Aadland Service. Referanse: ${orderNumber}.\nVi tar kontakt så snart vi kan.\n\nAadland Service\npost@aadland-service.no`:`Hei ${body.customer.name}!\n\nTakk for bestillingen. Ordrenummer: ${orderNumber}.\nSum: ${(total/100).toLocaleString("nb-NO")} kr.\nDette er en ordrebekreftelse. Kvittering sendes når betalingen senere er registrert/trukket.\n\nAadland Service\npost@aadland-service.no`})}catch(e){console.error("E-postfeil",e)}}
+  if(process.env.RESEND_API_KEY){
+   try{
+    const {Resend}=await import("resend");
+    const resend=new Resend(process.env.RESEND_API_KEY);
+    const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
+    const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+    const isCustom=body.orderType==="custom";
+    const requestOrigin=new URL(req.url).origin;
+    const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
+    const accountUrl=customerUserId?(configuredOrigin||requestOrigin)+"/min-side":"";
+    const title=isCustom?"Forespørselen er mottatt":"Bestillingen er mottatt";
+    const intro=isCustom
+     ?"Vi har mottatt forespørselen din og tar kontakt så snart vi kan."
+     :"Takk for bestillingen. Vi tar kontakt dersom noe må avklares før levering eller henting.";
+    const totalText=(total/100).toLocaleString("nb-NO",{minimumFractionDigits:0,maximumFractionDigits:2})+" kr";
+    const customerHtml=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111;padding:28px 12px"><tr><td align="center">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#181818;border:1px solid #34312b">
+<tr><td style="padding:28px 30px;background:#0d0d0d;color:#fff"><div style="font-size:18px;font-weight:900;letter-spacing:.13em">AADLAND SERVICE</div><div style="margin-top:5px;color:#d9b365;font-size:11px;letter-spacing:.08em">${isCustom?"FORESPØRSEL":"BESTILLING"}</div></td></tr>
+<tr><td style="padding:30px">
+<div style="color:#d9b365;font-size:11px;font-weight:800;letter-spacing:.12em">${esc(orderNumber)}</div>
+<h1 style="font-size:27px;line-height:1.15;margin:9px 0 14px;color:#fff">${title}</h1>
+<p style="color:#c9c3b8;line-height:1.65;margin:0 0 20px">Hei ${esc(safeCustomer.name)}! ${intro}</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#101010;border:1px solid #2d2d2d">
+<tr><td style="padding:12px 14px;color:#8e887f;font-size:11px">Referanse</td><td style="padding:12px 14px;color:#fff;font-weight:700;text-align:right">${esc(orderNumber)}</td></tr>
+${!isCustom?`<tr><td style="padding:12px 14px;color:#8e887f;font-size:11px;border-top:1px solid #2d2d2d">Sum</td><td style="padding:12px 14px;color:#fff;font-weight:700;text-align:right;border-top:1px solid #2d2d2d">${esc(totalText)}</td></tr>`:""}
+</table>
+${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:""}
+<p style="margin:22px 0 0;color:#8e887f;font-size:11px;line-height:1.55">${isCustom?"Vi tar kontakt videre om forespørselen.":"Dette er en ordrebekreftelse. Kvittering sendes når betalingen senere er registrert/trukket."}</p>
+</td></tr>
+<tr><td style="padding:18px 30px;border-top:1px solid #34312b;color:#8e887f;font-size:11px">Aadland Service · 471 54 898 · post@aadland-service.no</td></tr>
+</table></td></tr></table></body></html>`;
+    if(process.env.ORDER_EMAIL_TO){
+     await resend.emails.send({
+      from,to:process.env.ORDER_EMAIL_TO,replyTo,
+      subject:(isCustom?"Ny forespørsel ":"Ny bestilling ")+orderNumber,
+      text:`Fra: ${safeCustomer.name}\nTelefon: ${safeCustomer.phone}\nE-post: ${safeCustomer.email}\nReferanse: ${orderNumber}`
+     });
+    }
+    await resend.emails.send({
+     from,to:safeCustomer.email,replyTo,
+     subject:isCustom?"Vi har mottatt forespørselen din":"Ordrebekreftelse "+orderNumber,
+     html:customerHtml
+    });
+   }catch(e){console.error("E-postfeil",e)}
+  }
   return NextResponse.json({orderNumber,message:"Takk! Vi tar kontakt for å bekrefte bestillingen."});
  }catch(e){console.error(e);return NextResponse.json({error:"Bestillingen kunne ikke lagres."},{status:500})}
 }
