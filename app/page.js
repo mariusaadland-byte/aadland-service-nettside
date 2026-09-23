@@ -51,6 +51,7 @@ function serviceHref(service){
 
 export default function Home(){
  const [customer,setCustomer]=useState(emptyCustomer);
+ const [customerAccount,setCustomerAccount]=useState(null);
  const [custom,setCustom]=useState("");
  const [message,setMessage]=useState(null);
  const [error,setError]=useState("");
@@ -62,6 +63,28 @@ export default function Home(){
  const [apiServices,setApiServices]=useState(null);
  const [apiProjects,setApiProjects]=useState([]);
  const [siteSettings,setSiteSettings]=useState({heroEyebrow:"BYGG · RENOVERING · UTEOMRÅDER · VEDLIKEHOLD",heroTitle:"Kvalitet som varer.",seasonalTitle:"",seasonalText:"",seasonalCtaLabel:"",seasonalCtaHref:"",seasonalFrom:null,seasonalUntil:null,showSeasonal:false,heroText:"Aadland Service leverer solide løsninger innen bygg, oppussing, vedlikehold og uteområder. Vi kombinerer fagkunnskap, nøyaktighet og god oppfølging – tilpasset dine behov.",aboutTitle:"Lokalt håndverk med stolthet.",aboutText:"Vi hjelper med oppussing, vedlikehold, uteområder og spesialtilpassede løsninger. Målet er enkelt: ryddig kommunikasjon, praktiske valg og et resultat du kan være fornøyd med.",phone:"471 54 898",email:"post@aadland-service.no",orgNumber:"937 781 873 MVA",location:"Bergen og omegn",showServices:true,showProjects:true,showAbout:true,showSurvey:true});
+ useEffect(()=>{
+  fetch("/api/customer/profile")
+   .then(async response=>{
+    if(response.status===401)return null;
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)return null;
+    return data.customer||null;
+   })
+   .then(profile=>{
+    if(!profile)return;
+    setCustomerAccount(profile);
+    setCustomer(current=>({
+     ...current,
+     name:current.name||profile.name||"",
+     email:current.email||profile.email||"",
+     phone:current.phone||profile.phone||"",
+     address:current.address||profile.address||""
+    }));
+   })
+   .catch(()=>{});
+ },[]);
+
  useEffect(()=>{
   const storedService=sessionStorage.getItem("aadland-service");
   if(storedService){
@@ -118,7 +141,13 @@ export default function Home(){
    const response=await fetch("/api/orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({orderType:"custom",customRequest:requestText,customer,fulfillmentType:"pickup",deliveryWithinRadius:customer.deliveryWithinRadius})});
    const data=await response.json();
    if(!response.ok){setError(data.error||"Noe gikk galt.");return;}
-   setMessage(data);setCustom("");setCustomer(emptyCustomer);setContactImages([]);setImageError("");setSelectedService("");
+   setMessage(data);setCustom("");setCustomer(customerAccount?{
+    ...emptyCustomer,
+    name:customerAccount.name||"",
+    email:customerAccount.email||"",
+    phone:customerAccount.phone||"",
+    address:customerAccount.address||""
+   }:emptyCustomer);setContactImages([]);setImageError("");setSelectedService("");
   }catch{setError("Noe gikk galt. Prøv igjen.");}finally{setSending(false);}
  }
 
@@ -183,8 +212,9 @@ export default function Home(){
   {siteSettings.showSurvey!==false&&<section id="befaring" className="contactSection"><div className="contactPhoto" aria-hidden="true"></div><div className="contactShade" aria-hidden="true"></div><div className="homeWrap contactGrid">
    <div className="contactCopy"><span className="goldLabel">KONTAKT OSS</span><h2>Har du et prosjekt<br/>i tankene?</h2><p>Beskriv hva du ønsker hjelp med. Befaringen er gratis og uforpliktende, og vi tar kontakt for å finne et tidspunkt som passer.</p><div className="contactBenefits"><span><b aria-hidden="true">✓</b>Gratis og uforpliktende befaring</span><span><b aria-hidden="true">✓</b>Rask tilbakemelding</span><span><b aria-hidden="true">✓</b>Bergen og omegn</span></div><div className="contactDetails"><a href={"tel:"+siteSettings.phone.replace(/\s/g,"")}>{siteSettings.phone}</a><a href={"mailto:"+siteSettings.email}>{siteSettings.email}</a></div></div>
    <form className="homeForm" onSubmit={customOrder} aria-busy={sending}>
+    {customerAccount&&<p className="customerPrefillNote">✓ Kontaktopplysninger er hentet fra Min side. Du kan endre dem for denne forespørselen.</p>}
     <Field label="Hva gjelder det? *"><select required value={selectedService} onChange={e=>setSelectedService(e.target.value)}><option value="">Velg tjeneste</option>{services.filter(service=>service.kind!=="products"&&service.kind!=="rental").map(service=><option key={service.slug} value={service.title}>{service.title}</option>)}<option value="Annet">Annet</option></select></Field>
-    {message&&<div className="success"><b>Forespørselen er mottatt</b>{message.orderNumber&&<p>Ordrenummer: {message.orderNumber}</p>}</div>}
+    {message&&<div className="success"><b>Forespørselen er mottatt</b>{message.orderNumber&&<p>Ordrenummer: {message.orderNumber}</p>}{customerAccount&&<p><a href="/min-side">Se forespørselen på Min side →</a></p>}</div>}
     <div className="formTwo"><Field label="Navn *"><input autoComplete="name" required value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})}/></Field><Field label="Telefon *"><input type="tel" autoComplete="tel" required value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})}/></Field></div>
     <Field label="E-post *"><input type="email" autoComplete="email" required value={customer.email} onChange={e=>setCustomer({...customer,email:e.target.value})}/></Field>
     <Field label="Adresse"><input autoComplete="street-address" value={customer.address} onChange={e=>setCustomer({...customer,address:e.target.value})} placeholder="Adresse for prosjektet"/></Field>
