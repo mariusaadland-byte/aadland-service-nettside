@@ -753,3 +753,16 @@ where order_type='custom'
   and job_confirmation_sent_at is not null
   and job_reminder_sent_at is null
   and archived_at is null;
+
+
+-- ============================================================
+-- supabase/rental_notifications.sql
+-- ============================================================
+
+alter table public.rental_bookings
+ add column if not exists confirmation_sent_at timestamptz,
+ add column if not exists cancellation_sent_at timestamptz;
+
+create index if not exists rental_bookings_notification_idx
+on public.rental_bookings(status, start_date)
+where status in ('new','confirmed','cancelled');
