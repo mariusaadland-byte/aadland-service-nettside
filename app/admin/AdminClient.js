@@ -575,6 +575,16 @@ function Archive({orders,reload,setError,canUpdate}){
  return <div className="orderCards">{archived.length?archived.map(o=><article className="card orderCard" key={o.id}><div className="kicker">{o.orderNumber}</div><h3>{o.customerName||"Ukjent kunde"}</h3><p>{o.orderType==="custom"?(o.sourceQuoteId?"Oppdrag":"Befaring/forespørsel"):"Bestilling"} · {nok(o.totalOre||0)}<br/><small className="muted">Arkivert {new Date(o.archivedAt).toLocaleString("nb-NO")}</small></p>{canUpdate&&<button className="btn alt" onClick={()=>restore(o.id)}>Gjenopprett</button>}</article>):<div className="card"><h3>Arkivet er tomt</h3><p className="muted">Ferdige eller avbrutte saker kan flyttes hit uten at historikken slettes.</p></div>}</div>
 }
 
+function customerQuoteHref(customer){
+ const params=new URLSearchParams();
+ if(customer?.name)params.set("name",customer.name);
+ if(customer?.email)params.set("email",customer.email);
+ if(customer?.phone)params.set("phone",customer.phone);
+ if(customer?.address)params.set("address",customer.address);
+ const query=params.toString();
+ return "/admin/tilbud/ny"+(query?"?"+query:"");
+}
+
 function Customers({orders,bookings,profiles,quotes}) {
   const [query,setQuery]=useState("");
   const [accountFilter,setAccountFilter]=useState("all");
@@ -634,7 +644,7 @@ function Customers({orders,bookings,profiles,quotes}) {
    .filter(c=>accountFilter==="all"||(accountFilter==="account"?c.hasAccount:!c.hasAccount))
    .sort((x,y)=>String(y.lastDate||"").localeCompare(String(x.lastDate||"")));
   return <><div className="card customerSearch"><div className="kicker">KUNDEREGISTER</div><h3>{customers.size} kunder fra kundekonto, tilbud, bestillinger, befaringer og utleie</h3><div className="customerSearchControls"><div className="field"><label>Søk</label><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Navn, e-post, telefon eller adresse"/></div><div className="field"><label>Kundekonto</label><select value={accountFilter} onChange={e=>setAccountFilter(e.target.value)}><option value="all">Alle kunder</option><option value="account">Har kundekonto</option><option value="guest">Uten kundekonto</option></select></div></div></div>
-  <div className="grid customerGrid">{list.map((c,i)=><article className="card" key={(c.email||c.phone||c.name)+i}><div className="customerAdminCardTop"><h3>{c.name}</h3>{c.hasAccount&&<span className="customerAccountBadge">Kundekonto</span>}</div><p>{c.phone&&<><a href={"tel:"+c.phone}>{c.phone}</a><br/></>}{c.email&&<><a href={"mailto:"+c.email}>{c.email}</a><br/></>}{c.address}</p><p><b>{c.quotes}</b> tilbud · <b>{c.orders}</b> bestilling/befaring · <b>{c.rentals}</b> utleie<br/>Registrert verdi: <b>{nok(c.totalOre)}</b>{c.accountCreatedAt&&<><br/><small className="muted">Kundekonto opprettet {new Date(c.accountCreatedAt).toLocaleDateString("nb-NO")}</small></>}</p><details><summary>Vis historikk ({c.history.length})</summary>{c.history.sort((x,y)=>String(y.date||"").localeCompare(String(x.date||""))).map((h,j)=><div key={h.number+j} className="customerHistory"><b>{h.label}</b> · {h.number}<br/><small>{h.date?new Date(h.date).toLocaleString("nb-NO"):""} · {nok(h.totalOre||0)}</small></div>)}</details></article>)}</div>{!list.length&&<div className="card"><p>Ingen kunder funnet.</p></div>}</>;
+  <div className="grid customerGrid">{list.map((c,i)=><article className="card" key={(c.email||c.phone||c.name)+i}><div className="customerAdminCardTop"><h3>{c.name}</h3>{c.hasAccount&&<span className="customerAccountBadge">Kundekonto</span>}</div><p>{c.phone&&<><a href={"tel:"+c.phone}>{c.phone}</a><br/></>}{c.email&&<><a href={"mailto:"+c.email}>{c.email}</a><br/></>}{c.address}</p><p><b>{c.quotes}</b> tilbud · <b>{c.orders}</b> bestilling/befaring · <b>{c.rentals}</b> utleie<br/>Registrert verdi: <b>{nok(c.totalOre)}</b>{c.accountCreatedAt&&<><br/><small className="muted">Kundekonto opprettet {new Date(c.accountCreatedAt).toLocaleDateString("nb-NO")}</small></>}</p><div className="customerAdminActions"><a className="btn alt" href={customerQuoteHref(c)}>Nytt tilbud</a>{c.email&&<a className="btn alt" href={"mailto:"+c.email}>Send e-post</a>}</div><details><summary>Vis historikk ({c.history.length})</summary>{c.history.sort((x,y)=>String(y.date||"").localeCompare(String(x.date||""))).map((h,j)=><div key={h.number+j} className="customerHistory"><b>{h.label}</b> · {h.number}<br/><small>{h.date?new Date(h.date).toLocaleString("nb-NO"):""} · {nok(h.totalOre||0)}</small></div>)}</details></article>)}</div>{!list.length&&<div className="card"><p>Ingen kunder funnet.</p></div>}</>;
 }
 
 function Orders({ orders, status, canUpdateOrders, reload }) {
