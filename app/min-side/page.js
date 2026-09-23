@@ -131,7 +131,7 @@ export default function MinSide(){
       <div className="customerCardMeta">
        <span><small>Total inkl. MVA</small><b>{kr(q.totalIncVatOre)}</b></span>
        <span><small>{q.validUntil?"Gyldig til":"Sendt"}</small><b>{q.validUntil?date(q.validUntil):dateTime(q.sentAt||q.createdAt)}</b></span>
-       {q.plannedStartDate&&<span><small>Planlagt oppstart</small><b>{date(q.plannedStartDate)}</b></span>}
+       {q.plannedStartDate&&<span><small>Tidligst oppstart</small><b>{date(q.plannedStartDate)}</b></span>}
       </div>
       {status==="accepted"&&<p className="customerQuoteMessage">Tilbudet er godkjent.</p>}
       {status==="declined"&&<p className="customerQuoteMessage">Tilbudet er avslått.</p>}
