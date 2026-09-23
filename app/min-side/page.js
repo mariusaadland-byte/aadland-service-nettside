@@ -6,7 +6,9 @@ import Link from "next/link";
 const orderStatus={new:"Mottatt",confirmed:"Bekreftet",processing:"Under behandling",in_progress:"Under arbeid",ready:"Klar",completed:"Fullført",cancelled:"Kansellert"};
 const rentalStatus={new:"Mottatt",confirmed:"Bekreftet",active:"Pågående",returned:"Returnert",completed:"Fullført",cancelled:"Kansellert"};
 const quoteStatus={sent:"Sendt",accepted:"Godkjent",declined:"Avslått",expired:"Utløpt",cancelled:"Avbrutt"};
-const paymentStatus={unpaid:"Ikke betalt",pending:"Avventer betaling",authorized:"Reservert",paid:"Betalt",refunded:"Refundert"};
+const paymentStatus={unpaid:"Ikke betalt",pending:"Avventer betaling",authorized:"Reservert",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert"};
+const depositStatus={not_paid:"Ikke mottatt",held:"Holdes",released:"Frigitt",partially_charged:"Delvis trukket",charged:"Trukket"};
+const fulfillmentStatus={pickup:"Henting",delivery:"Levering",shipping:"Post / Bring"};
 
 const date=v=>v?new Intl.DateTimeFormat("nb-NO").format(new Date(v+"T12:00:00")):"";
 const dateTime=v=>v?new Intl.DateTimeFormat("nb-NO",{dateStyle:"medium"}).format(new Date(v)):"";
@@ -304,8 +306,17 @@ export default function MinSide(){
    <div className="customerSectionHead"><div><div className="kicker">HANDEL</div><h2>Bestillinger</h2></div><span>{purchases.length}</span></div>
    {!purchases.length?<div className="card customerEmpty"><p>Ingen produktbestillinger knyttet til kontoen ennå.</p></div>:
    <div className="customerGrid">{purchases.map(o=><article className="card customerHistoryCard" key={o.id}>
-    <div className="customerCardTop"><div><small>{o.order_number}</small><h3>Bestilling</h3></div><span className="customerStatus">{orderStatus[o.status]||o.status}</span></div>
-    <div className="customerCardMeta"><span><small>Sum</small><b>{kr(o.total_ore)}</b></span><span><small>Betaling</small><b>{paymentStatus[o.payment_status]||o.payment_status||"Ikke registrert"}</b></span></div>
+    <div className="customerCardTop"><div><small>{o.order_number}</small><h3>Bestilling</h3><p className="customerHistoryDate">Bestilt {dateTime(o.created_at)}</p></div><span className="customerStatus">{orderStatus[o.status]||o.status}</span></div>
+    {Array.isArray(o.items)&&o.items.length>0&&<div className="customerItemList">
+     {o.items.slice(0,6).map((item,index)=><div key={(item.productId||item.name||"item")+"-"+index}><span><b>{item.name||"Produkt"}</b><small>Antall {item.quantity||1}</small></span><strong>{kr((Number(item.unitPriceOre)||0)*(Number(item.quantity)||1))}</strong></div>)}
+     {o.items.length>6&&<small>+ {o.items.length-6} flere varelinjer</small>}
+    </div>}
+    <div className="customerCardMeta">
+     <span><small>Sum</small><b>{kr(o.total_ore)}</b></span>
+     <span><small>Betaling</small><b>{paymentStatus[o.payment_status]||o.payment_status||"Ikke registrert"}</b></span>
+     <span><small>Levering</small><b>{fulfillmentStatus[o.fulfillment_type]||o.fulfillment_type||"Ikke registrert"}</b></span>
+     {Number(o.shipping_ore)>0&&<span><small>Frakt</small><b>{kr(o.shipping_ore)}</b></span>}
+    </div>
    </article>)}</div>}
   </section>
 
@@ -313,8 +324,14 @@ export default function MinSide(){
    <div className="customerSectionHead"><div><div className="kicker">UTLEIE</div><h2>Utleie</h2></div><span>{data.rentals.length}</span></div>
    {!data.rentals.length?<div className="card customerEmpty"><p>Ingen utleier knyttet til kontoen ennå.</p></div>:
    <div className="customerGrid">{data.rentals.map(r=><article className="card customerHistoryCard" key={r.id}>
-    <div className="customerCardTop"><div><small>{r.booking_number}</small><h3>{r.rental_items?.name||"Utleie"}</h3></div><span className="customerStatus">{rentalStatus[r.status]||r.status}</span></div>
-    <div className="customerCardMeta"><span><small>Periode</small><b>{date(r.start_date)} – {date(r.end_date)}</b></span><span><small>Sum</small><b>{kr(r.total_ore)}</b></span></div>
+    <div className="customerCardTop"><div><small>{r.booking_number}</small><h3>{r.rental_items?.name||"Utleie"}</h3><p className="customerHistoryDate">Booket {dateTime(r.created_at)}</p></div><span className="customerStatus">{rentalStatus[r.status]||r.status}</span></div>
+    <div className="customerCardMeta">
+     <span><small>Periode</small><b>{date(r.start_date)} – {date(r.end_date)}</b></span>
+     <span><small>Leiepris</small><b>{kr(r.total_ore)}</b></span>
+     <span><small>Betaling</small><b>{paymentStatus[r.payment_status]||r.payment_status||"Ikke registrert"}</b></span>
+     <span><small>Utlevering</small><b>{fulfillmentStatus[r.customer?.fulfillment]||"Ikke registrert"}</b></span>
+     {Number(r.deposit_ore)>0&&<span><small>Depositum</small><b>{kr(r.deposit_ore)} · {depositStatus[r.deposit_status]||r.deposit_status||"Ikke registrert"}</b></span>}
+    </div>
    </article>)}</div>}
   </section>
  </main>;
