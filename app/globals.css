@@ -1779,14 +1779,17 @@ html{scroll-behavior:smooth}
  .quoteFormGrid{grid-template-columns:1fr}
  .quoteSectionHead{align-items:stretch;flex-direction:column}
  .quoteSectionHead>div:last-child{display:grid;grid-template-columns:1fr 1fr}
- .quoteLineEditor{grid-template-columns:34px minmax(112px,.7fr) minmax(0,1.5fr);gap:9px}
- .quoteLineDescription{grid-column:2/3}
- .quoteLineEditor .field{grid-column:auto}
- .quoteLineQuantity{grid-column:2/3;min-width:112px}
- .quoteLineVat{grid-column:2/3;min-width:112px}
- .quoteLineQuantity input,.quoteLineVat select{width:100%;min-width:112px}
- .quoteLineTotal{grid-column:3/4}
- .quoteLineRemove{grid-column:3/4;justify-self:end}
+ .quoteLineEditor{grid-template-columns:minmax(108px,.85fr) minmax(0,1fr) minmax(0,1.25fr);gap:9px}
+ .quoteLineNumber{grid-column:1/2;grid-row:1;justify-self:start}
+ .quoteLineDescription{grid-column:2/3;grid-row:1}
+ .quoteLineType{grid-column:3/4;grid-row:1}
+ .quoteLineQuantity{grid-column:1/2;grid-row:2;min-width:0}
+ .quoteLineUnit{grid-column:2/3;grid-row:2}
+ .quoteLinePrice{grid-column:3/4;grid-row:2}
+ .quoteLineVat{grid-column:1/2;grid-row:3;min-width:0}
+ .quoteLineQuantity input,.quoteLineVat select{width:100%;min-width:0}
+ .quoteLineTotal{grid-column:2/3;grid-row:3}
+ .quoteLineRemove{grid-column:3/4;grid-row:3;justify-self:end}
  .quotePaymentRow{grid-template-columns:1fr 100px}
  .quotePaymentRow .field:nth-child(3){grid-column:1/-1}
  .quotePaymentAmount{grid-column:1/-1}
