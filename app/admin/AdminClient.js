@@ -876,6 +876,10 @@ function Surveys({ orders, status, canUpdateOrders }) {
         <div style={{whiteSpace:"pre-wrap",lineHeight:1.55,marginTop:16}}>{order.customRequest || "Ingen beskrivelse."}</div>{Array.isArray(order.contactImages)&&order.contactImages.length>0&&<div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12}}>{order.contactImages.map((image,i)=><a className="btn alt" key={image.ref||i} href={image.url} target="_blank" rel="noopener noreferrer">Åpne bilde {i+1}</a>)}</div>}
         <div className="field" style={{marginTop:16}}><label>Dato og tid for befaring</label><input type="datetime-local" defaultValue={localDateTimeInput(order.surveyDate)} id={"survey-date-"+order.id}/></div>
         <div className="field"><label>Internt notat</label><textarea rows="3" defaultValue={order.adminNote||""} id={"survey-note-"+order.id} placeholder="Kun synlig i backoffice"/></div>
+        {(order.surveyConfirmationSentAt||order.surveyReminderSentAt)&&<div className="surveyDeliveryState">
+          {order.surveyConfirmationSentAt&&<span>✓ Bekreftelse sendt {new Date(order.surveyConfirmationSentAt).toLocaleString("nb-NO")}</span>}
+          {order.surveyReminderSentAt&&<span>✓ Påminnelse sendt {new Date(order.surveyReminderSentAt).toLocaleString("nb-NO")}</span>}
+        </div>}
         {canUpdateOrders&&<div className="surveySaveActions">
           <button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>saveSurvey(order,document.getElementById("survey-date-"+order.id).value,document.getElementById("survey-note-"+order.id).value,false)}>{savingId===order.id?"Lagrer …":"Lagre befaring"}</button>
           <button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>saveSurvey(order,document.getElementById("survey-date-"+order.id).value,document.getElementById("survey-note-"+order.id).value,true)}>{savingId===order.id?"Sender …":"Lagre og send bekreftelse"}</button>

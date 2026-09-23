@@ -62,3 +62,5 @@ SQL-filene er laget idempotente der det er praktisk, men produksjonskjøring ska
 13. `quote_followups.sql` – aktiverer automatisk, én gangs oppfølgingsmail på sendte tilbud etter omtrent to døgn.
 
 14. `security_hardening_20260923.sql` – strammer inn event-trigger-rettigheter, optimaliserer admin-policy og legger indeks på `quotes.created_by`.
+
+15. `survey_reminders.sql` – sporer bekreftelse på avtalt befaring og aktiverer én automatisk påminnelse før timen.

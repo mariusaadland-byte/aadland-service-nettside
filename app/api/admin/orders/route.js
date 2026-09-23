@@ -25,6 +25,8 @@ const mapOrder = (o) => ({
   totalOre: o.total_ore,
   createdAt: o.created_at,
   surveyDate: o.survey_date || null,
+  surveyConfirmationSentAt: o.survey_confirmation_sent_at || null,
+  surveyReminderSentAt: o.survey_reminder_sent_at || null,
   adminNote: o.admin_note || "",
   jobStartAt: o.job_start_at || null,
   jobCustomerAgreement: o.job_customer_agreement || "",
@@ -249,7 +251,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
 
   const updatePatch={
     ...(status !== undefined ? { status } : {}),
-    ...(surveyDate !== undefined ? { survey_date: surveyDate || null } : {}),
+    ...(surveyDate !== undefined ? { survey_date: surveyDate || null, survey_reminder_sent_at:null } : {}),
     ...(adminNote !== undefined ? { admin_note: adminNote || null } : {}),
     ...(trackingNumber !== undefined ? { tracking_number: String(trackingNumber||"").trim() || null } : {}),
     ...(trackingUrl !== undefined ? { tracking_url: String(trackingUrl||"").trim() || null } : {}),
@@ -317,7 +319,10 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
         html
       });
       if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
-      return NextResponse.json({ok:true,sentTo:customerEmail});
+      const sentAt=new Date().toISOString();
+      const {error:stampError}=await s.from("orders").update({survey_confirmation_sent_at:sentAt,survey_reminder_sent_at:null}).eq("id",id);
+      if(stampError&&!["42703"].includes(String(stampError.code||"")))console.error("SURVEY CONFIRMATION STAMP ERROR",stampError);
+      return NextResponse.json({ok:true,sentTo:customerEmail,sentAt});
     }catch(e){
       console.error("SURVEY CONFIRMATION EMAIL ERROR",e);
       return NextResponse.json({error:"Befaringen er lagret, men bekreftelsen kunne ikke sendes på e-post."},{status:500});

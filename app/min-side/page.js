@@ -315,6 +315,8 @@ export default function MinSide(){
     <div className="customerCardMeta">
      <span><small>Status</small><b>{enquiryStatus[o.status]||o.status}</b></span>
      {o.survey_date&&<span><small>Befaring</small><b>{dateTimeFull(o.survey_date)}</b></span>}
+     {o.survey_confirmation_sent_at&&<span><small>Bekreftelse</small><b>Sendt {dateTime(o.survey_confirmation_sent_at)}</b></span>}
+     {o.survey_reminder_sent_at&&<span><small>Påminnelse</small><b>Sendt {dateTime(o.survey_reminder_sent_at)}</b></span>}
     </div>
    </article>)}</div>}
   </section>
