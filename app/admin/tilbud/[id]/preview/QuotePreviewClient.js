@@ -31,6 +31,7 @@ export default function QuotePreviewClient({quoteId}){
 
  const created=quote.createdAt?new Date(quote.createdAt).toLocaleDateString("nb-NO"):"";
  const valid=quote.validUntil?new Date(quote.validUntil+"T12:00:00").toLocaleDateString("nb-NO"):"";
+ const start=quote.plannedStartDate?new Date(quote.plannedStartDate+"T12:00:00").toLocaleDateString("nb-NO"):"";
 
  return <main className="quotePreviewShell">
   <div className="quotePreviewToolbar noPrint">
@@ -61,6 +62,7 @@ export default function QuotePreviewClient({quoteId}){
      <span><small>Tilbudsnummer</small><b>{quote.quoteNumber}</b></span>
      <span><small>Dato</small><b>{created}</b></span>
      <span><small>Gyldig til</small><b>{valid||"—"}</b></span>
+     <span><small>Planlagt oppstart</small><b>{start||"Avtales"}</b></span>
     </div>
    </section>
 
