@@ -40,7 +40,7 @@ export async function POST(req){
  const request=[
   `Godkjent tilbud ${quote.quote_number}`,
   quote.title||"",
-  plannedStart?"Planlagt oppstart: "+plannedStart:"",
+  plannedStart?"Tidligst oppstart: "+plannedStart:"",
   "",
   quote.intro_text||"",
   lineText?"\nArbeid og leveranser:\n"+lineText:"",
