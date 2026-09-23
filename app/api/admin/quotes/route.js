@@ -148,6 +148,11 @@ export async function GET(req){
  const s=db();
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
  const params=new URL(req.url).searchParams;
+ const followUpCheck=await s.from("quotes").select("auto_follow_up,follow_up_sent_at").limit(1);
+ const followUpSetupRequired=Boolean(followUpCheck.error&&String(followUpCheck.error.code||"")==="42703");
+ if(followUpCheck.error&&!followUpSetupRequired&&String(followUpCheck.error.code||"")!=="42P01"){
+  console.error("QUOTE FOLLOWUP SETUP CHECK",followUpCheck.error);
+ }
  const id=clean(params.get("id"),100);
  const archived=params.get("archived")==="1";
  let query=s.from("quotes").select("*");
@@ -159,7 +164,9 @@ export async function GET(req){
   return NextResponse.json({error:"Tilbudene kunne ikke hentes."},{status:500});
  }
  if(id&&!data)return NextResponse.json({error:"Tilbudet ble ikke funnet."},{status:404});
- return id?NextResponse.json({quote:mapQuote(data)}):NextResponse.json({quotes:(data||[]).map(mapQuote)});
+ return id
+  ?NextResponse.json({quote:mapQuote(data),followUpSetupRequired})
+  :NextResponse.json({quotes:(data||[]).map(mapQuote),followUpSetupRequired});
 }
 
 export async function POST(req){
