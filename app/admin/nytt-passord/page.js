@@ -1,11 +1,63 @@
 "use client";
-import {useEffect,useState} from "react";
-import {useRouter} from "next/navigation";
-import {createClient} from "@supabase/supabase-js";
+import {useSearchParams} from "next/navigation";
+import {useState} from "react";
 
 export default function NewPassword(){
- const router=useRouter(),[password,setPassword]=useState(""),[confirm,setConfirm]=useState(""),[error,setError]=useState(""),[ready,setReady]=useState(false),[saving,setSaving]=useState(false),[client,setClient]=useState(null);
- useEffect(()=>{const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;if(!url||!key){setError("Passordendring er ikke konfigurert.");return}const s=createClient(url,key);setClient(s);let mounted=true;async function recover(){try{const hash=new URLSearchParams(window.location.hash.replace(/^#/,"")),access=hash.get("access_token"),refresh=hash.get("refresh_token"),query=new URLSearchParams(window.location.search),code=query.get("code");if(code){const {error:e}=await s.auth.exchangeCodeForSession(code);if(e)throw e;window.history.replaceState({},document.title,window.location.pathname)}else if(access&&refresh){const {error:e}=await s.auth.setSession({access_token:access,refresh_token:refresh});if(e)throw e;window.history.replaceState({},document.title,window.location.pathname)}const {data}=await s.auth.getSession();if(mounted)setReady(!!data.session);if(mounted&&!data.session)setError("Lenken er ugyldig eller utløpt. Be om en ny lenke.")}catch{if(mounted)setError("Lenken er ugyldig eller utløpt. Be om en ny lenke.")}}recover();return()=>{mounted=false}},[]);
- async function save(e){e.preventDefault();setError("");if(!client||!ready){setError("Lenken er ugyldig eller utløpt. Be om en ny lenke.");return}if(password.length<8||password.length>128){setError("Passordet må være mellom 8 og 128 tegn.");return}if(password!==confirm){setError("Passordene er ikke like.");return}setSaving(true);try{const {error:e}=await client.auth.updateUser({password});if(e){setError("Kunne ikke lagre nytt passord. Be om en ny lenke.");return}await client.auth.signOut();setReady(false);router.replace("/admin/login")}catch{setError("Kunne ikke lagre nytt passord. Be om en ny lenke.")}finally{setSaving(false)}}
- return <main className="login"><form className="loginbox" onSubmit={save}><div className="mark">AS</div><h1>Nytt passord</h1><p className="muted">Aadland Service</p>{error&&<p className="notice">{error}</p>}{ready&&<><div className="field"><label>Nytt passord</label><input type="password" autoComplete="new-password" minLength={8} maxLength={128} required disabled={saving} value={password} onChange={e=>setPassword(e.target.value)}/></div><div className="field"><label>Gjenta passord</label><input type="password" autoComplete="new-password" minLength={8} maxLength={128} required disabled={saving} value={confirm} onChange={e=>setConfirm(e.target.value)}/></div><button className="btn" style={{width:"100%",marginTop:14}} disabled={saving}>{saving?"Lagrer …":"Lagre nytt passord"}</button></>}</form></main>;
+ const params=useSearchParams();
+ const token=String(params.get("token")||"");
+ const [password,setPassword]=useState("");
+ const [confirm,setConfirm]=useState("");
+ const [error,setError]=useState(token?"":"Lenken mangler eller er ugyldig. Be om en ny lenke.");
+ const [saving,setSaving]=useState(false);
+ const [done,setDone]=useState(false);
+
+ async function save(e){
+  e.preventDefault();
+  setError("");
+  if(!token){setError("Lenken mangler eller er ugyldig. Be om en ny lenke.");return}
+  if(password.length<8||password.length>128){setError("Passordet må være mellom 8 og 128 tegn.");return}
+  if(password!==confirm){setError("Passordene er ikke like.");return}
+  setSaving(true);
+  try{
+   const r=await fetch("/api/auth/update-password",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({token,password})
+   });
+   const d=await r.json().catch(()=>({}));
+   if(!r.ok){setError(d.error||"Kunne ikke lagre nytt passord.");return}
+   setDone(true);
+   setPassword("");
+   setConfirm("");
+  }catch{
+   setError("Kunne ikke lagre nytt passord. Be om en ny lenke.");
+  }finally{
+   setSaving(false);
+  }
+ }
+
+ return <main className="login">
+  <form className="loginbox" onSubmit={save}>
+   <div className="mark">AS</div>
+   <h1>Nytt passord</h1>
+   <p className="muted">Aadland Service backoffice</p>
+
+   {error&&<p className="notice">{error}</p>}
+   {done?<div className="success adminPasswordDone">
+    <b>Passordet er endret.</b>
+    <p>Du kan nå logge inn med det nye passordet.</p>
+    <a className="btn" href="/admin/login">Til innlogging</a>
+   </div>:token&&<>
+    <div className="field">
+     <label>Nytt passord</label>
+     <input type="password" autoComplete="new-password" minLength={8} maxLength={128} required disabled={saving} value={password} onChange={e=>setPassword(e.target.value)}/>
+    </div>
+    <div className="field">
+     <label>Gjenta passord</label>
+     <input type="password" autoComplete="new-password" minLength={8} maxLength={128} required disabled={saving} value={confirm} onChange={e=>setConfirm(e.target.value)}/>
+    </div>
+    <button className="btn" style={{width:"100%",marginTop:14}} disabled={saving}>{saving?"Lagrer …":"Lagre nytt passord"}</button>
+   </>}
+  </form>
+ </main>;
 }
