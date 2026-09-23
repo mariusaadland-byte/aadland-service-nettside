@@ -18,6 +18,7 @@ function mapQuote(q){
   notes:q.notes||"",
   terms:q.terms||"",
   validUntil:q.valid_until||null,
+  plannedStartDate:q.planned_start_date||null,
   sentAt:q.sent_at||null,
   acceptedAt:q.accepted_at||null,
   declinedAt:q.declined_at||null,
