@@ -6,6 +6,7 @@ import {
 } from "../../../../lib/auth";
 
 import { db } from "../../../../lib/supabase";
+import { removePublicBucketUrls } from "../../../../lib/storageImages";
 
 async function requireCategoryAccess() {
   const currentUser =
@@ -284,7 +285,7 @@ export async function PATCH(req) {
     );
   }
 
-  const { data: existing, error: existingError } = await s.from("categories").select("name").eq("id", body.id).maybeSingle();
+  const { data: existing, error: existingError } = await s.from("categories").select("name,image_url").eq("id", body.id).maybeSingle();
   if (existingError) {
     console.error("CATEGORY LOOKUP ERROR:",existingError);
     return NextResponse.json({error:"Kategorien kunne ikke kontrolleres."},{status:500});
@@ -347,6 +348,12 @@ export async function PATCH(req) {
     );
   }
 
+  const nextImage=cleanText(body.imageUrl)||null;
+  if(existing.image_url&&existing.image_url!==nextImage){
+    const cleanupResult=await removePublicBucketUrls(s,"product-images",[existing.image_url]);
+    if(cleanupResult.error)console.error("CATEGORY IMAGE CLEANUP",cleanupResult.error);
+  }
+
   return NextResponse.json({
     ok: true,
     category: data,
@@ -388,6 +395,18 @@ export async function DELETE(req) {
       { status: 503 }
     );
   }
+
+  const { data: categoryForDelete, error: categoryLookupError }=await s
+    .from("categories")
+    .select("id,image_url")
+    .eq("id",categoryId)
+    .maybeSingle();
+
+  if(categoryLookupError){
+    console.error("CATEGORY DELETE LOOKUP ERROR:",categoryLookupError);
+    return NextResponse.json({error:"Kategorien kunne ikke kontrolleres."},{status:500});
+  }
+  if(!categoryForDelete)return NextResponse.json({error:"Kategorien ble ikke funnet."},{status:404});
 
   const {
     count,
@@ -450,6 +469,11 @@ export async function DELETE(req) {
       },
       { status: 500 }
     );
+  }
+
+  if(categoryForDelete.image_url){
+    const cleanupResult=await removePublicBucketUrls(s,"product-images",[categoryForDelete.image_url]);
+    if(cleanupResult.error)console.error("CATEGORY DELETE IMAGE CLEANUP",cleanupResult.error);
   }
 
   return NextResponse.json({
