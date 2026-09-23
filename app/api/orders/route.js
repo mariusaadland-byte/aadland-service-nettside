@@ -55,10 +55,11 @@ export async function POST(req){
    const {error:orderError}=await s.from("orders").insert(record);
    if(orderError)throw orderError;
   }
-  if(process.env.RESEND_API_KEY){
+  const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
+  if(resendKey){
    try{
     const {Resend}=await import("resend");
-    const resend=new Resend(process.env.RESEND_API_KEY);
+    const resend=new Resend(resendKey);
     const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
     const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
     const isCustom=body.orderType==="custom";
