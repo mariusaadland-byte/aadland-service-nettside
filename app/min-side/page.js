@@ -34,7 +34,14 @@ export default function MinSide(){
   }finally{setLoading(false)}
  }
 
- useEffect(()=>{load()},[]);
+ useEffect(()=>{
+  const params=new URLSearchParams(window.location.search);
+  const verification=params.get("verification");
+  if(verification==="success")setInfo("E-postadressen er bekreftet. Velkommen til Min side.");
+  if(verification==="invalid")setError("Bekreftelseslenken er ugyldig eller utløpt.");
+  if(verification==="error")setError("E-postadressen kunne ikke bekreftes akkurat nå. Prøv igjen.");
+  load();
+ },[]);
 
  async function submit(e){
   e.preventDefault();setBusy(true);setError("");setInfo("");
@@ -116,6 +123,8 @@ export default function MinSide(){
    </div>
    <button className="btn alt" onClick={logout}>Logg ut</button>
   </header>
+  {info&&<p className="success customerDashboardNotice">{info}</p>}
+  {error&&<p className="notice customerDashboardNotice">{error}</p>}
 
   <section className="customerDashboardSection">
    <div className="customerSectionHead">
