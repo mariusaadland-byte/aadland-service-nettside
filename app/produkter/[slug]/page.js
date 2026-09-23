@@ -30,12 +30,35 @@ export default function ProductPage() {
     note: "",
     deliveryWithinRadius: true,
   });
+  const [customerAccount,setCustomerAccount]=useState(null);
 
   const [fulfillment, setFulfillment] = useState("pickup");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState(null);
   const [acceptedTerms,setAcceptedTerms]=useState(false);
+
+  useEffect(() => {
+    fetch("/api/customer/profile")
+      .then(async response=>{
+        if(response.status===401)return null;
+        const data=await response.json().catch(()=>({}));
+        if(!response.ok)return null;
+        return data.customer||null;
+      })
+      .then(profile=>{
+        if(!profile)return;
+        setCustomerAccount(profile);
+        setCustomer(current=>({
+          ...current,
+          name:current.name||profile.name||"",
+          email:current.email||profile.email||"",
+          phone:current.phone||profile.phone||"",
+          address:current.address||profile.address||""
+        }));
+      })
+      .catch(()=>{});
+  }, []);
 
   useEffect(() => {
     fetch("/api/products")
@@ -506,6 +529,7 @@ export default function ProductPage() {
             </div>
 
             <form onSubmit={sendOrder}>
+              {customerAccount&&<p className="customerPrefillNote">✓ Kontaktopplysninger er hentet fra Min side. Du kan endre dem for denne bestillingen.</p>}
               <CustomerFields
                 customer={customer}
                 setCustomer={setCustomer}
@@ -560,13 +584,15 @@ export default function ProductPage() {
               {message.message && <p>{message.message}</p>}
             </div>
 
-            <button
-              className="btn"
-              onClick={() => setMessage(null)}
-              style={{ marginTop: 20 }}
-            >
-              Lukk
-            </button>
+            <div className="customerOrderSuccessActions">
+              {customerAccount&&<a className="btn" href="/min-side">Se bestillingen på Min side</a>}
+              <button
+                className="btn alt"
+                onClick={() => setMessage(null)}
+              >
+                Lukk
+              </button>
+            </div>
           </div>
         </div>
       )}
