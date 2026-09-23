@@ -29,7 +29,10 @@ export async function POST(req){
  if(quote.valid_until&&quote.valid_until<today)return NextResponse.json({error:"Tilbudet har passert gyldighetsdatoen. Oppdater datoen før du sender det."},{status:409});
  const email=String(quote.customer?.email||"").trim();
  if(!email)return NextResponse.json({error:"Kunden må ha e-postadresse før tilbudet kan sendes."},{status:400});
- if(!process.env.RESEND_API_KEY)return NextResponse.json({error:"E-post er ikke konfigurert på serveren."},{status:503});
+ const resendKey=process.env.VERCEL_ENV==="preview"
+  ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)
+  :process.env.RESEND_API_KEY;
+ if(!resendKey)return NextResponse.json({error:"E-post er ikke konfigurert på serveren."},{status:503});
 
  const token=createQuoteToken(quote);
  const requestOrigin=new URL(req.url).origin;
@@ -85,7 +88,7 @@ export async function POST(req){
 
  try{
   const {Resend}=await import("resend");
-  const resend=new Resend(process.env.RESEND_API_KEY);
+  const resend=new Resend(resendKey);
   const sent=await resend.emails.send({
    from,
    to:email,
