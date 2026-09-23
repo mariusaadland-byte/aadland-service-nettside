@@ -12,6 +12,7 @@ function mapQuote(quote){
   title:quote.title||"Tilbud",
   totalIncVatOre:Number(quote.total_inc_vat_ore)||0,
   validUntil:quote.valid_until||null,
+  plannedStartDate:quote.planned_start_date||null,
   sentAt:quote.sent_at||null,
   acceptedAt:quote.accepted_at||null,
   declinedAt:quote.declined_at||null,
@@ -38,7 +39,7 @@ export async function GET(){
    .order("created_at",{ascending:false})
    .limit(100),
   s.from("quotes")
-   .select("id,quote_number,status,title,total_inc_vat_ore,valid_until,sent_at,accepted_at,declined_at,created_at,customer")
+   .select("id,quote_number,status,title,total_inc_vat_ore,valid_until,planned_start_date,sent_at,accepted_at,declined_at,created_at,customer")
    .contains("customer",{email:String(customer.email||"").trim().toLowerCase()})
    .in("status",["sent","accepted","declined","expired","cancelled"])
    .order("created_at",{ascending:false})
