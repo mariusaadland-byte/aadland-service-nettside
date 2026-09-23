@@ -662,11 +662,16 @@ function Jobs({orders,status,canUpdateOrders,reload}){
       <small>Opprettet fra tilbud</small>
       <b>{order.sourceQuoteNumber}</b>
      </div>
-     <a className="btn alt" href={"/admin/tilbud/"+order.sourceQuoteId}>Åpne tilbud</a>
+     <div className="jobQuoteActions">
+      <a className="btn alt" href={"/admin/tilbud/"+order.sourceQuoteId}>Åpne tilbud</a>
+      <a className="btn" href={"/admin/oppdrag/"+order.id+"/planlegg"}>{order.jobStartAt?"Rediger plan":"Planlegg oppdrag"}</a>
+     </div>
     </div>
 
     <div className="jobMeta">
-     <span><small>Tidligst oppstart</small><b>{order.sourceQuotePlannedStartDate?new Date(order.sourceQuotePlannedStartDate+"T12:00:00").toLocaleDateString("nb-NO"):"Ikke satt"}</b></span>
+     <span><small>Avtalt oppstart</small><b>{order.jobStartAt?new Date(order.jobStartAt).toLocaleString("nb-NO"):"Ikke avtalt"}</b></span>
+     <span><small>Tidligst oppstart i tilbud</small><b>{order.sourceQuotePlannedStartDate?new Date(order.sourceQuotePlannedStartDate+"T12:00:00").toLocaleDateString("nb-NO"):"Ikke satt"}</b></span>
+     <span><small>Bekreftelse</small><b>{order.jobConfirmationSentAt?"Sendt "+new Date(order.jobConfirmationSentAt).toLocaleString("nb-NO"):"Ikke sendt"}</b></span>
      <span><small>Godkjent</small><b>{order.sourceQuoteAcceptedAt?new Date(order.sourceQuoteAcceptedAt).toLocaleString("nb-NO"):"—"}</b></span>
      <span><small>Avtalt total</small><b>{nok(order.sourceQuoteTotalOre||order.totalOre||0)}</b></span>
     </div>
