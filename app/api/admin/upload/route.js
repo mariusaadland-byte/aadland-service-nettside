@@ -5,6 +5,7 @@ import {
   hasPermission,
 } from "../../../../lib/auth";
 import { db } from "../../../../lib/supabase";
+import { publicBucketPath } from "../../../../lib/storageImages";
 
 export async function POST(req) {
   try {
@@ -144,5 +145,34 @@ export async function POST(req) {
       },
       { status: 500 }
     );
+  }
+}
+
+
+export async function DELETE(req) {
+  try {
+    const currentUser=await getAdminUser();
+    if(!currentUser)return NextResponse.json({error:"Ikke innlogget."},{status:401});
+    if(!(await hasPermission("canManageProducts"))){
+      return NextResponse.json({error:"Du har ikke tilgang til å slette produktbilder."},{status:403});
+    }
+
+    const body=await req.json().catch(()=>({}));
+    const url=String(body.url||"").trim();
+    const path=publicBucketPath(url,"product-images");
+    if(!path)return NextResponse.json({error:"Bildet tilhører ikke Aadland Service sin produktlagring."},{status:400});
+
+    const s=db();
+    if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+
+    const {error}=await s.storage.from("product-images").remove([path]);
+    if(error){
+      console.error("PRODUCT IMAGE DELETE ERROR:",error);
+      return NextResponse.json({error:"Bildet kunne ikke slettes."},{status:500});
+    }
+    return NextResponse.json({ok:true});
+  } catch(error) {
+    console.error("PRODUCT IMAGE DELETE ERROR:",error);
+    return NextResponse.json({error:"Bildet kunne ikke slettes."},{status:500});
   }
 }
