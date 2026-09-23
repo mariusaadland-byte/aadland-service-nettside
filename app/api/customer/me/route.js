@@ -29,7 +29,7 @@ export async function GET(){
 
  const [ordersResult,rentalsResult,quotesResult]=await Promise.all([
   s.from("orders")
-   .select("id,order_number,order_type,status,total_ore,payment_status,fulfillment_type,created_at")
+   .select("id,order_number,order_type,status,total_ore,payment_status,fulfillment_type,created_at,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at")
    .eq("customer_user_id",customer.id)
    .order("created_at",{ascending:false})
    .limit(100),
@@ -62,9 +62,48 @@ export async function GET(){
   quotes=(quotesResult.data||[]).map(mapQuote);
  }
 
+ const orderRows=ordersResult.data||[];
+ const customOrderIds=orderRows.filter(order=>order.order_type==="custom").map(order=>order.id);
+ const quoteByOrder=new Map();
+
+ if(customOrderIds.length){
+  const {data:linkedQuotes,error:linkedQuoteError}=await s.from("quotes")
+   .select("id,quote_number,title,total_inc_vat_ore,payment_plan,planned_start_date,converted_order_id,customer")
+   .in("converted_order_id",customOrderIds);
+
+  if(!linkedQuoteError){
+   for(const quote of linkedQuotes||[]){
+    if(!quote.converted_order_id)continue;
+    let href=null;
+    try{
+     const token=createQuoteToken(quote);
+     href="/tilbud/"+encodeURIComponent(quote.id)+"?token="+encodeURIComponent(token);
+    }catch(error){
+     console.error("CUSTOMER ORDER QUOTE LINK",error);
+    }
+    quoteByOrder.set(quote.converted_order_id,{
+     id:quote.id,
+     quoteNumber:quote.quote_number,
+     title:quote.title||"Oppdrag",
+     totalIncVatOre:Number(quote.total_inc_vat_ore)||0,
+     paymentPlan:Array.isArray(quote.payment_plan)?quote.payment_plan:[],
+     earliestStartDate:quote.planned_start_date||null,
+     href
+    });
+   }
+  }else if(!["42P01","42703"].includes(String(linkedQuoteError.code||""))){
+   console.error("CUSTOMER ORDER QUOTE HISTORY",linkedQuoteError);
+  }
+ }
+
+ const orders=orderRows.map(order=>({
+  ...order,
+  source_quote:quoteByOrder.get(order.id)||null
+ }));
+
  return NextResponse.json({
   customer,
-  orders:ordersResult.data||[],
+  orders,
   rentals:rentalsResult.data||[],
   quotes,
   quoteSetupRequired
