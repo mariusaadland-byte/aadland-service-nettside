@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, fromDbProduct } from "../../../../lib/supabase";
 import { hasPermission } from "../../../../lib/auth";
+import { removePublicBucketUrls } from "../../../../lib/storageImages";
 
 function cleanText(value) {
   return String(value || "").trim();
@@ -340,6 +341,17 @@ export async function PATCH(req) {
       );
     }
 
+    const {data:existingProduct,error:existingProductError}=await s.from("products").select("id,image_url,image_urls").eq("id",id).maybeSingle();
+    if(existingProductError){
+      console.error("ADMIN PRODUCT LOOKUP ERROR:",existingProductError);
+      return NextResponse.json({error:"Produktet kunne ikke kontrolleres."},{status:500});
+    }
+    if(!existingProduct)return NextResponse.json({error:"Produktet ble ikke funnet."},{status:404});
+    const oldProductImages=[
+      ...(Array.isArray(existingProduct.image_urls)?existingProduct.image_urls:[]),
+      existingProduct.image_url
+    ].map(cleanText).filter(Boolean);
+
     const imageUrls = cleanArray(body.imageUrls)
       .map(cleanText)
       .filter(Boolean);
@@ -417,6 +429,10 @@ export async function PATCH(req) {
       );
     }
 
+    const keptImages=new Set([...(imageUrls||[]),imageUrl].filter(Boolean));
+    const removedImages=oldProductImages.filter(url=>!keptImages.has(url));
+    if(removedImages.length)await removePublicBucketUrls(s,"product-images",removedImages);
+
     return NextResponse.json({
       ok: true,
       product: fromDbProduct(data),
@@ -431,5 +447,69 @@ export async function PATCH(req) {
       { error: "Produktet kunne ikke lagres." },
       { status: 500 }
     );
+  }
+}
+
+
+export async function DELETE(req) {
+  try {
+    if (!(await hasPermission("canManageProducts"))) {
+      return NextResponse.json(
+        { error: "Du har ikke tilgang til å administrere produkter." },
+        { status: 403 }
+      );
+    }
+
+    const body=await req.json().catch(()=>({}));
+    const id=cleanText(body.id);
+    if(!id)return NextResponse.json({error:"Produkt mangler."},{status:400});
+
+    const s=db();
+    if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+
+    const {data:product,error:productError}=await s
+      .from("products")
+      .select("id,name,image_url,image_urls")
+      .eq("id",id)
+      .maybeSingle();
+
+    if(productError){
+      console.error("ADMIN PRODUCT DELETE LOOKUP ERROR:",productError);
+      return NextResponse.json({error:"Produktet kunne ikke kontrolleres."},{status:500});
+    }
+    if(!product)return NextResponse.json({error:"Produktet ble ikke funnet."},{status:404});
+
+    const {count,error:usageError}=await s
+      .from("orders")
+      .select("id",{count:"exact",head:true})
+      .contains("items",[{productId:id}]);
+
+    if(usageError){
+      console.error("ADMIN PRODUCT ORDER USAGE ERROR:",usageError);
+      return NextResponse.json({error:"Kunne ikke kontrollere om produktet finnes i tidligere bestillinger."},{status:500});
+    }
+
+    if((count||0)>0){
+      return NextResponse.json({
+        error:`Produktet finnes i ${count} tidligere bestilling${count===1?"":"er"} og kan derfor ikke slettes. Skjul produktet i stedet.`
+      },{status:409});
+    }
+
+    const {error:deleteError}=await s.from("products").delete().eq("id",id);
+    if(deleteError){
+      console.error("ADMIN PRODUCT DELETE ERROR:",deleteError);
+      return NextResponse.json({error:"Produktet kunne ikke slettes."},{status:500});
+    }
+
+    const urls=[
+      ...(Array.isArray(product.image_urls)?product.image_urls:[]),
+      product.image_url
+    ].map(cleanText).filter(Boolean);
+    if(urls.length)await removePublicBucketUrls(s,"product-images",urls);
+
+    return NextResponse.json({ok:true});
+  } catch (error) {
+    console.error("ADMIN PRODUCT DELETE ERROR:",error);
+    return NextResponse.json({error:"Produktet kunne ikke slettes."},{status:500});
   }
 }

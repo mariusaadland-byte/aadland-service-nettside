@@ -2682,3 +2682,13 @@ body:has(.customerPage) .customerPage{
  .adminAttentionMain{grid-column:1;grid-row:2}
  .adminAttentionArrow{grid-column:2;grid-row:1/3;align-self:center}
 }
+
+
+.productDeleteButton{
+ border-color:rgba(150,45,45,.28)!important;
+ color:#7f2929!important;
+}
+.productDeleteButton:hover{
+ border-color:rgba(150,45,45,.55)!important;
+ background:rgba(150,45,45,.06)!important;
+}
