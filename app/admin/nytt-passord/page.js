@@ -1,15 +1,21 @@
 "use client";
-import {useSearchParams} from "next/navigation";
-import {useState} from "react";
+import {useEffect,useState} from "react";
 
 export default function NewPassword(){
- const params=useSearchParams();
- const token=String(params.get("token")||"");
+ const [token,setToken]=useState("");
+ const [tokenReady,setTokenReady]=useState(false);
  const [password,setPassword]=useState("");
  const [confirm,setConfirm]=useState("");
- const [error,setError]=useState(token?"":"Lenken mangler eller er ugyldig. Be om en ny lenke.");
+ const [error,setError]=useState("");
  const [saving,setSaving]=useState(false);
  const [done,setDone]=useState(false);
+
+ useEffect(()=>{
+  const value=new URLSearchParams(window.location.search).get("token")||"";
+  setToken(value);
+  setTokenReady(true);
+  if(!value)setError("Lenken mangler eller er ugyldig. Be om en ny lenke.");
+ },[]);
 
  async function save(e){
   e.preventDefault();
@@ -29,6 +35,7 @@ export default function NewPassword(){
    setDone(true);
    setPassword("");
    setConfirm("");
+   window.history.replaceState({},document.title,window.location.pathname);
   }catch{
    setError("Kunne ikke lagre nytt passord. Be om en ny lenke.");
   }finally{
@@ -47,7 +54,7 @@ export default function NewPassword(){
     <b>Passordet er endret.</b>
     <p>Du kan nå logge inn med det nye passordet.</p>
     <a className="btn" href="/admin/login">Til innlogging</a>
-   </div>:token&&<>
+   </div>:tokenReady&&token&&<>
     <div className="field">
      <label>Nytt passord</label>
      <input type="password" autoComplete="new-password" minLength={8} maxLength={128} required disabled={saving} value={password} onChange={e=>setPassword(e.target.value)}/>
