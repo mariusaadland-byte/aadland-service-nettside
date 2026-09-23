@@ -3806,6 +3806,7 @@ function RentalBookings({bookings,reload,setError,canUpdate}){
    </div>
    {(b.confirmationSentAt||b.cancellationSentAt)&&<div className="rentalNotificationState">
     {b.confirmationSentAt&&<span>✓ Bekreftelse sendt {new Date(b.confirmationSentAt).toLocaleString("nb-NO")}</span>}
+    {b.reminderSentAt&&<span>✓ Påminnelse sendt {new Date(b.reminderSentAt).toLocaleString("nb-NO")}</span>}
     {b.cancellationSentAt&&<span>✓ Avbestilling sendt {new Date(b.cancellationSentAt).toLocaleString("nb-NO")}</span>}
    </div>}
    <div className="field"><label>Status</label><select disabled={!canUpdate||savingId===b.id} value={b.status} onChange={e=>patch(b.id,{status:e.target.value})}>{Object.entries(statuses).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></div>
