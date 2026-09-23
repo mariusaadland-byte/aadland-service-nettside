@@ -61,7 +61,8 @@ export default function QuotesClient(){
     introText:quote.introText,
     notes:quote.notes,
     terms:quote.terms,
-    validUntil:valid.toISOString().slice(0,10)
+    validUntil:valid.toISOString().slice(0,10),
+    plannedStartDate:quote.plannedStartDate||""
    })
   });
   const data=await response.json().catch(()=>({}));
