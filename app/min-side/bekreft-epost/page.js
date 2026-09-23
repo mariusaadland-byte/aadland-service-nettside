@@ -68,7 +68,7 @@ export default function BekreftEpost(){
   </section>
 
   <p style={{marginTop:18,color:"#71675d",fontSize:14}}>
-   Kontoret blir ikke aktivert bare ved å åpne lenken i e-posten. Du må trykke «Bekreft e-post» på denne siden.
+   Kontoen blir ikke aktivert bare ved å åpne lenken i e-posten. Du må trykke «Bekreft e-post» på denne siden.
   </p>
  </main>;
 }
