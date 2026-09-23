@@ -303,6 +303,89 @@ export default function AdminClient({ user }) {
     .filter((quote) => quote.status === "accepted")
     .reduce((sum, quote) => sum + (Number(quote.totalOre) || 0), 0);
 
+  const nowMs=Date.now();
+  const soonMs=nowMs+72*60*60*1000;
+  const attentionItems = [
+    ...activeOrders
+      .filter(order=>order.orderType==="custom"&&!order.sourceQuoteId&&order.status==="new")
+      .map(order=>({
+        key:"enquiry-"+order.id,
+        sort:1,
+        eyebrow:"NY FORESPØRSEL",
+        title:order.customerName||"Ukjent kunde",
+        meta:order.orderNumber||"",
+        tab:"surveys"
+      })),
+    ...rentalBookings
+      .filter(booking=>booking.status==="new")
+      .map(booking=>({
+        key:"rental-"+booking.id,
+        sort:2,
+        eyebrow:"NY UTLEIEBOOKING",
+        title:booking.customer?.name||booking.bookingNumber||"Utleie",
+        meta:booking.bookingNumber||"",
+        tab:"rentalBookings"
+      })),
+    ...activeOrders
+      .filter(order=>order.orderType!=="custom"&&order.status==="new")
+      .map(order=>({
+        key:"order-"+order.id,
+        sort:3,
+        eyebrow:"NY BESTILLING",
+        title:order.customerName||"Ukjent kunde",
+        meta:order.orderNumber||"",
+        tab:"orders"
+      })),
+    ...activeOrders
+      .filter(order=>order.orderType==="custom"&&order.sourceQuoteId&&["confirmed","in_progress"].includes(order.status)&&!order.jobStartAt)
+      .map(order=>({
+        key:"jobplan-"+order.id,
+        sort:4,
+        eyebrow:"MANGLER OPPSTART",
+        title:order.sourceQuoteTitle||"Oppdrag",
+        meta:order.orderNumber||"",
+        href:"/admin/oppdrag/"+order.id+"/planlegg"
+      })),
+    ...activeOrders
+      .filter(order=>{
+        if(order.orderType!=="custom"||order.sourceQuoteId||!order.surveyDate)return false;
+        const time=new Date(order.surveyDate).getTime();
+        return Number.isFinite(time)&&time>=nowMs&&time<=soonMs;
+      })
+      .map(order=>({
+        key:"survey-soon-"+order.id,
+        sort:5,
+        eyebrow:"BEFARING SNART",
+        title:order.customerName||"Kunde",
+        meta:new Date(order.surveyDate).toLocaleString("nb-NO",{dateStyle:"short",timeStyle:"short"}),
+        tab:"surveys"
+      })),
+    ...activeOrders
+      .filter(order=>{
+        if(order.orderType!=="custom"||!order.sourceQuoteId||!order.jobStartAt)return false;
+        const time=new Date(order.jobStartAt).getTime();
+        return Number.isFinite(time)&&time>=nowMs&&time<=soonMs;
+      })
+      .map(order=>({
+        key:"job-soon-"+order.id,
+        sort:6,
+        eyebrow:"OPPSTART SNART",
+        title:order.sourceQuoteTitle||"Oppdrag",
+        meta:new Date(order.jobStartAt).toLocaleString("nb-NO",{dateStyle:"short",timeStyle:"short"}),
+        href:"/admin/oppdrag/"+order.id+"/planlegg"
+      })),
+    ...customerQuotes
+      .filter(quote=>quote.status==="sent"&&(!quote.validUntil||quote.validUntil>=today))
+      .map(quote=>({
+        key:"quote-"+quote.id,
+        sort:7,
+        eyebrow:"TILBUD VENTER SVAR",
+        title:quote.title||"Tilbud",
+        meta:quote.quoteNumber||"",
+        href:"/admin/tilbud/"+quote.id
+      }))
+  ].sort((a,b)=>a.sort-b.sort).slice(0,8);
+
   const tabs = [["overview", "Oversikt"]];
 
   if (canViewOrders) tabs.push(["orders", "Bestillinger"]);
@@ -495,6 +578,23 @@ export default function AdminClient({ user }) {
                 </>
               )}
             </div>
+
+            {canViewOrders&&<section className="adminAttention">
+              <div className="adminAttentionHead">
+                <div><div className="kicker">KREVER OPPMERKSOMHET</div><h2>Dette bør du se på</h2></div>
+                <span>{attentionItems.length}</span>
+              </div>
+              {attentionItems.length?<div className="adminAttentionList">
+                {attentionItems.map(item=><button type="button" className="adminAttentionItem" key={item.key} onClick={()=>{
+                  if(item.href)router.push(item.href);
+                  else if(item.tab)setTab(item.tab);
+                }}>
+                  <span className="adminAttentionEyebrow">{item.eyebrow}</span>
+                  <span className="adminAttentionMain"><b>{item.title}</b><small>{item.meta}</small></span>
+                  <span className="adminAttentionArrow">→</span>
+                </button>)}
+              </div>:<div className="card adminAttentionEmpty"><b>Alt ser ryddig ut akkurat nå.</b><p className="muted">Nye forespørsler, bookinger og oppdrag som trenger oppfølging vil dukke opp her.</p></div>}
+            </section>}
 
             {(canUpdateOrders || canManageProducts) && (
               <div className="adminOverviewActions">
