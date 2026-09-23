@@ -37,7 +37,7 @@ export default function QuoteCustomerClient({quoteId,token}){
   setSaving(false);
   if(!response.ok){setError(data.error||"Svaret kunne ikke lagres.");return;}
   setQuote(data.quote);
-  setMessage(action==="accept"?"Takk. Tilbudet er godkjent. Aadland Service har fått beskjed.":"Tilbudet er registrert som avslått.");
+  setMessage(action==="accept"?"Takk. Tilbudet er godkjent. Vi tar kontakt for å avtale endelig oppstart og videre fremdrift.":"Tilbudet er registrert som avslått.");
  }
 
  if(loading)return <main className="customerQuoteShell"><div className="customerQuoteState">Laster tilbud …</div></main>;
@@ -82,7 +82,7 @@ export default function QuoteCustomerClient({quoteId,token}){
      <span><small>Tilbudsnummer</small><b>{quote.quoteNumber}</b></span>
      <span><small>Dato</small><b>{created}</b></span>
      <span><small>Gyldig til</small><b>{valid||"—"}</b></span>
-     <span><small>Planlagt oppstart</small><b>{start||"Avtales"}</b></span>
+     <span><small>Tidligst oppstart</small><b>{start||"Avtales"}</b><em>Endelig oppstart avtales etter godkjenning.</em></span>
     </div>
    </section>
 
@@ -146,7 +146,7 @@ export default function QuoteCustomerClient({quoteId,token}){
   </article>
 
   <section className="customerQuoteDecision noPrint">
-   {quote.isExpired?<div><h2>Tilbudet er utløpt</h2><p>Kontakt Aadland Service dersom du ønsker et oppdatert tilbud.</p></div>:quote.status==="accepted"?<div className="customerQuoteAccepted"><h2>Tilbudet er godkjent ✓</h2><p>Vi tar kontakt om videre fremdrift.</p></div>:quote.status==="declined"?<div><h2>Tilbudet er avslått</h2><p>Ta gjerne kontakt hvis du ønsker endringer eller et nytt tilbud.</p></div>:quote.status==="cancelled"?<div><h2>Tilbudet er ikke lenger aktivt</h2></div>:<>
+   {quote.isExpired?<div><h2>Tilbudet er utløpt</h2><p>Kontakt Aadland Service dersom du ønsker et oppdatert tilbud.</p></div>:quote.status==="accepted"?<div className="customerQuoteAccepted"><h2>Tilbudet er godkjent ✓</h2><p>Vi tar kontakt for å avtale endelig oppstart og videre fremdrift.</p></div>:quote.status==="declined"?<div><h2>Tilbudet er avslått</h2><p>Ta gjerne kontakt hvis du ønsker endringer eller et nytt tilbud.</p></div>:quote.status==="cancelled"?<div><h2>Tilbudet er ikke lenger aktivt</h2></div>:<>
     <div><span className="quoteDocEyebrow">SVAR PÅ TILBUDET</span><h2>Ønsker du å gå videre?</h2><p>Ved godkjenning registreres tilbudet som akseptert hos Aadland Service.</p></div>
     {canRespond&&<div className="customerQuoteDecisionActions">
      <button className="btn customerQuoteAccept" disabled={saving} onClick={()=>respond("accept")}>{saving?"Lagrer …":"Godkjenn tilbud"}</button>
