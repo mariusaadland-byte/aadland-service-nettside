@@ -78,6 +78,22 @@ export default function MinSide(){
   }catch{setError("Kunne ikke sende lenken akkurat nå.")}
   finally{setBusy(false)}
  }
+\n async function resendVerification(){
+  setError("");setInfo("");
+  if(!form.email.trim()){setError("Skriv inn e-postadressen din først.");return}
+  setBusy(true);
+  try{
+   const r=await fetch("/api/customer/resend-verification",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({email:form.email})
+   });
+   const d=await r.json().catch(()=>({}));
+   if(!r.ok){setError(d.error||"Kunne ikke sende ny bekreftelsesmail.");return}
+   setInfo(d.message||"Hvis kontoen venter på bekreftelse, sender vi en ny mail.");
+  }catch{setError("Kunne ikke sende ny bekreftelsesmail akkurat nå.")}
+  finally{setBusy(false)}
+ }
 
  async function logout(){
   await fetch("/api/customer/logout",{method:"POST"});
@@ -105,6 +121,7 @@ export default function MinSide(){
   </form>
   <div className="customerLoginActions">
    {mode==="login"&&<button type="button" className="btn alt" disabled={busy} onClick={resetPassword}>Glemt passord?</button>}
+   {mode==="login"&&<button type="button" className="btn alt" disabled={busy} onClick={resendVerification}>Send bekreftelsesmail på nytt</button>}
    <button className="btn alt" onClick={()=>{setError("");setInfo("");setMode(mode==="login"?"register":"login")}}>{mode==="login"?"Ny kunde? Opprett konto":"Har du konto? Logg inn"}</button>
   </div>
  </main>;
