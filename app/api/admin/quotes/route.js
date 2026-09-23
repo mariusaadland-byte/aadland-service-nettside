@@ -31,6 +31,8 @@ function mapQuote(q){
   terms:q.terms||"",
   validUntil:q.valid_until||null,
   plannedStartDate:q.planned_start_date||null,
+  autoFollowUp:q.auto_follow_up!==false,
+  followUpSentAt:q.follow_up_sent_at||null,
   sourceOrderId:q.source_order_id||null,
   convertedOrderId:q.converted_order_id||null,
   sentAt:q.sent_at||null,
@@ -126,6 +128,7 @@ function payload(body,user,existing){
    terms:clean(body.terms,12000)||null,
    valid_until:validUntil,
    planned_start_date:plannedStartDate,
+   auto_follow_up:body.autoFollowUp===undefined?(existing?.auto_follow_up!==false):Boolean(body.autoFollowUp),
    source_order_id:body.sourceOrderId||existing?.source_order_id||null,
    ...(existing?{}:{created_by:user.id})
   },
