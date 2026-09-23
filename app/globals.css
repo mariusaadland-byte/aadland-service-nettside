@@ -2692,3 +2692,23 @@ body:has(.customerPage) .customerPage{
  border-color:rgba(150,45,45,.55)!important;
  background:rgba(150,45,45,.06)!important;
 }
+
+
+/* Rental booking notifications */
+.rentalBookingTop{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
+.rentalBookingTop h3{margin-top:5px}
+.rentalBookingStatus{display:inline-flex;padding:7px 10px;border-radius:999px;background:#f1eee8;border:1px solid #ddd4c7;font-size:10px;font-weight:900;white-space:nowrap}
+.rentalBookingStatus-confirmed,.rentalBookingStatus-active{background:rgba(47,103,55,.10);border-color:rgba(47,103,55,.22);color:#2f6737}
+.rentalBookingStatus-cancelled{background:rgba(150,45,45,.08);border-color:rgba(150,45,45,.20);color:#7f2929}
+.rentalBookingSummary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0}
+.rentalBookingSummary span{display:grid;gap:4px;padding:10px 12px;background:#faf8f4;border:1px solid #e7e0d5;border-radius:10px}
+.rentalBookingSummary small{color:#777}
+.rentalNotificationState{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+.rentalNotificationState span{display:inline-flex;padding:7px 10px;border-radius:999px;background:rgba(47,103,55,.10);border:1px solid rgba(47,103,55,.22);color:#2f6737;font-size:10px;font-weight:800}
+.rentalBookingActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.rentalCancelButton{border-color:rgba(150,45,45,.28)!important;color:#7f2929!important}
+@media(max-width:650px){
+ .rentalBookingSummary{grid-template-columns:1fr}
+ .rentalBookingActions{display:grid;grid-template-columns:1fr}
+ .rentalBookingActions .btn{text-align:center}
+}
