@@ -20,7 +20,7 @@ function validDate(value){
 }
 async function loadJob(s,id){
  const {data:order,error}=await s.from("orders")
-  .select("id,order_number,order_type,status,customer,customer_user_id,total_ore,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at")
+  .select("id,order_number,order_type,status,customer,customer_user_id,total_ore,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at,job_reminder_sent_at")
   .eq("id",id).maybeSingle();
  if(error){
   if(String(error.code||"")==="42703")return {setupRequired:true,error:"Databaseoppdatering mangler for oppdragsplanlegging."};
@@ -55,6 +55,7 @@ export async function GET(req){
   agreement:o.job_customer_agreement||"",
   planningUpdatedAt:o.job_planning_updated_at||null,
   confirmationSentAt:o.job_confirmation_sent_at||null,
+  reminderSentAt:o.job_reminder_sent_at||null,
   quote:loaded.quote?{
    id:loaded.quote.id,
    quoteNumber:loaded.quote.quote_number,
@@ -64,17 +65,20 @@ export async function GET(req){
  }});
 }
 
-async function savePlan(s,id,startAt,agreement){
+async function savePlan(s,id,startAt,agreement,currentStartAt=null){
  const start=validDate(startAt);
  if(!start)return {error:"Velg gyldig dato og klokkeslett for oppstart.",status:400};
  if(!agreement)return {error:"Skriv kort hva som er avtalt videre med kunden.",status:400};
  const now=new Date().toISOString();
+ const oldStart=currentStartAt?new Date(currentStartAt).toISOString():null;
+ const startChanged=oldStart!==start;
  const {data,error}=await s.from("orders").update({
   job_start_at:start,
   job_customer_agreement:agreement,
   job_planning_updated_at:now,
+  ...(startChanged?{job_reminder_sent_at:null}:{}),
   updated_at:now
- }).eq("id",id).select("id,order_number,order_type,status,customer,customer_user_id,total_ore,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at").single();
+ }).eq("id",id).select("id,order_number,order_type,status,customer,customer_user_id,total_ore,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at,job_reminder_sent_at").single();
  if(error){
   if(String(error.code||"")==="42703")return {setupRequired:true,error:"Databaseoppdatering mangler for oppdragsplanlegging.",status:409};
   return {error:"Planen kunne ikke lagres.",status:500};
@@ -94,13 +98,14 @@ export async function PATCH(req){
  const loaded=await loadJob(s,id);
  if(loaded.setupRequired)return NextResponse.json({error:loaded.error,setupRequired:true},{status:409});
  if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status||500});
- const saved=await savePlan(s,id,body.startAt,agreement);
+ const saved=await savePlan(s,id,body.startAt,agreement,loaded.order.job_start_at);
  if(saved.error)return NextResponse.json({error:saved.error,setupRequired:saved.setupRequired===true},{status:saved.status||500});
  return NextResponse.json({ok:true,job:{
   startAt:saved.data.job_start_at,
   agreement:saved.data.job_customer_agreement,
   planningUpdatedAt:saved.data.job_planning_updated_at,
-  confirmationSentAt:saved.data.job_confirmation_sent_at
+  confirmationSentAt:saved.data.job_confirmation_sent_at,
+  reminderSentAt:saved.data.job_reminder_sent_at
  }});
 }
 
@@ -117,7 +122,7 @@ export async function POST(req){
  if(loaded.setupRequired)return NextResponse.json({error:loaded.error,setupRequired:true},{status:409});
  if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status||500});
 
- const saved=await savePlan(s,id,body.startAt,agreement);
+ const saved=await savePlan(s,id,body.startAt,agreement,loaded.order.job_start_at);
  if(saved.error)return NextResponse.json({error:saved.error,setupRequired:saved.setupRequired===true},{status:saved.status||500});
 
  const email=clean(saved.data.customer?.email,254).toLowerCase();
