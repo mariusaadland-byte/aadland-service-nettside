@@ -45,7 +45,7 @@ function calculate(lines){
  return {subtotal,vat,total:subtotal+vat};
 }
 
-export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
+export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initialCustomer=null}){
  const router=useRouter();
  const [v,setV]=useState(blankState);
  const [quoteNumber,setQuoteNumber]=useState("");
@@ -59,6 +59,21 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
  const [savedMessage,setSavedMessage]=useState("");
  const calc=useMemo(()=>calculate(v.lineItems),[v.lineItems]);
  const planSum=useMemo(()=>v.paymentPlan.reduce((sum,row)=>sum+(Number(row.percent)||0),0),[v.paymentPlan]);
+
+ useEffect(()=>{
+  if(quoteId||sourceOrderId||!initialCustomer)return;
+  const hasValue=["name","email","phone","address"].some(key=>String(initialCustomer?.[key]||"").trim());
+  if(!hasValue)return;
+  setV(current=>({
+   ...current,
+   customer:{
+    name:String(initialCustomer.name||""),
+    email:String(initialCustomer.email||""),
+    phone:String(initialCustomer.phone||""),
+    address:String(initialCustomer.address||"")
+   }
+  }));
+ },[quoteId,sourceOrderId,initialCustomer]);
 
  useEffect(()=>{
   if(quoteId||!sourceOrderId)return;
