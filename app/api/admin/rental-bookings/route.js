@@ -37,6 +37,7 @@ const map=b=>({
  adminNote:b.admin_note||"",
  confirmationSentAt:b.confirmation_sent_at||null,
  cancellationSentAt:b.cancellation_sent_at||null,
+ reminderSentAt:b.reminder_sent_at||null,
  createdAt:b.created_at,
  updatedAt:b.updated_at
 });
@@ -223,7 +224,9 @@ export async function PATCH(req){
     statusSaved:true
    },{status:500});
   }
-  const stamp=kind==="confirmation"?{confirmation_sent_at:now,cancellation_sent_at:null}:{cancellation_sent_at:now};
+  const stamp=kind==="confirmation"
+   ?{confirmation_sent_at:now,cancellation_sent_at:null,reminder_sent_at:null}
+   :{cancellation_sent_at:now};
   const {error:stampError}=await s.from("rental_bookings").update({...stamp,updated_at:new Date().toISOString()}).eq("id",b.id);
   if(stampError&&!["42703"].includes(String(stampError.code||"")))console.error("RENTAL NOTIFICATION STAMP",stampError);
   return NextResponse.json({ok:true,sentTo:sent.email,kind});
