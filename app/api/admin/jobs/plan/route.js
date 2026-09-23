@@ -56,6 +56,7 @@ export async function GET(req){
   planningUpdatedAt:o.job_planning_updated_at||null,
   confirmationSentAt:o.job_confirmation_sent_at||null,
   reminderSentAt:o.job_reminder_sent_at||null,
+  reminderSentAt:o.job_reminder_sent_at||null,
   quote:loaded.quote?{
    id:loaded.quote.id,
    quoteNumber:loaded.quote.quote_number,
@@ -176,6 +177,6 @@ export async function POST(req){
  }
 
  const sentAt=new Date().toISOString();
- await s.from("orders").update({job_confirmation_sent_at:sentAt,updated_at:sentAt}).eq("id",id);
+ await s.from("orders").update({job_confirmation_sent_at:sentAt,job_reminder_sent_at:null,updated_at:sentAt}).eq("id",id);
  return NextResponse.json({ok:true,sentTo:email,sentAt});
 }
