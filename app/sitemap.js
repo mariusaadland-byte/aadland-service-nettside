@@ -1,64 +1,106 @@
 import {db} from "../lib/supabase";
 
+export const revalidate=3600;
+
 const base="https://www.aadland-service.no";
 
-function entry(path,changeFrequency="monthly",priority=.6,lastModified){
+function route(path,priority,changeFrequency,lastModified){
  return {
   url:base+path,
   changeFrequency,
   priority,
-  ...(lastModified?{lastModified:new Date(lastModified)}:{})
+  ...(lastModified?{lastModified}:{})
  };
 }
 
+function validSlug(value){
+ return typeof value==="string"&&value.trim().length>0;
+}
+
 export default async function sitemap(){
- const staticEntries=[
-  entry("/","weekly",1),
-  entry("/produkter","weekly",.85),
-  entry("/utleie","weekly",.8),
-  entry("/prosjekter","weekly",.8),
-  entry("/personvern","yearly",.2),
-  entry("/vilkar/salg","yearly",.25),
-  entry("/vilkar/utleie","yearly",.25)
+ const routes=[
+  route("",1,"weekly"),
+  route("/produkter",.85,"weekly"),
+  route("/utleie",.8,"weekly"),
+  route("/prosjekter",.85,"weekly"),
+  route("/personvern",.4,"yearly"),
+  route("/vilkar/salg",.4,"yearly"),
+  route("/vilkar/utleie",.4,"yearly")
  ];
 
- const s=db();
- if(!s)return staticEntries;
-
  try{
-  const nowIso=new Date().toISOString();
-  const [products,categories,rentalItems,projects,services]=await Promise.all([
-   s.from("products").select("slug,updated_at").eq("active",true),
-   s.from("categories").select("slug,updated_at").eq("active",true),
-   s.from("rental_items").select("slug,updated_at").eq("active",true).neq("status","hidden"),
-   s.from("projects").select("slug,updated_at").eq("active",true),
-   s.from("services").select("slug,updated_at,has_page,publish_from,publish_until").eq("active",true)
+  const s=db();
+  if(!s)return routes;
+
+  const [servicesResult,categoriesResult,productsResult,projectsResult,rentalItemsResult]=await Promise.all([
+   s.from("services").select("slug,has_page,publish_from,publish_until,updated_at,created_at").eq("active",true),
+   s.from("categories").select("slug,updated_at,created_at").eq("active",true),
+   s.from("products").select("slug,updated_at,created_at").eq("active",true),
+   s.from("projects").select("slug,updated_at,created_at").eq("active",true),
+   s.from("rental_items").select("slug,status,updated_at,created_at").eq("active",true).neq("status","hidden")
   ]);
 
-  const dynamic=[];
+  const now=Date.now();
 
-  for(const row of products.data||[]){
-   if(row.slug)dynamic.push(entry("/produkter/"+encodeURIComponent(row.slug),"weekly",.75,row.updated_at));
-  }
-  for(const row of categories.data||[]){
-   if(row.slug)dynamic.push(entry("/produkter/kategori/"+encodeURIComponent(row.slug),"weekly",.65,row.updated_at));
-  }
-  for(const row of rentalItems.data||[]){
-   if(row.slug)dynamic.push(entry("/utleie/"+encodeURIComponent(row.slug),"weekly",.7,row.updated_at));
-  }
-  for(const row of projects.data||[]){
-   if(row.slug)dynamic.push(entry("/prosjekter/"+encodeURIComponent(row.slug),"monthly",.7,row.updated_at));
-  }
-  for(const row of services.data||[]){
-   if(!row.slug||row.has_page!==true)continue;
-   if(row.publish_from&&new Date(row.publish_from).toISOString()>nowIso)continue;
-   if(row.publish_until&&new Date(row.publish_until).toISOString()<nowIso)continue;
-   dynamic.push(entry("/tjenester/"+encodeURIComponent(row.slug),"monthly",.75,row.updated_at));
+  if(!servicesResult.error&&Array.isArray(servicesResult.data)){
+   servicesResult.data
+    .filter(service=>service.has_page===true&&validSlug(service.slug))
+    .filter(service=>!service.publish_from||new Date(service.publish_from).getTime()<=now)
+    .filter(service=>!service.publish_until||new Date(service.publish_until).getTime()>=now)
+    .forEach(service=>routes.push(route(
+     "/tjenester/"+encodeURIComponent(service.slug),
+     .78,
+     "monthly",
+     service.updated_at||service.created_at||undefined
+    )));
   }
 
-  return staticEntries.concat(dynamic);
- }catch(error){
-  console.error("SITEMAP ERROR",error);
-  return staticEntries;
+  if(!categoriesResult.error&&Array.isArray(categoriesResult.data)){
+   categoriesResult.data
+    .filter(category=>validSlug(category.slug))
+    .forEach(category=>routes.push(route(
+     "/produkter/kategori/"+encodeURIComponent(category.slug),
+     .72,
+     "weekly",
+     category.updated_at||category.created_at||undefined
+    )));
+  }
+
+  if(!productsResult.error&&Array.isArray(productsResult.data)){
+   productsResult.data
+    .filter(product=>validSlug(product.slug))
+    .forEach(product=>routes.push(route(
+     "/produkter/"+encodeURIComponent(product.slug),
+     .76,
+     "weekly",
+     product.updated_at||product.created_at||undefined
+    )));
+  }
+
+  if(!rentalItemsResult.error&&Array.isArray(rentalItemsResult.data)){
+   rentalItemsResult.data
+    .filter(item=>validSlug(item.slug))
+    .forEach(item=>routes.push(route(
+     "/utleie/"+encodeURIComponent(item.slug),
+     .74,
+     "weekly",
+     item.updated_at||item.created_at||undefined
+    )));
+  }
+
+  if(!projectsResult.error&&Array.isArray(projectsResult.data)){
+   projectsResult.data
+    .filter(project=>validSlug(project.slug))
+    .forEach(project=>routes.push(route(
+     "/prosjekter/"+encodeURIComponent(project.slug),
+     .72,
+     "monthly",
+     project.updated_at||project.created_at||undefined
+    )));
+  }
+
+  return routes;
+ }catch{
+  return routes;
  }
 }
