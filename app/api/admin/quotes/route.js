@@ -30,6 +30,7 @@ function mapQuote(q){
   notes:q.notes||"",
   terms:q.terms||"",
   validUntil:q.valid_until||null,
+  plannedStartDate:q.planned_start_date||null,
   sourceOrderId:q.source_order_id||null,
   convertedOrderId:q.converted_order_id||null,
   sentAt:q.sent_at||null,
@@ -108,6 +109,7 @@ function payload(body,user,existing){
  if(!paymentPlan)return {error:"Betalingsplanen må til sammen være 100 %."};
  const calc=totals(lines);
  const validUntil=body.validUntil&&/^\d{4}-\d{2}-\d{2}$/.test(String(body.validUntil))?String(body.validUntil):null;
+ const plannedStartDate=body.plannedStartDate&&/^\d{4}-\d{2}-\d{2}$/.test(String(body.plannedStartDate))?String(body.plannedStartDate):null;
  const status=STATUSES.includes(body.status)?body.status:(existing?.status||"draft");
  return {
   record:{
@@ -123,6 +125,7 @@ function payload(body,user,existing){
    notes:clean(body.notes,8000)||null,
    terms:clean(body.terms,12000)||null,
    valid_until:validUntil,
+   planned_start_date:plannedStartDate,
    source_order_id:body.sourceOrderId||existing?.source_order_id||null,
    ...(existing?{}:{created_by:user.id})
   },
