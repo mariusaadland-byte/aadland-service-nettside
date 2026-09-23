@@ -52,7 +52,7 @@ Kontroller at spørringen faktisk opprettet/oppdaterte én rad. Ikke legg e-post
 - Test forespørsel med bilde og at bildet bare kan vises via innlogget backoffice.
 - Test ordre, befaring, utleie og kundekonto.
 - Test tilbud fra kladd → sendt → kundegodkjenning → opprett oppdrag, og kontroller at tilbudet vises på kundens Min side.
-- Test passordgjenoppretting for både admin og kundekonto. Produksjons-URL-ene `/admin/nytt-passord` og `/min-side/nytt-passord` må være tillatt i Supabase Auth redirect URLs.
+- Test passordgjenoppretting for både admin og kundekonto. Begge bruker nå egne signerte Aadland Service-lenker og er ikke avhengige av Supabase Auth redirect-URL for passordreset.
 - Test at eksisterende data fortsatt kan leses før testgrenen merges til `main`.
 
 SQL-filene er laget idempotente der det er praktisk, men produksjonskjøring skal fortsatt gjøres kontrollert.

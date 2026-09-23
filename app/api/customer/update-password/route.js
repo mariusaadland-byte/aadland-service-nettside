@@ -20,8 +20,9 @@ export async function POST(req){
   const s=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
   const {data:userData,error:userError}=await s.auth.admin.getUserById(verified.id);
   const user=userData?.user;
-  if(userError||!user||String(user.email||"").trim().toLowerCase()!==verified.email){
-   return NextResponse.json({error:"Lenken er ugyldig eller utløpt.",code:"invalid_or_expired"},{status:410});
+  const currentVersion=String(user?.updated_at||user?.created_at||"");
+  if(userError||!user||String(user.email||"").trim().toLowerCase()!==verified.email||currentVersion!==verified.version){
+   return NextResponse.json({error:"Lenken er ugyldig, utløpt eller allerede brukt.",code:"invalid_or_expired"},{status:410});
   }
 
   const {error:updateError}=await s.auth.admin.updateUserById(user.id,{password:nextPassword});
