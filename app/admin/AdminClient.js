@@ -666,7 +666,7 @@ function Jobs({orders,status,canUpdateOrders,reload}){
     </div>
 
     <div className="jobMeta">
-     <span><small>Planlagt oppstart</small><b>{order.sourceQuotePlannedStartDate?new Date(order.sourceQuotePlannedStartDate+"T12:00:00").toLocaleDateString("nb-NO"):"Ikke satt"}</b></span>
+     <span><small>Tidligst oppstart</small><b>{order.sourceQuotePlannedStartDate?new Date(order.sourceQuotePlannedStartDate+"T12:00:00").toLocaleDateString("nb-NO"):"Ikke satt"}</b></span>
      <span><small>Godkjent</small><b>{order.sourceQuoteAcceptedAt?new Date(order.sourceQuoteAcceptedAt).toLocaleString("nb-NO"):"—"}</b></span>
      <span><small>Avtalt total</small><b>{nok(order.sourceQuoteTotalOre||order.totalOre||0)}</b></span>
     </div>
