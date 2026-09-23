@@ -82,9 +82,11 @@ export default function QuoteCustomerClient({quoteId,token}){
      <span><small>Tilbudsnummer</small><b>{quote.quoteNumber}</b></span>
      <span><small>Dato</small><b>{created}</b></span>
      <span><small>Gyldig til</small><b>{valid||"—"}</b></span>
-     <span><small>Tidligst oppstart</small><b>{start||"Avtales"}</b><em>Endelig oppstart avtales etter godkjenning.</em></span>
+     <span><small>Tidligst oppstart</small><b>{start||"Avtales"}</b></span>
     </div>
    </section>
+
+   <p className="quoteStartNotice">Tidligste oppstart er veiledende. Endelig oppstart avtales etter godkjenning.</p>
 
    <section className="quoteDocCustomer">
     <div>
