@@ -281,7 +281,11 @@ export default function AdminClient({ user }) {
   const activeOrders = orders.filter((order) => !order.archivedAt);
 
   const fresh = activeOrders.filter(
-    (order) => order.status === "new"
+    (order) => order.orderType !== "custom" && order.status === "new"
+  ).length;
+
+  const freshEnquiries = activeOrders.filter(
+    (order) => order.orderType === "custom" && !order.sourceQuoteId && order.status === "new"
   ).length;
 
   const working = activeOrders.filter((order) =>
@@ -431,6 +435,7 @@ export default function AdminClient({ user }) {
           >
             {label}
             {id === "orders" && fresh ? ` (${fresh})` : ""}
+            {id === "surveys" && freshEnquiries ? ` (${freshEnquiries})` : ""}
           </button>
         ))}
 
@@ -490,9 +495,15 @@ export default function AdminClient({ user }) {
               {canViewOrders && (
                 <>
                   <div className="stat">
-                    <span className="muted">Nye ordre</span>
+                    <span className="muted">Nye bestillinger</span>
                     <br />
                     <b>{fresh}</b>
+                  </div>
+
+                  <div className="stat">
+                    <span className="muted">Nye forespørsler</span>
+                    <br />
+                    <b>{freshEnquiries}</b>
                   </div>
 
                   <div className="stat">
