@@ -1955,3 +1955,28 @@ html{scroll-behavior:smooth}
  .jobPlanningActions{display:grid;grid-template-columns:1fr}
  .jobPlanningActions .btn{text-align:center}
 }
+
+
+/* Min side – oppdrag */
+.customerJobGrid{display:grid;gap:18px}
+.customerJobCard{display:grid;gap:18px;padding:24px}
+.customerJobStart{display:grid;gap:5px;padding:16px 18px;border:1px solid #c7a45f;background:rgba(207,161,83,.12);border-radius:13px}
+.customerJobStart small,.customerJobAgreement>small{font-size:10px;font-weight:900;letter-spacing:.08em;color:#8a682d}
+.customerJobStart b{font-size:20px}
+.customerJobStart span{font-size:12px;color:#6f675b}
+.customerJobStartPending{border-color:#d8d0c2;background:rgba(255,255,255,.28)}
+.customerJobStartPending small{color:#777}
+.customerJobAgreement{display:grid;gap:7px;padding:16px 18px;border-radius:13px;background:rgba(0,0,0,.035);border:1px solid rgba(0,0,0,.07)}
+.customerJobAgreement p{margin:0;white-space:pre-wrap;line-height:1.65}
+.customerJobAgreement>span{font-size:11px;color:#777}
+.customerJobPaymentPlan{display:grid;gap:8px;padding-top:2px}
+.customerJobPaymentPlan h4{margin:0 0 2px}
+.customerJobPaymentPlan>div{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:12px 13px;border:1px solid rgba(0,0,0,.07);border-radius:11px;background:rgba(255,255,255,.3)}
+.customerJobPaymentPlan>div>span{display:grid;gap:3px}
+.customerJobPaymentPlan small{color:#777}
+.customerJobPaymentPlan strong{white-space:nowrap}
+@media(max-width:760px){
+ .customerJobCard{padding:18px}
+ .customerJobPaymentPlan>div{align-items:flex-start;flex-direction:column}
+ .customerJobStart b{font-size:18px}
+}
