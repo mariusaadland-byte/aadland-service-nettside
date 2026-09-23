@@ -29,7 +29,8 @@ function blankState(){
   notes:"",
   terms:defaultTerms,
   validUntil:defaultValidUntil(),
-  plannedStartDate:""
+  plannedStartDate:"",
+  autoFollowUp:true
  };
 }
 function calculate(lines){
@@ -135,7 +136,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      notes:quote.notes||"",
      terms:quote.terms||defaultTerms,
      validUntil:quote.validUntil||"",
-     plannedStartDate:quote.plannedStartDate||""
+     plannedStartDate:quote.plannedStartDate||"",
+     autoFollowUp:quote.autoFollowUp!==false
     });
    })
    .catch(err=>{if(!cancelled)setError(err.message||"Tilbudet kunne ikke lastes.")})
@@ -277,6 +279,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
        <div className="field"><label>Tidligst oppstart</label><input type="date" value={v.plannedStartDate||""} onChange={e=>set("plannedStartDate",e.target.value)}/><small className="muted">Vises til kunden. Endelig oppstart avtales etter godkjenning, og datoen kan endres senere.</small></div>
        {quoteId&&<div className="field"><label>Status</label><select value={v.status} onChange={e=>set("status",e.target.value)}><option value="draft">Kladd</option><option value="sent">Sendt</option><option value="accepted">Godkjent</option><option value="declined">Avslått</option><option value="expired">Utløpt</option><option value="cancelled">Avbrutt</option></select></div>}
       </div>
+      <label className="quoteFollowUpSetting"><input type="checkbox" checked={v.autoFollowUp!==false} onChange={e=>set("autoFollowUp",e.target.checked)}/><span><b>Automatisk oppfølging etter ca. 2 døgn</b><small>Sendes bare dersom tilbudet fortsatt står som sendt og kunden ikke har svart.</small></span></label>
      </section>
 
      <section className="card quoteEditorSection">
