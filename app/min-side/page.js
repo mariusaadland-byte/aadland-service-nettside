@@ -180,6 +180,11 @@ export default function MinSide(){
  const quotes=data.quotes||[];
  const jobs=(data.orders||[]).filter(order=>order.order_type==="custom");
  const purchases=(data.orders||[]).filter(order=>order.order_type!=="custom");
+ const rentals=data.rentals||[];
+ const openQuotes=quotes.filter(q=>effectiveQuoteStatus(q)==="sent").length;
+ const activeJobs=jobs.filter(o=>!["completed","cancelled"].includes(o.status)).length;
+ const activePurchases=purchases.filter(o=>!["completed","cancelled"].includes(o.status)).length;
+ const activeRentals=rentals.filter(r=>["new","confirmed","active"].includes(r.status)).length;
 
  return <main className="customerPage">
   <Link href="/">← Aadland Service</Link>
@@ -194,7 +199,14 @@ export default function MinSide(){
   {info&&<p className="success customerDashboardNotice">{info}</p>}
   {error&&<p className="notice customerDashboardNotice">{error}</p>}
 
-  <section className="customerDashboardSection customerAccountSection">
+  <nav className="customerOverview" aria-label="Oversikt over Min side">
+   <a href="#tilbud"><small>ÅPNE TILBUD</small><b>{openQuotes}</b><span>{openQuotes===1?"tilbud venter":"tilbud venter"}</span></a>
+   <a href="#oppdrag"><small>AKTIVE OPPDRAG</small><b>{activeJobs}</b><span>{activeJobs===1?"oppdrag":"oppdrag"}</span></a>
+   <a href="#bestillinger"><small>BESTILLINGER</small><b>{activePurchases}</b><span>aktive nå</span></a>
+   <a href="#utleie"><small>UTLEIE</small><b>{activeRentals}</b><span>aktive nå</span></a>
+  </nav>
+
+  <section id="konto" className="customerDashboardSection customerAccountSection">
    <div className="customerSectionHead">
     <div><div className="kicker">KONTO</div><h2>Mine opplysninger</h2></div>
     {!editingProfile&&<button type="button" className="btn alt customerEditProfileButton" onClick={()=>setEditingProfile(true)}>Rediger</button>}
@@ -222,7 +234,7 @@ export default function MinSide(){
    </form>}
   </section>
 
-  <section className="customerDashboardSection">
+  <section id="tilbud" className="customerDashboardSection">
    <div className="customerSectionHead">
     <div><div className="kicker">DOKUMENTER</div><h2>Tilbud</h2></div>
     <span>{quotes.length}</span>
@@ -250,7 +262,7 @@ export default function MinSide(){
    </div>}
   </section>
 
-  <section className="customerDashboardSection customerJobsSection">
+  <section id="oppdrag" className="customerDashboardSection customerJobsSection">
    <div className="customerSectionHead">
     <div><div className="kicker">MINE OPPDRAG</div><h2>Oppdrag</h2></div>
     <span>{jobs.length}</span>
@@ -261,7 +273,7 @@ export default function MinSide(){
     return <article className="card customerJobCard" key={o.id}>
      <div className="customerCardTop">
       <div><small>{o.order_number}{q?.quoteNumber?" · "+q.quoteNumber:""}</small><h3>{q?.title||"Oppdrag"}</h3></div>
-      <span className="customerStatus">{orderStatus[o.status]||o.status}</span>
+      <span className={"customerStatus customerStatus-"+o.status}>{orderStatus[o.status]||o.status}</span>
      </div>
 
      {o.job_start_at?<div className="customerJobStart">
@@ -302,11 +314,11 @@ export default function MinSide(){
    })}</div>}
   </section>
 
-  <section className="customerDashboardSection">
+  <section id="bestillinger" className="customerDashboardSection">
    <div className="customerSectionHead"><div><div className="kicker">HANDEL</div><h2>Bestillinger</h2></div><span>{purchases.length}</span></div>
    {!purchases.length?<div className="card customerEmpty"><p>Ingen produktbestillinger knyttet til kontoen ennå.</p></div>:
    <div className="customerGrid">{purchases.map(o=><article className="card customerHistoryCard" key={o.id}>
-    <div className="customerCardTop"><div><small>{o.order_number}</small><h3>Bestilling</h3><p className="customerHistoryDate">Bestilt {dateTime(o.created_at)}</p></div><span className="customerStatus">{orderStatus[o.status]||o.status}</span></div>
+    <div className="customerCardTop"><div><small>{o.order_number}</small><h3>Bestilling</h3><p className="customerHistoryDate">Bestilt {dateTime(o.created_at)}</p></div><span className={"customerStatus customerStatus-"+o.status}>{orderStatus[o.status]||o.status}</span></div>
     {Array.isArray(o.items)&&o.items.length>0&&<div className="customerItemList">
      {o.items.slice(0,6).map((item,index)=><div key={(item.productId||item.name||"item")+"-"+index}><span><b>{item.name||"Produkt"}</b><small>Antall {item.quantity||1}</small></span><strong>{kr((Number(item.unitPriceOre)||0)*(Number(item.quantity)||1))}</strong></div>)}
      {o.items.length>6&&<small>+ {o.items.length-6} flere varelinjer</small>}
@@ -320,11 +332,11 @@ export default function MinSide(){
    </article>)}</div>}
   </section>
 
-  <section className="customerDashboardSection">
-   <div className="customerSectionHead"><div><div className="kicker">UTLEIE</div><h2>Utleie</h2></div><span>{data.rentals.length}</span></div>
-   {!data.rentals.length?<div className="card customerEmpty"><p>Ingen utleier knyttet til kontoen ennå.</p></div>:
-   <div className="customerGrid">{data.rentals.map(r=><article className="card customerHistoryCard" key={r.id}>
-    <div className="customerCardTop"><div><small>{r.booking_number}</small><h3>{r.rental_items?.name||"Utleie"}</h3><p className="customerHistoryDate">Booket {dateTime(r.created_at)}</p></div><span className="customerStatus">{rentalStatus[r.status]||r.status}</span></div>
+  <section id="utleie" className="customerDashboardSection">
+   <div className="customerSectionHead"><div><div className="kicker">UTLEIE</div><h2>Utleie</h2></div><span>{rentals.length}</span></div>
+   {!rentals.length?<div className="card customerEmpty"><p>Ingen utleier knyttet til kontoen ennå.</p></div>:
+   <div className="customerGrid">{rentals.map(r=><article className="card customerHistoryCard" key={r.id}>
+    <div className="customerCardTop"><div><small>{r.booking_number}</small><h3>{r.rental_items?.name||"Utleie"}</h3><p className="customerHistoryDate">Booket {dateTime(r.created_at)}</p></div><span className={"customerStatus customerStatus-"+r.status}>{rentalStatus[r.status]||r.status}</span></div>
     <div className="customerCardMeta">
      <span><small>Periode</small><b>{date(r.start_date)} – {date(r.end_date)}</b></span>
      <span><small>Leiepris</small><b>{kr(r.total_ore)}</b></span>
