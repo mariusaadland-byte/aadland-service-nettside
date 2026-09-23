@@ -6,6 +6,12 @@ function clean(value,max){
  return String(value??"").trim().replace(/\s+/g," ").slice(0,max);
 }
 
+export async function GET(){
+ const customer=await getCustomer();
+ if(!customer)return NextResponse.json({error:"Ikke innlogget."},{status:401});
+ return NextResponse.json({customer});
+}
+
 export async function PATCH(req){
  try{
   const customer=await getCustomer();
