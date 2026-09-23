@@ -30,11 +30,12 @@ export default function QuotesClient(){
   if(!response.ok){
    setError(data.error||"Tilbudene kunne ikke hentes.");
    setSetupRequired(data.setupRequired===true);
-  setFollowUpSetupRequired(data.followUpSetupRequired===true);
+   setFollowUpSetupRequired(data.followUpSetupRequired===true);
    return;
   }
   setQuotes(data.quotes||[]);
   setSetupRequired(data.setupRequired===true);
+  setFollowUpSetupRequired(data.followUpSetupRequired===true);
  }
 
  useEffect(()=>{load()},[showArchived]);
