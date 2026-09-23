@@ -14,6 +14,7 @@ Ved trinnvis kjøring brukes denne rekkefølgen:
 8. `site-settings.sql` – innhold og kontaktdata for forsiden.
 9. `quotes.sql` – tilbud, tilbudsnummer, betalingsplan og tilbudsstatus.
 10. `quote_to_order.sql` – kobler et godkjent tilbud til oppdraget som opprettes i backoffice.
+11. `quote_start_date.sql` – legger til planlagt oppstart som kan vises direkte til kunden i tilbudet.
 
 ## Første eierkonto
 
