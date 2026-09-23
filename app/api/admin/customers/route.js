@@ -18,7 +18,7 @@ export async function GET(){
    .order("created_at",{ascending:false})
    .limit(1000),
   s.from("quotes")
-   .select("id,quote_number,title,status,total_inc_vat_ore,customer,created_at,sent_at,accepted_at,declined_at")
+   .select("id,quote_number,title,status,total_inc_vat_ore,customer,valid_until,created_at,sent_at,accepted_at,declined_at")
    .order("created_at",{ascending:false})
    .limit(1000)
  ]);
@@ -42,6 +42,7 @@ export async function GET(){
    status:row.status||"",
    totalOre:Number(row.total_inc_vat_ore)||0,
    customer:row.customer||{},
+   validUntil:row.valid_until||null,
    createdAt:row.created_at||null,
    sentAt:row.sent_at||null,
    acceptedAt:row.accepted_at||null,
