@@ -178,10 +178,13 @@ export default function MinSide(){
  </main>;
 
  const quotes=data.quotes||[];
- const jobs=(data.orders||[]).filter(order=>order.order_type==="custom");
+ const customOrders=(data.orders||[]).filter(order=>order.order_type==="custom");
+ const jobs=customOrders.filter(order=>Boolean(order.source_quote));
+ const enquiries=customOrders.filter(order=>!order.source_quote);
  const purchases=(data.orders||[]).filter(order=>order.order_type!=="custom");
  const rentals=data.rentals||[];
  const openQuotes=quotes.filter(q=>effectiveQuoteStatus(q)==="sent").length;
+ const openEnquiries=enquiries.filter(o=>!["completed","cancelled"].includes(o.status)).length;
  const activeJobs=jobs.filter(o=>!["completed","cancelled"].includes(o.status)).length;
  const activePurchases=purchases.filter(o=>!["completed","cancelled"].includes(o.status)).length;
  const activeRentals=rentals.filter(r=>["new","confirmed","active"].includes(r.status)).length;
@@ -194,6 +197,15 @@ export default function MinSide(){
    date:q.acceptedAt||q.declinedAt||q.sentAt||q.createdAt,
    status:quoteStatus[effectiveQuoteStatus(q)]||effectiveQuoteStatus(q),
    href:q.href||"#tilbud"
+  })),
+  ...enquiries.map(o=>({
+   key:"enquiry-"+o.id,
+   type:"Forespørsel",
+   title:"Befaring / forespørsel",
+   meta:o.order_number||"",
+   date:o.created_at,
+   status:orderStatus[o.status]||o.status,
+   href:"#foresporsler"
   })),
   ...jobs.map(o=>({
    key:"job-"+o.id,
@@ -238,6 +250,7 @@ export default function MinSide(){
   {error&&<p className="notice customerDashboardNotice">{error}</p>}
 
   <nav className="customerOverview" aria-label="Oversikt over Min side">
+   <a href="#foresporsler"><small>FORESPØRSLER</small><b>{openEnquiries}</b><span>aktive nå</span></a>
    <a href="#tilbud"><small>ÅPNE TILBUD</small><b>{openQuotes}</b><span>{openQuotes===1?"tilbud venter":"tilbud venter"}</span></a>
    <a href="#oppdrag"><small>AKTIVE OPPDRAG</small><b>{activeJobs}</b><span>{activeJobs===1?"oppdrag":"oppdrag"}</span></a>
    <a href="#bestillinger"><small>BESTILLINGER</small><b>{activePurchases}</b><span>aktive nå</span></a>
@@ -284,6 +297,25 @@ export default function MinSide(){
      <button type="button" className="btn alt" disabled={busy} onClick={()=>{setEditingProfile(false);setProfileForm({name:data.customer.name||"",phone:data.customer.phone||"",address:data.customer.address||""})}}>Avbryt</button>
     </div>
    </form>}
+  </section>
+
+  <section id="foresporsler" className="customerDashboardSection">
+   <div className="customerSectionHead">
+    <div><div className="kicker">KONTAKT</div><h2>Forespørsler og befaring</h2></div>
+    <span>{enquiries.length}</span>
+   </div>
+   {!enquiries.length?<div className="card customerEmpty"><p>Ingen forespørsler knyttet til kontoen ennå.</p></div>:
+   <div className="customerGrid">{enquiries.map(o=><article className="card customerHistoryCard" key={o.id}>
+    <div className="customerCardTop">
+     <div><small>{o.order_number}</small><h3>Befaring / forespørsel</h3><p className="customerHistoryDate">Sendt {dateTime(o.created_at)}</p></div>
+     <span className={"customerStatus customerStatus-"+o.status}>{orderStatus[o.status]||o.status}</span>
+    </div>
+    {o.custom_request&&<p className="customerEnquiryText">{String(o.custom_request).split("\nBilder:\n")[0]}</p>}
+    <div className="customerCardMeta">
+     <span><small>Status</small><b>{orderStatus[o.status]||o.status}</b></span>
+     {o.survey_date&&<span><small>Befaring</small><b>{dateTimeFull(o.survey_date)}</b></span>}
+    </div>
+   </article>)}</div>}
   </section>
 
   <section id="tilbud" className="customerDashboardSection">
