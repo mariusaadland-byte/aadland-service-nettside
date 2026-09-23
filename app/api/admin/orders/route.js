@@ -240,18 +240,25 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
   }
 
   let surveyOrder=null;
-  if(sendSurveyConfirmation===true){
-    if(!surveyDate)return NextResponse.json({error:"Velg dato og klokkeslett før bekreftelsen sendes."},{status:400});
+  let surveyDateChanged=false;
+  if(surveyDate!==undefined||sendSurveyConfirmation===true){
+    if(sendSurveyConfirmation===true&&!surveyDate)return NextResponse.json({error:"Velg dato og klokkeslett før bekreftelsen sendes."},{status:400});
     const {data:found,error:findError}=await s.from("orders").select("*").eq("id",id).maybeSingle();
     if(findError||!found)return NextResponse.json({error:"Forespørselen ble ikke funnet."},{status:404});
     if(found.order_type!=="custom")return NextResponse.json({error:"Befaringsbekreftelse gjelder bare forespørsler."},{status:400});
-    if(!String(found.customer?.email||"").trim())return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
+    if(sendSurveyConfirmation===true&&!String(found.customer?.email||"").trim())return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
     surveyOrder=found;
+    const previousSurvey=found.survey_date?new Date(found.survey_date).toISOString():"";
+    const nextSurvey=surveyDate?new Date(surveyDate).toISOString():"";
+    surveyDateChanged=previousSurvey!==nextSurvey;
   }
 
   const updatePatch={
     ...(status !== undefined ? { status } : {}),
-    ...(surveyDate !== undefined ? { survey_date: surveyDate || null, survey_reminder_sent_at:null } : {}),
+    ...(surveyDate !== undefined ? {
+      survey_date:surveyDate||null,
+      ...(surveyDateChanged?{survey_confirmation_sent_at:null,survey_reminder_sent_at:null}:{})
+    } : {}),
     ...(adminNote !== undefined ? { admin_note: adminNote || null } : {}),
     ...(trackingNumber !== undefined ? { tracking_number: String(trackingNumber||"").trim() || null } : {}),
     ...(trackingUrl !== undefined ? { tracking_url: String(trackingUrl||"").trim() || null } : {}),
