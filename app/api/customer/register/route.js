@@ -56,7 +56,10 @@ export async function POST(req){
   if(profileError)console.error("CUSTOMER REGISTER PROFILE",profileError);
 
   const token=createCustomerVerificationToken({id:data.user.id,email});
-  const verifyUrl=new URL("/api/customer/verify",req.url);
+  const requestOrigin=new URL(req.url).origin;
+  const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
+  const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
+  const verifyUrl=new URL("/min-side/bekreft-epost",base);
   verifyUrl.searchParams.set("token",token);
 
   const html=`<!doctype html><html><body style="margin:0;background:#f3efe8;font-family:Arial,Helvetica,sans-serif;color:#181613">
@@ -69,9 +72,9 @@ export async function POST(req){
     <tr><td style="padding:30px">
      <div style="color:#b5863b;font-size:11px;font-weight:800;letter-spacing:.12em">BEKREFT E-POST</div>
      <h1 style="font-size:27px;line-height:1.15;margin:9px 0 14px">Velkommen, ${esc(name)}</h1>
-     <p style="color:#625d55;line-height:1.65;margin:0 0 22px">Bekreft e-postadressen din for å aktivere kundekontoen. Etter bekreftelsen åpnes Min side automatisk.</p>
-     <a href="${esc(verifyUrl.toString())}" style="display:inline-block;background:#cfa153;color:#111;text-decoration:none;font-weight:900;padding:14px 22px">Bekreft e-post og åpne Min side →</a>
-     <p style="margin:24px 0 0;color:#8a857c;font-size:11px;line-height:1.55">Lenken er gyldig i 24 timer. Hvis du ikke opprettet denne kontoen, kan du se bort fra e-posten.</p>
+     <p style="color:#625d55;line-height:1.65;margin:0 0 22px">Åpne Aadland Service-siden og bekreft e-postadressen din for å aktivere kundekontoen.</p>
+     <a href="${esc(verifyUrl.toString())}" style="display:inline-block;background:#cfa153;color:#111;text-decoration:none;font-weight:900;padding:14px 22px">Gå til bekreftelse →</a>
+     <p style="margin:24px 0 0;color:#8a857c;font-size:11px;line-height:1.55">På siden må du trykke «Bekreft e-post». Lenken alene aktiverer ikke kontoen. Lenken er gyldig i 24 timer. Hvis du ikke opprettet denne kontoen, kan du se bort fra e-posten.</p>
     </td></tr>
     <tr><td style="padding:18px 30px;border-top:1px solid #ece7df;color:#777;font-size:11px">Aadland Service · 471 54 898 · post@aadland-service.no</td></tr>
    </table>
@@ -97,7 +100,7 @@ export async function POST(req){
   return NextResponse.json({
    ok:true,
    verificationRequired:true,
-   message:"Kontoen er opprettet. Vi har sendt en bekreftelsesmail fra Aadland Service."
+   message:"Kontoen er opprettet. Vi har sendt en bekreftelsesmail fra Aadland Service. Åpne mailen og trykk deretter «Bekreft e-post» på siden."
   });
  }catch(e){
   console.error("CUSTOMER REGISTER",e);
