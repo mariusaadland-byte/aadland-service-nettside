@@ -2553,3 +2553,25 @@ body:has(.customerPage) .customerPage{
  .adminOverviewActions{justify-content:stretch}
  .adminOverviewActions .btn{width:100%;text-align:center}
 }
+
+
+/* Min side enquiry cards */
+.customerOverview{
+ grid-template-columns:repeat(5,minmax(0,1fr));
+}
+.customerEnquiryText{
+ margin:0;
+ padding:13px 14px;
+ border:1px solid rgba(255,255,255,.08);
+ background:#101010;
+ color:rgba(255,255,255,.72);
+ line-height:1.6;
+ white-space:pre-line;
+ border-radius:12px;
+}
+@media(max-width:1050px){
+ .customerOverview{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:700px){
+ .customerOverview{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
