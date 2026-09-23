@@ -68,3 +68,5 @@ SQL-filene er laget idempotente der det er praktisk, men produksjonskjøring ska
 16. `job_reminders.sql` – aktiverer én automatisk påminnelse før avtalt oppstart på et oppdrag.
 
 17. `rental_notifications.sql` – sporer bekreftelses- og avbestillingsmail for utleiebookinger.
+
+18. `rental_reminders.sql` – aktiverer én automatisk påminnelse dagen før en bekreftet utleieperiode starter.
