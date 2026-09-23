@@ -284,6 +284,16 @@ export default function AdminClient({ user }) {
     0
   );
 
+  const today = new Date().toISOString().slice(0, 10);
+  const waitingQuotes = customerQuotes.filter(
+    (quote) =>
+      quote.status === "sent" &&
+      (!quote.validUntil || quote.validUntil >= today)
+  ).length;
+  const acceptedQuoteValue = customerQuotes
+    .filter((quote) => quote.status === "accepted")
+    .reduce((sum, quote) => sum + (Number(quote.totalOre) || 0), 0);
+
   const tabs = [["overview", "Oversikt"]];
 
   if (canViewOrders) tabs.push(["orders", "Bestillinger"]);
@@ -436,13 +446,29 @@ export default function AdminClient({ user }) {
               )}
 
               {canViewOrders && (
-                <div className="stat">
-                  <span className="muted">
-                    Ordreverdi
-                  </span>
-                  <br />
-                  <b>{nok(total)}</b>
-                </div>
+                <>
+                  <div className="stat">
+                    <span className="muted">
+                      Tilbud venter svar
+                    </span>
+                    <br />
+                    <b>{waitingQuotes}</b>
+                  </div>
+                  <div className="stat">
+                    <span className="muted">
+                      Godkjent tilbudsverdi
+                    </span>
+                    <br />
+                    <b>{nok(acceptedQuoteValue)}</b>
+                  </div>
+                  <div className="stat">
+                    <span className="muted">
+                      Ordreverdi
+                    </span>
+                    <br />
+                    <b>{nok(total)}</b>
+                  </div>
+                </>
               )}
 
               {canViewOrders && (
@@ -460,6 +486,12 @@ export default function AdminClient({ user }) {
                 </>
               )}
             </div>
+
+            {(canUpdateOrders || canManageProducts) && (
+              <div className="adminOverviewActions">
+                <button className="btn alt" type="button" onClick={() => router.push("/admin/tilbud")}>Åpne tilbudsoversikt</button>
+              </div>
+            )}
 
             {canViewOrders && (
               <Orders
