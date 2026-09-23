@@ -2469,3 +2469,19 @@ body:has(.customerPage) .customerPage{
  .customerActivityMain{grid-column:1/-1}
  .customerActivityArrow{display:none}
 }
+
+
+/* Backoffice customer account indicator */
+.customerAdminCardTop{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.customerAdminCardTop h3{margin-top:0}
+.customerAccountBadge{
+ display:inline-flex;
+ padding:6px 9px;
+ border-radius:999px;
+ background:rgba(47,103,55,.10);
+ border:1px solid rgba(47,103,55,.24);
+ color:#2f6737;
+ font-size:10px;
+ font-weight:900;
+ white-space:nowrap;
+}
