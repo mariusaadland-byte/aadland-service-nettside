@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/job-reminders",
       "schedule": "30 9 * * *"
+    },
+    {
+      "path": "/api/cron/rental-reminders",
+      "schedule": "45 9 * * *"
     }
   ]
 }
