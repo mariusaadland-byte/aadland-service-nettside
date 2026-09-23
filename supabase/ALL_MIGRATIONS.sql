@@ -699,3 +699,22 @@ where status='sent'
   and archived_at is null
   and auto_follow_up=true
   and follow_up_sent_at is null;
+
+
+-- ============================================================
+-- supabase/security_hardening_20260923.sql
+-- ============================================================
+
+revoke execute on function public.rls_auto_enable() from public;
+revoke execute on function public.rls_auto_enable() from anon;
+revoke execute on function public.rls_auto_enable() from authenticated;
+
+create index if not exists quotes_created_by_idx
+on public.quotes(created_by);
+
+drop policy if exists admin_users_read_own on public.admin_users;
+create policy admin_users_read_own
+on public.admin_users
+for select
+to authenticated
+using (id = (select auth.uid()));
