@@ -75,10 +75,13 @@ export async function POST(req,{params}){
  const {data,error}=await loaded.s.from("quotes").update(patch).eq("id",id).select("*").single();
  if(error)return NextResponse.json({error:"Svaret kunne ikke lagres."},{status:500});
 
- if(process.env.RESEND_API_KEY){
+ const resendKey=process.env.VERCEL_ENV==="preview"
+  ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)
+  :process.env.RESEND_API_KEY;
+ if(resendKey){
   try{
    const {Resend}=await import("resend");
-   const resend=new Resend(process.env.RESEND_API_KEY);
+   const resend=new Resend(resendKey);
    const from="Aadland Service <post@aadland-service.no>";
    const to="post@aadland-service.no";
    const customerName=String(data.customer?.name||"Kunde");
