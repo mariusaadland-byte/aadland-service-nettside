@@ -2284,3 +2284,13 @@ html{scroll-behavior:smooth}
   background:rgba(155,74,42,.16)!important;
   border-color:rgba(211,125,88,.24)!important;
 }
+
+
+/* Min side route background hardening */
+body:has(.customerPage){
+  background:#111!important;
+  color:#f5f2ec!important;
+}
+body:has(.customerPage) .customerPage{
+  background:#111!important;
+}
