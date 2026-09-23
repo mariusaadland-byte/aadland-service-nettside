@@ -25,12 +25,21 @@ export default function MinSide(){
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
  const [info,setInfo]=useState("");
+ const [editingProfile,setEditingProfile]=useState(false);
+ const [profileForm,setProfileForm]=useState({name:"",phone:"",address:""});
 
  async function load(){
   try{
    const r=await fetch("/api/customer/me");
    const d=await r.json();
-   if(r.ok)setData(d);else setData(null);
+   if(r.ok){
+    setData(d);
+    setProfileForm({
+     name:d.customer?.name||"",
+     phone:d.customer?.phone||"",
+     address:d.customer?.address||""
+    });
+   }else setData(null);
   }finally{setLoading(false)}
  }
 
@@ -96,6 +105,45 @@ export default function MinSide(){
   finally{setBusy(false)}
  }
 
+ async function saveProfile(e){
+  e.preventDefault();
+  setBusy(true);setError("");setInfo("");
+  try{
+   const r=await fetch("/api/customer/profile",{
+    method:"PATCH",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(profileForm)
+   });
+   const d=await r.json().catch(()=>({}));
+   if(!r.ok){setError(d.error||"Kundeopplysningene kunne ikke lagres.");return}
+   setData(current=>current?{...current,customer:d.customer}:current);
+   setEditingProfile(false);
+   setInfo("Kundeopplysningene er oppdatert.");
+  }catch{
+   setError("Kundeopplysningene kunne ikke lagres akkurat nå.");
+  }finally{
+   setBusy(false);
+  }
+ }
+
+ async function sendLoggedInPasswordReset(){
+  setBusy(true);setError("");setInfo("");
+  try{
+   const r=await fetch("/api/customer/reset-password",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({email:data?.customer?.email||""})
+   });
+   const d=await r.json().catch(()=>({}));
+   if(!r.ok){setError(d.error||"Kunne ikke sende passordlenken.");return}
+   setInfo(d.message||"Vi har sendt en lenke for å velge nytt passord.");
+  }catch{
+   setError("Kunne ikke sende passordlenken akkurat nå.");
+  }finally{
+   setBusy(false);
+  }
+ }
+
  async function logout(){
   await fetch("/api/customer/logout",{method:"POST"});
   setData(null);setMode("login");
@@ -143,6 +191,34 @@ export default function MinSide(){
   </header>
   {info&&<p className="success customerDashboardNotice">{info}</p>}
   {error&&<p className="notice customerDashboardNotice">{error}</p>}
+
+  <section className="customerDashboardSection customerAccountSection">
+   <div className="customerSectionHead">
+    <div><div className="kicker">KONTO</div><h2>Mine opplysninger</h2></div>
+    {!editingProfile&&<button type="button" className="btn alt customerEditProfileButton" onClick={()=>setEditingProfile(true)}>Rediger</button>}
+   </div>
+
+   {!editingProfile?<div className="card customerAccountCard">
+    <div className="customerAccountFacts">
+     <span><small>Navn</small><b>{data.customer.name||"Ikke registrert"}</b></span>
+     <span><small>E-post</small><b>{data.customer.email}</b></span>
+     <span><small>Telefon</small><b>{data.customer.phone||"Ikke registrert"}</b></span>
+     <span><small>Adresse</small><b>{data.customer.address||"Ikke registrert"}</b></span>
+    </div>
+    <div className="customerAccountActions">
+     <button type="button" className="btn alt" disabled={busy} onClick={sendLoggedInPasswordReset}>{busy?"Vent litt …":"Endre passord"}</button>
+    </div>
+   </div>:<form className="card customerAccountCard customerAccountForm" onSubmit={saveProfile}>
+    <div className="field"><label>Navn</label><input required maxLength={120} value={profileForm.name} onChange={e=>setProfileForm({...profileForm,name:e.target.value})}/></div>
+    <div className="field"><label>E-post</label><input value={data.customer.email} disabled readOnly/></div>
+    <div className="field"><label>Telefon</label><input maxLength={40} value={profileForm.phone} onChange={e=>setProfileForm({...profileForm,phone:e.target.value})}/></div>
+    <div className="field"><label>Adresse</label><input maxLength={300} value={profileForm.address} onChange={e=>setProfileForm({...profileForm,address:e.target.value})}/></div>
+    <div className="customerAccountActions">
+     <button className="btn" disabled={busy}>{busy?"Lagrer …":"Lagre opplysninger"}</button>
+     <button type="button" className="btn alt" disabled={busy} onClick={()=>{setEditingProfile(false);setProfileForm({name:data.customer.name||"",phone:data.customer.phone||"",address:data.customer.address||""})}}>Avbryt</button>
+    </div>
+   </form>}
+  </section>
 
   <section className="customerDashboardSection">
    <div className="customerSectionHead">
