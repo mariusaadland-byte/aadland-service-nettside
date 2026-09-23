@@ -17,6 +17,7 @@ export default function QuotesClient(){
  const [quotes,setQuotes]=useState([]);
  const [loading,setLoading]=useState(true);
  const [setupRequired,setSetupRequired]=useState(false);
+ const [followUpSetupRequired,setFollowUpSetupRequired]=useState(false);
  const [error,setError]=useState("");
  const [filter,setFilter]=useState("all");
  const [showArchived,setShowArchived]=useState(false);
@@ -29,10 +30,12 @@ export default function QuotesClient(){
   if(!response.ok){
    setError(data.error||"Tilbudene kunne ikke hentes.");
    setSetupRequired(data.setupRequired===true);
+   setFollowUpSetupRequired(data.followUpSetupRequired===true);
    return;
   }
   setQuotes(data.quotes||[]);
   setSetupRequired(data.setupRequired===true);
+  setFollowUpSetupRequired(data.followUpSetupRequired===true);
  }
 
  useEffect(()=>{load()},[showArchived]);
@@ -105,6 +108,12 @@ export default function QuotesClient(){
     <span>Tilbudssystemet er ferdig programmert, men tilbudstabellen må opprettes i Supabase før du kan bruke det.</span>
     <code>supabase/quotes.sql</code>
     <small>Kjør innholdet i denne filen én gang i Supabase SQL Editor.</small>
+   </div>}
+
+   {!setupRequired&&followUpSetupRequired&&<div className="adminProjectMigrationWarning">
+    <b>Automatisk tilbudsoppfølging venter på databaseoppdatering</b>
+    <span>Resten av tilbudssystemet fungerer som før. Kjør denne lille migrasjonen én gang for å aktivere automatisk oppfølging etter omtrent to døgn.</span>
+    <code>supabase/quote_followups.sql</code>
    </div>}
 
    {!setupRequired&&<>

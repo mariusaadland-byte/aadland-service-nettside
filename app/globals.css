@@ -2542,3 +2542,14 @@ body:has(.customerPage) .customerPage{
  background:rgba(207,161,83,.10);
  border:1px solid rgba(207,161,83,.26);
 }
+
+
+.adminOverviewActions{
+ display:flex;
+ justify-content:flex-end;
+ margin:0 0 18px;
+}
+@media(max-width:600px){
+ .adminOverviewActions{justify-content:stretch}
+ .adminOverviewActions .btn{width:100%;text-align:center}
+}
