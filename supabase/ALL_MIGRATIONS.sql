@@ -666,3 +666,19 @@ where converted_order_id is not null;
 -- Planlagt oppstart som vises i tilbudet til kunden
 alter table public.quotes
  add column if not exists planned_start_date date;
+
+
+-- ============================================================
+-- supabase/job_planning.sql
+-- ============================================================
+
+-- Planlegging av godkjente oppdrag og kundebekreftelse
+alter table public.orders
+ add column if not exists job_start_at timestamptz,
+ add column if not exists job_customer_agreement text,
+ add column if not exists job_planning_updated_at timestamptz,
+ add column if not exists job_confirmation_sent_at timestamptz;
+
+create index if not exists orders_job_start_at_idx
+on public.orders(job_start_at)
+where job_start_at is not null;
