@@ -56,3 +56,5 @@ Kontroller at spørringen faktisk opprettet/oppdaterte én rad. Ikke legg e-post
 - Test at eksisterende data fortsatt kan leses før testgrenen merges til `main`.
 
 SQL-filene er laget idempotente der det er praktisk, men produksjonskjøring skal fortsatt gjøres kontrollert.
+
+12. `job_planning.sql` – lagrer avtalt oppstart, videre avtale med kunden og tidspunkt for sendt planleggingsbekreftelse.
