@@ -3753,14 +3753,72 @@ function RentalCalendar({items,bookings,blocks}){
 
 function RentalBookings({bookings,reload,setError,canUpdate}){
  const statuses={new:"Ny",confirmed:"Bekreftet",active:"Utlevert",returned:"Returnert",completed:"Ferdig",cancelled:"Avbrutt"};
- async function patch(id,changes){const r=await fetch("/api/admin/rental-bookings",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,...changes})});const d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Bookingen kunne ikke oppdateres.");return;}await reload();}
+ const [savingId,setSavingId]=useState("");
+ const [message,setMessage]=useState("");
+
+ async function patch(id,changes){
+  setMessage("");
+  setSavingId(id);
+  const r=await fetch("/api/admin/rental-bookings",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,...changes})});
+  const d=await r.json().catch(()=>({}));
+  setSavingId("");
+  if(!r.ok){setError(d.error||"Bookingen kunne ikke oppdateres.");return;}
+  await reload();
+ }
+
+ async function notify(booking,action){
+  const verb=action==="confirm-and-send"?"bekrefte bookingen og sende e-post til":"avbryte bookingen og sende e-post til";
+  if(!window.confirm("Vil du "+verb+" "+booking.customer?.email+"?"))return;
+  setError("");
+  setMessage("");
+  setSavingId(booking.id);
+  const r=await fetch("/api/admin/rental-bookings",{
+   method:"PATCH",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({id:booking.id,action})
+  });
+  const d=await r.json().catch(()=>({}));
+  setSavingId("");
+  if(!r.ok){
+   setError(d.error||"Kundevarslingen kunne ikke sendes.");
+   if(d.statusSaved)await reload();
+   return;
+  }
+  setMessage(action==="confirm-and-send"
+   ?"Utleien er bekreftet og e-post er sendt til "+(d.sentTo||booking.customer?.email)+"."
+   :"Bookingen er avbrutt og kunden er varslet.");
+  await reload();
+ }
+
  if(!bookings.length)return <div className="card"><h3>Ingen utleiebookinger ennå</h3><p className="muted">Nye bookinger fra utleiesiden vises her.</p></div>;
- return <div className="grid">{bookings.map(b=><article className="card" key={b.id}><div className="kicker">{b.bookingNumber}</div><h3>{b.itemName}</h3><p><b>{b.customer?.name}</b><br/>{b.customer?.phone} · {b.customer?.email}<br/>{b.customer?.fulfillment==="delivery"?"Levering":"Henting"}{b.customer?.address?" · "+b.customer.address:""}</p><p>{b.startDate} – {b.endDate}<br/><b>{nok(b.totalOre)}</b> + depositum {nok(b.depositOre)}</p>
- <div className="field"><label>Status</label><select disabled={!canUpdate} value={b.status} onChange={e=>patch(b.id,{status:e.target.value})}>{Object.entries(statuses).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></div>
- <div className="field"><label>Betaling</label><select disabled={!canUpdate} value={b.paymentStatus} onChange={e=>patch(b.id,{paymentStatus:e.target.value})}><option value="unpaid">Ikke betalt</option><option value="partial">Delvis betalt</option><option value="paid">Betalt</option><option value="refunded">Refundert</option></select></div>
- <div className="field"><label>Depositum</label><select disabled={!canUpdate} value={b.depositStatus} onChange={e=>patch(b.id,{depositStatus:e.target.value})}><option value="not_paid">Ikke mottatt</option><option value="held">Holdes</option><option value="released">Frigitt</option><option value="partially_charged">Delvis trukket</option><option value="charged">Trukket</option></select></div>
- <div className="field"><label>Internt notat</label><textarea defaultValue={b.adminNote} id={"rental-note-"+b.id}/></div>{canUpdate&&<button className="btn alt" onClick={()=>patch(b.id,{adminNote:document.getElementById("rental-note-"+b.id).value})}>Lagre notat</button>}
- </article>)}</div>;
+ return <>
+  {message&&<p className="success">{message}</p>}
+  <div className="grid rentalBookingGrid">{bookings.map(b=><article className="card rentalBookingCard" key={b.id}>
+   <div className="rentalBookingTop">
+    <div><div className="kicker">{b.bookingNumber}</div><h3>{b.itemName}</h3></div>
+    <span className={"rentalBookingStatus rentalBookingStatus-"+b.status}>{statuses[b.status]||b.status}</span>
+   </div>
+   <p><b>{b.customer?.name}</b><br/>{b.customer?.phone} · {b.customer?.email}<br/>{b.customer?.fulfillment==="delivery"?"Levering":"Henting"}{b.customer?.address?" · "+b.customer.address:""}</p>
+   <div className="rentalBookingSummary">
+    <span><small>Periode</small><b>{b.startDate} – {b.endDate}</b></span>
+    <span><small>Leiepris</small><b>{nok(b.totalOre)}</b></span>
+    <span><small>Depositum</small><b>{nok(b.depositOre)}</b></span>
+   </div>
+   {(b.confirmationSentAt||b.cancellationSentAt)&&<div className="rentalNotificationState">
+    {b.confirmationSentAt&&<span>✓ Bekreftelse sendt {new Date(b.confirmationSentAt).toLocaleString("nb-NO")}</span>}
+    {b.cancellationSentAt&&<span>✓ Avbestilling sendt {new Date(b.cancellationSentAt).toLocaleString("nb-NO")}</span>}
+   </div>}
+   <div className="field"><label>Status</label><select disabled={!canUpdate||savingId===b.id} value={b.status} onChange={e=>patch(b.id,{status:e.target.value})}>{Object.entries(statuses).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></div>
+   <div className="field"><label>Betaling</label><select disabled={!canUpdate||savingId===b.id} value={b.paymentStatus} onChange={e=>patch(b.id,{paymentStatus:e.target.value})}><option value="unpaid">Ikke betalt</option><option value="partial">Delvis betalt</option><option value="paid">Betalt</option><option value="refunded">Refundert</option></select></div>
+   <div className="field"><label>Depositum</label><select disabled={!canUpdate||savingId===b.id} value={b.depositStatus} onChange={e=>patch(b.id,{depositStatus:e.target.value})}><option value="not_paid">Ikke mottatt</option><option value="held">Holdes</option><option value="released">Frigitt</option><option value="partially_charged">Delvis trukket</option><option value="charged">Trukket</option></select></div>
+   <div className="field"><label>Internt notat</label><textarea defaultValue={b.adminNote} id={"rental-note-"+b.id}/></div>
+   {canUpdate&&<div className="rentalBookingActions">
+    <button className="btn alt" type="button" disabled={savingId===b.id} onClick={()=>patch(b.id,{adminNote:document.getElementById("rental-note-"+b.id).value})}>{savingId===b.id?"Lagrer …":"Lagre notat"}</button>
+    {b.status!=="cancelled"&&b.status!=="completed"&&<button className="btn" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>notify(b,"confirm-and-send")}>{savingId===b.id?"Sender …":b.confirmationSentAt?"Send bekreftelse på nytt":"Bekreft og send e-post"}</button>}
+    {b.status!=="cancelled"&&<button className="btn alt rentalCancelButton" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>notify(b,"cancel-and-send")}>{savingId===b.id?"Sender …":"Avbryt og varsle kunde"}</button>}
+   </div>}
+  </article>)}</div>
+ </>;
 }
 
 const projectStoryMigrationSql="alter table public.projects add column if not exists content_blocks jsonb not null default '[]'::jsonb;";
