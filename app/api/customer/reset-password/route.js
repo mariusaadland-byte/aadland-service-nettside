@@ -44,7 +44,9 @@ export async function POST(req){
    return NextResponse.json({ok:true,message:genericMessage});
   }
 
-  const token=createCustomerPasswordResetToken({id:user.id,email:value});
+  const version=String(user.updated_at||user.created_at||"");
+  if(!version)return NextResponse.json({ok:true,message:genericMessage});
+  const token=createCustomerPasswordResetToken({id:user.id,email:value,version});
   const requestOrigin=new URL(req.url).origin;
   const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
   const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
