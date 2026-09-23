@@ -142,6 +142,7 @@ export default function PlanJobClient({jobId}){
      <span><small>Status</small><b>{job.status}</b></span>
      <span><small>Sist lagret</small><b>{job.planningUpdatedAt?dateTime(job.planningUpdatedAt):"Ikke planlagt"}</b></span>
      <span><small>Bekreftelse sendt</small><b>{job.confirmationSentAt?dateTime(job.confirmationSentAt):"Ikke sendt"}</b></span>
+     <span><small>Påminnelse sendt</small><b>{job.reminderSentAt?dateTime(job.reminderSentAt):"Ikke sendt"}</b></span>
     </div>
     <p className="muted">Når bekreftelsen sendes, får kunden avtalt oppstart og teksten du har skrevet under «Hva er avtalt videre».</p>
    </aside>
