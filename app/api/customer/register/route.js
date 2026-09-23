@@ -10,7 +10,11 @@ export async function POST(req){try{
  const {data,error}=await s.auth.signUp({email,password,options:{data:{customer:true,name:name.slice(0,120)}}});
  if(error||!data.user)return NextResponse.json({error:"Kunne ikke opprette konto. E-postadressen kan allerede være registrert."},{status:400});
  const profile={id:data.user.id,email,name:name.slice(0,120),phone:phone.slice(0,40),address:String(b.address||"").trim().slice(0,300)};
- const {error:profileError}=await s.from("customer_profiles").insert(profile);
- if(profileError){try{await s.auth.admin.deleteUser(data.user.id)}catch(cleanupError){console.error("CUSTOMER REGISTER CLEANUP",cleanupError)}if(profileError.code==="42P01")return NextResponse.json({error:"Kundekonto er ikke aktivert i databasen ennå.",setupRequired:true},{status:409});throw profileError}
+ const {error:profileError}=await s.from("customer_profiles").upsert(profile,{onConflict:"id"});
+ if(profileError){
+  if(["42P01","42703"].includes(String(profileError.code||"")))return NextResponse.json({error:"Kundekonto er ikke aktivert i databasen ennå.",setupRequired:true},{status:409});
+  console.error("CUSTOMER REGISTER PROFILE",profileError);
+  // Behold auth-brukeren. Innloggingen kan reparere en manglende profil etter e-postbekreftelse.
+ }
  return NextResponse.json({ok:true,verificationRequired:true,message:"Kontoen er opprettet. Bekreft e-postadressen før du logger inn."});
 }catch(e){console.error("CUSTOMER REGISTER",e);return NextResponse.json({error:"Kunne ikke opprette konto."},{status:500})}}
