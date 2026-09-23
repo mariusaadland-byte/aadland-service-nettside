@@ -65,7 +65,8 @@ export async function POST(req){
     const isCustom=body.orderType==="custom";
     const requestOrigin=new URL(req.url).origin;
     const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
-    const accountUrl=customerUserId?(configuredOrigin||requestOrigin)+"/min-side":"";
+    const minSideUrl=(configuredOrigin||requestOrigin)+"/min-side";
+    const accountUrl=customerUserId?minSideUrl:"";
     const title=isCustom?"Forespørselen er mottatt":"Bestillingen er mottatt";
     const intro=isCustom
      ?"Vi har mottatt forespørselen din og tar kontakt så snart vi kan."
@@ -83,7 +84,7 @@ export async function POST(req){
 <tr><td style="padding:12px 14px;color:#8e887f;font-size:11px">Referanse</td><td style="padding:12px 14px;color:#fff;font-weight:700;text-align:right">${esc(orderNumber)}</td></tr>
 ${!isCustom?`<tr><td style="padding:12px 14px;color:#8e887f;font-size:11px;border-top:1px solid #2d2d2d">Sum</td><td style="padding:12px 14px;color:#fff;font-weight:700;text-align:right;border-top:1px solid #2d2d2d">${esc(totalText)}</td></tr>`:""}
 </table>
-${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:""}
+${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:`<a href="${esc(minSideUrl)}" style="display:inline-block;margin-top:20px;border:1px solid #d7a74e;color:#d7a74e;text-decoration:none;font-weight:900;padding:12px 18px">Opprett Min side →</a><p style="margin:10px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Opprett konto med samme e-postadresse, så kobles bestillinger og tilbud til kontoen din.</p>`}
 <p style="margin:22px 0 0;color:#8e887f;font-size:11px;line-height:1.55">${isCustom?"Vi tar kontakt videre om forespørselen.":"Dette er en ordrebekreftelse. Kvittering sendes når betalingen senere er registrert/trukket."}</p>
 </td></tr>
 <tr><td style="padding:18px 30px;border-top:1px solid #34312b;color:#8e887f;font-size:11px">Aadland Service · 471 54 898 · post@aadland-service.no</td></tr>
