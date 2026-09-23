@@ -24,6 +24,10 @@ const mapOrder = (o) => ({
   createdAt: o.created_at,
   surveyDate: o.survey_date || null,
   adminNote: o.admin_note || "",
+  jobStartAt: o.job_start_at || null,
+  jobCustomerAgreement: o.job_customer_agreement || "",
+  jobPlanningUpdatedAt: o.job_planning_updated_at || null,
+  jobConfirmationSentAt: o.job_confirmation_sent_at || null,
   paymentStatus: o.payment_status || "unpaid",
   paymentReference: o.payment_reference || "",
   trackingNumber: o.tracking_number || "",
@@ -82,8 +86,44 @@ export async function GET() {
     );
   }
 
+  const orderRows=data||[];
+  const orderIds=orderRows.map(order=>order.id);
+  const quoteByOrder=new Map();
+
+  if(orderIds.length){
+    const {data:linkedQuotes,error:quoteError}=await s
+      .from("quotes")
+      .select("id,quote_number,title,status,total_inc_vat_ore,payment_plan,accepted_at,planned_start_date,converted_order_id")
+      .in("converted_order_id",orderIds);
+
+    if(!quoteError){
+      for(const quote of linkedQuotes||[]){
+        if(quote.converted_order_id)quoteByOrder.set(quote.converted_order_id,quote);
+      }
+    }else if(!["42P01","42703"].includes(String(quoteError.code||""))){
+      console.error("ADMIN ORDER QUOTE LINK ERROR",quoteError);
+    }
+  }
+
   return NextResponse.json({
-    orders: await Promise.all((data || []).map(async order=>{const mapped=mapOrder(order);const privateData=await privateImages(s,mapped.customRequest);mapped.customRequest=privateData.text;mapped.contactImages=privateData.images;return mapped;})),
+    orders: await Promise.all(orderRows.map(async order=>{
+      const mapped=mapOrder(order);
+      const privateData=await privateImages(s,mapped.customRequest);
+      mapped.customRequest=privateData.text;
+      mapped.contactImages=privateData.images;
+      const quote=quoteByOrder.get(order.id);
+      if(quote){
+        mapped.sourceQuoteId=quote.id;
+        mapped.sourceQuoteNumber=quote.quote_number;
+        mapped.sourceQuoteTitle=quote.title||"";
+        mapped.sourceQuoteStatus=quote.status||"accepted";
+        mapped.sourceQuoteAcceptedAt=quote.accepted_at||null;
+        mapped.sourceQuotePlannedStartDate=quote.planned_start_date||null;
+        mapped.sourceQuoteTotalOre=Number(quote.total_inc_vat_ore)||0;
+        mapped.sourceQuotePaymentPlan=Array.isArray(quote.payment_plan)?quote.payment_plan:[];
+      }
+      return mapped;
+    })),
   });
 }
 

@@ -266,6 +266,7 @@ export default function AdminClient({ user }) {
   const tabs = [["overview", "Oversikt"]];
 
   if (canViewOrders) tabs.push(["orders", "Bestillinger"]);
+  if (canViewOrders) tabs.push(["jobs", "Oppdrag"]);
   if (canViewOrders) tabs.push(["archive", "Arkiv"]);
   if (canViewOrders) tabs.push(["surveys", "Befaringer"]);
   if (canViewOrders) tabs.push(["customers", "Kunder"]);
@@ -310,6 +311,12 @@ export default function AdminClient({ user }) {
           </button>
         ))}
 
+        {(canUpdateOrders || canManageProducts) && (
+          <button onClick={() => { setMenuOpen(false); router.push("/admin/tilbud"); }}>
+            Tilbud
+          </button>
+        )}
+
         <button onClick={() => { setMenuOpen(false); logout(); }}>Logg ut</button>
       </aside>
 
@@ -323,6 +330,8 @@ export default function AdminClient({ user }) {
             ? "Oversikt"
             : tab === "orders"
             ? "Bestillinger"
+            : tab === "jobs"
+            ? "Oppdrag"
             : tab === "archive"
             ? "Arkiv"
             : tab === "surveys"
@@ -462,12 +471,21 @@ export default function AdminClient({ user }) {
           />
         )}
 
+        {tab === "jobs" && canViewOrders && (
+          <Jobs
+            orders={activeOrders.filter(order => order.orderType === "custom" && order.sourceQuoteId)}
+            status={status}
+            canUpdateOrders={canUpdateOrders}
+            reload={load}
+          />
+        )}
+
         {tab === "archive" && canViewOrders && (
           <Archive orders={orders} reload={load} setError={setError} canUpdate={canUpdateOrders} />
         )}
 
         {tab === "surveys" && canViewOrders && (
-          <Surveys orders={activeOrders.filter(order => order.orderType === "custom")} status={status} canUpdateOrders={canUpdateOrders} />
+          <Surveys orders={activeOrders.filter(order => order.orderType === "custom" && !order.sourceQuoteId)} status={status} canUpdateOrders={canUpdateOrders} />
         )}
 
         {tab === "customers" && canViewOrders && (
@@ -533,7 +551,7 @@ export default function AdminClient({ user }) {
 function Archive({orders,reload,setError,canUpdate}){
  const archived=(orders||[]).filter(o=>o.archivedAt);
  async function restore(id){const r=await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,action:"restore"})}),d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Kunne ikke gjenopprette.");return;}await reload()}
- return <div className="orderCards">{archived.length?archived.map(o=><article className="card orderCard" key={o.id}><div className="kicker">{o.orderNumber}</div><h3>{o.customerName||"Ukjent kunde"}</h3><p>{o.orderType==="custom"?"Befaring/forespørsel":"Bestilling"} · {nok(o.totalOre||0)}<br/><small className="muted">Arkivert {new Date(o.archivedAt).toLocaleString("nb-NO")}</small></p>{canUpdate&&<button className="btn alt" onClick={()=>restore(o.id)}>Gjenopprett</button>}</article>):<div className="card"><h3>Arkivet er tomt</h3><p className="muted">Ferdige eller avbrutte saker kan flyttes hit uten at historikken slettes.</p></div>}</div>
+ return <div className="orderCards">{archived.length?archived.map(o=><article className="card orderCard" key={o.id}><div className="kicker">{o.orderNumber}</div><h3>{o.customerName||"Ukjent kunde"}</h3><p>{o.orderType==="custom"?(o.sourceQuoteId?"Oppdrag":"Befaring/forespørsel"):"Bestilling"} · {nok(o.totalOre||0)}<br/><small className="muted">Arkivert {new Date(o.archivedAt).toLocaleString("nb-NO")}</small></p>{canUpdate&&<button className="btn alt" onClick={()=>restore(o.id)}>Gjenopprett</button>}</article>):<div className="card"><h3>Arkivet er tomt</h3><p className="muted">Ferdige eller avbrutte saker kan flyttes hit uten at historikken slettes.</p></div>}</div>
 }
 
 function Customers({orders,bookings}) {
@@ -549,7 +567,7 @@ function Customers({orders,bookings}) {
     if(!current.lastDate||String(entry.date)>String(current.lastDate))current.lastDate=entry.date;
     customers.set(key,current);
   }
-  (orders||[]).forEach(o=>add(o.customer||{name:o.customerName,email:o.customerEmail,phone:o.customerPhone},{type:"order",number:o.orderNumber,date:o.createdAt,totalOre:o.totalOre||0,label:o.orderType==="custom"?"Befaring/forespørsel":"Bestilling"}));
+  (orders||[]).forEach(o=>add(o.customer||{name:o.customerName,email:o.customerEmail,phone:o.customerPhone},{type:"order",number:o.orderNumber,date:o.createdAt,totalOre:o.totalOre||0,label:o.orderType==="custom"?(o.sourceQuoteId?"Oppdrag":"Befaring/forespørsel"):"Bestilling"}));
   (bookings||[]).forEach(b=>add(b.customer,{type:"rental",number:b.bookingNumber,date:b.createdAt,totalOre:b.totalOre||0,label:"Utleie"}));
   const q=query.trim().toLowerCase(),list=[...customers.values()].filter(c=>!q||[c.name,c.email,c.phone,c.address].some(v=>String(v||"").toLowerCase().includes(q))).sort((x,y)=>String(y.lastDate||"").localeCompare(String(x.lastDate||"")));
   return <><div className="card customerSearch"><div className="kicker">KUNDEREGISTER</div><h3>{customers.size} kunder fra bestillinger, befaringer og utleie</h3><div className="field"><label>Søk</label><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Navn, e-post, telefon eller adresse"/></div></div>
@@ -595,6 +613,98 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
  </article>):<div className="card"><p>Ingen bestillinger ennå.</p></div>}</div></>;
 }
 
+function Jobs({orders,status,canUpdateOrders,reload}){
+ const [openId,setOpenId]=useState(null);
+ const [savingId,setSavingId]=useState("");
+ const [message,setMessage]=useState("");
+
+ async function archive(order){
+  if(!confirm("Flytte dette oppdraget til arkivet?"))return;
+  setSavingId(order.id);setMessage("");
+  const response=await fetch("/api/admin/orders",{
+   method:"PATCH",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({id:order.id,action:"archive"})
+  });
+  const data=await response.json().catch(()=>({}));
+  setSavingId("");
+  if(!response.ok){setMessage(data.error||"Oppdraget kunne ikke arkiveres.");return}
+  setMessage("Oppdraget er flyttet til arkivet.");
+  if(typeof reload==="function")await reload();
+ }
+
+ const labels={
+  new:"Ny",
+  confirmed:"Bekreftet",
+  in_progress:"Under arbeid",
+  ready:"Klar",
+  completed:"Ferdig",
+  cancelled:"Avbrutt"
+ };
+
+ if(!orders.length)return <div className="card"><h3>Ingen oppdrag ennå</h3><p className="muted">Når et godkjent tilbud gjøres om til oppdrag, vises det her.</p></div>;
+
+ return <>
+  {message&&<p className="notice">{message}</p>}
+  <div className="jobGrid">
+   {orders.map(order=><article className="card jobCard" key={order.id}>
+    <div className="jobCardTop">
+     <div>
+      <div className="kicker">{order.orderNumber}</div>
+      <h3>{order.sourceQuoteTitle||"Oppdrag"}</h3>
+      <p>{order.customerName||"Ukjent kunde"}</p>
+     </div>
+     <b>{nok(order.totalOre||0)}</b>
+    </div>
+
+    <div className="jobQuoteLink">
+     <div>
+      <small>Opprettet fra tilbud</small>
+      <b>{order.sourceQuoteNumber}</b>
+     </div>
+     <div className="jobQuoteActions">
+      <a className="btn alt" href={"/admin/tilbud/"+order.sourceQuoteId}>Åpne tilbud</a>
+      <a className="btn" href={"/admin/oppdrag/"+order.id+"/planlegg"}>{order.jobStartAt?"Rediger plan":"Planlegg oppdrag"}</a>
+     </div>
+    </div>
+
+    <div className="jobMeta">
+     <span><small>Avtalt oppstart</small><b>{order.jobStartAt?new Date(order.jobStartAt).toLocaleString("nb-NO"):"Ikke avtalt"}</b></span>
+     <span><small>Tidligst oppstart i tilbud</small><b>{order.sourceQuotePlannedStartDate?new Date(order.sourceQuotePlannedStartDate+"T12:00:00").toLocaleDateString("nb-NO"):"Ikke satt"}</b></span>
+     <span><small>Bekreftelse</small><b>{order.jobConfirmationSentAt?"Sendt "+new Date(order.jobConfirmationSentAt).toLocaleString("nb-NO"):"Ikke sendt"}</b></span>
+     <span><small>Godkjent</small><b>{order.sourceQuoteAcceptedAt?new Date(order.sourceQuoteAcceptedAt).toLocaleString("nb-NO"):"—"}</b></span>
+     <span><small>Avtalt total</small><b>{nok(order.sourceQuoteTotalOre||order.totalOre||0)}</b></span>
+    </div>
+
+    <div className="field">
+     <label>Status</label>
+     {canUpdateOrders
+      ?<select value={order.status} onChange={e=>status(order.id,e.target.value)}>{Object.entries(labels).map(([value,label])=><option value={value} key={value}>{label}</option>)}</select>
+      :<b>{labels[order.status]||order.status}</b>}
+    </div>
+
+    <button className="btn alt" type="button" onClick={()=>setOpenId(openId===order.id?null:order.id)}>{openId===order.id?"Skjul detaljer":"Vis detaljer"}</button>
+
+    {openId===order.id&&<div className="jobDetails">
+     {order.customerPhone&&<p><b>Telefon:</b> <a href={"tel:"+order.customerPhone}>{order.customerPhone}</a></p>}
+     {order.customerEmail&&<p><b>E-post:</b> <a href={"mailto:"+order.customerEmail}>{order.customerEmail}</a></p>}
+     {order.customer?.address&&<p><b>Arbeidssted:</b> {order.customer.address}</p>}
+     {order.customRequest&&<div className="jobDescription">{order.customRequest}</div>}
+     {Array.isArray(order.sourceQuotePaymentPlan)&&order.sourceQuotePaymentPlan.length>0&&<div className="jobPaymentPlan">
+      <h4>Betalingsplan</h4>
+      {order.sourceQuotePaymentPlan.map((row,index)=><div key={row.id||index}>
+       <span><b>{row.label||("Delbetaling "+(index+1))}</b><small>{row.trigger||""}</small></span>
+       <b>{row.percent}% · {nok((order.sourceQuoteTotalOre||order.totalOre||0)*(Number(row.percent)||0)/100)}</b>
+      </div>)}
+     </div>}
+    </div>}
+
+    {canUpdateOrders&&["completed","cancelled"].includes(order.status)&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>archive(order)}>{savingId===order.id?"Flytter …":"Arkiver oppdrag"}</button>}
+   </article>)}
+  </div>
+ </>;
+}
+
 function Surveys({ orders, status, canUpdateOrders }) {
   const [savingId,setSavingId]=useState("");
   async function saveSurvey(order, surveyDate, adminNote){
@@ -638,6 +748,7 @@ function Surveys({ orders, status, canUpdateOrders }) {
         <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:18}}>
           {order.customerPhone && <a className="btn" href={"tel:"+order.customerPhone}>Ring kunde</a>}
           {order.customerEmail && <a className="btn alt" href={"mailto:"+order.customerEmail}>Send e-post</a>}
+          {canUpdateOrders && <a className="btn alt" href={"/admin/tilbud/ny?orderId="+order.id}>Lag tilbud</a>}
         </div>
       </article>;
     })}
