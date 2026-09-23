@@ -78,7 +78,8 @@ export default function MinSide(){
   }catch{setError("Kunne ikke sende lenken akkurat nå.")}
   finally{setBusy(false)}
  }
-\n async function resendVerification(){
+
+ async function resendVerification(){
   setError("");setInfo("");
   if(!form.email.trim()){setError("Skriv inn e-postadressen din først.");return}
   setBusy(true);
