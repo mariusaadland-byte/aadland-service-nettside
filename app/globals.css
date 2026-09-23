@@ -2313,3 +2313,40 @@ body:has(.customerPage) .customerPage{
  .customerAccountActions{display:grid;grid-template-columns:1fr}
  .customerAccountActions .btn{text-align:center}
 }
+
+
+/* Signed-in customer form prefill */
+.customerPrefillNote{
+ margin:0 0 14px!important;
+ padding:10px 12px;
+ border:1px solid rgba(215,167,78,.28);
+ background:rgba(215,167,78,.08);
+ color:#d9bd83!important;
+ font-size:12px;
+ line-height:1.5;
+}
+
+
+.customerOrderSuccessActions{
+ display:flex;
+ gap:10px;
+ flex-wrap:wrap;
+ margin-top:20px;
+}
+@media(max-width:600px){
+ .customerOrderSuccessActions{display:grid;grid-template-columns:1fr}
+ .customerOrderSuccessActions .btn{text-align:center}
+}
+
+
+/* Min side order and rental detail cards */
+.customerHistoryDate{margin:5px 0 0!important;color:rgba(255,255,255,.48)!important;font-size:11px}
+.customerItemList{display:grid;gap:1px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.08);border-radius:12px;overflow:hidden}
+.customerItemList>div{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:11px 12px;background:#101010}
+.customerItemList>div>span{display:grid;gap:3px}
+.customerItemList small{color:rgba(255,255,255,.48)}
+.customerItemList>small{padding:9px 12px;background:#101010}
+.customerItemList strong{white-space:nowrap}
+@media(max-width:600px){
+ .customerItemList>div{align-items:flex-start;flex-direction:column;gap:6px}
+}
