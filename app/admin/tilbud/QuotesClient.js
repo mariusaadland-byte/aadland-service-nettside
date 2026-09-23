@@ -62,7 +62,8 @@ export default function QuotesClient(){
     notes:quote.notes,
     terms:quote.terms,
     validUntil:valid.toISOString().slice(0,10),
-    plannedStartDate:quote.plannedStartDate||""
+    plannedStartDate:quote.plannedStartDate||"",
+    autoFollowUp:quote.autoFollowUp!==false
    })
   });
   const data=await response.json().catch(()=>({}));
@@ -139,6 +140,8 @@ export default function QuotesClient(){
         <span><small>Tidligst oppstart</small><b>{quote.plannedStartDate?new Date(quote.plannedStartDate+"T12:00:00").toLocaleDateString("nb-NO"):"Ikke satt"}</b></span>
        </div>
        {quote.convertedOrderId&&<div className="quoteConvertedListBadge">✓ Oppdrag opprettet</div>}
+       {quote.followUpSentAt&&<div className="quoteFollowUpBadge">✓ Oppfølging sendt {new Date(quote.followUpSentAt).toLocaleDateString("nb-NO")}</div>}
+       {!quote.followUpSentAt&&quote.status==="sent"&&quote.autoFollowUp!==false&&<div className="quoteFollowUpPending">Automatisk oppfølging er aktiv</div>}
        <div className="quoteListActions">
         <Link className="btn" href={"/admin/tilbud/"+quote.id}>Åpne</Link>
         <Link className="btn alt" href={"/admin/tilbud/"+quote.id+"/preview"}>Forhåndsvis</Link>

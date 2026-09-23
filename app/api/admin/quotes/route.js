@@ -31,6 +31,8 @@ function mapQuote(q){
   terms:q.terms||"",
   validUntil:q.valid_until||null,
   plannedStartDate:q.planned_start_date||null,
+  autoFollowUp:q.auto_follow_up!==false,
+  followUpSentAt:q.follow_up_sent_at||null,
   sourceOrderId:q.source_order_id||null,
   convertedOrderId:q.converted_order_id||null,
   sentAt:q.sent_at||null,
@@ -98,6 +100,12 @@ function sanitizePlan(value){
  if(Math.abs(sum-100)>0.01)return null;
  return plan;
 }
+function withoutFollowUpField(record){
+ const copy={...record};
+ delete copy.auto_follow_up;
+ return copy;
+}
+
 function payload(body,user,existing){
  const customer=sanitizeCustomer(body.customer);
  if(!customer.name)return {error:"Kunden må ha navn."};
@@ -126,6 +134,7 @@ function payload(body,user,existing){
    terms:clean(body.terms,12000)||null,
    valid_until:validUntil,
    planned_start_date:plannedStartDate,
+   auto_follow_up:body.autoFollowUp===undefined?(existing?.auto_follow_up!==false):Boolean(body.autoFollowUp),
    source_order_id:body.sourceOrderId||existing?.source_order_id||null,
    ...(existing?{}:{created_by:user.id})
   },
@@ -166,10 +175,17 @@ export async function POST(req){
   if(SETUP_CODES.includes(numberError.code))return NextResponse.json({error:"Databaseoppdatering mangler for tilbudssystemet.",setupRequired:true},{status:503});
   return NextResponse.json({error:"Tilbudsnummer kunne ikke opprettes."},{status:500});
  }
- const {data,error}=await s.from("quotes").insert({
+ let insertResult=await s.from("quotes").insert({
   quote_number:numberData,
   ...prepared.record
  }).select("*").single();
+ if(insertResult.error&&String(insertResult.error.code||"")==="42703"&&Object.prototype.hasOwnProperty.call(prepared.record,"auto_follow_up")){
+  insertResult=await s.from("quotes").insert({
+   quote_number:numberData,
+   ...withoutFollowUpField(prepared.record)
+  }).select("*").single();
+ }
+ const {data,error}=insertResult;
  if(error){
   if(SETUP_CODES.includes(error.code))return NextResponse.json({error:"Databaseoppdatering mangler for tilbudssystemet.",setupRequired:true},{status:503});
   return NextResponse.json({error:"Tilbudet kunne ikke lagres."},{status:500});
@@ -206,11 +222,19 @@ export async function PATCH(req){
   ...(status==="accepted"&&!existing.accepted_at?{accepted_at:now}:{}),
   ...(status==="declined"&&!existing.declined_at?{declined_at:now}:{})
  };
- const {data,error}=await s.from("quotes").update({
+ let updateResult=await s.from("quotes").update({
   ...prepared.record,
   ...statusDates,
   updated_at:now
  }).eq("id",id).select("*").single();
+ if(updateResult.error&&String(updateResult.error.code||"")==="42703"&&Object.prototype.hasOwnProperty.call(prepared.record,"auto_follow_up")){
+  updateResult=await s.from("quotes").update({
+   ...withoutFollowUpField(prepared.record),
+   ...statusDates,
+   updated_at:now
+  }).eq("id",id).select("*").single();
+ }
+ const {data,error}=updateResult;
  if(error)return NextResponse.json({error:"Tilbudet kunne ikke lagres."},{status:500});
  return NextResponse.json({quote:mapQuote(data)});
 }

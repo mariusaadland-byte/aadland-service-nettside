@@ -58,3 +58,5 @@ Kontroller at spørringen faktisk opprettet/oppdaterte én rad. Ikke legg e-post
 SQL-filene er laget idempotente der det er praktisk, men produksjonskjøring skal fortsatt gjøres kontrollert.
 
 12. `job_planning.sql` – lagrer avtalt oppstart, videre avtale med kunden og tidspunkt for sendt planleggingsbekreftelse.
+
+13. `quote_followups.sql` – aktiverer automatisk, én gangs oppfølgingsmail på sendte tilbud etter omtrent to døgn.
