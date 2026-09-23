@@ -2575,3 +2575,28 @@ body:has(.customerPage) .customerPage{
 @media(max-width:700px){
  .customerOverview{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+
+.customerSectionActions{
+ display:flex;
+ align-items:center;
+ gap:10px;
+ flex-wrap:wrap;
+ justify-content:flex-end;
+}
+.customerSectionActions>span{
+ min-width:34px;
+ height:34px;
+ border-radius:999px;
+ display:grid;
+ place-items:center;
+ color:#d7a74e;
+ background:rgba(215,167,78,.10);
+ border:1px solid rgba(215,167,78,.28);
+ font-weight:800;
+}
+.customerSectionActions .btn{padding:9px 13px}
+@media(max-width:560px){
+ .customerSectionHead{align-items:flex-start}
+ .customerSectionActions{justify-content:flex-start}
+}
