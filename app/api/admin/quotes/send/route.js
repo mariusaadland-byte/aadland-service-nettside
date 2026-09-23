@@ -47,6 +47,12 @@ export async function POST(req){
  const title=esc(quote.title||"Tilbud");
  const number=esc(quote.quote_number||"");
  const total=nok(quote.total_inc_vat_ore);
+ const minSideUrl=base+"/min-side";
+ let hasCustomerAccount=false;
+ try{
+  const {data:profile}=await s.from("customer_profiles").select("id").eq("email",email.toLowerCase()).maybeSingle();
+  hasCustomerAccount=Boolean(profile?.id);
+ }catch{}
 
  const rows=(Array.isArray(quote.line_items)?quote.line_items:[]).slice(0,20).map(line=>{
   const lineTotal=(Number(line.quantity)||0)*(Number(line.unitPriceOre??line.unit_price_ore)||0);
@@ -79,6 +85,7 @@ export async function POST(req){
  </div>
  <p style="margin:0 0 20px;color:#625d55;line-height:1.65">Åpne tilbudet for full oversikt, betalingsplan og vilkår. Der kan du også godkjenne eller avslå tilbudet.</p>
  <a href="${link}" style="display:inline-block;background:#cfa153;color:#111;text-decoration:none;font-weight:900;padding:14px 22px">Åpne tilbud →</a>
+ ${hasCustomerAccount?`<a href="${esc(minSideUrl)}" style="display:inline-block;margin-left:8px;border:1px solid #cfa153;color:#8a6326;text-decoration:none;font-weight:900;padding:13px 18px">Min side →</a>`:`<p style="margin:18px 0 0;color:#8a847a;font-size:11px;line-height:1.55">Vil du samle tilbud og oppdrag på ett sted? <a href="${esc(minSideUrl)}" style="color:#8a6326;font-weight:800">Opprett Min side med samme e-postadresse.</a></p>`}
  <p style="margin:26px 0 0;color:#8a847a;font-size:11px;line-height:1.55">Har du spørsmål kan du svare direkte på denne e-posten eller kontakte oss på 471 54 898.</p>
 </td></tr>
 <tr><td style="padding:18px 30px;border-top:1px solid #ece7df;color:#777;font-size:11px">
