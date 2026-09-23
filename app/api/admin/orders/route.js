@@ -146,7 +146,7 @@ export async function PATCH(req) {
     );
   }
 
-  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action } = await req.json();
+  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation } = await req.json();
   if(adminNote!==undefined&&String(adminNote||"").length>5000)return NextResponse.json({error:"Internt notat kan være maks 5000 tegn."},{status:400});
   if(trackingNumber!==undefined&&String(trackingNumber||"").length>120)return NextResponse.json({error:"Sporingsnummeret er for langt."},{status:400});
   if(trackingUrl!==undefined){const value=String(trackingUrl||"").trim();if(value.length>1000)return NextResponse.json({error:"Sporingslenken er for lang."},{status:400});if(value){try{const u=new URL(value);if(!["http:","https:"].includes(u.protocol))throw new Error()}catch{return NextResponse.json({error:"Skriv inn en gyldig sporingslenke."},{status:400})}}}
@@ -237,9 +237,28 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     return NextResponse.json({ok:true,paymentCaptureRequired:order.payment_status==="authorized",paymentStatus:order.payment_status||"unpaid"});
   }
 
+  let surveyOrder=null;
+  if(sendSurveyConfirmation===true){
+    if(!surveyDate)return NextResponse.json({error:"Velg dato og klokkeslett før bekreftelsen sendes."},{status:400});
+    const {data:found,error:findError}=await s.from("orders").select("*").eq("id",id).maybeSingle();
+    if(findError||!found)return NextResponse.json({error:"Forespørselen ble ikke funnet."},{status:404});
+    if(found.order_type!=="custom")return NextResponse.json({error:"Befaringsbekreftelse gjelder bare forespørsler."},{status:400});
+    if(!String(found.customer?.email||"").trim())return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
+    surveyOrder=found;
+  }
+
+  const updatePatch={
+    ...(status !== undefined ? { status } : {}),
+    ...(surveyDate !== undefined ? { survey_date: surveyDate || null } : {}),
+    ...(adminNote !== undefined ? { admin_note: adminNote || null } : {}),
+    ...(trackingNumber !== undefined ? { tracking_number: String(trackingNumber||"").trim() || null } : {}),
+    ...(trackingUrl !== undefined ? { tracking_url: String(trackingUrl||"").trim() || null } : {}),
+    ...(sendSurveyConfirmation===true ? {status:"confirmed"} : {})
+  };
+
   const { error } = await s
     .from("orders")
-    .update({ ...(status !== undefined ? { status } : {}), ...(surveyDate !== undefined ? { survey_date: surveyDate || null } : {}), ...(adminNote !== undefined ? { admin_note: adminNote || null } : {}), ...(trackingNumber !== undefined ? { tracking_number: String(trackingNumber||"").trim() || null } : {}), ...(trackingUrl !== undefined ? { tracking_url: String(trackingUrl||"").trim() || null } : {}) })
+    .update(updatePatch)
     .eq("id", id);
 
   if (error) {
@@ -258,6 +277,51 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
       },
       { status: 500 }
     );
+  }
+
+  if(sendSurveyConfirmation===true&&surveyOrder){
+    const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
+    if(!resendKey)return NextResponse.json({error:"Befaringen er lagret, men e-post er ikke konfigurert."},{status:503});
+    try{
+      const {Resend}=await import("resend");
+      const resend=new Resend(resendKey);
+      const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
+      const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+      const customerEmail=String(surveyOrder.customer?.email||"").trim().toLowerCase();
+      const customerName=String(surveyOrder.customer?.name||"kunde").trim();
+      const surveyText=new Date(surveyDate).toLocaleString("nb-NO",{dateStyle:"long",timeStyle:"short",timeZone:"Europe/Oslo"});
+      const requestOrigin=new URL(req.url).origin;
+      const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
+      const accountUrl=surveyOrder.customer_user_id?(configuredOrigin||requestOrigin)+"/min-side":"";
+      const address=[surveyOrder.customer?.address,surveyOrder.customer?.postalCode,surveyOrder.customer?.city].filter(Boolean).join(", ");
+      const html=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111;padding:28px 12px"><tr><td align="center">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#181818;border:1px solid #34312b">
+<tr><td style="padding:28px 30px;background:#0d0d0d;color:#fff"><div style="font-size:18px;font-weight:900;letter-spacing:.13em">AADLAND SERVICE</div><div style="margin-top:5px;color:#d9b365;font-size:11px;letter-spacing:.08em">BEFARING</div></td></tr>
+<tr><td style="padding:30px">
+<div style="color:#d9b365;font-size:11px;font-weight:800;letter-spacing:.12em">${esc(surveyOrder.order_number)}</div>
+<h1 style="font-size:27px;line-height:1.15;margin:9px 0 14px;color:#fff">Befaringen er avtalt</h1>
+<p style="color:#c9c3b8;line-height:1.65;margin:0 0 20px">Hei ${esc(customerName)}. Her er bekreftelsen på tidspunktet vi har avtalt.</p>
+<div style="padding:17px;background:#101010;border:1px solid #2d2d2d">
+<div style="color:#8e887f;font-size:11px">DATO OG TID</div><div style="margin-top:5px;color:#fff;font-size:21px;font-weight:900">${esc(surveyText)}</div>
+${address?`<div style="margin-top:14px;color:#8e887f;font-size:11px">ADRESSE</div><div style="margin-top:4px;color:#fff;font-weight:700">${esc(address)}</div>`:""}
+</div>
+${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:""}
+<p style="margin:24px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Hvis tidspunktet ikke lenger passer, kan du svare direkte på denne e-posten eller kontakte oss på 471 54 898.</p>
+</td></tr>
+<tr><td style="padding:18px 30px;border-top:1px solid #34312b;color:#8e887f;font-size:11px">Aadland Service · 471 54 898 · post@aadland-service.no</td></tr>
+</table></td></tr></table></body></html>`;
+      const sent=await resend.emails.send({
+        from,to:customerEmail,replyTo,
+        subject:"Bekreftelse på befaring – Aadland Service",
+        html
+      });
+      if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
+      return NextResponse.json({ok:true,sentTo:customerEmail});
+    }catch(e){
+      console.error("SURVEY CONFIRMATION EMAIL ERROR",e);
+      return NextResponse.json({error:"Befaringen er lagret, men bekreftelsen kunne ikke sendes på e-post."},{status:500});
+    }
   }
 
   return NextResponse.json({ ok: true });

@@ -13,6 +13,14 @@ const labels = {
   cancelled: "Avbrutt",
 };
 
+function localDateTimeInput(value){
+  if(!value)return "";
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime()))return "";
+  const pad=n=>String(n).padStart(2,"0");
+  return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes());
+}
+
 export default function AdminClient({ user }) {
   const [tab, setTab] = useState("overview");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -812,11 +820,30 @@ function Jobs({orders,status,canUpdateOrders,reload}){
 
 function Surveys({ orders, status, canUpdateOrders }) {
   const [savingId,setSavingId]=useState("");
-  async function saveSurvey(order, surveyDate, adminNote){
+  const [surveyMessage,setSurveyMessage]=useState("");
+  async function saveSurvey(order, surveyDate, adminNote, sendConfirmation=false){
+    setSurveyMessage("");
+    let isoDate="";
+    if(surveyDate){
+      const parsed=new Date(surveyDate);
+      if(Number.isNaN(parsed.getTime())){setSurveyMessage("Velg gyldig dato og klokkeslett.");return}
+      isoDate=parsed.toISOString();
+    }
+    if(sendConfirmation&&!isoDate){setSurveyMessage("Velg dato og klokkeslett før du sender bekreftelse.");return}
+    if(sendConfirmation&&!order.customerEmail){setSurveyMessage("Kunden mangler e-postadresse.");return}
+    if(sendConfirmation&&!window.confirm("Lagre befaringen og sende bekreftelse til "+order.customerEmail+"?"))return;
     setSavingId(order.id);
-    const response=await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,surveyDate,adminNote})});
+    const response=await fetch("/api/admin/orders",{
+      method:"PATCH",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({id:order.id,surveyDate:isoDate,adminNote,sendSurveyConfirmation:sendConfirmation})
+    });
+    const data=await response.json().catch(()=>({}));
     setSavingId("");
-    if(response.ok) window.location.reload();
+    if(!response.ok){setSurveyMessage(data.error||"Befaringen kunne ikke lagres.");return}
+    if(sendConfirmation)setSurveyMessage("Befaringen er lagret og bekreftelse er sendt til "+(data.sentTo||order.customerEmail)+".");
+    else setSurveyMessage("Befaringen er lagret.");
+    window.setTimeout(()=>window.location.reload(),sendConfirmation?1000:500);
   }
   const surveyLabels = {
     new: "Ny forespørsel",
@@ -831,7 +858,7 @@ function Surveys({ orders, status, canUpdateOrders }) {
     return <div className="card"><h3>Ingen befaringer ennå</h3><p className="muted">Forespørsler fra befaring-skjemaet vil vises her automatisk.</p></div>;
   }
 
-  return <div className="grid">
+  return <>{surveyMessage&&<p className="notice">{surveyMessage}</p>}<div className="grid">
     {orders.map(order => {
       const customer = order.customer || {};
       return <article className="card" key={order.id}>
@@ -847,9 +874,12 @@ function Surveys({ orders, status, canUpdateOrders }) {
         </div>
         {(customer.address || customer.postalCode || customer.city) && <p><b>Adresse:</b> {[customer.address,customer.postalCode,customer.city].filter(Boolean).join(", ")}</p>}
         <div style={{whiteSpace:"pre-wrap",lineHeight:1.55,marginTop:16}}>{order.customRequest || "Ingen beskrivelse."}</div>{Array.isArray(order.contactImages)&&order.contactImages.length>0&&<div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12}}>{order.contactImages.map((image,i)=><a className="btn alt" key={image.ref||i} href={image.url} target="_blank" rel="noopener noreferrer">Åpne bilde {i+1}</a>)}</div>}
-        <div className="field" style={{marginTop:16}}><label>Dato og tid for befaring</label><input type="datetime-local" defaultValue={order.surveyDate ? String(order.surveyDate).slice(0,16) : ""} id={"survey-date-"+order.id}/></div>
+        <div className="field" style={{marginTop:16}}><label>Dato og tid for befaring</label><input type="datetime-local" defaultValue={localDateTimeInput(order.surveyDate)} id={"survey-date-"+order.id}/></div>
         <div className="field"><label>Internt notat</label><textarea rows="3" defaultValue={order.adminNote||""} id={"survey-note-"+order.id} placeholder="Kun synlig i backoffice"/></div>
-        {canUpdateOrders&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>saveSurvey(order,document.getElementById("survey-date-"+order.id).value,document.getElementById("survey-note-"+order.id).value)}>{savingId===order.id?"Lagrer …":"Lagre befaring"}</button>}
+        {canUpdateOrders&&<div className="surveySaveActions">
+          <button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>saveSurvey(order,document.getElementById("survey-date-"+order.id).value,document.getElementById("survey-note-"+order.id).value,false)}>{savingId===order.id?"Lagrer …":"Lagre befaring"}</button>
+          <button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>saveSurvey(order,document.getElementById("survey-date-"+order.id).value,document.getElementById("survey-note-"+order.id).value,true)}>{savingId===order.id?"Sender …":"Lagre og send bekreftelse"}</button>
+        </div>}
         <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:18}}>
           {order.customerPhone && <a className="btn" href={"tel:"+order.customerPhone}>Ring kunde</a>}
           {order.customerEmail && <a className="btn alt" href={"mailto:"+order.customerEmail}>Send e-post</a>}
@@ -857,7 +887,7 @@ function Surveys({ orders, status, canUpdateOrders }) {
         </div>
       </article>;
     })}
-  </div>;
+  </div></>;
 }
 
 function Products({

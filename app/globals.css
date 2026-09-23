@@ -2600,3 +2600,15 @@ body:has(.customerPage) .customerPage{
  .customerSectionHead{align-items:flex-start}
  .customerSectionActions{justify-content:flex-start}
 }
+
+
+.surveySaveActions{
+ display:flex;
+ gap:10px;
+ flex-wrap:wrap;
+ margin-top:10px;
+}
+@media(max-width:600px){
+ .surveySaveActions{display:grid;grid-template-columns:1fr}
+ .surveySaveActions .btn{text-align:center}
+}
