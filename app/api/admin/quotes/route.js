@@ -3,7 +3,7 @@ import {getAdminUser} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
 
 const STATUSES=["draft","sent","accepted","declined","expired","cancelled"];
-const SETUP_CODES=["42P01","42883"];
+const SETUP_CODES=["42P01","42883","42703"];
 
 async function currentUser(){
  const user=await getAdminUser();
