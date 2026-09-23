@@ -367,6 +367,7 @@ export default function MinSide(){
       <small>AVTALT OPPSTART</small>
       <b>{dateTimeFull(o.job_start_at)}</b>
       {o.job_confirmation_sent_at&&<span>Bekreftet på e-post {dateTime(o.job_confirmation_sent_at)}</span>}
+      {o.job_reminder_sent_at&&<span>Påminnelse sendt {dateTime(o.job_reminder_sent_at)}</span>}
      </div>:q?.earliestStartDate?<div className="customerJobStart customerJobStartPending">
       <small>TIDLIGST OPPSTART I TILBUDET</small>
       <b>{date(q.earliestStartDate)}</b>
