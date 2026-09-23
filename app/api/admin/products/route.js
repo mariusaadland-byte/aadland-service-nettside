@@ -173,17 +173,6 @@ export async function POST(req) {
       );
     }
 
-    const {data:existingProduct,error:existingProductError}=await s.from("products").select("id,image_url,image_urls").eq("id",id).maybeSingle();
-    if(existingProductError){
-      console.error("ADMIN PRODUCT LOOKUP ERROR:",existingProductError);
-      return NextResponse.json({error:"Produktet kunne ikke kontrolleres."},{status:500});
-    }
-    if(!existingProduct)return NextResponse.json({error:"Produktet ble ikke funnet."},{status:404});
-    const oldProductImages=[
-      ...(Array.isArray(existingProduct.image_urls)?existingProduct.image_urls:[]),
-      existingProduct.image_url
-    ].map(cleanText).filter(Boolean);
-
     const imageUrls = cleanArray(body.imageUrls)
       .map(cleanText)
       .filter(Boolean);
@@ -271,10 +260,6 @@ export async function POST(req) {
       );
     }
 
-    const keptImages=new Set([...(imageUrls||[]),imageUrl].filter(Boolean));
-    const removedImages=oldProductImages.filter(url=>!keptImages.has(url));
-    if(removedImages.length)await removePublicBucketUrls(s,"product-images",removedImages);
-
     return NextResponse.json({
       ok: true,
       product: fromDbProduct(data),
@@ -356,6 +341,17 @@ export async function PATCH(req) {
       );
     }
 
+    const {data:existingProduct,error:existingProductError}=await s.from("products").select("id,image_url,image_urls").eq("id",id).maybeSingle();
+    if(existingProductError){
+      console.error("ADMIN PRODUCT LOOKUP ERROR:",existingProductError);
+      return NextResponse.json({error:"Produktet kunne ikke kontrolleres."},{status:500});
+    }
+    if(!existingProduct)return NextResponse.json({error:"Produktet ble ikke funnet."},{status:404});
+    const oldProductImages=[
+      ...(Array.isArray(existingProduct.image_urls)?existingProduct.image_urls:[]),
+      existingProduct.image_url
+    ].map(cleanText).filter(Boolean);
+
     const imageUrls = cleanArray(body.imageUrls)
       .map(cleanText)
       .filter(Boolean);
@@ -432,6 +428,10 @@ export async function PATCH(req) {
         { status: 500 }
       );
     }
+
+    const keptImages=new Set([...(imageUrls||[]),imageUrl].filter(Boolean));
+    const removedImages=oldProductImages.filter(url=>!keptImages.has(url));
+    if(removedImages.length)await removePublicBucketUrls(s,"product-images",removedImages);
 
     return NextResponse.json({
       ok: true,
