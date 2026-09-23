@@ -62,7 +62,7 @@ export default function QuotePreviewClient({quoteId}){
      <span><small>Tilbudsnummer</small><b>{quote.quoteNumber}</b></span>
      <span><small>Dato</small><b>{created}</b></span>
      <span><small>Gyldig til</small><b>{valid||"—"}</b></span>
-     <span><small>Planlagt oppstart</small><b>{start||"Avtales"}</b></span>
+     <span><small>Tidligst oppstart</small><b>{start||"Avtales"}</b><em>Endelig oppstart avtales etter godkjenning.</em></span>
     </div>
    </section>
 
