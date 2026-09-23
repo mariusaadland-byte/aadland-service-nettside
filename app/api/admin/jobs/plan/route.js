@@ -20,7 +20,7 @@ function validDate(value){
 }
 async function loadJob(s,id){
  const {data:order,error}=await s.from("orders")
-  .select("id,order_number,order_type,status,customer,total_ore,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at")
+  .select("id,order_number,order_type,status,customer,customer_user_id,total_ore,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at")
   .eq("id",id).maybeSingle();
  if(error){
   if(String(error.code||"")==="42703")return {setupRequired:true,error:"Databaseoppdatering mangler for oppdragsplanlegging."};
@@ -74,7 +74,7 @@ async function savePlan(s,id,startAt,agreement){
   job_customer_agreement:agreement,
   job_planning_updated_at:now,
   updated_at:now
- }).eq("id",id).select("id,order_number,order_type,status,customer,total_ore,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at").single();
+ }).eq("id",id).select("id,order_number,order_type,status,customer,customer_user_id,total_ore,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at").single();
  if(error){
   if(String(error.code||"")==="42703")return {setupRequired:true,error:"Databaseoppdatering mangler for oppdragsplanlegging.",status:409};
   return {error:"Planen kunne ikke lagres.",status:500};
@@ -134,6 +134,9 @@ export async function POST(req){
  });
  const customerName=clean(saved.data.customer?.name,180)||"kunde";
  const quoteNo=loaded.quote?.quote_number||"";
+ const requestOrigin=new URL(req.url).origin;
+ const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
+ const accountUrl=saved.data.customer_user_id?(configuredOrigin||requestOrigin)+"/min-side":"";
  const html=`<!doctype html><html><body style="margin:0;background:#f3efe8;font-family:Arial,Helvetica,sans-serif;color:#181613">
  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3efe8;padding:28px 12px"><tr><td align="center">
  <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#fff;border:1px solid #ded7cb">
@@ -145,6 +148,7 @@ export async function POST(req){
   <div style="margin:22px 0;padding:18px;background:#f7f3ec"><div style="font-size:11px;color:#777;text-transform:uppercase;font-weight:800">Avtalt oppstart</div><div style="margin-top:5px;font-size:22px;font-weight:900">${esc(startText)}</div></div>
   <div style="margin:22px 0"><div style="font-size:11px;color:#777;text-transform:uppercase;font-weight:800;margin-bottom:7px">Avtalt videre</div><div style="white-space:pre-line;line-height:1.65">${esc(agreement)}</div></div>
   ${quoteNo?`<p style="color:#777;font-size:12px">Tilhører tilbud ${esc(quoteNo)}.</p>`:""}
+  ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:10px;background:#d9b365;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:""}
   <p style="margin:24px 0 0;color:#625d55;line-height:1.65">Ta kontakt dersom noe i avtalen må justeres. Du kan svare direkte på denne e-posten.</p>
  </td></tr>
  <tr><td style="padding:18px 30px;border-top:1px solid #ece7df;color:#777;font-size:11px">Aadland Service · 471 54 898 · post@aadland-service.no</td></tr>
