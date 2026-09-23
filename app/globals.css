@@ -1779,10 +1779,13 @@ html{scroll-behavior:smooth}
  .quoteFormGrid{grid-template-columns:1fr}
  .quoteSectionHead{align-items:stretch;flex-direction:column}
  .quoteSectionHead>div:last-child{display:grid;grid-template-columns:1fr 1fr}
- .quoteLineEditor{grid-template-columns:34px 1fr 1fr;gap:9px}
- .quoteLineDescription{grid-column:2/-1}
+ .quoteLineEditor{grid-template-columns:34px minmax(112px,.7fr) minmax(0,1.5fr);gap:9px}
+ .quoteLineDescription{grid-column:2/3}
  .quoteLineEditor .field{grid-column:auto}
- .quoteLineTotal{grid-column:2/3}
+ .quoteLineQuantity{grid-column:2/3;min-width:112px}
+ .quoteLineVat{grid-column:2/3;min-width:112px}
+ .quoteLineQuantity input,.quoteLineVat select{width:100%;min-width:112px}
+ .quoteLineTotal{grid-column:3/4}
  .quoteLineRemove{grid-column:3/4;justify-self:end}
  .quotePaymentRow{grid-template-columns:1fr 100px}
  .quotePaymentRow .field:nth-child(3){grid-column:1/-1}
