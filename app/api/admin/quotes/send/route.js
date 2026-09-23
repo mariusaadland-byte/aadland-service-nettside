@@ -40,6 +40,7 @@ export async function POST(req){
  const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin||"https://www.aadland-service.no");
  const link=base+"/tilbud/"+encodeURIComponent(quote.id)+"?token="+encodeURIComponent(token);
  const valid=quote.valid_until?new Date(quote.valid_until+"T12:00:00").toLocaleDateString("nb-NO"):"";
+ const plannedStart=quote.planned_start_date?new Date(quote.planned_start_date+"T12:00:00").toLocaleDateString("nb-NO"):"";
  const from="Aadland Service <post@aadland-service.no>";
  const replyTo="post@aadland-service.no";
  const customerName=esc(quote.customer?.name||"");
@@ -74,6 +75,7 @@ export async function POST(req){
   <div style="font-size:11px;color:#777;text-transform:uppercase;font-weight:800">Total inkl. MVA</div>
   <div style="margin-top:5px;font-size:25px;font-weight:900">${total}</div>
   ${valid?`<div style="margin-top:6px;color:#777;font-size:12px">Gyldig til ${esc(valid)}</div>`:""}
+  ${plannedStart?`<div style="margin-top:6px;color:#777;font-size:12px"><b>Planlagt oppstart:</b> ${esc(plannedStart)}</div>`:""}
  </div>
  <p style="margin:0 0 20px;color:#625d55;line-height:1.65">Åpne tilbudet for full oversikt, betalingsplan og vilkår. Der kan du også godkjenne eller avslå tilbudet.</p>
  <a href="${link}" style="display:inline-block;background:#cfa153;color:#111;text-decoration:none;font-weight:900;padding:14px 22px">Åpne tilbud →</a>
