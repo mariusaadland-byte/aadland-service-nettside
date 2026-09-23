@@ -4,6 +4,7 @@ import {useEffect,useState} from "react";
 import Link from "next/link";
 
 const orderStatus={new:"Mottatt",confirmed:"Bekreftet",processing:"Under behandling",in_progress:"Under arbeid",ready:"Klar",completed:"Fullført",cancelled:"Kansellert"};
+const enquiryStatus={new:"Mottatt",confirmed:"Befaring avtalt",processing:"Under behandling",in_progress:"Under arbeid",ready:"Klar for oppfølging",completed:"Ferdig",cancelled:"Avbrutt"};
 const rentalStatus={new:"Mottatt",confirmed:"Bekreftet",active:"Pågående",returned:"Returnert",completed:"Fullført",cancelled:"Kansellert"};
 const quoteStatus={sent:"Sendt",accepted:"Godkjent",declined:"Avslått",expired:"Utløpt",cancelled:"Avbrutt"};
 const paymentStatus={unpaid:"Ikke betalt",pending:"Avventer betaling",authorized:"Reservert",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert"};
@@ -204,7 +205,7 @@ export default function MinSide(){
    title:"Befaring / forespørsel",
    meta:o.order_number||"",
    date:o.created_at,
-   status:orderStatus[o.status]||o.status,
+   status:enquiryStatus[o.status]||o.status,
    href:"#foresporsler"
   })),
   ...jobs.map(o=>({
@@ -308,11 +309,11 @@ export default function MinSide(){
    <div className="customerGrid">{enquiries.map(o=><article className="card customerHistoryCard" key={o.id}>
     <div className="customerCardTop">
      <div><small>{o.order_number}</small><h3>Befaring / forespørsel</h3><p className="customerHistoryDate">Sendt {dateTime(o.created_at)}</p></div>
-     <span className={"customerStatus customerStatus-"+o.status}>{orderStatus[o.status]||o.status}</span>
+     <span className={"customerStatus customerStatus-"+o.status}>{enquiryStatus[o.status]||o.status}</span>
     </div>
     {o.custom_request&&<p className="customerEnquiryText">{String(o.custom_request).split("\nBilder:\n")[0]}</p>}
     <div className="customerCardMeta">
-     <span><small>Status</small><b>{orderStatus[o.status]||o.status}</b></span>
+     <span><small>Status</small><b>{enquiryStatus[o.status]||o.status}</b></span>
      {o.survey_date&&<span><small>Befaring</small><b>{dateTimeFull(o.survey_date)}</b></span>}
     </div>
    </article>)}</div>}
