@@ -28,7 +28,8 @@ function blankState(){
   paymentPlan:defaultPlan,
   notes:"",
   terms:defaultTerms,
-  validUntil:defaultValidUntil()
+  validUntil:defaultValidUntil(),
+  plannedStartDate:""
  };
 }
 function calculate(lines){
@@ -118,7 +119,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
      paymentPlan:Array.isArray(quote.paymentPlan)&&quote.paymentPlan.length?quote.paymentPlan:defaultPlan,
      notes:quote.notes||"",
      terms:quote.terms||defaultTerms,
-     validUntil:quote.validUntil||""
+     validUntil:quote.validUntil||"",
+     plannedStartDate:quote.plannedStartDate||""
     });
    })
    .catch(err=>{if(!cancelled)setError(err.message||"Tilbudet kunne ikke lastes.")})
@@ -257,6 +259,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
       <div className="field"><label>Innledning</label><textarea rows="3" value={v.introText} onChange={e=>set("introText",e.target.value)}/></div>
       <div className="quoteFormGrid">
        <div className="field"><label>Gyldig til</label><input type="date" value={v.validUntil||""} onChange={e=>set("validUntil",e.target.value)}/></div>
+       <div className="field"><label>Planlagt oppstart</label><input type="date" value={v.plannedStartDate||""} onChange={e=>set("plannedStartDate",e.target.value)}/><small className="muted">Vises direkte til kunden i tilbudet.</small></div>
        {quoteId&&<div className="field"><label>Status</label><select value={v.status} onChange={e=>set("status",e.target.value)}><option value="draft">Kladd</option><option value="sent">Sendt</option><option value="accepted">Godkjent</option><option value="declined">Avslått</option><option value="expired">Utløpt</option><option value="cancelled">Avbrutt</option></select></div>}
       </div>
      </section>
