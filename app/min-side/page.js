@@ -302,7 +302,7 @@ export default function MinSide(){
   <section id="foresporsler" className="customerDashboardSection">
    <div className="customerSectionHead">
     <div><div className="kicker">KONTAKT</div><h2>Forespørsler og befaring</h2></div>
-    <span>{enquiries.length}</span>
+    <div className="customerSectionActions"><span>{enquiries.length}</span><a className="btn alt" href="/#befaring">Ny forespørsel</a></div>
    </div>
    {!enquiries.length?<div className="card customerEmpty"><p>Ingen forespørsler knyttet til kontoen ennå.</p></div>:
    <div className="customerGrid">{enquiries.map(o=><article className="card customerHistoryCard" key={o.id}>
