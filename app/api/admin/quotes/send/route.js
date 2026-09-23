@@ -112,12 +112,20 @@ export async function POST(req){
  }
 
  const now=new Date().toISOString();
- const {error:updateError}=await s.from("quotes").update({
+ let statusUpdate=await s.from("quotes").update({
   status:"sent",
   sent_at:now,
+  follow_up_sent_at:null,
   updated_at:now
  }).eq("id",id);
- if(updateError)return NextResponse.json({error:"E-posten ble sendt, men status kunne ikke lagres."},{status:500});
+ if(statusUpdate.error&&String(statusUpdate.error.code||"")==="42703"){
+  statusUpdate=await s.from("quotes").update({
+   status:"sent",
+   sent_at:now,
+   updated_at:now
+  }).eq("id",id);
+ }
+ if(statusUpdate.error)return NextResponse.json({error:"E-posten ble sendt, men status kunne ikke lagres."},{status:500});
 
  return NextResponse.json({ok:true,sentTo:email,sentAt:now,link});
 }
