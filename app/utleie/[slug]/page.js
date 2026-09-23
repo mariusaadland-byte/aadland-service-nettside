@@ -41,6 +41,28 @@ function RentalCalendar({item,onChoose,refreshKey}){
  const cells=calendarDays(month);
 
  useEffect(()=>{
+  fetch("/api/customer/profile")
+   .then(async response=>{
+    if(response.status===401)return null;
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)return null;
+    return data.customer||null;
+   })
+   .then(profile=>{
+    if(!profile)return;
+    setCustomerAccount(profile);
+    setCustomer(current=>({
+     ...current,
+     name:current.name||profile.name||"",
+     email:current.email||profile.email||"",
+     phone:current.phone||profile.phone||"",
+     address:current.address||profile.address||""
+    }));
+   })
+   .catch(()=>{});
+ },[]);
+
+ useEffect(()=>{
   let cancelled=false;
   setLoading(true);
   setError("");
@@ -174,6 +196,7 @@ export default function RentalDetailPage(){
  const [error,setError]=useState("");
  const [chosen,setChosen]=useState(null);
  const [customer,setCustomer]=useState({name:"",email:"",phone:"",address:""});
+ const [customerAccount,setCustomerAccount]=useState(null);
  const [accepted,setAccepted]=useState(false);
  const [fulfillment,setFulfillment]=useState("pickup");
  const [booking,setBooking]=useState(false);
@@ -229,7 +252,12 @@ export default function RentalDetailPage(){
    setMessage("Booking "+data.bookingNumber+" er mottatt. Vi tar kontakt med deg.");
    setChosen(null);
    setAccepted(false);
-   setCustomer({name:"",email:"",phone:"",address:""});
+   setCustomer(customerAccount?{
+    name:customerAccount.name||"",
+    email:customerAccount.email||"",
+    phone:customerAccount.phone||"",
+    address:customerAccount.address||""
+   }:{name:"",email:"",phone:"",address:""});
    setRefreshKey(value=>value+1);
   }catch(err){
    setError(err.message||"Kunne ikke sende booking.");
@@ -279,7 +307,7 @@ export default function RentalDetailPage(){
    </div>
   </section>
 
-  {message&&<div className="catalogWrap"><div className="rentalMessage success"><b>Booking mottatt</b><p>{message}</p></div></div>}
+  {message&&<div className="catalogWrap"><div className="rentalMessage success"><b>Booking mottatt</b><p>{message}</p>{customerAccount&&<Link className="catalogGoldButton" href="/min-side">Se bookingen på Min side →</Link>}</div></div>}
   {error&&<div className="catalogWrap"><div className="rentalMessage notice"><b>Noe gikk galt</b><p>{error}</p></div></div>}
 
   {canFulfill&&item.status==="available"&&<div className="catalogWrap rentalDetailCalendarWrap"><RentalCalendar item={item} onChoose={choosePeriod} refreshKey={refreshKey}/></div>}
@@ -294,6 +322,7 @@ export default function RentalDetailPage(){
       <div className="rentalBookingPrice"><b>{kr(chosen.pricing?.totalOre)}</b>{item.depositOre>0&&<span>+ depositum {kr(item.depositOre)}</span>}</div>
      </div>
      <div className="rentalBookingFields">
+      {customerAccount&&<p className="customerPrefillNote">✓ Kontaktopplysninger er hentet fra Min side. Du kan endre dem for denne bookingen.</p>}
       <div className="rentalFormTwo">
        <label><span>Navn *</span><input autoComplete="name" required value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})}/></label>
        <label><span>Telefon *</span><input autoComplete="tel" required type="tel" value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})}/></label>
