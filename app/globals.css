@@ -266,10 +266,10 @@
  .serviceCard{box-shadow:0 7px 20px rgba(24,20,14,.07)!important}
 }
 
-/* Mobile navigation for approved header */
+/* Mobile / compact laptop navigation for approved header */
 .mobileMenuBtn{display:none;background:transparent;border:0;padding:8px;cursor:pointer}
 .mobileMenuBtn span{display:block;width:24px;height:2px;background:#fff;margin:5px 0}
-@media(max-width:900px){
+@media(max-width:1100px){
  .homeNav{position:relative}
  .mobileMenuBtn{display:block;margin-left:auto;z-index:30}
  .homeLinks{display:none!important;position:absolute;left:0;right:0;top:100%;z-index:25;background:#111;padding:18px 5%;border-top:1px solid rgba(255,255,255,.1);box-shadow:0 18px 30px rgba(0,0,0,.28)}
@@ -760,6 +760,16 @@ html{scroll-behavior:smooth}
 .productDetailPage .drawerPanel{width:min(620px,100%);max-height:90vh;overflow:auto;padding:28px;background:#151515;color:#fff;border:1px solid rgba(255,255,255,.12);box-shadow:0 30px 80px rgba(0,0,0,.5)}
 .productDetailPage .drawerPanel .card{background:#202020;color:#fff;border-color:rgba(255,255,255,.1);border-radius:0}
 .productDetailPage .drawerPanel a{color:#d7a74e}
+
+/* Compact catalog navigation on smaller laptops */
+@media(max-width:1100px){
+ .catalogNav{position:relative}
+ .catalogMenuButton{display:block}
+ .catalogHeaderCta{display:none}
+ .catalogLinks{display:none;position:absolute;top:82px;left:0;right:0;margin:0;padding:8px 18px 18px;background:#0d0d0d;border-top:1px solid rgba(255,255,255,.08);box-shadow:0 20px 35px rgba(0,0,0,.35)}
+ .catalogLinks.isOpen{display:grid}
+ .catalogLinks a{padding:14px 2px;border-bottom:1px solid rgba(255,255,255,.08);font-size:14px}
+}
 
 @media(max-width:900px){
  .catalogHeader{height:72px}
