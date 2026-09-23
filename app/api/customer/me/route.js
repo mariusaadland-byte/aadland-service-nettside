@@ -43,7 +43,7 @@ export async function GET(){
 
  const [ordersResult,rentalsResult,quotesResult]=await Promise.all([
   s.from("orders")
-   .select("id,order_number,order_type,status,total_ore,shipping_ore,payment_status,fulfillment_type,items,created_at,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at")
+   .select("id,order_number,order_type,status,total_ore,shipping_ore,payment_status,fulfillment_type,items,custom_request,survey_date,created_at,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at")
    .eq("customer_user_id",customer.id)
    .order("created_at",{ascending:false})
    .limit(100),
