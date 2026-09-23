@@ -12,19 +12,45 @@ export async function GET(){
  const s=db();
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
 
- const {data,error}=await s.from("customer_profiles")
-  .select("id,email,name,phone,address,created_at,updated_at")
-  .order("created_at",{ascending:false})
-  .limit(1000);
+ const [profilesResult,quotesResult]=await Promise.all([
+  s.from("customer_profiles")
+   .select("id,email,name,phone,address,created_at,updated_at")
+   .order("created_at",{ascending:false})
+   .limit(1000),
+  s.from("quotes")
+   .select("id,quote_number,title,status,total_inc_vat_ore,customer,created_at,sent_at,accepted_at,declined_at")
+   .order("created_at",{ascending:false})
+   .limit(1000)
+ ]);
 
- if(error){
-  if(String(error.code||"")==="42P01")return NextResponse.json({customers:[],setupRequired:true});
-  console.error("ADMIN CUSTOMERS GET",error);
+ if(profilesResult.error){
+  if(String(profilesResult.error.code||"")==="42P01")return NextResponse.json({customers:[],quotes:[],setupRequired:true});
+  console.error("ADMIN CUSTOMERS GET",profilesResult.error);
   return NextResponse.json({error:"Kundekontoene kunne ikke hentes."},{status:500});
  }
 
+ let quotes=[];
+ if(quotesResult.error){
+  if(!["42P01","42703"].includes(String(quotesResult.error.code||""))){
+   console.error("ADMIN CUSTOMER QUOTES GET",quotesResult.error);
+  }
+ }else{
+  quotes=(quotesResult.data||[]).map(row=>({
+   id:row.id,
+   quoteNumber:row.quote_number||"",
+   title:row.title||"Tilbud",
+   status:row.status||"",
+   totalOre:Number(row.total_inc_vat_ore)||0,
+   customer:row.customer||{},
+   createdAt:row.created_at||null,
+   sentAt:row.sent_at||null,
+   acceptedAt:row.accepted_at||null,
+   declinedAt:row.declined_at||null
+  }));
+ }
+
  return NextResponse.json({
-  customers:(data||[]).map(row=>({
+  customers:(profilesResult.data||[]).map(row=>({
    id:row.id,
    email:row.email||"",
    name:row.name||"",
@@ -33,6 +59,7 @@ export async function GET(){
    createdAt:row.created_at||null,
    updatedAt:row.updated_at||null,
    hasAccount:true
-  }))
+  })),
+  quotes
  });
 }
