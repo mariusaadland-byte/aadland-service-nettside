@@ -10,6 +10,7 @@ const paymentStatus={unpaid:"Ikke betalt",pending:"Avventer betaling",authorized
 
 const date=v=>v?new Intl.DateTimeFormat("nb-NO").format(new Date(v+"T12:00:00")):"";
 const dateTime=v=>v?new Intl.DateTimeFormat("nb-NO",{dateStyle:"medium"}).format(new Date(v)):"";
+const dateTimeFull=v=>v?new Intl.DateTimeFormat("nb-NO",{dateStyle:"long",timeStyle:"short"}).format(new Date(v)):"";
 const kr=o=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",maximumFractionDigits:0}).format((Number(o)||0)/100);
 const effectiveQuoteStatus=q=>{
  if(q.status==="sent"&&q.validUntil&&q.validUntil<new Date().toISOString().slice(0,10))return "expired";
@@ -82,7 +83,7 @@ export default function MinSide(){
   <Link href="/">← Aadland Service</Link>
   <div className="kicker customerTopKicker">MIN SIDE</div>
   <h1>{mode==="login"?"Logg inn":"Opprett kundekonto"}</h1>
-  <p>Det er frivillig å ha konto. Med Min side kan du samle tilbud, kjøp og utleie på ett sted.</p>
+  <p>Det er frivillig å ha konto. Med Min side kan du samle tilbud, oppdrag, kjøp og utleie på ett sted.</p>
   <form className="card customerLoginCard" onSubmit={submit}>
    {mode==="register"&&<>
     <div className="field"><label>Navn</label><input required maxLength={120} value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></div>
@@ -102,6 +103,8 @@ export default function MinSide(){
  </main>;
 
  const quotes=data.quotes||[];
+ const jobs=(data.orders||[]).filter(order=>order.order_type==="custom");
+ const purchases=(data.orders||[]).filter(order=>order.order_type!=="custom");
 
  return <main className="customerPage">
   <Link href="/">← Aadland Service</Link>
@@ -142,11 +145,63 @@ export default function MinSide(){
    </div>}
   </section>
 
+  <section className="customerDashboardSection customerJobsSection">
+   <div className="customerSectionHead">
+    <div><div className="kicker">MINE OPPDRAG</div><h2>Oppdrag</h2></div>
+    <span>{jobs.length}</span>
+   </div>
+   {!jobs.length?<div className="card customerEmpty"><p>Ingen aktive eller tidligere oppdrag knyttet til kontoen ennå.</p></div>:
+   <div className="customerJobGrid">{jobs.map(o=>{
+    const q=o.source_quote;
+    return <article className="card customerJobCard" key={o.id}>
+     <div className="customerCardTop">
+      <div><small>{o.order_number}{q?.quoteNumber?" · "+q.quoteNumber:""}</small><h3>{q?.title||"Oppdrag"}</h3></div>
+      <span className="customerStatus">{orderStatus[o.status]||o.status}</span>
+     </div>
+
+     {o.job_start_at?<div className="customerJobStart">
+      <small>AVTALT OPPSTART</small>
+      <b>{dateTimeFull(o.job_start_at)}</b>
+      {o.job_confirmation_sent_at&&<span>Bekreftet på e-post {dateTime(o.job_confirmation_sent_at)}</span>}
+     </div>:q?.earliestStartDate?<div className="customerJobStart customerJobStartPending">
+      <small>TIDLIGST OPPSTART I TILBUDET</small>
+      <b>{date(q.earliestStartDate)}</b>
+      <span>Endelig oppstart er ikke avtalt ennå.</span>
+     </div>:<div className="customerJobStart customerJobStartPending">
+      <small>OPPSTART</small>
+      <b>Ikke avtalt ennå</b>
+      <span>Vi tar kontakt når oppstart skal avtales.</span>
+     </div>}
+
+     {o.job_customer_agreement&&<div className="customerJobAgreement">
+      <small>DETTE ER AVTALT VIDERE</small>
+      <p>{o.job_customer_agreement}</p>
+      {o.job_planning_updated_at&&<span>Sist oppdatert {dateTimeFull(o.job_planning_updated_at)}</span>}
+     </div>}
+
+     <div className="customerCardMeta">
+      <span><small>Avtalt total</small><b>{kr(q?.totalIncVatOre||o.total_ore)}</b></span>
+      <span><small>Betaling</small><b>{paymentStatus[o.payment_status]||o.payment_status||"Ikke registrert"}</b></span>
+     </div>
+
+     {Array.isArray(q?.paymentPlan)&&q.paymentPlan.length>0&&<div className="customerJobPaymentPlan">
+      <h4>Betalingsplan</h4>
+      {q.paymentPlan.map((row,index)=><div key={row.id||index}>
+       <span><b>{row.label||("Delbetaling "+(index+1))}</b><small>{row.trigger||""}</small></span>
+       <strong>{row.percent}% · {kr((q.totalIncVatOre||o.total_ore)*(Number(row.percent)||0)/100)}</strong>
+      </div>)}
+     </div>}
+
+     {q?.href&&<Link className="btn alt" href={q.href}>Åpne godkjent tilbud</Link>}
+    </article>;
+   })}</div>}
+  </section>
+
   <section className="customerDashboardSection">
-   <div className="customerSectionHead"><div><div className="kicker">HANDEL</div><h2>Bestillinger og oppdrag</h2></div><span>{data.orders.length}</span></div>
-   {!data.orders.length?<div className="card customerEmpty"><p>Ingen bestillinger eller oppdrag knyttet til kontoen ennå.</p></div>:
-   <div className="customerGrid">{data.orders.map(o=><article className="card customerHistoryCard" key={o.id}>
-    <div className="customerCardTop"><div><small>{o.order_number}</small><h3>{o.order_type==="custom"?"Oppdrag":"Bestilling"}</h3></div><span className="customerStatus">{orderStatus[o.status]||o.status}</span></div>
+   <div className="customerSectionHead"><div><div className="kicker">HANDEL</div><h2>Bestillinger</h2></div><span>{purchases.length}</span></div>
+   {!purchases.length?<div className="card customerEmpty"><p>Ingen produktbestillinger knyttet til kontoen ennå.</p></div>:
+   <div className="customerGrid">{purchases.map(o=><article className="card customerHistoryCard" key={o.id}>
+    <div className="customerCardTop"><div><small>{o.order_number}</small><h3>Bestilling</h3></div><span className="customerStatus">{orderStatus[o.status]||o.status}</span></div>
     <div className="customerCardMeta"><span><small>Sum</small><b>{kr(o.total_ore)}</b></span><span><small>Betaling</small><b>{paymentStatus[o.payment_status]||o.payment_status||"Ikke registrert"}</b></span></div>
    </article>)}</div>}
   </section>
