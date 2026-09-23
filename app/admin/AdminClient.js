@@ -17,6 +17,7 @@ export default function AdminClient({ user }) {
   const [tab, setTab] = useState("overview");
   const [menuOpen, setMenuOpen] = useState(false);
   const [orders, setOrders] = useState([]);
+  const [customerProfiles, setCustomerProfiles] = useState([]);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [services, setServices] = useState([]);
@@ -69,6 +70,22 @@ export default function AdminClient({ user }) {
       }
     } else {
       setOrders([]);
+    }
+
+    if (canViewOrders) {
+      const response = await fetch("/api/admin/customers");
+      if (response.status === 401) {
+        router.replace("/admin/login");
+        return;
+      }
+      if (response.ok) {
+        const data = await response.json();
+        setCustomerProfiles(data.customers || []);
+      } else {
+        setCustomerProfiles([]);
+      }
+    } else {
+      setCustomerProfiles([]);
     }
 
     if (canManageProducts) {
@@ -489,7 +506,7 @@ export default function AdminClient({ user }) {
         )}
 
         {tab === "customers" && canViewOrders && (
-          <Customers orders={orders} bookings={rentalBookings} />
+          <Customers orders={orders} bookings={rentalBookings} profiles={customerProfiles} />
         )}
 
         {tab === "products" && canManageProducts && (
@@ -554,24 +571,54 @@ function Archive({orders,reload,setError,canUpdate}){
  return <div className="orderCards">{archived.length?archived.map(o=><article className="card orderCard" key={o.id}><div className="kicker">{o.orderNumber}</div><h3>{o.customerName||"Ukjent kunde"}</h3><p>{o.orderType==="custom"?(o.sourceQuoteId?"Oppdrag":"Befaring/forespørsel"):"Bestilling"} · {nok(o.totalOre||0)}<br/><small className="muted">Arkivert {new Date(o.archivedAt).toLocaleString("nb-NO")}</small></p>{canUpdate&&<button className="btn alt" onClick={()=>restore(o.id)}>Gjenopprett</button>}</article>):<div className="card"><h3>Arkivet er tomt</h3><p className="muted">Ferdige eller avbrutte saker kan flyttes hit uten at historikken slettes.</p></div>}</div>
 }
 
-function Customers({orders,bookings}) {
+function Customers({orders,bookings,profiles}) {
   const [query,setQuery]=useState("");
   const customers=new Map();
-  function add(customer,entry){
-    const email=String(customer?.email||"").trim().toLowerCase(),phone=String(customer?.phone||"").replace(/\s/g,""),key=email||phone||String(customer?.name||"").trim().toLowerCase();
-    if(!key)return;
-    const current=customers.get(key)||{name:customer?.name||"Ukjent kunde",email:customer?.email||"",phone:customer?.phone||"",address:customer?.address||"",orders:0,rentals:0,totalOre:0,lastDate:null,history:[]};
-    if(customer?.name)current.name=customer.name;if(customer?.email)current.email=customer.email;if(customer?.phone)current.phone=customer.phone;if(customer?.address)current.address=customer.address;
-    if(entry.type==="order")current.orders+=1;else current.rentals+=1;
-    current.totalOre+=Number(entry.totalOre)||0;current.history.push(entry);
-    if(!current.lastDate||String(entry.date)>String(current.lastDate))current.lastDate=entry.date;
-    customers.set(key,current);
+  function keyFor(customer){
+    const email=String(customer?.email||"").trim().toLowerCase();
+    const phone=String(customer?.phone||"").replace(/\s/g,"");
+    return email||phone||String(customer?.name||"").trim().toLowerCase();
   }
+  function ensure(customer){
+    const key=keyFor(customer);
+    if(!key)return null;
+    const current=customers.get(key)||{
+      name:customer?.name||"Ukjent kunde",
+      email:customer?.email||"",
+      phone:customer?.phone||"",
+      address:customer?.address||"",
+      orders:0,rentals:0,totalOre:0,lastDate:null,history:[],
+      hasAccount:false,accountCreatedAt:null
+    };
+    if(customer?.name)current.name=customer.name;
+    if(customer?.email)current.email=customer.email;
+    if(customer?.phone)current.phone=customer.phone;
+    if(customer?.address)current.address=customer.address;
+    customers.set(key,current);
+    return current;
+  }
+  function add(customer,entry){
+    const current=ensure(customer);
+    if(!current)return;
+    if(entry.type==="order")current.orders+=1;else current.rentals+=1;
+    current.totalOre+=Number(entry.totalOre)||0;
+    current.history.push(entry);
+    if(!current.lastDate||String(entry.date)>String(current.lastDate))current.lastDate=entry.date;
+  }
+  (profiles||[]).forEach(profile=>{
+    const current=ensure(profile);
+    if(!current)return;
+    current.hasAccount=true;
+    current.accountCreatedAt=profile.createdAt||null;
+    if(profile.name)current.name=profile.name;
+    if(profile.phone)current.phone=profile.phone;
+    if(profile.address)current.address=profile.address;
+  });
   (orders||[]).forEach(o=>add(o.customer||{name:o.customerName,email:o.customerEmail,phone:o.customerPhone},{type:"order",number:o.orderNumber,date:o.createdAt,totalOre:o.totalOre||0,label:o.orderType==="custom"?(o.sourceQuoteId?"Oppdrag":"Befaring/forespørsel"):"Bestilling"}));
   (bookings||[]).forEach(b=>add(b.customer,{type:"rental",number:b.bookingNumber,date:b.createdAt,totalOre:b.totalOre||0,label:"Utleie"}));
   const q=query.trim().toLowerCase(),list=[...customers.values()].filter(c=>!q||[c.name,c.email,c.phone,c.address].some(v=>String(v||"").toLowerCase().includes(q))).sort((x,y)=>String(y.lastDate||"").localeCompare(String(x.lastDate||"")));
   return <><div className="card customerSearch"><div className="kicker">KUNDEREGISTER</div><h3>{customers.size} kunder fra bestillinger, befaringer og utleie</h3><div className="field"><label>Søk</label><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Navn, e-post, telefon eller adresse"/></div></div>
-  <div className="grid customerGrid">{list.map((c,i)=><article className="card" key={(c.email||c.phone||c.name)+i}><h3>{c.name}</h3><p>{c.phone&&<><a href={"tel:"+c.phone}>{c.phone}</a><br/></>}{c.email&&<><a href={"mailto:"+c.email}>{c.email}</a><br/></>}{c.address}</p><p><b>{c.orders}</b> bestilling/befaring · <b>{c.rentals}</b> utleie<br/>Registrert verdi: <b>{nok(c.totalOre)}</b></p><details><summary>Vis historikk ({c.history.length})</summary>{c.history.sort((x,y)=>String(y.date||"").localeCompare(String(x.date||""))).map((h,j)=><div key={h.number+j} className="customerHistory"><b>{h.label}</b> · {h.number}<br/><small>{h.date?new Date(h.date).toLocaleString("nb-NO"):""} · {nok(h.totalOre||0)}</small></div>)}</details></article>)}</div>{!list.length&&<div className="card"><p>Ingen kunder funnet.</p></div>}</>;
+  <div className="grid customerGrid">{list.map((c,i)=><article className="card" key={(c.email||c.phone||c.name)+i}><div className="customerAdminCardTop"><h3>{c.name}</h3>{c.hasAccount&&<span className="customerAccountBadge">Kundekonto</span>}</div><p>{c.phone&&<><a href={"tel:"+c.phone}>{c.phone}</a><br/></>}{c.email&&<><a href={"mailto:"+c.email}>{c.email}</a><br/></>}{c.address}</p><p><b>{c.orders}</b> bestilling/befaring · <b>{c.rentals}</b> utleie<br/>Registrert verdi: <b>{nok(c.totalOre)}</b>{c.accountCreatedAt&&<><br/><small className="muted">Kundekonto opprettet {new Date(c.accountCreatedAt).toLocaleDateString("nb-NO")}</small></>}</p><details><summary>Vis historikk ({c.history.length})</summary>{c.history.sort((x,y)=>String(y.date||"").localeCompare(String(x.date||""))).map((h,j)=><div key={h.number+j} className="customerHistory"><b>{h.label}</b> · {h.number}<br/><small>{h.date?new Date(h.date).toLocaleString("nb-NO"):""} · {nok(h.totalOre||0)}</small></div>)}</details></article>)}</div>{!list.length&&<div className="card"><p>Ingen kunder funnet.</p></div>}</>;
 }
 
 function Orders({ orders, status, canUpdateOrders, reload }) {
