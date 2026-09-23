@@ -185,6 +185,44 @@ export default function MinSide(){
  const activeJobs=jobs.filter(o=>!["completed","cancelled"].includes(o.status)).length;
  const activePurchases=purchases.filter(o=>!["completed","cancelled"].includes(o.status)).length;
  const activeRentals=rentals.filter(r=>["new","confirmed","active"].includes(r.status)).length;
+ const recentActivity=[
+  ...quotes.map(q=>({
+   key:"quote-"+q.id,
+   type:"Tilbud",
+   title:q.title||"Tilbud",
+   meta:q.quoteNumber||"",
+   date:q.acceptedAt||q.declinedAt||q.sentAt||q.createdAt,
+   status:quoteStatus[effectiveQuoteStatus(q)]||effectiveQuoteStatus(q),
+   href:q.href||"#tilbud"
+  })),
+  ...jobs.map(o=>({
+   key:"job-"+o.id,
+   type:"Oppdrag",
+   title:o.source_quote?.title||"Oppdrag",
+   meta:o.order_number||"",
+   date:o.job_planning_updated_at||o.created_at,
+   status:orderStatus[o.status]||o.status,
+   href:"#oppdrag"
+  })),
+  ...purchases.map(o=>({
+   key:"purchase-"+o.id,
+   type:"Bestilling",
+   title:(Array.isArray(o.items)&&o.items[0]?.name)||"Produktbestilling",
+   meta:o.order_number||"",
+   date:o.created_at,
+   status:orderStatus[o.status]||o.status,
+   href:"#bestillinger"
+  })),
+  ...rentals.map(r=>({
+   key:"rental-"+r.id,
+   type:"Utleie",
+   title:r.rental_items?.name||"Utleie",
+   meta:r.booking_number||"",
+   date:r.created_at,
+   status:rentalStatus[r.status]||r.status,
+   href:"#utleie"
+  }))
+ ].filter(item=>item.date).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,6);
 
  return <main className="customerPage">
   <Link href="/">← Aadland Service</Link>
@@ -205,6 +243,20 @@ export default function MinSide(){
    <a href="#bestillinger"><small>BESTILLINGER</small><b>{activePurchases}</b><span>aktive nå</span></a>
    <a href="#utleie"><small>UTLEIE</small><b>{activeRentals}</b><span>aktive nå</span></a>
   </nav>
+
+  {recentActivity.length>0&&<section className="customerDashboardSection customerRecentActivity">
+   <div className="customerSectionHead">
+    <div><div className="kicker">SISTE NYTT</div><h2>Siste aktivitet</h2></div>
+   </div>
+   <div className="customerActivityList">
+    {recentActivity.map(item=><a className="customerActivityItem" href={item.href} key={item.key}>
+     <span className="customerActivityType">{item.type}</span>
+     <span className="customerActivityMain"><b>{item.title}</b><small>{item.meta}{item.meta?" · ":""}{dateTime(item.date)}</small></span>
+     <span className="customerActivityStatus">{item.status}</span>
+     <span className="customerActivityArrow">→</span>
+    </a>)}
+   </div>
+  </section>}
 
   <section id="konto" className="customerDashboardSection customerAccountSection">
    <div className="customerSectionHead">
