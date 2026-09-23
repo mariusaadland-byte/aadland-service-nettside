@@ -1215,6 +1215,29 @@ function ProductEditor({
     setUploading(false);
   }
 
+  async function deleteUploadedImage(url){
+    if(!url)return;
+    try{
+      const response=await fetch("/api/admin/upload",{
+        method:"DELETE",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({url})
+      });
+      if(!response.ok){
+        const data=await response.json().catch(()=>({}));
+        setError(data.error||"Bildet kunne ikke ryddes bort.");
+      }
+    }catch{
+      setError("Bildet kunne ikke ryddes bort.");
+    }
+  }
+
+  async function removeImage(index){
+    const url=imageUrls[index]||"";
+    setImageUrls(current=>current.filter((_,i)=>i!==index));
+    if(isNew&&url)await deleteUploadedImage(url);
+  }
+
   function moveImage(index, direction) {
     setImageUrls((current) => {
       const next = [...current];
@@ -2046,19 +2069,7 @@ function ProductEditor({
                     <button
                       type="button"
                       className="btn alt"
-                      onClick={() =>
-                        setImageUrls(
-                          (current) =>
-                            current.filter(
-                              (
-                                _,
-                                i
-                              ) =>
-                                i !==
-                                index
-                            )
-                        )
-                      }
+                      onClick={() => removeImage(index)}
                     >
                       Fjern
                     </button>
@@ -2584,6 +2595,26 @@ function CategoryEditor({
     }
   }
 
+  async function clearCategoryImage(){
+    const url=imageUrl;
+    setImageUrl("");
+    if(isNew&&url){
+      try{
+        const response=await fetch("/api/admin/upload",{
+          method:"DELETE",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({url})
+        });
+        if(!response.ok){
+          const data=await response.json().catch(()=>({}));
+          setError(data.error||"Bildet kunne ikke ryddes bort.");
+        }
+      }catch{
+        setError("Bildet kunne ikke ryddes bort.");
+      }
+    }
+  }
+
   async function save(e) {
     e?.preventDefault();
 
@@ -2997,9 +3028,7 @@ function CategoryEditor({
             <button
               type="button"
               className="btn alt"
-              onClick={() =>
-                setImageUrl("")
-              }
+              onClick={clearCategoryImage}
             >
               Fjern bilde
             </button>
