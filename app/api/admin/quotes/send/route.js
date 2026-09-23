@@ -75,7 +75,7 @@ export async function POST(req){
   <div style="font-size:11px;color:#777;text-transform:uppercase;font-weight:800">Total inkl. MVA</div>
   <div style="margin-top:5px;font-size:25px;font-weight:900">${total}</div>
   ${valid?`<div style="margin-top:6px;color:#777;font-size:12px">Gyldig til ${esc(valid)}</div>`:""}
-  ${plannedStart?`<div style="margin-top:6px;color:#777;font-size:12px"><b>Planlagt oppstart:</b> ${esc(plannedStart)}</div>`:""}
+  ${plannedStart?`<div style="margin-top:6px;color:#777;font-size:12px"><b>Tidligst oppstart:</b> ${esc(plannedStart)}</div><div style="margin-top:4px;color:#777;font-size:11px">Endelig oppstart avtales etter godkjenning.</div>`:""}
  </div>
  <p style="margin:0 0 20px;color:#625d55;line-height:1.65">Åpne tilbudet for full oversikt, betalingsplan og vilkår. Der kan du også godkjenne eller avslå tilbudet.</p>
  <a href="${link}" style="display:inline-block;background:#cfa153;color:#111;text-decoration:none;font-weight:900;padding:14px 22px">Åpne tilbud →</a>
