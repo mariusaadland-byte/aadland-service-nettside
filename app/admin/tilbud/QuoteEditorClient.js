@@ -230,7 +230,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null}){
     <div className="quoteEditorHeaderActions">
      {quoteId&&<Link className="btn alt" href={"/admin/tilbud/"+quoteId+"/preview"}>Forhåndsvis / PDF</Link>}
      {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
-     {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href="/admin">Åpne backoffice</Link></div>}
+     {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href={"/admin/oppdrag/"+convertedOrderId+"/planlegg"}>Planlegg oppdrag</Link><Link href="/admin">Åpne backoffice</Link></div>}
      {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={sendQuote}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
      <button type="button" className="btn" disabled={saving||sending||converting} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>
     </div>
