@@ -136,7 +136,7 @@ export default function QuotesClient(){
         <span><small>Total inkl. MVA</small><b>{nok(quote.totalIncVatOre)}</b></span>
         <span><small>Opprettet</small><b>{quote.createdAt?new Date(quote.createdAt).toLocaleDateString("nb-NO"):"—"}</b></span>
         <span><small>Gyldig til</small><b>{quote.validUntil?new Date(quote.validUntil+"T12:00:00").toLocaleDateString("nb-NO"):"Ikke satt"}</b></span>
-        <span><small>Planlagt oppstart</small><b>{quote.plannedStartDate?new Date(quote.plannedStartDate+"T12:00:00").toLocaleDateString("nb-NO"):"Ikke satt"}</b></span>
+        <span><small>Tidligst oppstart</small><b>{quote.plannedStartDate?new Date(quote.plannedStartDate+"T12:00:00").toLocaleDateString("nb-NO"):"Ikke satt"}</b></span>
        </div>
        {quote.convertedOrderId&&<div className="quoteConvertedListBadge">✓ Oppdrag opprettet</div>}
        <div className="quoteListActions">
