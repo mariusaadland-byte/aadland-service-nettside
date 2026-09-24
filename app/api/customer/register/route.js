@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {createClient} from "@supabase/supabase-js";
 import {createCustomerVerificationToken} from "../../../../lib/customerVerification";
@@ -7,6 +8,7 @@ function esc(value){
 }
 
 export async function POST(req){
+ const originError=sameOriginGuard(req); if(originError)return originError;
  try{
   const b=await req.json();
   const email=String(b.email||"").trim().toLowerCase();
