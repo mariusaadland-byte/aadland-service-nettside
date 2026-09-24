@@ -16,7 +16,7 @@ Nettsted og backoffice for Aadland Service.
 ## Miljøvariabler
 Kopier `.env.example` til `.env.local` og fyll inn verdiene. Ikke legg hemmelige nøkler i Git.
 
-I Vercel må `RESEND_API_KEY` være satt i **Production** for at kundekonto, passordgjenoppretting og andre kunde-e-poster skal kunne sendes fra produksjon. Preview kan bruke `RESEND_PREVIEW_API_KEY`. Etter endring av en miljøvariabel må det kjøres en ny deployment.
+I Vercel må `RESEND_API_KEY` være satt i **Production** for at kundekonto, passordgjenoppretting og andre kunde-e-poster skal kunne sendes fra produksjon. Preview kan bruke `RESEND_PREVIEW_API_KEY`. `CRON_SECRET` er påkrevd i Production for at automatiske tilbudsoppfølginger og påminnelser skal kjøre; cron-rutene avviser alle kall dersom hemmeligheten mangler eller Authorization-headeren ikke matcher. Etter endring av en miljøvariabel må det kjøres en ny deployment.
 
 ## Database
 SQL-filene i `supabase/` beskriver databasegrunnlaget og senere utvidelser. De må kjøres kontrollert i riktig rekkefølge mot Supabase før funksjoner som bruker de nye tabellene/feltene tas i produksjon.
@@ -26,13 +26,13 @@ SQL-filene i `supabase/` beskriver databasegrunnlaget og senere utvidelser. De m
 ## Før publisering
 1. Installer avhengigheter med `npm install`.
 2. Kjør `npm run build` og rett eventuelle byggefeil.
-3. Sett produksjonsverdier for Supabase, sessions og Resend.
+3. Sett produksjonsverdier for Supabase, `SESSION_SECRET`, Resend og `CRON_SECRET` i Vercel.
 4. Kjør nødvendige SQL-oppgraderinger kontrollert mot riktig Supabase-prosjekt, inkludert `customers.sql` før Min side aktiveres.
 5. Test innlogging og rettigheter i backoffice.
 6. Test befaring, produktbestilling, lager/frakt og alle kunde-e-poster.
 7. Test utleie for ledige og kolliderende datoer samt admin-bekreftelse.
 8. Test tegninger både lokalt og med prosjektlagring.
-9. Kontroller mobil og desktop, metadata, vilkår og kontaktinformasjon.
+9. Kontroller mobil og desktop, metadata, vilkår, kontaktinformasjon, bildeopplasting (maks 4 MB per bilde) og at cron-rutene svarer 401 uten riktig token.
 10. Først etter godkjent test merges testgrenen til `main`.
 
 Ingen API-nøkler eller passord skal ligge i prosjektet.
