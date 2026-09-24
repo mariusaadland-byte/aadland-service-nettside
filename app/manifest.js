@@ -10,9 +10,9 @@ export default function manifest(){
   lang:"nb",
   icons:[
    {
-    src:"/aadland-service-logo.webp",
-    sizes:"any",
-    type:"image/webp",
+    src:"/icon",
+    sizes:"512x512",
+    type:"image/png",
     purpose:"any"
    }
   ]
