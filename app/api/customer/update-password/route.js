@@ -1,8 +1,10 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {createClient} from "@supabase/supabase-js";
 import {verifyCustomerPasswordResetToken} from "../../../../lib/customerPasswordReset";
 
 export async function POST(req){
+ const originError=sameOriginGuard(req); if(originError)return originError;
  try{
   const {token,password}=await req.json().catch(()=>({}));
   const nextPassword=String(password||"");
