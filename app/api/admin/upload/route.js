@@ -58,13 +58,13 @@ export async function POST(req) {
       );
     }
 
-    const maxSize = 10 * 1024 * 1024;
+    const maxSize = 4 * 1024 * 1024;
 
     if (file.size > maxSize) {
       return NextResponse.json(
         {
           error:
-            "Bildet kan maksimalt være 10 MB.",
+            "Bildet kan maksimalt være 4 MB.",
         },
         { status: 400 }
       );
