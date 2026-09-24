@@ -1,18 +1,11 @@
 import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
+import {cronGuard} from "../../../../lib/cronAuth";
 
 const MAX_PER_RUN=50;
 
 function esc(value){
  return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
-}
-
-function authorized(req){
- const secret=String(process.env.CRON_SECRET||"").trim();
- const authorization=String(req.headers.get("authorization")||"");
- if(secret)return authorization===("Bearer "+secret);
- const ua=String(req.headers.get("user-agent")||"").toLowerCase();
- return ua.startsWith("vercel-cron/");
 }
 
 function osloDate(offsetDays=0){
@@ -33,7 +26,7 @@ function baseUrl(req){
 }
 
 export async function GET(req){
- if(!authorized(req))return NextResponse.json({error:"Ingen tilgang."},{status:401});
+ const authError=cronGuard(req); if(authError)return authError;
 
  const resendKey=process.env.RESEND_API_KEY;
  if(!resendKey)return NextResponse.json({ok:false,error:"RESEND_API_KEY mangler."},{status:503});
