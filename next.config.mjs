@@ -6,6 +6,11 @@ const securityHeaders=[
   {key:"Strict-Transport-Security",value:"max-age=63072000; includeSubDomains; preload"}
 ];
 
+const privateHeaders=[
+  {key:"Cache-Control",value:"private, no-store, max-age=0"},
+  {key:"X-Robots-Tag",value:"noindex, nofollow, noarchive"}
+];
+
 const nextConfig={
   poweredByHeader:false,
   async headers(){
@@ -13,6 +18,22 @@ const nextConfig={
       {
         source:"/:path*",
         headers:securityHeaders
+      },
+      {
+        source:"/admin/:path*",
+        headers:privateHeaders
+      },
+      {
+        source:"/min-side/:path*",
+        headers:privateHeaders
+      },
+      {
+        source:"/tilbud/:path*",
+        headers:privateHeaders
+      },
+      {
+        source:"/api/:path*",
+        headers:privateHeaders
       }
     ];
   }
