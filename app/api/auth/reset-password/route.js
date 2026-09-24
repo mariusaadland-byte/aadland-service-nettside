@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {createAdminPasswordResetToken} from "../../../../lib/adminPasswordReset";
@@ -5,6 +6,7 @@ import {createAdminPasswordResetToken} from "../../../../lib/adminPasswordReset"
 const genericMessage="Hvis e-postadressen er registrert, sender vi en lenke for å velge nytt passord.";
 
 export async function POST(req){
+ const originError=sameOriginGuard(req); if(originError)return originError;
  try{
   const {email}=await req.json().catch(()=>({}));
   const value=String(email||"").trim().toLowerCase();
