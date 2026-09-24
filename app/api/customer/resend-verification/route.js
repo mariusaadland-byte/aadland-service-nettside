@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {createClient} from "@supabase/supabase-js";
 import {createCustomerVerificationToken} from "../../../../lib/customerVerification";
@@ -9,6 +10,7 @@ function esc(value){
 const genericMessage="Hvis e-postadressen tilhører en kundekonto som ikke er bekreftet, sender vi en ny bekreftelsesmail.";
 
 export async function POST(req){
+ const originError=sameOriginGuard(req); if(originError)return originError;
  try{
   const {email}=await req.json().catch(()=>({}));
   const value=String(email||"").trim().toLowerCase();
