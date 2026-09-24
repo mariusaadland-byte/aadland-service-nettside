@@ -1,8 +1,10 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {createClient} from "@supabase/supabase-js";
 import {setCustomerCookie} from "../../../../lib/customer-auth";
 
 export async function POST(req){
+ const originError=sameOriginGuard(req); if(originError)return originError;
  try{
   const {email,password}=await req.json();
   const value=String(email||"").trim().toLowerCase();
