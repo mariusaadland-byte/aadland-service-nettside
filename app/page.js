@@ -128,12 +128,16 @@ export default function Home(){
   try{
    let imageUrls=[];
    if(contactImages.length){
-    const formData=new FormData();
-    contactImages.forEach(file=>formData.append("images",file));
-    const upload=await fetch("/api/contact-images",{method:"POST",body:formData});
-    const uploaded=await upload.json();
-    if(!upload.ok) throw new Error(uploaded.error||"Kunne ikke laste opp bilder.");
-    imageUrls=uploaded.urls||[];
+    if(contactImages.length>8)throw new Error("Du kan laste opp maks 8 bilder.");
+    for(const file of contactImages){
+     if(file.size>4*1024*1024)throw new Error("Hvert bilde kan være maks 4 MB.");
+     const formData=new FormData();
+     formData.append("images",file);
+     const upload=await fetch("/api/contact-images",{method:"POST",body:formData});
+     const uploaded=await upload.json().catch(()=>({}));
+     if(!upload.ok)throw new Error(uploaded.error||"Kunne ikke laste opp bildet.");
+     imageUrls.push(...(uploaded.urls||[]));
+    }
    }
    const servicePrefix=selectedService?"Tjeneste: "+selectedService+"\n\n":"";
    const requestBase=servicePrefix+custom;
@@ -148,7 +152,7 @@ export default function Home(){
     phone:customerAccount.phone||"",
     address:customerAccount.address||""
    }:emptyCustomer);setContactImages([]);setImageError("");setSelectedService("");
-  }catch{setError("Noe gikk galt. Prøv igjen.");}finally{setSending(false);}
+  }catch(e){setError(e?.message||"Noe gikk galt. Prøv igjen.");}finally{setSending(false);}
  }
 
  return <main className="newHome">
@@ -220,7 +224,7 @@ export default function Home(){
     <Field label="Adresse"><input autoComplete="street-address" value={customer.address} onChange={e=>setCustomer({...customer,address:e.target.value})} placeholder="Adresse for prosjektet"/></Field>
     <div className="formTwo"><Field label="Postnummer"><input inputMode="numeric" autoComplete="postal-code" value={customer.postalCode} onChange={e=>setCustomer({...customer,postalCode:e.target.value})}/></Field><Field label="Sted"><input autoComplete="address-level2" value={customer.city} onChange={e=>setCustomer({...customer,city:e.target.value})}/></Field></div>
     <Field label="Beskriv hva du ønsker hjelp med *"><textarea rows="5" required value={custom} onChange={e=>setCustom(e.target.value)} placeholder="Beskriv kort hva du ønsker hjelp med …"/></Field>
-    <label className="contactUpload"><span>Last opp bilder <small>(valgfritt)</small></span><input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>{const picked=Array.from(e.target.files||[]);const valid=picked.filter(file=>["image/jpeg","image/png","image/webp"].includes(file.type)&&file.size<=10*1024*1024).slice(0,8);setContactImages(valid);setImageError(valid.length!==picked.length?"Noen bilder ble ikke lagt til. Bruk JPG, PNG eller WebP, maks 10 MB per bilde og maks 8 bilder.":"");}}/><strong>Velg bilder</strong><em>{contactImages.length?`${contactImages.length} bilde${contactImages.length===1?"":"r"} valgt`:"Dra og slipp eller velg filer · JPG, PNG eller WebP · maks 8 bilder"}</em></label>
+    <label className="contactUpload"><span>Last opp bilder <small>(valgfritt)</small></span><input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>{const picked=Array.from(e.target.files||[]);const valid=picked.filter(file=>["image/jpeg","image/png","image/webp"].includes(file.type)&&file.size<=4*1024*1024).slice(0,8);setContactImages(valid);setImageError(valid.length!==picked.length?"Noen bilder ble ikke lagt til. Bruk JPG, PNG eller WebP, maks 4 MB per bilde og maks 8 bilder.":"");}}/><strong>Velg bilder</strong><em>{contactImages.length?`${contactImages.length} bilde${contactImages.length===1?"":"r"} valgt`:"Dra og slipp eller velg filer · JPG, PNG eller WebP · maks 8 bilder"}</em></label>
     {imageError&&<p className="contactImageError">{imageError}</p>}
     {contactImages.length>0&&<div className="contactImageSelected"><b>{contactImages.length} bilde{contactImages.length===1?"":"r"} klare</b><button type="button" onClick={()=>setContactImages([])}>Fjern bilder</button></div>}
     {error&&<p className="notice">{error}</p>}<button className="goldBtn submitBtn" disabled={sending} aria-disabled={sending}>{sending?"Sender forespørsel …":"Send forespørsel →"}</button><small>Vi bruker opplysningene for å behandle og følge opp forespørselen din. Se <a href="/personvern">personvernerklæringen</a>.</small>
