@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import crypto from "crypto";
 import {getCustomerUserId} from "../../../lib/customer-auth";
@@ -6,6 +7,7 @@ import {productPrice} from "../../../lib/catalog";
 function num(){return "AS-"+Date.now().toString().slice(-8)+"-"+crypto.randomBytes(2).toString("hex").toUpperCase()}
 function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 export async function POST(req){
+ const originError=sameOriginGuard(req); if(originError)return originError;
  try{
   const body=await req.json();
   if(!["order","custom"].includes(body.orderType))return NextResponse.json({error:"Ugyldig bestillingstype."},{status:400});
