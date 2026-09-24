@@ -1,7 +1,7 @@
 import QuoteCustomerClient from "./QuoteCustomerClient";
 
 export const metadata={
- title:"Tilbud | Aadland Service",
+ title:"Tilbud",
  robots:{index:false,follow:false}
 };
 
