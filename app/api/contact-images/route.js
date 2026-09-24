@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../lib/requestGuard";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { db } from "../../../lib/supabase";
@@ -14,6 +15,7 @@ function matchesSignature(type,bytes){
 }
 
 export async function POST(request){
+ const originError=sameOriginGuard(request); if(originError)return originError;
  try{
   const supabase=db();
   if(!supabase) return NextResponse.json({error:"Lagring er ikke konfigurert."},{status:503});
