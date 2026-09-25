@@ -13,5 +13,8 @@
     "react": "19.1.9",
     "react-dom": "19.1.9",
     "resend": "6.29.0"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }
