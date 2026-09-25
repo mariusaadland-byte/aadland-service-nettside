@@ -81,11 +81,7 @@ export async function GET() {
     });
 
     return NextResponse.json(
-      {
-        error: `Bestillingene kunne ikke hentes: ${
-          error.message || "Ukjent databasefeil"
-        }`,
-      },
+      { error: "Bestillingene kunne ikke hentes." },
       { status: 500 }
     );
   }
@@ -285,11 +281,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     });
 
     return NextResponse.json(
-      {
-        error: `Status kunne ikke lagres: ${
-          error.message || "Ukjent databasefeil"
-        }`,
-      },
+      { error: "Status kunne ikke lagres." },
       { status: 500 }
     );
   }
