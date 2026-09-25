@@ -43,6 +43,7 @@ export default function NyttPassord(){
    setPassword("");
    setConfirm("");
    setToken("");
+   window.history.replaceState({},document.title,window.location.pathname);
   }catch{
    setError("Passordet kunne ikke endres akkurat nå. Prøv igjen.");
   }finally{
