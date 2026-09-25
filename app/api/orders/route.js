@@ -4,6 +4,7 @@ import crypto from "crypto";
 import {getCustomerUserId} from "../../../lib/customer-auth";
 import {db,fromDbProduct} from "../../../lib/supabase";
 import {productPrice} from "../../../lib/catalog";
+const SALES_TERMS_VERSION="2026-09";
 function num(){return "AS-"+Date.now().toString().slice(-8)+"-"+crypto.randomBytes(2).toString("hex").toUpperCase()}
 function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 export async function POST(req){
@@ -44,8 +45,15 @@ export async function POST(req){
    stockRequests=products.filter(p=>p.inventoryMode==="stock").map(p=>({id:p.id,quantity:requestedStock.get(p.id)||0}));
   }
   total+=shipping;
+  const address=String(body.customer?.address||"").trim().slice(0,300);
+  const postalCode=String(body.customer?.postalCode||"").trim().slice(0,20);
+  const city=String(body.customer?.city||"").trim().slice(0,120);
+  if(body.orderType==="order"&&["delivery","shipping"].includes(body.fulfillmentType)&&(!address||!postalCode||!city)){
+   return NextResponse.json({error:"Fyll inn adresse, postnummer og sted for levering eller sending."},{status:400});
+  }
   const orderNumber=num(),now=new Date().toISOString(),customerUserId=await getCustomerUserId();
-  const safeCustomer={...body.customer,name,email,phone,address:String(body.customer?.address||"").trim().slice(0,300),postalCode:String(body.customer?.postalCode||"").trim().slice(0,20),city:String(body.customer?.city||"").trim().slice(0,120),note:String(body.customer?.note||"").trim().slice(0,2000)};const record={customer_user_id:customerUserId,order_number:orderNumber,order_type:body.orderType==="custom"?"custom":"order",status:"new",customer:safeCustomer,fulfillment_type:body.fulfillmentType||"pickup",delivery_within_radius:!!body.deliveryWithinRadius,items,custom_request:body.customRequest?String(body.customRequest).trim():null,total_ore:total,shipping_ore:shipping,payment_status:body.orderType==="order"?"pending":"unpaid",terms_version:body.orderType==="order"?(body.termsVersion||"2026-09"):null,terms_accepted_at:body.orderType==="order"?now:null};
+  const safeCustomer={name,email,phone,address,postalCode,city,note:String(body.customer?.note||"").trim().slice(0,2000)};
+  const record={customer_user_id:customerUserId,order_number:orderNumber,order_type:body.orderType==="custom"?"custom":"order",status:"new",customer:safeCustomer,fulfillment_type:body.fulfillmentType||"pickup",delivery_within_radius:body.fulfillmentType==="delivery"?null:false,items,custom_request:body.customRequest?String(body.customRequest).trim():null,total_ore:total,shipping_ore:shipping,payment_status:body.orderType==="order"?"pending":"unpaid",terms_version:body.orderType==="order"?SALES_TERMS_VERSION:null,terms_accepted_at:body.orderType==="order"?now:null};
   if(stockRequests.length){
    const {error:orderError}=await s.rpc("create_order_with_stock",{order_record:record,stock_requests:stockRequests});
    if(orderError){
