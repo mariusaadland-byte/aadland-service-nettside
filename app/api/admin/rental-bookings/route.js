@@ -145,7 +145,8 @@ export async function GET(){
  const {data,error}=await s.from("rental_bookings").select("*,rental_items(name)").order("start_date",{ascending:true});
  if(error){
   if(error.code==="42P01")return NextResponse.json({bookings:[],setupRequired:true});
-  console.error("RENTAL BOOKINGS GET",error);\n  return NextResponse.json({error:"Utleiebookingene kunne ikke hentes."},{status:500});
+  console.error("RENTAL BOOKINGS GET",error);
+  return NextResponse.json({error:"Utleiebookingene kunne ikke hentes."},{status:500});
  }
  return NextResponse.json({bookings:(data||[]).map(map)});
 }
