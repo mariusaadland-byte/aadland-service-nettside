@@ -6,16 +6,21 @@ const nok=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",mi
 const typeLabels={work:"Arbeid",material:"Materiale",other:"Annet"};
 const statusLabels={draft:"Kladd",sent:"Sendt",accepted:"Godkjent",declined:"Avslått",expired:"Utløpt",cancelled:"Avbrutt"};
 
-export default function QuoteCustomerClient({quoteId,token}){
+export default function QuoteCustomerClient({quoteId}){
+ const [token,setToken]=useState("");
+ const [tokenReady,setTokenReady]=useState(false);
  const [quote,setQuote]=useState(null);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
  const [saving,setSaving]=useState(false);
  const [message,setMessage]=useState("");
 
- async function load(){
+ async function load(currentToken){
   setLoading(true);setError("");
-  const response=await fetch("/api/quotes/"+encodeURIComponent(quoteId)+"?token="+encodeURIComponent(token));
+  const response=await fetch("/api/quotes/"+encodeURIComponent(quoteId),{
+   headers:{"X-Quote-Token":currentToken},
+   cache:"no-store"
+  });
   const data=await response.json().catch(()=>({}));
   setLoading(false);
   if(!response.ok){setError(data.error||"Tilbudet kunne ikke åpnes.");return;}
@@ -23,9 +28,18 @@ export default function QuoteCustomerClient({quoteId,token}){
  }
 
  useEffect(()=>{
-  if(token&&typeof window!=="undefined")window.history.replaceState({},document.title,window.location.pathname);
-  load();
- },[quoteId,token]);
+  const fragment=new URLSearchParams(window.location.hash.replace(/^#/,""));
+  const value=fragment.get("token")||new URLSearchParams(window.location.search).get("token")||"";
+  setToken(value);
+  if(value)window.history.replaceState({},document.title,window.location.pathname);
+  setTokenReady(true);
+ },[]);
+
+ useEffect(()=>{
+  if(!tokenReady)return;
+  if(!token){setLoading(false);setError("Tilbudslenken mangler eller er ugyldig.");return;}
+  load(token);
+ },[quoteId,token,tokenReady]);
 
  async function respond(action){
   const label=action==="accept"?"godkjenne":"avslå";
