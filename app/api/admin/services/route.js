@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import { NextResponse } from "next/server";
 import { getAdminUser, hasPermission } from "../../../../lib/auth";
 import { db, fromDbService } from "../../../../lib/supabase";
@@ -38,7 +39,7 @@ export async function GET() {
   if(error)return NextResponse.json({error:"Tjenestene kunne ikke hentes."},{status:500});
   return NextResponse.json({services:(data||[]).map(fromDbService)});
 }
-export async function POST(req) {
+export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;
   const a=await requireAccess(); if(a.error)return a.error; const b=await req.json(); const dateError=publishDateError(b); if(dateError)return dateError; const p=payload(b);
   if(!p.title)return NextResponse.json({error:"Tjenesten må ha et navn."},{status:400});
   if(text(b.ctaHref)&&!p.cta_href)return NextResponse.json({error:"Knappelenken må være en intern lenke, en #seksjon eller en https-adresse."},{status:400});
@@ -47,7 +48,7 @@ export async function POST(req) {
   if(error){console.error("SERVICE CREATE ERROR:",error);return NextResponse.json({error:"Tjenesten kunne ikke opprettes."},{status:500});}
   return NextResponse.json({ok:true,service:fromDbService(data)});
 }
-export async function PATCH(req) {
+export async function PATCH(req){ const originError=sameOriginGuard(req); if(originError)return originError;
   const a=await requireAccess(); if(a.error)return a.error; const b=await req.json(); const dateError=publishDateError(b); if(dateError)return dateError;
   if(!b.id)return NextResponse.json({error:"Tjeneste mangler."},{status:400});
   const p=payload(b); if(!p.title)return NextResponse.json({error:"Tjenesten må ha et navn."},{status:400}); if(text(b.ctaHref)&&!p.cta_href)return NextResponse.json({error:"Knappelenken må være en intern lenke, en #seksjon eller en https-adresse."},{status:400});
@@ -56,7 +57,7 @@ export async function PATCH(req) {
   if(error){console.error("SERVICE UPDATE ERROR:",error);return NextResponse.json({error:"Tjenesten kunne ikke lagres."},{status:500});}
   return NextResponse.json({ok:true,service:fromDbService(data)});
 }
-export async function DELETE(req) {
+export async function DELETE(req){ const originError=sameOriginGuard(req); if(originError)return originError;
   const a=await requireAccess(); if(a.error)return a.error; const b=await req.json();
   if(!b.id)return NextResponse.json({error:"Tjeneste mangler."},{status:400});const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
   const {error}=await s.from("services").delete().eq("id",b.id);
