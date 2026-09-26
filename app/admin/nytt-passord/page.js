@@ -11,7 +11,8 @@ export default function NewPassword(){
  const [done,setDone]=useState(false);
 
  useEffect(()=>{
-  const value=new URLSearchParams(window.location.search).get("token")||"";
+  const fragment=new URLSearchParams(window.location.hash.replace(/^#/,""));
+  const value=fragment.get("token")||new URLSearchParams(window.location.search).get("token")||"";
   setToken(value);
   if(value)window.history.replaceState({},document.title,window.location.pathname);
   setTokenReady(true);
