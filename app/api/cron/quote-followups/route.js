@@ -2,6 +2,7 @@ import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {cronGuard} from "../../../../lib/cronAuth";
 import {createQuoteToken} from "../../../../lib/quoteLinks";
+import {osloDateKey} from "../../../../lib/osloTime";
 
 const MAX_PER_RUN=25;
 const TWO_DAYS_MS=48*60*60*1000;
@@ -25,7 +26,7 @@ export async function GET(req){
  if(!s)return NextResponse.json({ok:false,error:"Databasen er ikke tilgjengelig."},{status:503});
 
  const cutoff=new Date(Date.now()-TWO_DAYS_MS).toISOString();
- const today=new Date().toISOString().slice(0,10);
+ const today=osloDateKey(new Date());
 
  const {data,error}=await s.from("quotes")
   .select("id,quote_number,title,status,customer,total_inc_vat_ore,valid_until,sent_at,follow_up_sent_at,auto_follow_up,archived_at")
