@@ -29,7 +29,7 @@ export async function POST(req){
   }
 
   const nextSessionVersion=createSessionVersion();
-  const {error:updateError}=await s.auth.admin.updateUserById(user.id,{password:nextPassword,user_metadata:{...(user.user_metadata||{}),[SESSION_VERSION_FIELD]:nextSessionVersion}});
+  const {error:updateError}=await s.auth.admin.updateUserById(user.id,{password:nextPassword,app_metadata:{...(user.app_metadata||{}),[SESSION_VERSION_FIELD]:nextSessionVersion}});
   if(updateError){
    console.error("CUSTOMER UPDATE PASSWORD",updateError);
    return NextResponse.json({error:"Kunne ikke lagre nytt passord."},{status:500});
