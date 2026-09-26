@@ -13,7 +13,8 @@ function projectApiError(error){
    migration:"supabase/project_content_blocks.sql"
   },{status:503});
  }
- console.error("PROJECT API",error);\n return NextResponse.json({error:"Oppdraget kunne ikke lagres."},{status:500});
+ console.error("PROJECT API",error);
+ return NextResponse.json({error:"Oppdraget kunne ikke lagres."},{status:500});
 }
 const slugify=v=>String(v||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
 const map=p=>({id:p.id,title:p.title,slug:p.slug,category:p.category||"",description:p.description||"",imageUrls:Array.isArray(p.image_urls)?p.image_urls:[],contentBlocks:Array.isArray(p.content_blocks)?p.content_blocks:[],featured:p.featured!==false,active:p.active!==false,sortOrder:p.sort_order||0});
@@ -76,7 +77,8 @@ export async function GET(){
  const {data,error}=await s.from("projects").select("*").order("sort_order").order("created_at",{ascending:false});
  if(error){
   if(error.code==="42P01")return NextResponse.json({projects:[],setupRequired:true,storySetupRequired:true});
-  console.error("PROJECTS GET",error);\n  return NextResponse.json({error:"Prosjektene kunne ikke hentes."},{status:500});
+  console.error("PROJECTS GET",error);
+  return NextResponse.json({error:"Prosjektene kunne ikke hentes."},{status:500});
  }
  return NextResponse.json({projects:(data||[]).map(map),storySetupRequired});
 }
