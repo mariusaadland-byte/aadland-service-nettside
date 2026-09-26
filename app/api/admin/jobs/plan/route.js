@@ -14,8 +14,9 @@ async function allowed(){
  return user.role==="owner"||user.canUpdateOrders?user:null;
 }
 function validDate(value){
- if(!value)return null;
- const d=new Date(value);
+ const input=String(value||"").trim();
+ if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(input))return null;
+ const d=new Date(input);
  return Number.isNaN(d.getTime())?null:d.toISOString();
 }
 async function loadJob(s,id){
