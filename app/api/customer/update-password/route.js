@@ -2,6 +2,7 @@ import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {createClient} from "@supabase/supabase-js";
 import {verifyCustomerPasswordResetToken} from "../../../../lib/customerPasswordReset";
+import {createSessionVersion,SESSION_VERSION_FIELD} from "../../../../lib/sessionVersion";
 
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;
@@ -27,7 +28,8 @@ export async function POST(req){
    return NextResponse.json({error:"Lenken er ugyldig, utløpt eller allerede brukt.",code:"invalid_or_expired"},{status:410});
   }
 
-  const {error:updateError}=await s.auth.admin.updateUserById(user.id,{password:nextPassword});
+  const nextSessionVersion=createSessionVersion();
+  const {error:updateError}=await s.auth.admin.updateUserById(user.id,{password:nextPassword,user_metadata:{...(user.user_metadata||{}),[SESSION_VERSION_FIELD]:nextSessionVersion}});
   if(updateError){
    console.error("CUSTOMER UPDATE PASSWORD",updateError);
    return NextResponse.json({error:"Kunne ikke lagre nytt passord."},{status:500});
