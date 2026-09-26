@@ -13,6 +13,7 @@ export default function BekreftEpost(){
  useEffect(()=>{
   const value=new URLSearchParams(window.location.search).get("token")||"";
   setToken(value);
+  if(value)window.history.replaceState({},document.title,window.location.pathname);
   setReady(true);
  },[]);
 
