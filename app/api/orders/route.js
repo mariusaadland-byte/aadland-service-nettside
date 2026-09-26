@@ -1,3 +1,4 @@
+import {rateLimitRequest} from "../../../lib/rateLimit";
 import {sameOriginGuard} from "../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import crypto from "crypto";
@@ -9,6 +10,7 @@ function num(){return "AS-"+Date.now().toString().slice(-8)+"-"+crypto.randomByt
 function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;
+ const rateError=await rateLimitRequest(req,{"scope":"orders","max":15,"windowSeconds":900,"message":"For mange forespørsler på kort tid. Prøv igjen senere."}); if(rateError)return rateError;
  try{
   const body=await req.json();
   if(!["order","custom"].includes(body.orderType))return NextResponse.json({error:"Ugyldig bestillingstype."},{status:400});
