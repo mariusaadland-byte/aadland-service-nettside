@@ -1,4 +1,4 @@
-import {rateLimitRequest} from "../../../../lib/rateLimit";
+import {rateLimitRequest,rateLimitValue} from "../../../../lib/rateLimit";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {createClient} from "@supabase/supabase-js";
@@ -22,6 +22,7 @@ export async function POST(req){
   if(name.length>120||email.length>254||phone.length>40||address.length>300)return NextResponse.json({error:"Kontaktinformasjonen er for lang."},{status:400});
   if(!name||!email||password.length<8||password.length>128)return NextResponse.json({error:"Fyll inn navn og e-post. Passordet må ha minst 8 tegn."},{status:400});
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return NextResponse.json({error:"Skriv inn en gyldig e-postadresse."},{status:400});
+  const emailRateError=await rateLimitValue(email,{"scope":"customer-register-email","max":3,"windowSeconds":3600,"message":"For mange registreringsforsøk for denne e-postadressen. Prøv igjen senere."}); if(emailRateError)return emailRateError;
 
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
