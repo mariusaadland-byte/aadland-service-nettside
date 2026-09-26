@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {verifyQuoteToken} from "../../../../lib/quoteLinks";
@@ -56,7 +57,7 @@ export async function GET(req,{params}){
  return NextResponse.json({quote:{...quote,isExpired:expired(loaded.data)}});
 }
 
-export async function POST(req,{params}){
+export async function POST(req,{params}){ const originError=sameOriginGuard(req); if(originError)return originError;
  const resolved=await params;
  const id=String(resolved?.id||"").trim();
  const body=await req.json().catch(()=>({}));
