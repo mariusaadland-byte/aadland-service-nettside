@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
@@ -151,7 +152,7 @@ export async function GET(){
  return NextResponse.json({bookings:(data||[]).map(map)});
 }
 
-export async function PATCH(req){
+export async function PATCH(req){ const originError=sameOriginGuard(req); if(originError)return originError;
  if(!(await getAdminUser())||!(await hasPermission("canUpdateOrders")))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const s=db();
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
