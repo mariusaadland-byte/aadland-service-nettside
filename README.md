@@ -32,7 +32,7 @@ Direkte kontroll mot prosjektet `aadland-service-nettside` er gjennomført 26. s
 - Kritiske `SECURITY DEFINER`-RPC-er har eksplisitt `search_path` og kan bare kjøres av `service_role`.
 - `contact-images` er privat og `product-images` er offentlig.
 - Rate-limit-migrasjonen `20260926005033_app_rate_limiting` er lagt inn og funksjonstestet i produksjonsdatabasen.
-- Supabase Security Advisor viser fortsatt **Leaked Password Protection Disabled**. Slå dette på i Auth-innstillingene før produksjonsmerge.
+- Supabase Security Advisor viser fortsatt **Leaked Password Protection Disabled** fordi prosjektet ligger på Supabase Free, mens den innebygde funksjonen krever Pro eller høyere. Aadland Service kompenserer derfor server-side ved å kontrollere nye passord mot HIBP Pwned Passwords med k-anonymitet (kun SHA-1-prefix på 5 tegn sendes, med response padding). Ved senere oppgradering til Pro kan Supabase-funksjonen også slås på som ekstra lag.
 - Eksisterende public-tabellgrants og kritiske `SECURITY DEFINER`-funksjoner er herdet i produksjon via migrasjon `20260926102035_harden_public_privileges_and_function_paths`. Default privileges for **fremtidige** objekter kan i tillegg strammes inn med `supabase/manual_default_privileges_hardening.sql`; Management-connectoren har ikke eierrettighet til dette.
 - Advisor-meldinger om «RLS enabled, no policy» på de øvrige tabellene er forventet i dagens server-only-modell: klientroller har ikke CRUD-grants, mens serveren bruker `service_role`.
 
