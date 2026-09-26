@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import crypto from "crypto";
 import {getAdminUser} from "../../../../../lib/auth";
@@ -7,7 +8,7 @@ function orderNumber(){
  return "AS-"+Date.now().toString().slice(-8)+"-"+crypto.randomBytes(2).toString("hex").toUpperCase();
 }
 
-export async function POST(req){
+export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;
  const user=await getAdminUser();
  if(!user||!(user.role==="owner"||user.canUpdateOrders))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const {id}=await req.json().catch(()=>({}));
