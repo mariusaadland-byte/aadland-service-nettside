@@ -1,3 +1,4 @@
+import {rateLimitRequest} from "../../../lib/rateLimit";
 import {sameOriginGuard} from "../../../lib/requestGuard";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
@@ -25,6 +26,7 @@ function privateContactPath(ref){
 
 export async function POST(request){
  const originError=sameOriginGuard(request); if(originError)return originError;
+ const rateError=await rateLimitRequest(request,{scope:"contact-images",max:24,windowSeconds:900,message:"For mange bildeopplastinger på kort tid. Prøv igjen senere."}); if(rateError)return rateError;
  try{
   const supabase=db();
   if(!supabase) return NextResponse.json({error:"Lagring er ikke konfigurert."},{status:503});
