@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import { NextResponse } from "next/server";
 import {
   getAdminUser,
@@ -128,7 +129,7 @@ export async function GET() {
   });
 }
 
-export async function PATCH(req) {
+export async function PATCH(req){ const originError=sameOriginGuard(req); if(originError)return originError;
   const currentUser = await getAdminUser();
 
   if (!currentUser) {
