@@ -22,7 +22,8 @@ export async function GET(req){
  const {data,error}=await q;
  if(error){
   if(error.code==="42P01")return NextResponse.json({blocks:[],setupRequired:true});
-  console.error("RENTAL BLOCKS GET",error);\n  return NextResponse.json({error:"Blokkeringene kunne ikke hentes."},{status:500});
+  console.error("RENTAL BLOCKS GET",error);
+  return NextResponse.json({error:"Blokkeringene kunne ikke hentes."},{status:500});
  }
  return NextResponse.json({blocks:(data||[]).map(x=>({
   id:x.id,
