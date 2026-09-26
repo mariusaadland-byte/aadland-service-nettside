@@ -1,3 +1,4 @@
+import {rateLimitRequest} from "../../../../lib/rateLimit";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {createClient} from "@supabase/supabase-js";
@@ -11,6 +12,7 @@ const genericMessage="Hvis e-postadressen tilhører en kundekonto som ikke er be
 
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;
+ const rateError=await rateLimitRequest(req,{"scope":"customer-resend-verification","max":5,"windowSeconds":3600,"message":"For mange forespørsler om bekreftelsesmail. Prøv igjen senere."}); if(rateError)return rateError;
  try{
   const {email}=await req.json().catch(()=>({}));
   const value=String(email||"").trim().toLowerCase();
