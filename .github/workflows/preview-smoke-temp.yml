@@ -1,0 +1,63 @@
+name: Preview Smoke
+
+on:
+  push:
+    branches:
+      - test/production-readiness-a15698c
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check preview routes and headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://aadland-service-nettside-git-test-produc-7ef8cd-aadland-service.vercel.app"
+
+          fetch_code() {
+            local path="$1"
+            curl -sS -L --retry 18 --retry-all-errors --retry-delay 5               --connect-timeout 10 --max-time 30               -o /tmp/aadland-smoke-body -w "%{http_code}" "$BASE$path"
+          }
+
+          for path in / /produkter /utleie /prosjekter /min-side /admin/login; do
+            code="$(fetch_code "$path")"
+            echo "$path -> $code"
+            test "$code" = "200"
+          done
+
+          for path in /api/site-settings /api/services /api/products /api/rental; do
+            code="$(fetch_code "$path")"
+            echo "$path -> $code"
+            test "$code" = "200"
+          done
+
+          headers="$(curl -sS -I --retry 12 --retry-all-errors --retry-delay 5 "$BASE/")"
+          echo "$headers"
+          grep -qi '^x-content-type-options: nosniff' <<<"$headers"
+          grep -qi '^content-security-policy:' <<<"$headers"
+          grep -qi '^cross-origin-opener-policy: same-origin' <<<"$headers"
+          grep -qi '^cross-origin-resource-policy: same-site' <<<"$headers"
+          grep -qi '^strict-transport-security:' <<<"$headers"
+
+          private_headers="$(curl -sS -I --retry 12 --retry-all-errors --retry-delay 5 "$BASE/admin/login")"
+          grep -qi '^cache-control:.*no-store' <<<"$private_headers"
+          grep -qi '^x-robots-tag:.*noindex' <<<"$private_headers"
+
+          cron_code="$(curl -sS -o /tmp/cron-body -w "%{http_code}" "$BASE/api/cron/quote-followups")"
+          echo "cron without token -> $cron_code"
+          test "$cron_code" = "401" -o "$cron_code" = "503"
+
+          origin_code="$(curl -sS -o /tmp/origin-body -w "%{http_code}"             -X PUT -H 'Origin: https://evil.example' -H 'Content-Type: application/json'             --data '{}' "$BASE/api/admin/site-settings")"
+          echo "cross-origin admin mutation -> $origin_code"
+          test "$origin_code" = "403"
+
+          quote_code="$(curl -sS -o /tmp/quote-body -w "%{http_code}"             -X POST -H 'Content-Type: application/json' --data '{}'             "$BASE/api/quotes/smoke-invalid")"
+          echo "quote mutation without Origin -> $quote_code"
+          test "$quote_code" = "403"
+
+          echo "Preview smoke checks passed."
