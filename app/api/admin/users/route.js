@@ -5,6 +5,7 @@ import {
   hasPermission,
 } from "../../../../lib/auth";
 import { db } from "../../../../lib/supabase";
+import {checkNewPassword} from "../../../../lib/passwordSecurity";
 
 export async function GET() {
   const currentUser = await getAdminUser();
@@ -103,6 +104,9 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
       { status: 400 }
     );
   }
+
+  const passwordCheck=await checkNewPassword(password);
+  if(!passwordCheck.ok)return NextResponse.json({error:passwordCheck.error},{status:passwordCheck.status});
 
   const s = db();
 

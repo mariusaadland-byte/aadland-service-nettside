@@ -3,6 +3,7 @@ import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {verifyAdminPasswordResetToken} from "../../../../lib/adminPasswordReset";
 import {createSessionVersion,SESSION_VERSION_FIELD} from "../../../../lib/sessionVersion";
+import {checkNewPassword} from "../../../../lib/passwordSecurity";
 
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;
@@ -39,6 +40,9 @@ export async function POST(req){
   if(userError||!authUser||String(authUser.email||"").trim().toLowerCase()!==reset.email||currentVersion!==reset.version){
    return NextResponse.json({error:"Lenken er ugyldig eller allerede brukt. Be om en ny lenke.",code:"invalid_or_expired"},{status:410});
   }
+
+  const passwordCheck=await checkNewPassword(password);
+  if(!passwordCheck.ok)return NextResponse.json({error:passwordCheck.error},{status:passwordCheck.status});
 
   const nextSessionVersion=createSessionVersion();
   const {error:updateError}=await s.auth.admin.updateUserById(reset.id,{password,app_metadata:{...(authUser.app_metadata||{}),[SESSION_VERSION_FIELD]:nextSessionVersion}});
