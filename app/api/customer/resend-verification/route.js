@@ -50,7 +50,7 @@ export async function POST(req){
   const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
   const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
   const verifyUrl=new URL("/min-side/bekreft-epost",base);
-  verifyUrl.searchParams.set("token",token);
+  verifyUrl.hash="token="+encodeURIComponent(token);
 
   const name=String(profile.name||user.user_metadata?.name||"").trim();
   const html=`<!doctype html><html><body style="margin:0;background:#f3efe8;font-family:Arial,Helvetica,sans-serif;color:#181613">
