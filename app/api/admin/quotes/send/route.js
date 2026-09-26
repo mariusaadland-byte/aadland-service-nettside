@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {getAdminUser} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
@@ -14,7 +15,7 @@ async function allowed(){
  return (user.role==="owner"||user.canUpdateOrders||user.canManageProducts)?user:null;
 }
 
-export async function POST(req){
+export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;
  const user=await allowed();
  if(!user)return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const {id}=await req.json().catch(()=>({}));
