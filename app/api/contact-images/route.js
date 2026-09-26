@@ -14,6 +14,15 @@ function matchesSignature(type,bytes){
  return false;
 }
 
+function privateContactPath(ref){
+ const prefix="private-image:contact-images:";
+ const value=String(ref||"");
+ if(!value.startsWith(prefix))return null;
+ const path=value.slice(prefix.length);
+ if(!/^contact\/\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}\.(?:jpg|png|webp)$/i.test(path))return null;
+ return path;
+}
+
 export async function POST(request){
  const originError=sameOriginGuard(request); if(originError)return originError;
  try{
@@ -50,5 +59,27 @@ export async function POST(request){
  }catch(error){
   console.error("contact image upload",error);
   return NextResponse.json({error:"Kunne ikke laste opp bildene."},{status:500});
+ }
+}
+
+
+export async function DELETE(request){
+ const originError=sameOriginGuard(request); if(originError)return originError;
+ try{
+  const supabase=db();
+  if(!supabase)return NextResponse.json({error:"Lagring er ikke konfigurert."},{status:503});
+  const body=await request.json().catch(()=>({}));
+  const refs=Array.isArray(body.refs)?body.refs.slice(0,8):[];
+  const paths=[...new Set(refs.map(privateContactPath).filter(Boolean))];
+  if(!paths.length)return NextResponse.json({ok:true,removed:0});
+  const {error}=await supabase.storage.from("contact-images").remove(paths);
+  if(error){
+   console.error("CONTACT IMAGE DELETE ERROR",error);
+   return NextResponse.json({error:"Bildene kunne ikke ryddes bort."},{status:500});
+  }
+  return NextResponse.json({ok:true,removed:paths.length});
+ }catch(error){
+  console.error("CONTACT IMAGE DELETE ERROR",error);
+  return NextResponse.json({error:"Bildene kunne ikke ryddes bort."},{status:500});
  }
 }
