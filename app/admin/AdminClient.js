@@ -836,9 +836,14 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
  }
  async function saveTracking(order){
   setSavingId(order.id);
+  setMessage("");
   const trackingNumber=document.getElementById("tracking-number-"+order.id)?.value||"",trackingUrl=document.getElementById("tracking-url-"+order.id)?.value||"";
-  await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,trackingNumber,trackingUrl})});
+  const response=await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,trackingNumber,trackingUrl})});
+  const data=await response.json().catch(()=>({}));
   setSavingId(null);
+  if(!response.ok){setMessage(data.error||"Sporingen kunne ikke lagres.");return;}
+  setMessage("Sporingsinformasjonen er lagret.");
+  if(typeof reload==="function")await reload();
  }
  async function finish(order,action){setSavingId(order.id);setMessage("");const r=await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,action})}),d=await r.json().catch(()=>({}));setSavingId(null);if(!r.ok){setMessage(d.error||"Handlingen kunne ikke utføres.");return;}setMessage(d.paymentCaptureRequired?"Status er lagret. Betalingen står fortsatt bare som reservert til betalingsleverandøren er koblet til.":"Status er lagret.");window.setTimeout(()=>window.location.reload(),700);}
  return <><>{message&&<p className="notice">{message}</p>}</><div className="orderCards">{orders.length?orders.map(order=><article className="card orderCard" key={order.id}>
