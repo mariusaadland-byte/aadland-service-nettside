@@ -49,12 +49,12 @@ function expired(quote){
 export async function GET(req,{params}){
  const resolved=await params;
  const id=String(resolved?.id||"").trim();
- const token=new URL(req.url).searchParams.get("token")||"";
+ const token=String(req.headers.get("x-quote-token")||new URL(req.url).searchParams.get("token")||"");
  const loaded=await loadQuote(id);
  if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status});
  if(!verifyQuoteToken(loaded.data,token))return NextResponse.json({error:"Ugyldig eller utløpt tilbudslenke."},{status:403});
  const quote=mapQuote(loaded.data);
- return NextResponse.json({quote:{...quote,isExpired:expired(loaded.data)}});
+ return NextResponse.json({quote:{...quote,isExpired:expired(loaded.data)}},{headers:{"Cache-Control":"private, no-store, max-age=0"}});
 }
 
 export async function POST(req,{params}){ const originError=sameOriginGuard(req); if(originError)return originError;
