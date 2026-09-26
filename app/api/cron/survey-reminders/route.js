@@ -83,8 +83,8 @@ export async function GET(req){
 <tr><td style="padding:28px 30px;background:#0d0d0d;color:#fff"><div style="font-size:18px;font-weight:900;letter-spacing:.13em">AADLAND SERVICE</div><div style="margin-top:5px;color:#d9b365;font-size:11px;letter-spacing:.08em">PÅMINNELSE OM BEFARING</div></td></tr>
 <tr><td style="padding:30px">
 <div style="color:#d9b365;font-size:11px;font-weight:800;letter-spacing:.12em">${esc(order.order_number)}</div>
-<h1 style="font-size:27px;line-height:1.15;margin:9px 0 14px;color:#fff">Vi sees til befaring</h1>
-<p style="color:#c9c3b8;line-height:1.65;margin:0 0 20px">Hei ${customerName}. Dette er en kort påminnelse om den avtalte befaringen.</p>
+<h1 style="font-size:27px;line-height:1.15;margin:9px 0 14px;color:#fff">Vi sees til befaring i morgen</h1>
+<p style="color:#c9c3b8;line-height:1.65;margin:0 0 20px">Hei ${customerName}. Dette er en kort påminnelse om den avtalte befaringen i morgen.</p>
 <div style="padding:17px;background:#101010;border:1px solid #2d2d2d">
 <div style="color:#8e887f;font-size:11px">DATO OG TID</div><div style="margin-top:5px;color:#fff;font-size:21px;font-weight:900">${esc(dateText)}</div>
 ${address?`<div style="margin-top:14px;color:#8e887f;font-size:11px">ADRESSE</div><div style="margin-top:4px;color:#fff;font-weight:700">${esc(address)}</div>`:""}
@@ -99,7 +99,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     from:"Aadland Service <noreply@aadland-service.no>",
     to:email,
     replyTo:"post@aadland-service.no",
-    subject:"Påminnelse om befaring – Aadland Service",
+    subject:"Påminnelse om befaring i morgen – Aadland Service",
     html
    });
    if(result?.error)throw new Error(result.error.message||"E-postfeil");
