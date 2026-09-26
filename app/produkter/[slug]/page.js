@@ -106,6 +106,20 @@ export default function ProductPage() {
     setSelectedImage(0);
   }, [product]);
 
+  useEffect(() => {
+    if (!showOrder) return;
+    const previousOverflow=document.body.style.overflow;
+    document.body.style.overflow="hidden";
+    function onKeyDown(event){
+      if(event.key==="Escape")setShowOrder(false);
+    }
+    window.addEventListener("keydown",onKeyDown);
+    return()=>{
+      window.removeEventListener("keydown",onKeyDown);
+      document.body.style.overflow=previousOverflow;
+    };
+  }, [showOrder]);
+
   const price = useMemo(() => {
     if (!product) return 0;
     return productPrice(product, selected);
@@ -503,6 +517,7 @@ export default function ProductPage() {
                 type="button"
                 className="drawerCloseButton"
                 aria-label="Lukk bestilling"
+                autoFocus
                 onClick={() => setShowOrder(false)}
               >
                 ×
