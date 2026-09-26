@@ -1,3 +1,4 @@
+import {rateLimitRequest} from "../../../../lib/rateLimit";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {createClient} from "@supabase/supabase-js";
@@ -9,6 +10,7 @@ function esc(value){
 
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;
+ const rateError=await rateLimitRequest(req,{"scope":"customer-register","max":5,"windowSeconds":900,"message":"For mange registreringsforsøk. Prøv igjen senere."}); if(rateError)return rateError;
  try{
   const b=await req.json();
   const email=String(b.email||"").trim().toLowerCase();
