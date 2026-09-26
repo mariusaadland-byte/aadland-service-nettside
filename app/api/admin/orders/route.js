@@ -206,7 +206,8 @@ export async function PATCH(req) {
         const sent=action==="mark-dispatched";
         const requestOrigin=new URL(req.url).origin;
         const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
-        const accountUrl=order.customer_user_id?(configuredOrigin||requestOrigin)+"/min-side":"";
+        const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
+        const accountUrl=order.customer_user_id?base+"/min-side":"";
         const trackingUrl=sent&&order.tracking_url?String(order.tracking_url).trim():"";
         const html=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111;padding:28px 12px"><tr><td align="center">
@@ -299,7 +300,8 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
       const surveyText=new Date(surveyDate).toLocaleString("nb-NO",{dateStyle:"long",timeStyle:"short",timeZone:"Europe/Oslo"});
       const requestOrigin=new URL(req.url).origin;
       const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
-      const accountUrl=surveyOrder.customer_user_id?(configuredOrigin||requestOrigin)+"/min-side":"";
+      const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
+      const accountUrl=surveyOrder.customer_user_id?base+"/min-side":"";
       const address=[surveyOrder.customer?.address,surveyOrder.customer?.postalCode,surveyOrder.customer?.city].filter(Boolean).join(", ");
       const html=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111;padding:28px 12px"><tr><td align="center">
