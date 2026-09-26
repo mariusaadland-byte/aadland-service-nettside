@@ -2,6 +2,7 @@
 
 import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
+import {osloDateKey,shiftDateKey} from "../../../lib/osloTime";
 
 const statusLabels={
  draft:"Kladd",
@@ -50,8 +51,7 @@ export default function QuotesClient(){
 
  async function duplicate(quote){
   setError("");
-  const valid=new Date();
-  valid.setDate(valid.getDate()+30);
+  const valid=shiftDateKey(osloDateKey(new Date()),30);
   const response=await fetch("/api/admin/quotes",{
    method:"POST",
    headers:{"Content-Type":"application/json"},
@@ -64,7 +64,7 @@ export default function QuotesClient(){
     introText:quote.introText,
     notes:quote.notes,
     terms:quote.terms,
-    validUntil:valid.toISOString().slice(0,10),
+    validUntil:valid,
     plannedStartDate:quote.plannedStartDate||"",
     autoFollowUp:quote.autoFollowUp!==false
    })
