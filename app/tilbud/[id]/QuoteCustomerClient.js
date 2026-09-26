@@ -22,7 +22,10 @@ export default function QuoteCustomerClient({quoteId,token}){
   setQuote(data.quote);
  }
 
- useEffect(()=>{load()},[quoteId,token]);
+ useEffect(()=>{
+  if(token&&typeof window!=="undefined")window.history.replaceState({},document.title,window.location.pathname);
+  load();
+ },[quoteId,token]);
 
  async function respond(action){
   const label=action==="accept"?"godkjenne":"avslå";
