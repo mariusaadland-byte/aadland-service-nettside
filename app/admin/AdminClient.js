@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { nok } from "../../lib/catalog";
+import {osloDateKey} from "../../lib/osloTime";
 import { useRouter } from "next/navigation";
 
 const ADMIN_IMAGE_TYPES=new Set(["image/jpeg","image/png","image/webp"]);
@@ -3661,8 +3662,8 @@ function ServiceEditor({ service, reload, setError, close }) {
   const [sortOrder,setSortOrder]=useState(service?.sortOrder??0);
   const [imageUrl,setImageUrl]=useState(service?.imageUrl||"");
   const [uploading,setUploading]=useState(false);
-  const [publishFrom,setPublishFrom]=useState(service?.publishFrom?String(service.publishFrom).slice(0,10):"");
-  const [publishUntil,setPublishUntil]=useState(service?.publishUntil?String(service.publishUntil).slice(0,10):"");
+  const [publishFrom,setPublishFrom]=useState(service?.publishFrom?osloDateKey(service.publishFrom):"");
+  const [publishUntil,setPublishUntil]=useState(service?.publishUntil?osloDateKey(service.publishUntil):"");
   const [saving,setSaving]=useState(false);
 
   async function uploadImage(file){
@@ -3685,7 +3686,7 @@ function ServiceEditor({ service, reload, setError, close }) {
       ...(isNew?{}:{id:service.id}),title:title.trim(),description:description.trim(),active,showOnHome,showInMenu,showInFooter,sortOrder,
       kind,imageUrl,hasPage,ctaLabel,
       ctaHref:service?.ctaHref||"",formTitle,formPrompt,
-      publishFrom:publishFrom?publishFrom+"T00:00:00":null,publishUntil:publishUntil?publishUntil+"T23:59:59":null
+      publishFrom:publishFrom||null,publishUntil:publishUntil||null
     })});
     const data=await response.json().catch(()=>({})); setSaving(false);
     if(!response.ok){setError(data.error||"Tjenesten kunne ikke lagres.");return;}
