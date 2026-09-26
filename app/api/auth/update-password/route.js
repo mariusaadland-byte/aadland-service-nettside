@@ -1,8 +1,12 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {verifyAdminPasswordResetToken} from "../../../../lib/adminPasswordReset";
+import {createSessionVersion,SESSION_VERSION_FIELD} from "../../../../lib/sessionVersion";
+import {checkNewPassword} from "../../../../lib/passwordSecurity";
 
 export async function POST(req){
+ const originError=sameOriginGuard(req); if(originError)return originError;
  try{
   const body=await req.json().catch(()=>({}));
   const token=String(body.token||"");
@@ -37,7 +41,11 @@ export async function POST(req){
    return NextResponse.json({error:"Lenken er ugyldig eller allerede brukt. Be om en ny lenke.",code:"invalid_or_expired"},{status:410});
   }
 
-  const {error:updateError}=await s.auth.admin.updateUserById(reset.id,{password});
+  const passwordCheck=await checkNewPassword(password);
+  if(!passwordCheck.ok)return NextResponse.json({error:passwordCheck.error},{status:passwordCheck.status});
+
+  const nextSessionVersion=createSessionVersion();
+  const {error:updateError}=await s.auth.admin.updateUserById(reset.id,{password,app_metadata:{...(authUser.app_metadata||{}),[SESSION_VERSION_FIELD]:nextSessionVersion}});
   if(updateError){
    console.error("ADMIN PASSWORD UPDATE",updateError);
    return NextResponse.json({error:"Kunne ikke lagre nytt passord. Be om en ny lenke."},{status:500});

@@ -243,8 +243,7 @@ export default function RentalDetailPage(){
      endDate:chosen.endDate,
      customer,
      fulfillment,
-     acceptedTerms:accepted,
-     termsVersion:"2026-09"
+     acceptedTerms:accepted
     })
    });
    const data=await response.json().catch(()=>({}));
@@ -328,7 +327,7 @@ export default function RentalDetailPage(){
        <label><span>Telefon *</span><input autoComplete="tel" required type="tel" value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})}/></label>
       </div>
       <label><span>E-post *</span><input autoComplete="email" required type="email" value={customer.email} onChange={e=>setCustomer({...customer,email:e.target.value})}/></label>
-      <label><span>Adresse</span><input autoComplete="street-address" value={customer.address} onChange={e=>setCustomer({...customer,address:e.target.value})}/></label>
+      <label><span>Adresse{fulfillment==="delivery"?" *":""}</span><input autoComplete="street-address" required={fulfillment==="delivery"} value={customer.address} onChange={e=>setCustomer({...customer,address:e.target.value})}/></label>
       <label><span>Henting / levering</span><select value={fulfillment} onChange={e=>setFulfillment(e.target.value)}>{item.pickupAvailable&&<option value="pickup">Jeg henter selv</option>}{item.deliveryAvailable&&<option value="delivery">Jeg ønsker levering</option>}</select></label>
       <label className="rentalTerms"><input type="checkbox" required checked={accepted} onChange={e=>setAccepted(e.target.checked)}/><span>Jeg godtar <a href="/vilkar/utleie" target="_blank" rel="noreferrer">utleiebetingelsene</a>.</span></label>
       <div className="rentalBookingActions">

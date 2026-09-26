@@ -49,6 +49,8 @@ export default function NewRentalItemClient(){
  async function upload(files){
   const list=Array.from(files||[]);
   if(!list.length)return;
+  const invalid=list.find(file=>!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>4*1024*1024);
+  if(invalid){setError(!["image/jpeg","image/png","image/webp"].includes(invalid.type)?"Bruk JPG, PNG eller WebP.":"Hvert bilde kan være maks 4 MB.");return;}
   setUploading(true);
   const urls=[];
   for(const file of list){

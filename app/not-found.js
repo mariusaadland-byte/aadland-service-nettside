@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 export const metadata={
-  title:"Siden ble ikke funnet | Aadland Service",
+  title:"Siden ble ikke funnet",
   robots:{index:false,follow:false}
 };
 

@@ -1,7 +1,9 @@
+import {sameOriginGuard} from "../../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {getAdminUser} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
 import {createQuoteToken} from "../../../../../lib/quoteLinks";
+import {osloDateKey} from "../../../../../lib/osloTime";
 
 const nok=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",minimumFractionDigits:2,maximumFractionDigits:2}).format((Number(ore)||0)/100);
 function esc(value){
@@ -13,7 +15,7 @@ async function allowed(){
  return (user.role==="owner"||user.canUpdateOrders||user.canManageProducts)?user:null;
 }
 
-export async function POST(req){
+export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;
  const user=await allowed();
  if(!user)return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const {id}=await req.json().catch(()=>({}));
@@ -25,7 +27,7 @@ export async function POST(req){
  if(error||!quote)return NextResponse.json({error:"Tilbudet ble ikke funnet."},{status:404});
 
  if(["accepted","declined","cancelled"].includes(quote.status))return NextResponse.json({error:"Dette tilbudet er ferdigbehandlet og kan ikke sendes på nytt."},{status:409});
- const today=new Date().toISOString().slice(0,10);
+ const today=osloDateKey(new Date());
  if(quote.valid_until&&quote.valid_until<today)return NextResponse.json({error:"Tilbudet har passert gyldighetsdatoen. Oppdater datoen før du sender det."},{status:409});
  const email=String(quote.customer?.email||"").trim();
  if(!email)return NextResponse.json({error:"Kunden må ha e-postadresse før tilbudet kan sendes."},{status:400});
@@ -38,7 +40,7 @@ export async function POST(req){
  const requestOrigin=new URL(req.url).origin;
  const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
  const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin||"https://www.aadland-service.no");
- const link=base+"/tilbud/"+encodeURIComponent(quote.id)+"?token="+encodeURIComponent(token);
+ const link=base+"/tilbud/"+encodeURIComponent(quote.id)+"#token="+encodeURIComponent(token);
  const valid=quote.valid_until?new Date(quote.valid_until+"T12:00:00").toLocaleDateString("nb-NO"):"";
  const plannedStart=quote.planned_start_date?new Date(quote.planned_start_date+"T12:00:00").toLocaleDateString("nb-NO"):"";
  const from="Aadland Service <post@aadland-service.no>";

@@ -1,3 +1,5 @@
+import {rateLimitRequest,rateLimitValue} from "../../../../lib/rateLimit";
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {createAdminPasswordResetToken} from "../../../../lib/adminPasswordReset";
@@ -5,11 +7,14 @@ import {createAdminPasswordResetToken} from "../../../../lib/adminPasswordReset"
 const genericMessage="Hvis e-postadressen er registrert, sender vi en lenke for å velge nytt passord.";
 
 export async function POST(req){
+ const originError=sameOriginGuard(req); if(originError)return originError;
+ const rateError=await rateLimitRequest(req,{"scope":"admin-password-reset","max":5,"windowSeconds":3600,"message":"For mange forespørsler om nytt passord. Prøv igjen senere."}); if(rateError)return rateError;
  try{
   const {email}=await req.json().catch(()=>({}));
   const value=String(email||"").trim().toLowerCase();
   if(!value)return NextResponse.json({error:"Skriv inn e-postadressen din."},{status:400});
   if(value.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))return NextResponse.json({error:"Skriv inn en gyldig e-postadresse."},{status:400});
+  const emailRateError=await rateLimitValue(value,{"scope":"admin-password-reset-email","max":3,"windowSeconds":3600,"message":"For mange forespørsler om nytt passord for denne e-postadressen. Prøv igjen senere."}); if(emailRateError)return emailRateError;
 
   const s=db();
   if(!s)return NextResponse.json({error:"Passordgjenoppretting er ikke konfigurert."},{status:503});
@@ -40,7 +45,9 @@ export async function POST(req){
   const requestOrigin=new URL(req.url).origin;
   const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
   const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
-  const link=base+"/admin/nytt-passord?token="+encodeURIComponent(token);
+  const resetUrl=new URL("/admin/nytt-passord",base);
+  resetUrl.hash="token="+encodeURIComponent(token);
+  const link=resetUrl.toString();
 
   const resendKey=process.env.VERCEL_ENV==="preview"
    ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)

@@ -1,6 +1,8 @@
 import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
+import {cronGuard} from "../../../../lib/cronAuth";
 import {createQuoteToken} from "../../../../lib/quoteLinks";
+import {osloDateKey} from "../../../../lib/osloTime";
 
 const MAX_PER_RUN=25;
 const TWO_DAYS_MS=48*60*60*1000;
@@ -9,21 +11,13 @@ function esc(value){
  return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
 }
 
-function authorized(req){
- const secret=String(process.env.CRON_SECRET||"").trim();
- const authorization=String(req.headers.get("authorization")||"");
- if(secret)return authorization===("Bearer "+secret);
- const ua=String(req.headers.get("user-agent")||"").toLowerCase();
- return ua.startsWith("vercel-cron/");
-}
-
 function baseUrl(req){
  const configured=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
  return configured||new URL(req.url).origin||"https://www.aadland-service.no";
 }
 
 export async function GET(req){
- if(!authorized(req))return NextResponse.json({error:"Ingen tilgang."},{status:401});
+ const authError=cronGuard(req); if(authError)return authError;
 
  const resendKey=process.env.RESEND_API_KEY;
  if(!resendKey)return NextResponse.json({ok:false,error:"RESEND_API_KEY mangler."},{status:503});
@@ -32,7 +26,7 @@ export async function GET(req){
  if(!s)return NextResponse.json({ok:false,error:"Databasen er ikke tilgjengelig."},{status:503});
 
  const cutoff=new Date(Date.now()-TWO_DAYS_MS).toISOString();
- const today=new Date().toISOString().slice(0,10);
+ const today=osloDateKey(new Date());
 
  const {data,error}=await s.from("quotes")
   .select("id,quote_number,title,status,customer,total_inc_vat_ore,valid_until,sent_at,follow_up_sent_at,auto_follow_up,archived_at")
@@ -80,7 +74,7 @@ export async function GET(req){
 
   try{
    const token=createQuoteToken(quote);
-   const link=base+"/tilbud/"+encodeURIComponent(quote.id)+"?token="+encodeURIComponent(token);
+   const link=base+"/tilbud/"+encodeURIComponent(quote.id)+"#token="+encodeURIComponent(token);
    const customerName=esc(quote.customer?.name||"kunde");
    const title=esc(quote.title||"tilbudet");
    const number=esc(quote.quote_number||"");

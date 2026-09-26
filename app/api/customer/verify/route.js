@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {createClient} from "@supabase/supabase-js";
 import {setCustomerCookie} from "../../../../lib/customer-auth";
@@ -15,6 +16,7 @@ export async function GET(req){
 }
 
 export async function POST(req){
+ const originError=sameOriginGuard(req); if(originError)return originError;
  try{
   const body=await req.json().catch(()=>({}));
   const token=String(body.token||"");
@@ -32,12 +34,13 @@ export async function POST(req){
    return NextResponse.json({error:"Bekreftelseslenken er ugyldig eller utløpt.",code:"invalid_or_expired"},{status:410});
   }
 
-  if(!user.email_confirmed_at){
-   const {error:confirmError}=await s.auth.admin.updateUserById(user.id,{email_confirm:true});
-   if(confirmError){
-    console.error("CUSTOMER VERIFY CONFIRM",confirmError);
-    return NextResponse.json({error:"E-postadressen kunne ikke bekreftes akkurat nå. Prøv igjen."},{status:500});
-   }
+  if(user.email_confirmed_at){
+   return NextResponse.json({error:"E-postadressen er allerede bekreftet. Logg inn på Min side.",code:"already_verified"},{status:410});
+  }
+  const {error:confirmError}=await s.auth.admin.updateUserById(user.id,{email_confirm:true});
+  if(confirmError){
+   console.error("CUSTOMER VERIFY CONFIRM",confirmError);
+   return NextResponse.json({error:"E-postadressen kunne ikke bekreftes akkurat nå. Prøv igjen."},{status:500});
   }
 
   let {data:profile,error:profileError}=await s.from("customer_profiles").select("*").eq("id",user.id).maybeSingle();

@@ -2,7 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { nok } from "../../lib/catalog";
+import {osloDateKey,osloDateTimeLocal,osloLocalDateTimeToIso} from "../../lib/osloTime";
 import { useRouter } from "next/navigation";
+
+const ADMIN_IMAGE_TYPES=new Set(["image/jpeg","image/png","image/webp"]);
+const ADMIN_IMAGE_MAX_BYTES=4*1024*1024;
+function adminImageError(file){
+  if(!file)return "";
+  if(!ADMIN_IMAGE_TYPES.has(file.type))return "Bruk JPG, PNG eller WebP.";
+  if(file.size>ADMIN_IMAGE_MAX_BYTES)return "Hvert bilde kan være maks 4 MB.";
+  return "";
+}
 
 const labels = {
   new: "Ny",
@@ -13,13 +23,6 @@ const labels = {
   cancelled: "Avbrutt",
 };
 
-function localDateTimeInput(value){
-  if(!value)return "";
-  const d=new Date(value);
-  if(Number.isNaN(d.getTime()))return "";
-  const pad=n=>String(n).padStart(2,"0");
-  return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes());
-}
 
 export default function AdminClient({ user }) {
   const [tab, setTab] = useState("overview");
@@ -297,7 +300,7 @@ export default function AdminClient({ user }) {
     0
   );
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = osloDateKey(new Date());
   const waitingQuotes = customerQuotes.filter(
     (quote) =>
       quote.status === "sent" &&
@@ -361,7 +364,7 @@ export default function AdminClient({ user }) {
         sort:5,
         eyebrow:"BEFARING SNART",
         title:order.customerName||"Kunde",
-        meta:new Date(order.surveyDate).toLocaleString("nb-NO",{dateStyle:"short",timeStyle:"short"}),
+        meta:new Date(order.surveyDate).toLocaleString("nb-NO",{dateStyle:"short",timeStyle:"short",timeZone:"Europe/Oslo"}),
         tab:"surveys"
       })),
     ...activeOrders
@@ -375,7 +378,7 @@ export default function AdminClient({ user }) {
         sort:6,
         eyebrow:"OPPSTART SNART",
         title:order.sourceQuoteTitle||"Oppdrag",
-        meta:new Date(order.jobStartAt).toLocaleString("nb-NO",{dateStyle:"short",timeStyle:"short"}),
+        meta:new Date(order.jobStartAt).toLocaleString("nb-NO",{dateStyle:"short",timeStyle:"short",timeZone:"Europe/Oslo"}),
         href:"/admin/oppdrag/"+order.id+"/planlegg"
       })),
     ...customerQuotes
@@ -827,9 +830,14 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
  }
  async function saveTracking(order){
   setSavingId(order.id);
+  setMessage("");
   const trackingNumber=document.getElementById("tracking-number-"+order.id)?.value||"",trackingUrl=document.getElementById("tracking-url-"+order.id)?.value||"";
-  await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,trackingNumber,trackingUrl})});
+  const response=await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,trackingNumber,trackingUrl})});
+  const data=await response.json().catch(()=>({}));
   setSavingId(null);
+  if(!response.ok){setMessage(data.error||"Sporingen kunne ikke lagres.");return;}
+  setMessage("Sporingsinformasjonen er lagret.");
+  if(typeof reload==="function")await reload();
  }
  async function finish(order,action){setSavingId(order.id);setMessage("");const r=await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,action})}),d=await r.json().catch(()=>({}));setSavingId(null);if(!r.ok){setMessage(d.error||"Handlingen kunne ikke utføres.");return;}setMessage(d.paymentCaptureRequired?"Status er lagret. Betalingen står fortsatt bare som reservert til betalingsleverandøren er koblet til.":"Status er lagret.");window.setTimeout(()=>window.location.reload(),700);}
  return <><>{message&&<p className="notice">{message}</p>}</><div className="orderCards">{orders.length?orders.map(order=><article className="card orderCard" key={order.id}>
@@ -947,9 +955,8 @@ function Surveys({ orders, status, canUpdateOrders }) {
     setSurveyMessage("");
     let isoDate="";
     if(surveyDate){
-      const parsed=new Date(surveyDate);
-      if(Number.isNaN(parsed.getTime())){setSurveyMessage("Velg gyldig dato og klokkeslett.");return}
-      isoDate=parsed.toISOString();
+      isoDate=osloLocalDateTimeToIso(surveyDate);
+      if(!isoDate){setSurveyMessage("Velg gyldig dato og klokkeslett i Oslo-tid.");return}
     }
     if(sendConfirmation&&!isoDate){setSurveyMessage("Velg dato og klokkeslett før du sender bekreftelse.");return}
     if(sendConfirmation&&!order.customerEmail){setSurveyMessage("Kunden mangler e-postadresse.");return}
@@ -996,11 +1003,11 @@ function Surveys({ orders, status, canUpdateOrders }) {
         </div>
         {(customer.address || customer.postalCode || customer.city) && <p><b>Adresse:</b> {[customer.address,customer.postalCode,customer.city].filter(Boolean).join(", ")}</p>}
         <div style={{whiteSpace:"pre-wrap",lineHeight:1.55,marginTop:16}}>{order.customRequest || "Ingen beskrivelse."}</div>{Array.isArray(order.contactImages)&&order.contactImages.length>0&&<div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12}}>{order.contactImages.map((image,i)=><a className="btn alt" key={image.ref||i} href={image.url} target="_blank" rel="noopener noreferrer">Åpne bilde {i+1}</a>)}</div>}
-        <div className="field" style={{marginTop:16}}><label>Dato og tid for befaring</label><input type="datetime-local" defaultValue={localDateTimeInput(order.surveyDate)} id={"survey-date-"+order.id}/></div>
+        <div className="field" style={{marginTop:16}}><label>Dato og tid for befaring</label><input type="datetime-local" defaultValue={osloDateTimeLocal(order.surveyDate)} id={"survey-date-"+order.id}/></div>
         <div className="field"><label>Internt notat</label><textarea rows="3" defaultValue={order.adminNote||""} id={"survey-note-"+order.id} placeholder="Kun synlig i backoffice"/></div>
         {(order.surveyConfirmationSentAt||order.surveyReminderSentAt)&&<div className="surveyDeliveryState">
-          {order.surveyConfirmationSentAt&&<span>✓ Bekreftelse sendt {new Date(order.surveyConfirmationSentAt).toLocaleString("nb-NO")}</span>}
-          {order.surveyReminderSentAt&&<span>✓ Påminnelse sendt {new Date(order.surveyReminderSentAt).toLocaleString("nb-NO")}</span>}
+          {order.surveyConfirmationSentAt&&<span>✓ Bekreftelse sendt {new Date(order.surveyConfirmationSentAt).toLocaleString("nb-NO",{timeZone:"Europe/Oslo"})}</span>}
+          {order.surveyReminderSentAt&&<span>✓ Påminnelse sendt {new Date(order.surveyReminderSentAt).toLocaleString("nb-NO",{timeZone:"Europe/Oslo"})}</span>}
         </div>}
         {canUpdateOrders&&<div className="surveySaveActions">
           <button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>saveSurvey(order,document.getElementById("survey-date-"+order.id).value,document.getElementById("survey-note-"+order.id).value,false)}>{savingId===order.id?"Lagrer …":"Lagre befaring"}</button>
@@ -1171,6 +1178,8 @@ function ProductEditor({
     const selected = Array.from(files || []);
 
     if (!selected.length) return;
+    const invalid=selected.find(file=>adminImageError(file));
+    if(invalid){setError(adminImageError(invalid));return;}
 
     setUploading(true);
     setError("");
@@ -2561,6 +2570,8 @@ function CategoryEditor({
 
   async function uploadImage(file) {
     if (!file) return;
+    const invalid=adminImageError(file);
+    if(invalid){setError(invalid);return;}
 
     setUploading(true);
     setError("");
@@ -3643,12 +3654,15 @@ function ServiceEditor({ service, reload, setError, close }) {
   const [sortOrder,setSortOrder]=useState(service?.sortOrder??0);
   const [imageUrl,setImageUrl]=useState(service?.imageUrl||"");
   const [uploading,setUploading]=useState(false);
-  const [publishFrom,setPublishFrom]=useState(service?.publishFrom?String(service.publishFrom).slice(0,10):"");
-  const [publishUntil,setPublishUntil]=useState(service?.publishUntil?String(service.publishUntil).slice(0,10):"");
+  const [publishFrom,setPublishFrom]=useState(service?.publishFrom?osloDateKey(service.publishFrom):"");
+  const [publishUntil,setPublishUntil]=useState(service?.publishUntil?osloDateKey(service.publishUntil):"");
   const [saving,setSaving]=useState(false);
 
   async function uploadImage(file){
-    if(!file)return; setUploading(true); setError("");
+    if(!file)return;
+    const invalid=adminImageError(file);
+    if(invalid){setError(invalid);return;}
+    setUploading(true); setError("");
     const formData=new FormData(); formData.append("file",file);
     const response=await fetch("/api/admin/upload",{method:"POST",body:formData});
     const data=await response.json().catch(()=>({})); setUploading(false);
@@ -3664,7 +3678,7 @@ function ServiceEditor({ service, reload, setError, close }) {
       ...(isNew?{}:{id:service.id}),title:title.trim(),description:description.trim(),active,showOnHome,showInMenu,showInFooter,sortOrder,
       kind,imageUrl,hasPage,ctaLabel,
       ctaHref:service?.ctaHref||"",formTitle,formPrompt,
-      publishFrom:publishFrom?publishFrom+"T00:00:00":null,publishUntil:publishUntil?publishUntil+"T23:59:59":null
+      publishFrom:publishFrom||null,publishUntil:publishUntil||null
     })});
     const data=await response.json().catch(()=>({})); setSaving(false);
     if(!response.ok){setError(data.error||"Tjenesten kunne ikke lagres.");return;}
@@ -3710,7 +3724,7 @@ function RentalItems({items,blocks,reload,setError}){
  const [showNew,setShowNew]=useState(Boolean(initialProject));
  const [block,setBlock]=useState({itemId:"",startDate:"",endDate:"",reason:""});
  async function addBlock(e){e.preventDefault();setError("");const r=await fetch("/api/admin/rental/blocks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(block)});const d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Perioden kunne ikke blokkeres.");return;}setBlock({itemId:"",startDate:"",endDate:"",reason:""});await reload();}
- async function removeBlock(id){const r=await fetch("/api/admin/rental/blocks",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});if(!r.ok){setError("Blokkeringen kunne ikke fjernes.");return;}await reload();}
+ async function removeBlock(id){const entry=blocks.find(item=>item.id===id);const label=entry?(items.find(item=>item.id===entry.itemId)?.name||"utstyret")+" · "+entry.startDate+" – "+entry.endDate:"denne blokkeringen";if(!window.confirm("Fjerne blokkeringen for "+label+"?"))return;const r=await fetch("/api/admin/rental/blocks",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});if(!r.ok){setError("Blokkeringen kunne ikke fjernes.");return;}await reload();}
  return <><div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20}}><a className="btn alt" href="/admin/utleiekategorier">Utleiekategorier</a><a className="btn" href="/admin/utleie/ny">Legg til utstyr</a></div>
  <div className="grid">{items.map(item=><RentalEditor key={item.id} item={item} reload={reload} setError={setError}/>)}</div>
  <div className="card" style={{marginTop:24}}><div className="kicker">Tilgjengelighet</div><h3>Blokker datoer manuelt</h3><p className="muted">Bruk dette ved service, eget bruk eller andre perioder utstyret ikke kan leies ut.</p>
@@ -3723,7 +3737,7 @@ function RentalEditor({item,reload,setError,close}){
  const isNew=!item,[editing,setEditing]=useState(isNew),[saving,setSaving]=useState(false),[uploading,setUploading]=useState(false);
  const [v,setV]=useState({name:item?.name||"",description:item?.description||"",status:item?.status||"available",quantity:item?.quantity||1,dailyPriceOre:item?.dailyPriceOre||0,weekendPriceOre:item?.weekendPriceOre??"",weeklyPriceOre:item?.weeklyPriceOre??"",longTermDays:item?.longTermDays??"",longTermDiscountPercent:item?.longTermDiscountPercent||0,depositOre:item?.depositOre||0,bufferDays:item?.bufferDays||0,pickupAvailable:item?.pickupAvailable!==false,deliveryAvailable:item?.deliveryAvailable===true,active:item?.active!==false,sortOrder:item?.sortOrder||0,imageUrls:item?.imageUrls||[]});
  const set=(k,x)=>setV({...v,[k]:x});
- async function upload(files){const list=Array.from(files||[]);if(!list.length)return;setUploading(true);const urls=[];for(const file of list){const fd=new FormData();fd.append("file",file);const r=await fetch("/api/admin/upload",{method:"POST",body:fd});const d=await r.json().catch(()=>({}));if(r.ok&&d.url)urls.push(d.url);else setError(d.error||"Et bilde kunne ikke lastes opp.");}setV(x=>({...x,imageUrls:[...x.imageUrls,...urls]}));setUploading(false);}
+ async function upload(files){const list=Array.from(files||[]);if(!list.length)return;const invalid=list.find(file=>adminImageError(file));if(invalid){setError(adminImageError(invalid));return;}setUploading(true);const urls=[];for(const file of list){const fd=new FormData();fd.append("file",file);const r=await fetch("/api/admin/upload",{method:"POST",body:fd});const d=await r.json().catch(()=>({}));if(r.ok&&d.url)urls.push(d.url);else setError(d.error||"Et bilde kunne ikke lastes opp.");}setV(x=>({...x,imageUrls:[...x.imageUrls,...urls]}));setUploading(false);}
  async function save(e){e.preventDefault();setSaving(true);setError("");const r=await fetch("/api/admin/rental",{method:isNew?"POST":"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({...v,...(!isNew?{id:item.id}:{})})});const d=await r.json().catch(()=>({}));setSaving(false);if(!r.ok){setError(d.error||"Utstyret kunne ikke lagres.");return;}if(close)close();else setEditing(false);await reload();}
  async function remove(){if(!item?.id||!window.confirm('Slette "'+item.name+'"?'))return;const r=await fetch("/api/admin/rental",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:item.id})});const d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Utstyret kunne ikke slettes.");return;}await reload();}
  if(!editing&&item)return <div className="card">{item.imageUrls?.[0]&&<img src={item.imageUrls[0]} alt="" style={{width:"100%",height:190,objectFit:"cover",borderRadius:12}}/>}<div className="kicker">{item.status==="available"?"Tilgjengelig":item.status==="maintenance"?"Service":"Ikke tilgjengelig"}</div><h3>{item.name}</h3><p>{item.description}</p><p><b>{nok(item.dailyPriceOre)}</b> / dag · Depositum {nok(item.depositOre)}</p><div style={{display:"flex",gap:10}}><button className="btn" onClick={()=>setEditing(true)}>Rediger</button><button className="btn alt" onClick={remove}>Slett</button></div></div>;
@@ -3908,6 +3922,8 @@ function ProjectEditor({project,initialProject=null,reload,setError,close,storyS
  async function upload(files){
   const picked=Array.from(files||[]);
   if(!picked.length)return;
+  const invalid=picked.find(file=>adminImageError(file));
+  if(invalid){setError(adminImageError(invalid));return;}
   const room=Math.max(0,30-v.imageUrls.length);
   const selected=picked.slice(0,room);
   if(!selected.length){setError("Du kan ha maks 30 bilder per oppdrag.");return;}

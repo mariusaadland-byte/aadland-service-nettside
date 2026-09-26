@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {getCustomer} from "../../../../lib/customer-auth";
 import {db} from "../../../../lib/supabase";
@@ -13,6 +14,7 @@ export async function GET(){
 }
 
 export async function PATCH(req){
+ const originError=sameOriginGuard(req); if(originError)return originError;
  try{
   const customer=await getCustomer();
   if(!customer)return NextResponse.json({error:"Ikke innlogget."},{status:401});

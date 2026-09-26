@@ -1,3 +1,5 @@
+import {rateLimitRequest,rateLimitValue} from "../../../../lib/rateLimit";
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {createClient} from "@supabase/supabase-js";
 import {createCustomerPasswordResetToken} from "../../../../lib/customerPasswordReset";
@@ -9,12 +11,15 @@ function esc(value){
 const genericMessage="Hvis e-postadressen er registrert, sender vi en lenke for å velge nytt passord.";
 
 export async function POST(req){
+ const originError=sameOriginGuard(req); if(originError)return originError;
+ const rateError=await rateLimitRequest(req,{"scope":"customer-password-reset","max":5,"windowSeconds":3600,"message":"For mange forespørsler om nytt passord. Prøv igjen senere."}); if(rateError)return rateError;
  try{
   const {email}=await req.json().catch(()=>({}));
   const value=String(email||"").trim().toLowerCase();
 
   if(!value)return NextResponse.json({error:"Skriv inn e-postadressen din."},{status:400});
   if(value.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))return NextResponse.json({error:"Skriv inn en gyldig e-postadresse."},{status:400});
+  const emailRateError=await rateLimitValue(value,{"scope":"customer-password-reset-email","max":3,"windowSeconds":3600,"message":"For mange forespørsler om nytt passord for denne e-postadressen. Prøv igjen senere."}); if(emailRateError)return emailRateError;
 
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -51,7 +56,7 @@ export async function POST(req){
   const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
   const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
   const resetUrl=new URL("/min-side/nytt-passord",base);
-  resetUrl.searchParams.set("token",token);
+  resetUrl.hash="token="+encodeURIComponent(token);
 
   const name=String(profile.name||user.user_metadata?.name||"").trim();
   const html=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">

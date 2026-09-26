@@ -106,6 +106,20 @@ export default function ProductPage() {
     setSelectedImage(0);
   }, [product]);
 
+  useEffect(() => {
+    if (!showOrder) return;
+    const previousOverflow=document.body.style.overflow;
+    document.body.style.overflow="hidden";
+    function onKeyDown(event){
+      if(event.key==="Escape")setShowOrder(false);
+    }
+    window.addEventListener("keydown",onKeyDown);
+    return()=>{
+      window.removeEventListener("keydown",onKeyDown);
+      document.body.style.overflow=previousOverflow;
+    };
+  }, [showOrder]);
+
   const price = useMemo(() => {
     if (!product) return 0;
     return productPrice(product, selected);
@@ -137,7 +151,6 @@ export default function ProductPage() {
           fulfillmentType: fulfillment,
           deliveryWithinRadius: customer.deliveryWithinRadius,
           acceptedTerms,
-          termsVersion: "2026-09",
           items: [
             {
               productId: product.id,
@@ -504,6 +517,7 @@ export default function ProductPage() {
                 type="button"
                 className="drawerCloseButton"
                 aria-label="Lukk bestilling"
+                autoFocus
                 onClick={() => setShowOrder(false)}
               >
                 ×
@@ -533,6 +547,7 @@ export default function ProductPage() {
               <CustomerFields
                 customer={customer}
                 setCustomer={setCustomer}
+                requireAddress={fulfillment!=="pickup"}
               />
 
               <div className="field">
@@ -543,7 +558,7 @@ export default function ProductPage() {
                   onChange={(e) => setFulfillment(e.target.value)}
                 >
                   <option value="pickup">Henting</option>
-                  <option value="delivery">Levering innen 15 km</option>{product.shippable&&<option value="shipping">Send med post/Bring{product.shippingPriceOre?` (+${nok(product.shippingPriceOre)})`:""}</option>}
+                  <option value="delivery">Levering innen 15 km (bekreftes etter adressekontroll)</option>{product.shippable&&<option value="shipping">Send med post/Bring{product.shippingPriceOre?` (+${nok(product.shippingPriceOre)})`:""}</option>}
                 </select>
               </div>
 
@@ -613,7 +628,7 @@ function selectedLabels(product, selected) {
     .join(" · ");
 }
 
-function CustomerFields({ customer, setCustomer }) {
+function CustomerFields({ customer, setCustomer, requireAddress=false }) {
   const set = (key, value) =>
     setCustomer((current) => ({
       ...current,
@@ -653,6 +668,7 @@ function CustomerFields({ customer, setCustomer }) {
       <div className="field">
         <label>Adresse</label>
         <input
+          required={requireAddress}
           value={customer.address}
           onChange={(e) => set("address", e.target.value)}
         />
@@ -661,6 +677,9 @@ function CustomerFields({ customer, setCustomer }) {
       <div className="field">
         <label>Postnummer</label>
         <input
+          required={requireAddress}
+          inputMode="numeric"
+          autoComplete="postal-code"
           value={customer.postalCode}
           onChange={(e) => set("postalCode", e.target.value)}
         />
@@ -669,6 +688,8 @@ function CustomerFields({ customer, setCustomer }) {
       <div className="field">
         <label>Sted</label>
         <input
+          required={requireAddress}
+          autoComplete="address-level2"
           value={customer.city}
           onChange={(e) => set("city", e.target.value)}
         />
