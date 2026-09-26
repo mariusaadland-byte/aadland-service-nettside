@@ -123,28 +123,68 @@ export default function Home(){
  const menuServices=services.filter(service=>service.showInMenu!==false);
  const footerServices=services.filter(service=>service.showInFooter!==false);
 
+ async function cleanupContactImageRefs(refs){
+  if(!Array.isArray(refs)||!refs.length)return;
+  try{
+   await fetch("/api/contact-images",{
+    method:"DELETE",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({refs})
+   });
+  }catch{}
+ }
+
  async function customOrder(e){
   e.preventDefault(); setError(""); setMessage(null); setSending(true);
+  let imageUrls=[];
   try{
-   let imageUrls=[];
    if(contactImages.length){
     if(contactImages.length>8)throw new Error("Du kan laste opp maks 8 bilder.");
-    for(const file of contactImages){
-     if(file.size>4*1024*1024)throw new Error("Hvert bilde kan være maks 4 MB.");
-     const formData=new FormData();
-     formData.append("images",file);
-     const upload=await fetch("/api/contact-images",{method:"POST",body:formData});
-     const uploaded=await upload.json().catch(()=>({}));
-     if(!upload.ok)throw new Error(uploaded.error||"Kunne ikke laste opp bildet.");
-     imageUrls.push(...(uploaded.urls||[]));
+    try{
+     for(const file of contactImages){
+      if(file.size>4*1024*1024)throw new Error("Hvert bilde kan være maks 4 MB.");
+      const formData=new FormData();
+      formData.append("images",file);
+      const upload=await fetch("/api/contact-images",{method:"POST",body:formData});
+      const uploaded=await upload.json().catch(()=>({}));
+      if(!upload.ok)throw new Error(uploaded.error||"Kunne ikke laste opp bildet.");
+      imageUrls.push(...(uploaded.urls||[]));
+     }
+    }catch(uploadError){
+     await cleanupContactImageRefs(imageUrls);
+     throw uploadError;
     }
    }
+
    const servicePrefix=selectedService?"Tjeneste: "+selectedService+"\n\n":"";
    const requestBase=servicePrefix+custom;
    const requestText=imageUrls.length?requestBase+"\n\nBilder:\n"+imageUrls.join("\n"):requestBase;
-   const response=await fetch("/api/orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({orderType:"custom",customRequest:requestText,customer,fulfillmentType:"pickup",deliveryWithinRadius:customer.deliveryWithinRadius})});
-   const data=await response.json();
-   if(!response.ok){setError(data.error||"Noe gikk galt.");return;}
+
+   let response;
+   try{
+    response=await fetch("/api/orders",{
+     method:"POST",
+     headers:{"Content-Type":"application/json"},
+     body:JSON.stringify({
+      orderType:"custom",
+      customRequest:requestText,
+      customer,
+      fulfillmentType:"pickup",
+      deliveryWithinRadius:customer.deliveryWithinRadius
+     })
+    });
+   }catch{
+    setError("Nettverksfeil etter sending. Forespørselen kan ha blitt registrert; sjekk e-post eller Min side før du prøver igjen.");
+    return;
+   }
+
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok){
+    await cleanupContactImageRefs(imageUrls);
+    setError(data.error||"Noe gikk galt.");
+    return;
+   }
+
    setMessage(data);setCustom("");setCustomer(customerAccount?{
     ...emptyCustomer,
     name:customerAccount.name||"",
@@ -152,7 +192,11 @@ export default function Home(){
     phone:customerAccount.phone||"",
     address:customerAccount.address||""
    }:emptyCustomer);setContactImages([]);setImageError("");setSelectedService("");
-  }catch(e){setError(e?.message||"Noe gikk galt. Prøv igjen.");}finally{setSending(false);}
+  }catch(e){
+   setError(e?.message||"Noe gikk galt. Prøv igjen.");
+  }finally{
+   setSending(false);
+  }
  }
 
  return <main className="newHome">
