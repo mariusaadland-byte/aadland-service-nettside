@@ -36,3 +36,8 @@ SQL-filene i `supabase/` beskriver databasegrunnlaget og senere utvidelser. De m
 10. Først etter godkjent test merges testgrenen til `main`.
 
 Ingen API-nøkler eller passord skal ligge i prosjektet.
+
+### Session security
+
+Admin- og kundecookies er bundet til en roterbar `session_version` i Supabase Auth-metadata. Første deploy som innfører dette vil ugyldiggjøre eldre cookies én gang, slik at eksisterende innloggede brukere må logge inn på nytt. Ved senere passordreset roteres `session_version`, og eldre Aadland Service-sesjoner på andre enheter blir automatisk ugyldige.
+
