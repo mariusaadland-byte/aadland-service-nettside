@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {getAdminUser} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
@@ -174,7 +175,7 @@ export async function GET(req){
   :NextResponse.json({quotes:(data||[]).map(mapQuote),followUpSetupRequired});
 }
 
-export async function POST(req){
+export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;
  const user=await currentUser();
  if(!user)return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const body=await req.json();
@@ -205,7 +206,7 @@ export async function POST(req){
  return NextResponse.json({quote:mapQuote(data)});
 }
 
-export async function PATCH(req){
+export async function PATCH(req){ const originError=sameOriginGuard(req); if(originError)return originError;
  const user=await currentUser();
  if(!user)return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const body=await req.json();
