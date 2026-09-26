@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminUser, hasPermission } from "../../../../lib/auth";
 import { db, fromDbService } from "../../../../lib/supabase";
 import {safeSiteHref} from "../../../../lib/safeUrl";
+import {isValidDateInput,osloDayStartIso,osloDayEndIso} from "../../../../lib/osloTime";
 
 async function requireAccess() {
   const currentUser = await getAdminUser();
@@ -11,6 +12,15 @@ async function requireAccess() {
 }
 const text = v => String(v || "").trim();
 const slugify = v => text(v).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/æ/g,"ae").replace(/ø/g,"o").replace(/å/g,"a").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+function publishDateError(b){
+ if((b.publishFrom&&!isValidDateInput(b.publishFrom))||(b.publishUntil&&!isValidDateInput(b.publishUntil))){
+  return NextResponse.json({error:"Publiseringsdatoene er ugyldige."},{status:400});
+ }
+ if(b.publishFrom&&b.publishUntil&&b.publishUntil<b.publishFrom){
+  return NextResponse.json({error:"Publiser til kan ikke være før publiser fra."},{status:400});
+ }
+ return null;
+}
 function payload(b) {
   return {
     title:text(b.title).slice(0,180), description:text(b.description).slice(0,8000)||null, image_url:text(b.imageUrl).slice(0,2000)||null,
@@ -18,7 +28,7 @@ function payload(b) {
     show_in_menu:b.showInMenu!==false, show_in_footer:b.showInFooter!==false, has_page:b.hasPage===true,
     cta_label:text(b.ctaLabel).slice(0,120)||"Les mer", cta_href:safeSiteHref(text(b.ctaHref).slice(0,2000))||null,
     form_title:text(b.formTitle).slice(0,180)||"Be om befaring", form_prompt:text(b.formPrompt).slice(0,2000)||"Beskriv kort hva du ønsker hjelp med.",
-    publish_from:b.publishFrom||null, publish_until:b.publishUntil||null,
+    publish_from:b.publishFrom?osloDayStartIso(b.publishFrom):null, publish_until:b.publishUntil?osloDayEndIso(b.publishUntil):null,
     sort_order:Number.isFinite(Number(b.sortOrder))?Math.round(Number(b.sortOrder)):0
   };
 }
@@ -29,7 +39,7 @@ export async function GET() {
   return NextResponse.json({services:(data||[]).map(fromDbService)});
 }
 export async function POST(req) {
-  const a=await requireAccess(); if(a.error)return a.error; const b=await req.json(); const p=payload(b);
+  const a=await requireAccess(); if(a.error)return a.error; const b=await req.json(); const dateError=publishDateError(b); if(dateError)return dateError; const p=payload(b);
   if(!p.title)return NextResponse.json({error:"Tjenesten må ha et navn."},{status:400});
   if(text(b.ctaHref)&&!p.cta_href)return NextResponse.json({error:"Knappelenken må være en intern lenke, en #seksjon eller en https-adresse."},{status:400});
   p.slug=slugify(b.slug||p.title)+"-"+Date.now();const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
@@ -38,7 +48,7 @@ export async function POST(req) {
   return NextResponse.json({ok:true,service:fromDbService(data)});
 }
 export async function PATCH(req) {
-  const a=await requireAccess(); if(a.error)return a.error; const b=await req.json();
+  const a=await requireAccess(); if(a.error)return a.error; const b=await req.json(); const dateError=publishDateError(b); if(dateError)return dateError;
   if(!b.id)return NextResponse.json({error:"Tjeneste mangler."},{status:400});
   const p=payload(b); if(!p.title)return NextResponse.json({error:"Tjenesten må ha et navn."},{status:400}); if(text(b.ctaHref)&&!p.cta_href)return NextResponse.json({error:"Knappelenken må være en intern lenke, en #seksjon eller en https-adresse."},{status:400});
   p.updated_at=new Date().toISOString();const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
