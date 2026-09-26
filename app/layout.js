@@ -54,9 +54,6 @@ export default function RootLayout({children}){
     dangerouslySetInnerHTML={{__html:JSON.stringify(businessStructuredData)}}
    />
   </head>
-  <body>
-   <a className="skipLink" href="#main-content">Hopp til hovedinnhold</a>
-   <div id="main-content" tabIndex="-1">{children}</div>
-  </body>
+  <body>{children}</body>
  </html>
 }
