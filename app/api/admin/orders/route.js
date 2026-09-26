@@ -4,6 +4,7 @@ import {
   hasPermission,
 } from "../../../../lib/auth";
 import { db } from "../../../../lib/supabase";
+import {safeHttpsUrl} from "../../../../lib/safeUrl";
 
 function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 
@@ -147,7 +148,7 @@ export async function PATCH(req) {
   const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation } = await req.json();
   if(adminNote!==undefined&&String(adminNote||"").length>5000)return NextResponse.json({error:"Internt notat kan være maks 5000 tegn."},{status:400});
   if(trackingNumber!==undefined&&String(trackingNumber||"").length>120)return NextResponse.json({error:"Sporingsnummeret er for langt."},{status:400});
-  if(trackingUrl!==undefined){const value=String(trackingUrl||"").trim();if(value.length>1000)return NextResponse.json({error:"Sporingslenken er for lang."},{status:400});if(value){try{const u=new URL(value);if(!["http:","https:"].includes(u.protocol))throw new Error()}catch{return NextResponse.json({error:"Skriv inn en gyldig sporingslenke."},{status:400})}}}
+  if(trackingUrl!==undefined){const value=String(trackingUrl||"").trim();if(value.length>1000)return NextResponse.json({error:"Sporingslenken er for lang."},{status:400});if(value&&!safeHttpsUrl(value))return NextResponse.json({error:"Sporingslenken må være en gyldig https-adresse."},{status:400});}
 
   const allowed = [
     "new",
@@ -208,7 +209,7 @@ export async function PATCH(req) {
         const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
         const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
         const accountUrl=order.customer_user_id?base+"/min-side":"";
-        const trackingUrl=sent&&order.tracking_url?String(order.tracking_url).trim():"";
+        const trackingUrl=sent?safeHttpsUrl(order.tracking_url):"";
         const html=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111;padding:28px 12px"><tr><td align="center">
 <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#181818;border:1px solid #34312b">
