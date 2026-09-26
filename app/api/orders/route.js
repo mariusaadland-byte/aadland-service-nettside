@@ -75,7 +75,8 @@ export async function POST(req){
     const isCustom=body.orderType==="custom";
     const requestOrigin=new URL(req.url).origin;
     const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
-    const minSideUrl=(configuredOrigin||requestOrigin)+"/min-side";
+    const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
+    const minSideUrl=base+"/min-side";
     const accountUrl=customerUserId?minSideUrl:"";
     const title=isCustom?"Forespørselen er mottatt":"Bestillingen er mottatt";
     const intro=isCustom
