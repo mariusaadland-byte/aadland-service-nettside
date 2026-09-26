@@ -241,7 +241,11 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
   let surveyDateChanged=false;
   let normalizedSurveyDate=surveyDate===undefined?undefined:"";
   if(surveyDate){
-    const parsedSurveyDate=new Date(surveyDate);
+    const value=String(surveyDate).trim();
+    if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)){
+      return NextResponse.json({error:"Befaringstidspunktet må sendes som en gyldig tidssonefast verdi."},{status:400});
+    }
+    const parsedSurveyDate=new Date(value);
     if(Number.isNaN(parsedSurveyDate.getTime()))return NextResponse.json({error:"Velg gyldig dato og klokkeslett for befaring."},{status:400});
     normalizedSurveyDate=parsedSurveyDate.toISOString();
   }
@@ -298,7 +302,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
       const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
       const customerEmail=String(surveyOrder.customer?.email||"").trim().toLowerCase();
       const customerName=String(surveyOrder.customer?.name||"kunde").trim();
-      const surveyText=new Date(surveyDate).toLocaleString("nb-NO",{dateStyle:"long",timeStyle:"short",timeZone:"Europe/Oslo"});
+      const surveyText=new Date(normalizedSurveyDate).toLocaleString("nb-NO",{dateStyle:"long",timeStyle:"short",timeZone:"Europe/Oslo"});
       const requestOrigin=new URL(req.url).origin;
       const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
       const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
