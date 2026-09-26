@@ -72,3 +72,5 @@ SQL-filene er laget idempotente der det er praktisk, men produksjonskjøring ska
 18. `rental_reminders.sql` – aktiverer én automatisk påminnelse dagen før en bekreftet utleieperiode starter.
 
 19. `migrations/20260926005033_app_rate_limiting.sql` – privat, databasebasert rate limiting for åpne serverruter. Funksjonen kan kun kjøres med `service_role`.
+
+20. `migrations/20260926102035_harden_public_privileges_and_function_paths.sql` – fjerner unødvendige klientgrants på eksisterende tabeller og låser `SECURITY DEFINER`-funksjoner til `pg_catalog, public`.
