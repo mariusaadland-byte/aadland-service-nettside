@@ -1,18 +1,12 @@
 import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {cronGuard} from "../../../../lib/cronAuth";
+import {osloDateKey,shiftDateKey} from "../../../../lib/osloTime";
 
 const MAX_PER_RUN=50;
 
 function esc(value){
  return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
-}
-
-function osloDate(offsetDays=0){
- const now=new Date(Date.now()+offsetDays*86400000);
- const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Oslo",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(now);
- const value=Object.fromEntries(parts.map(part=>[part.type,part.value]));
- return value.year+"-"+value.month+"-"+value.day;
 }
 
 function displayDate(value){
@@ -34,7 +28,7 @@ export async function GET(req){
  const s=db();
  if(!s)return NextResponse.json({ok:false,error:"Databasen er ikke tilgjengelig."},{status:503});
 
- const targetDate=osloDate(1);
+ const targetDate=shiftDateKey(osloDateKey(new Date()),1);
  const {data,error}=await s.from("rental_bookings")
   .select("id,booking_number,status,customer,customer_user_id,start_date,end_date,total_ore,deposit_ore,confirmation_sent_at,reminder_sent_at,rental_items(name)")
   .eq("status","confirmed")
