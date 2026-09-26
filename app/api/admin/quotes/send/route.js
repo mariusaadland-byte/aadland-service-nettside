@@ -2,6 +2,7 @@ import {NextResponse} from "next/server";
 import {getAdminUser} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
 import {createQuoteToken} from "../../../../../lib/quoteLinks";
+import {osloDateKey} from "../../../../../lib/osloTime";
 
 const nok=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",minimumFractionDigits:2,maximumFractionDigits:2}).format((Number(ore)||0)/100);
 function esc(value){
@@ -25,7 +26,7 @@ export async function POST(req){
  if(error||!quote)return NextResponse.json({error:"Tilbudet ble ikke funnet."},{status:404});
 
  if(["accepted","declined","cancelled"].includes(quote.status))return NextResponse.json({error:"Dette tilbudet er ferdigbehandlet og kan ikke sendes på nytt."},{status:409});
- const today=new Date().toISOString().slice(0,10);
+ const today=osloDateKey(new Date());
  if(quote.valid_until&&quote.valid_until<today)return NextResponse.json({error:"Tilbudet har passert gyldighetsdatoen. Oppdater datoen før du sender det."},{status:409});
  const email=String(quote.customer?.email||"").trim();
  if(!email)return NextResponse.json({error:"Kunden må ha e-postadresse før tilbudet kan sendes."},{status:400});
