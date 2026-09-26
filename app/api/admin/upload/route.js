@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import {
@@ -7,7 +8,7 @@ import {
 import { db } from "../../../../lib/supabase";
 import { publicBucketPath } from "../../../../lib/storageImages";
 
-export async function POST(req) {
+export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;
   try {
     const currentUser = await getAdminUser();
 
@@ -149,7 +150,7 @@ export async function POST(req) {
 }
 
 
-export async function DELETE(req) {
+export async function DELETE(req){ const originError=sameOriginGuard(req); if(originError)return originError;
   try {
     const currentUser=await getAdminUser();
     if(!currentUser)return NextResponse.json({error:"Ikke innlogget."},{status:401});
