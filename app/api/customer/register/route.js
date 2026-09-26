@@ -54,11 +54,14 @@ export async function POST(req){
   };
 
   const {error:profileError}=await s.from("customer_profiles").upsert(profile,{onConflict:"id"});
-  if(profileError&&["42P01","42703"].includes(String(profileError.code||""))){
+  if(profileError){
+   console.error("CUSTOMER REGISTER PROFILE",profileError);
    try{await s.auth.admin.deleteUser(data.user.id)}catch(cleanupError){console.error("CUSTOMER REGISTER CLEANUP",cleanupError)}
-   return NextResponse.json({error:"Kundekonto er ikke aktivert i databasen ennå.",setupRequired:true},{status:409});
+   if(["42P01","42703"].includes(String(profileError.code||""))){
+    return NextResponse.json({error:"Kundekonto er ikke aktivert i databasen ennå.",setupRequired:true},{status:409});
+   }
+   return NextResponse.json({error:"Kundeprofilen kunne ikke opprettes. Prøv igjen."},{status:500});
   }
-  if(profileError)console.error("CUSTOMER REGISTER PROFILE",profileError);
 
   const token=createCustomerVerificationToken({id:data.user.id,email});
   const requestOrigin=new URL(req.url).origin;
