@@ -23,10 +23,23 @@ SQL-filene i `supabase/` beskriver databasegrunnlaget og senere utvidelser. De m
 
 **Ikke anta at alle SQL-utvidelser allerede er kjørt.**
 
+## Supabase-produksjon
+
+Direkte kontroll mot prosjektet `aadland-service-nettside` er gjennomført 26. september 2026:
+
+- Alle relevante apptabeller har RLS aktivert.
+- `anon` og `authenticated` har ikke vanlig SELECT/INSERT/UPDATE/DELETE-tilgang til forretningsdata.
+- Kritiske `SECURITY DEFINER`-RPC-er har eksplisitt `search_path` og kan bare kjøres av `service_role`.
+- `contact-images` er privat og `product-images` er offentlig.
+- Rate-limit-migrasjonen `20260926005033_app_rate_limiting` er lagt inn og funksjonstestet i produksjonsdatabasen.
+- Supabase Security Advisor viser fortsatt **Leaked Password Protection Disabled**. Slå dette på i Auth-innstillingene før produksjonsmerge.
+- Default privileges for nye objekter bør strammes inn manuelt i Supabase SQL Editor med `supabase/manual_default_privileges_hardening.sql`. Management-connectoren har ikke rettighet til å endre disse default privilege-eierinnstillingene.
+- Advisor-meldinger om «RLS enabled, no policy» på de øvrige tabellene er forventet i dagens server-only-modell: klientroller har ikke CRUD-grants, mens serveren bruker `service_role`.
+
 ## Før publisering
-1. Installer avhengigheter med `npm install`.
+1. Installer avhengigheter med `npm ci`.
 2. Kjør `npm run build` og rett eventuelle byggefeil.
-3. Sett produksjonsverdier for Supabase, `SESSION_SECRET`, Resend og `CRON_SECRET` i Vercel.
+3. Sett produksjonsverdier for Supabase, `SESSION_SECRET`, `RATE_LIMIT_SECRET`, Resend og `CRON_SECRET` i Vercel.
 4. Kjør nødvendige SQL-oppgraderinger kontrollert mot riktig Supabase-prosjekt, inkludert `customers.sql` før Min side aktiveres.
 5. Test innlogging og rettigheter i backoffice.
 6. Test befaring, produktbestilling, lager/frakt og alle kunde-e-poster.
