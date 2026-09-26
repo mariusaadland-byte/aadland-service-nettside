@@ -2,6 +2,7 @@
 
 import {useEffect,useState} from "react";
 import Link from "next/link";
+import {osloDateKey} from "../../lib/osloTime";
 
 const orderStatus={new:"Mottatt",confirmed:"Bekreftet",processing:"Under behandling",in_progress:"Under arbeid",ready:"Klar",completed:"Fullført",cancelled:"Kansellert"};
 const enquiryStatus={new:"Mottatt",confirmed:"Befaring avtalt",processing:"Under behandling",in_progress:"Under arbeid",ready:"Klar for oppfølging",completed:"Ferdig",cancelled:"Avbrutt"};
@@ -16,7 +17,7 @@ const dateTime=v=>v?new Intl.DateTimeFormat("nb-NO",{dateStyle:"medium"}).format
 const dateTimeFull=v=>v?new Intl.DateTimeFormat("nb-NO",{dateStyle:"long",timeStyle:"short"}).format(new Date(v)):"";
 const kr=o=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",maximumFractionDigits:0}).format((Number(o)||0)/100);
 const effectiveQuoteStatus=q=>{
- if(q.status==="sent"&&q.validUntil&&q.validUntil<new Date().toISOString().slice(0,10))return "expired";
+ if(q.status==="sent"&&q.validUntil&&q.validUntil<osloDateKey(new Date()))return "expired";
  return q.status;
 };
 
