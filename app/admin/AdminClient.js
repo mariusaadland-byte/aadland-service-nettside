@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { nok } from "../../lib/catalog";
-import {osloDateKey} from "../../lib/osloTime";
+import {osloDateKey,osloDateTimeLocal,osloLocalDateTimeToIso} from "../../lib/osloTime";
 import { useRouter } from "next/navigation";
 
 const ADMIN_IMAGE_TYPES=new Set(["image/jpeg","image/png","image/webp"]);
@@ -23,13 +23,6 @@ const labels = {
   cancelled: "Avbrutt",
 };
 
-function localDateTimeInput(value){
-  if(!value)return "";
-  const d=new Date(value);
-  if(Number.isNaN(d.getTime()))return "";
-  const pad=n=>String(n).padStart(2,"0");
-  return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes());
-}
 
 export default function AdminClient({ user }) {
   const [tab, setTab] = useState("overview");
@@ -371,7 +364,7 @@ export default function AdminClient({ user }) {
         sort:5,
         eyebrow:"BEFARING SNART",
         title:order.customerName||"Kunde",
-        meta:new Date(order.surveyDate).toLocaleString("nb-NO",{dateStyle:"short",timeStyle:"short"}),
+        meta:new Date(order.surveyDate).toLocaleString("nb-NO",{dateStyle:"short",timeStyle:"short",timeZone:"Europe/Oslo"}),
         tab:"surveys"
       })),
     ...activeOrders
@@ -385,7 +378,7 @@ export default function AdminClient({ user }) {
         sort:6,
         eyebrow:"OPPSTART SNART",
         title:order.sourceQuoteTitle||"Oppdrag",
-        meta:new Date(order.jobStartAt).toLocaleString("nb-NO",{dateStyle:"short",timeStyle:"short"}),
+        meta:new Date(order.jobStartAt).toLocaleString("nb-NO",{dateStyle:"short",timeStyle:"short",timeZone:"Europe/Oslo"}),
         href:"/admin/oppdrag/"+order.id+"/planlegg"
       })),
     ...customerQuotes
@@ -962,9 +955,8 @@ function Surveys({ orders, status, canUpdateOrders }) {
     setSurveyMessage("");
     let isoDate="";
     if(surveyDate){
-      const parsed=new Date(surveyDate);
-      if(Number.isNaN(parsed.getTime())){setSurveyMessage("Velg gyldig dato og klokkeslett.");return}
-      isoDate=parsed.toISOString();
+      isoDate=osloLocalDateTimeToIso(surveyDate);
+      if(!isoDate){setSurveyMessage("Velg gyldig dato og klokkeslett i Oslo-tid.");return}
     }
     if(sendConfirmation&&!isoDate){setSurveyMessage("Velg dato og klokkeslett før du sender bekreftelse.");return}
     if(sendConfirmation&&!order.customerEmail){setSurveyMessage("Kunden mangler e-postadresse.");return}
@@ -1011,11 +1003,11 @@ function Surveys({ orders, status, canUpdateOrders }) {
         </div>
         {(customer.address || customer.postalCode || customer.city) && <p><b>Adresse:</b> {[customer.address,customer.postalCode,customer.city].filter(Boolean).join(", ")}</p>}
         <div style={{whiteSpace:"pre-wrap",lineHeight:1.55,marginTop:16}}>{order.customRequest || "Ingen beskrivelse."}</div>{Array.isArray(order.contactImages)&&order.contactImages.length>0&&<div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12}}>{order.contactImages.map((image,i)=><a className="btn alt" key={image.ref||i} href={image.url} target="_blank" rel="noopener noreferrer">Åpne bilde {i+1}</a>)}</div>}
-        <div className="field" style={{marginTop:16}}><label>Dato og tid for befaring</label><input type="datetime-local" defaultValue={localDateTimeInput(order.surveyDate)} id={"survey-date-"+order.id}/></div>
+        <div className="field" style={{marginTop:16}}><label>Dato og tid for befaring</label><input type="datetime-local" defaultValue={osloDateTimeLocal(order.surveyDate)} id={"survey-date-"+order.id}/></div>
         <div className="field"><label>Internt notat</label><textarea rows="3" defaultValue={order.adminNote||""} id={"survey-note-"+order.id} placeholder="Kun synlig i backoffice"/></div>
         {(order.surveyConfirmationSentAt||order.surveyReminderSentAt)&&<div className="surveyDeliveryState">
-          {order.surveyConfirmationSentAt&&<span>✓ Bekreftelse sendt {new Date(order.surveyConfirmationSentAt).toLocaleString("nb-NO")}</span>}
-          {order.surveyReminderSentAt&&<span>✓ Påminnelse sendt {new Date(order.surveyReminderSentAt).toLocaleString("nb-NO")}</span>}
+          {order.surveyConfirmationSentAt&&<span>✓ Bekreftelse sendt {new Date(order.surveyConfirmationSentAt).toLocaleString("nb-NO",{timeZone:"Europe/Oslo"})}</span>}
+          {order.surveyReminderSentAt&&<span>✓ Påminnelse sendt {new Date(order.surveyReminderSentAt).toLocaleString("nb-NO",{timeZone:"Europe/Oslo"})}</span>}
         </div>}
         {canUpdateOrders&&<div className="surveySaveActions">
           <button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>saveSurvey(order,document.getElementById("survey-date-"+order.id).value,document.getElementById("survey-note-"+order.id).value,false)}>{savingId===order.id?"Lagrer …":"Lagre befaring"}</button>
