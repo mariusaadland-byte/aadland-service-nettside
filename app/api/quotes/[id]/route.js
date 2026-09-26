@@ -1,6 +1,7 @@
 import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {verifyQuoteToken} from "../../../../lib/quoteLinks";
+import {osloDateKey} from "../../../../lib/osloTime";
 
 function esc(value){
  return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
@@ -40,7 +41,7 @@ async function loadQuote(id){
 
 function expired(quote){
  if(!quote.valid_until)return false;
- const today=new Date().toISOString().slice(0,10);
+ const today=osloDateKey(new Date());
  return quote.valid_until<today;
 }
 
