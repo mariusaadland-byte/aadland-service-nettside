@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {safeSiteHref} from "../lib/safeUrl";
 
 const emptyCustomer={name:"",email:"",phone:"",address:"",postalCode:"",city:"",note:"",deliveryWithinRadius:true};
 
@@ -41,7 +42,7 @@ function enquiryServiceName(service){
 }
 
 function serviceHref(service){
- if(service.ctaHref) return service.ctaHref;
+ if(service.ctaHref){const safe=safeSiteHref(service.ctaHref);if(safe)return safe;}
  if(service.kind==="products") return "/produkter";
  if(service.kind==="rental") return "/utleie";
  if(service.kind==="survey") return "#befaring";
@@ -222,7 +223,7 @@ export default function Home(){
    </div>
   </section>
 
-  {seasonalVisible&&<section className="seasonalBanner"><div className="homeWrap"><div><span className="goldLabel">AKTUELT</span><h2>{siteSettings.seasonalTitle}</h2>{siteSettings.seasonalText&&<p>{siteSettings.seasonalText}</p>}</div>{siteSettings.seasonalCtaLabel&&siteSettings.seasonalCtaHref&&<a className="goldBtn" href={siteSettings.seasonalCtaHref}>{siteSettings.seasonalCtaLabel} →</a>}</div></section>}
+  {seasonalVisible&&<section className="seasonalBanner"><div className="homeWrap"><div><span className="goldLabel">AKTUELT</span><h2>{siteSettings.seasonalTitle}</h2>{siteSettings.seasonalText&&<p>{siteSettings.seasonalText}</p>}</div>{siteSettings.seasonalCtaLabel&&safeSiteHref(siteSettings.seasonalCtaHref)&&<a className="goldBtn" href={safeSiteHref(siteSettings.seasonalCtaHref)}>{siteSettings.seasonalCtaLabel} →</a>}</div></section>}
 
   <section className="serviceStrip"><div className="homeWrap stripGrid serviceStripInner">
    {services.slice(0,6).map(service=><a href={serviceHref(service)} key={service.slug} className="serviceStripItem" onClick={()=>{if(service.kind==="survey")setSelectedService(enquiryServiceName(service))}}><span className={"serviceIcon "+service.slug} aria-hidden="true"></span><span>{service.title}</span></a>)}
