@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {safeSiteHref} from "../lib/safeUrl";
+import {osloDateKey} from "../lib/osloTime";
 
 const emptyCustomer={name:"",email:"",phone:"",address:"",postalCode:"",city:"",note:"",deliveryWithinRadius:true};
 
@@ -113,7 +114,8 @@ export default function Home(){
  },[]);
 
  const now=Date.now();
- const seasonalVisible=siteSettings.showSeasonal===true&&siteSettings.seasonalTitle&&(!siteSettings.seasonalFrom||new Date(siteSettings.seasonalFrom+"T00:00:00").getTime()<=now)&&(!siteSettings.seasonalUntil||new Date(siteSettings.seasonalUntil+"T23:59:59").getTime()>=now);
+ const todayOslo=osloDateKey(new Date());
+ const seasonalVisible=siteSettings.showSeasonal===true&&siteSettings.seasonalTitle&&(!siteSettings.seasonalFrom||siteSettings.seasonalFrom<=todayOslo)&&(!siteSettings.seasonalUntil||siteSettings.seasonalUntil>=todayOslo);
  const serviceSource=apiServices||fallbackServices;
  const services=serviceSource.map(normalizeService)
   .filter(service=>service.active!==false)
