@@ -1,3 +1,4 @@
+import {rateLimitRequest} from "../../../../lib/rateLimit";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {createClient} from "@supabase/supabase-js";
@@ -11,6 +12,7 @@ const genericMessage="Hvis e-postadressen er registrert, sender vi en lenke for 
 
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;
+ const rateError=await rateLimitRequest(req,{"scope":"customer-password-reset","max":5,"windowSeconds":3600,"message":"For mange forespørsler om nytt passord. Prøv igjen senere."}); if(rateError)return rateError;
  try{
   const {email}=await req.json().catch(()=>({}));
   const value=String(email||"").trim().toLowerCase();
