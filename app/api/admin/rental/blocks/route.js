@@ -22,7 +22,7 @@ export async function GET(req){
  const {data,error}=await q;
  if(error){
   if(error.code==="42P01")return NextResponse.json({blocks:[],setupRequired:true});
-  return NextResponse.json({error:error.message},{status:500});
+  console.error("RENTAL BLOCKS GET",error);\n  return NextResponse.json({error:"Blokkeringene kunne ikke hentes."},{status:500});
  }
  return NextResponse.json({blocks:(data||[]).map(x=>({
   id:x.id,
@@ -67,6 +67,6 @@ export async function DELETE(req){
  const s=db();
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
  const {error}=await s.from("rental_blocks").delete().eq("id",id);
- if(error)return NextResponse.json({error:error.message},{status:500});
+ if(error){console.error("RENTAL BLOCK DELETE",error);return NextResponse.json({error:"Blokkeringen kunne ikke slettes."},{status:500});}
  return NextResponse.json({ok:true});
 }
