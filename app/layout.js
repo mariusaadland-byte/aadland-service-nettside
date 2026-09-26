@@ -15,7 +15,6 @@ export const metadata={
  metadataBase:new URL("https://www.aadland-service.no"),
  title:{default:siteTitle,template:"%s | Aadland Service"},
  description:siteDescription,
- alternates:{canonical:"/"},
  manifest:"/manifest.webmanifest",
  openGraph:{
   title:siteTitle,
