@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminUser, hasPermission } from "../../../../lib/auth";
 import { db, fromDbService } from "../../../../lib/supabase";
+import {safeSiteHref} from "../../../../lib/safeUrl";
 
 async function requireAccess() {
   const currentUser = await getAdminUser();
@@ -15,7 +16,7 @@ function payload(b) {
     title:text(b.title).slice(0,180), description:text(b.description).slice(0,8000)||null, image_url:text(b.imageUrl).slice(0,2000)||null,
     kind:text(b.kind).slice(0,80)||"service", active:b.active!==false, show_on_home:b.showOnHome!==false,
     show_in_menu:b.showInMenu!==false, show_in_footer:b.showInFooter!==false, has_page:b.hasPage===true,
-    cta_label:text(b.ctaLabel).slice(0,120)||"Les mer", cta_href:text(b.ctaHref).slice(0,2000)||null,
+    cta_label:text(b.ctaLabel).slice(0,120)||"Les mer", cta_href:safeSiteHref(text(b.ctaHref).slice(0,2000))||null,
     form_title:text(b.formTitle).slice(0,180)||"Be om befaring", form_prompt:text(b.formPrompt).slice(0,2000)||"Beskriv kort hva du ønsker hjelp med.",
     publish_from:b.publishFrom||null, publish_until:b.publishUntil||null,
     sort_order:Number.isFinite(Number(b.sortOrder))?Math.round(Number(b.sortOrder)):0
@@ -30,6 +31,7 @@ export async function GET() {
 export async function POST(req) {
   const a=await requireAccess(); if(a.error)return a.error; const b=await req.json(); const p=payload(b);
   if(!p.title)return NextResponse.json({error:"Tjenesten må ha et navn."},{status:400});
+  if(text(b.ctaHref)&&!p.cta_href)return NextResponse.json({error:"Knappelenken må være en intern lenke, en #seksjon eller en https-adresse."},{status:400});
   p.slug=slugify(b.slug||p.title)+"-"+Date.now();const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
   const {data,error}=await s.from("services").insert(p).select("*").single();
   if(error){console.error("SERVICE CREATE ERROR:",error);return NextResponse.json({error:"Tjenesten kunne ikke opprettes."},{status:500});}
@@ -38,7 +40,7 @@ export async function POST(req) {
 export async function PATCH(req) {
   const a=await requireAccess(); if(a.error)return a.error; const b=await req.json();
   if(!b.id)return NextResponse.json({error:"Tjeneste mangler."},{status:400});
-  const p=payload(b); if(!p.title)return NextResponse.json({error:"Tjenesten må ha et navn."},{status:400});
+  const p=payload(b); if(!p.title)return NextResponse.json({error:"Tjenesten må ha et navn."},{status:400}); if(text(b.ctaHref)&&!p.cta_href)return NextResponse.json({error:"Knappelenken må være en intern lenke, en #seksjon eller en https-adresse."},{status:400});
   p.updated_at=new Date().toISOString();const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
   const {data,error}=await s.from("services").update(p).eq("id",b.id).select("*").single();
   if(error){console.error("SERVICE UPDATE ERROR:",error);return NextResponse.json({error:"Tjenesten kunne ikke lagres."},{status:500});}
