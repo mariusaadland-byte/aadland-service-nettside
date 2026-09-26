@@ -70,3 +70,5 @@ SQL-filene er laget idempotente der det er praktisk, men produksjonskjøring ska
 17. `rental_notifications.sql` – sporer bekreftelses- og avbestillingsmail for utleiebookinger.
 
 18. `rental_reminders.sql` – aktiverer én automatisk påminnelse dagen før en bekreftet utleieperiode starter.
+
+19. `migrations/20260926005033_app_rate_limiting.sql` – privat, databasebasert rate limiting for åpne serverruter. Funksjonen kan kun kjøres med `service_role`.
