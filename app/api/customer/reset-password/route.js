@@ -1,4 +1,4 @@
-import {rateLimitRequest} from "../../../../lib/rateLimit";
+import {rateLimitRequest,rateLimitValue} from "../../../../lib/rateLimit";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {createClient} from "@supabase/supabase-js";
@@ -19,6 +19,7 @@ export async function POST(req){
 
   if(!value)return NextResponse.json({error:"Skriv inn e-postadressen din."},{status:400});
   if(value.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))return NextResponse.json({error:"Skriv inn en gyldig e-postadresse."},{status:400});
+  const emailRateError=await rateLimitValue(value,{"scope":"customer-password-reset-email","max":3,"windowSeconds":3600,"message":"For mange forespørsler om nytt passord for denne e-postadressen. Prøv igjen senere."}); if(emailRateError)return emailRateError;
 
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
