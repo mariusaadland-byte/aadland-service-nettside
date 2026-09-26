@@ -1,11 +1,7 @@
--- Manuell Supabase-hardening for prosjektets default privileges.
--- Kjør i Supabase SQL Editor som prosjektets postgres-eier.
--- Beholder service_role-tilgang, men stopper nye public-objekter fra å få
--- unødvendige privilegier til anon/authenticated automatisk.
-
-revoke truncate, references, trigger, maintain
-on all tables in schema public
-from anon, authenticated;
+-- Kjør manuelt i Supabase SQL Editor som prosjektets postgres-eier.
+-- Eksisterende tabellgrants og SECURITY DEFINER-search_path er allerede herdet
+-- i migrasjon 20260926102035_harden_public_privileges_and_function_paths.sql.
+-- Dette scriptet gjelder KUN default privileges for fremtidige objekter.
 
 alter default privileges for role postgres in schema public
   revoke all on tables from anon, authenticated;
