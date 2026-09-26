@@ -1,10 +1,9 @@
 import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {cronGuard} from "../../../../lib/cronAuth";
+import {osloDateKey,shiftDateKey,osloDayStartIso,osloDayEndIso} from "../../../../lib/osloTime";
 
 const MAX_PER_RUN=25;
-const WINDOW_MS=30*60*60*1000;
-
 function esc(value){
  return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
 }
@@ -23,8 +22,9 @@ export async function GET(req){
  const s=db();
  if(!s)return NextResponse.json({ok:false,error:"Databasen er ikke tilgjengelig."},{status:503});
 
- const now=new Date();
- const until=new Date(now.getTime()+WINDOW_MS);
+ const targetDate=shiftDateKey(osloDateKey(new Date()),1);
+ const from=osloDayStartIso(targetDate);
+ const until=osloDayEndIso(targetDate);
 
  const {data,error}=await s.from("orders")
   .select("id,order_number,status,order_type,customer,customer_user_id,survey_date,survey_confirmation_sent_at,survey_reminder_sent_at,archived_at")
@@ -34,8 +34,8 @@ export async function GET(req){
   .not("survey_confirmation_sent_at","is",null)
   .is("survey_reminder_sent_at",null)
   .is("archived_at",null)
-  .gte("survey_date",now.toISOString())
-  .lte("survey_date",until.toISOString())
+  .gte("survey_date",from)
+  .lte("survey_date",until)
   .order("survey_date",{ascending:true})
   .limit(MAX_PER_RUN);
 
@@ -111,5 +111,5 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
   }
  }
 
- return NextResponse.json({ok:true,checked:(data||[]).length,sent:sentCount,failed:failures.length,failures});
+ return NextResponse.json({ok:true,targetDate,checked:(data||[]).length,sent:sentCount,failed:failures.length,failures});
 }
