@@ -45,7 +45,9 @@ export async function POST(req){
   const requestOrigin=new URL(req.url).origin;
   const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
   const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
-  const link=base+"/admin/nytt-passord?token="+encodeURIComponent(token);
+  const resetUrl=new URL("/admin/nytt-passord",base);
+  resetUrl.hash="token="+encodeURIComponent(token);
+  const link=resetUrl.toString();
 
   const resendKey=process.env.VERCEL_ENV==="preview"
    ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)
