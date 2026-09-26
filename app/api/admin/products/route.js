@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import { NextResponse } from "next/server";
 import { db, fromDbProduct } from "../../../../lib/supabase";
 import { hasPermission } from "../../../../lib/auth";
@@ -120,7 +121,7 @@ export async function GET() {
   }
 }
 
-export async function POST(req) {
+export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;
   try {
     if (!(await hasPermission("canManageProducts"))) {
       return NextResponse.json(
@@ -277,7 +278,7 @@ export async function POST(req) {
   }
 }
 
-export async function PATCH(req) {
+export async function PATCH(req){ const originError=sameOriginGuard(req); if(originError)return originError;
   try {
     if (!(await hasPermission("canManageProducts"))) {
       return NextResponse.json(
@@ -451,7 +452,7 @@ export async function PATCH(req) {
 }
 
 
-export async function DELETE(req) {
+export async function DELETE(req){ const originError=sameOriginGuard(req); if(originError)return originError;
   try {
     if (!(await hasPermission("canManageProducts"))) {
       return NextResponse.json(
