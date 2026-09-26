@@ -307,7 +307,7 @@ export default function AdminClient({ user }) {
     0
   );
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = osloDateKey(new Date());
   const waitingQuotes = customerQuotes.filter(
     (quote) =>
       quote.status === "sent" &&
