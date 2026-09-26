@@ -56,7 +56,7 @@ export async function POST(req){
   const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
   const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
   const resetUrl=new URL("/min-side/nytt-passord",base);
-  resetUrl.searchParams.set("token",token);
+  resetUrl.hash="token="+encodeURIComponent(token);
 
   const name=String(profile.name||user.user_metadata?.name||"").trim();
   const html=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
