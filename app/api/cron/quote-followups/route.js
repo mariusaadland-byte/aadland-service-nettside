@@ -74,7 +74,7 @@ export async function GET(req){
 
   try{
    const token=createQuoteToken(quote);
-   const link=base+"/tilbud/"+encodeURIComponent(quote.id)+"?token="+encodeURIComponent(token);
+   const link=base+"/tilbud/"+encodeURIComponent(quote.id)+"#token="+encodeURIComponent(token);
    const customerName=esc(quote.customer?.name||"kunde");
    const title=esc(quote.title||"tilbudet");
    const number=esc(quote.quote_number||"");
