@@ -13,6 +13,7 @@ export default function NewPassword(){
  useEffect(()=>{
   const value=new URLSearchParams(window.location.search).get("token")||"";
   setToken(value);
+  if(value)window.history.replaceState({},document.title,window.location.pathname);
   setTokenReady(true);
   if(!value)setError("Lenken mangler eller er ugyldig. Be om en ny lenke.");
  },[]);
