@@ -34,4 +34,28 @@ if(siteUrl.protocol!=="https:"){
  process.exit(1);
 }
 
+const vippsEnabled=String(process.env.VIPPS_ENABLED||"").toLowerCase()==="true";
+if(vippsEnabled){
+ const vippsRequired=[
+  "VIPPS_CLIENT_ID",
+  "VIPPS_CLIENT_SECRET",
+  "VIPPS_SUBSCRIPTION_KEY",
+  "VIPPS_MSN",
+  "VIPPS_WEBHOOK_SECRET"
+ ];
+ const vippsMissing=vippsRequired.filter(name=>!String(process.env[name]||"").trim());
+ if(vippsMissing.length){
+  console.error("VIPPS_ENABLED=true but required Vipps environment variables are missing:",vippsMissing.join(", "));
+  process.exit(1);
+ }
+ if(String(process.env.VIPPS_ENVIRONMENT||"").toLowerCase()!=="production"){
+  console.error("VIPPS_ENVIRONMENT must be 'production' when Vipps is enabled in production.");
+  process.exit(1);
+ }
+ if(!/^[0-9]{4,10}$/.test(String(process.env.VIPPS_MSN||"").trim())){
+  console.error("VIPPS_MSN must be a 4-10 digit merchant serial number.");
+  process.exit(1);
+ }
+}
+
 console.log("Production environment validation passed.");
