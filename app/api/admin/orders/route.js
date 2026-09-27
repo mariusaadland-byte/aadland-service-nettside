@@ -8,6 +8,8 @@ import { db, fromDbProduct } from "../../../../lib/supabase";
 import {safeHttpsUrl} from "../../../../lib/safeUrl";
 import {buildReceiptEmail} from "../../../../lib/receiptEmail";
 import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
+import {captureVippsPayment,getVippsPayment} from "../../../../lib/vipps";
+import {syncVippsOrderFromPayment} from "../../../../lib/vippsOrder";
 
 function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 
@@ -37,8 +39,16 @@ const mapOrder = (o) => ({
   jobPlanningUpdatedAt: o.job_planning_updated_at || null,
   jobConfirmationSentAt: o.job_confirmation_sent_at || null,
   paymentStatus: o.payment_status || "unpaid",
+  paymentProvider: o.payment_provider || "",
   paymentReference: o.payment_reference || "",
+  paymentPspReference: o.payment_psp_reference || "",
+  paymentReservedOre: Number(o.payment_reserved_ore)||0,
   paymentCapturedOre: Number(o.payment_captured_ore)||0,
+  paymentRefundedOre: Number(o.payment_refunded_ore)||0,
+  paymentAuthorizedAt: o.payment_authorized_at || null,
+  paymentCapturedAt: o.payment_captured_at || null,
+  paymentRefundedAt: o.payment_refunded_at || null,
+  paymentCaptureGuaranteedUntil: o.payment_capture_guaranteed_until || null,
   receiptSentAt: o.receipt_sent_at || null,
   trackingNumber: o.tracking_number || "",
   trackingUrl: o.tracking_url || "",
@@ -194,10 +204,35 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     return NextResponse.json({ok:true});
   }
 
+  if(action==="capture-vipps"){
+    const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+    if(order.order_type==="custom")return NextResponse.json({error:"Vipps-capture gjelder produktbestillinger."},{status:400});
+    if(order.payment_provider!=="vipps"||!order.payment_reference)return NextResponse.json({error:"Bestillingen har ingen aktiv Vipps-betaling."},{status:400});
+    const total=Math.max(0,Number(order.total_ore)||0);
+    const alreadyCaptured=Math.max(0,Number(order.payment_captured_ore)||0);
+    const remaining=Math.max(0,total-alreadyCaptured);
+    if(remaining<=0)return NextResponse.json({ok:true,alreadyCaptured:true,paymentStatus:order.payment_status||"paid"});
+    if(order.payment_status!=="authorized")return NextResponse.json({error:"Vipps-beløpet er ikke autorisert og kan ikke trekkes ennå."},{status:409});
+    try{
+      await captureVippsPayment(order.payment_reference,remaining);
+      const payment=await getVippsPayment(order.payment_reference);
+      const synced=await syncVippsOrderFromPayment(s,order,payment);
+      if(synced.captured<total)return NextResponse.json({error:"Vipps rapporterer bare delvis capture. Kontroller betalingen før ordren ferdigstilles.",paymentStatus:synced.paymentStatus},{status:409});
+      return NextResponse.json({ok:true,paymentStatus:synced.paymentStatus,capturedOre:synced.captured,receiptRequired:true});
+    }catch(error){
+      console.error("VIPPS CAPTURE ERROR",error);
+      return NextResponse.json({error:"Vipps-beløpet kunne ikke trekkes. Ikke lever ut varen før betalingen er kontrollert."},{status:502});
+    }
+  }
+
   if(action==="record-paid-and-send-receipt"){
     const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
     if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
     if(order.order_type==="custom")return NextResponse.json({error:"Denne betalingsflyten gjelder produktbestillinger."},{status:400});
+    if(order.payment_provider==="vipps"&&(Number(order.payment_captured_ore)||0)<(Number(order.total_ore)||0)){
+      return NextResponse.json({error:"Vipps-ordren må trekkes via Vipps før den kan registreres som betalt."},{status:409});
+    }
     const email=String(order.customer?.email||"").trim().toLowerCase();
     if(!email)return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
     const total=Math.max(0,Number(order.total_ore)||0);
