@@ -440,9 +440,15 @@ export default function MinSide(){
     <div className="customerCardMeta">
      <span><small>Sum</small><b>{kr(o.total_ore)}</b></span>
      <span><small>Betaling</small><b>{paymentStatus[o.payment_status]||o.payment_status||"Ikke registrert"}</b></span>
+     {Number(o.payment_captured_ore)>0&&<span><small>Registrert betalt</small><b>{kr(o.payment_captured_ore)}</b></span>}
      <span><small>Levering</small><b>{fulfillmentStatus[o.fulfillment_type]||o.fulfillment_type||"Ikke registrert"}</b></span>
      {Number(o.shipping_ore)>0&&<span><small>Frakt</small><b>{kr(o.shipping_ore)}</b></span>}
     </div>
+    {o.payment_status==="paid"&&(o.payment_reference||o.receipt_sent_at)&&<div className="customerPaymentConfirmation">
+     <b>✓ Betaling registrert</b>
+     {o.payment_reference&&<span>Referanse: {o.payment_reference}</span>}
+     {o.receipt_sent_at&&<span>Betalingsbekreftelse sendt {dateTimeFull(o.receipt_sent_at)}</span>}
+    </div>}
    </article>)}</div>}
   </section>
 
