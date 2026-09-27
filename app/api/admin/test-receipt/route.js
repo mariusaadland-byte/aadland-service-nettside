@@ -19,21 +19,61 @@ export async function POST(req){
  const resendKey=process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY;
  if(!resendKey)return NextResponse.json({error:"Preview-e-post er ikke konfigurert."},{status:503});
 
- const orderNumber="TEST-1001";
+ const orderNumber="TEST-2026-1001";
  const items=[
-  {quantity:1,name:"Eksempelprodukt",unitPriceOre:800000}
+  {
+   quantity:1,
+   name:"Terrassebenk 160 cm",
+   unitPriceOre:389000,
+   details:[
+    {label:"Lengde",value:"160 cm"},
+    {label:"Overflate",value:"Oljet"},
+    {label:"Treverk",value:"Trykkimpregnert"}
+   ]
+  },
+  {
+   quantity:2,
+   name:"Plantekasse 120 cm",
+   unitPriceOre:169000,
+   details:[
+    {label:"Mål",value:"120 × 40 × 45 cm"},
+    {label:"Utførelse",value:"Svartbeiset"},
+    {label:"Levering",value:"Ferdig montert"}
+   ]
+  },
+  {
+   quantity:1,
+   name:"Oppbevaringskasse til terrasse",
+   unitPriceOre:249000,
+   details:[
+    {label:"Størrelse",value:"Stor"},
+    {label:"Farge",value:"Natur"}
+   ]
+  }
  ];
- const shippingOre=50000;
- const totalOre=850000;
+ const shippingOre=79000;
+ const totalOre=1055000;
+ const customerPhone=String(body.customerPhone||"999 99 999").trim().slice(0,40);
+ const customerAddress=String(body.customerAddress||"Eksempelveien 12, 5000 Bergen").trim().slice(0,500);
+ const orderNote=String(body.orderNote||"Ring ca. 30 minutter før levering. Plantekassene ønskes levert ferdig montert og settes ved inngangen.").trim().slice(0,2000);
+ const quoteNote=String(body.quoteNote||"Avtalt oljet overflate på benken. Levering og plassering inngår i avtalt pris.").trim().slice(0,4000);
  const html=buildReceiptEmail({
   test:true,
   orderNumber,
   customerName,
+  customerEmail:email,
+  customerPhone,
+  customerAddress,
+  fulfillmentLabel:"Levering til kunde",
   reference,
   items,
   shippingOre,
   totalOre,
-  paidAt:new Date()
+  paidAt:new Date(),
+  orderNote,
+  quoteNumber:"TILBUD-1042",
+  quoteNote,
+  vatRate:25
  });
 
  try{
