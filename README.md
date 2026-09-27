@@ -11,12 +11,27 @@ Nettsted og backoffice for Aadland Service.
 - Backoffice på `/admin` med ordre, kunder, produkter, tjenester, utleie, prosjekter og forsideinnhold
 - Tegning og visualisering på `/admin/tegning`
 - Supabase som database og Resend for e-post
-- Betalingsstatus er separat fra ordrestatus. Betalingsleverandør er ikke koblet til ennå.
+- Betalingsstatus er separat fra ordrestatus. Vipps ePayment kan aktiveres eksplisitt etter at database, testnøkler og webhook er satt opp.
 
 ## Miljøvariabler
 Kopier `.env.example` til `.env.local` og fyll inn verdiene. Ikke legg hemmelige nøkler i Git.
 
 I Vercel må `RESEND_API_KEY` være satt i **Production** for at kundekonto, passordgjenoppretting og andre kunde-e-poster skal kunne sendes fra produksjon. Preview kan bruke `RESEND_PREVIEW_API_KEY`. `CRON_SECRET` er påkrevd i Production for at automatiske tilbudsoppfølginger og påminnelser skal kjøre; cron-rutene avviser alle kall dersom hemmeligheten mangler eller Authorization-headeren ikke matcher. Produksjonsbuilden stopper automatisk dersom Supabase-konfigurasjon, `SESSION_SECRET`, `RESEND_API_KEY`, `CRON_SECRET` eller `NEXT_PUBLIC_SITE_URL` mangler. Etter endring av en miljøvariabel må det kjøres en ny deployment.
+
+### Vipps ePayment
+
+Vipps er **av som standard**. Dagens manuelle betalingsflyt fortsetter helt uendret så lenge `VIPPS_ENABLED` ikke er satt til `true`.
+
+Før Vipps aktiveres:
+
+1. Kjør migreringen `supabase/migrations/20260928011500_vipps_epayment_orders.sql` mot riktig Supabase-prosjekt.
+2. Legg inn testnøkler i Vercel Preview: `VIPPS_CLIENT_ID`, `VIPPS_CLIENT_SECRET`, `VIPPS_SUBSCRIPTION_KEY` og `VIPPS_MSN`.
+3. Sett `VIPPS_ENVIRONMENT=test` og `VIPPS_ENABLED=true` **kun i Preview**.
+4. Registrer webhook mot preview-URL-en `/api/payments/vipps/webhook` og lagre hemmeligheten som `VIPPS_WEBHOOK_SECRET`.
+5. Redeploy preview og gjennomfør komplett test: opprett betaling, godkjenn, retur/status, backoffice-capture, kvittering/PDF, avbrutt/utløpt betaling og lagerfrigjøring.
+6. Først etter godkjent test legges produksjonsnøkler inn med `VIPPS_ENVIRONMENT=production`. Produksjonsbuilden avviser `VIPPS_ENABLED=true` dersom nødvendig Vipps-konfigurasjon mangler eller miljøet ikke er `production`.
+
+Vipps-hemmeligheter skal aldri legges i Git eller deles i chat.
 
 ## Database
 SQL-filene i `supabase/` beskriver databasegrunnlaget og senere utvidelser. De må kjøres kontrollert i riktig rekkefølge mot Supabase før funksjoner som bruker de nye tabellene/feltene tas i produksjon.
