@@ -153,6 +153,31 @@ export default function MinSide(){
   setData(null);setMode("login");
  }
 
+ function repeatPurchase(item){
+  if(!item?.productSlug)return;
+  try{
+   sessionStorage.setItem("aadlandRepeatPurchase",JSON.stringify({
+    slug:item.productSlug,
+    productId:item.productId||"",
+    quantity:Number(item.quantity)||1,
+    selectedOptions:item.selectedOptions&&typeof item.selectedOptions==="object"?item.selectedOptions:{}
+   }));
+  }catch{}
+  window.location.href="/produkter/"+encodeURIComponent(item.productSlug);
+ }
+
+ function repeatRental(rental){
+  const slug=rental?.rental_items?.slug;
+  if(!slug)return;
+  try{
+   sessionStorage.setItem("aadlandRepeatRental",JSON.stringify({
+    slug,
+    fulfillment:rental?.customer?.fulfillment==="delivery"?"delivery":"pickup"
+   }));
+  }catch{}
+  window.location.href="/utleie/"+encodeURIComponent(slug);
+ }
+
  if(loading)return <main className="customerPage"><p>Laster …</p></main>;
 
  if(!data)return <main className="customerPage customerLoginPage">
@@ -409,7 +434,7 @@ export default function MinSide(){
    <div className="customerGrid">{purchases.map(o=><article className="card customerHistoryCard" key={o.id}>
     <div className="customerCardTop"><div><small>{o.order_number}</small><h3>Bestilling</h3><p className="customerHistoryDate">Bestilt {dateTime(o.created_at)}</p></div><span className={"customerStatus customerStatus-"+o.status}>{orderStatus[o.status]||o.status}</span></div>
     {Array.isArray(o.items)&&o.items.length>0&&<div className="customerItemList">
-     {o.items.slice(0,6).map((item,index)=><div key={(item.productId||item.name||"item")+"-"+index}><span><b>{item.name||"Produkt"}</b><small>Antall {item.quantity||1}</small></span><span className="customerItemRepeat"><strong>{kr((Number(item.unitPriceOre)||0)*(Number(item.quantity)||1))}</strong>{item.productSlug&&<Link className="btn alt" href={"/produkter/"+encodeURIComponent(item.productSlug)}>Kjøp igjen</Link>}</span></div>)}
+     {o.items.slice(0,6).map((item,index)=><div key={(item.productId||item.name||"item")+"-"+index}><span><b>{item.name||"Produkt"}</b><small>Antall {item.quantity||1}</small></span><span className="customerItemRepeat"><strong>{kr((Number(item.unitPriceOre)||0)*(Number(item.quantity)||1))}</strong>{item.productSlug&&<button type="button" className="btn alt" onClick={()=>repeatPurchase(item)}>Kjøp igjen</button>}</span></div>)}
      {o.items.length>6&&<small>+ {o.items.length-6} flere varelinjer</small>}
     </div>}
     <div className="customerCardMeta">
@@ -433,7 +458,7 @@ export default function MinSide(){
      <span><small>Utlevering</small><b>{fulfillmentStatus[r.customer?.fulfillment]||"Ikke registrert"}</b></span>
      {Number(r.deposit_ore)>0&&<span><small>Depositum</small><b>{kr(r.deposit_ore)} · {depositStatus[r.deposit_status]||r.deposit_status||"Ikke registrert"}</b></span>}
     </div>
-    {r.rental_items?.slug&&<Link className="btn alt" href={"/utleie/"+encodeURIComponent(r.rental_items.slug)}>Lei igjen</Link>}
+    {r.rental_items?.slug&&<button type="button" className="btn alt" onClick={()=>repeatRental(r)}>Lei igjen</button>}
    </article>)}</div>}
   </section>
  </main>;
