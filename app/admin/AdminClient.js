@@ -869,10 +869,26 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
   setMessage((alreadyPaid?"Betalingsbekreftelsen er sendt på nytt til ":"Betalingen er registrert og betalingsbekreftelsen er sendt til ")+(data.sentTo||order.customerEmail)+".");
   if(typeof reload==="function")await reload();
  }
+ async function captureVippsOrder(order){
+  const remaining=Math.max(0,(Number(order.totalOre)||0)-(Number(order.paymentCapturedOre)||0));
+  if(remaining<=0)return;
+  if(!window.confirm("Trekke "+nok(remaining)+" via Vipps nå? Gjør dette først når varen eller tjenesten kan belastes."))return;
+  setSavingId(order.id);setMessage("");
+  const response=await fetch("/api/admin/orders",{
+   method:"PATCH",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({id:order.id,action:"capture-vipps"})
+  });
+  const data=await response.json().catch(()=>({}));
+  setSavingId(null);
+  if(!response.ok){setMessage(data.error||"Vipps-beløpet kunne ikke trekkes.");return}
+  setMessage("Vipps-beløpet er trukket. Send kvitteringen til kunden fra betalingsfeltet.");
+  if(typeof reload==="function")await reload();
+ }
  return <><>{message&&<p className="notice">{message}</p>}</><div className="orderCards">{orders.length?orders.map(order=><article className="card orderCard" key={order.id}>
   <div className="orderCardTop"><div><div className="kicker">{order.orderNumber}</div><h3>{order.customerName||"Ukjent kunde"}</h3><small className="muted">{new Date(order.createdAt).toLocaleString("nb-NO")}</small></div><b>{nok(order.totalOre||0)}</b></div>
   <p>{order.customerPhone&&<>{order.customerPhone}<br/></>}{order.customerEmail}</p>
-  <div className="orderBadges"><span>{order.fulfillmentType==="delivery"?"Levering":order.fulfillmentType==="shipping"?"Sending":"Henting"}</span><span>Betaling: {order.paymentStatus==="pending"?"Venter":order.paymentStatus==="authorized"?"Reservert":order.paymentStatus==="paid"?"Betalt":order.paymentStatus==="refunded"?"Refundert":order.paymentStatus}</span></div>
+  <div className="orderBadges"><span>{order.fulfillmentType==="delivery"?"Levering":order.fulfillmentType==="shipping"?"Sending":"Henting"}</span><span>Betaling: {order.paymentStatus==="pending"?"Venter":order.paymentStatus==="authorized"?"Reservert":order.paymentStatus==="paid"?"Betalt":order.paymentStatus==="refunded"?"Refundert":order.paymentStatus==="cancelled"?"Avbrutt":order.paymentStatus}</span></div>
   <div className="field"><label>Status</label>{canUpdateOrders?<select value={order.status} onChange={e=>status(order.id,e.target.value)}>{Object.entries(labels).map(([value,label])=><option value={value} key={value}>{label}</option>)}</select>:<b>{labels[order.status]||order.status}</b>}</div>
   <button className="btn alt" type="button" onClick={()=>setOpenId(openId===order.id?null:order.id)}>{openId===order.id?"Skjul detaljer":"Vis detaljer"}</button>
   {openId===order.id&&<div className="orderDetails">
@@ -881,12 +897,19 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
    {order.orderType!=="custom"&&<div className="orderPaymentPanel">
     <h4>Betaling og kvittering</h4>
     <div className="orderPaymentFacts">
-     <span><small>Status</small><b>{order.paymentStatus==="paid"?"Betalt":order.paymentStatus==="authorized"?"Reservert":order.paymentStatus==="refunded"?"Refundert":order.paymentStatus==="partial"?"Delvis betalt":"Ikke betalt"}</b></span>
+     <span><small>Status</small><b>{order.paymentStatus==="paid"?"Betalt":order.paymentStatus==="authorized"?"Reservert":order.paymentStatus==="refunded"?"Refundert":order.paymentStatus==="partial"?"Delvis betalt":order.paymentStatus==="cancelled"?"Avbrutt":"Ikke betalt"}</b></span>
+     {order.paymentProvider&&<span><small>Betalingsmåte</small><b>{order.paymentProvider==="vipps"?"Vipps":order.paymentProvider}</b></span>}
+     {Number(order.paymentReservedOre)>0&&<span><small>Reservert</small><b>{nok(order.paymentReservedOre)}</b></span>}
      <span><small>Registrert betalt</small><b>{nok(order.paymentCapturedOre||0)}</b></span>
+     {Number(order.paymentRefundedOre)>0&&<span><small>Refundert</small><b>{nok(order.paymentRefundedOre)}</b></span>}
      {order.receiptSentAt&&<span><small>Betalingsbekreftelse</small><b>Sendt {new Date(order.receiptSentAt).toLocaleString("nb-NO")}</b></span>}
     </div>
-    <div className="field"><label>Betalingsreferanse <span className="muted">(f.eks. Vipps-ref., kontant eller bank)</span></label><input id={"payment-reference-"+order.id} defaultValue={order.paymentReference||""} maxLength={120} placeholder="Valgfri referanse"/></div>
-    {canUpdateOrders&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>registerPayment(order)}>{savingId===order.id?"Sender …":order.paymentStatus==="paid"?"Send betalingsbekreftelse på nytt":"Registrer betalt + send bekreftelse"}</button>}
+    <div className="field"><label>Betalingsreferanse <span className="muted">(f.eks. Vipps-ref., kontant eller bank)</span></label><input id={"payment-reference-"+order.id} defaultValue={order.paymentReference||""} readOnly={order.paymentProvider==="vipps"} maxLength={120} placeholder="Valgfri referanse"/></div>
+    {order.paymentProvider==="vipps"&&order.paymentCaptureGuaranteedUntil&&<p className="muted">Vipps oppgir garantert capture til {new Date(order.paymentCaptureGuaranteedUntil).toLocaleString("nb-NO")}.</p>}
+    {canUpdateOrders&&order.paymentProvider==="vipps"&&order.paymentStatus==="authorized"&&<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>captureVippsOrder(order)}>{savingId===order.id?"Trekker …":"Trekk Vipps-beløp"}</button>}
+    {canUpdateOrders&&order.paymentProvider==="vipps"&&order.paymentStatus==="pending"&&<p className="muted">Venter på at kunden skal godkjenne betalingen i Vipps.</p>}
+    {canUpdateOrders&&order.paymentProvider==="vipps"&&order.paymentStatus==="paid"&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>registerPayment(order)}>{savingId===order.id?"Sender …":order.receiptSentAt?"Send betalingsbekreftelse på nytt":"Send betalingsbekreftelse"}</button>}
+    {canUpdateOrders&&order.paymentProvider!=="vipps"&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>registerPayment(order)}>{savingId===order.id?"Sender …":order.paymentStatus==="paid"?"Send betalingsbekreftelse på nytt":"Registrer betalt + send bekreftelse"}</button>}
    </div>}
    {order.fulfillmentType==="shipping"&&<><div className="field"><label>Sporingsnummer</label><input id={"tracking-number-"+order.id} defaultValue={order.trackingNumber||""}/></div><div className="field"><label>Sporingslenke</label><input type="url" id={"tracking-url-"+order.id} defaultValue={order.trackingUrl||""}/></div>{canUpdateOrders&&<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>saveTracking(order)}>{savingId===order.id?"Lagrer …":"Lagre sporing"}</button>}</>}
   </div>}
