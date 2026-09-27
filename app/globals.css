@@ -2806,3 +2806,44 @@ body:has(.customerPage) .customerPage{
 @media(prefers-reduced-motion:reduce){
  .siteStateSpinner{animation:none}
 }
+
+/* Manual payment confirmation / receipts */
+.orderPaymentPanel{
+ margin-top:16px;
+ padding:16px;
+ border:1px solid #ddd;
+ border-radius:12px;
+ background:#faf8f3;
+}
+.orderPaymentPanel h4{margin:0 0 12px}
+.orderPaymentFacts{
+ display:grid;
+ grid-template-columns:repeat(3,minmax(0,1fr));
+ gap:10px;
+ margin-bottom:12px;
+}
+.orderPaymentFacts span{
+ display:grid;
+ gap:3px;
+ padding:10px 11px;
+ border:1px solid #e2ddd3;
+ border-radius:9px;
+ background:#fff;
+}
+.orderPaymentFacts small{color:#756f66}
+.customerPaymentConfirmation{
+ display:grid;
+ gap:4px;
+ margin-top:12px;
+ padding:12px 14px;
+ border:1px solid rgba(103,183,117,.30);
+ background:rgba(73,145,87,.12);
+ color:#d9f3dd;
+}
+.customerPaymentConfirmation span{
+ color:rgba(255,255,255,.68);
+ font-size:12px;
+}
+@media(max-width:700px){
+ .orderPaymentFacts{grid-template-columns:1fr}
+}
