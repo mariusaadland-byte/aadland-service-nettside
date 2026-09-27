@@ -2,6 +2,7 @@ import {NextResponse} from "next/server";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {buildReceiptEmail} from "../../../../lib/receiptEmail";
+import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
 
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;
@@ -57,7 +58,7 @@ export async function POST(req){
  const customerAddress=String(body.customerAddress||"Eksempelveien 12, 5000 Bergen").trim().slice(0,500);
  const orderNote=String(body.orderNote||"Ring ca. 30 minutter før levering. Plantekassene ønskes levert ferdig montert og settes ved inngangen.").trim().slice(0,2000);
  const quoteNote=String(body.quoteNote||"Avtalt oljet overflate på benken. Levering og plassering inngår i avtalt pris.").trim().slice(0,4000);
- const html=buildReceiptEmail({
+ const receiptData={
   test:true,
   orderNumber,
   customerName,
@@ -74,7 +75,9 @@ export async function POST(req){
   quoteNumber:"TILBUD-1042",
   quoteNote,
   vatRate:25
- });
+ };
+ const html=buildReceiptEmail(receiptData);
+ const pdf=buildReceiptPdf(receiptData);
 
  try{
   const {Resend}=await import("resend");
@@ -84,7 +87,11 @@ export async function POST(req){
   const result=await resend.emails.send({
    from,to:email,replyTo,
    subject:"[TEST] Betalingsbekreftelse – "+orderNumber,
-   html
+   html,
+   attachments:[{
+    filename:receiptPdfFilename(orderNumber),
+    content:pdf.toString("base64")
+   }]
   });
   if(result?.error)throw new Error(result.error.message||"E-postfeil");
   return NextResponse.json({ok:true,sentTo:email});
