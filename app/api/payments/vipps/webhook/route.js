@@ -6,6 +6,8 @@ import {syncVippsOrderFromPayment} from "../../../../../lib/vippsOrder";
 export const dynamic="force-dynamic";
 
 export async function POST(req){
+ const config=vippsConfig();
+ if(!config.enabled)return NextResponse.json({error:"Vipps er ikke aktivert."},{status:404});
  const rawBody=await req.text();
  const url=new URL(req.url);
  const dateHeader=req.headers.get("x-ms-date")||"";
@@ -25,7 +27,6 @@ export async function POST(req){
 
  let payload;
  try{payload=JSON.parse(rawBody)}catch{return NextResponse.json({error:"Ugyldig payload."},{status:400})}
- const config=vippsConfig();
  if(String(payload?.msn||"")!==config.msn)return NextResponse.json({error:"Feil salgssted."},{status:403});
  const reference=String(payload?.reference||"").trim();
  const pspReference=String(payload?.pspReference||"").trim();
