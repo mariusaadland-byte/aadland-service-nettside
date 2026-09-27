@@ -90,8 +90,12 @@ export async function POST(req){
    }).eq("id",orderId);
    if(setupError){
     console.error("VIPPS ORDER SETUP ERROR",setupError);
-    if(stockRequests.length)await s.rpc("release_product_stock",{stock_requests:stockRequests}).catch(()=>{});
-    await s.from("orders").update({status:"cancelled",payment_status:"cancelled",updated_at:new Date().toISOString()}).eq("id",orderId).catch(()=>{});
+    if(stockRequests.length){
+     const {error:releaseError}=await s.rpc("release_product_stock",{stock_requests:stockRequests});
+     if(releaseError)console.error("VIPPS SETUP STOCK RELEASE ERROR",releaseError);
+    }
+    const {error:cancelError}=await s.from("orders").update({status:"cancelled",payment_status:"cancelled",updated_at:new Date().toISOString()}).eq("id",orderId);
+    if(cancelError)console.error("VIPPS SETUP CANCEL ORDER ERROR",cancelError);
     return NextResponse.json({error:"Vipps-betalingen kunne ikke klargjøres. Ingen betaling er gjennomført."},{status:503});
    }
    try{
@@ -110,13 +114,21 @@ export async function POST(req){
    }catch(vippsError){
     console.error("VIPPS CREATE PAYMENT ERROR",vippsError);
     const {error:releaseOnceError}=await s.rpc("release_order_stock_once",{target_order_id:orderId});
-    if(releaseOnceError&&stockRequests.length)await s.rpc("release_product_stock",{stock_requests:stockRequests}).catch(()=>{});
-    await s.from("orders").update({
+    if(releaseOnceError){
+     console.error("VIPPS STOCK RELEASE ON CREATE ERROR",releaseOnceError);
+     if(stockRequests.length){
+      const {error:fallbackReleaseError}=await s.rpc("release_product_stock",{stock_requests:stockRequests});
+      if(fallbackReleaseError)console.error("VIPPS FALLBACK STOCK RELEASE ERROR",fallbackReleaseError);
+     }
+    }
+    const failedAt=new Date().toISOString();
+    const {error:cancelError}=await s.from("orders").update({
      status:"cancelled",
      payment_status:"cancelled",
-     payment_cancelled_at:new Date().toISOString(),
-     updated_at:new Date().toISOString()
-    }).eq("id",orderId).catch(()=>{});
+     payment_cancelled_at:failedAt,
+     updated_at:failedAt
+    }).eq("id",orderId);
+    if(cancelError)console.error("VIPPS CREATE CANCEL ORDER ERROR",cancelError);
     return NextResponse.json({error:"Vipps-betalingen kunne ikke startes. Bestillingen er ikke aktivert.",code:"vipps_create_failed"},{status:502});
    }
   }
