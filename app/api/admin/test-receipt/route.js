@@ -77,7 +77,7 @@ export async function POST(req){
   vatRate:25
  };
  const html=buildReceiptEmail(receiptData);
- const pdf=buildReceiptPdf(receiptData);
+ const pdf=await buildReceiptPdf(receiptData);
 
  try{
   const {Resend}=await import("resend");
@@ -88,10 +88,17 @@ export async function POST(req){
    from,to:email,replyTo,
    subject:"[TEST] Betalingsbekreftelse – "+orderNumber,
    html,
-   attachments:[{
-    filename:receiptPdfFilename(orderNumber),
-    content:pdf.toString("base64")
-   }]
+   attachments:[
+    {
+     filename:"aadland-service-logo.webp",
+     path:"https://www.aadland-service.no/aadland-service-logo.webp",
+     contentId:"aadland-service-logo"
+    },
+    {
+     filename:receiptPdfFilename(orderNumber),
+     content:pdf.toString("base64")
+    }
+   ]
   });
   if(result?.error)throw new Error(result.error.message||"E-postfeil");
   return NextResponse.json({ok:true,sentTo:email});
