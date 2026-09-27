@@ -881,8 +881,12 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
   });
   const data=await response.json().catch(()=>({}));
   setSavingId(null);
-  if(!response.ok){setMessage(data.error||"Vipps-beløpet kunne ikke trekkes.");return}
-  setMessage("Vipps-beløpet er trukket. Send kvitteringen til kunden fra betalingsfeltet.");
+  if(!response.ok){
+   setMessage(data.error||"Vipps-beløpet kunne ikke trekkes.");
+   if(data.statusSaved&&typeof reload==="function")await reload();
+   return;
+  }
+  setMessage("Vipps-beløpet er trukket og betalingsbekreftelse med PDF er sendt til "+(data.sentTo||order.customerEmail)+".");
   if(typeof reload==="function")await reload();
  }
  return <><>{message&&<p className="notice">{message}</p>}</><div className="orderCards">{orders.length?orders.map(order=><article className="card orderCard" key={order.id}>
