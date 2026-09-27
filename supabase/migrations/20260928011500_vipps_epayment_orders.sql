@@ -28,6 +28,34 @@ create table if not exists private.vipps_payment_events(
 revoke all on table private.vipps_payment_events from public, anon, authenticated;
 grant select,insert on table private.vipps_payment_events to service_role;
 
+create or replace function public.record_vipps_payment_event_once(
+  event_psp_reference text,
+  event_payment_reference text,
+  event_name text,
+  event_amount_ore integer,
+  event_payload jsonb
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, private
+as $
+begin
+  insert into private.vipps_payment_events(
+    psp_reference,payment_reference,event_name,amount_ore,payload
+  ) values (
+    event_psp_reference,event_payment_reference,event_name,
+    greatest(coalesce(event_amount_ore,0),0),coalesce(event_payload,'{}'::jsonb)
+  )
+  on conflict (psp_reference) do nothing;
+
+  return found;
+end;
+$;
+
+revoke all on function public.record_vipps_payment_event_once(text,text,text,integer,jsonb) from public,anon,authenticated;
+grant execute on function public.record_vipps_payment_event_once(text,text,text,integer,jsonb) to service_role;
+
 create or replace function public.release_order_stock_once(target_order_id uuid)
 returns boolean
 language plpgsql
