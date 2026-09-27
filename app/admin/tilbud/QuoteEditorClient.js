@@ -59,6 +59,26 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const planSum=useMemo(()=>v.paymentPlan.reduce((sum,row)=>sum+(Number(row.percent)||0),0),[v.paymentPlan]);
 
  useEffect(()=>{
+  if(quoteId||sourceOrderId)return;
+  try{
+   const raw=sessionStorage.getItem("aadlandQuoteDraftFromDrawing");
+   if(!raw)return;
+   sessionStorage.removeItem("aadlandQuoteDraftFromDrawing");
+   const draft=JSON.parse(raw);
+   setV(current=>({
+    ...current,
+    title:String(draft?.title||current.title||"").slice(0,180),
+    customer:{
+     ...current.customer,
+     name:String(draft?.customer?.name||current.customer.name||"").slice(0,120),
+     address:String(draft?.customer?.address||current.customer.address||"").slice(0,300)
+    },
+    notes:String(draft?.notes||current.notes||"").slice(0,8000)
+   }));
+  }catch{}
+ },[quoteId,sourceOrderId]);
+
+ useEffect(()=>{
   if(quoteId||sourceOrderId||!initialCustomer)return;
   const hasValue=["name","email","phone","address"].some(key=>String(initialCustomer?.[key]||"").trim());
   if(!hasValue)return;
