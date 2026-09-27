@@ -6,6 +6,7 @@ alter table public.orders add column if not exists payment_authorized_at timesta
 alter table public.orders add column if not exists payment_captured_at timestamptz;
 alter table public.orders add column if not exists payment_cancelled_at timestamptz;
 alter table public.orders add column if not exists payment_refunded_at timestamptz;
+alter table public.orders add column if not exists payment_refunded_ore integer not null default 0;
 alter table public.orders add column if not exists payment_capture_guaranteed_until timestamptz;
 alter table public.orders add column if not exists payment_stock_released_at timestamptz;
 alter table public.orders add column if not exists vipps_checkout_started_at timestamptz;
