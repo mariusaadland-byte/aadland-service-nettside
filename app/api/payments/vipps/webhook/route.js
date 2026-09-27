@@ -1,0 +1,65 @@
+import {NextResponse} from "next/server";
+import {db} from "../../../../../lib/supabase";
+import {getVippsPayment,verifyVippsWebhook,vippsConfig} from "../../../../../lib/vipps";
+import {syncVippsOrderFromPayment} from "../../../../../lib/vippsOrder";
+
+export const dynamic="force-dynamic";
+
+export async function POST(req){
+ const rawBody=await req.text();
+ const url=new URL(req.url);
+ const dateHeader=req.headers.get("x-ms-date")||"";
+ const contentHashHeader=req.headers.get("x-ms-content-sha256")||"";
+ const authorization=req.headers.get("authorization")||req.headers.get("x-vipps-authorization")||"";
+ const host=req.headers.get("host")||url.host;
+ const valid=verifyVippsWebhook({
+  rawBody,
+  method:"POST",
+  pathAndQuery:url.pathname+url.search,
+  host,
+  dateHeader,
+  contentHashHeader,
+  authorization
+ });
+ if(!valid)return NextResponse.json({error:"Ugyldig webhook-signatur."},{status:401});
+
+ let payload;
+ try{payload=JSON.parse(rawBody)}catch{return NextResponse.json({error:"Ugyldig payload."},{status:400})}
+ const config=vippsConfig();
+ if(String(payload?.msn||"")!==config.msn)return NextResponse.json({error:"Feil salgssted."},{status:403});
+ const reference=String(payload?.reference||"").trim();
+ const pspReference=String(payload?.pspReference||"").trim();
+ const eventName=String(payload?.name||"").trim().toUpperCase();
+ const amountOre=Math.max(0,Math.round(Number(payload?.amount?.value)||0));
+ if(!/^[a-zA-Z0-9-]{8,64}$/.test(reference)||!pspReference||!eventName)return NextResponse.json({error:"Webhook mangler påkrevde felt."},{status:400});
+
+ const s=db(); if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+ const {data:recorded,error:recordError}=await s.rpc("record_vipps_payment_event_once",{
+  event_psp_reference:pspReference,
+  event_payment_reference:reference,
+  event_name:eventName,
+  event_amount_ore:amountOre,
+  event_payload:payload
+ });
+ if(recordError){
+  console.error("VIPPS WEBHOOK EVENT RECORD ERROR",recordError);
+  return NextResponse.json({error:"Webhook kunne ikke registreres."},{status:500});
+ }
+ if(recorded!==true)return NextResponse.json({ok:true,duplicate:true});
+
+ const {data:order,error:orderError}=await s.from("orders").select("*").eq("payment_provider","vipps").eq("payment_reference",reference).maybeSingle();
+ if(orderError){
+  console.error("VIPPS WEBHOOK ORDER LOOKUP ERROR",orderError);
+  return NextResponse.json({error:"Ordren kunne ikke hentes."},{status:500});
+ }
+ if(!order)return NextResponse.json({ok:true,ignored:true});
+
+ try{
+  const payment=await getVippsPayment(reference);
+  await syncVippsOrderFromPayment(s,order,payment);
+  return NextResponse.json({ok:true});
+ }catch(error){
+  console.error("VIPPS WEBHOOK SYNC ERROR",error);
+  return NextResponse.json({error:"Vipps-status kunne ikke synkroniseres."},{status:500});
+ }
+}
