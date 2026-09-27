@@ -36,6 +36,7 @@ export default function AdminClient({ user }) {
   const [rentalItems, setRentalItems] = useState([]);
   const [rentalCategories, setRentalCategories] = useState([]);
   const [rentalCategorySetupRequired, setRentalCategorySetupRequired] = useState(false);
+  const [rentalPaymentSetupRequired, setRentalPaymentSetupRequired] = useState(false);
   const [rentalBookings, setRentalBookings] = useState([]);
   const [rentalBlocks, setRentalBlocks] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -190,11 +191,15 @@ export default function AdminClient({ user }) {
       if (response.ok) {
         const data = await response.json();
         setRentalBookings(data.bookings || []);
+        setRentalPaymentSetupRequired(data.paymentSetupRequired===true);
       } else {
+        const data = await response.json().catch(() => ({}));
         setRentalBookings([]);
+        setRentalPaymentSetupRequired(data.paymentSetupRequired===true);
       }
     } else {
       setRentalBookings([]);
+      setRentalPaymentSetupRequired(false);
     }
 
     if (canManageProducts) {
@@ -708,7 +713,7 @@ export default function AdminClient({ user }) {
         )}
 
         {tab === "rentalBookings" && canViewOrders && (
-          <RentalBookings bookings={rentalBookings} reload={load} setError={setError} canUpdate={canUpdateOrders} />
+          <RentalBookings bookings={rentalBookings} reload={load} setError={setError} canUpdate={canUpdateOrders} paymentSetupRequired={rentalPaymentSetupRequired} />
         )}
 
         {tab === "projects" && canManageProducts && (
