@@ -280,15 +280,22 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
         vatRate:25
       };
       const html=buildReceiptEmail(receiptData);
-      const pdf=buildReceiptPdf(receiptData);
+      const pdf=await buildReceiptPdf(receiptData);
       const sent=await resend.emails.send({
         from,to:email,replyTo,
         subject:"Betalingsbekreftelse – "+order.order_number,
         html,
-        attachments:[{
-          filename:receiptPdfFilename(order.order_number),
-          content:pdf.toString("base64")
-        }]
+        attachments:[
+          {
+            filename:"aadland-service-logo.webp",
+            path:"https://www.aadland-service.no/aadland-service-logo.webp",
+            contentId:"aadland-service-logo"
+          },
+          {
+            filename:receiptPdfFilename(order.order_number),
+            content:pdf.toString("base64")
+          }
+        ]
       });
       if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
       const receiptSentAt=new Date().toISOString();
