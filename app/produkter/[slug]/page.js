@@ -102,7 +102,28 @@ export default function ProductPage() {
       ])
     );
 
-    setSelected(initial);
+    let nextSelected=initial;
+    let nextQuantity=1;
+    try{
+      const raw=sessionStorage.getItem("aadlandRepeatPurchase");
+      if(raw){
+        const repeat=JSON.parse(raw);
+        if(String(repeat?.slug||"")===String(product.slug||product.id)){
+          const previous=repeat?.selectedOptions&&typeof repeat.selectedOptions==="object"?repeat.selectedOptions:{};
+          nextSelected=Object.fromEntries((product.options||[]).map(option=>{
+            const wanted=previous[option.id];
+            const valid=option.choices?.some(choice=>choice.value===wanted);
+            return [option.id,valid?wanted:(option.choices?.[0]?.value||"")];
+          }));
+          const stockMax=product.inventoryMode==="stock"?Math.max(1,Math.min(10,Number(product.stockQuantity)||1)):10;
+          nextQuantity=Math.max(1,Math.min(stockMax,Number(repeat?.quantity)||1));
+          sessionStorage.removeItem("aadlandRepeatPurchase");
+        }
+      }
+    }catch{}
+
+    setSelected(nextSelected);
+    setQuantity(nextQuantity);
     setSelectedImage(0);
   }, [product]);
 
