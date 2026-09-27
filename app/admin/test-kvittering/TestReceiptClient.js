@@ -26,7 +26,7 @@ export default function TestReceiptClient(){
    });
    const data=await response.json().catch(()=>({}));
    if(!response.ok)throw new Error(data.error||"Testkvitteringen kunne ikke sendes.");
-   setMessage("Full testkvittering er sendt til "+(data.sentTo||email)+".");
+   setMessage("Full testkvittering med PDF-vedlegg er sendt til "+(data.sentTo||email)+".");
   }catch(err){
    setError(err.message||"Testkvitteringen kunne ikke sendes.");
   }finally{
@@ -41,7 +41,7 @@ export default function TestReceiptClient(){
    <h1>Full test av kvittering</h1>
    <div className="card">
     <p><b>Denne testen endrer ingen bestilling og registrerer ingen betaling.</b></p>
-    <p className="muted">Testen fyller kvitteringen med flere varer, variantvalg, antall, stykkpris, frakt, kunde-/leveringsinfo, ordrenotat, tilbudsnotat og MVA. Eksempelsummen er 10 550 kr.</p>
+    <p className="muted">Testen fyller kvitteringen med flere varer, variantvalg, antall, stykkpris, frakt, kunde-/leveringsinfo, ordrenotat, tilbudsnotat og MVA. Det følger også med en utskriftsvennlig PDF som vedlegg. Eksempelsummen er 10 550 kr.</p>
     <form onSubmit={send}>
      <div className="field"><label>Send testen til e-post</label><input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="din@epost.no"/></div>
      <div className="field"><label>Kundenavn</label><input maxLength={120} value={customerName} onChange={e=>setCustomerName(e.target.value)}/></div>
