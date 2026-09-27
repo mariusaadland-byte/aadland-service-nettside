@@ -36,6 +36,7 @@ export default function AdminClient({ user }) {
   const [rentalItems, setRentalItems] = useState([]);
   const [rentalCategories, setRentalCategories] = useState([]);
   const [rentalCategorySetupRequired, setRentalCategorySetupRequired] = useState(false);
+  const [rentalPaymentSetupRequired, setRentalPaymentSetupRequired] = useState(false);
   const [rentalBookings, setRentalBookings] = useState([]);
   const [rentalBlocks, setRentalBlocks] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -190,11 +191,15 @@ export default function AdminClient({ user }) {
       if (response.ok) {
         const data = await response.json();
         setRentalBookings(data.bookings || []);
+        setRentalPaymentSetupRequired(data.paymentSetupRequired===true);
       } else {
+        const data = await response.json().catch(() => ({}));
         setRentalBookings([]);
+        setRentalPaymentSetupRequired(data.paymentSetupRequired===true);
       }
     } else {
       setRentalBookings([]);
+      setRentalPaymentSetupRequired(false);
     }
 
     if (canManageProducts) {
@@ -708,7 +713,7 @@ export default function AdminClient({ user }) {
         )}
 
         {tab === "rentalBookings" && canViewOrders && (
-          <RentalBookings bookings={rentalBookings} reload={load} setError={setError} canUpdate={canUpdateOrders} />
+          <RentalBookings bookings={rentalBookings} reload={load} setError={setError} canUpdate={canUpdateOrders} paymentSetupRequired={rentalPaymentSetupRequired} />
         )}
 
         {tab === "projects" && canManageProducts && (
@@ -3799,10 +3804,22 @@ function RentalCalendar({items,bookings,blocks}){
  <div className="calendarGrid">{["Man","Tir","Ons","Tor","Fre","Lør","Søn"].map(x=><b className="calendarWeekday" key={x}>{x}</b>)}{cells.map((day,i)=>day?<div className="calendarDay" key={i}><strong>{day}</strong>{events(day).map((e,j)=><span className={"calendarEvent "+e.kind} key={j}>{e.label}</span>)}</div>:<div className="calendarDay empty" key={i}/>)}</div><p className="muted">Bookinger og manuelt blokkerte perioder vises samlet. Serviceperioder kan fortsatt legges inn under Utleieutstyr.</p></div>;
 }
 
-function RentalBookings({bookings,reload,setError,canUpdate}){
+const rentalPaymentMigrationSql=`alter table public.rental_bookings add column if not exists payment_reference text;
+alter table public.rental_bookings add column if not exists payment_captured_ore integer not null default 0;
+alter table public.rental_bookings add column if not exists receipt_sent_at timestamptz;
+alter table public.rental_bookings add column if not exists deposit_reference text;
+alter table public.rental_bookings add column if not exists deposit_held_ore integer not null default 0;
+alter table public.rental_bookings add column if not exists deposit_received_at timestamptz;
+alter table public.rental_bookings add column if not exists deposit_released_at timestamptz;
+alter table public.rental_bookings add column if not exists deposit_charged_ore integer not null default 0;`;
+
+function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired=false}){
  const statuses={new:"Ny",confirmed:"Bekreftet",active:"Utlevert",returned:"Returnert",completed:"Ferdig",cancelled:"Avbrutt"};
+ const paymentLabels={unpaid:"Ikke betalt",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert"};
+ const depositLabels={not_paid:"Ikke mottatt",held:"Holdes",released:"Frigitt",partially_charged:"Delvis brukt",charged:"Brukt"};
  const [savingId,setSavingId]=useState("");
  const [message,setMessage]=useState("");
+ const [migrationCopied,setMigrationCopied]=useState(false);
 
  async function patch(id,changes){
   setMessage("");
@@ -3810,37 +3827,96 @@ function RentalBookings({bookings,reload,setError,canUpdate}){
   const r=await fetch("/api/admin/rental-bookings",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,...changes})});
   const d=await r.json().catch(()=>({}));
   setSavingId("");
-  if(!r.ok){setError(d.error||"Bookingen kunne ikke oppdateres.");return;}
+  if(!r.ok){setError(d.error||"Bookingen kunne ikke oppdateres.");return false;}
   await reload();
+  return true;
  }
 
- async function notify(booking,action){
-  const verb=action==="confirm-and-send"?"bekrefte bookingen og sende e-post til":"avbryte bookingen og sende e-post til";
-  if(!window.confirm("Vil du "+verb+" "+booking.customer?.email+"?"))return;
-  setError("");
-  setMessage("");
-  setSavingId(booking.id);
+ async function runAction(booking,action,extra={},confirmText=""){
+  if(confirmText&&!window.confirm(confirmText))return;
+  setError("");setMessage("");setSavingId(booking.id);
   const r=await fetch("/api/admin/rental-bookings",{
    method:"PATCH",
    headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({id:booking.id,action})
+   body:JSON.stringify({id:booking.id,action,...extra})
   });
   const d=await r.json().catch(()=>({}));
   setSavingId("");
   if(!r.ok){
-   setError(d.error||"Kundevarslingen kunne ikke sendes.");
+   setError(d.error||"Handlingen kunne ikke utføres.");
    if(d.statusSaved)await reload();
-   return;
+   return null;
   }
+  await reload();
+  return d;
+ }
+
+ async function notify(booking,action){
+  const verb=action==="confirm-and-send"?"bekrefte bookingen og sende e-post til":"avbryte bookingen og sende e-post til";
+  const d=await runAction(booking,action,{},"Vil du "+verb+" "+booking.customer?.email+"?");
+  if(!d)return;
   setMessage(action==="confirm-and-send"
    ?"Utleien er bekreftet og e-post er sendt til "+(d.sentTo||booking.customer?.email)+"."
    :"Bookingen er avbrutt og kunden er varslet.");
-  await reload();
  }
 
- if(!bookings.length)return <div className="card"><h3>Ingen utleiebookinger ennå</h3><p className="muted">Nye bookinger fra utleiesiden vises her.</p></div>;
+ async function registerPayment(booking){
+  const reference=document.getElementById("rental-payment-reference-"+booking.id)?.value||booking.paymentReference||"";
+  const alreadyPaid=booking.paymentStatus==="paid";
+  const text=alreadyPaid
+   ?"Sende utleiekvitteringen på nytt til "+booking.customer?.email+"?"
+   :"Registrere "+nok(booking.totalOre)+" som betalt leie og sende kvittering/PDF til "+booking.customer?.email+"?";
+  const d=await runAction(booking,"record-paid-and-send-receipt",{paymentReference:reference},text);
+  if(!d)return;
+  setMessage((alreadyPaid?"Kvitteringen er sendt på nytt til ":"Leiebetalingen er registrert og kvitteringen er sendt til ")+(d.sentTo||booking.customer?.email)+".");
+ }
+
+ async function holdDeposit(booking){
+  const reference=document.getElementById("rental-deposit-reference-"+booking.id)?.value||booking.depositReference||"";
+  const d=await runAction(booking,"record-deposit-held",{depositReference:reference},"Registrere "+nok(booking.depositOre)+" som mottatt/holdt depositum? Beløpet regnes ikke som omsetning.");
+  if(d)setMessage("Depositumet er registrert som holdt.");
+ }
+
+ async function releaseDeposit(booking){
+  const d=await runAction(booking,"release-deposit",{},"Registrere depositumet som fullt frigitt/tilbakebetalt til kunden?");
+  if(d)setMessage("Depositumet er registrert som frigitt.");
+ }
+
+ async function chargeDeposit(booking){
+  const input=document.getElementById("rental-deposit-charge-"+booking.id);
+  const krValue=String(input?.value||"").trim().replace(",",".");
+  const amountOre=Math.round(Number(krValue)*100);
+  if(!Number.isFinite(amountOre)||amountOre<=0){setError("Skriv inn beløpet av depositumet som skal registreres brukt.");return;}
+  const d=await runAction(
+   booking,
+   "record-deposit-charge",
+   {depositChargedOre:amountOre},
+   "Registrere "+nok(amountOre)+" av depositumet som brukt? Dette er kun registrering av et manuelt oppgjør."
+  );
+  if(d)setMessage(d.depositStatus==="charged"?"Hele depositumet er registrert som brukt.":"En del av depositumet er registrert som brukt.");
+ }
+
+ async function copyMigration(){
+  try{
+   await navigator.clipboard.writeText(rentalPaymentMigrationSql);
+   setMigrationCopied(true);
+   window.setTimeout(()=>setMigrationCopied(false),1800);
+  }catch{
+   setError("Kunne ikke kopiere SQL automatisk. Migreringen ligger i supabase/migrations/20260928004500_rental_payment_audit.sql.");
+  }
+ }
+
  return <>
+  {paymentSetupRequired&&<div className="adminProjectMigrationWarning">
+   <b>Databaseoppdatering mangler for utleiebetaling</b>
+   <span>Den nye kvitterings- og depositumsporingen er programmert, men de nye databasefeltene må opprettes før knappene kan brukes.</span>
+   <div className="adminProjectMigrationActions">
+    <button type="button" className="btn alt" onClick={copyMigration}>{migrationCopied?"Kopiert ✓":"Kopier SQL"}</button>
+    <small>Migreringen endrer ikke eksisterende bookinger eller beløp.</small>
+   </div>
+  </div>}
   {message&&<p className="success">{message}</p>}
+  {!bookings.length?<div className="card"><h3>Ingen utleiebookinger ennå</h3><p className="muted">Nye bookinger fra utleiesiden vises her.</p></div>:
   <div className="grid rentalBookingGrid">{bookings.map(b=><article className="card rentalBookingCard" key={b.id}>
    <div className="rentalBookingTop">
     <div><div className="kicker">{b.bookingNumber}</div><h3>{b.itemName}</h3></div>
@@ -3852,21 +3928,55 @@ function RentalBookings({bookings,reload,setError,canUpdate}){
     <span><small>Leiepris</small><b>{nok(b.totalOre)}</b></span>
     <span><small>Depositum</small><b>{nok(b.depositOre)}</b></span>
    </div>
-   {(b.confirmationSentAt||b.cancellationSentAt)&&<div className="rentalNotificationState">
+   {(b.confirmationSentAt||b.cancellationSentAt||b.receiptSentAt)&&<div className="rentalNotificationState">
     {b.confirmationSentAt&&<span>✓ Bekreftelse sendt {new Date(b.confirmationSentAt).toLocaleString("nb-NO")}</span>}
     {b.reminderSentAt&&<span>✓ Påminnelse sendt {new Date(b.reminderSentAt).toLocaleString("nb-NO")}</span>}
+    {b.receiptSentAt&&<span>✓ Leiekvittering sendt {new Date(b.receiptSentAt).toLocaleString("nb-NO")}</span>}
     {b.cancellationSentAt&&<span>✓ Avbestilling sendt {new Date(b.cancellationSentAt).toLocaleString("nb-NO")}</span>}
    </div>}
+
    <div className="field"><label>Status</label><select disabled={!canUpdate||savingId===b.id} value={b.status} onChange={e=>patch(b.id,{status:e.target.value})}>{Object.entries(statuses).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></div>
-   <div className="field"><label>Betaling</label><select disabled={!canUpdate||savingId===b.id} value={b.paymentStatus} onChange={e=>patch(b.id,{paymentStatus:e.target.value})}><option value="unpaid">Ikke betalt</option><option value="partial">Delvis betalt</option><option value="paid">Betalt</option><option value="refunded">Refundert</option></select></div>
-   <div className="field"><label>Depositum</label><select disabled={!canUpdate||savingId===b.id} value={b.depositStatus} onChange={e=>patch(b.id,{depositStatus:e.target.value})}><option value="not_paid">Ikke mottatt</option><option value="held">Holdes</option><option value="released">Frigitt</option><option value="partially_charged">Delvis trukket</option><option value="charged">Trukket</option></select></div>
+
+   <section className="orderPaymentPanel rentalPaymentPanel">
+    <h4>Leiebetaling</h4>
+    <div className="orderPaymentFacts">
+     <span><small>Status</small><b>{paymentLabels[b.paymentStatus]||b.paymentStatus}</b></span>
+     <span><small>Registrert betalt</small><b>{nok(b.paymentCapturedOre||0)}</b></span>
+     {b.receiptSentAt&&<span><small>Kvittering</small><b>Sendt {new Date(b.receiptSentAt).toLocaleString("nb-NO")}</b></span>}
+    </div>
+    <div className="field"><label>Betalingsreferanse <span className="muted">(Vipps, bank, kontant osv.)</span></label><input id={"rental-payment-reference-"+b.id} defaultValue={b.paymentReference||""} maxLength={120} placeholder="Valgfri referanse"/></div>
+    {canUpdate&&<button className="btn" type="button" disabled={savingId===b.id||paymentSetupRequired||!b.customer?.email} onClick={()=>registerPayment(b)}>{savingId===b.id?"Sender …":b.paymentStatus==="paid"?"Send kvittering på nytt":"Registrer leie betalt + send kvittering/PDF"}</button>}
+    <div className="field"><label>Overstyr betalingsstatus</label><select disabled={!canUpdate||savingId===b.id} value={b.paymentStatus} onChange={e=>patch(b.id,{paymentStatus:e.target.value})}><option value="unpaid">Ikke betalt</option><option value="partial">Delvis betalt</option><option value="paid">Betalt</option><option value="refunded">Refundert</option></select></div>
+   </section>
+
+   {Number(b.depositOre)>0&&<section className="orderPaymentPanel rentalDepositPanel">
+    <h4>Depositum</h4>
+    <div className="orderPaymentFacts">
+     <span><small>Status</small><b>{depositLabels[b.depositStatus]||b.depositStatus}</b></span>
+     <span><small>Holdt</small><b>{nok(b.depositHeldOre||0)}</b></span>
+     <span><small>Brukt</small><b>{nok(b.depositChargedOre||0)}</b></span>
+    </div>
+    <p className="muted">Depositumet holdes separat fra leieinntekten og inngår ikke i leiekvitteringens totalsum.</p>
+    <div className="field"><label>Depositumreferanse</label><input id={"rental-deposit-reference-"+b.id} defaultValue={b.depositReference||""} maxLength={120} placeholder="F.eks. Vipps-ref. eller bank"/></div>
+    {canUpdate&&<div className="rentalBookingActions">
+     <button className="btn alt" type="button" disabled={savingId===b.id||paymentSetupRequired} onClick={()=>holdDeposit(b)}>Registrer mottatt/holdt</button>
+     <button className="btn alt" type="button" disabled={savingId===b.id||paymentSetupRequired||!["held","partially_charged"].includes(b.depositStatus)} onClick={()=>releaseDeposit(b)}>Frigi depositum</button>
+    </div>}
+    <div className="field"><label>Beløp brukt av depositum (kr)</label><input id={"rental-deposit-charge-"+b.id} type="number" min="0" step="0.01" max={(Number(b.depositOre)||0)/100} defaultValue={b.depositChargedOre?((Number(b.depositChargedOre)||0)/100).toFixed(2):""} placeholder="0,00"/></div>
+    {canUpdate&&<button className="btn alt" type="button" disabled={savingId===b.id||paymentSetupRequired||!["held","partially_charged","charged"].includes(b.depositStatus)} onClick={()=>chargeDeposit(b)}>Registrer brukt beløp</button>}
+    {(b.depositReceivedAt||b.depositReleasedAt)&&<div className="rentalNotificationState">
+     {b.depositReceivedAt&&<span>Mottatt/holdt {new Date(b.depositReceivedAt).toLocaleString("nb-NO")}</span>}
+     {b.depositReleasedAt&&<span>Frigitt {new Date(b.depositReleasedAt).toLocaleString("nb-NO")}</span>}
+    </div>}
+   </section>}
+
    <div className="field"><label>Internt notat</label><textarea defaultValue={b.adminNote} id={"rental-note-"+b.id}/></div>
    {canUpdate&&<div className="rentalBookingActions">
     <button className="btn alt" type="button" disabled={savingId===b.id} onClick={()=>patch(b.id,{adminNote:document.getElementById("rental-note-"+b.id).value})}>{savingId===b.id?"Lagrer …":"Lagre notat"}</button>
     {b.status!=="cancelled"&&b.status!=="completed"&&<button className="btn" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>notify(b,"confirm-and-send")}>{savingId===b.id?"Sender …":b.confirmationSentAt?"Send bekreftelse på nytt":"Bekreft og send e-post"}</button>}
     {b.status!=="cancelled"&&<button className="btn alt rentalCancelButton" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>notify(b,"cancel-and-send")}>{savingId===b.id?"Sender …":"Avbryt og varsle kunde"}</button>}
    </div>}
-  </article>)}</div>
+  </article>)}</div>}
  </>;
 }
 
