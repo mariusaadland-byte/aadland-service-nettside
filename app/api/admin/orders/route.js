@@ -4,7 +4,7 @@ import {
   getAdminUser,
   hasPermission,
 } from "../../../../lib/auth";
-import { db } from "../../../../lib/supabase";
+import { db, fromDbProduct } from "../../../../lib/supabase";
 import {safeHttpsUrl} from "../../../../lib/safeUrl";
 import {buildReceiptEmail} from "../../../../lib/receiptEmail";
 
@@ -222,15 +222,60 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
       const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
       const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
       const accountUrl=order.customer_user_id?base+"/min-side":"";
+      const rawItems=Array.isArray(order.items)?order.items:[];
+      const productIds=[...new Set(rawItems.map(item=>String(item?.productId||"")).filter(Boolean))];
+      const productById=new Map();
+      if(productIds.length){
+        const {data:productRows,error:productError}=await s.from("products").select("*").in("id",productIds);
+        if(!productError){
+          for(const row of productRows||[]){
+            const product=fromDbProduct(row);
+            productById.set(String(product.id),product);
+          }
+        }else{
+          console.error("ORDER RECEIPT PRODUCT DETAILS ERROR",productError);
+        }
+      }
+      const receiptItems=rawItems.map(item=>{
+        const product=productById.get(String(item?.productId||""));
+        const selected=item?.selectedOptions&&typeof item.selectedOptions==="object"?item.selectedOptions:{};
+        const details=(product?.options||[]).map(option=>{
+          const value=selected[option.id];
+          const choice=(option.choices||[]).find(entry=>entry.value===value);
+          if(value==null&&!choice)return null;
+          return {label:option.label||option.id||"Valg",value:choice?.label||String(value??"")};
+        }).filter(Boolean);
+        return {...item,details};
+      });
+      let quoteNumber="",quoteNote="";
+      const {data:linkedQuote,error:quoteLookupError}=await s.from("quotes")
+        .select("quote_number,notes")
+        .eq("converted_order_id",order.id)
+        .maybeSingle();
+      if(!quoteLookupError&&linkedQuote){
+        quoteNumber=linkedQuote.quote_number||"";
+        quoteNote=linkedQuote.notes||"";
+      }else if(quoteLookupError&&!["42P01","42703"].includes(String(quoteLookupError.code||""))){
+        console.error("ORDER RECEIPT QUOTE NOTE ERROR",quoteLookupError);
+      }
+      const customerAddress=[order.customer?.address,order.customer?.postalCode,order.customer?.city].filter(Boolean).join(", ");
+      const fulfillmentLabel=order.fulfillment_type==="delivery"?"Levering":order.fulfillment_type==="shipping"?"Sending med post/Bring":"Henting";
       const html=buildReceiptEmail({
         orderNumber:order.order_number,
         customerName:order.customer?.name||"kunde",
+        customerEmail:order.customer?.email||"",
+        customerPhone:order.customer?.phone||"",
+        customerAddress,
+        fulfillmentLabel,
         reference,
-        items:Array.isArray(order.items)?order.items:[],
+        items:receiptItems,
         shippingOre:Number(order.shipping_ore)||0,
         totalOre:total,
         paidAt:now,
-        accountUrl
+        accountUrl,
+        orderNote:order.customer?.note||order.custom_request||"",
+        quoteNumber,
+        quoteNote
       });
       const sent=await resend.emails.send({
         from,to:email,replyTo,
