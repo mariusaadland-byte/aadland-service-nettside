@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
@@ -145,12 +146,13 @@ export async function GET(){
  const {data,error}=await s.from("rental_bookings").select("*,rental_items(name)").order("start_date",{ascending:true});
  if(error){
   if(error.code==="42P01")return NextResponse.json({bookings:[],setupRequired:true});
-  return NextResponse.json({error:error.message},{status:500});
+  console.error("RENTAL BOOKINGS GET",error);
+  return NextResponse.json({error:"Utleiebookingene kunne ikke hentes."},{status:500});
  }
  return NextResponse.json({bookings:(data||[]).map(map)});
 }
 
-export async function PATCH(req){
+export async function PATCH(req){ const originError=sameOriginGuard(req); if(originError)return originError;
  if(!(await getAdminUser())||!(await hasPermission("canUpdateOrders")))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const s=db();
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
@@ -212,7 +214,7 @@ export async function PATCH(req){
  }
 
  const {error}=await s.from("rental_bookings").update(changes).eq("id",b.id);
- if(error)return NextResponse.json({error:error.message},{status:500});
+ if(error){console.error("RENTAL BOOKING UPDATE",error);return NextResponse.json({error:"Bookingen kunne ikke oppdateres."},{status:500});}
 
  if(action==="confirm-and-send"||action==="cancel-and-send"){
   const updated={...current,...changes};

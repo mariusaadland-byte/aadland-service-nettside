@@ -1,9 +1,11 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import { NextResponse } from "next/server";
 import {
   getAdminUser,
   hasPermission,
 } from "../../../../lib/auth";
 import { db } from "../../../../lib/supabase";
+import {checkNewPassword} from "../../../../lib/passwordSecurity";
 
 export async function GET() {
   const currentUser = await getAdminUser();
@@ -53,7 +55,7 @@ export async function GET() {
   });
 }
 
-export async function POST(req) {
+export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;
   const currentUser = await getAdminUser();
 
   if (!currentUser) {
@@ -102,6 +104,9 @@ export async function POST(req) {
       { status: 400 }
     );
   }
+
+  const passwordCheck=await checkNewPassword(password);
+  if(!passwordCheck.ok)return NextResponse.json({error:passwordCheck.error},{status:passwordCheck.status});
 
   const s = db();
 
@@ -175,7 +180,7 @@ export async function POST(req) {
   return NextResponse.json({ ok: true });
 }
 
-export async function PATCH(req) {
+export async function PATCH(req){ const originError=sameOriginGuard(req); if(originError)return originError;
   const currentUser = await getAdminUser();
 
   if (!currentUser) {

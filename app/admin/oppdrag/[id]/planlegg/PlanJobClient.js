@@ -2,18 +2,11 @@
 
 import {useEffect,useState} from "react";
 import Link from "next/link";
+import {osloDateTimeLocal,osloLocalDateTimeToIso} from "../../../../../lib/osloTime";
 
 const kr=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",maximumFractionDigits:0}).format((Number(ore)||0)/100);
 const date=v=>v?new Intl.DateTimeFormat("nb-NO",{dateStyle:"long"}).format(new Date(v+"T12:00:00")):"";
-const dateTime=v=>v?new Intl.DateTimeFormat("nb-NO",{dateStyle:"long",timeStyle:"short"}).format(new Date(v)):"";
-
-function inputDateTime(value){
- if(!value)return "";
- const d=new Date(value);
- if(Number.isNaN(d.getTime()))return "";
- const pad=n=>String(n).padStart(2,"0");
- return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes());
-}
+const dateTime=v=>v?new Intl.DateTimeFormat("nb-NO",{dateStyle:"long",timeStyle:"short",timeZone:"Europe/Oslo"}).format(new Date(v)):"";
 
 export default function PlanJobClient({jobId}){
  const [job,setJob]=useState(null);
@@ -35,7 +28,7 @@ export default function PlanJobClient({jobId}){
    return;
   }
   setJob(d.job);
-  setStartAt(inputDateTime(d.job.startAt));
+  setStartAt(osloDateTimeLocal(d.job.startAt));
   setAgreement(d.job.agreement||"");
  }
 
@@ -44,7 +37,7 @@ export default function PlanJobClient({jobId}){
  function payload(){
   return {
    id:jobId,
-   startAt:startAt?new Date(startAt).toISOString():"",
+   startAt:startAt?osloLocalDateTimeToIso(startAt):"",
    agreement
   };
  }
@@ -52,7 +45,7 @@ export default function PlanJobClient({jobId}){
  async function save(){
   setSaving(true);setError("");setMessage("");
   let body;
-  try{body=payload()}catch{setSaving(false);setError("Velg gyldig oppstartstid.");return false}
+  try{body=payload();if(startAt&&!body.startAt)throw new Error()}catch{setSaving(false);setError("Velg gyldig oppstartstid i Oslo-tid.");return false}
   const r=await fetch("/api/admin/jobs/plan",{
    method:"PATCH",
    headers:{"Content-Type":"application/json"},
@@ -73,7 +66,7 @@ export default function PlanJobClient({jobId}){
   if(!window.confirm("Lagre planen og sende bekreftelse til "+email+"?"))return;
   setSending(true);setError("");setMessage("");
   let body;
-  try{body=payload()}catch{setSending(false);setError("Velg gyldig oppstartstid.");return}
+  try{body=payload();if(startAt&&!body.startAt)throw new Error()}catch{setSending(false);setError("Velg gyldig oppstartstid i Oslo-tid.");return}
   const r=await fetch("/api/admin/jobs/plan",{
    method:"POST",
    headers:{"Content-Type":"application/json"},

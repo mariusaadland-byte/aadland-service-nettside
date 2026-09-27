@@ -1,6 +1,8 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {getAdminUser} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
+import {isValidDateInput} from "../../../../lib/osloTime";
 
 const STATUSES=["draft","sent","accepted","declined","expired","cancelled"];
 const SETUP_CODES=["42P01","42883","42703"];
@@ -116,8 +118,12 @@ function payload(body,user,existing){
  const paymentPlan=sanitizePlan(body.paymentPlan);
  if(!paymentPlan)return {error:"Betalingsplanen må til sammen være 100 %."};
  const calc=totals(lines);
- const validUntil=body.validUntil&&/^\d{4}-\d{2}-\d{2}$/.test(String(body.validUntil))?String(body.validUntil):null;
- const plannedStartDate=body.plannedStartDate&&/^\d{4}-\d{2}-\d{2}$/.test(String(body.plannedStartDate))?String(body.plannedStartDate):null;
+ const rawValidUntil=String(body.validUntil||"").trim();
+ const rawPlannedStartDate=String(body.plannedStartDate||"").trim();
+ if(rawValidUntil&&!isValidDateInput(rawValidUntil))return {error:"Gyldighetsdatoen er ugyldig."};
+ if(rawPlannedStartDate&&!isValidDateInput(rawPlannedStartDate))return {error:"Dato for tidligst oppstart er ugyldig."};
+ const validUntil=rawValidUntil||null;
+ const plannedStartDate=rawPlannedStartDate||null;
  const status=STATUSES.includes(body.status)?body.status:(existing?.status||"draft");
  return {
   record:{
@@ -169,7 +175,7 @@ export async function GET(req){
   :NextResponse.json({quotes:(data||[]).map(mapQuote),followUpSetupRequired});
 }
 
-export async function POST(req){
+export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;
  const user=await currentUser();
  if(!user)return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const body=await req.json();
@@ -200,7 +206,7 @@ export async function POST(req){
  return NextResponse.json({quote:mapQuote(data)});
 }
 
-export async function PATCH(req){
+export async function PATCH(req){ const originError=sameOriginGuard(req); if(originError)return originError;
  const user=await currentUser();
  if(!user)return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const body=await req.json();

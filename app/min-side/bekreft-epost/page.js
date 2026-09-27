@@ -11,8 +11,10 @@ export default function BekreftEpost(){
  const [message,setMessage]=useState("");
 
  useEffect(()=>{
-  const value=new URLSearchParams(window.location.search).get("token")||"";
+  const fragment=new URLSearchParams(window.location.hash.replace(/^#/,""));
+  const value=fragment.get("token")||new URLSearchParams(window.location.search).get("token")||"";
   setToken(value);
+  if(value)window.history.replaceState({},document.title,window.location.pathname);
   setReady(true);
  },[]);
 
@@ -33,7 +35,7 @@ export default function BekreftEpost(){
    });
    const d=await r.json().catch(()=>({}));
    if(!r.ok){
-    setState("error");
+    setState(d.code==="already_verified"?"already":"error");
     setMessage(d.error||"E-postadressen kunne ikke bekreftes.");
     return;
    }
@@ -59,13 +61,14 @@ export default function BekreftEpost(){
    {ready&&!token&&<p className="notice">Bekreftelseslenken mangler eller er ugyldig.</p>}
    {ready&&token&&state!=="success"&&<>
     <p>Trykk på knappen under for å bekrefte e-postadressen og aktivere Min side.</p>
-    {state==="error"&&<p className="notice">{message}</p>}
-    <button type="button" className="btn" disabled={busy} onClick={confirm}>
+    {(state==="error"||state==="already")&&<p className="notice">{message}</p>}
+    {state!=="already"&&<button type="button" className="btn" disabled={busy} onClick={confirm}>
      {busy?"Bekrefter …":"Bekreft e-post"}
-    </button>
+    </button>}
    </>}
    {state==="success"&&<p className="success">{message}</p>}
    {state==="error"&&<p style={{marginTop:14,fontSize:14}}><Link href="/min-side">Gå til Min side</Link> og velg «Send bekreftelsesmail på nytt» hvis lenken har utløpt.</p>}
+   {state==="already"&&<p style={{marginTop:14,fontSize:14}}><Link href="/min-side">Gå til Min side og logg inn →</Link></p>}
   </section>
 
   <p style={{marginTop:18,color:"#71675d",fontSize:14}}>

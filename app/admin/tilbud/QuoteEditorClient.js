@@ -3,14 +3,11 @@
 import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
+import {osloDateKey,shiftDateKey} from "../../../lib/osloTime";
 
 const nok=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",maximumFractionDigits:2}).format((Number(ore)||0)/100);
 const lineId=()=>("line-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,7));
-const defaultValidUntil=()=>{
- const d=new Date();
- d.setDate(d.getDate()+30);
- return d.toISOString().slice(0,10);
-};
+const defaultValidUntil=()=>shiftDateKey(osloDateKey(new Date()),30);
 const defaultPlan=[
  {id:"deposit",label:"Forskudd",percent:25,trigger:"Ved aksept av tilbud"},
  {id:"halfway",label:"Halvført arbeid",percent:50,trigger:"Når omtrent halvparten av arbeidet er utført"},

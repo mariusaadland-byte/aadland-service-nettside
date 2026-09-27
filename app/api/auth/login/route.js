@@ -1,8 +1,12 @@
+import {rateLimitRequest} from "../../../../lib/rateLimit";
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import { NextResponse } from "next/server";
 import { setAdminCookie } from "../../../../lib/auth";
 import { createClient } from "@supabase/supabase-js";
 
-export async function POST(req) {
+export async function POST(req){
+ const originError=sameOriginGuard(req); if(originError)return originError;
+ const rateError=await rateLimitRequest(req,{"scope":"admin-login","max":10,"windowSeconds":900,"message":"For mange innloggingsforsøk. Prøv igjen senere."}); if(rateError)return rateError;
   try {
     const { email, password } = await req.json();
 

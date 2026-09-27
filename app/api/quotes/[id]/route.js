@@ -1,6 +1,8 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {verifyQuoteToken} from "../../../../lib/quoteLinks";
+import {osloDateKey} from "../../../../lib/osloTime";
 
 function esc(value){
  return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
@@ -40,22 +42,22 @@ async function loadQuote(id){
 
 function expired(quote){
  if(!quote.valid_until)return false;
- const today=new Date().toISOString().slice(0,10);
+ const today=osloDateKey(new Date());
  return quote.valid_until<today;
 }
 
 export async function GET(req,{params}){
  const resolved=await params;
  const id=String(resolved?.id||"").trim();
- const token=new URL(req.url).searchParams.get("token")||"";
+ const token=String(req.headers.get("x-quote-token")||new URL(req.url).searchParams.get("token")||"");
  const loaded=await loadQuote(id);
  if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status});
  if(!verifyQuoteToken(loaded.data,token))return NextResponse.json({error:"Ugyldig eller utløpt tilbudslenke."},{status:403});
  const quote=mapQuote(loaded.data);
- return NextResponse.json({quote:{...quote,isExpired:expired(loaded.data)}});
+ return NextResponse.json({quote:{...quote,isExpired:expired(loaded.data)}},{headers:{"Cache-Control":"private, no-store, max-age=0"}});
 }
 
-export async function POST(req,{params}){
+export async function POST(req,{params}){ const originError=sameOriginGuard(req); if(originError)return originError;
  const resolved=await params;
  const id=String(resolved?.id||"").trim();
  const body=await req.json().catch(()=>({}));

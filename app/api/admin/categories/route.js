@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import { NextResponse } from "next/server";
 
 import {
@@ -118,7 +119,7 @@ export async function GET() {
   });
 }
 
-export async function POST(req) {
+export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;
   const access =
     await requireCategoryAccess();
 
@@ -224,7 +225,7 @@ export async function POST(req) {
   });
 }
 
-export async function PATCH(req) {
+export async function PATCH(req){ const originError=sameOriginGuard(req); if(originError)return originError;
   const access =
     await requireCategoryAccess();
 
@@ -360,7 +361,7 @@ export async function PATCH(req) {
   });
 }
 
-export async function DELETE(req) {
+export async function DELETE(req){ const originError=sameOriginGuard(req); if(originError)return originError;
   const access =
     await requireCategoryAccess();
 

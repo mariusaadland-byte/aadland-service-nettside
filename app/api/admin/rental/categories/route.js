@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {getAdminUser,hasPermission} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
@@ -42,7 +43,7 @@ export async function GET(){
  return NextResponse.json({categories:(data||[]).map(map)});
 }
 
-export async function POST(req){
+export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;
  if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const body=await req.json();
  const name=clean(body.name,160);
@@ -65,7 +66,7 @@ export async function POST(req){
  return NextResponse.json({category:map(data)});
 }
 
-export async function PATCH(req){
+export async function PATCH(req){ const originError=sameOriginGuard(req); if(originError)return originError;
  if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const body=await req.json();
  if(!body.id)return NextResponse.json({error:"Kategori mangler."},{status:400});
@@ -84,7 +85,7 @@ export async function PATCH(req){
  return NextResponse.json({category:map(data)});
 }
 
-export async function DELETE(req){
+export async function DELETE(req){ const originError=sameOriginGuard(req); if(originError)return originError;
  if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const {id}=await req.json();
  if(!id)return NextResponse.json({error:"Kategori mangler."},{status:400});

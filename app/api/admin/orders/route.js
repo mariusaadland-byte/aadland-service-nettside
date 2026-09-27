@@ -1,9 +1,11 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import { NextResponse } from "next/server";
 import {
   getAdminUser,
   hasPermission,
 } from "../../../../lib/auth";
 import { db } from "../../../../lib/supabase";
+import {safeHttpsUrl} from "../../../../lib/safeUrl";
 
 function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 
@@ -81,11 +83,7 @@ export async function GET() {
     });
 
     return NextResponse.json(
-      {
-        error: `Bestillingene kunne ikke hentes: ${
-          error.message || "Ukjent databasefeil"
-        }`,
-      },
+      { error: "Bestillingene kunne ikke hentes." },
       { status: 500 }
     );
   }
@@ -131,7 +129,7 @@ export async function GET() {
   });
 }
 
-export async function PATCH(req) {
+export async function PATCH(req){ const originError=sameOriginGuard(req); if(originError)return originError;
   const currentUser = await getAdminUser();
 
   if (!currentUser) {
@@ -151,7 +149,7 @@ export async function PATCH(req) {
   const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation } = await req.json();
   if(adminNote!==undefined&&String(adminNote||"").length>5000)return NextResponse.json({error:"Internt notat kan være maks 5000 tegn."},{status:400});
   if(trackingNumber!==undefined&&String(trackingNumber||"").length>120)return NextResponse.json({error:"Sporingsnummeret er for langt."},{status:400});
-  if(trackingUrl!==undefined){const value=String(trackingUrl||"").trim();if(value.length>1000)return NextResponse.json({error:"Sporingslenken er for lang."},{status:400});if(value){try{const u=new URL(value);if(!["http:","https:"].includes(u.protocol))throw new Error()}catch{return NextResponse.json({error:"Skriv inn en gyldig sporingslenke."},{status:400})}}}
+  if(trackingUrl!==undefined){const value=String(trackingUrl||"").trim();if(value.length>1000)return NextResponse.json({error:"Sporingslenken er for lang."},{status:400});if(value&&!safeHttpsUrl(value))return NextResponse.json({error:"Sporingslenken må være en gyldig https-adresse."},{status:400});}
 
   const allowed = [
     "new",
@@ -210,8 +208,9 @@ export async function PATCH(req) {
         const sent=action==="mark-dispatched";
         const requestOrigin=new URL(req.url).origin;
         const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
-        const accountUrl=order.customer_user_id?(configuredOrigin||requestOrigin)+"/min-side":"";
-        const trackingUrl=sent&&order.tracking_url?String(order.tracking_url).trim():"";
+        const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
+        const accountUrl=order.customer_user_id?base+"/min-side":"";
+        const trackingUrl=sent?safeHttpsUrl(order.tracking_url):"";
         const html=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111;padding:28px 12px"><tr><td align="center">
 <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#181818;border:1px solid #34312b">
@@ -243,7 +242,11 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
   let surveyDateChanged=false;
   let normalizedSurveyDate=surveyDate===undefined?undefined:"";
   if(surveyDate){
-    const parsedSurveyDate=new Date(surveyDate);
+    const value=String(surveyDate).trim();
+    if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)){
+      return NextResponse.json({error:"Befaringstidspunktet må sendes som en gyldig tidssonefast verdi."},{status:400});
+    }
+    const parsedSurveyDate=new Date(value);
     if(Number.isNaN(parsedSurveyDate.getTime()))return NextResponse.json({error:"Velg gyldig dato og klokkeslett for befaring."},{status:400});
     normalizedSurveyDate=parsedSurveyDate.toISOString();
   }
@@ -285,11 +288,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     });
 
     return NextResponse.json(
-      {
-        error: `Status kunne ikke lagres: ${
-          error.message || "Ukjent databasefeil"
-        }`,
-      },
+      { error: "Status kunne ikke lagres." },
       { status: 500 }
     );
   }
@@ -304,10 +303,11 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
       const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
       const customerEmail=String(surveyOrder.customer?.email||"").trim().toLowerCase();
       const customerName=String(surveyOrder.customer?.name||"kunde").trim();
-      const surveyText=new Date(surveyDate).toLocaleString("nb-NO",{dateStyle:"long",timeStyle:"short",timeZone:"Europe/Oslo"});
+      const surveyText=new Date(normalizedSurveyDate).toLocaleString("nb-NO",{dateStyle:"long",timeStyle:"short",timeZone:"Europe/Oslo"});
       const requestOrigin=new URL(req.url).origin;
       const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
-      const accountUrl=surveyOrder.customer_user_id?(configuredOrigin||requestOrigin)+"/min-side":"";
+      const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
+      const accountUrl=surveyOrder.customer_user_id?base+"/min-side":"";
       const address=[surveyOrder.customer?.address,surveyOrder.customer?.postalCode,surveyOrder.customer?.city].filter(Boolean).join(", ");
       const html=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111;padding:28px 12px"><tr><td align="center">

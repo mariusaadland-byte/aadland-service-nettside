@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {getAdminUser,hasPermission} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
@@ -6,7 +7,7 @@ async function allowed(){
  return (await getAdminUser())&&(await hasPermission("canManageProducts"));
 }
 
-export async function PATCH(req){
+export async function PATCH(req){ const originError=sameOriginGuard(req); if(originError)return originError;
  if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const body=await req.json();
  const itemId=String(body.itemId||"").trim();

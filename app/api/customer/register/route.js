@@ -1,12 +1,17 @@
+import {rateLimitRequest,rateLimitValue} from "../../../../lib/rateLimit";
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {createClient} from "@supabase/supabase-js";
 import {createCustomerVerificationToken} from "../../../../lib/customerVerification";
+import {checkNewPassword} from "../../../../lib/passwordSecurity";
 
 function esc(value){
  return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
 }
 
 export async function POST(req){
+ const originError=sameOriginGuard(req); if(originError)return originError;
+ const rateError=await rateLimitRequest(req,{"scope":"customer-register","max":5,"windowSeconds":900,"message":"For mange registreringsforsøk. Prøv igjen senere."}); if(rateError)return rateError;
  try{
   const b=await req.json();
   const email=String(b.email||"").trim().toLowerCase();
@@ -18,6 +23,10 @@ export async function POST(req){
   if(name.length>120||email.length>254||phone.length>40||address.length>300)return NextResponse.json({error:"Kontaktinformasjonen er for lang."},{status:400});
   if(!name||!email||password.length<8||password.length>128)return NextResponse.json({error:"Fyll inn navn og e-post. Passordet må ha minst 8 tegn."},{status:400});
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return NextResponse.json({error:"Skriv inn en gyldig e-postadresse."},{status:400});
+  const emailRateError=await rateLimitValue(email,{"scope":"customer-register-email","max":3,"windowSeconds":3600,"message":"For mange registreringsforsøk for denne e-postadressen. Prøv igjen senere."}); if(emailRateError)return emailRateError;
+
+  const passwordCheck=await checkNewPassword(password);
+  if(!passwordCheck.ok)return NextResponse.json({error:passwordCheck.error},{status:passwordCheck.status});
 
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -49,18 +58,21 @@ export async function POST(req){
   };
 
   const {error:profileError}=await s.from("customer_profiles").upsert(profile,{onConflict:"id"});
-  if(profileError&&["42P01","42703"].includes(String(profileError.code||""))){
+  if(profileError){
+   console.error("CUSTOMER REGISTER PROFILE",profileError);
    try{await s.auth.admin.deleteUser(data.user.id)}catch(cleanupError){console.error("CUSTOMER REGISTER CLEANUP",cleanupError)}
-   return NextResponse.json({error:"Kundekonto er ikke aktivert i databasen ennå.",setupRequired:true},{status:409});
+   if(["42P01","42703"].includes(String(profileError.code||""))){
+    return NextResponse.json({error:"Kundekonto er ikke aktivert i databasen ennå.",setupRequired:true},{status:409});
+   }
+   return NextResponse.json({error:"Kundeprofilen kunne ikke opprettes. Prøv igjen."},{status:500});
   }
-  if(profileError)console.error("CUSTOMER REGISTER PROFILE",profileError);
 
   const token=createCustomerVerificationToken({id:data.user.id,email});
   const requestOrigin=new URL(req.url).origin;
   const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
   const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
   const verifyUrl=new URL("/min-side/bekreft-epost",base);
-  verifyUrl.searchParams.set("token",token);
+  verifyUrl.hash="token="+encodeURIComponent(token);
 
   const html=`<!doctype html><html><body style="margin:0;background:#f3efe8;font-family:Arial,Helvetica,sans-serif;color:#181613">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3efe8;padding:28px 12px"><tr><td align="center">
