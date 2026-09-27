@@ -461,9 +461,20 @@ export default function MinSide(){
      <span><small>Periode</small><b>{date(r.start_date)} – {date(r.end_date)}</b></span>
      <span><small>Leiepris</small><b>{kr(r.total_ore)}</b></span>
      <span><small>Betaling</small><b>{paymentStatus[r.payment_status]||r.payment_status||"Ikke registrert"}</b></span>
+     {Number(r.payment_captured_ore)>0&&<span><small>Registrert betalt</small><b>{kr(r.payment_captured_ore)}</b></span>}
      <span><small>Utlevering</small><b>{fulfillmentStatus[r.customer?.fulfillment]||"Ikke registrert"}</b></span>
      {Number(r.deposit_ore)>0&&<span><small>Depositum</small><b>{kr(r.deposit_ore)} · {depositStatus[r.deposit_status]||r.deposit_status||"Ikke registrert"}</b></span>}
     </div>
+    {r.payment_status==="paid"&&r.receipt_sent_at&&<div className="customerPaymentConfirmation">
+     <b>✓ Leiebetaling registrert</b>
+     <span>Betalingsbekreftelse sendt {dateTimeFull(r.receipt_sent_at)}</span>
+    </div>}
+    {Number(r.deposit_ore)>0&&["held","released","partially_charged","charged"].includes(r.deposit_status)&&<div className="customerPaymentConfirmation">
+     <b>{r.deposit_status==="released"?"✓ Depositum frigitt":r.deposit_status==="held"?"✓ Depositum mottatt":"Depositum oppgjort"}</b>
+     {Number(r.deposit_held_ore)>0&&<span>Registrert holdt: {kr(r.deposit_held_ore)}</span>}
+     {Number(r.deposit_charged_ore)>0&&<span>Registrert brukt: {kr(r.deposit_charged_ore)}</span>}
+     {r.deposit_released_at&&<span>Frigitt {dateTimeFull(r.deposit_released_at)}</span>}
+    </div>}
     {r.rental_items?.slug&&<button type="button" className="btn alt" onClick={()=>repeatRental(r)}>Lei igjen</button>}
    </article>)}</div>}
   </section>
