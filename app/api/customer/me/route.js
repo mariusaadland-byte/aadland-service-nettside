@@ -41,14 +41,19 @@ export async function GET(){
   if(rentalLink.error&&!["42703","42P01"].includes(String(rentalLink.error.code||"")))console.error("CUSTOMER RENTAL AUTO LINK",rentalLink.error);
  }
 
- const [ordersResult,rentalsResult,quotesResult]=await Promise.all([
+ const [ordersResult,rentalsResult,rentalPaymentResult,quotesResult]=await Promise.all([
   s.from("orders")
    .select("id,order_number,order_type,status,total_ore,shipping_ore,payment_status,payment_reference,payment_captured_ore,receipt_sent_at,fulfillment_type,items,custom_request,survey_date,survey_confirmation_sent_at,survey_reminder_sent_at,created_at,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at,job_reminder_sent_at")
    .eq("customer_user_id",customer.id)
    .order("created_at",{ascending:false})
    .limit(100),
   s.from("rental_bookings")
-   .select("id,booking_number,start_date,end_date,status,total_ore,deposit_ore,payment_status,payment_reference,payment_captured_ore,receipt_sent_at,deposit_status,deposit_held_ore,deposit_received_at,deposit_released_at,deposit_charged_ore,customer,confirmation_sent_at,cancellation_sent_at,reminder_sent_at,created_at,rental_items(name,slug,active)")
+   .select("id,booking_number,start_date,end_date,status,total_ore,deposit_ore,payment_status,deposit_status,customer,confirmation_sent_at,cancellation_sent_at,reminder_sent_at,created_at,rental_items(name,slug,active)")
+   .eq("customer_user_id",customer.id)
+   .order("created_at",{ascending:false})
+   .limit(100),
+  s.from("rental_bookings")
+   .select("id,payment_reference,payment_captured_ore,receipt_sent_at,deposit_held_ore,deposit_received_at,deposit_released_at,deposit_charged_ore")
    .eq("customer_user_id",customer.id)
    .order("created_at",{ascending:false})
    .limit(100),
@@ -62,6 +67,12 @@ export async function GET(){
 
  if(ordersResult.error||rentalsResult.error){
   return NextResponse.json({error:"Historikken kunne ikke hentes."},{status:500});
+ }
+ const rentalPaymentById=new Map();
+ if(rentalPaymentResult.error){
+  if(!["42703","42P01"].includes(String(rentalPaymentResult.error.code||"")))console.error("CUSTOMER RENTAL PAYMENT HISTORY",rentalPaymentResult.error);
+ }else{
+  for(const row of rentalPaymentResult.data||[])rentalPaymentById.set(row.id,row);
  }
 
  let quotes=[];
@@ -134,6 +145,7 @@ export async function GET(){
 
  const rentals=(rentalsResult.data||[]).map(row=>({
   ...row,
+  ...(rentalPaymentById.get(row.id)||{}),
   rental_items:row.rental_items?{
    ...row.rental_items,
    slug:row.rental_items.active===false?null:(row.rental_items.slug||null)
