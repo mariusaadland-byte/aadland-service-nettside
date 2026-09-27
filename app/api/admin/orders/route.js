@@ -7,6 +7,7 @@ import {
 import { db, fromDbProduct } from "../../../../lib/supabase";
 import {safeHttpsUrl} from "../../../../lib/safeUrl";
 import {buildReceiptEmail} from "../../../../lib/receiptEmail";
+import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
 
 function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 
@@ -260,7 +261,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
       }
       const customerAddress=[order.customer?.address,order.customer?.postalCode,order.customer?.city].filter(Boolean).join(", ");
       const fulfillmentLabel=order.fulfillment_type==="delivery"?"Levering":order.fulfillment_type==="shipping"?"Sending med post/Bring":"Henting";
-      const html=buildReceiptEmail({
+      const receiptData={
         orderNumber:order.order_number,
         customerName:order.customer?.name||"kunde",
         customerEmail:order.customer?.email||"",
@@ -275,12 +276,19 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
         accountUrl,
         orderNote:order.customer?.note||order.custom_request||"",
         quoteNumber,
-        quoteNote
-      });
+        quoteNote,
+        vatRate:25
+      };
+      const html=buildReceiptEmail(receiptData);
+      const pdf=buildReceiptPdf(receiptData);
       const sent=await resend.emails.send({
         from,to:email,replyTo,
         subject:"Betalingsbekreftelse – "+order.order_number,
-        html
+        html,
+        attachments:[{
+          filename:receiptPdfFilename(order.order_number),
+          content:pdf.toString("base64")
+        }]
       });
       if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
       const receiptSentAt=new Date().toISOString();
