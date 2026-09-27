@@ -48,7 +48,7 @@ export async function GET(){
    .order("created_at",{ascending:false})
    .limit(100),
   s.from("rental_bookings")
-   .select("id,booking_number,start_date,end_date,status,total_ore,deposit_ore,payment_status,deposit_status,customer,confirmation_sent_at,cancellation_sent_at,reminder_sent_at,created_at,rental_items(name)")
+   .select("id,booking_number,start_date,end_date,status,total_ore,deposit_ore,payment_status,deposit_status,customer,confirmation_sent_at,cancellation_sent_at,reminder_sent_at,created_at,rental_items(name,slug,active)")
    .eq("customer_user_id",customer.id)
    .order("created_at",{ascending:false})
    .limit(100),
@@ -110,15 +110,40 @@ export async function GET(){
   }
  }
 
+ const productIds=[...new Set(orderRows.flatMap(order=>Array.isArray(order.items)?order.items.map(item=>String(item?.productId||"")).filter(Boolean):[]))];
+ const productLinks=new Map();
+ if(productIds.length){
+  const {data:linkedProducts,error:linkedProductsError}=await s.from("products")
+   .select("id,slug,active")
+   .in("id",productIds);
+  if(!linkedProductsError){
+   for(const product of linkedProducts||[])productLinks.set(String(product.id),product.active===false?null:(product.slug||null));
+  }else if(!["42P01","42703"].includes(String(linkedProductsError.code||""))){
+   console.error("CUSTOMER PRODUCT LINKS",linkedProductsError);
+  }
+ }
+
  const orders=orderRows.map(order=>({
   ...order,
+  items:Array.isArray(order.items)?order.items.map(item=>({
+   ...item,
+   productSlug:productLinks.get(String(item?.productId||""))||null
+  })):[],
   source_quote:quoteByOrder.get(order.id)||null
+ }));
+
+ const rentals=(rentalsResult.data||[]).map(row=>({
+  ...row,
+  rental_items:row.rental_items?{
+   ...row.rental_items,
+   slug:row.rental_items.active===false?null:(row.rental_items.slug||null)
+  }:null
  }));
 
  return NextResponse.json({
   customer,
   orders,
-  rentals:rentalsResult.data||[],
+  rentals,
   quotes,
   quoteSetupRequired
  });
