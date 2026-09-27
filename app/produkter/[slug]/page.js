@@ -37,6 +37,7 @@ export default function ProductPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState(null);
   const [acceptedTerms,setAcceptedTerms]=useState(false);
+  const [vippsEnabled,setVippsEnabled]=useState(false);
 
   useEffect(() => {
     fetch("/api/customer/profile")
@@ -59,6 +60,13 @@ export default function ProductPage() {
       })
       .catch(()=>{});
   }, []);
+
+  useEffect(()=>{
+    fetch("/api/payments/vipps/config")
+      .then(async response=>response.ok?response.json():null)
+      .then(data=>setVippsEnabled(data?.enabled===true))
+      .catch(()=>setVippsEnabled(false));
+  },[]);
 
   useEffect(() => {
     fetch("/api/products")
@@ -155,6 +163,7 @@ export default function ProductPage() {
     e.preventDefault();
 
     if (!product) return;
+    const paymentMethod=e.nativeEvent?.submitter?.value==="vipps"?"vipps":"manual";
 
     setError("");
     setMessage(null);
@@ -172,6 +181,7 @@ export default function ProductPage() {
           fulfillmentType: fulfillment,
           deliveryWithinRadius: customer.deliveryWithinRadius,
           acceptedTerms,
+          paymentMethod,
           items: [
             {
               productId: product.id,
@@ -189,6 +199,10 @@ export default function ProductPage() {
         return;
       }
 
+      if(data.vippsRedirectUrl){
+        window.location.assign(data.vippsRedirectUrl);
+        return;
+      }
       setMessage(data);
       setShowOrder(false);
     } catch {
@@ -587,15 +601,27 @@ export default function ProductPage() {
 
               {error && <p className="notice">{error}</p>}
 
-              <button
-                className="btn drawerSubmitButton"
+              {vippsEnabled&&<button
+                className="btn drawerSubmitButton vippsCheckoutButton"
                 disabled={sending}
+                name="paymentMethod"
+                value="vipps"
                 style={{ width: "100%" }}
+              >
+                {sending?"Starter Vipps...":`Betal med Vipps · ${nok(total)}`}
+              </button>}
+              <button
+                className={vippsEnabled?"btn alt drawerSubmitButton":"btn drawerSubmitButton"}
+                disabled={sending}
+                name="paymentMethod"
+                value="manual"
+                style={{ width: "100%", marginTop: vippsEnabled ? 10 : 0 }}
               >
                 {sending
                   ? "Sender..."
-                  : `Send bestilling · ${nok(total)}`}
+                  : vippsEnabled?`Send bestilling uten nettbetaling · ${nok(total)}`:`Send bestilling · ${nok(total)}`}
               </button>
+              {vippsEnabled&&<p className="muted" style={{fontSize:11,lineHeight:1.5,margin:"10px 0 0"}}>Ved Vipps reserveres beløpet først. Beløpet trekkes senere når varen eller tjenesten kan belastes.</p>}
             </form>
           </div>
         </div>
