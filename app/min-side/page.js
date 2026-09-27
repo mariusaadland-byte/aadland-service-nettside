@@ -404,12 +404,12 @@ export default function MinSide(){
   </section>
 
   <section id="bestillinger" className="customerDashboardSection">
-   <div className="customerSectionHead"><div><div className="kicker">HANDEL</div><h2>Bestillinger</h2></div><span>{purchases.length}</span></div>
+   <div className="customerSectionHead"><div><div className="kicker">HANDEL</div><h2>Bestillinger</h2></div><div className="customerSectionActions"><span>{purchases.length}</span><Link className="btn alt" href="/produkter">Se produkter</Link></div></div>
    {!purchases.length?<div className="card customerEmpty"><p>Ingen produktbestillinger knyttet til kontoen ennå.</p></div>:
    <div className="customerGrid">{purchases.map(o=><article className="card customerHistoryCard" key={o.id}>
     <div className="customerCardTop"><div><small>{o.order_number}</small><h3>Bestilling</h3><p className="customerHistoryDate">Bestilt {dateTime(o.created_at)}</p></div><span className={"customerStatus customerStatus-"+o.status}>{orderStatus[o.status]||o.status}</span></div>
     {Array.isArray(o.items)&&o.items.length>0&&<div className="customerItemList">
-     {o.items.slice(0,6).map((item,index)=><div key={(item.productId||item.name||"item")+"-"+index}><span><b>{item.name||"Produkt"}</b><small>Antall {item.quantity||1}</small></span><strong>{kr((Number(item.unitPriceOre)||0)*(Number(item.quantity)||1))}</strong></div>)}
+     {o.items.slice(0,6).map((item,index)=><div key={(item.productId||item.name||"item")+"-"+index}><span><b>{item.name||"Produkt"}</b><small>Antall {item.quantity||1}</small></span><span className="customerItemRepeat"><strong>{kr((Number(item.unitPriceOre)||0)*(Number(item.quantity)||1))}</strong>{item.productSlug&&<Link className="btn alt" href={"/produkter/"+encodeURIComponent(item.productSlug)}>Kjøp igjen</Link>}</span></div>)}
      {o.items.length>6&&<small>+ {o.items.length-6} flere varelinjer</small>}
     </div>}
     <div className="customerCardMeta">
@@ -422,7 +422,7 @@ export default function MinSide(){
   </section>
 
   <section id="utleie" className="customerDashboardSection">
-   <div className="customerSectionHead"><div><div className="kicker">UTLEIE</div><h2>Utleie</h2></div><span>{rentals.length}</span></div>
+   <div className="customerSectionHead"><div><div className="kicker">UTLEIE</div><h2>Utleie</h2></div><div className="customerSectionActions"><span>{rentals.length}</span><Link className="btn alt" href="/utleie">Se utleie</Link></div></div>
    {!rentals.length?<div className="card customerEmpty"><p>Ingen utleier knyttet til kontoen ennå.</p></div>:
    <div className="customerGrid">{rentals.map(r=><article className="card customerHistoryCard" key={r.id}>
     <div className="customerCardTop"><div><small>{r.booking_number}</small><h3>{r.rental_items?.name||"Utleie"}</h3><p className="customerHistoryDate">Booket {dateTime(r.created_at)}</p></div><span className={"customerStatus customerStatus-"+r.status}>{rentalStatus[r.status]||r.status}</span></div>
@@ -433,6 +433,7 @@ export default function MinSide(){
      <span><small>Utlevering</small><b>{fulfillmentStatus[r.customer?.fulfillment]||"Ikke registrert"}</b></span>
      {Number(r.deposit_ore)>0&&<span><small>Depositum</small><b>{kr(r.deposit_ore)} · {depositStatus[r.deposit_status]||r.deposit_status||"Ikke registrert"}</b></span>}
     </div>
+    {r.rental_items?.slug&&<Link className="btn alt" href={"/utleie/"+encodeURIComponent(r.rental_items.slug)}>Lei igjen</Link>}
    </article>)}</div>}
   </section>
  </main>;
