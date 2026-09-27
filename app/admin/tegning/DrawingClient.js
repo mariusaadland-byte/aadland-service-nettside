@@ -86,6 +86,22 @@ export default function DrawingClient(){
  const detach=()=>{if(selected?.kind!=="item"||!sel)return;mutate(d=>({...d,items:d.items.map(o=>o.id===sel.id?{...o,wallId:null}:o)}))};
  const duplicate=()=>{if(selected?.kind!=="item"||!sel)return;mutate(d=>({...d,items:[...d.items,{...sel,id:uid(),x:sel.x+200,y:sel.y+200}]}))};
  const applySizePreset=value=>{if(selected?.kind!=="item"||!sel||!value)return;const [w,h]=value.split("x").map(Number);if(!Number.isFinite(w)||!Number.isFinite(h)||w<=0||h<=0)return;mutate(d=>({...d,items:d.items.map(o=>o.id!==sel.id?o:{...o,x:o.x+(o.w-w)/2,y:o.y+(o.h-h)/2,w,h})}))};
+ useEffect(()=>{
+  const onKey=e=>{
+   const tag=String(e.target?.tagName||"").toLowerCase();
+   const typing=tag==="input"||tag==="textarea"||tag==="select"||e.target?.isContentEditable;
+   const mod=e.ctrlKey||e.metaKey;
+   if(mod&&e.key.toLowerCase()==="s"){e.preventDefault();persist();return}
+   if(typing)return;
+   if(mod&&e.key.toLowerCase()==="z"){e.preventDefault();if(e.shiftKey)redo();else undo();return}
+   if(mod&&e.key.toLowerCase()==="y"){e.preventDefault();redo();return}
+   if(mod&&e.key.toLowerCase()==="d"&&selected?.kind==="item"){e.preventDefault();duplicate();return}
+   if((e.key==="Delete"||e.key==="Backspace")&&selected){e.preventDefault();remove();return}
+   if(e.key==="Escape"){setDraft(null);setMeasureDraft(null);setTool("select");setSelected(null)}
+  };
+  window.addEventListener("keydown",onKey);
+  return()=>window.removeEventListener("keydown",onKey);
+ });
  const downWallEnd=(e,w,end)=>{e.stopPropagation();setTool("select");setSelected({kind:"wall",id:w.id});setWallDrag({id:w.id,end,start:JSON.stringify(doc)})};
  const moveWallEnd=e=>{if(!wallDrag)return;const p=point(e),q={x:snapTo(p.x,doc.snapSize||50),y:snapTo(p.y,doc.snapSize||50)};setDoc(d=>{const target=d.walls.find(w=>w.id===wallDrag.id);if(!target)return d;const ox=wallDrag.end===1?target.x1:target.x2,oy=wallDrag.end===1?target.y1:target.y2;const walls=d.walls.map(w=>{let n={...w};if(w.id===wallDrag.id){if(wallDrag.end===1){n.x1=q.x;n.y1=q.y}else{n.x2=q.x;n.y2=q.y}}else{if(Math.hypot(w.x1-ox,w.y1-oy)<5){n.x1=q.x;n.y1=q.y}if(Math.hypot(w.x2-ox,w.y2-oy)<5){n.x2=q.x;n.y2=q.y}}return n});return {...d,walls,items:syncMounted(walls,d.items)}})};
  const endWallDrag=()=>{if(!wallDrag)return;setHistory(h=>[...h.slice(-24),wallDrag.start]);setFuture([]);setWallDrag(null)};
