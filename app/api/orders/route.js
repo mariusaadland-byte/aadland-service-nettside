@@ -5,6 +5,7 @@ import crypto from "crypto";
 import {getCustomerUserId} from "../../../lib/customer-auth";
 import {db,fromDbProduct} from "../../../lib/supabase";
 import {productPrice} from "../../../lib/catalog";
+import {createVippsPayment,createVippsReference,vippsPublicStatus} from "../../../lib/vipps";
 const SALES_TERMS_VERSION="2026-09";
 function num(){return "AS-"+Date.now().toString().slice(-8)+"-"+crypto.randomBytes(2).toString("hex").toUpperCase()}
 function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
@@ -14,6 +15,8 @@ export async function POST(req){
  try{
   const body=await req.json();
   if(!["order","custom"].includes(body.orderType))return NextResponse.json({error:"Ugyldig bestillingstype."},{status:400});
+  const paymentMethod=body.orderType==="order"?(String(body.paymentMethod||"manual")==="vipps"?"vipps":"manual"):"manual";
+  if(paymentMethod==="vipps"&&!vippsPublicStatus().enabled)return NextResponse.json({error:"Vipps-betaling er ikke tilgjengelig akkurat nå.",code:"vipps_disabled"},{status:503});
   const email=String(body.customer?.email||"").trim().toLowerCase(),name=String(body.customer?.name||"").trim(),phone=String(body.customer?.phone||"").trim();
   if(!name||!email||!phone)return NextResponse.json({error:"Fyll inn navn, e-post og telefon."},{status:400});
   if(name.length>120||email.length>254||phone.length>40)return NextResponse.json({error:"Kontaktinformasjonen er for lang."},{status:400});
@@ -56,16 +59,66 @@ export async function POST(req){
   const orderNumber=num(),now=new Date().toISOString(),customerUserId=await getCustomerUserId();
   const safeCustomer={name,email,phone,address,postalCode,city,note:String(body.customer?.note||"").trim().slice(0,2000)};
   const record={customer_user_id:customerUserId,order_number:orderNumber,order_type:body.orderType==="custom"?"custom":"order",status:"new",customer:safeCustomer,fulfillment_type:body.fulfillmentType||"pickup",delivery_within_radius:body.fulfillmentType==="delivery"?null:false,items,custom_request:body.customRequest?String(body.customRequest).trim():null,total_ore:total,shipping_ore:shipping,payment_status:body.orderType==="order"?"pending":"unpaid",terms_version:body.orderType==="order"?SALES_TERMS_VERSION:null,terms_accepted_at:body.orderType==="order"?now:null};
+  let orderId=null;
   if(stockRequests.length){
-   const {error:orderError}=await s.rpc("create_order_with_stock",{order_record:record,stock_requests:stockRequests});
+   const {data:createdId,error:orderError}=await s.rpc("create_order_with_stock",{order_record:record,stock_requests:stockRequests});
    if(orderError){
     console.error("ATOMIC ORDER ERROR",orderError);
     if(String(orderError.message||"").includes("INSUFFICIENT_STOCK"))return NextResponse.json({error:"En vare ble nettopp utsolgt. Oppdater handlekurven og prøv igjen."},{status:409});
     throw orderError;
    }
+   orderId=createdId||null;
   }else{
-   const {error:orderError}=await s.from("orders").insert(record);
+   const {data:created,error:orderError}=await s.from("orders").insert(record).select("id").single();
    if(orderError)throw orderError;
+   orderId=created?.id||null;
+  }
+
+  let vippsRedirectUrl="",vippsReference="";
+  if(paymentMethod==="vipps"){
+   if(!orderId)throw new Error("VIPPS_ORDER_ID_MISSING");
+   vippsReference=createVippsReference(orderNumber);
+   const requestOrigin=new URL(req.url).origin;
+   const returnUrl=requestOrigin+"/betaling/vipps?reference="+encodeURIComponent(vippsReference);
+   const startedAt=new Date().toISOString();
+   const {error:setupError}=await s.from("orders").update({
+    payment_provider:"vipps",
+    payment_reference:vippsReference,
+    payment_status:"pending",
+    vipps_checkout_started_at:startedAt,
+    updated_at:startedAt
+   }).eq("id",orderId);
+   if(setupError){
+    console.error("VIPPS ORDER SETUP ERROR",setupError);
+    if(stockRequests.length)await s.rpc("release_product_stock",{stock_requests:stockRequests}).catch(()=>{});
+    await s.from("orders").update({status:"cancelled",payment_status:"cancelled",updated_at:new Date().toISOString()}).eq("id",orderId).catch(()=>{});
+    return NextResponse.json({error:"Vipps-betalingen kunne ikke klargjøres. Ingen betaling er gjennomført."},{status:503});
+   }
+   try{
+    const payment=await createVippsPayment({
+     reference:vippsReference,
+     amountOre:total,
+     returnUrl,
+     description:"Aadland Service "+orderNumber
+    });
+    vippsRedirectUrl=String(payment?.redirectUrl||"");
+    if(!vippsRedirectUrl)throw new Error("VIPPS_REDIRECT_MISSING");
+    await s.from("orders").update({
+     payment_psp_reference:payment?.pspReference||null,
+     updated_at:new Date().toISOString()
+    }).eq("id",orderId);
+   }catch(vippsError){
+    console.error("VIPPS CREATE PAYMENT ERROR",vippsError);
+    const {error:releaseOnceError}=await s.rpc("release_order_stock_once",{target_order_id:orderId});
+    if(releaseOnceError&&stockRequests.length)await s.rpc("release_product_stock",{stock_requests:stockRequests}).catch(()=>{});
+    await s.from("orders").update({
+     status:"cancelled",
+     payment_status:"cancelled",
+     payment_cancelled_at:new Date().toISOString(),
+     updated_at:new Date().toISOString()
+    }).eq("id",orderId).catch(()=>{});
+    return NextResponse.json({error:"Vipps-betalingen kunne ikke startes. Bestillingen er ikke aktivert.",code:"vipps_create_failed"},{status:502});
+   }
   }
   const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
   if(resendKey){
@@ -83,7 +136,9 @@ export async function POST(req){
     const title=isCustom?"Forespørselen er mottatt":"Bestillingen er mottatt";
     const intro=isCustom
      ?"Vi har mottatt forespørselen din og tar kontakt så snart vi kan."
-     :"Takk for bestillingen. Vi tar kontakt dersom noe må avklares før levering eller henting.";
+     :paymentMethod==="vipps"
+      ?"Bestillingen er opprettet. Fullfør betalingen i Vipps for å reservere beløpet."
+      :"Takk for bestillingen. Vi tar kontakt dersom noe må avklares før levering eller henting.";
     const totalText=(total/100).toLocaleString("nb-NO",{minimumFractionDigits:0,maximumFractionDigits:2})+" kr";
     const customerHtml=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111;padding:28px 12px"><tr><td align="center">
@@ -98,7 +153,7 @@ export async function POST(req){
 ${!isCustom?`<tr><td style="padding:12px 14px;color:#8e887f;font-size:11px;border-top:1px solid #2d2d2d">Sum</td><td style="padding:12px 14px;color:#fff;font-weight:700;text-align:right;border-top:1px solid #2d2d2d">${esc(totalText)}</td></tr>`:""}
 </table>
 ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:`<a href="${esc(minSideUrl)}" style="display:inline-block;margin-top:20px;border:1px solid #d7a74e;color:#d7a74e;text-decoration:none;font-weight:900;padding:12px 18px">Opprett Min side →</a><p style="margin:10px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Opprett konto med samme e-postadresse, så kobles bestillinger og tilbud til kontoen din.</p>`}
-<p style="margin:22px 0 0;color:#8e887f;font-size:11px;line-height:1.55">${isCustom?"Vi tar kontakt videre om forespørselen.":"Dette er en ordrebekreftelse. Kvittering sendes når betalingen senere er registrert/trukket."}</p>
+<p style="margin:22px 0 0;color:#8e887f;font-size:11px;line-height:1.55">${isCustom?"Vi tar kontakt videre om forespørselen.":paymentMethod==="vipps"?"Dette er en ordrebekreftelse. Vipps-beløpet reserveres først og trekkes senere når varen eller tjenesten kan belastes.":"Dette er en ordrebekreftelse. Kvittering sendes når betalingen senere er registrert/trukket."}</p>
 </td></tr>
 <tr><td style="padding:18px 30px;border-top:1px solid #34312b;color:#8e887f;font-size:11px">Aadland Service · 471 54 898 · post@aadland-service.no</td></tr>
 </table></td></tr></table></body></html>`;
@@ -116,6 +171,6 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     });
    }catch(e){console.error("E-postfeil",e)}
   }
-  return NextResponse.json({orderNumber,message:"Takk! Vi tar kontakt for å bekrefte bestillingen."});
+  return NextResponse.json({orderNumber,message:paymentMethod==="vipps"?"Bestillingen er opprettet. Fortsett til Vipps for å godkjenne betalingen.":"Takk! Vi tar kontakt for å bekrefte bestillingen.",vippsRedirectUrl:vippsRedirectUrl||null,vippsReference:vippsReference||null});
  }catch(e){console.error(e);return NextResponse.json({error:"Bestillingen kunne ikke lagres."},{status:500})}
 }
