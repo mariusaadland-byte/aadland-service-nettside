@@ -26,6 +26,14 @@ alter table public.rental_bookings add column if not exists confirmation_sent_at
 alter table public.rental_bookings add column if not exists cancellation_sent_at timestamptz;
 alter table public.rental_bookings add column if not exists reminder_sent_at timestamptz;
 alter table public.rental_bookings add column if not exists customer_user_id uuid references auth.users(id) on delete set null;
+alter table public.rental_bookings add column if not exists payment_reference text;
+alter table public.rental_bookings add column if not exists payment_captured_ore integer not null default 0;
+alter table public.rental_bookings add column if not exists receipt_sent_at timestamptz;
+alter table public.rental_bookings add column if not exists deposit_reference text;
+alter table public.rental_bookings add column if not exists deposit_held_ore integer not null default 0;
+alter table public.rental_bookings add column if not exists deposit_received_at timestamptz;
+alter table public.rental_bookings add column if not exists deposit_released_at timestamptz;
+alter table public.rental_bookings add column if not exists deposit_charged_ore integer not null default 0;
 alter table public.rental_items enable row level security; alter table public.rental_blocks enable row level security; alter table public.rental_bookings enable row level security;
 grant select,insert,update,delete on public.rental_items to service_role; grant select,insert,update,delete on public.rental_blocks to service_role; grant select,insert,update,delete on public.rental_bookings to service_role;
 create index if not exists rental_blocks_item_dates_idx on public.rental_blocks(rental_item_id,start_date,end_date);
