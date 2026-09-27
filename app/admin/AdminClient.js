@@ -840,6 +840,30 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
   if(typeof reload==="function")await reload();
  }
  async function finish(order,action){setSavingId(order.id);setMessage("");const r=await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,action})}),d=await r.json().catch(()=>({}));setSavingId(null);if(!r.ok){setMessage(d.error||"Handlingen kunne ikke utføres.");return;}setMessage(d.paymentCaptureRequired?"Status er lagret. Betalingen står fortsatt bare som reservert til betalingsleverandøren er koblet til.":"Status er lagret.");window.setTimeout(()=>window.location.reload(),700);}
+ async function registerPayment(order){
+  if(order.orderType==="custom")return;
+  const reference=document.getElementById("payment-reference-"+order.id)?.value||order.paymentReference||"";
+  const alreadyPaid=order.paymentStatus==="paid";
+  const prompt=alreadyPaid
+   ?"Sende betalingsbekreftelsen på nytt til "+order.customerEmail+"?"
+   :"Registrere "+nok(order.totalOre||0)+" som fullt betalt og sende betalingsbekreftelse til "+order.customerEmail+"?";
+  if(!window.confirm(prompt))return;
+  setSavingId(order.id);setMessage("");
+  const response=await fetch("/api/admin/orders",{
+   method:"PATCH",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({id:order.id,action:"record-paid-and-send-receipt",paymentReference:reference})
+  });
+  const data=await response.json().catch(()=>({}));
+  setSavingId(null);
+  if(!response.ok){
+   setMessage(data.error||"Betalingen kunne ikke registreres.");
+   if(data.statusSaved&&typeof reload==="function")await reload();
+   return;
+  }
+  setMessage((alreadyPaid?"Betalingsbekreftelsen er sendt på nytt til ":"Betalingen er registrert og betalingsbekreftelsen er sendt til ")+(data.sentTo||order.customerEmail)+".");
+  if(typeof reload==="function")await reload();
+ }
  return <><>{message&&<p className="notice">{message}</p>}</><div className="orderCards">{orders.length?orders.map(order=><article className="card orderCard" key={order.id}>
   <div className="orderCardTop"><div><div className="kicker">{order.orderNumber}</div><h3>{order.customerName||"Ukjent kunde"}</h3><small className="muted">{new Date(order.createdAt).toLocaleString("nb-NO")}</small></div><b>{nok(order.totalOre||0)}</b></div>
   <p>{order.customerPhone&&<>{order.customerPhone}<br/></>}{order.customerEmail}</p>
@@ -849,6 +873,16 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
   {openId===order.id&&<div className="orderDetails">
    {(order.items||[]).length>0&&<div><h4>Varer</h4>{order.items.map((item,i)=><p key={i}>{item.quantity||1} × {item.name||"Produkt"} · {nok((item.unitPriceOre||0)*(item.quantity||1))}</p>)}</div>}
    {order.customRequest&&<p style={{whiteSpace:"pre-wrap"}}>{order.customRequest}</p>}{Array.isArray(order.contactImages)&&order.contactImages.length>0&&<div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12}}>{order.contactImages.map((image,i)=><a className="btn alt" key={image.ref||i} href={image.url} target="_blank" rel="noopener noreferrer">Åpne bilde {i+1}</a>)}</div>}
+   {order.orderType!=="custom"&&<div className="orderPaymentPanel">
+    <h4>Betaling og kvittering</h4>
+    <div className="orderPaymentFacts">
+     <span><small>Status</small><b>{order.paymentStatus==="paid"?"Betalt":order.paymentStatus==="authorized"?"Reservert":order.paymentStatus==="refunded"?"Refundert":order.paymentStatus==="partial"?"Delvis betalt":"Ikke betalt"}</b></span>
+     <span><small>Registrert betalt</small><b>{nok(order.paymentCapturedOre||0)}</b></span>
+     {order.receiptSentAt&&<span><small>Betalingsbekreftelse</small><b>Sendt {new Date(order.receiptSentAt).toLocaleString("nb-NO")}</b></span>}
+    </div>
+    <div className="field"><label>Betalingsreferanse <span className="muted">(f.eks. Vipps-ref., kontant eller bank)</span></label><input id={"payment-reference-"+order.id} defaultValue={order.paymentReference||""} maxLength={120} placeholder="Valgfri referanse"/></div>
+    {canUpdateOrders&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>registerPayment(order)}>{savingId===order.id?"Sender …":order.paymentStatus==="paid"?"Send betalingsbekreftelse på nytt":"Registrer betalt + send bekreftelse"}</button>}
+   </div>}
    {order.fulfillmentType==="shipping"&&<><div className="field"><label>Sporingsnummer</label><input id={"tracking-number-"+order.id} defaultValue={order.trackingNumber||""}/></div><div className="field"><label>Sporingslenke</label><input type="url" id={"tracking-url-"+order.id} defaultValue={order.trackingUrl||""}/></div>{canUpdateOrders&&<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>saveTracking(order)}>{savingId===order.id?"Lagrer …":"Lagre sporing"}</button>}</>}
   </div>}
  {canUpdateOrders&&<div className="orderActions">{["completed","cancelled"].includes(order.status)&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>archive(order)}>Arkiver</button>}{order.orderType!=="custom"&&order.status!=="completed"&&(order.fulfillmentType==="shipping"?<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-dispatched")}>Sendt til kunde</button>:<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-delivered")}>Levert til kunde</button>)}</div>}

@@ -4,8 +4,10 @@ import {
   getAdminUser,
   hasPermission,
 } from "../../../../lib/auth";
-import { db } from "../../../../lib/supabase";
+import { db, fromDbProduct } from "../../../../lib/supabase";
 import {safeHttpsUrl} from "../../../../lib/safeUrl";
+import {buildReceiptEmail} from "../../../../lib/receiptEmail";
+import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
 
 function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 
@@ -36,6 +38,8 @@ const mapOrder = (o) => ({
   jobConfirmationSentAt: o.job_confirmation_sent_at || null,
   paymentStatus: o.payment_status || "unpaid",
   paymentReference: o.payment_reference || "",
+  paymentCapturedOre: Number(o.payment_captured_ore)||0,
+  receiptSentAt: o.receipt_sent_at || null,
   trackingNumber: o.tracking_number || "",
   trackingUrl: o.tracking_url || "",
   dispatchedAt: o.dispatched_at || null,
@@ -146,8 +150,9 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     );
   }
 
-  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation } = await req.json();
+  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference } = await req.json();
   if(adminNote!==undefined&&String(adminNote||"").length>5000)return NextResponse.json({error:"Internt notat kan være maks 5000 tegn."},{status:400});
+  if(paymentReference!==undefined&&String(paymentReference||"").length>120)return NextResponse.json({error:"Betalingsreferansen er for lang."},{status:400});
   if(trackingNumber!==undefined&&String(trackingNumber||"").length>120)return NextResponse.json({error:"Sporingsnummeret er for langt."},{status:400});
   if(trackingUrl!==undefined){const value=String(trackingUrl||"").trim();if(value.length>1000)return NextResponse.json({error:"Sporingslenken er for lang."},{status:400});if(value&&!safeHttpsUrl(value))return NextResponse.json({error:"Sporingslenken må være en gyldig https-adresse."},{status:400});}
 
@@ -187,6 +192,120 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     const {error:archiveError}=await s.from("orders").update({archived_at:action==="archive"?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("id",id);
     if(archiveError)return NextResponse.json({error:"Arkivstatus kunne ikke lagres."},{status:500});
     return NextResponse.json({ok:true});
+  }
+
+  if(action==="record-paid-and-send-receipt"){
+    const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+    if(order.order_type==="custom")return NextResponse.json({error:"Denne betalingsflyten gjelder produktbestillinger."},{status:400});
+    const email=String(order.customer?.email||"").trim().toLowerCase();
+    if(!email)return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
+    const total=Math.max(0,Number(order.total_ore)||0);
+    if(total<=0)return NextResponse.json({error:"Bestillingen har ikke et gyldig beløp."},{status:400});
+    const reference=String(paymentReference??order.payment_reference??"").trim()||"Manuelt registrert";
+    const now=new Date().toISOString();
+    const {error:paymentError}=await s.from("orders").update({
+      payment_status:"paid",
+      payment_reference:reference,
+      payment_captured_ore:total,
+      updated_at:now
+    }).eq("id",id);
+    if(paymentError)return NextResponse.json({error:"Betalingen kunne ikke registreres."},{status:500});
+
+    const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
+    if(!resendKey)return NextResponse.json({error:"Betalingen er registrert, men e-post er ikke konfigurert.",statusSaved:true},{status:503});
+    try{
+      const {Resend}=await import("resend");
+      const resend=new Resend(resendKey);
+      const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
+      const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+      const requestOrigin=new URL(req.url).origin;
+      const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
+      const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
+      const accountUrl=order.customer_user_id?base+"/min-side":"";
+      const rawItems=Array.isArray(order.items)?order.items:[];
+      const productIds=[...new Set(rawItems.map(item=>String(item?.productId||"")).filter(Boolean))];
+      const productById=new Map();
+      if(productIds.length){
+        const {data:productRows,error:productError}=await s.from("products").select("*").in("id",productIds);
+        if(!productError){
+          for(const row of productRows||[]){
+            const product=fromDbProduct(row);
+            productById.set(String(product.id),product);
+          }
+        }else{
+          console.error("ORDER RECEIPT PRODUCT DETAILS ERROR",productError);
+        }
+      }
+      const receiptItems=rawItems.map(item=>{
+        const product=productById.get(String(item?.productId||""));
+        const selected=item?.selectedOptions&&typeof item.selectedOptions==="object"?item.selectedOptions:{};
+        const details=(product?.options||[]).map(option=>{
+          const value=selected[option.id];
+          const choice=(option.choices||[]).find(entry=>entry.value===value);
+          if(value==null&&!choice)return null;
+          return {label:option.label||option.id||"Valg",value:choice?.label||String(value??"")};
+        }).filter(Boolean);
+        return {...item,details};
+      });
+      let quoteNumber="",quoteNote="";
+      const {data:linkedQuote,error:quoteLookupError}=await s.from("quotes")
+        .select("quote_number,notes")
+        .eq("converted_order_id",order.id)
+        .maybeSingle();
+      if(!quoteLookupError&&linkedQuote){
+        quoteNumber=linkedQuote.quote_number||"";
+        quoteNote=linkedQuote.notes||"";
+      }else if(quoteLookupError&&!["42P01","42703"].includes(String(quoteLookupError.code||""))){
+        console.error("ORDER RECEIPT QUOTE NOTE ERROR",quoteLookupError);
+      }
+      const customerAddress=[order.customer?.address,order.customer?.postalCode,order.customer?.city].filter(Boolean).join(", ");
+      const fulfillmentLabel=order.fulfillment_type==="delivery"?"Levering":order.fulfillment_type==="shipping"?"Sending med post/Bring":"Henting";
+      const receiptData={
+        orderNumber:order.order_number,
+        customerName:order.customer?.name||"kunde",
+        customerEmail:order.customer?.email||"",
+        customerPhone:order.customer?.phone||"",
+        customerAddress,
+        fulfillmentLabel,
+        reference,
+        items:receiptItems,
+        shippingOre:Number(order.shipping_ore)||0,
+        totalOre:total,
+        paidAt:now,
+        accountUrl,
+        orderNote:order.customer?.note||order.custom_request||"",
+        quoteNumber,
+        quoteNote,
+        vatRate:25
+      };
+      const html=buildReceiptEmail(receiptData);
+      const pdf=await buildReceiptPdf(receiptData);
+      const sent=await resend.emails.send({
+        from,to:email,replyTo,
+        subject:"Betalingsbekreftelse – "+order.order_number,
+        html,
+        attachments:[
+          {
+            filename:"aadland-service-logo.webp",
+            path:"https://www.aadland-service.no/aadland-service-logo.webp",
+            contentId:"aadland-service-logo"
+          },
+          {
+            filename:receiptPdfFilename(order.order_number),
+            content:pdf.toString("base64")
+          }
+        ]
+      });
+      if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
+      const receiptSentAt=new Date().toISOString();
+      const {error:stampError}=await s.from("orders").update({receipt_sent_at:receiptSentAt,updated_at:receiptSentAt}).eq("id",id);
+      if(stampError)console.error("ORDER RECEIPT STAMP ERROR",stampError);
+      return NextResponse.json({ok:true,sentTo:email,receiptSentAt,paymentStatus:"paid",paymentReference:reference});
+    }catch(e){
+      console.error("ORDER RECEIPT EMAIL ERROR",e);
+      return NextResponse.json({error:"Betalingen er registrert, men betalingsbekreftelsen kunne ikke sendes.",statusSaved:true},{status:500});
+    }
   }
 
   if (action === "mark-dispatched" || action === "mark-delivered") {

@@ -59,6 +59,37 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const planSum=useMemo(()=>v.paymentPlan.reduce((sum,row)=>sum+(Number(row.percent)||0),0),[v.paymentPlan]);
 
  useEffect(()=>{
+  if(quoteId||sourceOrderId)return;
+  try{
+   const raw=sessionStorage.getItem("aadlandQuoteDraftFromDrawing");
+   if(!raw)return;
+   sessionStorage.removeItem("aadlandQuoteDraftFromDrawing");
+   const draft=JSON.parse(raw);
+   const importedLines=(Array.isArray(draft?.lineItems)?draft.lineItems:[]).slice(0,80).map(line=>({
+    id:lineId(),
+    type:["work","material","other"].includes(line?.type)?line.type:"other",
+    description:String(line?.description||"").trim().slice(0,500),
+    quantity:Math.max(0.01,Number(line?.quantity)||1),
+    unit:String(line?.unit||"stk").trim().slice(0,20),
+    unitPriceOre:"",
+    vatRate:Number(line?.vatRate)===0?0:25
+   })).filter(line=>line.description);
+   setV(current=>({
+    ...current,
+    title:String(draft?.title||current.title||"").slice(0,180),
+    customer:{
+     ...current.customer,
+     name:String(draft?.customer?.name||current.customer.name||"").slice(0,120),
+     address:String(draft?.customer?.address||current.customer.address||"").slice(0,300)
+    },
+    lineItems:importedLines.length?importedLines:current.lineItems,
+    notes:String(draft?.notes||current.notes||"").slice(0,8000)
+   }));
+   if(importedLines.length)setSavedMessage(importedLines.length+" mengdelinjer er hentet fra tegningen. Fyll inn pris på hver linje før tilbudet lagres.");
+  }catch{}
+ },[quoteId,sourceOrderId]);
+
+ useEffect(()=>{
   if(quoteId||sourceOrderId||!initialCustomer)return;
   const hasValue=["name","email","phone","address"].some(key=>String(initialCustomer?.[key]||"").trim());
   if(!hasValue)return;

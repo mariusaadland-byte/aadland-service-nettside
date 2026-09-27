@@ -41,28 +41,6 @@ function RentalCalendar({item,onChoose,refreshKey}){
  const cells=calendarDays(month);
 
  useEffect(()=>{
-  fetch("/api/customer/profile")
-   .then(async response=>{
-    if(response.status===401)return null;
-    const data=await response.json().catch(()=>({}));
-    if(!response.ok)return null;
-    return data.customer||null;
-   })
-   .then(profile=>{
-    if(!profile)return;
-    setCustomerAccount(profile);
-    setCustomer(current=>({
-     ...current,
-     name:current.name||profile.name||"",
-     email:current.email||profile.email||"",
-     phone:current.phone||profile.phone||"",
-     address:current.address||profile.address||""
-    }));
-   })
-   .catch(()=>{});
- },[]);
-
- useEffect(()=>{
   let cancelled=false;
   setLoading(true);
   setError("");
@@ -203,6 +181,39 @@ export default function RentalDetailPage(){
  const [message,setMessage]=useState("");
  const [refreshKey,setRefreshKey]=useState(0);
  const [activeImage,setActiveImage]=useState(0);
+ const [repeatFulfillment,setRepeatFulfillment]=useState("");
+
+ useEffect(()=>{
+  fetch("/api/customer/profile")
+   .then(async response=>{
+    if(response.status===401)return null;
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)return null;
+    return data.customer||null;
+   })
+   .then(profile=>{
+    if(!profile)return;
+    setCustomerAccount(profile);
+    setCustomer(current=>({
+     ...current,
+     name:current.name||profile.name||"",
+     email:current.email||profile.email||"",
+     phone:current.phone||profile.phone||"",
+     address:current.address||profile.address||""
+    }));
+   })
+   .catch(()=>{});
+  try{
+   const raw=sessionStorage.getItem("aadlandRepeatRental");
+   if(raw){
+    const repeat=JSON.parse(raw);
+    if(String(repeat?.slug||"")===slug){
+     setRepeatFulfillment(repeat?.fulfillment==="delivery"?"delivery":"pickup");
+     sessionStorage.removeItem("aadlandRepeatRental");
+    }
+   }
+  }catch{}
+ },[slug]);
 
  useEffect(()=>{
   let cancelled=false;
@@ -223,7 +234,13 @@ export default function RentalDetailPage(){
 
  function choosePeriod(startDate,endDate,pricing){
   setChosen({startDate,endDate,pricing});
-  setFulfillment(item.pickupAvailable?"pickup":"delivery");
+  const preferred=repeatFulfillment==="delivery"&&item.deliveryAvailable
+   ?"delivery"
+   :repeatFulfillment==="pickup"&&item.pickupAvailable
+   ?"pickup"
+   :item.pickupAvailable?"pickup":"delivery";
+  setFulfillment(preferred);
+  setRepeatFulfillment("");
   setMessage("");
   window.setTimeout(()=>document.getElementById("booking")?.scrollIntoView({behavior:"smooth",block:"start"}),50);
  }
