@@ -323,6 +323,14 @@ export default function AdminClient({ user }) {
     return sum+Math.max(0,(Number(order.totalOre)||0)-captured);
   },0);
 
+  const deliveryAreaOrders=activeOrders.filter(order=>
+    order.orderType!=="custom"
+    &&order.status==="new"
+    &&order.fulfillmentType==="delivery"
+    &&order.deliveryWithinRadius!==true
+  );
+  const deliveryAreaCount=deliveryAreaOrders.length;
+
   const total = activeOrders.reduce(
     (sum, order) => sum + (order.totalOre || 0),
     0
@@ -360,6 +368,15 @@ export default function AdminClient({ user }) {
           tab:"orders"
         };
       }),
+    ...deliveryAreaOrders
+      .map(order=>({
+        key:"delivery-area-"+order.id,
+        sort:0.5,
+        eyebrow:order.deliveryWithinRadius===false?"UTENFOR LEVERINGSOMRÅDE":"LEVERINGSOMRÅDE MÅ SJEKKES",
+        title:order.customerName||"Ukjent kunde",
+        meta:order.orderNumber||"",
+        tab:"orders"
+      })),
     ...activeOrders
       .filter(order=>order.orderType==="custom"&&!order.sourceQuoteId&&order.status==="new")
       .map(order=>({
@@ -607,6 +624,13 @@ export default function AdminClient({ user }) {
                     <br />
                     <b>{paymentAttentionCount}</b>
                     {paymentAttentionOre>0&&<><br/><small className="muted">{nok(paymentAttentionOre)}</small></>}
+                  </div>
+                  <div className="stat">
+                    <span className="muted">
+                      Leveringsområde må sjekkes
+                    </span>
+                    <br />
+                    <b>{deliveryAreaCount}</b>
                   </div>
                   <div className="stat">
                     <span className="muted">
@@ -946,6 +970,37 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
   setMessage((sent?"Sendt-varselet":"Levert-varselet")+" er sendt på nytt til "+(data.sentTo||order.customerEmail)+".");
   if(typeof reload==="function")await reload();
  }
+ async function setDeliveryRadius(order,within){
+  const label=within?"innenfor 15 km":"utenfor 15 km";
+  if(!window.confirm("Markere leveringsadressen som "+label+"?"))return;
+  setSavingId(order.id);setMessage("");
+  const response=await fetch("/api/admin/orders",{
+   method:"PATCH",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({id:order.id,action:"set-delivery-radius",deliveryWithinRadius:within})
+  });
+  const data=await response.json().catch(()=>({}));
+  setSavingId(null);
+  if(!response.ok){setMessage(data.error||"Leveringskontrollen kunne ikke lagres.");return}
+  setMessage(within
+   ?"Leveringsadressen er godkjent innenfor 15 km."
+   :"Leveringsadressen er markert utenfor 15 km. Avtal henting eller annen løsning med kunden.");
+  if(typeof reload==="function")await reload();
+ }
+ async function changeDeliveryToPickup(order){
+  if(!window.confirm("Endre bestillingen fra lokal levering til henting? Bruk dette etter avtale med kunden."))return;
+  setSavingId(order.id);setMessage("");
+  const response=await fetch("/api/admin/orders",{
+   method:"PATCH",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({id:order.id,action:"change-delivery-to-pickup"})
+  });
+  const data=await response.json().catch(()=>({}));
+  setSavingId(null);
+  if(!response.ok){setMessage(data.error||"Leveringsmåten kunne ikke endres.");return}
+  setMessage("Leveringsmåten er endret til henting.");
+  if(typeof reload==="function")await reload();
+ }
  async function setProductProgress(order,progressStatus,resend=false){
   const confirmed=progressStatus==="confirmed";
   const label=confirmed?"bekreftet":"under arbeid";
@@ -1114,11 +1169,28 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
       ?<span> Betalingen står fortsatt som reservert.</span>
       :<span> Gjenstår å registrere: {nok(Math.max(0,Number(order.totalOre||0)-Number(order.paymentCapturedOre||0)))}</span>}
   </div>}
+  {order.orderType!=="custom"&&order.status==="new"&&order.fulfillmentType==="delivery"&&order.deliveryWithinRadius!==true&&<div className="notice">
+   <b>{order.deliveryWithinRadius===false?"Leveringsadressen er utenfor 15 km.":"Leveringsområdet er ikke kontrollert ennå."}</b>
+   <span> Ordren kan ikke bekreftes før dette er avklart.</span>
+  </div>}
   <div className="field"><label>Status</label><b>{labels[order.status]||order.status}</b></div>
   <button className="btn alt" type="button" onClick={()=>setOpenId(openId===order.id?null:order.id)}>{openId===order.id?"Skjul detaljer":"Vis detaljer"}</button>
   {openId===order.id&&<div className="orderDetails">
    {(order.items||[]).length>0&&<div><h4>Varer</h4>{order.items.map((item,i)=><p key={i}>{item.quantity||1} × {item.name||"Produkt"} · {nok((item.unitPriceOre||0)*(item.quantity||1))}</p>)}</div>}
    {order.customRequest&&<p style={{whiteSpace:"pre-wrap"}}>{order.customRequest}</p>}{Array.isArray(order.contactImages)&&order.contactImages.length>0&&<div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12}}>{order.contactImages.map((image,i)=><a className="btn alt" key={image.ref||i} href={image.url} target="_blank" rel="noopener noreferrer">Åpne bilde {i+1}</a>)}</div>}
+   {order.orderType!=="custom"&&order.fulfillmentType==="delivery"&&<div className="orderPaymentPanel">
+    <h4>Leveringsområde · 15 km</h4>
+    <div className="orderPaymentFacts">
+     <span><small>Status</small><b>{order.deliveryWithinRadius===true?"Godkjent innenfor 15 km":order.deliveryWithinRadius===false?"Utenfor 15 km":"Ikke kontrollert"}</b></span>
+    </div>
+    {(order.customer?.address||order.customer?.postalCode||order.customer?.city)&&<p><b>Adresse:</b> {[order.customer?.address,order.customer?.postalCode,order.customer?.city].filter(Boolean).join(", ")}</p>}
+    {(order.customer?.address||order.customer?.postalCode||order.customer?.city)&&<a className="btn alt" target="_blank" rel="noopener noreferrer" href={"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent([order.customer?.address,order.customer?.postalCode,order.customer?.city].filter(Boolean).join(", "))}>Åpne adresse i kart</a>}
+    {canUpdateOrders&&order.status==="new"&&<div className="orderActions">
+     <button className="btn" type="button" disabled={savingId===order.id} onClick={()=>setDeliveryRadius(order,true)}>{savingId===order.id?"Lagrer …":"Innenfor 15 km"}</button>
+     <button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>setDeliveryRadius(order,false)}>{savingId===order.id?"Lagrer …":"Utenfor 15 km"}</button>
+     {order.deliveryWithinRadius===false&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>changeDeliveryToPickup(order)}>{savingId===order.id?"Lagrer …":"Endre til henting etter avtale"}</button>}
+    </div>}
+   </div>}
    {order.orderType!=="custom"&&(order.confirmedAt||order.inProgressAt||order.confirmedNoticeSentAt||order.inProgressNoticeSentAt)&&<div className="orderPaymentPanel">
     <h4>Ordrefremdrift</h4>
     <div className="orderPaymentFacts">
@@ -1178,7 +1250,7 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
    {order.readyNoticeSentAt&&<div className="rentalNotificationState"><span>✓ Klar-varsel sendt {new Date(order.readyNoticeSentAt).toLocaleString("nb-NO")}</span></div>}
   </div>}
  {canUpdateOrders&&<div className="orderActions">
-  {order.orderType!=="custom"&&order.status==="new"&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>setProductProgress(order,"confirmed",false)}>{savingId===order.id?"Sender …":"Bekreft ordre + varsle"}</button>}
+  {order.orderType!=="custom"&&order.status==="new"&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail||(order.fulfillmentType==="delivery"&&order.deliveryWithinRadius!==true)} onClick={()=>setProductProgress(order,"confirmed",false)}>{savingId===order.id?"Sender …":order.fulfillmentType==="delivery"&&order.deliveryWithinRadius!==true?"Kontroller 15 km først":"Bekreft ordre + varsle"}</button>}
   {order.orderType!=="custom"&&order.status==="confirmed"&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>setProductProgress(order,"in_progress",false)}>{savingId===order.id?"Sender …":"Sett under arbeid + varsle"}</button>}
   {["completed","cancelled"].includes(order.status)&&(()=>{
     const paymentStatus=String(order.paymentStatus||"");
