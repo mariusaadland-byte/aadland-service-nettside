@@ -13,6 +13,11 @@ function adminImageError(file){
   if(file.size>ADMIN_IMAGE_MAX_BYTES)return "Hvert bilde kan være maks 4 MB.";
   return "";
 }
+function kronerToOre(value){
+  const normalized=String(value??"").trim().replace(/\s/g,"").replace(",",".");
+  const amount=Number(normalized);
+  return Number.isFinite(amount)?Math.round(amount*100):NaN;
+}
 
 const labels = {
   new: "Ny",
@@ -958,6 +963,47 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
   setMessage("Ordrebekreftelsen er sendt til "+(data.sentTo||order.customerEmail)+".");
   if(typeof reload==="function")await reload();
  }
+ async function recordRefund(order,resend=false){
+  if(order.orderType==="custom")return;
+  if(String(order.paymentProvider||"").toLowerCase()==="vipps"){
+   setMessage("Vipps-betaling skal refunderes gjennom Vipps-flyten.");
+   return;
+  }
+  let refundOre=Number(order.refundLastOre)||0;
+  let refundReference=order.refundReference||"";
+  let refundNote=order.refundNote||"";
+  if(!resend){
+   refundOre=kronerToOre(document.getElementById("refund-amount-"+order.id)?.value||"");
+   refundReference=document.getElementById("refund-reference-"+order.id)?.value||"";
+   refundNote=document.getElementById("refund-note-"+order.id)?.value||"";
+   const remaining=Math.max(0,(Number(order.paymentCapturedOre)||0)-(Number(order.paymentRefundedOre)||0));
+   if(!Number.isInteger(refundOre)||refundOre<=0){setMessage("Skriv inn et gyldig tilbakebetalingsbeløp.");return}
+   if(refundOre>remaining){setMessage("Tilbakebetalingen kan ikke være større enn "+nok(remaining)+".");return}
+   if(!window.confirm("Registrere "+nok(refundOre)+" tilbakebetalt på "+order.orderNumber+" og sende bekreftelse til "+order.customerEmail+"?"))return;
+  }else if(!window.confirm("Sende tilbakebetalingsbekreftelsen på nytt til "+order.customerEmail+"?"))return;
+
+  setSavingId(order.id);setMessage("");
+  const response=await fetch("/api/admin/orders",{
+   method:"PATCH",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({
+    id:order.id,
+    action:resend?"resend-manual-refund-notice":"record-manual-refund-and-notify",
+    ...(resend?{}:{refundOre,refundReference,refundNote})
+   })
+  });
+  const data=await response.json().catch(()=>({}));
+  setSavingId(null);
+  if(!response.ok){
+   setMessage(data.error||"Tilbakebetalingen kunne ikke behandles.");
+   if(data.statusSaved&&typeof reload==="function")await reload();
+   return;
+  }
+  setMessage(resend
+   ?"Tilbakebetalingsbekreftelsen er sendt på nytt."
+   :"Tilbakebetalingen er registrert og kunden har fått bekreftelse.");
+  if(typeof reload==="function")await reload();
+ }
  async function registerPayment(order){
   if(order.orderType==="custom")return;
   const reference=document.getElementById("payment-reference-"+order.id)?.value||order.paymentReference||"";
@@ -1015,10 +1061,23 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
     <div className="orderPaymentFacts">
      <span><small>Status</small><b>{order.paymentStatus==="paid"?"Betalt":order.paymentStatus==="authorized"?"Reservert":order.paymentStatus==="refunded"?"Refundert":order.paymentStatus==="partial"?"Delvis betalt":"Ikke betalt"}</b></span>
      <span><small>Registrert betalt</small><b>{nok(order.paymentCapturedOre||0)}</b></span>
+     {Number(order.paymentRefundedOre)>0&&<span><small>Tilbakebetalt</small><b>{nok(order.paymentRefundedOre)}</b></span>}
+     {order.paymentRefundedAt&&<span><small>Sist tilbakebetalt</small><b>{new Date(order.paymentRefundedAt).toLocaleString("nb-NO")}</b></span>}
      {order.receiptSentAt&&<span><small>Betalingsbekreftelse</small><b>Sendt {new Date(order.receiptSentAt).toLocaleString("nb-NO")}</b></span>}
+     {order.refundNoticeSentAt&&<span><small>Tilbakebetalingsbekreftelse</small><b>Sendt {new Date(order.refundNoticeSentAt).toLocaleString("nb-NO")}</b></span>}
     </div>
     <div className="field"><label>Betalingsreferanse <span className="muted">(f.eks. Vipps-ref., kontant eller bank)</span></label><input id={"payment-reference-"+order.id} defaultValue={order.paymentReference||""} maxLength={120} placeholder="Valgfri referanse"/></div>
-    {canUpdateOrders&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>registerPayment(order)}>{savingId===order.id?"Sender …":order.paymentStatus==="paid"?"Send betalingsbekreftelse på nytt":"Registrer betalt + send bekreftelse"}</button>}
+    {canUpdateOrders&&order.paymentStatus!=="refunded"&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>registerPayment(order)}>{savingId===order.id?"Sender …":order.paymentStatus==="paid"?"Send betalingsbekreftelse på nytt":"Registrer betalt + send bekreftelse"}</button>}
+    {Number(order.paymentCapturedOre)>Number(order.paymentRefundedOre||0)&&String(order.paymentProvider||"").toLowerCase()!=="vipps"&&<div className="orderRefundPanel">
+     <h4>Tilbakebetaling</h4>
+     <p className="muted">Gjenstår å kunne tilbakebetale: <b>{nok(Math.max(0,Number(order.paymentCapturedOre||0)-Number(order.paymentRefundedOre||0)))}</b></p>
+     <div className="field"><label>Beløp som tilbakebetales (kr)</label><input id={"refund-amount-"+order.id} inputMode="decimal" placeholder="0,00"/></div>
+     <div className="field"><label>Referanse <span className="muted">(bank/Vipps/kontant e.l.)</span></label><input id={"refund-reference-"+order.id} defaultValue={order.refundReference||""} maxLength={120} placeholder="Valgfri referanse"/></div>
+     <div className="field"><label>Merknad til kunden</label><textarea id={"refund-note-"+order.id} defaultValue={order.refundNote||""} maxLength={1000} rows="3" placeholder="Valgfritt"/></div>
+     {canUpdateOrders&&<button className="btn alt" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>recordRefund(order,false)}>{savingId===order.id?"Behandler …":"Registrer tilbakebetaling + send bekreftelse"}</button>}
+    </div>}
+    {String(order.paymentProvider||"").toLowerCase()==="vipps"&&Number(order.paymentCapturedOre)>Number(order.paymentRefundedOre||0)&&<p className="muted">Vipps-refusjon håndteres gjennom Vipps-betalingsflyten når den aktiveres.</p>}
+    {Number(order.refundLastOre)>0&&canUpdateOrders&&<button className="btn alt" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>recordRefund(order,true)}>{savingId===order.id?"Sender …":"Send tilbakebetalingsbekreftelse på nytt"}</button>}
    </div>}
    {order.status==="cancelled"&&<div className="orderPaymentPanel">
     <h4>Kansellering</h4>
