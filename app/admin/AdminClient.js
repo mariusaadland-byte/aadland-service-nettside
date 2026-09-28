@@ -405,6 +405,7 @@ export default function AdminClient({ user }) {
   if (canViewOrders) tabs.push(["archive", "Arkiv"]);
   if (canViewOrders) tabs.push(["surveys", "Befaringer"]);
   if (canViewOrders) tabs.push(["customers", "Kunder"]);
+  if (canUpdateOrders) tabs.push(["vipps", "Vipps"]);
   if (canManageProducts) tabs.push(["products", "Produkter"]);
   if (canManageProducts) tabs.push(["categories", "Kategorier"]);
   if (canManageProducts) tabs.push(["services", "Tjenester"]);
@@ -418,6 +419,7 @@ export default function AdminClient({ user }) {
 
   function chooseTab(id) {
     if (id === "drawing") { setMenuOpen(false); router.push("/admin/tegning"); return; }
+    if (id === "vipps") { setMenuOpen(false); router.push("/admin/vipps"); return; }
     setTab(id);
     setMenuOpen(false);
   }
