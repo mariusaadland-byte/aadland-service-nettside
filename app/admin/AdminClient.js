@@ -1067,7 +1067,7 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
      {order.refundNoticeSentAt&&<span><small>Tilbakebetalingsbekreftelse</small><b>Sendt {new Date(order.refundNoticeSentAt).toLocaleString("nb-NO")}</b></span>}
     </div>
     <div className="field"><label>Betalingsreferanse <span className="muted">(f.eks. Vipps-ref., kontant eller bank)</span></label><input id={"payment-reference-"+order.id} defaultValue={order.paymentReference||""} maxLength={120} placeholder="Valgfri referanse"/></div>
-    {canUpdateOrders&&order.paymentStatus!=="refunded"&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>registerPayment(order)}>{savingId===order.id?"Sender …":order.paymentStatus==="paid"?"Send betalingsbekreftelse på nytt":"Registrer betalt + send bekreftelse"}</button>}
+    {canUpdateOrders&&order.paymentStatus!=="refunded"&&Number(order.paymentRefundedOre||0)===0&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>registerPayment(order)}>{savingId===order.id?"Sender …":order.paymentStatus==="paid"?"Send betalingsbekreftelse på nytt":"Registrer betalt + send bekreftelse"}</button>}
     {Number(order.paymentCapturedOre)>Number(order.paymentRefundedOre||0)&&String(order.paymentProvider||"").toLowerCase()!=="vipps"&&<div className="orderRefundPanel">
      <h4>Tilbakebetaling</h4>
      <p className="muted">Gjenstår å kunne tilbakebetale: <b>{nok(Math.max(0,Number(order.paymentCapturedOre||0)-Number(order.paymentRefundedOre||0)))}</b></p>
