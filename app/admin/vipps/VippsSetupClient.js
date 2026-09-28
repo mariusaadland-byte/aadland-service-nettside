@@ -5,9 +5,10 @@ import Link from "next/link";
 
 const labels={
  disabled:"Vipps er slått av",
+ configured_disabled:"Nøkler klare – Vipps fortsatt av",
  missing_configuration:"Vipps mangler konfigurasjon",
  environment_mismatch:"Vipps-miljøet er feil",
- ready:"Vipps er klar"
+ ready:"Vipps er aktivert"
 };
 
 export default function VippsSetupClient(){
@@ -72,8 +73,8 @@ export default function VippsSetupClient(){
     </div>}
     {data?.connectionError&&<p className="notice">{data.connectionError}</p>}
     <div className="rentalBookingActions" style={{marginTop:16}}>
-     <button className="btn alt" type="button" disabled={!status.enabled||busy} onClick={()=>action("test-connection")}>{busy==="test-connection"?"Tester …":"Test Vipps-forbindelsen"}</button>
-     <button className="btn" type="button" disabled={!status.enabled||busy||(data?.vercelEnvironment==="preview"&&!data?.bypassConfigured)} onClick={()=>action("register-webhook")}>{busy==="register-webhook"?"Registrerer …":"Registrer webhook"}</button>
+     <button className="btn alt" type="button" disabled={!status.credentialsReady||busy} onClick={()=>action("test-connection")}>{busy==="test-connection"?"Tester …":"Test Vipps-forbindelsen"}</button>
+     <button className="btn" type="button" disabled={!status.credentialsReady||busy||(data?.vercelEnvironment==="preview"&&!data?.bypassConfigured)} onClick={()=>action("register-webhook")}>{busy==="register-webhook"?"Registrerer …":"Registrer webhook"}</button>
     </div>
    </div>
 
@@ -90,7 +91,8 @@ export default function VippsSetupClient(){
 
    <div className="card" style={{marginTop:18}}>
     <h3>Før test</h3>
-    <p className="muted">Vipps er fortsatt av helt til Preview har testnøkler og <b>VIPPS_ENABLED=true</b>. Preview-beskyttelsen krever også Vercel Protection Bypass for Automation slik at Vipps kan nå webhooken.</p>
+    <p className="muted">Legg først inn testnøklene i Preview mens <b>VIPPS_ENABLED=false</b>. Da kan forbindelsen testes og webhooken registreres uten at Vipps-knappen vises for kunder.</p>
+    <p className="muted">Preview-beskyttelsen krever Vercel Protection Bypass for Automation slik at Vipps kan nå webhooken. Når testen er klar, settes <b>VIPPS_ENABLED=true</b> kun i Preview.</p>
     <p className="muted">Webhook-hemmeligheten lagres automatisk i Supabase og vises ikke i nettleseren.</p>
    </div>
   </section>
