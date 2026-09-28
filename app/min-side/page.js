@@ -444,6 +444,14 @@ export default function MinSide(){
      <span><small>Levering</small><b>{fulfillmentStatus[o.fulfillment_type]||o.fulfillment_type||"Ikke registrert"}</b></span>
      {Number(o.shipping_ore)>0&&<span><small>Frakt</small><b>{kr(o.shipping_ore)}</b></span>}
     </div>
+    {o.fulfillment_type==="delivery"&&<div className="customerPaymentConfirmation">
+     <b>{o.delivery_within_radius===true?"✓ Leveringsområdet er godkjent":o.delivery_within_radius===false?"Leveringsadressen er utenfor 15 km":"Leveringsområdet kontrolleres"}</b>
+     <span>{o.delivery_within_radius===true
+      ?"Adressen er godkjent for lokal levering innen 15 km."
+      :o.delivery_within_radius===false
+       ?"Vi tar kontakt for å avtale henting eller en annen løsning."
+       :"Vi kontrollerer adressen før bestillingen bekreftes."}</span>
+    </div>}
     {o.confirmation_sent_at&&<div className="customerPaymentConfirmation">
      <b>✓ Ordrebekreftelse sendt</b>
      <span>Sendt {dateTimeFull(o.confirmation_sent_at)}</span>
