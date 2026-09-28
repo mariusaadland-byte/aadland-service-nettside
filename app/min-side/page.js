@@ -448,6 +448,12 @@ export default function MinSide(){
      <b>✓ Ordrebekreftelse sendt</b>
      <span>Sendt {dateTimeFull(o.confirmation_sent_at)}</span>
     </div>}
+    {(o.confirmed_at||o.in_progress_at)&&<div className="customerPaymentConfirmation">
+     <b>Ordrefremdrift</b>
+     {o.confirmed_at&&<span>✓ Bekreftet {dateTimeFull(o.confirmed_at)}{o.confirmed_notice_sent_at?" · kunde varslet "+dateTimeFull(o.confirmed_notice_sent_at):""}</span>}
+     {o.in_progress_at&&<span>✓ Under arbeid {dateTimeFull(o.in_progress_at)}{o.in_progress_notice_sent_at?" · kunde varslet "+dateTimeFull(o.in_progress_notice_sent_at):""}</span>}
+    </div>}
+
     {o.status==="cancelled"&&<div className="customerPaymentConfirmation">
      <b>Bestillingen er kansellert</b>
      {o.cancellation_reason&&<span>Årsak: {o.cancellation_reason}</span>}
