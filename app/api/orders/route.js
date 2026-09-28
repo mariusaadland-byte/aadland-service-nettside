@@ -16,7 +16,6 @@ export async function POST(req){
   const body=await req.json();
   if(!["order","custom"].includes(body.orderType))return NextResponse.json({error:"Ugyldig bestillingstype."},{status:400});
   const paymentMethod=body.orderType==="order"?(String(body.paymentMethod||"manual")==="vipps"?"vipps":"manual"):"manual";
-  if(paymentMethod==="vipps"&&!vippsPublicStatus().enabled)return NextResponse.json({error:"Vipps-betaling er ikke tilgjengelig akkurat nå.",code:"vipps_disabled"},{status:503});
   const email=String(body.customer?.email||"").trim().toLowerCase(),name=String(body.customer?.name||"").trim(),phone=String(body.customer?.phone||"").trim();
   if(!name||!email||!phone)return NextResponse.json({error:"Fyll inn navn, e-post og telefon."},{status:400});
   if(name.length>120||email.length>254||phone.length>40)return NextResponse.json({error:"Kontaktinformasjonen er for lang."},{status:400});
@@ -24,6 +23,15 @@ export async function POST(req){
   if(body.orderType==="custom"&&!String(body.customRequest||"").trim())return NextResponse.json({error:"Beskriv hva du ønsker hjelp med."},{status:400});
   if(String(body.customRequest||"").length>12000)return NextResponse.json({error:"Forespørselen er for lang."},{status:400});
   const s=db(); if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+  if(paymentMethod==="vipps"){
+   const vippsStatus=vippsPublicStatus();
+   if(!vippsStatus.enabled)return NextResponse.json({error:"Vipps-betaling er ikke tilgjengelig akkurat nå.",code:"vipps_disabled"},{status:503});
+   const {data:webhookReady,error:webhookError}=await s.rpc("has_active_vipps_webhook_registration",{target_environment:vippsStatus.environment});
+   if(webhookError||webhookReady!==true){
+    if(webhookError)console.error("VIPPS CHECKOUT WEBHOOK READINESS ERROR",webhookError);
+    return NextResponse.json({error:"Vipps-betaling er ikke klar ennå.",code:"vipps_webhook_missing"},{status:503});
+   }
+  }
   let items=[],total=0,shipping=0,stockRequests=[];
   if(body.orderType==="order"){
    if(body.acceptedTerms!==true)return NextResponse.json({error:"Du må godta salgsbetingelsene før bestilling."},{status:400});
