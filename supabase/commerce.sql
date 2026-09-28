@@ -333,6 +333,7 @@ where in_progress_at is not null;
 -- Manuell tilbakebetaling av produktordre.
 -- Bruker de samme summeringsfeltene som Vipps-integrasjonen senere vil bruke.
 alter table public.orders
+ add column if not exists payment_provider text,
  add column if not exists payment_refunded_ore integer not null default 0,
  add column if not exists payment_refunded_at timestamptz,
  add column if not exists refund_last_ore integer not null default 0,
