@@ -39,7 +39,7 @@ returns boolean
 language plpgsql
 security definer
 set search_path = pg_catalog, private
-as $
+as $vipps_event$
 begin
   insert into private.vipps_payment_events(
     psp_reference,payment_reference,event_name,amount_ore,payload
@@ -51,7 +51,7 @@ begin
 
   return found;
 end;
-$;
+$vipps_event$;
 
 revoke all on function public.record_vipps_payment_event_once(text,text,text,integer,jsonb) from public,anon,authenticated;
 grant execute on function public.record_vipps_payment_event_once(text,text,text,integer,jsonb) to service_role;
