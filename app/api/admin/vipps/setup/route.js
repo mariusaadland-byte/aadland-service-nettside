@@ -59,7 +59,7 @@ export async function GET(req){
  if(access.error)return access.error;
  const status=vippsPublicStatus();
  const bypassConfigured=Boolean(String(process.env.VERCEL_AUTOMATION_BYPASS_SECRET||"").trim());
- if(!status.enabled){
+ if(!status.credentialsReady){
   return NextResponse.json({
    status,
    bypassConfigured,
@@ -68,7 +68,7 @@ export async function GET(req){
   },{headers:{"Cache-Control":"private, no-store, max-age=0"}});
  }
  try{
-  const webhooks=await listVippsWebhooks();
+  const webhooks=await listVippsWebhooks({allowDisabled:true});
   return NextResponse.json({
    status,
    bypassConfigured,
@@ -92,14 +92,14 @@ export async function POST(req){
  const access=await requireAdmin();
  if(access.error)return access.error;
  const config=vippsConfig();
- if(!config.enabled)return NextResponse.json({error:"Vipps er ikke aktivert eller mangler nødvendige nøkler."},{status:409});
+ if(!config.complete||config.productionMismatch)return NextResponse.json({error:"Vipps mangler gyldige API-nøkler eller har feil miljø."},{status:409});
  const body=await req.json().catch(()=>({}));
  const action=String(body.action||"");
  const s=db(); if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
 
  if(action==="test-connection"){
   try{
-   const webhooks=await listVippsWebhooks();
+   const webhooks=await listVippsWebhooks({allowDisabled:true});
    return NextResponse.json({ok:true,count:webhooks.length});
   }catch(error){
    console.error("VIPPS CONNECTION TEST ERROR",error);
@@ -122,7 +122,7 @@ export async function POST(req){
   }
 
   try{
-   const registered=await registerVippsWebhook({url:callbackUrl,events:EVENTS});
+   const registered=await registerVippsWebhook({url:callbackUrl,events:EVENTS,allowDisabled:true});
    const webhookId=String(registered?.id||"").trim();
    const secret=String(registered?.secret||"").trim();
    if(!webhookId||!secret)throw new Error("VIPPS_WEBHOOK_RESPONSE_INCOMPLETE");
@@ -135,7 +135,7 @@ export async function POST(req){
    });
    if(storeError){
     console.error("VIPPS WEBHOOK SECRET STORE ERROR",storeError);
-    try{await deleteVippsWebhook(webhookId)}catch(cleanupError){console.error("VIPPS WEBHOOK CLEANUP ERROR",cleanupError)}
+    try{await deleteVippsWebhook(webhookId,{allowDisabled:true})}catch(cleanupError){console.error("VIPPS WEBHOOK CLEANUP ERROR",cleanupError)}
     return NextResponse.json({error:"Webhooken ble opprettet hos Vipps, men hemmeligheten kunne ikke lagres sikkert. Registreringen er forsøkt slettet."},{status:500});
    }
    return NextResponse.json({
@@ -156,7 +156,7 @@ export async function POST(req){
   const webhookId=String(body.webhookId||"").trim();
   if(!webhookId)return NextResponse.json({error:"Webhook-ID mangler."},{status:400});
   try{
-   await deleteVippsWebhook(webhookId);
+   await deleteVippsWebhook(webhookId,{allowDisabled:true});
    const {error:deactivateError}=await s.rpc("deactivate_vipps_webhook_registration",{
     target_webhook_id:webhookId,
     target_environment:config.environment
