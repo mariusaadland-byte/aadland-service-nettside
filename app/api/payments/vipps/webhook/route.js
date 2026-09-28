@@ -11,7 +11,7 @@ export async function POST(req){
  const webhookId=String(req.headers.get("webhook-id")||"").trim();
  if(!webhookId)return NextResponse.json({error:"Webhook-Id mangler."},{status:401});
  const s=db(); if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
- const {data:webhookSecret,error:secretError}=await s.rpc("get_vipps_webhook_secret",{
+ const {data:webhookAuth,error:secretError}=await s.rpc("get_vipps_webhook_auth",{
   target_webhook_id:webhookId,
   target_environment:config.environment
  });
@@ -19,18 +19,20 @@ export async function POST(req){
   console.error("VIPPS WEBHOOK SECRET LOOKUP ERROR",secretError);
   return NextResponse.json({error:"Webhook kunne ikke autentiseres."},{status:500});
  }
- if(!webhookSecret)return NextResponse.json({error:"Ukjent webhook."},{status:401});
+ const webhookSecret=String(webhookAuth?.secret||"");
+ const registeredUrl=String(webhookAuth?.callback_url||"");
+ if(!webhookSecret||!registeredUrl)return NextResponse.json({error:"Ukjent webhook."},{status:401});
+ let signingUrl;
+ try{signingUrl=new URL(registeredUrl)}catch{return NextResponse.json({error:"Webhook-oppsettet er ugyldig."},{status:500})}
  const rawBody=await req.text();
- const url=new URL(req.url);
  const dateHeader=req.headers.get("x-ms-date")||"";
  const contentHashHeader=req.headers.get("x-ms-content-sha256")||"";
  const authorization=req.headers.get("authorization")||req.headers.get("x-vipps-authorization")||"";
- const host=req.headers.get("host")||url.host;
  const valid=verifyVippsWebhook({
   rawBody,
   method:"POST",
-  pathAndQuery:url.pathname+url.search,
-  host,
+  pathAndQuery:signingUrl.pathname+signingUrl.search,
+  host:signingUrl.host,
   dateHeader,
   contentHashHeader,
   authorization,
