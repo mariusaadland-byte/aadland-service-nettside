@@ -45,6 +45,10 @@ const mapOrder = (o) => ({
   dispatchedAt: o.dispatched_at || null,
   deliveredAt: o.delivered_at || null,
   readyNoticeSentAt: o.ready_notice_sent_at || null,
+  cancellationReason: o.cancellation_reason || "",
+  cancellationSentAt: o.cancellation_sent_at || null,
+  cancelledAt: o.cancelled_at || null,
+  stockReleasedAt: o.stock_released_at || null,
   archivedAt: o.archived_at || null,
 });
 
@@ -151,9 +155,10 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     );
   }
 
-  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference } = await req.json();
+  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, cancellationReason } = await req.json();
   if(adminNote!==undefined&&String(adminNote||"").length>5000)return NextResponse.json({error:"Internt notat kan være maks 5000 tegn."},{status:400});
   if(paymentReference!==undefined&&String(paymentReference||"").length>120)return NextResponse.json({error:"Betalingsreferansen er for lang."},{status:400});
+  if(cancellationReason!==undefined&&String(cancellationReason||"").length>1000)return NextResponse.json({error:"Kanselleringsårsaken kan være maks 1000 tegn."},{status:400});
   if(trackingNumber!==undefined&&String(trackingNumber||"").length>120)return NextResponse.json({error:"Sporingsnummeret er for langt."},{status:400});
   if(trackingUrl!==undefined){const value=String(trackingUrl||"").trim();if(value.length>1000)return NextResponse.json({error:"Sporingslenken er for lang."},{status:400});if(value&&!safeHttpsUrl(value))return NextResponse.json({error:"Sporingslenken må være en gyldig https-adresse."},{status:400});}
 
@@ -187,6 +192,93 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
       { error: "Databasen er ikke tilgjengelig." },
       { status: 500 }
     );
+  }
+
+  if(status==="cancelled"&&action!=="cancel-and-notify"){
+    const {data:order,error:findError}=await s.from("orders").select("order_type").eq("id",id).maybeSingle();
+    if(findError)return NextResponse.json({error:"Bestillingen kunne ikke hentes."},{status:500});
+    if(order?.order_type==="order"){
+      return NextResponse.json({error:"Produktordre må kanselleres med «Kanseller ordre + varsle kunde», slik at lager og kundevarsel håndteres riktig."},{status:409});
+    }
+  }
+
+  if(action==="cancel-and-notify"){
+    const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+    if(order.order_type!=="order")return NextResponse.json({error:"Denne kanselleringsflyten gjelder produktbestillinger."},{status:400});
+    if(order.status==="completed")return NextResponse.json({error:"En fullført bestilling kan ikke kanselleres."},{status:409});
+
+    const reason=String(cancellationReason??order.cancellation_reason??"").trim().slice(0,1000);
+    const {data:cancelResult,error:cancelError}=await s.rpc("cancel_product_order_once",{
+      target_order_id:id,
+      customer_reason:reason||null
+    });
+    if(cancelError){
+      console.error("ORDER CANCEL ERROR",cancelError);
+      const message=String(cancelError.message||"");
+      if(message.includes("ORDER_ALREADY_COMPLETED"))return NextResponse.json({error:"En fullført bestilling kan ikke kanselleres."},{status:409});
+      return NextResponse.json({error:"Bestillingen kunne ikke kanselleres."},{status:500});
+    }
+
+    const customerEmail=String(order.customer?.email||"").trim().toLowerCase();
+    if(!customerEmail)return NextResponse.json({ok:true,status:"cancelled",statusSaved:true,warning:"Bestillingen er kansellert, men kunden mangler e-postadresse.",cancelResult});
+
+    const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
+    if(!resendKey)return NextResponse.json({error:"Bestillingen er kansellert og lageret er frigjort, men e-post er ikke konfigurert.",statusSaved:true},{status:503});
+
+    try{
+      const {Resend}=await import("resend");
+      const resend=new Resend(resendKey);
+      const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
+      const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+      const requestOrigin=new URL(req.url).origin;
+      const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
+      const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
+      const accountUrl=order.customer_user_id?base+"/min-side":"";
+      const paymentRegistered=["paid","partial","authorized"].includes(String(order.payment_status||""));
+      const reasonBlock=reason?`<div style="margin-top:18px;padding:16px;background:#101010;border:1px solid #2d2d2d"><div style="color:#8e887f;font-size:11px">ÅRSAK</div><div style="margin-top:6px;color:#fff;line-height:1.6">${esc(reason)}</div></div>`:"";
+      const paymentText=paymentRegistered
+        ?`<p style="margin:18px 0 0;color:#d9b365;line-height:1.6"><b>Betaling:</b> Det er registrert betaling/reservasjon på bestillingen. Dette betyr ikke at beløpet er automatisk refundert. Vi håndterer eventuell tilbakebetaling separat og tar kontakt ved behov.</p>`
+        :"";
+      const html=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111;padding:28px 12px"><tr><td align="center">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#181818;border:1px solid #34312b">
+<tr><td style="padding:22px 30px;background:#0d0d0d"><img src="https://www.aadland-service.no/aadland-service-logo.webp" alt="Aadland Service" width="180" style="display:block;width:180px;max-width:100%;height:auto;border:0"/><div style="margin-top:8px;color:#d9b365;font-size:10px;font-weight:800;letter-spacing:.12em">BESTILLING</div></td></tr>
+<tr><td style="padding:30px">
+<div style="color:#d9b365;font-size:11px;font-weight:800;letter-spacing:.12em">${esc(order.order_number)}</div>
+<h1 style="font-size:27px;line-height:1.15;margin:9px 0 14px;color:#fff">Bestillingen er kansellert</h1>
+<p style="color:#c9c3b8;line-height:1.65;margin:0">Hei ${esc(order.customer?.name||"kunde")}. Bestillingen er nå registrert som kansellert hos Aadland Service.</p>
+${reasonBlock}
+${paymentText}
+${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:""}
+<p style="margin:24px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Har du spørsmål, kan du svare direkte på denne e-posten eller kontakte oss på 471 54 898.</p>
+</td></tr>
+<tr><td style="padding:18px 30px;border-top:1px solid #34312b;color:#8e887f;font-size:11px">Aadland Service · 471 54 898 · post@aadland-service.no</td></tr>
+</table></td></tr></table></body></html>`;
+
+      const sent=await resend.emails.send({
+        from,
+        to:customerEmail,
+        replyTo,
+        subject:"Bestillingen er kansellert – "+order.order_number,
+        html
+      });
+      if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
+      const sentAt=new Date().toISOString();
+      const {error:stampError}=await s.from("orders").update({cancellation_sent_at:sentAt,updated_at:sentAt}).eq("id",id);
+      if(stampError)console.error("ORDER CANCELLATION STAMP ERROR",stampError);
+      return NextResponse.json({
+        ok:true,
+        status:"cancelled",
+        sentTo:customerEmail,
+        sentAt,
+        paymentAttention:paymentRegistered,
+        cancelResult
+      });
+    }catch(error){
+      console.error("ORDER CANCELLATION EMAIL ERROR",error);
+      return NextResponse.json({error:"Bestillingen er kansellert og lageret er frigjort, men kundevarselet kunne ikke sendes.",statusSaved:true},{status:500});
+    }
   }
 
   if (action === "archive" || action === "restore") {
