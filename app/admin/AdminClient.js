@@ -305,6 +305,19 @@ export default function AdminClient({ user }) {
     ["confirmed", "in_progress", "ready"].includes(order.status)
   ).length;
 
+  const paymentAttentionOrders=activeOrders.filter(order=>{
+    if(order.orderType==="custom"||order.status!=="cancelled")return false;
+    const captured=Math.max(0,Number(order.paymentCapturedOre)||0);
+    const refunded=Math.max(0,Number(order.paymentRefundedOre)||0);
+    return order.paymentStatus==="authorized"||captured>refunded;
+  });
+  const paymentAttentionCount=paymentAttentionOrders.length;
+  const paymentAttentionOre=paymentAttentionOrders.reduce((sum,order)=>{
+    const captured=Math.max(0,Number(order.paymentCapturedOre)||0);
+    const refunded=Math.max(0,Number(order.paymentRefundedOre)||0);
+    return sum+Math.max(0,captured-refunded);
+  },0);
+
   const total = activeOrders.reduce(
     (sum, order) => sum + (order.totalOre || 0),
     0
@@ -323,6 +336,20 @@ export default function AdminClient({ user }) {
   const nowMs=Date.now();
   const soonMs=nowMs+72*60*60*1000;
   const attentionItems = [
+    ...paymentAttentionOrders
+      .map(order=>{
+        const captured=Math.max(0,Number(order.paymentCapturedOre)||0);
+        const refunded=Math.max(0,Number(order.paymentRefundedOre)||0);
+        const remaining=Math.max(0,captured-refunded);
+        return {
+          key:"payment-attention-"+order.id,
+          sort:0,
+          eyebrow:order.paymentStatus==="authorized"?"RESERVERT BETALING MÅ AVKLARES":"TILBAKEBETALING MANGLER",
+          title:order.customerName||"Ukjent kunde",
+          meta:remaining>0?(order.orderNumber+" · "+nok(remaining)+" gjenstår"):(order.orderNumber||""),
+          tab:"orders"
+        };
+      }),
     ...activeOrders
       .filter(order=>order.orderType==="custom"&&!order.sourceQuoteId&&order.status==="new")
       .map(order=>({
@@ -563,6 +590,14 @@ export default function AdminClient({ user }) {
 
               {canViewOrders && (
                 <>
+                  <div className="stat">
+                    <span className="muted">
+                      Betaling må avklares
+                    </span>
+                    <br />
+                    <b>{paymentAttentionCount}</b>
+                    {paymentAttentionOre>0&&<><br/><small className="muted">{nok(paymentAttentionOre)}</small></>}
+                  </div>
                   <div className="stat">
                     <span className="muted">
                       Tilbud venter svar
@@ -824,6 +859,15 @@ function Customers({orders,bookings,profiles,quotes}) {
 function Orders({ orders, status, canUpdateOrders, reload }) {
  const [openId,setOpenId]=useState(null),[savingId,setSavingId]=useState(null),[message,setMessage]=useState("");
  async function archive(order){
+  const captured=Math.max(0,Number(order.paymentCapturedOre)||0);
+  const refunded=Math.max(0,Number(order.paymentRefundedOre)||0);
+  if(order.orderType!=="custom"&&order.status==="cancelled"&&(order.paymentStatus==="authorized"||captured>refunded)){
+   const text=order.paymentStatus==="authorized"
+    ?"Denne ordren har fortsatt en reservert betaling som må avklares før den kan arkiveres."
+    :"Denne ordren mangler "+nok(Math.max(0,captured-refunded))+" i tilbakebetaling og kan ikke arkiveres ennå.";
+   setMessage(text);
+   return;
+  }
   if(!confirm("Flytte denne til arkivet?"))return;
   setSavingId(order.id);
   setMessage("");
@@ -1032,6 +1076,12 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
   <div className="orderCardTop"><div><div className="kicker">{order.orderNumber}</div><h3>{order.customerName||"Ukjent kunde"}</h3><small className="muted">{new Date(order.createdAt).toLocaleString("nb-NO")}</small></div><b>{nok(order.totalOre||0)}</b></div>
   <p>{order.customerPhone&&<>{order.customerPhone}<br/></>}{order.customerEmail}</p>
   <div className="orderBadges"><span>{order.fulfillmentType==="delivery"?"Levering":order.fulfillmentType==="shipping"?"Sending":"Henting"}</span><span>Betaling: {order.paymentStatus==="pending"?"Venter":order.paymentStatus==="authorized"?"Reservert":order.paymentStatus==="paid"?"Betalt":order.paymentStatus==="refunded"?"Refundert":order.paymentStatus}</span></div>
+  {order.orderType!=="custom"&&order.status==="cancelled"&&(order.paymentStatus==="authorized"||Number(order.paymentCapturedOre||0)>Number(order.paymentRefundedOre||0))&&<div className="notice">
+   <b>Betaling må avklares før arkivering.</b>
+   {order.paymentStatus==="authorized"
+    ?<span> Betalingen står fortsatt som reservert.</span>
+    :<span> Gjenstår å tilbakebetale: {nok(Math.max(0,Number(order.paymentCapturedOre||0)-Number(order.paymentRefundedOre||0)))}</span>}
+  </div>}
   <div className="field"><label>Status</label><b>{labels[order.status]||order.status}</b></div>
   <button className="btn alt" type="button" onClick={()=>setOpenId(openId===order.id?null:order.id)}>{openId===order.id?"Skjul detaljer":"Vis detaljer"}</button>
   {openId===order.id&&<div className="orderDetails">
@@ -1098,7 +1148,7 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
  {canUpdateOrders&&<div className="orderActions">
   {order.orderType!=="custom"&&order.status==="new"&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>setProductProgress(order,"confirmed",false)}>{savingId===order.id?"Sender …":"Bekreft ordre + varsle"}</button>}
   {order.orderType!=="custom"&&order.status==="confirmed"&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>setProductProgress(order,"in_progress",false)}>{savingId===order.id?"Sender …":"Sett under arbeid + varsle"}</button>}
-  {["completed","cancelled"].includes(order.status)&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>archive(order)}>Arkiver</button>}
+  {["completed","cancelled"].includes(order.status)&&<button className="btn alt" type="button" disabled={savingId===order.id||(order.orderType!=="custom"&&order.status==="cancelled"&&(order.paymentStatus==="authorized"||Number(order.paymentCapturedOre||0)>Number(order.paymentRefundedOre||0)))} onClick={()=>archive(order)}>{order.orderType!=="custom"&&order.status==="cancelled"&&(order.paymentStatus==="authorized"||Number(order.paymentCapturedOre||0)>Number(order.paymentRefundedOre||0))?"Arkivering sperret":"Arkiver"}</button>}
   {order.orderType!=="custom"&&["in_progress","ready"].includes(order.status)&&["pickup","delivery"].includes(order.fulfillmentType)&&<button className="btn alt" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>markReady(order)}>{savingId===order.id?"Sender …":order.status==="ready"||order.readyNoticeSentAt?"Send klar-varsel på nytt":order.fulfillmentType==="pickup"?"Klar for henting + varsle":"Klar for levering + varsle"}</button>}
   {order.orderType!=="custom"&&order.fulfillmentType==="shipping"&&order.status==="in_progress"&&<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-dispatched")}>Sendt til kunde</button>}
   {order.orderType!=="custom"&&order.fulfillmentType!=="shipping"&&order.status==="ready"&&<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-delivered")}>Levert til kunde</button>}
