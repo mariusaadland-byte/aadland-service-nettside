@@ -8,6 +8,7 @@ import { db, fromDbProduct } from "../../../../lib/supabase";
 import {safeHttpsUrl} from "../../../../lib/safeUrl";
 import {buildReceiptEmail} from "../../../../lib/receiptEmail";
 import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
+import {buildOrderConfirmationEmail} from "../../../../lib/orderConfirmationEmail";
 
 function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 
@@ -40,6 +41,7 @@ const mapOrder = (o) => ({
   paymentReference: o.payment_reference || "",
   paymentCapturedOre: Number(o.payment_captured_ore)||0,
   receiptSentAt: o.receipt_sent_at || null,
+  confirmationSentAt: o.confirmation_sent_at || null,
   trackingNumber: o.tracking_number || "",
   trackingUrl: o.tracking_url || "",
   dispatchedAt: o.dispatched_at || null,
@@ -285,6 +287,50 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     const {error:archiveError}=await s.from("orders").update({archived_at:action==="archive"?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("id",id);
     if(archiveError)return NextResponse.json({error:"Arkivstatus kunne ikke lagres."},{status:500});
     return NextResponse.json({ok:true});
+  }
+
+  if(action==="send-order-confirmation"){
+    const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+    if(order.order_type!=="order")return NextResponse.json({error:"Ordrebekreftelse gjelder produktbestillinger."},{status:400});
+    const email=String(order.customer?.email||"").trim().toLowerCase();
+    if(!email)return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
+    const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
+    if(!resendKey)return NextResponse.json({error:"E-post er ikke konfigurert."},{status:503});
+    try{
+      const {Resend}=await import("resend");
+      const resend=new Resend(resendKey);
+      const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
+      const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+      const requestOrigin=new URL(req.url).origin;
+      const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
+      const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
+      const minSideUrl=base+"/min-side";
+      const accountUrl=order.customer_user_id?minSideUrl:"";
+      const html=buildOrderConfirmationEmail({
+        orderNumber:order.order_number,
+        customerName:order.customer?.name||"kunde",
+        totalOre:Number(order.total_ore)||0,
+        isCustom:false,
+        accountUrl,
+        minSideUrl
+      });
+      const sent=await resend.emails.send({
+        from,
+        to:email,
+        replyTo,
+        subject:"Ordrebekreftelse "+order.order_number,
+        html
+      });
+      if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
+      const sentAt=new Date().toISOString();
+      const {error:stampError}=await s.from("orders").update({confirmation_sent_at:sentAt,updated_at:sentAt}).eq("id",id);
+      if(stampError)console.error("ORDER CONFIRMATION RESEND STAMP ERROR",stampError);
+      return NextResponse.json({ok:true,sentTo:email,sentAt});
+    }catch(error){
+      console.error("ORDER CONFIRMATION RESEND ERROR",error);
+      return NextResponse.json({error:"Ordrebekreftelsen kunne ikke sendes."},{status:500});
+    }
   }
 
   if(action==="record-paid-and-send-receipt"){
