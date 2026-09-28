@@ -24,7 +24,7 @@ Vipps er **av som standard**. Dagens manuelle betalingsflyt fortsetter helt uend
 
 Trygg aktiveringsrekkefølge:
 
-1. Migreringene `20260928051633_vipps_epayment_orders.sql`, `20260928052246_vipps_webhook_registration.sql` og `20260928052649_vipps_webhook_readiness.sql` må være kjørt mot riktig Supabase-prosjekt.
+1. Migreringene `20260928051633_vipps_epayment_orders.sql`, `20260928052246_vipps_webhook_registration.sql`, `20260928052649_vipps_webhook_readiness.sql` og `20260928053104_vipps_webhook_auth_context.sql` må være kjørt mot riktig Supabase-prosjekt.
 2. Legg inn `VIPPS_CLIENT_ID`, `VIPPS_CLIENT_SECRET`, `VIPPS_SUBSCRIPTION_KEY`, `VIPPS_MSN` og `VIPPS_ENVIRONMENT=test` i Vercel **Preview**, men la `VIPPS_ENABLED=false`.
 3. Aktiver **Protection Bypass for Automation** i Vercel. Preview-webhooken bruker bypass-verdien automatisk; den skal ikke kopieres til Git.
 4. Åpne `/admin/vipps`, test forbindelsen og registrer webhooken. Vipps sin webhook-secret lagres automatisk i Supabase sitt private schema og vises ikke i nettleseren.
