@@ -40,8 +40,7 @@ if(vippsEnabled){
   "VIPPS_CLIENT_ID",
   "VIPPS_CLIENT_SECRET",
   "VIPPS_SUBSCRIPTION_KEY",
-  "VIPPS_MSN",
-  "VIPPS_WEBHOOK_SECRET"
+  "VIPPS_MSN"
  ];
  const vippsMissing=vippsRequired.filter(name=>!String(process.env[name]||"").trim());
  if(vippsMissing.length){
