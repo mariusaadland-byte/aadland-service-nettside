@@ -455,6 +455,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
         customerName:order.customer?.name||"kunde",
         totalOre:Number(order.total_ore)||0,
         isCustom:false,
+        fulfillmentType:order.fulfillment_type||"pickup",
         accountUrl,
         minSideUrl
       });
