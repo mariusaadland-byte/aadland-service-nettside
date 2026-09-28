@@ -2,6 +2,7 @@ import {NextResponse} from "next/server";
 import {getCustomer} from "../../../../lib/customer-auth";
 import {db} from "../../../../lib/supabase";
 import {createQuoteToken} from "../../../../lib/quoteLinks";
+import {safeHttpsUrl} from "../../../../lib/safeUrl";
 
 function mapQuote(quote){
  const token=createQuoteToken(quote);
@@ -43,7 +44,7 @@ export async function GET(){
 
  const [ordersResult,rentalsResult,rentalPaymentResult,quotesResult]=await Promise.all([
   s.from("orders")
-   .select("id,order_number,order_type,status,total_ore,shipping_ore,payment_status,payment_reference,payment_captured_ore,receipt_sent_at,fulfillment_type,items,custom_request,survey_date,survey_confirmation_sent_at,survey_reminder_sent_at,created_at,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at,job_reminder_sent_at")
+   .select("id,order_number,order_type,status,total_ore,shipping_ore,payment_status,payment_reference,payment_captured_ore,receipt_sent_at,fulfillment_type,items,custom_request,survey_date,survey_confirmation_sent_at,survey_reminder_sent_at,created_at,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at,job_reminder_sent_at,ready_notice_sent_at,tracking_number,tracking_url,tracking_sent_at,dispatched_at,delivered_at")
    .eq("customer_user_id",customer.id)
    .order("created_at",{ascending:false})
    .limit(100),
@@ -136,6 +137,7 @@ export async function GET(){
 
  const orders=orderRows.map(order=>({
   ...order,
+  tracking_url:safeHttpsUrl(order.tracking_url)||null,
   items:Array.isArray(order.items)?order.items.map(item=>({
    ...item,
    productSlug:productLinks.get(String(item?.productId||""))||null
