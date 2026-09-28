@@ -444,6 +444,21 @@ export default function MinSide(){
      <span><small>Levering</small><b>{fulfillmentStatus[o.fulfillment_type]||o.fulfillment_type||"Ikke registrert"}</b></span>
      {Number(o.shipping_ore)>0&&<span><small>Frakt</small><b>{kr(o.shipping_ore)}</b></span>}
     </div>
+    {o.status==="ready"&&["pickup","delivery"].includes(o.fulfillment_type)&&<div className="customerPaymentConfirmation">
+     <b>{o.fulfillment_type==="pickup"?"✓ Klar for henting":"✓ Klar for levering"}</b>
+     <span>{o.fulfillment_type==="pickup"?"Bestillingen er ferdig og klar for henting.":"Bestillingen er ferdig og klar for levering."}</span>
+     {o.ready_notice_sent_at&&<span>Varsel sendt {dateTimeFull(o.ready_notice_sent_at)}</span>}
+    </div>}
+    {o.fulfillment_type==="shipping"&&(o.tracking_number||o.tracking_url)&&<div className="customerPaymentConfirmation">
+     <b>✓ Bestillingen er sendt</b>
+     {o.tracking_number&&<span>Sporingsnummer: {o.tracking_number}</span>}
+     {o.tracking_url&&<a className="btn alt" href={o.tracking_url} target="_blank" rel="noopener noreferrer">Spor pakken</a>}
+     {o.dispatched_at&&<span>Sendt {dateTimeFull(o.dispatched_at)}</span>}
+    </div>}
+    {o.delivered_at&&<div className="customerPaymentConfirmation">
+     <b>✓ Bestillingen er levert</b>
+     <span>Registrert levert {dateTimeFull(o.delivered_at)}</span>
+    </div>}
     {o.payment_status==="paid"&&(o.payment_reference||o.receipt_sent_at)&&<div className="customerPaymentConfirmation">
      <b>✓ Betaling registrert</b>
      {o.payment_reference&&<span>Referanse: {o.payment_reference}</span>}
