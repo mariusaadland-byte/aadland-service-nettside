@@ -22,16 +22,17 @@ I Vercel må `RESEND_API_KEY` være satt i **Production** for at kundekonto, pas
 
 Vipps er **av som standard**. Dagens manuelle betalingsflyt fortsetter helt uendret så lenge `VIPPS_ENABLED` ikke er satt til `true`.
 
-Før Vipps aktiveres:
+Trygg aktiveringsrekkefølge:
 
-1. Kjør migreringen `supabase/migrations/20260928051633_vipps_epayment_orders.sql` mot riktig Supabase-prosjekt.
-2. Legg inn testnøkler i Vercel Preview: `VIPPS_CLIENT_ID`, `VIPPS_CLIENT_SECRET`, `VIPPS_SUBSCRIPTION_KEY` og `VIPPS_MSN`.
-3. Sett `VIPPS_ENVIRONMENT=test` og `VIPPS_ENABLED=true` **kun i Preview**.
-4. Registrer webhook mot preview-URL-en `/api/payments/vipps/webhook` og lagre hemmeligheten som `VIPPS_WEBHOOK_SECRET`.
-5. Redeploy preview og gjennomfør komplett test: opprett betaling, godkjenn, retur/status, backoffice-capture, kvittering/PDF, avbrutt/utløpt betaling og lagerfrigjøring.
-6. Først etter godkjent test legges produksjonsnøkler inn med `VIPPS_ENVIRONMENT=production`. Produksjonsbuilden avviser `VIPPS_ENABLED=true` dersom nødvendig Vipps-konfigurasjon mangler eller miljøet ikke er `production`.
+1. Migreringene `20260928051633_vipps_epayment_orders.sql`, `20260928052246_vipps_webhook_registration.sql` og webhook-readiness-migreringen må være kjørt mot riktig Supabase-prosjekt.
+2. Legg inn `VIPPS_CLIENT_ID`, `VIPPS_CLIENT_SECRET`, `VIPPS_SUBSCRIPTION_KEY`, `VIPPS_MSN` og `VIPPS_ENVIRONMENT=test` i Vercel **Preview**, men la `VIPPS_ENABLED=false`.
+3. Aktiver **Protection Bypass for Automation** i Vercel. Preview-webhooken bruker bypass-verdien automatisk; den skal ikke kopieres til Git.
+4. Åpne `/admin/vipps`, test forbindelsen og registrer webhooken. Vipps sin webhook-secret lagres automatisk i Supabase sitt private schema og vises ikke i nettleseren.
+5. Når forbindelse og webhook er bekreftet, sett `VIPPS_ENABLED=true` kun i Preview og redeploy.
+6. Test komplett betalingsflyt: opprett betaling, godkjenn, retur/status, backoffice-capture, automatisk kvittering/PDF, avbrutt/utløpt betaling og lagerfrigjøring.
+7. Først etter godkjent test gjentas oppsettet med produksjonsnøkler og `VIPPS_ENVIRONMENT=production`. Produksjonsbuilden avviser aktiv Vipps dersom nødvendige produksjonsnøkler mangler eller miljøet ikke er `production`.
 
-Vipps-hemmeligheter skal aldri legges i Git eller deles i chat.
+Koden viser ikke Vipps-knappen før både feature-flagget er aktivt **og** en aktiv webhook-registrering finnes i databasen. Vipps-hemmeligheter skal aldri legges i Git eller deles i chat.
 
 ## Database
 SQL-filene i `supabase/` beskriver databasegrunnlaget og senere utvidelser. De må kjøres kontrollert i riktig rekkefølge mot Supabase før funksjoner som bruker de nye tabellene/feltene tas i produksjon.
