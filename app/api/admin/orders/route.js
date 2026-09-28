@@ -173,7 +173,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     );
   }
 
-  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, cancellationReason, progressStatus, refundOre, refundReference, refundNote } = await req.json();
+  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, cancellationReason, progressStatus, refundOre, refundReference, refundNote, deliveryWithinRadius } = await req.json();
   if(adminNote!==undefined&&String(adminNote||"").length>5000)return NextResponse.json({error:"Internt notat kan være maks 5000 tegn."},{status:400});
   if(paymentReference!==undefined&&String(paymentReference||"").length>120)return NextResponse.json({error:"Betalingsreferansen er for lang."},{status:400});
   if(cancellationReason!==undefined&&String(cancellationReason||"").length>1000)return NextResponse.json({error:"Kanselleringsårsaken kan være maks 1000 tegn."},{status:400});
@@ -220,6 +220,31 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     if(order?.order_type==="order"){
       return NextResponse.json({error:"Produktordre må oppdateres med de egne ordreknappene, slik at status og kundevarsler håndteres riktig."},{status:409});
     }
+  }
+
+  if(action==="set-delivery-radius"){
+    if(typeof deliveryWithinRadius!=="boolean")return NextResponse.json({error:"Leveringskontrollen mangler gyldig verdi."},{status:400});
+    const {data:order,error:findError}=await s.from("orders").select("id,order_type,status,fulfillment_type").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+    if(order.order_type!=="order")return NextResponse.json({error:"Leveringskontroll gjelder produktbestillinger."},{status:400});
+    if(order.fulfillment_type!=="delivery")return NextResponse.json({error:"Bestillingen er ikke satt opp for lokal levering."},{status:409});
+    if(order.status!=="new")return NextResponse.json({error:"Leveringsområdet må avklares før bestillingen bekreftes."},{status:409});
+    const now=new Date().toISOString();
+    const {error:updateError}=await s.from("orders").update({delivery_within_radius:deliveryWithinRadius,updated_at:now}).eq("id",id);
+    if(updateError)return NextResponse.json({error:"Leveringskontrollen kunne ikke lagres."},{status:500});
+    return NextResponse.json({ok:true,deliveryWithinRadius});
+  }
+
+  if(action==="change-delivery-to-pickup"){
+    const {data:order,error:findError}=await s.from("orders").select("id,order_type,status,fulfillment_type").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+    if(order.order_type!=="order")return NextResponse.json({error:"Denne handlingen gjelder produktbestillinger."},{status:400});
+    if(order.fulfillment_type!=="delivery")return NextResponse.json({error:"Bestillingen er ikke satt opp for lokal levering."},{status:409});
+    if(order.status!=="new")return NextResponse.json({error:"Leveringsmåten kan bare endres før bestillingen er bekreftet."},{status:409});
+    const now=new Date().toISOString();
+    const {error:updateError}=await s.from("orders").update({fulfillment_type:"pickup",delivery_within_radius:false,updated_at:now}).eq("id",id);
+    if(updateError)return NextResponse.json({error:"Leveringsmåten kunne ikke endres."},{status:500});
+    return NextResponse.json({ok:true,fulfillmentType:"pickup"});
   }
 
   if(action==="cancel-and-notify"){
@@ -312,6 +337,13 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     const resendOnly=action==="resend-product-progress-notice";
     if(!resendOnly){
       if(nextStatus==="confirmed"&&order.status!=="new")return NextResponse.json({error:"Bare nye bestillinger kan bekreftes med denne handlingen."},{status:409});
+      if(nextStatus==="confirmed"&&order.fulfillment_type==="delivery"&&order.delivery_within_radius!==true){
+        return NextResponse.json({
+          error:order.delivery_within_radius===false
+            ?"Leveringsadressen er markert utenfor 15 km. Avtal en annen leveringsmåte før ordren bekreftes."
+            :"Kontroller først at leveringsadressen er innenfor 15 km."
+        },{status:409});
+      }
       if(nextStatus==="in_progress"&&order.status!=="confirmed")return NextResponse.json({error:"Bestillingen må være bekreftet før den settes under arbeid."},{status:409});
       const now=new Date().toISOString();
       const patch=nextStatus==="confirmed"
