@@ -8,6 +8,18 @@ export const dynamic="force-dynamic";
 export async function POST(req){
  const config=vippsConfig();
  if(!config.enabled)return NextResponse.json({error:"Vipps er ikke aktivert."},{status:404});
+ const webhookId=String(req.headers.get("webhook-id")||"").trim();
+ if(!webhookId)return NextResponse.json({error:"Webhook-Id mangler."},{status:401});
+ const s=db(); if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+ const {data:webhookSecret,error:secretError}=await s.rpc("get_vipps_webhook_secret",{
+  target_webhook_id:webhookId,
+  target_environment:config.environment
+ });
+ if(secretError){
+  console.error("VIPPS WEBHOOK SECRET LOOKUP ERROR",secretError);
+  return NextResponse.json({error:"Webhook kunne ikke autentiseres."},{status:500});
+ }
+ if(!webhookSecret)return NextResponse.json({error:"Ukjent webhook."},{status:401});
  const rawBody=await req.text();
  const url=new URL(req.url);
  const dateHeader=req.headers.get("x-ms-date")||"";
@@ -21,7 +33,8 @@ export async function POST(req){
   host,
   dateHeader,
   contentHashHeader,
-  authorization
+  authorization,
+  secret:webhookSecret
  });
  if(!valid)return NextResponse.json({error:"Ugyldig webhook-signatur."},{status:401});
 
@@ -34,7 +47,6 @@ export async function POST(req){
  const amountOre=Math.max(0,Math.round(Number(payload?.amount?.value)||0));
  if(!/^[a-zA-Z0-9-]{8,64}$/.test(reference)||!pspReference||!eventName)return NextResponse.json({error:"Webhook mangler påkrevde felt."},{status:400});
 
- const s=db(); if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
  const {data:recorded,error:recordError}=await s.rpc("record_vipps_payment_event_once",{
   event_psp_reference:pspReference,
   event_payment_reference:reference,
