@@ -478,6 +478,16 @@ export default function MinSide(){
      <span>Registrert levert {dateTimeFull(o.delivered_at)}</span>
      {o.delivery_notice_sent_at&&<span>Levert-varsel sendt {dateTimeFull(o.delivery_notice_sent_at)}</span>}
     </div>}
+    {Number(o.payment_refunded_ore)>0&&<div className="customerPaymentConfirmation">
+     <b>{Number(o.payment_refunded_ore)>=Number(o.payment_captured_ore||0)?"✓ Betalingen er tilbakebetalt":"✓ Delvis tilbakebetaling registrert"}</b>
+     {Number(o.refund_last_ore)>0&&<span>Sist tilbakebetalt: {kr(o.refund_last_ore)}</span>}
+     <span>Totalt tilbakebetalt: {kr(o.payment_refunded_ore)}</span>
+     {Number(o.payment_captured_ore)>Number(o.payment_refunded_ore)&&<span>Netto registrert betaling etter tilbakebetaling: {kr(Number(o.payment_captured_ore)-Number(o.payment_refunded_ore))}</span>}
+     {o.refund_reference&&<span>Referanse: {o.refund_reference}</span>}
+     {o.refund_note&&<span>Merknad: {o.refund_note}</span>}
+     {o.payment_refunded_at&&<span>Registrert {dateTimeFull(o.payment_refunded_at)}</span>}
+     {o.refund_notice_sent_at&&<span>Tilbakebetalingsbekreftelse sendt {dateTimeFull(o.refund_notice_sent_at)}</span>}
+    </div>}
     {o.payment_status==="paid"&&(o.payment_reference||o.receipt_sent_at)&&<div className="customerPaymentConfirmation">
      <b>✓ Betaling registrert</b>
      {o.payment_reference&&<span>Referanse: {o.payment_reference}</span>}
