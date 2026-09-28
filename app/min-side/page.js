@@ -444,6 +444,13 @@ export default function MinSide(){
      <span><small>Levering</small><b>{fulfillmentStatus[o.fulfillment_type]||o.fulfillment_type||"Ikke registrert"}</b></span>
      {Number(o.shipping_ore)>0&&<span><small>Frakt</small><b>{kr(o.shipping_ore)}</b></span>}
     </div>
+    {o.status==="cancelled"&&<div className="customerPaymentConfirmation">
+     <b>Bestillingen er kansellert</b>
+     {o.cancellation_reason&&<span>Årsak: {o.cancellation_reason}</span>}
+     {o.cancelled_at&&<span>Kansellert {dateTimeFull(o.cancelled_at)}</span>}
+     {o.cancellation_sent_at&&<span>Bekreftelse sendt {dateTimeFull(o.cancellation_sent_at)}</span>}
+     {["paid","partial","authorized"].includes(o.payment_status)&&<span>Eventuell registrert betaling/refusjon håndteres separat.</span>}
+    </div>}
     {o.status==="ready"&&["pickup","delivery"].includes(o.fulfillment_type)&&<div className="customerPaymentConfirmation">
      <b>{o.fulfillment_type==="pickup"?"✓ Klar for henting":"✓ Klar for levering"}</b>
      <span>{o.fulfillment_type==="pickup"?"Bestillingen er ferdig og klar for henting.":"Bestillingen er ferdig og klar for levering."}</span>
