@@ -464,6 +464,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
     if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
     if(order.order_type==="custom")return NextResponse.json({error:"Denne betalingsflyten gjelder produktbestillinger."},{status:400});
+    if((Number(order.payment_refunded_ore)||0)>0)return NextResponse.json({error:"Denne betalingen har allerede en registrert tilbakebetaling. Bruk tilbakebetalingsbekreftelsen i stedet."},{status:409});
     const email=String(order.customer?.email||"").trim().toLowerCase();
     if(!email)return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
     const total=Math.max(0,Number(order.total_ore)||0);
