@@ -11,6 +11,7 @@ import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
 import {buildOrderConfirmationEmail} from "../../../../lib/orderConfirmationEmail";
 import {sendOrderStatusNotice} from "../../../../lib/orderStatusNotice";
 import {sendProductOrderProgressNotice} from "../../../../lib/orderProgressNotice";
+import {sendManualOrderRefundNotice} from "../../../../lib/orderRefundNotice";
 
 function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 
@@ -40,8 +41,15 @@ const mapOrder = (o) => ({
   jobPlanningUpdatedAt: o.job_planning_updated_at || null,
   jobConfirmationSentAt: o.job_confirmation_sent_at || null,
   paymentStatus: o.payment_status || "unpaid",
+  paymentProvider: o.payment_provider || "",
   paymentReference: o.payment_reference || "",
   paymentCapturedOre: Number(o.payment_captured_ore)||0,
+  paymentRefundedOre: Number(o.payment_refunded_ore)||0,
+  paymentRefundedAt: o.payment_refunded_at || null,
+  refundLastOre: Number(o.refund_last_ore)||0,
+  refundReference: o.refund_reference || "",
+  refundNote: o.refund_note || "",
+  refundNoticeSentAt: o.refund_notice_sent_at || null,
   receiptSentAt: o.receipt_sent_at || null,
   confirmationSentAt: o.confirmation_sent_at || null,
   confirmedAt: o.confirmed_at || null,
@@ -165,10 +173,12 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     );
   }
 
-  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, cancellationReason, progressStatus } = await req.json();
+  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, cancellationReason, progressStatus, refundOre, refundReference, refundNote } = await req.json();
   if(adminNote!==undefined&&String(adminNote||"").length>5000)return NextResponse.json({error:"Internt notat kan være maks 5000 tegn."},{status:400});
   if(paymentReference!==undefined&&String(paymentReference||"").length>120)return NextResponse.json({error:"Betalingsreferansen er for lang."},{status:400});
   if(cancellationReason!==undefined&&String(cancellationReason||"").length>1000)return NextResponse.json({error:"Kanselleringsårsaken kan være maks 1000 tegn."},{status:400});
+  if(refundReference!==undefined&&String(refundReference||"").length>120)return NextResponse.json({error:"Tilbakebetalingsreferansen kan være maks 120 tegn."},{status:400});
+  if(refundNote!==undefined&&String(refundNote||"").length>1000)return NextResponse.json({error:"Merknad om tilbakebetaling kan være maks 1000 tegn."},{status:400});
   if(trackingNumber!==undefined&&String(trackingNumber||"").length>120)return NextResponse.json({error:"Sporingsnummeret er for langt."},{status:400});
   if(trackingUrl!==undefined){const value=String(trackingUrl||"").trim();if(value.length>1000)return NextResponse.json({error:"Sporingslenken er for lang."},{status:400});if(value&&!safeHttpsUrl(value))return NextResponse.json({error:"Sporingslenken må være en gyldig https-adresse."},{status:400});}
 
@@ -384,6 +394,69 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     }catch(error){
       console.error("ORDER CONFIRMATION RESEND ERROR",error);
       return NextResponse.json({error:"Ordrebekreftelsen kunne ikke sendes."},{status:500});
+    }
+  }
+
+  if(action==="record-manual-refund-and-notify"||action==="resend-manual-refund-notice"){
+    const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+    if(order.order_type!=="order")return NextResponse.json({error:"Tilbakebetaling gjelder produktbestillinger."},{status:400});
+    if(String(order.payment_provider||"").toLowerCase()==="vipps"){
+      return NextResponse.json({error:"Vipps-betaling skal refunderes gjennom Vipps-flyten, ikke registreres manuelt."},{status:409});
+    }
+
+    const resendOnly=action==="resend-manual-refund-notice";
+    let refundResult=null;
+    let updatedOrder=order;
+
+    if(!resendOnly){
+      const amount=Number(refundOre);
+      if(!Number.isInteger(amount)||amount<=0)return NextResponse.json({error:"Tilbakebetalingsbeløpet må være større enn 0."},{status:400});
+      const {data,error:refundError}=await s.rpc("record_manual_order_refund",{
+        target_order_id:id,
+        refund_ore:amount,
+        refund_reference_value:String(refundReference||"").trim()||null,
+        refund_note_value:String(refundNote||"").trim()||null
+      });
+      if(refundError){
+        console.error("MANUAL ORDER REFUND ERROR",refundError);
+        const message=String(refundError.message||"");
+        if(message.includes("NO_CAPTURED_PAYMENT"))return NextResponse.json({error:"Det er ikke registrert noen betaling å tilbakebetale."},{status:409});
+        if(message.includes("PAYMENT_ALREADY_FULLY_REFUNDED"))return NextResponse.json({error:"Hele den registrerte betalingen er allerede tilbakebetalt."},{status:409});
+        if(message.includes("REFUND_EXCEEDS_CAPTURED_PAYMENT"))return NextResponse.json({error:"Tilbakebetalingen kan ikke være større enn gjenstående registrert betaling."},{status:409});
+        if(message.includes("VIPPS_REFUND_REQUIRES_PROVIDER_FLOW"))return NextResponse.json({error:"Vipps-betaling skal refunderes gjennom Vipps-flyten."},{status:409});
+        return NextResponse.json({error:"Tilbakebetalingen kunne ikke registreres."},{status:500});
+      }
+      refundResult=data||null;
+      const {data:fresh,error:freshError}=await s.from("orders").select("*").eq("id",id).single();
+      if(freshError||!fresh)return NextResponse.json({error:"Tilbakebetalingen er registrert, men ordren kunne ikke lastes på nytt.",statusSaved:true},{status:500});
+      updatedOrder=fresh;
+    }else{
+      if((Number(order.refund_last_ore)||0)<=0||(Number(order.payment_refunded_ore)||0)<=0){
+        return NextResponse.json({error:"Det finnes ingen manuell tilbakebetaling å sende bekreftelse for."},{status:409});
+      }
+    }
+
+    try{
+      const notice=await sendManualOrderRefundNotice({
+        s,
+        order:updatedOrder,
+        requestOrigin:new URL(req.url).origin
+      });
+      return NextResponse.json({
+        ok:true,
+        ...notice,
+        refundResult,
+        paymentStatus:updatedOrder.payment_status||"paid",
+        refundedTotalOre:Number(updatedOrder.payment_refunded_ore)||0
+      });
+    }catch(error){
+      console.error("MANUAL ORDER REFUND NOTICE ERROR",error);
+      const message=String(error?.message||"");
+      let customerError=resendOnly?"Tilbakebetalingsbekreftelsen kunne ikke sendes.":"Tilbakebetalingen er registrert, men bekreftelsen kunne ikke sendes.";
+      if(message==="ORDER_REFUND_NOTICE_EMAIL_MISSING")customerError=resendOnly?"Kunden mangler e-postadresse.":"Tilbakebetalingen er registrert, men kunden mangler e-postadresse.";
+      if(message==="ORDER_REFUND_NOTICE_EMAIL_NOT_CONFIGURED")customerError=resendOnly?"E-post er ikke konfigurert.":"Tilbakebetalingen er registrert, men e-post er ikke konfigurert.";
+      return NextResponse.json({error:customerError,statusSaved:!resendOnly,refundResult},{status:500});
     }
   }
 
