@@ -7,7 +7,7 @@ export const dynamic="force-dynamic";
 
 export async function POST(req){
  const config=vippsConfig();
- if(!config.enabled)return NextResponse.json({error:"Vipps er ikke aktivert."},{status:404});
+ if(!config.complete||config.productionMismatch)return NextResponse.json({error:"Vipps er ikke konfigurert."},{status:404});
  const webhookId=String(req.headers.get("webhook-id")||"").trim();
  if(!webhookId)return NextResponse.json({error:"Webhook-Id mangler."},{status:401});
  const s=db(); if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
@@ -68,7 +68,7 @@ export async function POST(req){
  if(!order)return NextResponse.json({ok:true,ignored:true});
 
  try{
-  const payment=await getVippsPayment(reference);
+  const payment=await getVippsPayment(reference,{allowDisabled:true});
   await syncVippsOrderFromPayment(s,order,payment);
   return NextResponse.json({ok:true});
  }catch(error){
