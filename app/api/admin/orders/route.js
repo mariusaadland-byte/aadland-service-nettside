@@ -348,6 +348,32 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
   }
 
   if (action === "archive" || action === "restore") {
+    if(action==="archive"){
+      const {data:order,error:findError}=await s.from("orders")
+        .select("id,order_type,status,payment_status,payment_captured_ore,payment_refunded_ore")
+        .eq("id",id)
+        .single();
+      if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+
+      if(order.order_type==="order"&&order.status==="cancelled"){
+        const captured=Math.max(0,Number(order.payment_captured_ore)||0);
+        const refunded=Math.max(0,Number(order.payment_refunded_ore)||0);
+        const hasAuthorizedPayment=String(order.payment_status||"")==="authorized";
+        const hasOutstandingRefund=captured>refunded;
+        if(hasAuthorizedPayment||hasOutstandingRefund){
+          return NextResponse.json({
+            error:hasAuthorizedPayment
+              ?"Ordren har fortsatt en reservert betaling og kan ikke arkiveres før betalingen er avklart."
+              :"Ordren kan ikke arkiveres før hele den registrerte betalingen er tilbakebetalt.",
+            paymentAttention:true,
+            capturedOre:captured,
+            refundedOre:refunded,
+            remainingOre:Math.max(0,captured-refunded)
+          },{status:409});
+        }
+      }
+    }
+
     const {error:archiveError}=await s.from("orders").update({archived_at:action==="archive"?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("id",id);
     if(archiveError)return NextResponse.json({error:"Arkivstatus kunne ikke lagres."},{status:500});
     return NextResponse.json({ok:true});
