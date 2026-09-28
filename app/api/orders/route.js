@@ -85,6 +85,7 @@ export async function POST(req){
     customerName:safeCustomer.name,
     totalOre:total,
     isCustom,
+    fulfillmentType:body.fulfillmentType||"pickup",
     accountUrl,
     minSideUrl
    });
