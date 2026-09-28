@@ -444,6 +444,10 @@ export default function MinSide(){
      <span><small>Levering</small><b>{fulfillmentStatus[o.fulfillment_type]||o.fulfillment_type||"Ikke registrert"}</b></span>
      {Number(o.shipping_ore)>0&&<span><small>Frakt</small><b>{kr(o.shipping_ore)}</b></span>}
     </div>
+    {o.confirmation_sent_at&&<div className="customerPaymentConfirmation">
+     <b>✓ Ordrebekreftelse sendt</b>
+     <span>Sendt {dateTimeFull(o.confirmation_sent_at)}</span>
+    </div>}
     {o.status==="cancelled"&&<div className="customerPaymentConfirmation">
      <b>Bestillingen er kansellert</b>
      {o.cancellation_reason&&<span>Årsak: {o.cancellation_reason}</span>}
