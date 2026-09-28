@@ -889,6 +889,20 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
   setMessage("Bestillingen er satt som "+label+" og kunden er varslet.");
   if(typeof reload==="function")await reload();
  }
+ async function resendOrderConfirmation(order){
+  if(!window.confirm("Sende ordrebekreftelsen på nytt til "+order.customerEmail+"?"))return;
+  setSavingId(order.id);setMessage("");
+  const response=await fetch("/api/admin/orders",{
+   method:"PATCH",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({id:order.id,action:"send-order-confirmation"})
+  });
+  const data=await response.json().catch(()=>({}));
+  setSavingId(null);
+  if(!response.ok){setMessage(data.error||"Ordrebekreftelsen kunne ikke sendes.");return}
+  setMessage("Ordrebekreftelsen er sendt til "+(data.sentTo||order.customerEmail)+".");
+  if(typeof reload==="function")await reload();
+ }
  async function registerPayment(order){
   if(order.orderType==="custom")return;
   const reference=document.getElementById("payment-reference-"+order.id)?.value||order.paymentReference||"";
@@ -922,6 +936,14 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
   {openId===order.id&&<div className="orderDetails">
    {(order.items||[]).length>0&&<div><h4>Varer</h4>{order.items.map((item,i)=><p key={i}>{item.quantity||1} × {item.name||"Produkt"} · {nok((item.unitPriceOre||0)*(item.quantity||1))}</p>)}</div>}
    {order.customRequest&&<p style={{whiteSpace:"pre-wrap"}}>{order.customRequest}</p>}{Array.isArray(order.contactImages)&&order.contactImages.length>0&&<div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12}}>{order.contactImages.map((image,i)=><a className="btn alt" key={image.ref||i} href={image.url} target="_blank" rel="noopener noreferrer">Åpne bilde {i+1}</a>)}</div>}
+   {order.orderType!=="custom"&&<div className="orderPaymentPanel">
+    <h4>Ordrebekreftelse</h4>
+    <div className="orderPaymentFacts">
+     <span><small>Status</small><b>{order.confirmationSentAt?"Sendt":"Ikke registrert sendt"}</b></span>
+     {order.confirmationSentAt&&<span><small>Sist sendt</small><b>{new Date(order.confirmationSentAt).toLocaleString("nb-NO")}</b></span>}
+    </div>
+    {canUpdateOrders&&<button className="btn alt" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>resendOrderConfirmation(order)}>{savingId===order.id?"Sender …":order.confirmationSentAt?"Send ordrebekreftelse på nytt":"Send ordrebekreftelse"}</button>}
+   </div>}
    {order.orderType!=="custom"&&<div className="orderPaymentPanel">
     <h4>Betaling og kvittering</h4>
     <div className="orderPaymentFacts">
