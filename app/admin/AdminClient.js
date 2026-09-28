@@ -306,16 +306,21 @@ export default function AdminClient({ user }) {
   ).length;
 
   const paymentAttentionOrders=activeOrders.filter(order=>{
-    if(order.orderType==="custom"||order.status!=="cancelled")return false;
+    if(order.orderType==="custom"||!["completed","cancelled"].includes(order.status))return false;
+    const paymentStatus=String(order.paymentStatus||"");
     const captured=Math.max(0,Number(order.paymentCapturedOre)||0);
     const refunded=Math.max(0,Number(order.paymentRefundedOre)||0);
-    return order.paymentStatus==="authorized"||captured>refunded;
+    if(order.status==="cancelled"){
+      return paymentStatus==="authorized"||captured>refunded||["paid","partial"].includes(paymentStatus);
+    }
+    return ["pending","unpaid","partial","authorized"].includes(paymentStatus);
   });
   const paymentAttentionCount=paymentAttentionOrders.length;
   const paymentAttentionOre=paymentAttentionOrders.reduce((sum,order)=>{
     const captured=Math.max(0,Number(order.paymentCapturedOre)||0);
     const refunded=Math.max(0,Number(order.paymentRefundedOre)||0);
-    return sum+Math.max(0,captured-refunded);
+    if(order.status==="cancelled")return sum+Math.max(0,captured-refunded);
+    return sum+Math.max(0,(Number(order.totalOre)||0)-captured);
   },0);
 
   const total = activeOrders.reduce(
@@ -340,11 +345,16 @@ export default function AdminClient({ user }) {
       .map(order=>{
         const captured=Math.max(0,Number(order.paymentCapturedOre)||0);
         const refunded=Math.max(0,Number(order.paymentRefundedOre)||0);
-        const remaining=Math.max(0,captured-refunded);
+        const remaining=order.status==="cancelled"
+          ?Math.max(0,captured-refunded)
+          :Math.max(0,(Number(order.totalOre)||0)-captured);
+        const eyebrow=order.status==="cancelled"
+          ?(order.paymentStatus==="authorized"?"RESERVERT BETALING MÅ AVKLARES":"TILBAKEBETALING MÅ AVKLARES")
+          :(order.paymentStatus==="authorized"?"RESERVERT BETALING MÅ AVKLARES":"BETALING MANGLER");
         return {
           key:"payment-attention-"+order.id,
           sort:0,
-          eyebrow:order.paymentStatus==="authorized"?"RESERVERT BETALING MÅ AVKLARES":"TILBAKEBETALING MANGLER",
+          eyebrow,
           title:order.customerName||"Ukjent kunde",
           meta:remaining>0?(order.orderNumber+" · "+nok(remaining)+" gjenstår"):(order.orderNumber||""),
           tab:"orders"
@@ -861,11 +871,24 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
  async function archive(order){
   const captured=Math.max(0,Number(order.paymentCapturedOre)||0);
   const refunded=Math.max(0,Number(order.paymentRefundedOre)||0);
-  if(order.orderType!=="custom"&&order.status==="cancelled"&&(order.paymentStatus==="authorized"||captured>refunded)){
-   const text=order.paymentStatus==="authorized"
+  const paymentStatus=String(order.paymentStatus||"");
+  if(!["completed","cancelled"].includes(order.status)){
+   setMessage("Bare ferdige eller kansellerte ordre kan arkiveres.");
+   return;
+  }
+  if(order.orderType!=="custom"&&order.status==="cancelled"&&(paymentStatus==="authorized"||captured>refunded||["paid","partial"].includes(paymentStatus))){
+   const text=paymentStatus==="authorized"
     ?"Denne ordren har fortsatt en reservert betaling som må avklares før den kan arkiveres."
-    :"Denne ordren mangler "+nok(Math.max(0,captured-refunded))+" i tilbakebetaling og kan ikke arkiveres ennå.";
+    :captured>refunded
+      ?"Denne ordren mangler "+nok(Math.max(0,captured-refunded))+" i tilbakebetaling og kan ikke arkiveres ennå."
+      :"Denne ordren har registrert betaling som må avklares før arkivering.";
    setMessage(text);
+   return;
+  }
+  if(order.orderType!=="custom"&&order.status==="completed"&&["pending","unpaid","partial","authorized"].includes(paymentStatus)){
+   setMessage(paymentStatus==="authorized"
+    ?"Ordren er ferdig, men betalingen står fortsatt som reservert."
+    :"Ordren er ferdig, men betalingen er ikke ferdig registrert.");
    return;
   }
   if(!confirm("Flytte denne til arkivet?"))return;
@@ -1076,11 +1099,20 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
   <div className="orderCardTop"><div><div className="kicker">{order.orderNumber}</div><h3>{order.customerName||"Ukjent kunde"}</h3><small className="muted">{new Date(order.createdAt).toLocaleString("nb-NO")}</small></div><b>{nok(order.totalOre||0)}</b></div>
   <p>{order.customerPhone&&<>{order.customerPhone}<br/></>}{order.customerEmail}</p>
   <div className="orderBadges"><span>{order.fulfillmentType==="delivery"?"Levering":order.fulfillmentType==="shipping"?"Sending":"Henting"}</span><span>Betaling: {order.paymentStatus==="pending"?"Venter":order.paymentStatus==="authorized"?"Reservert":order.paymentStatus==="paid"?"Betalt":order.paymentStatus==="refunded"?"Refundert":order.paymentStatus}</span></div>
-  {order.orderType!=="custom"&&order.status==="cancelled"&&(order.paymentStatus==="authorized"||Number(order.paymentCapturedOre||0)>Number(order.paymentRefundedOre||0))&&<div className="notice">
+  {order.orderType!=="custom"&&["completed","cancelled"].includes(order.status)&&(
+    (order.status==="cancelled"&&(order.paymentStatus==="authorized"||Number(order.paymentCapturedOre||0)>Number(order.paymentRefundedOre||0)||["paid","partial"].includes(String(order.paymentStatus||""))))
+    ||(order.status==="completed"&&["pending","unpaid","partial","authorized"].includes(String(order.paymentStatus||"")))
+   )&&<div className="notice">
    <b>Betaling må avklares før arkivering.</b>
-   {order.paymentStatus==="authorized"
-    ?<span> Betalingen står fortsatt som reservert.</span>
-    :<span> Gjenstår å tilbakebetale: {nok(Math.max(0,Number(order.paymentCapturedOre||0)-Number(order.paymentRefundedOre||0)))}</span>}
+   {order.status==="cancelled"
+    ?order.paymentStatus==="authorized"
+      ?<span> Betalingen står fortsatt som reservert.</span>
+      :Number(order.paymentCapturedOre||0)>Number(order.paymentRefundedOre||0)
+        ?<span> Gjenstår å tilbakebetale: {nok(Math.max(0,Number(order.paymentCapturedOre||0)-Number(order.paymentRefundedOre||0)))}</span>
+        :<span> Registrert betaling må avklares.</span>
+    :order.paymentStatus==="authorized"
+      ?<span> Betalingen står fortsatt som reservert.</span>
+      :<span> Gjenstår å registrere: {nok(Math.max(0,Number(order.totalOre||0)-Number(order.paymentCapturedOre||0)))}</span>}
   </div>}
   <div className="field"><label>Status</label><b>{labels[order.status]||order.status}</b></div>
   <button className="btn alt" type="button" onClick={()=>setOpenId(openId===order.id?null:order.id)}>{openId===order.id?"Skjul detaljer":"Vis detaljer"}</button>
@@ -1148,7 +1180,16 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
  {canUpdateOrders&&<div className="orderActions">
   {order.orderType!=="custom"&&order.status==="new"&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>setProductProgress(order,"confirmed",false)}>{savingId===order.id?"Sender …":"Bekreft ordre + varsle"}</button>}
   {order.orderType!=="custom"&&order.status==="confirmed"&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>setProductProgress(order,"in_progress",false)}>{savingId===order.id?"Sender …":"Sett under arbeid + varsle"}</button>}
-  {["completed","cancelled"].includes(order.status)&&<button className="btn alt" type="button" disabled={savingId===order.id||(order.orderType!=="custom"&&order.status==="cancelled"&&(order.paymentStatus==="authorized"||Number(order.paymentCapturedOre||0)>Number(order.paymentRefundedOre||0)))} onClick={()=>archive(order)}>{order.orderType!=="custom"&&order.status==="cancelled"&&(order.paymentStatus==="authorized"||Number(order.paymentCapturedOre||0)>Number(order.paymentRefundedOre||0))?"Arkivering sperret":"Arkiver"}</button>}
+  {["completed","cancelled"].includes(order.status)&&(()=>{
+    const paymentStatus=String(order.paymentStatus||"");
+    const captured=Math.max(0,Number(order.paymentCapturedOre)||0);
+    const refunded=Math.max(0,Number(order.paymentRefundedOre)||0);
+    const blocked=order.orderType!=="custom"&&(
+      (order.status==="cancelled"&&(paymentStatus==="authorized"||captured>refunded||["paid","partial"].includes(paymentStatus)))
+      ||(order.status==="completed"&&["pending","unpaid","partial","authorized"].includes(paymentStatus))
+    );
+    return <button className="btn alt" type="button" disabled={savingId===order.id||blocked} onClick={()=>archive(order)}>{blocked?"Arkivering sperret":"Arkiver"}</button>;
+   })()}
   {order.orderType!=="custom"&&["in_progress","ready"].includes(order.status)&&["pickup","delivery"].includes(order.fulfillmentType)&&<button className="btn alt" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>markReady(order)}>{savingId===order.id?"Sender …":order.status==="ready"||order.readyNoticeSentAt?"Send klar-varsel på nytt":order.fulfillmentType==="pickup"?"Klar for henting + varsle":"Klar for levering + varsle"}</button>}
   {order.orderType!=="custom"&&order.fulfillmentType==="shipping"&&order.status==="in_progress"&&<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-dispatched")}>Sendt til kunde</button>}
   {order.orderType!=="custom"&&order.fulfillmentType!=="shipping"&&order.status==="ready"&&<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-delivered")}>Levert til kunde</button>}
