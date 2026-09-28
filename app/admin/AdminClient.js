@@ -845,6 +845,26 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
   if(typeof reload==="function")await reload();
  }
  async function finish(order,action){setSavingId(order.id);setMessage("");const r=await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,action})}),d=await r.json().catch(()=>({}));setSavingId(null);if(!r.ok){setMessage(d.error||"Handlingen kunne ikke utføres.");return;}setMessage(d.paymentCaptureRequired?"Status er lagret. Betalingen står fortsatt bare som reservert til betalingsleverandøren er koblet til.":"Status er lagret.");window.setTimeout(()=>window.location.reload(),700);}
+ async function markReady(order){
+  const pickup=order.fulfillmentType==="pickup";
+  const label=pickup?"klar for henting":"klar for levering";
+  if(!window.confirm("Sette bestillingen som "+label+" og sende varsel til "+order.customerEmail+"?"))return;
+  setSavingId(order.id);setMessage("");
+  const response=await fetch("/api/admin/orders",{
+   method:"PATCH",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({id:order.id,action:"mark-ready-and-notify"})
+  });
+  const data=await response.json().catch(()=>({}));
+  setSavingId(null);
+  if(!response.ok){
+   setMessage(data.error||"Bestillingen kunne ikke settes som klar.");
+   if(data.statusSaved&&typeof reload==="function")await reload();
+   return;
+  }
+  setMessage("Bestillingen er satt som "+label+" og kunden er varslet.");
+  if(typeof reload==="function")await reload();
+ }
  async function registerPayment(order){
   if(order.orderType==="custom")return;
   const reference=document.getElementById("payment-reference-"+order.id)?.value||order.paymentReference||"";
@@ -889,8 +909,13 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
     {canUpdateOrders&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>registerPayment(order)}>{savingId===order.id?"Sender …":order.paymentStatus==="paid"?"Send betalingsbekreftelse på nytt":"Registrer betalt + send bekreftelse"}</button>}
    </div>}
    {order.fulfillmentType==="shipping"&&<><div className="field"><label>Sporingsnummer</label><input id={"tracking-number-"+order.id} defaultValue={order.trackingNumber||""}/></div><div className="field"><label>Sporingslenke</label><input type="url" id={"tracking-url-"+order.id} defaultValue={order.trackingUrl||""}/></div>{canUpdateOrders&&<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>saveTracking(order)}>{savingId===order.id?"Lagrer …":"Lagre sporing"}</button>}</>}
+   {order.readyNoticeSentAt&&<div className="rentalNotificationState"><span>✓ Klar-varsel sendt {new Date(order.readyNoticeSentAt).toLocaleString("nb-NO")}</span></div>}
   </div>}
- {canUpdateOrders&&<div className="orderActions">{["completed","cancelled"].includes(order.status)&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>archive(order)}>Arkiver</button>}{order.orderType!=="custom"&&order.status!=="completed"&&(order.fulfillmentType==="shipping"?<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-dispatched")}>Sendt til kunde</button>:<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-delivered")}>Levert til kunde</button>)}</div>}
+ {canUpdateOrders&&<div className="orderActions">
+  {["completed","cancelled"].includes(order.status)&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>archive(order)}>Arkiver</button>}
+  {order.orderType!=="custom"&&!["completed","cancelled"].includes(order.status)&&["pickup","delivery"].includes(order.fulfillmentType)&&<button className="btn alt" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>markReady(order)}>{savingId===order.id?"Sender …":order.readyNoticeSentAt?"Send klar-varsel på nytt":order.fulfillmentType==="pickup"?"Klar for henting + varsle":"Klar for levering + varsle"}</button>}
+  {order.orderType!=="custom"&&order.status!=="completed"&&(order.fulfillmentType==="shipping"?<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-dispatched")}>Sendt til kunde</button>:<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-delivered")}>Levert til kunde</button>)}
+ </div>}
  </article>):<div className="card"><p>Ingen bestillinger ennå.</p></div>}</div></>;
 }
 
