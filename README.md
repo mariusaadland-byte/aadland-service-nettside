@@ -24,7 +24,7 @@ Vipps er **av som standard**. Dagens manuelle betalingsflyt fortsetter helt uend
 
 Før Vipps aktiveres:
 
-1. Kjør migreringen `supabase/migrations/20260928011500_vipps_epayment_orders.sql` mot riktig Supabase-prosjekt.
+1. Kjør migreringen `supabase/migrations/20260928051633_vipps_epayment_orders.sql` mot riktig Supabase-prosjekt.
 2. Legg inn testnøkler i Vercel Preview: `VIPPS_CLIENT_ID`, `VIPPS_CLIENT_SECRET`, `VIPPS_SUBSCRIPTION_KEY` og `VIPPS_MSN`.
 3. Sett `VIPPS_ENVIRONMENT=test` og `VIPPS_ENABLED=true` **kun i Preview**.
 4. Registrer webhook mot preview-URL-en `/api/payments/vipps/webhook` og lagre hemmeligheten som `VIPPS_WEBHOOK_SECRET`.
