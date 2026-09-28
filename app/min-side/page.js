@@ -465,10 +465,12 @@ export default function MinSide(){
      {o.tracking_number&&<span>Sporingsnummer: {o.tracking_number}</span>}
      {o.tracking_url&&<a className="btn alt" href={o.tracking_url} target="_blank" rel="noopener noreferrer">Spor pakken</a>}
      {o.dispatched_at&&<span>Sendt {dateTimeFull(o.dispatched_at)}</span>}
+     {o.tracking_sent_at&&<span>Sendt-varsel sendt {dateTimeFull(o.tracking_sent_at)}</span>}
     </div>}
     {o.delivered_at&&<div className="customerPaymentConfirmation">
      <b>✓ Bestillingen er levert</b>
      <span>Registrert levert {dateTimeFull(o.delivered_at)}</span>
+     {o.delivery_notice_sent_at&&<span>Levert-varsel sendt {dateTimeFull(o.delivery_notice_sent_at)}</span>}
     </div>}
     {o.payment_status==="paid"&&(o.payment_reference||o.receipt_sent_at)&&<div className="customerPaymentConfirmation">
      <b>✓ Betaling registrert</b>
