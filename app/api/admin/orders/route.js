@@ -10,6 +10,7 @@ import {buildReceiptEmail} from "../../../../lib/receiptEmail";
 import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
 import {buildOrderConfirmationEmail} from "../../../../lib/orderConfirmationEmail";
 import {sendOrderStatusNotice} from "../../../../lib/orderStatusNotice";
+import {sendProductOrderProgressNotice} from "../../../../lib/orderProgressNotice";
 
 function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 
@@ -43,6 +44,10 @@ const mapOrder = (o) => ({
   paymentCapturedOre: Number(o.payment_captured_ore)||0,
   receiptSentAt: o.receipt_sent_at || null,
   confirmationSentAt: o.confirmation_sent_at || null,
+  confirmedAt: o.confirmed_at || null,
+  inProgressAt: o.in_progress_at || null,
+  confirmedNoticeSentAt: o.confirmed_notice_sent_at || null,
+  inProgressNoticeSentAt: o.in_progress_notice_sent_at || null,
   trackingNumber: o.tracking_number || "",
   trackingUrl: o.tracking_url || "",
   dispatchedAt: o.dispatched_at || null,
@@ -160,7 +165,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     );
   }
 
-  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, cancellationReason } = await req.json();
+  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, cancellationReason, progressStatus } = await req.json();
   if(adminNote!==undefined&&String(adminNote||"").length>5000)return NextResponse.json({error:"Internt notat kan være maks 5000 tegn."},{status:400});
   if(paymentReference!==undefined&&String(paymentReference||"").length>120)return NextResponse.json({error:"Betalingsreferansen er for lang."},{status:400});
   if(cancellationReason!==undefined&&String(cancellationReason||"").length>1000)return NextResponse.json({error:"Kanselleringsårsaken kan være maks 1000 tegn."},{status:400});
@@ -283,6 +288,52 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     }catch(error){
       console.error("ORDER CANCELLATION EMAIL ERROR",error);
       return NextResponse.json({error:"Bestillingen er kansellert og lageret er frigjort, men kundevarselet kunne ikke sendes.",statusSaved:true},{status:500});
+    }
+  }
+
+  if(action==="set-product-progress-and-notify"||action==="resend-product-progress-notice"){
+    const nextStatus=String(progressStatus||"");
+    if(!["confirmed","in_progress"].includes(nextStatus))return NextResponse.json({error:"Ugyldig ordrestatus."},{status:400});
+    const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+    if(order.order_type!=="order")return NextResponse.json({error:"Denne statusflyten gjelder produktbestillinger."},{status:400});
+    if(["completed","cancelled"].includes(order.status))return NextResponse.json({error:"En fullført eller kansellert bestilling kan ikke endres."},{status:409});
+
+    const resendOnly=action==="resend-product-progress-notice";
+    if(!resendOnly){
+      if(nextStatus==="confirmed"&&order.status!=="new")return NextResponse.json({error:"Bare nye bestillinger kan bekreftes med denne handlingen."},{status:409});
+      if(nextStatus==="in_progress"&&order.status!=="confirmed")return NextResponse.json({error:"Bestillingen må være bekreftet før den settes under arbeid."},{status:409});
+      const now=new Date().toISOString();
+      const patch=nextStatus==="confirmed"
+        ?{status:"confirmed",confirmed_at:order.confirmed_at||now,updated_at:now}
+        :{status:"in_progress",in_progress_at:order.in_progress_at||now,updated_at:now};
+      const {error:updateError}=await s.from("orders").update(patch).eq("id",id);
+      if(updateError)return NextResponse.json({error:"Statusen kunne ikke lagres."},{status:500});
+      order.status=nextStatus;
+      if(nextStatus==="confirmed")order.confirmed_at=patch.confirmed_at;
+      if(nextStatus==="in_progress")order.in_progress_at=patch.in_progress_at;
+    }else{
+      const hasReached=nextStatus==="confirmed"
+        ?Boolean(order.confirmed_at||order.confirmed_notice_sent_at)
+        :Boolean(order.in_progress_at||order.in_progress_notice_sent_at);
+      if(!hasReached)return NextResponse.json({error:"Bestillingen har ikke nådd denne statusen ennå."},{status:409});
+    }
+
+    try{
+      const notice=await sendProductOrderProgressNotice({
+        s,
+        order,
+        kind:nextStatus,
+        requestOrigin:new URL(req.url).origin
+      });
+      return NextResponse.json({ok:true,status:order.status,...notice});
+    }catch(error){
+      console.error("ORDER PROGRESS NOTICE ERROR",error);
+      const message=String(error?.message||"");
+      let customerError=resendOnly?"Kundevarselet kunne ikke sendes.":"Status er lagret, men kundevarselet kunne ikke sendes.";
+      if(message==="ORDER_PROGRESS_NOTICE_EMAIL_MISSING")customerError=resendOnly?"Kunden mangler e-postadresse.":"Status er lagret, men kunden mangler e-postadresse.";
+      if(message==="ORDER_PROGRESS_NOTICE_EMAIL_NOT_CONFIGURED")customerError=resendOnly?"E-post er ikke konfigurert.":"Status er lagret, men e-post er ikke konfigurert.";
+      return NextResponse.json({error:customerError,statusSaved:!resendOnly},{status:500});
     }
   }
 
