@@ -204,11 +204,11 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     );
   }
 
-  if(status==="cancelled"&&action!=="cancel-and-notify"){
+  if(status!==undefined){
     const {data:order,error:findError}=await s.from("orders").select("order_type").eq("id",id).maybeSingle();
     if(findError)return NextResponse.json({error:"Bestillingen kunne ikke hentes."},{status:500});
     if(order?.order_type==="order"){
-      return NextResponse.json({error:"Produktordre må kanselleres med «Kanseller ordre + varsle kunde», slik at lager og kundevarsel håndteres riktig."},{status:409});
+      return NextResponse.json({error:"Produktordre må oppdateres med de egne ordreknappene, slik at status og kundevarsler håndteres riktig."},{status:409});
     }
   }
 
@@ -506,7 +506,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
     if(order.order_type==="custom")return NextResponse.json({error:"Denne handlingen gjelder produktbestillinger."},{status:400});
     if(!["pickup","delivery"].includes(order.fulfillment_type))return NextResponse.json({error:"Klar-varsel gjelder bestillinger som skal hentes eller leveres."},{status:400});
-    if(["completed","cancelled"].includes(order.status))return NextResponse.json({error:"En fullført eller kansellert bestilling kan ikke settes klar."},{status:409});
+    if(!["in_progress","ready"].includes(order.status))return NextResponse.json({error:"Bestillingen må være under arbeid før den kan settes klar."},{status:409});
     const customerEmail=String(order.customer?.email||"").trim().toLowerCase();
     if(!customerEmail)return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
 
@@ -602,6 +602,8 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     if(order.order_type==="custom")return NextResponse.json({error:"Denne handlingen gjelder produktbestillinger."},{status:400});
     if(action==="mark-dispatched"&&order.fulfillment_type!=="shipping")return NextResponse.json({error:"Bare bestillinger som sendes kan markeres som sendt."},{status:400});
     if(action==="mark-delivered"&&order.fulfillment_type==="shipping")return NextResponse.json({error:"Bruk Sendt til kunde for bestillinger som sendes."},{status:400});
+    if(action==="mark-dispatched"&&order.status!=="in_progress")return NextResponse.json({error:"Bestillingen må være under arbeid før den kan markeres som sendt."},{status:409});
+    if(action==="mark-delivered"&&order.status!=="ready")return NextResponse.json({error:"Bestillingen må være klar før den kan markeres som levert."},{status:409});
     if(action==="mark-dispatched"&&!String(order.tracking_number||"").trim()&&!safeHttpsUrl(order.tracking_url))return NextResponse.json({error:"Legg inn sporingsnummer eller sporingslenke før bestillingen markeres som sendt."},{status:400});
     const now=new Date().toISOString();
     const patch=action==="mark-dispatched"
