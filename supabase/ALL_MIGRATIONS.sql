@@ -906,3 +906,233 @@ alter function public.release_product_stock(jsonb)
 
 alter function public.reserve_product_stock(jsonb)
   set search_path = pg_catalog, public;
+
+
+-- ============================================================
+-- VIPPS EPAYMENT FOR PRODUKTORDRE
+-- ============================================================
+
+alter table public.orders add column if not exists payment_provider text;
+alter table public.orders add column if not exists payment_psp_reference text;
+alter table public.orders add column if not exists payment_authorized_at timestamptz;
+alter table public.orders add column if not exists payment_captured_at timestamptz;
+alter table public.orders add column if not exists payment_cancelled_at timestamptz;
+alter table public.orders add column if not exists payment_refunded_at timestamptz;
+alter table public.orders add column if not exists payment_refunded_ore integer not null default 0;
+alter table public.orders add column if not exists payment_capture_guaranteed_until timestamptz;
+alter table public.orders add column if not exists payment_stock_released_at timestamptz;
+alter table public.orders add column if not exists vipps_checkout_started_at timestamptz;
+create index if not exists orders_payment_provider_reference_idx on public.orders(payment_provider,payment_reference);
+
+create schema if not exists private;
+create table if not exists private.vipps_payment_events(
+ psp_reference text primary key,
+ payment_reference text not null,
+ event_name text not null,
+ amount_ore integer not null default 0,
+ payload jsonb not null default '{}'::jsonb,
+ created_at timestamptz not null default now()
+);
+revoke all on table private.vipps_payment_events from public,anon,authenticated;
+grant select,insert on table private.vipps_payment_events to service_role;
+
+create or replace function public.record_vipps_payment_event_once(
+ event_psp_reference text,event_payment_reference text,event_name text,event_amount_ore integer,event_payload jsonb
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, private
+as $$
+begin
+ insert into private.vipps_payment_events(psp_reference,payment_reference,event_name,amount_ore,payload)
+ values(event_psp_reference,event_payment_reference,event_name,greatest(coalesce(event_amount_ore,0),0),coalesce(event_payload,'{}'::jsonb))
+ on conflict (psp_reference) do nothing;
+ return found;
+end;
+$$;
+revoke all on function public.record_vipps_payment_event_once(text,text,text,integer,jsonb) from public,anon,authenticated;
+grant execute on function public.record_vipps_payment_event_once(text,text,text,integer,jsonb) to service_role;
+
+create or replace function public.release_order_stock_once(target_order_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+ order_row public.orders%rowtype;
+ item jsonb;
+ product_id text;
+ quantity integer;
+begin
+ select * into order_row from public.orders where id=target_order_id for update;
+ if not found then return false; end if;
+ if order_row.payment_stock_released_at is not null then return false; end if;
+ for item in select value from jsonb_array_elements(coalesce(order_row.items,'[]'::jsonb)) loop
+  if coalesce(item->>'inventoryMode','')='stock' then
+   product_id:=item->>'productId';
+   quantity:=coalesce((item->>'quantity')::integer,0);
+   if product_id is not null and quantity>0 then
+    update public.products set stock_quantity=stock_quantity+quantity,updated_at=now()
+    where id=product_id and inventory_mode='stock';
+    if not found then raise exception 'STOCK_RELEASE_FAILED:%',product_id; end if;
+   end if;
+  end if;
+ end loop;
+ update public.orders set payment_stock_released_at=now(),updated_at=now() where id=target_order_id;
+ return true;
+end;
+$$;
+revoke all on function public.release_order_stock_once(uuid) from public,anon,authenticated;
+grant execute on function public.release_order_stock_once(uuid) to service_role;
+
+
+-- ============================================================
+-- VIPPS WEBHOOK-REGISTRERING OG READINESS
+-- ============================================================
+
+-- Lagrer Vipps webhook-hemmeligheter i privat schema.
+-- Hemmeligheten returneres aldri til klienten; webhooken slår den opp via Webhook-Id.
+create schema if not exists private;
+
+create table if not exists private.vipps_webhook_registrations(
+  webhook_id text primary key,
+  environment text not null check (environment in ('test','production')),
+  secret text not null,
+  callback_url text not null,
+  events jsonb not null default '[]'::jsonb,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+revoke all on table private.vipps_webhook_registrations from public,anon,authenticated;
+
+create or replace function public.upsert_vipps_webhook_registration(
+  target_webhook_id text,
+  target_environment text,
+  target_secret text,
+  target_callback_url text,
+  target_events jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, private
+as $vipps_webhook_upsert$
+begin
+  if coalesce(target_webhook_id,'')='' or coalesce(target_secret,'')='' or coalesce(target_callback_url,'')='' then
+    raise exception 'INVALID_VIPPS_WEBHOOK_REGISTRATION';
+  end if;
+  if target_environment not in ('test','production') then
+    raise exception 'INVALID_VIPPS_ENVIRONMENT';
+  end if;
+
+  insert into private.vipps_webhook_registrations(
+    webhook_id,environment,secret,callback_url,events,active,updated_at
+  ) values (
+    target_webhook_id,target_environment,target_secret,target_callback_url,
+    coalesce(target_events,'[]'::jsonb),true,now()
+  )
+  on conflict (webhook_id) do update
+  set environment=excluded.environment,
+      secret=excluded.secret,
+      callback_url=excluded.callback_url,
+      events=excluded.events,
+      active=true,
+      updated_at=now();
+end;
+$vipps_webhook_upsert$;
+
+revoke all on function public.upsert_vipps_webhook_registration(text,text,text,text,jsonb) from public,anon,authenticated;
+grant execute on function public.upsert_vipps_webhook_registration(text,text,text,text,jsonb) to service_role;
+
+create or replace function public.get_vipps_webhook_secret(
+  target_webhook_id text,
+  target_environment text
+)
+returns text
+language sql
+security definer
+set search_path = pg_catalog, private
+as $vipps_webhook_secret$
+  select secret
+  from private.vipps_webhook_registrations
+  where webhook_id=target_webhook_id
+    and environment=target_environment
+    and active=true
+  limit 1
+$vipps_webhook_secret$;
+
+revoke all on function public.get_vipps_webhook_secret(text,text) from public,anon,authenticated;
+grant execute on function public.get_vipps_webhook_secret(text,text) to service_role;
+
+create or replace function public.deactivate_vipps_webhook_registration(
+  target_webhook_id text,
+  target_environment text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, private
+as $vipps_webhook_deactivate$
+declare
+  affected integer;
+begin
+  update private.vipps_webhook_registrations
+  set active=false,updated_at=now()
+  where webhook_id=target_webhook_id
+    and environment=target_environment
+    and active=true;
+  get diagnostics affected=row_count;
+  return affected>0;
+end;
+$vipps_webhook_deactivate$;
+
+revoke all on function public.deactivate_vipps_webhook_registration(text,text) from public,anon,authenticated;
+grant execute on function public.deactivate_vipps_webhook_registration(text,text) to service_role;
+
+create or replace function public.has_active_vipps_webhook_registration(
+  target_environment text
+)
+returns boolean
+language sql
+security definer
+set search_path = pg_catalog, private
+as $vipps_webhook_ready$
+  select exists(
+    select 1
+    from private.vipps_webhook_registrations
+    where environment=target_environment
+      and active=true
+  )
+$vipps_webhook_ready$;
+
+revoke all on function public.has_active_vipps_webhook_registration(text) from public,anon,authenticated;
+grant execute on function public.has_active_vipps_webhook_registration(text) to service_role;
+
+
+-- Vipps webhook auth context
+create or replace function public.get_vipps_webhook_auth(
+  target_webhook_id text,
+  target_environment text
+)
+returns jsonb
+language sql
+security definer
+set search_path = pg_catalog, private
+as $vipps_webhook_auth$
+  select jsonb_build_object(
+    'secret',secret,
+    'callback_url',callback_url
+  )
+  from private.vipps_webhook_registrations
+  where webhook_id=target_webhook_id
+    and environment=target_environment
+    and active=true
+  limit 1
+$vipps_webhook_auth$;
+
+revoke all on function public.get_vipps_webhook_auth(text,text) from public,anon,authenticated;
+grant execute on function public.get_vipps_webhook_auth(text,text) to service_role;
