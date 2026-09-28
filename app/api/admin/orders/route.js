@@ -350,25 +350,46 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
   if (action === "archive" || action === "restore") {
     if(action==="archive"){
       const {data:order,error:findError}=await s.from("orders")
-        .select("id,order_type,status,payment_status,payment_captured_ore,payment_refunded_ore")
+        .select("id,order_type,status,total_ore,payment_status,payment_captured_ore,payment_refunded_ore")
         .eq("id",id)
         .single();
       if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
 
-      if(order.order_type==="order"&&order.status==="cancelled"){
+      if(!["completed","cancelled"].includes(String(order.status||""))){
+        return NextResponse.json({error:"Bare ferdige eller kansellerte ordre kan arkiveres."},{status:409});
+      }
+
+      if(order.order_type==="order"){
+        const paymentStatus=String(order.payment_status||"");
         const captured=Math.max(0,Number(order.payment_captured_ore)||0);
         const refunded=Math.max(0,Number(order.payment_refunded_ore)||0);
-        const hasAuthorizedPayment=String(order.payment_status||"")==="authorized";
-        const hasOutstandingRefund=captured>refunded;
-        if(hasAuthorizedPayment||hasOutstandingRefund){
+
+        if(order.status==="cancelled"){
+          const hasAuthorizedPayment=paymentStatus==="authorized";
+          const hasOutstandingRefund=captured>refunded;
+          const hasLegacyPaidState=["paid","partial"].includes(paymentStatus)&&paymentStatus!=="refunded";
+          if(hasAuthorizedPayment||hasOutstandingRefund||hasLegacyPaidState){
+            return NextResponse.json({
+              error:hasAuthorizedPayment
+                ?"Ordren har fortsatt en reservert betaling og kan ikke arkiveres før betalingen er avklart."
+                :"Ordren kan ikke arkiveres før registrert betaling er ferdig tilbakebetalt eller avklart.",
+              paymentAttention:true,
+              capturedOre:captured,
+              refundedOre:refunded,
+              remainingOre:Math.max(0,captured-refunded)
+            },{status:409});
+          }
+        }
+
+        if(order.status==="completed"&&["pending","unpaid","partial","authorized"].includes(paymentStatus)){
           return NextResponse.json({
-            error:hasAuthorizedPayment
-              ?"Ordren har fortsatt en reservert betaling og kan ikke arkiveres før betalingen er avklart."
-              :"Ordren kan ikke arkiveres før hele den registrerte betalingen er tilbakebetalt.",
+            error:paymentStatus==="authorized"
+              ?"Ordren er ferdig, men betalingen står fortsatt som reservert. Avklar betalingen før arkivering."
+              :"Ordren er ferdig, men betalingen er ikke ferdig registrert. Registrer betalingen før arkivering.",
             paymentAttention:true,
             capturedOre:captured,
             refundedOre:refunded,
-            remainingOre:Math.max(0,captured-refunded)
+            remainingOre:Math.max(0,(Number(order.total_ore)||0)-captured)
           },{status:409});
         }
       }
