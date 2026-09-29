@@ -136,6 +136,15 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
   return NextResponse.json({error:"E-posten ble sendt, men revisjonsstatus kunne ikke lagres. Kontroller tilbudet før du sender på nytt."},{status:500});
  }
 
+ try{
+  await s.from("quotes").update({
+   issued_via:quote.issued_via||"email",
+   updated_at:now
+  }).eq("id",id);
+ }catch(issueMethodError){
+  console.error("QUOTE EMAIL ISSUE METHOD",issueMethodError);
+ }
+
  const deliveryType=overrideEmail&&overrideEmail!==customerEmail?"alternate":"primary";
  try{
   await s.from("quote_send_log").insert({
