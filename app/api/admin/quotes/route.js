@@ -170,9 +170,23 @@ export async function GET(req){
   return NextResponse.json({error:"Tilbudene kunne ikke hentes."},{status:500});
  }
  if(id&&!data)return NextResponse.json({error:"Tilbudet ble ikke funnet."},{status:404});
- return id
-  ?NextResponse.json({quote:mapQuote(data),followUpSetupRequired})
-  :NextResponse.json({quotes:(data||[]).map(mapQuote),followUpSetupRequired});
+ if(id){
+  let sendHistory=[];
+  try{
+   const {data:history}=await s.from("quote_send_log")
+    .select("recipient,delivery_type,sent_at")
+    .eq("quote_id",id)
+    .order("sent_at",{ascending:false})
+    .limit(20);
+   sendHistory=(history||[]).map(row=>({
+    recipient:row.recipient||"",
+    deliveryType:row.delivery_type||"primary",
+    sentAt:row.sent_at||null
+   }));
+  }catch{}
+  return NextResponse.json({quote:{...mapQuote(data),sendHistory},followUpSetupRequired});
+ }
+ return NextResponse.json({quotes:(data||[]).map(mapQuote),followUpSetupRequired});
 }
 
 export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;
