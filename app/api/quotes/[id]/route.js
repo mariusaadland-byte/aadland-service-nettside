@@ -25,6 +25,10 @@ function mapQuote(q){
   terms:q.terms||"",
   validUntil:q.valid_until||null,
   plannedStartDate:q.planned_start_date||null,
+  revisionNumber:Number(q.revision_number)||1,
+  revisedFromId:q.revised_from_id||null,
+  supersededById:q.superseded_by_id||null,
+  supersededAt:q.superseded_at||null,
   sentAt:q.sent_at||null,
   acceptedAt:q.accepted_at||null,
   declinedAt:q.declined_at||null,
@@ -69,7 +73,7 @@ export async function POST(req,{params}){ const originError=sameOriginGuard(req)
  if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status});
  if(!verifyQuoteToken(loaded.data,token))return NextResponse.json({error:"Ugyldig eller utløpt tilbudslenke."},{status:403});
 
- if(["accepted","declined","cancelled"].includes(loaded.data.status)){
+ if(["accepted","declined","cancelled","superseded"].includes(loaded.data.status)){
   return NextResponse.json({error:"Tilbudet er allerede ferdigbehandlet."},{status:409});
  }
  if(expired(loaded.data))return NextResponse.json({error:"Tilbudet er utløpt."},{status:409});
