@@ -4,7 +4,7 @@ import {getAdminUser} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
 import {isValidDateInput} from "../../../../lib/osloTime";
 
-const STATUSES=["draft","sent","accepted","declined","expired","cancelled"];
+const STATUSES=["draft","sent","accepted","declined","expired","cancelled","superseded"];
 const SETUP_CODES=["42P01","42883","42703"];
 
 async function currentUser(){
@@ -35,6 +35,11 @@ function mapQuote(q){
   plannedStartDate:q.planned_start_date||null,
   autoFollowUp:q.auto_follow_up!==false,
   followUpSentAt:q.follow_up_sent_at||null,
+  revisionSeriesId:q.revision_series_id||null,
+  revisionNumber:Number(q.revision_number)||1,
+  revisedFromId:q.revised_from_id||null,
+  supersededById:q.superseded_by_id||null,
+  supersededAt:q.superseded_at||null,
   sourceOrderId:q.source_order_id||null,
   convertedOrderId:q.converted_order_id||null,
   sentAt:q.sent_at||null,
@@ -163,7 +168,10 @@ export async function GET(req){
  const archived=params.get("archived")==="1";
  let query=s.from("quotes").select("*");
  if(id)query=query.eq("id",id).maybeSingle();
- else query=(archived?query.not("archived_at","is",null):query.is("archived_at",null)).order("created_at",{ascending:false});
+ else {
+  query=archived?query.not("archived_at","is",null):query.is("archived_at",null).neq("status","superseded");
+  query=query.order("created_at",{ascending:false});
+ }
  const {data,error}=await query;
  if(error){
   if(SETUP_CODES.includes(error.code))return NextResponse.json({quotes:[],setupRequired:true});
@@ -184,7 +192,27 @@ export async function GET(req){
     sentAt:row.sent_at||null
    }));
   }catch{}
-  return NextResponse.json({quote:{...mapQuote(data),sendHistory},followUpSetupRequired});
+  let revisionHistory=[];
+  if(data.revision_series_id){
+   try{
+    const {data:revisions}=await s.from("quotes")
+     .select("id,quote_number,status,revision_number,sent_at,accepted_at,declined_at,superseded_at,created_at")
+     .eq("revision_series_id",data.revision_series_id)
+     .order("revision_number",{ascending:false});
+    revisionHistory=(revisions||[]).map(row=>({
+     id:row.id,
+     quoteNumber:row.quote_number,
+     status:row.status,
+     revisionNumber:Number(row.revision_number)||1,
+     sentAt:row.sent_at||null,
+     acceptedAt:row.accepted_at||null,
+     declinedAt:row.declined_at||null,
+     supersededAt:row.superseded_at||null,
+     createdAt:row.created_at||null
+    }));
+   }catch{}
+  }
+  return NextResponse.json({quote:{...mapQuote(data),sendHistory,revisionHistory},followUpSetupRequired});
  }
  return NextResponse.json({quotes:(data||[]).map(mapQuote),followUpSetupRequired});
 }
@@ -240,7 +268,13 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
 
  const {data:existing,error:findError}=await s.from("quotes").select("*").eq("id",id).maybeSingle();
  if(findError||!existing)return NextResponse.json({error:"Tilbudet ble ikke funnet."},{status:404});
- const prepared=payload(body,user,existing);
+ if(existing.status!=="draft"){
+  return NextResponse.json({
+   error:existing.status==="sent"?"Sendte tilbud er låst. Opprett en revisjon for å gjøre endringer.":"Dette tilbudet er låst og kan ikke redigeres.",
+   revisionRequired:existing.status==="sent"||existing.status==="expired"
+  },{status:409});
+ }
+ const prepared=payload({...body,status:"draft"},user,existing);
  if(prepared.error)return NextResponse.json({error:prepared.error},{status:400});
  const now=new Date().toISOString();
  const status=prepared.record.status;
