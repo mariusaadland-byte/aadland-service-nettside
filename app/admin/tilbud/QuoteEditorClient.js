@@ -60,6 +60,12 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [revisionHistory,setRevisionHistory]=useState([]);
  const [revisedFromId,setRevisedFromId]=useState(null);
  const [revising,setRevising]=useState(false);
+ const [paperIssuedAt,setPaperIssuedAt]=useState(null);
+ const [acceptanceMethod,setAcceptanceMethod]=useState(null);
+ const [paperSignedDate,setPaperSignedDate]=useState("");
+ const [showPaperAccept,setShowPaperAccept]=useState(false);
+ const [paperAcceptDate,setPaperAcceptDate]=useState(osloDateKey(new Date()));
+ const [paperBusy,setPaperBusy]=useState(false);
  const [showAlternateEmail,setShowAlternateEmail]=useState(false);
  const [alternateEmail,setAlternateEmail]=useState("");
  const calc=useMemo(()=>calculate(v.lineItems),[v.lineItems]);
@@ -174,6 +180,9 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     setSendHistory(Array.isArray(quote.sendHistory)?quote.sendHistory:[]);
     setRevisionHistory(Array.isArray(quote.revisionHistory)?quote.revisionHistory:[]);
     setRevisedFromId(quote.revisedFromId||null);
+    setPaperIssuedAt(quote.paperIssuedAt||null);
+    setAcceptanceMethod(quote.acceptanceMethod||null);
+    setPaperSignedDate(quote.paperSignedDate||"");
     setConvertedOrderId(quote.convertedOrderId||null);
     const loadedState={
      title:quote.title||"",
@@ -334,6 +343,65 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   router.push("/admin/tilbud/"+quoteId+"/preview");
  }
 
+ async function registerPaperIssue(){
+  if(!quoteId||!["draft","sent"].includes(v.status))return;
+  if(!window.confirm(v.status==="draft"
+   ?"Registrere at dette tilbudet er utlevert til kunden på papir? Da låses denne versjonen."
+   :"Registrere at kunden også har fått denne tilbudsversjonen på papir?"))return;
+  setPaperBusy(true);setError("");setSavedMessage("");
+  if(v.status==="draft"){
+   const saved=await save();
+   if(!saved){setPaperBusy(false);return;}
+  }
+  const response=await fetch("/api/admin/quotes/paper-issue",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({id:quoteId})
+  });
+  const data=await response.json().catch(()=>({}));
+  setPaperBusy(false);
+  if(!response.ok){setError(data.error||"Papirutleveringen kunne ikke registreres.");return;}
+  const nextState={...v,status:"sent"};
+  setV(nextState);
+  setSavedSnapshot(JSON.stringify(nextState));
+  setPaperIssuedAt(data.paperIssuedAt||new Date().toISOString());
+  setHistory(current=>({...current,sentAt:current.sentAt||data.sentAt||new Date().toISOString()}));
+  setRevisionHistory(current=>current.map(item=>{
+   if(item.id===quoteId)return {...item,status:"sent",sentAt:item.sentAt||data.sentAt||new Date().toISOString()};
+   if(revisedFromId&&item.id===revisedFromId)return {...item,status:"superseded",supersededAt:data.sentAt||new Date().toISOString()};
+   return item;
+  }));
+  setSavedMessage("Registrert som utlevert på papir.");
+ }
+
+ function openPaperAcceptance(){
+  setPaperAcceptDate(osloDateKey(new Date()));
+  setError("");
+  setShowPaperAccept(true);
+ }
+
+ async function confirmPaperAcceptance(){
+  if(!quoteId||v.status!=="sent")return;
+  setPaperBusy(true);setError("");setSavedMessage("");
+  const response=await fetch("/api/admin/quotes/paper-accept",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({id:quoteId,signedDate:paperAcceptDate})
+  });
+  const data=await response.json().catch(()=>({}));
+  setPaperBusy(false);
+  if(!response.ok){setError(data.error||"Papirgodkjenningen kunne ikke registreres.");return;}
+  const nextState={...v,status:"accepted"};
+  setV(nextState);
+  setSavedSnapshot(JSON.stringify(nextState));
+  setAcceptanceMethod("paper");
+  setPaperSignedDate(data.paperSignedDate||paperAcceptDate);
+  setHistory(current=>({...current,acceptedAt:data.acceptedAt||new Date().toISOString()}));
+  setRevisionHistory(current=>current.map(item=>item.id===quoteId?{...item,status:"accepted",acceptedAt:data.acceptedAt||new Date().toISOString()}:item));
+  setShowPaperAccept(false);
+  setSavedMessage("Godkjenningen på papir er registrert.");
+ }
+
  async function createRevision(){
   if(!quoteId||!["sent","expired"].includes(v.status))return;
   if(!window.confirm("Opprette en ny revisjon? Den sendte versjonen beholdes urørt til den nye revisjonen faktisk sendes."))return;
@@ -367,6 +435,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     <div className="quoteEditorHeaderActions">
      {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Papirutgave / skriv ut</button>}
      {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
+     {quoteId&&v.status==="draft"&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
+     {quoteId&&v.status==="sent"&&<button type="button" className="btn alt" disabled={paperBusy} onClick={openPaperAcceptance}>Registrer papirgodkjenning</button>}
      {quoteId&&["sent","expired"].includes(v.status)&&<button type="button" className="btn quoteRevisionButton" disabled={revising} onClick={createRevision}>{revising?"Oppretter …":"Opprett revisjon"}</button>}
      {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
      {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href={"/admin/oppdrag/"+convertedOrderId+"/planlegg"}>Planlegg oppdrag</Link><Link href="/admin">Åpne backoffice</Link></div>}
@@ -461,6 +531,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      <div className="quoteSummaryPlan">
       {v.paymentPlan.map(row=><span key={row.id}><small>{row.label} · {row.percent}%</small><b>{nok(calc.total*(Number(row.percent)||0)/100)}</b></span>)}
      </div>
+     {quoteId&&v.status==="draft"&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
+     {quoteId&&v.status==="sent"&&<button type="button" className="btn alt" disabled={paperBusy} onClick={openPaperAcceptance}>Registrer papirgodkjenning</button>}
      {quoteId&&["sent","expired"].includes(v.status)&&<button type="button" className="btn quoteRevisionButton" disabled={revising} onClick={createRevision}>{revising?"Oppretter …":"Opprett revisjon"}</button>}
      {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
      {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href="/admin">Åpne backoffice</Link></div>}
@@ -477,14 +549,33 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
        </Link>)}
       </div>}
       {history.createdAt&&<span><b>Opprettet</b><small>{new Date(history.createdAt).toLocaleString("nb-NO")}</small></span>}
-      {history.sentAt&&<span><b>Sendt</b><small>{new Date(history.sentAt).toLocaleString("nb-NO")}</small></span>}
-      {history.acceptedAt&&<span><b>Godkjent</b><small>{new Date(history.acceptedAt).toLocaleString("nb-NO")}</small></span>}
+      {history.sentAt&&<span><b>Sendt / utlevert</b><small>{new Date(history.sentAt).toLocaleString("nb-NO")}</small></span>}
+      {paperIssuedAt&&<span><b>Utlevert på papir</b><small>{new Date(paperIssuedAt).toLocaleString("nb-NO")}</small></span>}
+      {history.acceptedAt&&<span><b>{acceptanceMethod==="paper"?"Godkjent på papir":"Godkjent"}</b><small>{acceptanceMethod==="paper"&&paperSignedDate?new Date(paperSignedDate+"T12:00:00").toLocaleDateString("nb-NO")+" · registrert ":""}{new Date(history.acceptedAt).toLocaleString("nb-NO")}</small></span>}
       {history.declinedAt&&<span><b>Avslått</b><small>{new Date(history.declinedAt).toLocaleString("nb-NO")}</small></span>}
       {sendHistory.map((entry,index)=><span className="quoteEmailHistoryRow" key={(entry.sentAt||"send")+"-"+index}><b>{entry.deliveryType==="alternate"?"Sendt til annen e-post":"Sendt til kunde"}</b><small>{entry.recipient}{entry.sentAt?" · "+new Date(entry.sentAt).toLocaleString("nb-NO"):""}</small></span>)}
      </div>}
     </aside>
    </div>
   </section>
+
+  {showPaperAccept&&<div className="quoteModalBackdrop" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget&&!paperBusy)setShowPaperAccept(false)}}>
+   <div className="quoteModal" role="dialog" aria-modal="true" aria-labelledby="quotePaperAcceptTitle">
+    <div>
+     <div className="kicker">PAPIRGODKJENNING</div>
+     <h2 id="quotePaperAcceptTitle">Registrer signert tilbud</h2>
+     <p className="muted">Velg datoen kunden faktisk signerte papirutgaven.</p>
+    </div>
+    <div className="field">
+     <label>Signeringsdato</label>
+     <input type="date" max={osloDateKey(new Date())} value={paperAcceptDate} onChange={e=>setPaperAcceptDate(e.target.value)}/>
+    </div>
+    <div className="quoteModalActions">
+     <button type="button" className="btn alt" disabled={paperBusy} onClick={()=>setShowPaperAccept(false)}>Avbryt</button>
+     <button type="button" className="btn quoteSendButton" disabled={paperBusy} onClick={confirmPaperAcceptance}>{paperBusy?"Registrerer …":"Registrer godkjenning"}</button>
+    </div>
+   </div>
+  </div>}
 
   {showAlternateEmail&&<div className="quoteModalBackdrop" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget&&!sending)setShowAlternateEmail(false)}}>
    <div className="quoteModal" role="dialog" aria-modal="true" aria-labelledby="quoteAlternateEmailTitle">
