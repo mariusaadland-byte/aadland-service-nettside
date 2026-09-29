@@ -17,6 +17,10 @@ function mapQuote(quote){
   revisionNumber:Number(quote.revision_number)||1,
   revisedFromId:quote.revised_from_id||null,
   supersededAt:quote.superseded_at||null,
+  issuedVia:quote.issued_via||null,
+  paperIssuedAt:quote.paper_issued_at||null,
+  acceptanceMethod:quote.acceptance_method||null,
+  paperSignedDate:quote.paper_signed_date||null,
   sentAt:quote.sent_at||null,
   acceptedAt:quote.accepted_at||null,
   declinedAt:quote.declined_at||null,
@@ -62,7 +66,7 @@ export async function GET(){
    .order("created_at",{ascending:false})
    .limit(100),
   s.from("quotes")
-   .select("id,quote_number,status,title,total_inc_vat_ore,valid_until,planned_start_date,revision_number,revised_from_id,superseded_at,sent_at,accepted_at,declined_at,created_at,customer")
+   .select("id,quote_number,status,title,total_inc_vat_ore,valid_until,planned_start_date,revision_number,revised_from_id,superseded_at,issued_via,paper_issued_at,acceptance_method,paper_signed_date,sent_at,accepted_at,declined_at,created_at,customer")
    .contains("customer",{email:customerEmail})
    .in("status",["sent","accepted","declined","expired","cancelled","superseded"])
    .order("created_at",{ascending:false})
