@@ -18,7 +18,7 @@ async function allowed(){
 export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;
  const user=await allowed();
  if(!user)return NextResponse.json({error:"Ingen tilgang."},{status:403});
- const {id}=await req.json().catch(()=>({}));
+ const {id,recipientEmail}=await req.json().catch(()=>({}));
  if(!id)return NextResponse.json({error:"Tilbud mangler."},{status:400});
 
  const s=db();
@@ -29,8 +29,11 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  if(["accepted","declined","cancelled"].includes(quote.status))return NextResponse.json({error:"Dette tilbudet er ferdigbehandlet og kan ikke sendes på nytt."},{status:409});
  const today=osloDateKey(new Date());
  if(quote.valid_until&&quote.valid_until<today)return NextResponse.json({error:"Tilbudet har passert gyldighetsdatoen. Oppdater datoen før du sender det."},{status:409});
- const email=String(quote.customer?.email||"").trim();
+ const customerEmail=String(quote.customer?.email||"").trim().toLowerCase();
+ const overrideEmail=String(recipientEmail||"").trim().toLowerCase();
+ const email=overrideEmail||customerEmail;
  if(!email)return NextResponse.json({error:"Kunden må ha e-postadresse før tilbudet kan sendes."},{status:400});
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return NextResponse.json({error:"E-postadressen er ugyldig."},{status:400});
  const resendKey=process.env.VERCEL_ENV==="preview"
   ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)
   :process.env.RESEND_API_KEY;
@@ -52,7 +55,7 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  const minSideUrl=base+"/min-side";
  let hasCustomerAccount=false;
  try{
-  const {data:profile}=await s.from("customer_profiles").select("id").eq("email",email.toLowerCase()).maybeSingle();
+  const {data:profile}=await s.from("customer_profiles").select("id").eq("email",(customerEmail||email).toLowerCase()).maybeSingle();
   hasCustomerAccount=Boolean(profile?.id);
  }catch{}
 
