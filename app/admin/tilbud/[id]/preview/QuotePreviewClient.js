@@ -4,7 +4,7 @@ import {useEffect,useState} from "react";
 import Link from "next/link";
 
 const nok=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",minimumFractionDigits:2,maximumFractionDigits:2}).format((Number(ore)||0)/100);
-const statusLabels={draft:"Kladd",sent:"Sendt",accepted:"Godkjent",declined:"Avslått",expired:"Utløpt",cancelled:"Avbrutt"};
+const statusLabels={draft:"Kladd",sent:"Sendt",accepted:"Godkjent",declined:"Avslått",expired:"Utløpt",cancelled:"Avbrutt",superseded:"Erstattet"};
 const typeLabels={work:"Arbeid",material:"Materiale",other:"Annet"};
 
 export default function QuotePreviewClient({quoteId}){
@@ -55,7 +55,7 @@ export default function QuotePreviewClient({quoteId}){
 
    <section className="quoteDocTitle">
     <div>
-     <span className="quoteDocEyebrow">TILBUD</span>
+     <span className="quoteDocEyebrow">TILBUD{quote.revisionNumber>1?" · REVISJON "+quote.revisionNumber:""}</span>
      <h1>{quote.title}</h1>
     </div>
     <div className="quoteDocMeta">
