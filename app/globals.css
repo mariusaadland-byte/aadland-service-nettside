@@ -3025,3 +3025,42 @@ body:has(.customerPage) .customerPage{
  .quoteRevisionNotice>span,.quoteRevisionNotice>.btn{grid-column:1;grid-row:auto}
  .quoteRevisionNotice>.btn{width:100%}
 }
+
+
+/* Paper quote acceptance */
+.quotePaperAcceptance{
+ margin-top:26px;
+ padding:20px 0 8px;
+ border-top:1px solid #d8d2c8;
+ break-inside:avoid;
+ page-break-inside:avoid;
+}
+.quotePaperAcceptance h2{margin:6px 0 5px;font-size:18px}
+.quotePaperAcceptance>p{margin:0 0 18px;color:#6f6a62;font-size:11px}
+.quotePaperAcceptanceFields{
+ display:grid;
+ grid-template-columns:1fr 1fr;
+ gap:20px 24px;
+}
+.quotePaperAcceptanceFields span{
+ display:grid;
+ gap:10px;
+}
+.quotePaperAcceptanceFields small{
+ color:#777168;
+ font-size:9px;
+ font-weight:800;
+ letter-spacing:.06em;
+ text-transform:uppercase;
+}
+.quotePaperAcceptanceFields i{
+ display:block;
+ height:28px;
+ border-bottom:1px solid #625d55;
+}
+.quotePaperSignature{grid-column:1/-1}
+.quotePaperSignature i{height:42px}
+@media(max-width:600px){
+ .quotePaperAcceptanceFields{grid-template-columns:1fr}
+ .quotePaperSignature{grid-column:1}
+}
