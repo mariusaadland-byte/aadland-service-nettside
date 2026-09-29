@@ -22,7 +22,10 @@ if(resendKey){
   const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
   const requestOrigin=new URL(req.url).origin;
   const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
-  const minSideUrl=(configuredOrigin||requestOrigin)+"/min-side";
+  const requestHost=new URL(requestOrigin).hostname.toLowerCase();
+  const rentalHost=requestHost==="aadlandutleie.no"||requestHost==="www.aadlandutleie.no";
+  const customerOrigin=rentalHost?requestOrigin:(configuredOrigin||requestOrigin);
+  const minSideUrl=customerOrigin+"/min-side";
   const accountUrl=customerUserId?minSideUrl:"";
   const totalText=(p.totalOre/100).toLocaleString("nb-NO",{minimumFractionDigits:0,maximumFractionDigits:2})+" kr";
   const depositText=p.depositOre?(p.depositOre/100).toLocaleString("nb-NO",{minimumFractionDigits:0,maximumFractionDigits:2})+" kr":"";
