@@ -1848,6 +1848,7 @@ html{scroll-behavior:smooth}
 .customerQuoteAccept:hover{background:#3d7a46}
 .customerQuoteAccepted h2{color:#2f6737}
 .customerQuoteDocument{box-shadow:0 20px 60px #0002}
+.quotePreviewShell .quoteDocument,.customerQuoteDocument{width:min(210mm,100%);min-height:0}
 
 @media(max-width:760px){
  .customerQuoteShell{padding:10px}
@@ -1856,6 +1857,21 @@ html{scroll-behavior:smooth}
  .customerQuoteDecision{align-items:stretch;flex-direction:column}
  .customerQuoteDecisionActions{display:grid;grid-template-columns:1fr}
  .customerQuoteDecisionActions .btn{text-align:center}
+ .quoteDocument{padding:24px 16px}
+ .quoteDocHeader{flex-direction:column;gap:12px}
+ .quoteDocCompany{text-align:left}
+ .quoteDocTitle{grid-template-columns:1fr;gap:14px;padding:20px 0 16px}
+ .quoteDocTitle h1{font-size:25px}
+ .quoteStartNotice{margin:0 0 14px}
+ .quoteDocCustomer{flex-direction:column;gap:10px}
+ .quoteDocCustomer>div:last-child{text-align:left}
+ .quoteDocLine{grid-template-columns:minmax(0,1.8fr) .65fr .85fr .5fr .9fr;gap:5px;padding:8px 4px;font-size:8.2px}
+ .quoteDocLineHead{font-size:7px;letter-spacing:0}
+ .quoteDocTotals{grid-template-columns:1fr}
+ .quoteDocPaymentGrid{grid-template-columns:1fr}
+ .quoteDocPaymentGrid p{min-height:0}
+ .quoteDocFooter{grid-template-columns:1fr;gap:6px}
+ .quoteDocFooter>div:nth-child(2),.quoteDocFooter>div:last-child{text-align:left}
 }
 @media print{
  .customerQuoteDecision{display:none!important}
