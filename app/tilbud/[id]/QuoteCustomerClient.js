@@ -28,12 +28,19 @@ export default function QuoteCustomerClient({quoteId}){
  }
 
  useEffect(()=>{
+  const storageKey="aadlandQuoteToken:"+quoteId;
   const fragment=new URLSearchParams(window.location.hash.replace(/^#/,""));
-  const value=fragment.get("token")||new URLSearchParams(window.location.search).get("token")||"";
+  const query=new URLSearchParams(window.location.search);
+  let stored="";
+  try{stored=sessionStorage.getItem(storageKey)||""}catch{}
+  const value=fragment.get("token")||query.get("token")||stored||"";
   setToken(value);
-  if(value)window.history.replaceState({},document.title,window.location.pathname);
+  if(value){
+   try{sessionStorage.setItem(storageKey,value)}catch{}
+   if(fragment.get("token")||query.get("token"))window.history.replaceState({},document.title,window.location.pathname);
+  }
   setTokenReady(true);
- },[]);
+ },[quoteId]);
 
  useEffect(()=>{
   if(!tokenReady)return;
