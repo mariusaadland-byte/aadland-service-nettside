@@ -355,16 +355,15 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      <Link className="btn alt" href="/admin/tilbud">← Tilbud</Link>
      <h1>{quoteId?(quoteNumber||"Rediger tilbud"):"Nytt tilbud"}</h1>
      <p className="muted">Prisene på linjene føres ekskl. MVA. Systemet regner MVA og totalsum automatisk.</p>
-     {quoteId&&<div className={isDirty?"quoteSaveState quoteSaveStateDirty":"quoteSaveState"}>{isDirty?"● Ulagrede endringer":"✓ Alt er lagret"}</div>}
+     {quoteId&&<div className={isDirty?"quoteSaveState quoteSaveStateDirty":"quoteSaveState"}>{locked?"🔒 Låst versjon":isDirty?"● Ulagrede endringer":"✓ Alt er lagret"}</div>}
     </div>
     <div className="quoteEditorHeaderActions">
      {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Papirutgave / skriv ut</button>}
-     {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
-     {quoteId&&["sent","expired"].includes(v.status)&&<button type="button" className="btn quoteRevisionButton" disabled={revising} onClick={createRevision}>{revising?"Oppretter …":"Opprett revisjon"}</button>}
+     {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
      {quoteId&&["sent","expired"].includes(v.status)&&<button type="button" className="btn quoteRevisionButton" disabled={revising} onClick={createRevision}>{revising?"Oppretter …":"Opprett revisjon"}</button>}
      {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
      {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href={"/admin/oppdrag/"+convertedOrderId+"/planlegg"}>Planlegg oppdrag</Link><Link href="/admin">Åpne backoffice</Link></div>}
-     {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={()=>sendQuote()}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
+     {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={()=>sendQuote()}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
      {!locked&&<button type="button" className="btn" disabled={saving||sending||converting} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>}
     </div>
    </div>
@@ -396,7 +395,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       <div className="quoteFormGrid">
        <div className="field"><label>Gyldig til</label><input type="date" value={v.validUntil||""} onChange={e=>set("validUntil",e.target.value)}/></div>
        <div className="field"><label>Tidligst oppstart</label><input type="date" value={v.plannedStartDate||""} onChange={e=>set("plannedStartDate",e.target.value)}/><small className="muted">Vises til kunden. Endelig oppstart avtales etter godkjenning, og datoen kan endres senere.</small></div>
-       {quoteId&&<div className="field"><label>Status</label><select value={v.status} onChange={e=>set("status",e.target.value)}><option value="draft">Kladd</option><option value="sent">Sendt</option><option value="accepted">Godkjent</option><option value="declined">Avslått</option><option value="expired">Utløpt</option><option value="cancelled">Avbrutt</option><option value="superseded">Erstattet</option></select></div>}
+       {quoteId&&<div className="field"><label>Status</label><select value={v.status} disabled><option value="draft">Kladd</option><option value="sent">Sendt</option><option value="accepted">Godkjent</option><option value="declined">Avslått</option><option value="expired">Utløpt</option><option value="cancelled">Avbrutt</option><option value="superseded">Erstattet</option></select></div>}
       </div>
       <label className="quoteFollowUpSetting"><input type="checkbox" checked={v.autoFollowUp!==false} onChange={e=>set("autoFollowUp",e.target.checked)}/><span><b>Automatisk oppfølging etter ca. 2 døgn</b><small>Sendes bare dersom tilbudet fortsatt står som sendt og kunden ikke har svart.</small></span></label>
      </section>
@@ -455,11 +454,12 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      <div className="quoteSummaryPlan">
       {v.paymentPlan.map(row=><span key={row.id}><small>{row.label} · {row.percent}%</small><b>{nok(calc.total*(Number(row.percent)||0)/100)}</b></span>)}
      </div>
+     {quoteId&&["sent","expired"].includes(v.status)&&<button type="button" className="btn quoteRevisionButton" disabled={revising} onClick={createRevision}>{revising?"Oppretter …":"Opprett revisjon"}</button>}
      {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
      {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href="/admin">Åpne backoffice</Link></div>}
-     {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={()=>sendQuote()}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
-     <button type="button" className="btn" disabled={saving||sending||converting} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>
-     {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
+     {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={()=>sendQuote()}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
+     {!locked&&<button type="button" className="btn" disabled={saving||sending||converting} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>}
+     {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
      {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Papirutgave / skriv ut</button>}
      {quoteId&&<div className="quoteHistory">
       <div className="kicker">HISTORIKK</div>
