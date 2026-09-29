@@ -70,7 +70,9 @@ export async function POST(req){
   const token=createCustomerVerificationToken({id:data.user.id,email});
   const requestOrigin=new URL(req.url).origin;
   const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
-  const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
+  const requestHost=new URL(requestOrigin).hostname.toLowerCase();
+  const rentalHost=requestHost==="aadlandutleie.no"||requestHost==="www.aadlandutleie.no";
+  const base=process.env.VERCEL_ENV==="preview"||rentalHost?requestOrigin:(configuredOrigin||requestOrigin);
   const verifyUrl=new URL("/min-side/bekreft-epost",base);
   verifyUrl.hash="token="+encodeURIComponent(token);
 
