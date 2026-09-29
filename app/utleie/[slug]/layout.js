@@ -22,16 +22,16 @@ export async function generateMetadata({params}){
  if(!item){
   return {
    title:"Utleie",
-   description:"Utleie fra Aadland Service.",
+   description:"Utleie fra Aadland Utleie.",
    robots:{index:false,follow:false}
   };
  }
 
  const title=item.name;
- const socialTitle=`${item.name} | Utleie | Aadland Service`;
- const description=String(item.description||`Lei ${item.name} hos Aadland Service.`).slice(0,180);
+ const socialTitle=`${item.name} | Utleie | Aadland Utleie`;
+ const description=String(item.description||`Lei ${item.name} hos Aadland Utleie.`).slice(0,180);
  const image=Array.isArray(item.image_urls)?item.image_urls[0]:null;
- const url=`https://www.aadland-service.no/utleie/${encodeURIComponent(item.slug)}`;
+ const url=`https://www.aadlandutleie.no/utleie/${encodeURIComponent(item.slug)}`;
 
  return {
   title,
@@ -40,7 +40,7 @@ export async function generateMetadata({params}){
   openGraph:{
    type:"website",
    locale:"nb_NO",
-   siteName:"Aadland Service",
+   siteName:"Aadland Utleie",
    title:socialTitle,
    description,
    url,
