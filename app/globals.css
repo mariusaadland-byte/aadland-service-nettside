@@ -1694,6 +1694,9 @@ html{scroll-behavior:smooth}
 .quoteEditorContent{display:grid;gap:18px}
 .quoteEditorSection{display:grid;gap:16px}
 .quoteEditorSection h3{margin:4px 0 0}
+.quoteEditorPage .field input,.quoteEditorPage .field select,.quoteEditorPage .field textarea{color:#15130f!important;-webkit-text-fill-color:#15130f!important;caret-color:#15130f;color-scheme:light}
+.quoteEditorPage .field input::placeholder,.quoteEditorPage .field textarea::placeholder{color:#9b968e!important;-webkit-text-fill-color:#9b968e!important;opacity:1}
+.quoteEditorPage .field input:-webkit-autofill,.quoteEditorPage .field input:-webkit-autofill:hover,.quoteEditorPage .field input:-webkit-autofill:focus,.quoteEditorPage .field textarea:-webkit-autofill,.quoteEditorPage .field select:-webkit-autofill{-webkit-text-fill-color:#15130f!important;caret-color:#15130f!important;box-shadow:0 0 0 1000px #fff inset!important;-webkit-box-shadow:0 0 0 1000px #fff inset!important}
 .quoteFormGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .quoteSectionHead{display:flex;align-items:flex-end;justify-content:space-between;gap:18px}
 .quoteSectionHead>div:last-child{display:flex;gap:8px;flex-wrap:wrap}
