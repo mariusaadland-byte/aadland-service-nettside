@@ -27,6 +27,17 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  if(error||!quote)return NextResponse.json({error:"Tilbudet ble ikke funnet."},{status:404});
 
  if(["accepted","declined","cancelled","superseded"].includes(quote.status))return NextResponse.json({error:"Dette tilbudet er ferdigbehandlet og kan ikke sendes på nytt."},{status:409});
+ if(quote.revised_from_id){
+  const {data:previous,error:previousError}=await s.from("quotes")
+   .select("status,superseded_by_id")
+   .eq("id",quote.revised_from_id)
+   .maybeSingle();
+  if(previousError||!previous)return NextResponse.json({error:"Forrige tilbudsversjon kunne ikke kontrolleres."},{status:409});
+  const alreadyLinked=previous.status==="superseded"&&previous.superseded_by_id===quote.id;
+  if(!alreadyLinked&&!["sent","expired"].includes(previous.status)){
+   return NextResponse.json({error:"Forrige tilbudsversjon er allerede ferdigbehandlet. Denne revisjonen kan derfor ikke sendes."},{status:409});
+  }
+ }
  const today=osloDateKey(new Date());
  if(quote.valid_until&&quote.valid_until<today)return NextResponse.json({error:"Tilbudet har passert gyldighetsdatoen. Oppdater datoen før du sender det."},{status:409});
  const customerEmail=String(quote.customer?.email||"").trim().toLowerCase();
