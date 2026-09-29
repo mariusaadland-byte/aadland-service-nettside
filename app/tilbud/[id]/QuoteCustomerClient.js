@@ -167,7 +167,7 @@ export default function QuoteCustomerClient({quoteId}){
    <footer className="quoteDocFooter">
     <div><b>Aadland Service</b><span>Org.nr. 937 781 873 MVA</span></div>
     <div><span>471 54 898</span><span>post@aadland-service.no</span></div>
-    <div><span>{quote.quoteNumber}</span><span>Side 1</span></div>
+    <div><span>{quote.quoteNumber}</span><span>Tilbud</span></div>
    </footer>
   </article>
 
