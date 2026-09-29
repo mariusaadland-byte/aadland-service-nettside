@@ -366,7 +366,7 @@ export default function MinSide(){
        <span><small>{q.validUntil?"Gyldig til":"Sendt"}</small><b>{q.validUntil?date(q.validUntil):dateTime(q.sentAt||q.createdAt)}</b></span>
        {q.plannedStartDate&&<span><small>Tidligst oppstart</small><b>{date(q.plannedStartDate)}</b></span>}
       </div>
-      {status==="accepted"&&<p className="customerQuoteMessage">Tilbudet er godkjent.</p>}
+      {status==="accepted"&&<p className="customerQuoteMessage">{q.acceptanceMethod==="paper"?"Tilbudet er godkjent på papir"+(q.paperSignedDate?" · signert "+date(q.paperSignedDate):"")+".":"Tilbudet er godkjent."}</p>}
       {status==="declined"&&<p className="customerQuoteMessage">Tilbudet er avslått.</p>}
       {status==="expired"&&<p className="customerQuoteMessage">Tilbudets gyldighetsdato er passert.</p>}
       {status==="superseded"&&<p className="customerQuoteMessage">Denne versjonen er erstattet av en nyere revisjon og beholdes som dokumentasjon.</p>}
