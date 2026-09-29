@@ -2,7 +2,7 @@ import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {getAdminUser} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
-import {isValidDateInput} from "../../../../lib/osloTime";
+import {isValidDateInput,osloDateKey} from "../../../../lib/osloTime";
 
 const STATUSES=["draft","sent","accepted","declined","expired","cancelled","superseded"];
 const SETUP_CODES=["42P01","42883","42703"];
@@ -17,10 +17,12 @@ function clean(value,max=4000){
  return String(value??"").trim().slice(0,max);
 }
 function mapQuote(q){
+ const storedStatus=q.status||"draft";
+ const status=storedStatus==="sent"&&q.valid_until&&q.valid_until<osloDateKey(new Date())?"expired":storedStatus;
  return {
   id:q.id,
   quoteNumber:q.quote_number,
-  status:q.status||"draft",
+  status,
   title:q.title||"",
   customer:q.customer||{},
   lineItems:Array.isArray(q.line_items)?q.line_items:[],
