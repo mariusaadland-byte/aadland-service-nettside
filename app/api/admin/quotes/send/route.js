@@ -132,5 +132,17 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  }
  if(statusUpdate.error)return NextResponse.json({error:"E-posten ble sendt, men status kunne ikke lagres."},{status:500});
 
- return NextResponse.json({ok:true,sentTo:email,sentAt:now,link});
+ const deliveryType=overrideEmail&&overrideEmail!==customerEmail?"alternate":"primary";
+ try{
+  await s.from("quote_send_log").insert({
+   quote_id:id,
+   recipient:email,
+   delivery_type:deliveryType,
+   sent_at:now
+  });
+ }catch(logError){
+  console.error("QUOTE SEND LOG",logError);
+ }
+
+ return NextResponse.json({ok:true,sentTo:email,sentAt:now,deliveryType,link});
 }
