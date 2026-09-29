@@ -1337,6 +1337,9 @@ html{scroll-behavior:smooth}
 .rentalHeroInner{position:relative;z-index:1;padding-top:92px;padding-bottom:82px}
 .rentalHero h1{max-width:850px;margin:12px 0 20px;font-size:clamp(54px,7vw,88px);line-height:.9;letter-spacing:-.055em}
 .rentalHero p{max-width:690px;margin:0;color:rgba(255,255,255,.68);font-size:17px;line-height:1.72}
+.rentalHeroActions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:26px}
+.rentalHeroAccount{min-height:46px;display:inline-flex;align-items:center;justify-content:center;padding:0 22px;border:1px solid rgba(215,167,78,.72);color:#d7a74e;font-size:12px;font-weight:800;transition:background .18s ease,color .18s ease,transform .18s ease}
+.rentalHeroAccount:hover{background:#d7a74e;color:#111;transform:translateY(-1px)}
 .rentalHeroTrust{display:flex;gap:22px;flex-wrap:wrap;margin-top:32px;padding-top:24px;border-top:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.7);font-size:11px;font-weight:700}
 .rentalHeroTrust span:before{color:#d7a74e}
 
