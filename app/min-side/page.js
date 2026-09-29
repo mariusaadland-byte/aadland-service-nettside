@@ -7,7 +7,7 @@ import {osloDateKey} from "../../lib/osloTime";
 const orderStatus={new:"Mottatt",confirmed:"Bekreftet",processing:"Under behandling",in_progress:"Under arbeid",ready:"Klar",completed:"Fullført",cancelled:"Kansellert"};
 const enquiryStatus={new:"Mottatt",confirmed:"Befaring avtalt",processing:"Under behandling",in_progress:"Under arbeid",ready:"Klar for oppfølging",completed:"Ferdig",cancelled:"Avbrutt"};
 const rentalStatus={new:"Mottatt",confirmed:"Bekreftet",active:"Pågående",returned:"Returnert",completed:"Fullført",cancelled:"Kansellert"};
-const quoteStatus={sent:"Sendt",accepted:"Godkjent",declined:"Avslått",expired:"Utløpt",cancelled:"Avbrutt"};
+const quoteStatus={sent:"Sendt",accepted:"Godkjent",declined:"Avslått",expired:"Utløpt",cancelled:"Avbrutt",superseded:"Erstattet"};
 const paymentStatus={unpaid:"Ikke betalt",pending:"Avventer betaling",authorized:"Reservert",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert"};
 const depositStatus={not_paid:"Ikke mottatt",held:"Holdes",released:"Frigitt",partially_charged:"Delvis trukket",charged:"Trukket"};
 const fulfillmentStatus={pickup:"Henting",delivery:"Levering",shipping:"Post / Bring"};
@@ -220,7 +220,7 @@ export default function MinSide(){
    key:"quote-"+q.id,
    type:"Tilbud",
    title:q.title||"Tilbud",
-   meta:q.quoteNumber||"",
+   meta:(q.quoteNumber||"")+(q.revisionNumber>1?" · Revisjon "+q.revisionNumber:""),
    date:q.acceptedAt||q.declinedAt||q.sentAt||q.createdAt,
    status:quoteStatus[effectiveQuoteStatus(q)]||effectiveQuoteStatus(q),
    href:q.href||"#tilbud"
@@ -358,7 +358,7 @@ export default function MinSide(){
      const status=effectiveQuoteStatus(q);
      return <article className="card customerQuoteCard" key={q.id}>
       <div className="customerCardTop">
-       <div><small>{q.quoteNumber}</small><h3>{q.title}</h3></div>
+       <div><small>{q.quoteNumber}{q.revisionNumber>1?" · Revisjon "+q.revisionNumber:""}</small><h3>{q.title}</h3></div>
        <span className={"customerStatus customerStatus-"+status}>{quoteStatus[status]||status}</span>
       </div>
       <div className="customerCardMeta">
@@ -369,6 +369,7 @@ export default function MinSide(){
       {status==="accepted"&&<p className="customerQuoteMessage">Tilbudet er godkjent.</p>}
       {status==="declined"&&<p className="customerQuoteMessage">Tilbudet er avslått.</p>}
       {status==="expired"&&<p className="customerQuoteMessage">Tilbudets gyldighetsdato er passert.</p>}
+      {status==="superseded"&&<p className="customerQuoteMessage">Denne versjonen er erstattet av en nyere revisjon og beholdes som dokumentasjon.</p>}
       <Link className="btn" href={q.href}>Åpne tilbud</Link>
      </article>
     })}
