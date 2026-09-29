@@ -25,6 +25,16 @@ export async function POST(req){
  if(!["draft","sent"].includes(quote.status)){
   return NextResponse.json({error:"Denne tilbudsversjonen kan ikke registreres som utlevert på papir."},{status:409});
  }
+ if(quote.paper_issued_at){
+  return NextResponse.json({
+   ok:true,
+   status:quote.status,
+   sentAt:quote.sent_at||quote.paper_issued_at,
+   issuedVia:quote.issued_via||"paper",
+   paperIssuedAt:quote.paper_issued_at,
+   alreadyRegistered:true
+  });
+ }
 
  const today=osloDateKey(new Date());
  if(quote.valid_until&&quote.valid_until<today){
