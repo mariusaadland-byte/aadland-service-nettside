@@ -241,24 +241,36 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   setSavedMessage("Oppdrag "+(data.orderNumber||"")+" er opprettet i backoffice.");
  }
 
- async function sendQuote(){
+ async function sendQuote(recipientOverride=""){
   if(!quoteId)return;
-  if(!String(v.customer.email||"").trim()){setError("Legg inn kundens e-postadresse før tilbudet sendes.");return;}
-  if(!window.confirm("Sende tilbudet til "+v.customer.email+"?"))return;
+  const recipient=String(recipientOverride||v.customer.email||"").trim().toLowerCase();
+  if(!recipient){setError("Legg inn kundens e-postadresse før tilbudet sendes.");return;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)){setError("E-postadressen er ugyldig.");return;}
+  if(!window.confirm("Sende tilbudet til "+recipient+"?"))return;
   setSending(true);setError("");setSavedMessage("");
   const saved=await save();
   if(!saved){setSending(false);return;}
   const response=await fetch("/api/admin/quotes/send",{
    method:"POST",
    headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({id:quoteId})
+   body:JSON.stringify({id:quoteId,...(recipientOverride?{recipientEmail:recipient}:{})})
   });
   const data=await response.json().catch(()=>({}));
   setSending(false);
   if(!response.ok){setError(data.error||"Tilbudet kunne ikke sendes.");return;}
   setV(current=>({...current,status:"sent"}));
   setHistory(current=>({...current,sentAt:data.sentAt||new Date().toISOString()}));
-  setSavedMessage("Tilbudet er sendt til "+(data.sentTo||v.customer.email)+".");
+  setSavedMessage("Tilbudet er sendt til "+(data.sentTo||recipient)+".");
+ }
+
+ function sendToOtherEmail(){
+  if(!quoteId)return;
+  const value=window.prompt("Skriv inn e-postadressen du vil sende tilbudet til:","");
+  if(value===null)return;
+  const email=String(value||"").trim().toLowerCase();
+  if(!email){setError("Skriv inn en e-postadresse.");return;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setError("E-postadressen er ugyldig.");return;}
+  sendQuote(email);
  }
 
  if(loading)return <main className="admin quoteEditorPage"><section className="adminmain quoteEditorMain"><div className="card">Laster tilbud …</div></section></main>;
@@ -273,7 +285,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      <p className="muted">Prisene på linjene føres ekskl. MVA. Systemet regner MVA og totalsum automatisk.</p>
     </div>
     <div className="quoteEditorHeaderActions">
-     {quoteId&&<Link className="btn alt" href={"/admin/tilbud/"+quoteId+"/preview"}>Forhåndsvis / PDF</Link>}
+     {quoteId&&<Link className="btn alt" href={"/admin/tilbud/"+quoteId+"/preview"}>Papirutgave / skriv ut</Link>}
+     {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={sendToOtherEmail}>Send til annen e-post</button>}
      {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
      {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href={"/admin/oppdrag/"+convertedOrderId+"/planlegg"}>Planlegg oppdrag</Link><Link href="/admin">Åpne backoffice</Link></div>}
      {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={sendQuote}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
@@ -368,7 +381,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href="/admin">Åpne backoffice</Link></div>}
      {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={sendQuote}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
      <button type="button" className="btn" disabled={saving||sending||converting} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>
-     {quoteId&&<Link className="btn alt" href={"/admin/tilbud/"+quoteId+"/preview"}>Forhåndsvis / PDF</Link>}
+     {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={sendToOtherEmail}>Send til annen e-post</button>}
+     {quoteId&&<Link className="btn alt" href={"/admin/tilbud/"+quoteId+"/preview"}>Papirutgave / skriv ut</Link>}
      {quoteId&&<div className="quoteHistory">
       <div className="kicker">HISTORIKK</div>
       {history.createdAt&&<span><b>Opprettet</b><small>{new Date(history.createdAt).toLocaleString("nb-NO")}</small></span>}
