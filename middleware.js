@@ -10,7 +10,7 @@ export function middleware(req){
  if((req.method==="GET"||req.method==="HEAD")&&rentalHosts.has(host)&&pathname==="/"){
   const url=req.nextUrl.clone();
   url.pathname="/utleie";
-  return NextResponse.redirect(url,308);
+  return NextResponse.rewrite(url);
  }
 
  if(!mutatingMethods.has(req.method))return NextResponse.next();
