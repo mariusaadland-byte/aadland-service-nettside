@@ -74,8 +74,9 @@ export async function POST(req,{params}){ const originError=sameOriginGuard(req)
  if(!verifyQuoteToken(loaded.data,token))return NextResponse.json({error:"Ugyldig eller utløpt tilbudslenke."},{status:403});
 
  if(["accepted","declined","cancelled","superseded"].includes(loaded.data.status)){
-  return NextResponse.json({error:"Tilbudet er allerede ferdigbehandlet."},{status:409});
+  return NextResponse.json({error:loaded.data.status==="superseded"?"Denne tilbudsversjonen er erstattet av en nyere revisjon.":"Tilbudet er allerede ferdigbehandlet."},{status:409});
  }
+ if(loaded.data.status!=="sent")return NextResponse.json({error:"Tilbudet er ikke aktivt for svar ennå."},{status:409});
  if(expired(loaded.data))return NextResponse.json({error:"Tilbudet er utløpt."},{status:409});
 
  const now=new Date().toISOString();
