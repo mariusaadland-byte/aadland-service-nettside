@@ -52,6 +52,8 @@ set search_path = ''
 as $$
 declare
   v_previous_id uuid;
+  v_previous_status text;
+  v_previous_superseded_by uuid;
 begin
   select revised_from_id
   into v_previous_id
@@ -61,6 +63,24 @@ begin
 
   if not found then
     raise exception 'quote_not_found';
+  end if;
+
+  if v_previous_id is not null then
+    select status, superseded_by_id
+    into v_previous_status, v_previous_superseded_by
+    from public.quotes
+    where id = v_previous_id
+    for update;
+
+    if not found then
+      raise exception 'previous_revision_not_found';
+    end if;
+
+    if v_previous_status = 'superseded' and v_previous_superseded_by = p_quote_id then
+      null;
+    elsif v_previous_status not in ('sent','expired') then
+      raise exception 'previous_revision_finalized';
+    end if;
   end if;
 
   update public.quotes
@@ -75,15 +95,14 @@ begin
     raise exception 'quote_not_sendable';
   end if;
 
-  if v_previous_id is not null then
+  if v_previous_id is not null and v_previous_status in ('sent','expired') then
     update public.quotes
     set status = 'superseded',
         superseded_by_id = p_quote_id,
         superseded_at = p_sent_at,
         auto_follow_up = false,
         updated_at = p_sent_at
-    where id = v_previous_id
-      and status in ('sent','expired');
+    where id = v_previous_id;
   end if;
 end;
 $$;
