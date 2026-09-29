@@ -55,8 +55,27 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [sending,setSending]=useState(false);
  const [error,setError]=useState("");
  const [savedMessage,setSavedMessage]=useState("");
+ const [savedSnapshot,setSavedSnapshot]=useState("");
+ const [sendHistory,setSendHistory]=useState([]);
+ const [showAlternateEmail,setShowAlternateEmail]=useState(false);
+ const [alternateEmail,setAlternateEmail]=useState("");
  const calc=useMemo(()=>calculate(v.lineItems),[v.lineItems]);
  const planSum=useMemo(()=>v.paymentPlan.reduce((sum,row)=>sum+(Number(row.percent)||0),0),[v.paymentPlan]);
+ const isDirty=useMemo(()=>Boolean(savedSnapshot)&&JSON.stringify(v)!==savedSnapshot,[v,savedSnapshot]);
+
+ useEffect(()=>{
+  if(!quoteId&&!savedSnapshot)setSavedSnapshot(JSON.stringify(v));
+ },[quoteId,savedSnapshot]);
+
+ useEffect(()=>{
+  const handleBeforeUnload=event=>{
+   if(!isDirty)return;
+   event.preventDefault();
+   event.returnValue="";
+  };
+  window.addEventListener("beforeunload",handleBeforeUnload);
+  return()=>window.removeEventListener("beforeunload",handleBeforeUnload);
+ },[isDirty]);
 
  useEffect(()=>{
   if(quoteId||sourceOrderId)return;
@@ -148,8 +167,9 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     if(cancelled)return;
     setQuoteNumber(quote.quoteNumber||"");
     setHistory({createdAt:quote.createdAt||null,sentAt:quote.sentAt||null,acceptedAt:quote.acceptedAt||null,declinedAt:quote.declinedAt||null});
+    setSendHistory(Array.isArray(quote.sendHistory)?quote.sendHistory:[]);
     setConvertedOrderId(quote.convertedOrderId||null);
-    setV({
+    const loadedState={
      title:quote.title||"",
      status:quote.status||"draft",
      customer:{
@@ -166,7 +186,9 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      validUntil:quote.validUntil||"",
      plannedStartDate:quote.plannedStartDate||"",
      autoFollowUp:quote.autoFollowUp!==false
-    });
+    };
+    setV(loadedState);
+    setSavedSnapshot(JSON.stringify(loadedState));
    })
    .catch(err=>{if(!cancelled)setError(err.message||"Tilbudet kunne ikke lastes.")})
    .finally(()=>{if(!cancelled)setLoading(false)});
@@ -216,6 +238,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    return data.quote;
   }
   setQuoteNumber(data.quote.quoteNumber||quoteNumber);
+  setSavedSnapshot(JSON.stringify(v));
   setSavedMessage("Tilbudet er lagret.");
   window.setTimeout(()=>setSavedMessage(""),1800);
   return data.quote;
@@ -242,14 +265,14 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  }
 
  async function sendQuote(recipientOverride=""){
-  if(!quoteId)return;
+  if(!quoteId)return false;
   const recipient=String(recipientOverride||v.customer.email||"").trim().toLowerCase();
-  if(!recipient){setError("Legg inn kundens e-postadresse før tilbudet sendes.");return;}
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)){setError("E-postadressen er ugyldig.");return;}
-  if(!window.confirm("Sende tilbudet til "+recipient+"?"))return;
+  if(!recipient){setError("Legg inn kundens e-postadresse før tilbudet sendes.");return false;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)){setError("E-postadressen er ugyldig.");return false;}
+  if(!window.confirm("Sende tilbudet til "+recipient+"?"))return false;
   setSending(true);setError("");setSavedMessage("");
   const saved=await save();
-  if(!saved){setSending(false);return;}
+  if(!saved){setSending(false);return false;}
   const response=await fetch("/api/admin/quotes/send",{
    method:"POST",
    headers:{"Content-Type":"application/json"},
@@ -257,20 +280,40 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   });
   const data=await response.json().catch(()=>({}));
   setSending(false);
-  if(!response.ok){setError(data.error||"Tilbudet kunne ikke sendes.");return;}
-  setV(current=>({...current,status:"sent"}));
+  if(!response.ok){setError(data.error||"Tilbudet kunne ikke sendes.");return false;}
+  const nextState={...v,status:"sent"};
+  setV(nextState);
+  setSavedSnapshot(JSON.stringify(nextState));
   setHistory(current=>({...current,sentAt:data.sentAt||new Date().toISOString()}));
+  setSendHistory(current=>[{
+   recipient:data.sentTo||recipient,
+   deliveryType:data.deliveryType||((recipientOverride&&recipient!==String(v.customer.email||"").trim().toLowerCase())?"alternate":"primary"),
+   sentAt:data.sentAt||new Date().toISOString()
+  },...current].slice(0,20));
   setSavedMessage("Tilbudet er sendt til "+(data.sentTo||recipient)+".");
+  return true;
  }
 
- function sendToOtherEmail(){
-  if(!quoteId)return;
-  const value=window.prompt("Skriv inn e-postadressen du vil sende tilbudet til:","");
-  if(value===null)return;
-  const email=String(value||"").trim().toLowerCase();
+ function openAlternateEmail(){
+  setAlternateEmail("");
+  setError("");
+  setShowAlternateEmail(true);
+ }
+
+ async function confirmAlternateEmailSend(){
+  const email=String(alternateEmail||"").trim().toLowerCase();
   if(!email){setError("Skriv inn en e-postadresse.");return;}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setError("E-postadressen er ugyldig.");return;}
-  sendQuote(email);
+  const ok=await sendQuote(email);
+  if(ok){setShowAlternateEmail(false);setAlternateEmail("");}
+ }
+
+ async function openPaperCopy(){
+  if(!quoteId)return;
+  setError("");setSavedMessage("");
+  const saved=await save();
+  if(!saved)return;
+  router.push("/admin/tilbud/"+quoteId+"/preview");
  }
 
  if(loading)return <main className="admin quoteEditorPage"><section className="adminmain quoteEditorMain"><div className="card">Laster tilbud …</div></section></main>;
@@ -283,10 +326,11 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      <Link className="btn alt" href="/admin/tilbud">← Tilbud</Link>
      <h1>{quoteId?(quoteNumber||"Rediger tilbud"):"Nytt tilbud"}</h1>
      <p className="muted">Prisene på linjene føres ekskl. MVA. Systemet regner MVA og totalsum automatisk.</p>
+     {quoteId&&<div className={isDirty?"quoteSaveState quoteSaveStateDirty":"quoteSaveState"}>{isDirty?"● Ulagrede endringer":"✓ Alt er lagret"}</div>}
     </div>
     <div className="quoteEditorHeaderActions">
-     {quoteId&&<Link className="btn alt" href={"/admin/tilbud/"+quoteId+"/preview"}>Papirutgave / skriv ut</Link>}
-     {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={sendToOtherEmail}>Send til annen e-post</button>}
+     {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Papirutgave / skriv ut</button>}
+     {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
      {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
      {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href={"/admin/oppdrag/"+convertedOrderId+"/planlegg"}>Planlegg oppdrag</Link><Link href="/admin">Åpne backoffice</Link></div>}
      {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={sendQuote}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
@@ -381,17 +425,36 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href="/admin">Åpne backoffice</Link></div>}
      {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={sendQuote}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
      <button type="button" className="btn" disabled={saving||sending||converting} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>
-     {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={sendToOtherEmail}>Send til annen e-post</button>}
-     {quoteId&&<Link className="btn alt" href={"/admin/tilbud/"+quoteId+"/preview"}>Papirutgave / skriv ut</Link>}
+     {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
+     {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Papirutgave / skriv ut</button>}
      {quoteId&&<div className="quoteHistory">
       <div className="kicker">HISTORIKK</div>
       {history.createdAt&&<span><b>Opprettet</b><small>{new Date(history.createdAt).toLocaleString("nb-NO")}</small></span>}
       {history.sentAt&&<span><b>Sendt</b><small>{new Date(history.sentAt).toLocaleString("nb-NO")}</small></span>}
       {history.acceptedAt&&<span><b>Godkjent</b><small>{new Date(history.acceptedAt).toLocaleString("nb-NO")}</small></span>}
       {history.declinedAt&&<span><b>Avslått</b><small>{new Date(history.declinedAt).toLocaleString("nb-NO")}</small></span>}
-     </div>}
+      {sendHistory.map((entry,index)=><span className="quoteEmailHistoryRow" key={(entry.sentAt||"send")+"-"+index}><b>{entry.deliveryType==="alternate"?"Sendt til annen e-post":"Sendt til kunde"}</b><small>{entry.recipient}{entry.sentAt?" · "+new Date(entry.sentAt).toLocaleString("nb-NO"):""}</small></span>)}
+     </div>
     </aside>
    </div>
   </section>
+
+  {showAlternateEmail&&<div className="quoteModalBackdrop" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget&&!sending)setShowAlternateEmail(false)}}>
+   <div className="quoteModal" role="dialog" aria-modal="true" aria-labelledby="quoteAlternateEmailTitle">
+    <div>
+     <div className="kicker">SEND KOPI</div>
+     <h2 id="quoteAlternateEmailTitle">Send tilbudet til en annen e-post</h2>
+     <p className="muted">Kundens lagrede e-postadresse blir ikke endret.</p>
+    </div>
+    <div className="field">
+     <label>E-postadresse</label>
+     <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck="false" value={alternateEmail} onChange={e=>setAlternateEmail(e.target.value)} placeholder="navn@epost.no" autoFocus/>
+    </div>
+    <div className="quoteModalActions">
+     <button type="button" className="btn alt" disabled={sending} onClick={()=>setShowAlternateEmail(false)}>Avbryt</button>
+     <button type="button" className="btn quoteSendButton" disabled={sending} onClick={confirmAlternateEmailSend}>{sending?"Sender …":"Lagre og send"}</button>
+    </div>
+   </div>
+  </div>}
  </main>;
 }
