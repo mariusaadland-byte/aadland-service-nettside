@@ -10,7 +10,8 @@ const statusLabels={
  accepted:"Godkjent",
  declined:"Avslått",
  expired:"Utløpt",
- cancelled:"Avbrutt"
+ cancelled:"Avbrutt",
+ superseded:"Erstattet"
 };
 const nok=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",maximumFractionDigits:0}).format((Number(ore)||0)/100);
 
@@ -136,7 +137,7 @@ export default function QuotesClient(){
       {visible.map(quote=><article className="card quoteListCard" key={quote.id}>
        <div className="quoteListTop">
         <div>
-         <div className="kicker">{quote.quoteNumber}</div>
+         <div className="kicker">{quote.quoteNumber}{quote.revisionNumber>1?" · REVISJON "+quote.revisionNumber:""}</div>
          <h3>{quote.title}</h3>
          <p>{quote.customer?.name||"Ukjent kunde"}{quote.customer?.phone?" · "+quote.customer.phone:""}</p>
         </div>
