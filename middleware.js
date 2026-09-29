@@ -1,8 +1,18 @@
 import {NextResponse} from "next/server";
 
 const mutatingMethods=new Set(["POST","PUT","PATCH","DELETE"]);
+const rentalHosts=new Set(["aadlandutleie.no","www.aadlandutleie.no"]);
 
 export function middleware(req){
+ const host=String(req.headers.get("host")||"").split(":")[0].toLowerCase();
+ const pathname=req.nextUrl.pathname;
+
+ if((req.method==="GET"||req.method==="HEAD")&&rentalHosts.has(host)&&pathname==="/"){
+  const url=req.nextUrl.clone();
+  url.pathname="/utleie";
+  return NextResponse.redirect(url,308);
+ }
+
  if(!mutatingMethods.has(req.method))return NextResponse.next();
 
  const supplied=String(req.headers.get("origin")||"").trim();
@@ -31,5 +41,5 @@ export function middleware(req){
 }
 
 export const config={
- matcher:["/api/admin/:path*"]
+ matcher:["/","/api/admin/:path*"]
 };
