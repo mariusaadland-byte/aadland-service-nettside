@@ -74,11 +74,15 @@ export default function Utleie(){
     <span className="catalogEyebrow">AADLAND SERVICE · UTLEIE</span>
     <h1>Utstyr til jobben.</h1>
     <p>Finn det du trenger, åpne produktet og velg ønsket leieperiode i kalenderen.</p>
+    <div className="rentalHeroActions">
+     <a className="catalogGoldButton" href="#utleiekatalog">Se utleieutstyr →</a>
+     <Link className="rentalHeroAccount" href="/min-side">Min side →</Link>
+    </div>
     <div className="rentalHeroTrust"><span>✓ Se pris før booking</span><span>✓ Kalender på hvert produkt</span><span>✓ Henting eller levering der det tilbys</span></div>
    </div>
   </section>
 
-  <section className="rentalCatalogSection">
+  <section id="utleiekatalog" className="rentalCatalogSection">
    <div className="catalogWrap">
     <div className="rentalCatalogHeading">
      <div>
