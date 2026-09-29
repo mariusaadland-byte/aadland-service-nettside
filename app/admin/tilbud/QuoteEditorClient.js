@@ -58,6 +58,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [savedSnapshot,setSavedSnapshot]=useState("");
  const [sendHistory,setSendHistory]=useState([]);
  const [revisionHistory,setRevisionHistory]=useState([]);
+ const [revisedFromId,setRevisedFromId]=useState(null);
  const [revising,setRevising]=useState(false);
  const [showAlternateEmail,setShowAlternateEmail]=useState(false);
  const [alternateEmail,setAlternateEmail]=useState("");
@@ -172,6 +173,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     setHistory({createdAt:quote.createdAt||null,sentAt:quote.sentAt||null,acceptedAt:quote.acceptedAt||null,declinedAt:quote.declinedAt||null});
     setSendHistory(Array.isArray(quote.sendHistory)?quote.sendHistory:[]);
     setRevisionHistory(Array.isArray(quote.revisionHistory)?quote.revisionHistory:[]);
+    setRevisedFromId(quote.revisedFromId||null);
     setConvertedOrderId(quote.convertedOrderId||null);
     const loadedState={
      title:quote.title||"",
@@ -294,6 +296,11 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   setV(nextState);
   setSavedSnapshot(JSON.stringify(nextState));
   setHistory(current=>({...current,sentAt:data.sentAt||new Date().toISOString()}));
+  setRevisionHistory(current=>current.map(item=>{
+   if(item.id===quoteId)return {...item,status:"sent",sentAt:data.sentAt||new Date().toISOString()};
+   if(revisedFromId&&item.id===revisedFromId)return {...item,status:"superseded",supersededAt:data.sentAt||new Date().toISOString()};
+   return item;
+  }));
   setSendHistory(current=>[{
    recipient:data.sentTo||recipient,
    deliveryType:data.deliveryType||((recipientOverride&&recipient!==String(v.customer.email||"").trim().toLowerCase())?"alternate":"primary"),
