@@ -7,7 +7,7 @@ import {osloDateKey} from "../../lib/osloTime";
 const orderStatus={new:"Mottatt",confirmed:"Bekreftet",processing:"Under behandling",in_progress:"Under arbeid",ready:"Klar",completed:"Fullført",cancelled:"Kansellert"};
 const enquiryStatus={new:"Mottatt",confirmed:"Befaring avtalt",processing:"Under behandling",in_progress:"Under arbeid",ready:"Klar for oppfølging",completed:"Ferdig",cancelled:"Avbrutt"};
 const rentalStatus={new:"Mottatt",confirmed:"Bekreftet",active:"Pågående",returned:"Returnert",completed:"Fullført",cancelled:"Kansellert"};
-const quoteStatus={sent:"Sendt",accepted:"Godkjent",declined:"Avslått",expired:"Utløpt",cancelled:"Avbrutt"};
+const quoteStatus={sent:"Sendt",accepted:"Godkjent",declined:"Avslått",expired:"Utløpt",cancelled:"Avbrutt",superseded:"Erstattet"};
 const paymentStatus={unpaid:"Ikke betalt",pending:"Avventer betaling",authorized:"Reservert",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert"};
 const depositStatus={not_paid:"Ikke mottatt",held:"Holdes",released:"Frigitt",partially_charged:"Delvis trukket",charged:"Trukket"};
 const fulfillmentStatus={pickup:"Henting",delivery:"Levering",shipping:"Post / Bring"};
@@ -220,7 +220,7 @@ export default function MinSide(){
    key:"quote-"+q.id,
    type:"Tilbud",
    title:q.title||"Tilbud",
-   meta:q.quoteNumber||"",
+   meta:(q.quoteNumber||"")+(q.revisionNumber>1?" · Revisjon "+q.revisionNumber:""),
    date:q.acceptedAt||q.declinedAt||q.sentAt||q.createdAt,
    status:quoteStatus[effectiveQuoteStatus(q)]||effectiveQuoteStatus(q),
    href:q.href||"#tilbud"
@@ -358,7 +358,7 @@ export default function MinSide(){
      const status=effectiveQuoteStatus(q);
      return <article className="card customerQuoteCard" key={q.id}>
       <div className="customerCardTop">
-       <div><small>{q.quoteNumber}</small><h3>{q.title}</h3></div>
+       <div><small>{q.quoteNumber}{q.revisionNumber>1?" · Revisjon "+q.revisionNumber:""}</small><h3>{q.title}</h3></div>
        <span className={"customerStatus customerStatus-"+status}>{quoteStatus[status]||status}</span>
       </div>
       <div className="customerCardMeta">
@@ -366,9 +366,10 @@ export default function MinSide(){
        <span><small>{q.validUntil?"Gyldig til":"Sendt"}</small><b>{q.validUntil?date(q.validUntil):dateTime(q.sentAt||q.createdAt)}</b></span>
        {q.plannedStartDate&&<span><small>Tidligst oppstart</small><b>{date(q.plannedStartDate)}</b></span>}
       </div>
-      {status==="accepted"&&<p className="customerQuoteMessage">Tilbudet er godkjent.</p>}
+      {status==="accepted"&&<p className="customerQuoteMessage">{q.acceptanceMethod==="paper"?"Tilbudet er godkjent på papir"+(q.paperSignedDate?" · signert "+date(q.paperSignedDate):"")+".":"Tilbudet er godkjent."}</p>}
       {status==="declined"&&<p className="customerQuoteMessage">Tilbudet er avslått.</p>}
       {status==="expired"&&<p className="customerQuoteMessage">Tilbudets gyldighetsdato er passert.</p>}
+      {status==="superseded"&&<p className="customerQuoteMessage">Denne versjonen er erstattet av en nyere revisjon og beholdes som dokumentasjon.</p>}
       <Link className="btn" href={q.href}>Åpne tilbud</Link>
      </article>
     })}
@@ -444,6 +445,58 @@ export default function MinSide(){
      <span><small>Levering</small><b>{fulfillmentStatus[o.fulfillment_type]||o.fulfillment_type||"Ikke registrert"}</b></span>
      {Number(o.shipping_ore)>0&&<span><small>Frakt</small><b>{kr(o.shipping_ore)}</b></span>}
     </div>
+    {o.fulfillment_type==="delivery"&&<div className="customerPaymentConfirmation">
+     <b>{o.delivery_within_radius===true?"✓ Leveringsområdet er godkjent":o.delivery_within_radius===false?"Leveringsadressen er utenfor 15 km":"Leveringsområdet kontrolleres"}</b>
+     <span>{o.delivery_within_radius===true
+      ?"Adressen er godkjent for lokal levering innen 15 km."
+      :o.delivery_within_radius===false
+       ?"Vi tar kontakt for å avtale henting eller en annen løsning."
+       :"Vi kontrollerer adressen før bestillingen bekreftes."}</span>
+    </div>}
+    {o.confirmation_sent_at&&<div className="customerPaymentConfirmation">
+     <b>✓ Ordrebekreftelse sendt</b>
+     <span>Sendt {dateTimeFull(o.confirmation_sent_at)}</span>
+    </div>}
+    {(o.confirmed_at||o.in_progress_at)&&<div className="customerPaymentConfirmation">
+     <b>Ordrefremdrift</b>
+     {o.confirmed_at&&<span>✓ Bekreftet {dateTimeFull(o.confirmed_at)}{o.confirmed_notice_sent_at?" · kunde varslet "+dateTimeFull(o.confirmed_notice_sent_at):""}</span>}
+     {o.in_progress_at&&<span>✓ Under arbeid {dateTimeFull(o.in_progress_at)}{o.in_progress_notice_sent_at?" · kunde varslet "+dateTimeFull(o.in_progress_notice_sent_at):""}</span>}
+    </div>}
+
+    {o.status==="cancelled"&&<div className="customerPaymentConfirmation">
+     <b>Bestillingen er kansellert</b>
+     {o.cancellation_reason&&<span>Årsak: {o.cancellation_reason}</span>}
+     {o.cancelled_at&&<span>Kansellert {dateTimeFull(o.cancelled_at)}</span>}
+     {o.cancellation_sent_at&&<span>Bekreftelse sendt {dateTimeFull(o.cancellation_sent_at)}</span>}
+     {["paid","partial","authorized"].includes(o.payment_status)&&<span>Eventuell registrert betaling/refusjon håndteres separat.</span>}
+    </div>}
+    {o.status==="ready"&&["pickup","delivery"].includes(o.fulfillment_type)&&<div className="customerPaymentConfirmation">
+     <b>{o.fulfillment_type==="pickup"?"✓ Klar for henting":"✓ Klar for levering"}</b>
+     <span>{o.fulfillment_type==="pickup"?"Bestillingen er ferdig og klar for henting.":"Bestillingen er ferdig og klar for levering."}</span>
+     {o.ready_notice_sent_at&&<span>Varsel sendt {dateTimeFull(o.ready_notice_sent_at)}</span>}
+    </div>}
+    {o.fulfillment_type==="shipping"&&(o.tracking_number||o.tracking_url)&&<div className="customerPaymentConfirmation">
+     <b>✓ Bestillingen er sendt</b>
+     {o.tracking_number&&<span>Sporingsnummer: {o.tracking_number}</span>}
+     {o.tracking_url&&<a className="btn alt" href={o.tracking_url} target="_blank" rel="noopener noreferrer">Spor pakken</a>}
+     {o.dispatched_at&&<span>Sendt {dateTimeFull(o.dispatched_at)}</span>}
+     {o.tracking_sent_at&&<span>Sendt-varsel sendt {dateTimeFull(o.tracking_sent_at)}</span>}
+    </div>}
+    {o.delivered_at&&<div className="customerPaymentConfirmation">
+     <b>✓ Bestillingen er levert</b>
+     <span>Registrert levert {dateTimeFull(o.delivered_at)}</span>
+     {o.delivery_notice_sent_at&&<span>Levert-varsel sendt {dateTimeFull(o.delivery_notice_sent_at)}</span>}
+    </div>}
+    {Number(o.payment_refunded_ore)>0&&<div className="customerPaymentConfirmation">
+     <b>{Number(o.payment_refunded_ore)>=Number(o.payment_captured_ore||0)?"✓ Betalingen er tilbakebetalt":"✓ Delvis tilbakebetaling registrert"}</b>
+     {Number(o.refund_last_ore)>0&&<span>Sist tilbakebetalt: {kr(o.refund_last_ore)}</span>}
+     <span>Totalt tilbakebetalt: {kr(o.payment_refunded_ore)}</span>
+     {Number(o.payment_captured_ore)>Number(o.payment_refunded_ore)&&<span>Netto registrert betaling etter tilbakebetaling: {kr(Number(o.payment_captured_ore)-Number(o.payment_refunded_ore))}</span>}
+     {o.refund_reference&&<span>Referanse: {o.refund_reference}</span>}
+     {o.refund_note&&<span>Merknad: {o.refund_note}</span>}
+     {o.payment_refunded_at&&<span>Registrert {dateTimeFull(o.payment_refunded_at)}</span>}
+     {o.refund_notice_sent_at&&<span>Tilbakebetalingsbekreftelse sendt {dateTimeFull(o.refund_notice_sent_at)}</span>}
+    </div>}
     {o.payment_status==="paid"&&(o.payment_reference||o.receipt_sent_at)&&<div className="customerPaymentConfirmation">
      <b>✓ Betaling registrert</b>
      {o.payment_reference&&<span>Referanse: {o.payment_reference}</span>}

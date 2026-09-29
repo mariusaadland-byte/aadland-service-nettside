@@ -4,6 +4,7 @@ import {NextResponse} from "next/server";
 import crypto from "crypto";
 import {getCustomerUserId} from "../../../lib/customer-auth";
 import {db,fromDbRentalItem} from "../../../lib/supabase";
+import {rentalEmailFrom,rentalReplyTo,rentalSiteUrl} from "../../../lib/rentalEmailConfig";
 const RENTAL_TERMS_VERSION="2026-09";
 function valid(a,b){if(!/^\d{4}-\d{2}-\d{2}$/.test(a||"")||!/^\d{4}-\d{2}-\d{2}$/.test(b||"")||b<a)return false;const A=new Date(a+"T12:00:00Z"),B=new Date(b+"T12:00:00Z");return !Number.isNaN(A.valueOf())&&!Number.isNaN(B.valueOf())&&A.toISOString().slice(0,10)===a&&B.toISOString().slice(0,10)===b}
 function todayOslo(){const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Oslo",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date()),v=Object.fromEntries(parts.map(p=>[p.type,p.value]));return `${v.year}-${v.month}-${v.day}`}
@@ -18,18 +19,16 @@ if(resendKey){
  try{
   const {Resend}=await import("resend");
   const resend=new Resend(resendKey);
-  const sender=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
-  const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
-  const requestOrigin=new URL(req.url).origin;
-  const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
-  const minSideUrl=(configuredOrigin||requestOrigin)+"/min-side";
+  const sender=rentalEmailFrom();
+  const replyTo=rentalReplyTo();
+  const minSideUrl=rentalSiteUrl(req)+"/min-side";
   const accountUrl=customerUserId?minSideUrl:"";
   const totalText=(p.totalOre/100).toLocaleString("nb-NO",{minimumFractionDigits:0,maximumFractionDigits:2})+" kr";
   const depositText=p.depositOre?(p.depositOre/100).toLocaleString("nb-NO",{minimumFractionDigits:0,maximumFractionDigits:2})+" kr":"";
   const customerHtml=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111;padding:28px 12px"><tr><td align="center">
 <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#181818;border:1px solid #34312b">
-<tr><td style="padding:28px 30px;background:#0d0d0d;color:#fff"><div style="font-size:18px;font-weight:900;letter-spacing:.13em">AADLAND SERVICE</div><div style="margin-top:5px;color:#d9b365;font-size:11px;letter-spacing:.08em">UTLEIE</div></td></tr>
+<tr><td style="padding:28px 30px;background:#0d0d0d;color:#fff"><div style="font-size:18px;font-weight:900;letter-spacing:.13em">AADLAND UTLEIE</div><div style="margin-top:5px;color:#d9b365;font-size:11px;letter-spacing:.08em">UTLEIE</div></td></tr>
 <tr><td style="padding:30px">
 <div style="color:#d9b365;font-size:11px;font-weight:800;letter-spacing:.12em">${esc(bookingNumber)}</div>
 <h1 style="font-size:27px;line-height:1.15;margin:9px 0 14px;color:#fff">Utleieforespørselen er mottatt</h1>
@@ -42,7 +41,7 @@ ${p.depositOre?`<tr><td style="padding:12px 14px;color:#8e887f;font-size:11px;bo
 ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:`<a href="${esc(minSideUrl)}" style="display:inline-block;margin-top:20px;border:1px solid #d7a74e;color:#d7a74e;text-decoration:none;font-weight:900;padding:12px 18px">Opprett Min side →</a><p style="margin:10px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Opprett konto med samme e-postadresse, så kobles utleien automatisk til kontoen din.</p>`}
 <p style="margin:22px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Vi tar kontakt når bookingen er behandlet.</p>
 </td></tr>
-<tr><td style="padding:18px 30px;border-top:1px solid #34312b;color:#8e887f;font-size:11px">Aadland Service · 471 54 898 · post@aadland-service.no</td></tr>
+<tr><td style="padding:18px 30px;border-top:1px solid #34312b;color:#8e887f;font-size:11px">Aadland Utleie · 471 54 898 · post@aadland-service.no</td></tr>
 </table></td></tr></table></body></html>`;
   await resend.emails.send({
    from:sender,to:email,replyTo,

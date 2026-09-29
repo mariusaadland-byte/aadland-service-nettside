@@ -18,6 +18,22 @@ Kopier `.env.example` til `.env.local` og fyll inn verdiene. Ikke legg hemmelige
 
 I Vercel må `RESEND_API_KEY` være satt i **Production** for at kundekonto, passordgjenoppretting og andre kunde-e-poster skal kunne sendes fra produksjon. Preview kan bruke `RESEND_PREVIEW_API_KEY`. `CRON_SECRET` er påkrevd i Production for at automatiske tilbudsoppfølginger og påminnelser skal kjøre; cron-rutene avviser alle kall dersom hemmeligheten mangler eller Authorization-headeren ikke matcher. Produksjonsbuilden stopper automatisk dersom Supabase-konfigurasjon, `SESSION_SECRET`, `RESEND_API_KEY`, `CRON_SECRET` eller `NEXT_PUBLIC_SITE_URL` mangler. Etter endring av en miljøvariabel må det kjøres en ny deployment.
 
+## Aadland Utleie-domene og e-post
+
+Utleiedelen er fortsatt tilgjengelig på `https://www.aadland-service.no/utleie`, men kan i tillegg bruke `https://www.aadlandutleie.no` som eget utleiedomene. Middleware viser utleiekatalogen på roten av utleiedomenet, mens eksisterende `/utleie`-ruter fortsatt fungerer.
+
+Utleie-e-post bruker egne innstillinger:
+- `RENTAL_EMAIL_FROM=Aadland Utleie <noreplay@aadlandutleie.no>`
+- `RENTAL_REPLY_TO=post@aadland-service.no`
+- `RENTAL_SITE_URL=https://www.aadlandutleie.no`
+
+I Production faller avsenderen tilbake til `noreplay@aadlandutleie.no` dersom `RENTAL_EMAIL_FROM` ikke er satt. I Preview brukes eksisterende ordreavsender som fallback inntil utleiedomenet er verifisert i Resend; sett `RENTAL_EMAIL_FROM` eksplisitt i Preview når domenet er klart for test.
+
+Før produksjonsaktivering må `aadlandutleie.no` være:
+1. lagt til på samme Vercel-prosjekt som Aadland Service,
+2. pekt til Vercel via DNS hos domeneleverandøren,
+3. verifisert som sending domain i Resend.
+
 ## Database
 SQL-filene i `supabase/` beskriver databasegrunnlaget og senere utvidelser. De må kjøres kontrollert i riktig rekkefølge mot Supabase før funksjoner som bruker de nye tabellene/feltene tas i produksjon.
 

@@ -2,6 +2,7 @@ import {NextResponse} from "next/server";
 import {getCustomer} from "../../../../lib/customer-auth";
 import {db} from "../../../../lib/supabase";
 import {createQuoteToken} from "../../../../lib/quoteLinks";
+import {safeHttpsUrl} from "../../../../lib/safeUrl";
 
 function mapQuote(quote){
  const token=createQuoteToken(quote);
@@ -13,6 +14,13 @@ function mapQuote(quote){
   totalIncVatOre:Number(quote.total_inc_vat_ore)||0,
   validUntil:quote.valid_until||null,
   plannedStartDate:quote.planned_start_date||null,
+  revisionNumber:Number(quote.revision_number)||1,
+  revisedFromId:quote.revised_from_id||null,
+  supersededAt:quote.superseded_at||null,
+  issuedVia:quote.issued_via||null,
+  paperIssuedAt:quote.paper_issued_at||null,
+  acceptanceMethod:quote.acceptance_method||null,
+  paperSignedDate:quote.paper_signed_date||null,
   sentAt:quote.sent_at||null,
   acceptedAt:quote.accepted_at||null,
   declinedAt:quote.declined_at||null,
@@ -43,7 +51,7 @@ export async function GET(){
 
  const [ordersResult,rentalsResult,rentalPaymentResult,quotesResult]=await Promise.all([
   s.from("orders")
-   .select("id,order_number,order_type,status,total_ore,shipping_ore,payment_status,payment_reference,payment_captured_ore,receipt_sent_at,fulfillment_type,items,custom_request,survey_date,survey_confirmation_sent_at,survey_reminder_sent_at,created_at,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at,job_reminder_sent_at")
+   .select("id,order_number,order_type,status,total_ore,shipping_ore,payment_status,payment_reference,payment_captured_ore,payment_refunded_ore,payment_refunded_at,refund_last_ore,refund_reference,refund_note,refund_notice_sent_at,receipt_sent_at,confirmation_sent_at,confirmed_at,in_progress_at,confirmed_notice_sent_at,in_progress_notice_sent_at,fulfillment_type,delivery_within_radius,items,custom_request,survey_date,survey_confirmation_sent_at,survey_reminder_sent_at,created_at,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at,job_reminder_sent_at,ready_notice_sent_at,tracking_number,tracking_url,tracking_sent_at,delivery_notice_sent_at,dispatched_at,delivered_at,cancellation_reason,cancellation_sent_at,cancelled_at")
    .eq("customer_user_id",customer.id)
    .order("created_at",{ascending:false})
    .limit(100),
@@ -58,9 +66,9 @@ export async function GET(){
    .order("created_at",{ascending:false})
    .limit(100),
   s.from("quotes")
-   .select("id,quote_number,status,title,total_inc_vat_ore,valid_until,planned_start_date,sent_at,accepted_at,declined_at,created_at,customer")
+   .select("id,quote_number,status,title,total_inc_vat_ore,valid_until,planned_start_date,revision_number,revised_from_id,superseded_at,issued_via,paper_issued_at,acceptance_method,paper_signed_date,sent_at,accepted_at,declined_at,created_at,customer")
    .contains("customer",{email:customerEmail})
-   .in("status",["sent","accepted","declined","expired","cancelled"])
+   .in("status",["sent","accepted","declined","expired","cancelled","superseded"])
    .order("created_at",{ascending:false})
    .limit(100)
  ]);
@@ -136,6 +144,7 @@ export async function GET(){
 
  const orders=orderRows.map(order=>({
   ...order,
+  tracking_url:safeHttpsUrl(order.tracking_url)||null,
   items:Array.isArray(order.items)?order.items.map(item=>({
    ...item,
    productSlug:productLinks.get(String(item?.productId||""))||null

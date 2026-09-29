@@ -25,6 +25,14 @@ function mapQuote(q){
   terms:q.terms||"",
   validUntil:q.valid_until||null,
   plannedStartDate:q.planned_start_date||null,
+  revisionNumber:Number(q.revision_number)||1,
+  revisedFromId:q.revised_from_id||null,
+  supersededById:q.superseded_by_id||null,
+  supersededAt:q.superseded_at||null,
+  issuedVia:q.issued_via||null,
+  paperIssuedAt:q.paper_issued_at||null,
+  acceptanceMethod:q.acceptance_method||null,
+  paperSignedDate:q.paper_signed_date||null,
   sentAt:q.sent_at||null,
   acceptedAt:q.accepted_at||null,
   declinedAt:q.declined_at||null,
@@ -69,18 +77,25 @@ export async function POST(req,{params}){ const originError=sameOriginGuard(req)
  if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status});
  if(!verifyQuoteToken(loaded.data,token))return NextResponse.json({error:"Ugyldig eller utløpt tilbudslenke."},{status:403});
 
- if(["accepted","declined","cancelled"].includes(loaded.data.status)){
-  return NextResponse.json({error:"Tilbudet er allerede ferdigbehandlet."},{status:409});
+ if(["accepted","declined","cancelled","superseded"].includes(loaded.data.status)){
+  return NextResponse.json({error:loaded.data.status==="superseded"?"Denne tilbudsversjonen er erstattet av en nyere revisjon.":"Tilbudet er allerede ferdigbehandlet."},{status:409});
  }
+ if(loaded.data.status!=="sent")return NextResponse.json({error:"Tilbudet er ikke aktivt for svar ennå."},{status:409});
  if(expired(loaded.data))return NextResponse.json({error:"Tilbudet er utløpt."},{status:409});
 
  const now=new Date().toISOString();
  const patch=action==="accept"
-  ?{status:"accepted",accepted_at:now,declined_at:null,updated_at:now}
-  :{status:"declined",declined_at:now,accepted_at:null,updated_at:now};
+  ?{status:"accepted",accepted_at:now,declined_at:null,acceptance_method:"digital",paper_signed_date:null,accepted_recorded_by:null,auto_follow_up:false,updated_at:now}
+  :{status:"declined",declined_at:now,accepted_at:null,acceptance_method:null,paper_signed_date:null,accepted_recorded_by:null,auto_follow_up:false,updated_at:now};
 
- const {data,error}=await loaded.s.from("quotes").update(patch).eq("id",id).select("*").single();
+ const {data,error}=await loaded.s.from("quotes")
+  .update(patch)
+  .eq("id",id)
+  .eq("status","sent")
+  .select("*")
+  .maybeSingle();
  if(error)return NextResponse.json({error:"Svaret kunne ikke lagres."},{status:500});
+ if(!data)return NextResponse.json({error:"Tilbudet er ikke lenger aktivt. Last siden på nytt for å se siste status."},{status:409});
 
  const resendKey=process.env.VERCEL_ENV==="preview"
   ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)

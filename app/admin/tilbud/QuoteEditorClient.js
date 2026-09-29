@@ -55,8 +55,37 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [sending,setSending]=useState(false);
  const [error,setError]=useState("");
  const [savedMessage,setSavedMessage]=useState("");
+ const [savedSnapshot,setSavedSnapshot]=useState("");
+ const [sendHistory,setSendHistory]=useState([]);
+ const [revisionHistory,setRevisionHistory]=useState([]);
+ const [revisedFromId,setRevisedFromId]=useState(null);
+ const [revising,setRevising]=useState(false);
+ const [paperIssuedAt,setPaperIssuedAt]=useState(null);
+ const [acceptanceMethod,setAcceptanceMethod]=useState(null);
+ const [paperSignedDate,setPaperSignedDate]=useState("");
+ const [showPaperAccept,setShowPaperAccept]=useState(false);
+ const [paperAcceptDate,setPaperAcceptDate]=useState(osloDateKey(new Date()));
+ const [paperBusy,setPaperBusy]=useState(false);
+ const [showAlternateEmail,setShowAlternateEmail]=useState(false);
+ const [alternateEmail,setAlternateEmail]=useState("");
  const calc=useMemo(()=>calculate(v.lineItems),[v.lineItems]);
  const planSum=useMemo(()=>v.paymentPlan.reduce((sum,row)=>sum+(Number(row.percent)||0),0),[v.paymentPlan]);
+ const isDirty=useMemo(()=>Boolean(savedSnapshot)&&JSON.stringify(v)!==savedSnapshot,[v,savedSnapshot]);
+ const locked=quoteId&&v.status!=="draft";
+
+ useEffect(()=>{
+  if(!quoteId&&!savedSnapshot)setSavedSnapshot(JSON.stringify(v));
+ },[quoteId,savedSnapshot]);
+
+ useEffect(()=>{
+  const handleBeforeUnload=event=>{
+   if(!isDirty)return;
+   event.preventDefault();
+   event.returnValue="";
+  };
+  window.addEventListener("beforeunload",handleBeforeUnload);
+  return()=>window.removeEventListener("beforeunload",handleBeforeUnload);
+ },[isDirty]);
 
  useEffect(()=>{
   if(quoteId||sourceOrderId)return;
@@ -148,8 +177,14 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     if(cancelled)return;
     setQuoteNumber(quote.quoteNumber||"");
     setHistory({createdAt:quote.createdAt||null,sentAt:quote.sentAt||null,acceptedAt:quote.acceptedAt||null,declinedAt:quote.declinedAt||null});
+    setSendHistory(Array.isArray(quote.sendHistory)?quote.sendHistory:[]);
+    setRevisionHistory(Array.isArray(quote.revisionHistory)?quote.revisionHistory:[]);
+    setRevisedFromId(quote.revisedFromId||null);
+    setPaperIssuedAt(quote.paperIssuedAt||null);
+    setAcceptanceMethod(quote.acceptanceMethod||null);
+    setPaperSignedDate(quote.paperSignedDate||"");
     setConvertedOrderId(quote.convertedOrderId||null);
-    setV({
+    const loadedState={
      title:quote.title||"",
      status:quote.status||"draft",
      customer:{
@@ -166,7 +201,9 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      validUntil:quote.validUntil||"",
      plannedStartDate:quote.plannedStartDate||"",
      autoFollowUp:quote.autoFollowUp!==false
-    });
+    };
+    setV(loadedState);
+    setSavedSnapshot(JSON.stringify(loadedState));
    })
    .catch(err=>{if(!cancelled)setError(err.message||"Tilbudet kunne ikke lastes.")})
    .finally(()=>{if(!cancelled)setLoading(false)});
@@ -190,6 +227,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
 
  async function save(){
   setError("");setSavedMessage("");
+  if(locked){setError(v.status==="sent"?"Sendte tilbud er låst. Opprett en revisjon for å gjøre endringer.":"Denne tilbudsversjonen er låst.");return null;}
   if(!v.customer.name.trim()){setError("Skriv inn kundenavn.");return;}
   if(!v.title.trim()){setError("Skriv inn hva tilbudet gjelder.");return;}
   if(v.lineItems.some(line=>!String(line.description||"").trim())){setError("Alle tilbudslinjer må ha beskrivelse.");return;}
@@ -216,6 +254,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    return data.quote;
   }
   setQuoteNumber(data.quote.quoteNumber||quoteNumber);
+  setSavedSnapshot(JSON.stringify(v));
   setSavedMessage("Tilbudet er lagret.");
   window.setTimeout(()=>setSavedMessage(""),1800);
   return data.quote;
@@ -241,24 +280,144 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   setSavedMessage("Oppdrag "+(data.orderNumber||"")+" er opprettet i backoffice.");
  }
 
- async function sendQuote(){
-  if(!quoteId)return;
-  if(!String(v.customer.email||"").trim()){setError("Legg inn kundens e-postadresse før tilbudet sendes.");return;}
-  if(!window.confirm("Sende tilbudet til "+v.customer.email+"?"))return;
+ async function sendQuote(recipientOverride=""){
+  if(!quoteId)return false;
+  const recipient=String(recipientOverride||v.customer.email||"").trim().toLowerCase();
+  if(!recipient){setError("Legg inn kundens e-postadresse før tilbudet sendes.");return false;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)){setError("E-postadressen er ugyldig.");return false;}
+  if(!window.confirm("Sende tilbudet til "+recipient+"?"))return false;
   setSending(true);setError("");setSavedMessage("");
-  const saved=await save();
-  if(!saved){setSending(false);return;}
+  if(v.status==="draft"){
+   const saved=await save();
+   if(!saved){setSending(false);return false;}
+  }else if(v.status!=="sent"){
+   setSending(false);setError("Denne tilbudsversjonen kan ikke sendes.");return false;
+  }
   const response=await fetch("/api/admin/quotes/send",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({id:quoteId,...(recipientOverride?{recipientEmail:recipient}:{})})
+  });
+  const data=await response.json().catch(()=>({}));
+  setSending(false);
+  if(!response.ok){setError(data.error||"Tilbudet kunne ikke sendes.");return false;}
+  const nextState={...v,status:"sent"};
+  setV(nextState);
+  setSavedSnapshot(JSON.stringify(nextState));
+  setHistory(current=>({...current,sentAt:data.sentAt||new Date().toISOString()}));
+  setRevisionHistory(current=>current.map(item=>{
+   if(item.id===quoteId)return {...item,status:"sent",sentAt:data.sentAt||new Date().toISOString()};
+   if(revisedFromId&&item.id===revisedFromId)return {...item,status:"superseded",supersededAt:data.sentAt||new Date().toISOString()};
+   return item;
+  }));
+  setSendHistory(current=>[{
+   recipient:data.sentTo||recipient,
+   deliveryType:data.deliveryType||((recipientOverride&&recipient!==String(v.customer.email||"").trim().toLowerCase())?"alternate":"primary"),
+   sentAt:data.sentAt||new Date().toISOString()
+  },...current].slice(0,20));
+  setSavedMessage("Tilbudet er sendt til "+(data.sentTo||recipient)+".");
+  return true;
+ }
+
+ function openAlternateEmail(){
+  setAlternateEmail("");
+  setError("");
+  setShowAlternateEmail(true);
+ }
+
+ async function confirmAlternateEmailSend(){
+  const email=String(alternateEmail||"").trim().toLowerCase();
+  if(!email){setError("Skriv inn en e-postadresse.");return;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setError("E-postadressen er ugyldig.");return;}
+  const ok=await sendQuote(email);
+  if(ok){setShowAlternateEmail(false);setAlternateEmail("");}
+ }
+
+ async function openPaperCopy(){
+  if(!quoteId)return;
+  setError("");setSavedMessage("");
+  if(v.status==="draft"){
+   const saved=await save();
+   if(!saved)return;
+  }
+  router.push("/admin/tilbud/"+quoteId+"/preview");
+ }
+
+ async function registerPaperIssue(){
+  if(!quoteId||!["draft","sent"].includes(v.status))return;
+  if(!window.confirm(v.status==="draft"
+   ?"Registrere at dette tilbudet er utlevert til kunden på papir? Da låses denne versjonen."
+   :"Registrere at kunden også har fått denne tilbudsversjonen på papir?"))return;
+  setPaperBusy(true);setError("");setSavedMessage("");
+  if(v.status==="draft"){
+   const saved=await save();
+   if(!saved){setPaperBusy(false);return;}
+  }
+  const response=await fetch("/api/admin/quotes/paper-issue",{
    method:"POST",
    headers:{"Content-Type":"application/json"},
    body:JSON.stringify({id:quoteId})
   });
   const data=await response.json().catch(()=>({}));
-  setSending(false);
-  if(!response.ok){setError(data.error||"Tilbudet kunne ikke sendes.");return;}
-  setV(current=>({...current,status:"sent"}));
-  setHistory(current=>({...current,sentAt:data.sentAt||new Date().toISOString()}));
-  setSavedMessage("Tilbudet er sendt til "+(data.sentTo||v.customer.email)+".");
+  setPaperBusy(false);
+  if(!response.ok){setError(data.error||"Papirutleveringen kunne ikke registreres.");return;}
+  const nextState={...v,status:"sent"};
+  setV(nextState);
+  setSavedSnapshot(JSON.stringify(nextState));
+  setPaperIssuedAt(data.paperIssuedAt||new Date().toISOString());
+  setHistory(current=>({...current,sentAt:current.sentAt||data.sentAt||new Date().toISOString()}));
+  setRevisionHistory(current=>current.map(item=>{
+   if(item.id===quoteId)return {...item,status:"sent",sentAt:item.sentAt||data.sentAt||new Date().toISOString()};
+   if(revisedFromId&&item.id===revisedFromId)return {...item,status:"superseded",supersededAt:data.sentAt||new Date().toISOString()};
+   return item;
+  }));
+  setSavedMessage("Registrert som utlevert på papir.");
+ }
+
+ function openPaperAcceptance(){
+  setPaperAcceptDate(osloDateKey(new Date()));
+  setError("");
+  setShowPaperAccept(true);
+ }
+
+ async function confirmPaperAcceptance(){
+  if(!quoteId||v.status!=="sent")return;
+  setPaperBusy(true);setError("");setSavedMessage("");
+  const response=await fetch("/api/admin/quotes/paper-accept",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({id:quoteId,signedDate:paperAcceptDate})
+  });
+  const data=await response.json().catch(()=>({}));
+  setPaperBusy(false);
+  if(!response.ok){setError(data.error||"Papirgodkjenningen kunne ikke registreres.");return;}
+  const nextState={...v,status:"accepted"};
+  setV(nextState);
+  setSavedSnapshot(JSON.stringify(nextState));
+  setAcceptanceMethod("paper");
+  setPaperSignedDate(data.paperSignedDate||paperAcceptDate);
+  setHistory(current=>({...current,acceptedAt:data.acceptedAt||new Date().toISOString()}));
+  setRevisionHistory(current=>current.map(item=>item.id===quoteId?{...item,status:"accepted",acceptedAt:data.acceptedAt||new Date().toISOString()}:item));
+  setShowPaperAccept(false);
+  setSavedMessage("Godkjenningen på papir er registrert.");
+ }
+
+ async function createRevision(){
+  if(!quoteId||!["sent","expired"].includes(v.status))return;
+  if(!window.confirm("Opprette en ny revisjon? Den sendte versjonen beholdes urørt til den nye revisjonen faktisk sendes."))return;
+  setRevising(true);setError("");setSavedMessage("");
+  const response=await fetch("/api/admin/quotes/revise",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({id:quoteId})
+  });
+  const data=await response.json().catch(()=>({}));
+  setRevising(false);
+  if(!response.ok){
+   if(data.quoteId){router.push("/admin/tilbud/"+data.quoteId);return;}
+   setError(data.error||"Ny revisjon kunne ikke opprettes.");return;
+  }
+  router.push("/admin/tilbud/"+data.quoteId);
  }
 
  if(loading)return <main className="admin quoteEditorPage"><section className="adminmain quoteEditorMain"><div className="card">Laster tilbud …</div></section></main>;
@@ -271,29 +430,38 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      <Link className="btn alt" href="/admin/tilbud">← Tilbud</Link>
      <h1>{quoteId?(quoteNumber||"Rediger tilbud"):"Nytt tilbud"}</h1>
      <p className="muted">Prisene på linjene føres ekskl. MVA. Systemet regner MVA og totalsum automatisk.</p>
+     {quoteId&&<div className={isDirty?"quoteSaveState quoteSaveStateDirty":"quoteSaveState"}>{locked?"🔒 Låst versjon":isDirty?"● Ulagrede endringer":"✓ Alt er lagret"}</div>}
     </div>
     <div className="quoteEditorHeaderActions">
-     {quoteId&&<Link className="btn alt" href={"/admin/tilbud/"+quoteId+"/preview"}>Forhåndsvis / PDF</Link>}
+     {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Papirutgave / skriv ut</button>}
+     {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
+     {quoteId&&v.status==="draft"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
+     {quoteId&&v.status==="sent"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy} onClick={registerPaperIssue}>Registrer utlevert på papir</button>}
+     {quoteId&&v.status==="sent"&&<button type="button" className="btn alt" disabled={paperBusy} onClick={openPaperAcceptance}>Registrer papirgodkjenning</button>}
+     {quoteId&&["sent","expired"].includes(v.status)&&<button type="button" className="btn quoteRevisionButton" disabled={revising} onClick={createRevision}>{revising?"Oppretter …":"Opprett revisjon"}</button>}
      {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
      {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href={"/admin/oppdrag/"+convertedOrderId+"/planlegg"}>Planlegg oppdrag</Link><Link href="/admin">Åpne backoffice</Link></div>}
-     {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={sendQuote}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
-     <button type="button" className="btn" disabled={saving||sending||converting} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>
+     {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={()=>sendQuote()}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
+     {!locked&&<button type="button" className="btn" disabled={saving||sending||converting} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>}
     </div>
    </div>
 
+   {v.status==="sent"&&<div className="quoteRevisionNotice"><b>Sendt versjon er låst</b><span>Opprett en revisjon dersom pris, innhold eller vilkår skal endres. Denne versjonen beholdes som dokumentasjon.</span><button type="button" className="btn" disabled={revising} onClick={createRevision}>{revising?"Oppretter …":"Opprett revisjon"}</button></div>}
+   {v.status==="superseded"&&<div className="quoteRevisionNotice quoteRevisionSuperseded"><b>Denne versjonen er erstattet</b><span>Versjonen beholdes urørt i historikken. Åpne den nyeste revisjonen nedenfor.</span></div>}
+   {v.status==="expired"&&<div className="quoteRevisionNotice"><b>Tilbudet er utløpt</b><span>Lag en ny revisjon for å oppdatere pris, gyldighet eller innhold.</span><button type="button" className="btn" disabled={revising} onClick={createRevision}>{revising?"Oppretter …":"Opprett revisjon"}</button></div>}
    {error&&<p className="notice">{error}</p>}
    {savedMessage&&<p className="success">{savedMessage}</p>}
 
    <div className="quoteEditorLayout">
-    <div className="quoteEditorContent">
+    <fieldset className="quoteEditorContent quoteEditorFieldset" disabled={Boolean(locked)}>
      <section className="card quoteEditorSection">
       <div className="kicker">KUNDE</div>
       <h3>Kundeopplysninger</h3>
       <div className="quoteFormGrid">
-       <div className="field"><label>Navn *</label><input value={v.customer.name} onChange={e=>setCustomer("name",e.target.value)} placeholder="Kundens navn"/></div>
-       <div className="field"><label>Telefon</label><input value={v.customer.phone} onChange={e=>setCustomer("phone",e.target.value)} placeholder="Telefonnummer"/></div>
-       <div className="field"><label>E-post</label><input type="email" value={v.customer.email} onChange={e=>setCustomer("email",e.target.value)} placeholder="E-postadresse"/></div>
-       <div className="field"><label>Adresse</label><input value={v.customer.address} onChange={e=>setCustomer("address",e.target.value)} placeholder="Adresse / arbeidssted"/></div>
+       <div className="field"><label>Navn *</label><input value={v.customer.name} onChange={e=>setCustomer("name",e.target.value)} placeholder="Kundens navn" autoComplete="name"/></div>
+       <div className="field"><label>Telefon</label><input type="tel" inputMode="tel" value={v.customer.phone} onChange={e=>setCustomer("phone",e.target.value)} placeholder="Telefonnummer" autoComplete="tel"/></div>
+       <div className="field"><label>E-post</label><input type="email" inputMode="email" value={v.customer.email} onChange={e=>setCustomer("email",e.target.value)} placeholder="E-postadresse" autoComplete="email" autoCapitalize="none" spellCheck="false"/></div>
+       <div className="field"><label>Adresse</label><input value={v.customer.address} onChange={e=>setCustomer("address",e.target.value)} placeholder="Adresse / arbeidssted" autoComplete="street-address"/></div>
       </div>
      </section>
 
@@ -305,7 +473,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       <div className="quoteFormGrid">
        <div className="field"><label>Gyldig til</label><input type="date" value={v.validUntil||""} onChange={e=>set("validUntil",e.target.value)}/></div>
        <div className="field"><label>Tidligst oppstart</label><input type="date" value={v.plannedStartDate||""} onChange={e=>set("plannedStartDate",e.target.value)}/><small className="muted">Vises til kunden. Endelig oppstart avtales etter godkjenning, og datoen kan endres senere.</small></div>
-       {quoteId&&<div className="field"><label>Status</label><select value={v.status} onChange={e=>set("status",e.target.value)}><option value="draft">Kladd</option><option value="sent">Sendt</option><option value="accepted">Godkjent</option><option value="declined">Avslått</option><option value="expired">Utløpt</option><option value="cancelled">Avbrutt</option></select></div>}
+       {quoteId&&<div className="field"><label>Status</label><select value={v.status} disabled><option value="draft">Kladd</option><option value="sent">Sendt</option><option value="accepted">Godkjent</option><option value="declined">Avslått</option><option value="expired">Utløpt</option><option value="cancelled">Avbrutt</option><option value="superseded">Erstattet</option></select></div>}
       </div>
       <label className="quoteFollowUpSetting"><input type="checkbox" checked={v.autoFollowUp!==false} onChange={e=>set("autoFollowUp",e.target.checked)}/><span><b>Automatisk oppfølging etter ca. 2 døgn</b><small>Sendes bare dersom tilbudet fortsatt står som sendt og kunden ikke har svart.</small></span></label>
      </section>
@@ -351,7 +519,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       <div className="field"><label>Vilkår som vises til kunden</label><textarea rows="6" value={v.terms} onChange={e=>set("terms",e.target.value)}/></div>
       <div className="field"><label>Tilleggsnotat som vises til kunden</label><textarea rows="4" value={v.notes} onChange={e=>set("notes",e.target.value)} placeholder="Valgfritt"/></div>
      </section>
-    </div>
+    </fieldset>
 
     <aside className="quoteSummaryCard card">
      <div className="kicker">OPPSUMMERING</div>
@@ -364,20 +532,69 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      <div className="quoteSummaryPlan">
       {v.paymentPlan.map(row=><span key={row.id}><small>{row.label} · {row.percent}%</small><b>{nok(calc.total*(Number(row.percent)||0)/100)}</b></span>)}
      </div>
+     {quoteId&&v.status==="draft"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
+     {quoteId&&v.status==="sent"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy} onClick={registerPaperIssue}>Registrer utlevert på papir</button>}
+     {quoteId&&v.status==="sent"&&<button type="button" className="btn alt" disabled={paperBusy} onClick={openPaperAcceptance}>Registrer papirgodkjenning</button>}
+     {quoteId&&["sent","expired"].includes(v.status)&&<button type="button" className="btn quoteRevisionButton" disabled={revising} onClick={createRevision}>{revising?"Oppretter …":"Opprett revisjon"}</button>}
      {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
      {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href="/admin">Åpne backoffice</Link></div>}
-     {quoteId&&!["accepted","declined","cancelled"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={sendQuote}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
-     <button type="button" className="btn" disabled={saving||sending||converting} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>
-     {quoteId&&<Link className="btn alt" href={"/admin/tilbud/"+quoteId+"/preview"}>Forhåndsvis / PDF</Link>}
+     {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={()=>sendQuote()}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
+     {!locked&&<button type="button" className="btn" disabled={saving||sending||converting} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>}
+     {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
+     {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Papirutgave / skriv ut</button>}
      {quoteId&&<div className="quoteHistory">
       <div className="kicker">HISTORIKK</div>
+      {revisionHistory.length>1&&<div className="quoteRevisionHistory">
+       {revisionHistory.map(item=><Link key={item.id} className={item.id===quoteId?"quoteRevisionItem active":"quoteRevisionItem"} href={"/admin/tilbud/"+item.id}>
+        <span><b>Revisjon {item.revisionNumber}</b><small>{item.quoteNumber}</small></span>
+        <small>{item.status==="superseded"?"Erstattet":item.status==="sent"?"Sendt":item.status==="accepted"?"Godkjent":item.status==="draft"?"Kladd":item.status}</small>
+       </Link>)}
+      </div>}
       {history.createdAt&&<span><b>Opprettet</b><small>{new Date(history.createdAt).toLocaleString("nb-NO")}</small></span>}
-      {history.sentAt&&<span><b>Sendt</b><small>{new Date(history.sentAt).toLocaleString("nb-NO")}</small></span>}
-      {history.acceptedAt&&<span><b>Godkjent</b><small>{new Date(history.acceptedAt).toLocaleString("nb-NO")}</small></span>}
+      {history.sentAt&&<span><b>Sendt / utlevert</b><small>{new Date(history.sentAt).toLocaleString("nb-NO")}</small></span>}
+      {paperIssuedAt&&<span><b>Utlevert på papir</b><small>{new Date(paperIssuedAt).toLocaleString("nb-NO")}</small></span>}
+      {history.acceptedAt&&<span><b>{acceptanceMethod==="paper"?"Godkjent på papir":"Godkjent"}</b><small>{acceptanceMethod==="paper"&&paperSignedDate?new Date(paperSignedDate+"T12:00:00").toLocaleDateString("nb-NO")+" · registrert ":""}{new Date(history.acceptedAt).toLocaleString("nb-NO")}</small></span>}
       {history.declinedAt&&<span><b>Avslått</b><small>{new Date(history.declinedAt).toLocaleString("nb-NO")}</small></span>}
+      {sendHistory.map((entry,index)=><span className="quoteEmailHistoryRow" key={(entry.sentAt||"send")+"-"+index}><b>{entry.deliveryType==="alternate"?"Sendt til annen e-post":"Sendt til kunde"}</b><small>{entry.recipient}{entry.sentAt?" · "+new Date(entry.sentAt).toLocaleString("nb-NO"):""}</small></span>)}
      </div>}
     </aside>
    </div>
   </section>
+
+  {showPaperAccept&&<div className="quoteModalBackdrop" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget&&!paperBusy)setShowPaperAccept(false)}}>
+   <div className="quoteModal" role="dialog" aria-modal="true" aria-labelledby="quotePaperAcceptTitle">
+    <div>
+     <div className="kicker">PAPIRGODKJENNING</div>
+     <h2 id="quotePaperAcceptTitle">Registrer signert tilbud</h2>
+     <p className="muted">Velg datoen kunden faktisk signerte papirutgaven.</p>
+    </div>
+    <div className="field">
+     <label>Signeringsdato</label>
+     <input type="date" max={osloDateKey(new Date())} value={paperAcceptDate} onChange={e=>setPaperAcceptDate(e.target.value)}/>
+    </div>
+    <div className="quoteModalActions">
+     <button type="button" className="btn alt" disabled={paperBusy} onClick={()=>setShowPaperAccept(false)}>Avbryt</button>
+     <button type="button" className="btn quoteSendButton" disabled={paperBusy} onClick={confirmPaperAcceptance}>{paperBusy?"Registrerer …":"Registrer godkjenning"}</button>
+    </div>
+   </div>
+  </div>}
+
+  {showAlternateEmail&&<div className="quoteModalBackdrop" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget&&!sending)setShowAlternateEmail(false)}}>
+   <div className="quoteModal" role="dialog" aria-modal="true" aria-labelledby="quoteAlternateEmailTitle">
+    <div>
+     <div className="kicker">SEND KOPI</div>
+     <h2 id="quoteAlternateEmailTitle">Send tilbudet til en annen e-post</h2>
+     <p className="muted">Kundens lagrede e-postadresse blir ikke endret.</p>
+    </div>
+    <div className="field">
+     <label>E-postadresse</label>
+     <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck="false" value={alternateEmail} onChange={e=>setAlternateEmail(e.target.value)} placeholder="navn@epost.no" autoFocus/>
+    </div>
+    <div className="quoteModalActions">
+     <button type="button" className="btn alt" disabled={sending} onClick={()=>setShowAlternateEmail(false)}>Avbryt</button>
+     <button type="button" className="btn quoteSendButton" disabled={sending} onClick={confirmAlternateEmailSend}>{sending?"Sender …":"Lagre og send"}</button>
+    </div>
+   </div>
+  </div>}
  </main>;
 }

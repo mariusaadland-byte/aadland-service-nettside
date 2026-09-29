@@ -8,6 +8,10 @@ import { db, fromDbProduct } from "../../../../lib/supabase";
 import {safeHttpsUrl} from "../../../../lib/safeUrl";
 import {buildReceiptEmail} from "../../../../lib/receiptEmail";
 import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
+import {buildOrderConfirmationEmail} from "../../../../lib/orderConfirmationEmail";
+import {sendOrderStatusNotice} from "../../../../lib/orderStatusNotice";
+import {sendProductOrderProgressNotice} from "../../../../lib/orderProgressNotice";
+import {sendManualOrderRefundNotice} from "../../../../lib/orderRefundNotice";
 
 function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 
@@ -37,13 +41,32 @@ const mapOrder = (o) => ({
   jobPlanningUpdatedAt: o.job_planning_updated_at || null,
   jobConfirmationSentAt: o.job_confirmation_sent_at || null,
   paymentStatus: o.payment_status || "unpaid",
+  paymentProvider: o.payment_provider || "",
   paymentReference: o.payment_reference || "",
   paymentCapturedOre: Number(o.payment_captured_ore)||0,
+  paymentRefundedOre: Number(o.payment_refunded_ore)||0,
+  paymentRefundedAt: o.payment_refunded_at || null,
+  refundLastOre: Number(o.refund_last_ore)||0,
+  refundReference: o.refund_reference || "",
+  refundNote: o.refund_note || "",
+  refundNoticeSentAt: o.refund_notice_sent_at || null,
   receiptSentAt: o.receipt_sent_at || null,
+  confirmationSentAt: o.confirmation_sent_at || null,
+  confirmedAt: o.confirmed_at || null,
+  inProgressAt: o.in_progress_at || null,
+  confirmedNoticeSentAt: o.confirmed_notice_sent_at || null,
+  inProgressNoticeSentAt: o.in_progress_notice_sent_at || null,
   trackingNumber: o.tracking_number || "",
   trackingUrl: o.tracking_url || "",
   dispatchedAt: o.dispatched_at || null,
   deliveredAt: o.delivered_at || null,
+  trackingSentAt: o.tracking_sent_at || null,
+  deliveryNoticeSentAt: o.delivery_notice_sent_at || null,
+  readyNoticeSentAt: o.ready_notice_sent_at || null,
+  cancellationReason: o.cancellation_reason || "",
+  cancellationSentAt: o.cancellation_sent_at || null,
+  cancelledAt: o.cancelled_at || null,
+  stockReleasedAt: o.stock_released_at || null,
   archivedAt: o.archived_at || null,
 });
 
@@ -150,9 +173,12 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     );
   }
 
-  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference } = await req.json();
+  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, cancellationReason, progressStatus, refundOre, refundReference, refundNote, deliveryWithinRadius } = await req.json();
   if(adminNote!==undefined&&String(adminNote||"").length>5000)return NextResponse.json({error:"Internt notat kan være maks 5000 tegn."},{status:400});
   if(paymentReference!==undefined&&String(paymentReference||"").length>120)return NextResponse.json({error:"Betalingsreferansen er for lang."},{status:400});
+  if(cancellationReason!==undefined&&String(cancellationReason||"").length>1000)return NextResponse.json({error:"Kanselleringsårsaken kan være maks 1000 tegn."},{status:400});
+  if(refundReference!==undefined&&String(refundReference||"").length>120)return NextResponse.json({error:"Tilbakebetalingsreferansen kan være maks 120 tegn."},{status:400});
+  if(refundNote!==undefined&&String(refundNote||"").length>1000)return NextResponse.json({error:"Merknad om tilbakebetaling kan være maks 1000 tegn."},{status:400});
   if(trackingNumber!==undefined&&String(trackingNumber||"").length>120)return NextResponse.json({error:"Sporingsnummeret er for langt."},{status:400});
   if(trackingUrl!==undefined){const value=String(trackingUrl||"").trim();if(value.length>1000)return NextResponse.json({error:"Sporingslenken er for lang."},{status:400});if(value&&!safeHttpsUrl(value))return NextResponse.json({error:"Sporingslenken må være en gyldig https-adresse."},{status:400});}
 
@@ -188,16 +214,337 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     );
   }
 
+  if(status!==undefined){
+    const {data:order,error:findError}=await s.from("orders").select("order_type").eq("id",id).maybeSingle();
+    if(findError)return NextResponse.json({error:"Bestillingen kunne ikke hentes."},{status:500});
+    if(order?.order_type==="order"){
+      return NextResponse.json({error:"Produktordre må oppdateres med de egne ordreknappene, slik at status og kundevarsler håndteres riktig."},{status:409});
+    }
+  }
+
+  if(action==="set-delivery-radius"){
+    if(typeof deliveryWithinRadius!=="boolean")return NextResponse.json({error:"Leveringskontrollen mangler gyldig verdi."},{status:400});
+    const {data:order,error:findError}=await s.from("orders").select("id,order_type,status,fulfillment_type").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+    if(order.order_type!=="order")return NextResponse.json({error:"Leveringskontroll gjelder produktbestillinger."},{status:400});
+    if(order.fulfillment_type!=="delivery")return NextResponse.json({error:"Bestillingen er ikke satt opp for lokal levering."},{status:409});
+    if(order.status!=="new")return NextResponse.json({error:"Leveringsområdet må avklares før bestillingen bekreftes."},{status:409});
+    const now=new Date().toISOString();
+    const {error:updateError}=await s.from("orders").update({delivery_within_radius:deliveryWithinRadius,updated_at:now}).eq("id",id);
+    if(updateError)return NextResponse.json({error:"Leveringskontrollen kunne ikke lagres."},{status:500});
+    return NextResponse.json({ok:true,deliveryWithinRadius});
+  }
+
+  if(action==="change-delivery-to-pickup"){
+    const {data:order,error:findError}=await s.from("orders").select("id,order_type,status,fulfillment_type").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+    if(order.order_type!=="order")return NextResponse.json({error:"Denne handlingen gjelder produktbestillinger."},{status:400});
+    if(order.fulfillment_type!=="delivery")return NextResponse.json({error:"Bestillingen er ikke satt opp for lokal levering."},{status:409});
+    if(order.status!=="new")return NextResponse.json({error:"Leveringsmåten kan bare endres før bestillingen er bekreftet."},{status:409});
+    const now=new Date().toISOString();
+    const {error:updateError}=await s.from("orders").update({fulfillment_type:"pickup",delivery_within_radius:false,updated_at:now}).eq("id",id);
+    if(updateError)return NextResponse.json({error:"Leveringsmåten kunne ikke endres."},{status:500});
+    return NextResponse.json({ok:true,fulfillmentType:"pickup"});
+  }
+
+  if(action==="cancel-and-notify"){
+    const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+    if(order.order_type!=="order")return NextResponse.json({error:"Denne kanselleringsflyten gjelder produktbestillinger."},{status:400});
+    if(order.status==="completed")return NextResponse.json({error:"En fullført bestilling kan ikke kanselleres."},{status:409});
+
+    const reason=String(cancellationReason??order.cancellation_reason??"").trim().slice(0,1000);
+    const {data:cancelResult,error:cancelError}=await s.rpc("cancel_product_order_once",{
+      target_order_id:id,
+      customer_reason:reason||null
+    });
+    if(cancelError){
+      console.error("ORDER CANCEL ERROR",cancelError);
+      const message=String(cancelError.message||"");
+      if(message.includes("ORDER_ALREADY_COMPLETED"))return NextResponse.json({error:"En fullført bestilling kan ikke kanselleres."},{status:409});
+      return NextResponse.json({error:"Bestillingen kunne ikke kanselleres."},{status:500});
+    }
+
+    const customerEmail=String(order.customer?.email||"").trim().toLowerCase();
+    if(!customerEmail)return NextResponse.json({ok:true,status:"cancelled",statusSaved:true,warning:"Bestillingen er kansellert, men kunden mangler e-postadresse.",cancelResult});
+
+    const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
+    if(!resendKey)return NextResponse.json({error:"Bestillingen er kansellert og lageret er frigjort, men e-post er ikke konfigurert.",statusSaved:true},{status:503});
+
+    try{
+      const {Resend}=await import("resend");
+      const resend=new Resend(resendKey);
+      const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
+      const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+      const requestOrigin=new URL(req.url).origin;
+      const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
+      const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
+      const accountUrl=order.customer_user_id?base+"/min-side":"";
+      const paymentRegistered=["paid","partial","authorized"].includes(String(order.payment_status||""));
+      const reasonBlock=reason?`<div style="margin-top:18px;padding:16px;background:#101010;border:1px solid #2d2d2d"><div style="color:#8e887f;font-size:11px">ÅRSAK</div><div style="margin-top:6px;color:#fff;line-height:1.6">${esc(reason)}</div></div>`:"";
+      const paymentText=paymentRegistered
+        ?`<p style="margin:18px 0 0;color:#d9b365;line-height:1.6"><b>Betaling:</b> Det er registrert betaling/reservasjon på bestillingen. Dette betyr ikke at beløpet er automatisk refundert. Vi håndterer eventuell tilbakebetaling separat og tar kontakt ved behov.</p>`
+        :"";
+      const html=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111;padding:28px 12px"><tr><td align="center">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#181818;border:1px solid #34312b">
+<tr><td style="padding:22px 30px;background:#0d0d0d"><img src="https://www.aadland-service.no/aadland-service-logo.webp" alt="Aadland Service" width="180" style="display:block;width:180px;max-width:100%;height:auto;border:0"/><div style="margin-top:8px;color:#d9b365;font-size:10px;font-weight:800;letter-spacing:.12em">BESTILLING</div></td></tr>
+<tr><td style="padding:30px">
+<div style="color:#d9b365;font-size:11px;font-weight:800;letter-spacing:.12em">${esc(order.order_number)}</div>
+<h1 style="font-size:27px;line-height:1.15;margin:9px 0 14px;color:#fff">Bestillingen er kansellert</h1>
+<p style="color:#c9c3b8;line-height:1.65;margin:0">Hei ${esc(order.customer?.name||"kunde")}. Bestillingen er nå registrert som kansellert hos Aadland Service.</p>
+${reasonBlock}
+${paymentText}
+${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:""}
+<p style="margin:24px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Har du spørsmål, kan du svare direkte på denne e-posten eller kontakte oss på 471 54 898.</p>
+</td></tr>
+<tr><td style="padding:18px 30px;border-top:1px solid #34312b;color:#8e887f;font-size:11px">Aadland Service · 471 54 898 · post@aadland-service.no</td></tr>
+</table></td></tr></table></body></html>`;
+
+      const sent=await resend.emails.send({
+        from,
+        to:customerEmail,
+        replyTo,
+        subject:"Bestillingen er kansellert – "+order.order_number,
+        html
+      });
+      if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
+      const sentAt=new Date().toISOString();
+      const {error:stampError}=await s.from("orders").update({cancellation_sent_at:sentAt,updated_at:sentAt}).eq("id",id);
+      if(stampError)console.error("ORDER CANCELLATION STAMP ERROR",stampError);
+      return NextResponse.json({
+        ok:true,
+        status:"cancelled",
+        sentTo:customerEmail,
+        sentAt,
+        paymentAttention:paymentRegistered,
+        cancelResult
+      });
+    }catch(error){
+      console.error("ORDER CANCELLATION EMAIL ERROR",error);
+      return NextResponse.json({error:"Bestillingen er kansellert og lageret er frigjort, men kundevarselet kunne ikke sendes.",statusSaved:true},{status:500});
+    }
+  }
+
+  if(action==="set-product-progress-and-notify"||action==="resend-product-progress-notice"){
+    const nextStatus=String(progressStatus||"");
+    if(!["confirmed","in_progress"].includes(nextStatus))return NextResponse.json({error:"Ugyldig ordrestatus."},{status:400});
+    const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+    if(order.order_type!=="order")return NextResponse.json({error:"Denne statusflyten gjelder produktbestillinger."},{status:400});
+    if(["completed","cancelled"].includes(order.status))return NextResponse.json({error:"En fullført eller kansellert bestilling kan ikke endres."},{status:409});
+
+    const resendOnly=action==="resend-product-progress-notice";
+    if(!resendOnly){
+      if(nextStatus==="confirmed"&&order.status!=="new")return NextResponse.json({error:"Bare nye bestillinger kan bekreftes med denne handlingen."},{status:409});
+      if(nextStatus==="confirmed"&&order.fulfillment_type==="delivery"&&order.delivery_within_radius!==true){
+        return NextResponse.json({
+          error:order.delivery_within_radius===false
+            ?"Leveringsadressen er markert utenfor 15 km. Avtal en annen leveringsmåte før ordren bekreftes."
+            :"Kontroller først at leveringsadressen er innenfor 15 km."
+        },{status:409});
+      }
+      if(nextStatus==="in_progress"&&order.status!=="confirmed")return NextResponse.json({error:"Bestillingen må være bekreftet før den settes under arbeid."},{status:409});
+      const now=new Date().toISOString();
+      const patch=nextStatus==="confirmed"
+        ?{status:"confirmed",confirmed_at:order.confirmed_at||now,updated_at:now}
+        :{status:"in_progress",in_progress_at:order.in_progress_at||now,updated_at:now};
+      const {error:updateError}=await s.from("orders").update(patch).eq("id",id);
+      if(updateError)return NextResponse.json({error:"Statusen kunne ikke lagres."},{status:500});
+      order.status=nextStatus;
+      if(nextStatus==="confirmed")order.confirmed_at=patch.confirmed_at;
+      if(nextStatus==="in_progress")order.in_progress_at=patch.in_progress_at;
+    }else{
+      const hasReached=nextStatus==="confirmed"
+        ?Boolean(order.confirmed_at||order.confirmed_notice_sent_at)
+        :Boolean(order.in_progress_at||order.in_progress_notice_sent_at);
+      if(!hasReached)return NextResponse.json({error:"Bestillingen har ikke nådd denne statusen ennå."},{status:409});
+    }
+
+    try{
+      const notice=await sendProductOrderProgressNotice({
+        s,
+        order,
+        kind:nextStatus,
+        requestOrigin:new URL(req.url).origin
+      });
+      return NextResponse.json({ok:true,status:order.status,...notice});
+    }catch(error){
+      console.error("ORDER PROGRESS NOTICE ERROR",error);
+      const message=String(error?.message||"");
+      let customerError=resendOnly?"Kundevarselet kunne ikke sendes.":"Status er lagret, men kundevarselet kunne ikke sendes.";
+      if(message==="ORDER_PROGRESS_NOTICE_EMAIL_MISSING")customerError=resendOnly?"Kunden mangler e-postadresse.":"Status er lagret, men kunden mangler e-postadresse.";
+      if(message==="ORDER_PROGRESS_NOTICE_EMAIL_NOT_CONFIGURED")customerError=resendOnly?"E-post er ikke konfigurert.":"Status er lagret, men e-post er ikke konfigurert.";
+      return NextResponse.json({error:customerError,statusSaved:!resendOnly},{status:500});
+    }
+  }
+
   if (action === "archive" || action === "restore") {
+    if(action==="archive"){
+      const {data:order,error:findError}=await s.from("orders")
+        .select("id,order_type,status,total_ore,payment_status,payment_captured_ore,payment_refunded_ore")
+        .eq("id",id)
+        .single();
+      if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+
+      if(!["completed","cancelled"].includes(String(order.status||""))){
+        return NextResponse.json({error:"Bare ferdige eller kansellerte ordre kan arkiveres."},{status:409});
+      }
+
+      if(order.order_type==="order"){
+        const paymentStatus=String(order.payment_status||"");
+        const captured=Math.max(0,Number(order.payment_captured_ore)||0);
+        const refunded=Math.max(0,Number(order.payment_refunded_ore)||0);
+
+        if(order.status==="cancelled"){
+          const hasAuthorizedPayment=paymentStatus==="authorized";
+          const hasOutstandingRefund=captured>refunded;
+          const hasLegacyPaidState=["paid","partial"].includes(paymentStatus)&&paymentStatus!=="refunded";
+          if(hasAuthorizedPayment||hasOutstandingRefund||hasLegacyPaidState){
+            return NextResponse.json({
+              error:hasAuthorizedPayment
+                ?"Ordren har fortsatt en reservert betaling og kan ikke arkiveres før betalingen er avklart."
+                :"Ordren kan ikke arkiveres før registrert betaling er ferdig tilbakebetalt eller avklart.",
+              paymentAttention:true,
+              capturedOre:captured,
+              refundedOre:refunded,
+              remainingOre:Math.max(0,captured-refunded)
+            },{status:409});
+          }
+        }
+
+        if(order.status==="completed"&&["pending","unpaid","partial","authorized"].includes(paymentStatus)){
+          return NextResponse.json({
+            error:paymentStatus==="authorized"
+              ?"Ordren er ferdig, men betalingen står fortsatt som reservert. Avklar betalingen før arkivering."
+              :"Ordren er ferdig, men betalingen er ikke ferdig registrert. Registrer betalingen før arkivering.",
+            paymentAttention:true,
+            capturedOre:captured,
+            refundedOre:refunded,
+            remainingOre:Math.max(0,(Number(order.total_ore)||0)-captured)
+          },{status:409});
+        }
+      }
+    }
+
     const {error:archiveError}=await s.from("orders").update({archived_at:action==="archive"?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("id",id);
     if(archiveError)return NextResponse.json({error:"Arkivstatus kunne ikke lagres."},{status:500});
     return NextResponse.json({ok:true});
+  }
+
+  if(action==="send-order-confirmation"){
+    const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+    if(order.order_type!=="order")return NextResponse.json({error:"Ordrebekreftelse gjelder produktbestillinger."},{status:400});
+    const email=String(order.customer?.email||"").trim().toLowerCase();
+    if(!email)return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
+    const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
+    if(!resendKey)return NextResponse.json({error:"E-post er ikke konfigurert."},{status:503});
+    try{
+      const {Resend}=await import("resend");
+      const resend=new Resend(resendKey);
+      const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
+      const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+      const requestOrigin=new URL(req.url).origin;
+      const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
+      const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
+      const minSideUrl=base+"/min-side";
+      const accountUrl=order.customer_user_id?minSideUrl:"";
+      const html=buildOrderConfirmationEmail({
+        orderNumber:order.order_number,
+        customerName:order.customer?.name||"kunde",
+        totalOre:Number(order.total_ore)||0,
+        isCustom:false,
+        fulfillmentType:order.fulfillment_type||"pickup",
+        accountUrl,
+        minSideUrl
+      });
+      const sent=await resend.emails.send({
+        from,
+        to:email,
+        replyTo,
+        subject:"Ordrebekreftelse "+order.order_number,
+        html
+      });
+      if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
+      const sentAt=new Date().toISOString();
+      const {error:stampError}=await s.from("orders").update({confirmation_sent_at:sentAt,updated_at:sentAt}).eq("id",id);
+      if(stampError)console.error("ORDER CONFIRMATION RESEND STAMP ERROR",stampError);
+      return NextResponse.json({ok:true,sentTo:email,sentAt});
+    }catch(error){
+      console.error("ORDER CONFIRMATION RESEND ERROR",error);
+      return NextResponse.json({error:"Ordrebekreftelsen kunne ikke sendes."},{status:500});
+    }
+  }
+
+  if(action==="record-manual-refund-and-notify"||action==="resend-manual-refund-notice"){
+    const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+    if(order.order_type!=="order")return NextResponse.json({error:"Tilbakebetaling gjelder produktbestillinger."},{status:400});
+    if(String(order.payment_provider||"").toLowerCase()==="vipps"){
+      return NextResponse.json({error:"Vipps-betaling skal refunderes gjennom Vipps-flyten, ikke registreres manuelt."},{status:409});
+    }
+
+    const resendOnly=action==="resend-manual-refund-notice";
+    let refundResult=null;
+    let updatedOrder=order;
+
+    if(!resendOnly){
+      const amount=Number(refundOre);
+      if(!Number.isInteger(amount)||amount<=0)return NextResponse.json({error:"Tilbakebetalingsbeløpet må være større enn 0."},{status:400});
+      const {data,error:refundError}=await s.rpc("record_manual_order_refund",{
+        target_order_id:id,
+        refund_ore:amount,
+        refund_reference_value:String(refundReference||"").trim()||null,
+        refund_note_value:String(refundNote||"").trim()||null
+      });
+      if(refundError){
+        console.error("MANUAL ORDER REFUND ERROR",refundError);
+        const message=String(refundError.message||"");
+        if(message.includes("NO_CAPTURED_PAYMENT"))return NextResponse.json({error:"Det er ikke registrert noen betaling å tilbakebetale."},{status:409});
+        if(message.includes("PAYMENT_ALREADY_FULLY_REFUNDED"))return NextResponse.json({error:"Hele den registrerte betalingen er allerede tilbakebetalt."},{status:409});
+        if(message.includes("REFUND_EXCEEDS_CAPTURED_PAYMENT"))return NextResponse.json({error:"Tilbakebetalingen kan ikke være større enn gjenstående registrert betaling."},{status:409});
+        if(message.includes("VIPPS_REFUND_REQUIRES_PROVIDER_FLOW"))return NextResponse.json({error:"Vipps-betaling skal refunderes gjennom Vipps-flyten."},{status:409});
+        return NextResponse.json({error:"Tilbakebetalingen kunne ikke registreres."},{status:500});
+      }
+      refundResult=data||null;
+      const {data:fresh,error:freshError}=await s.from("orders").select("*").eq("id",id).single();
+      if(freshError||!fresh)return NextResponse.json({error:"Tilbakebetalingen er registrert, men ordren kunne ikke lastes på nytt.",statusSaved:true},{status:500});
+      updatedOrder=fresh;
+    }else{
+      if((Number(order.refund_last_ore)||0)<=0||(Number(order.payment_refunded_ore)||0)<=0){
+        return NextResponse.json({error:"Det finnes ingen manuell tilbakebetaling å sende bekreftelse for."},{status:409});
+      }
+    }
+
+    try{
+      const notice=await sendManualOrderRefundNotice({
+        s,
+        order:updatedOrder,
+        requestOrigin:new URL(req.url).origin
+      });
+      return NextResponse.json({
+        ok:true,
+        ...notice,
+        refundResult,
+        paymentStatus:updatedOrder.payment_status||"paid",
+        refundedTotalOre:Number(updatedOrder.payment_refunded_ore)||0
+      });
+    }catch(error){
+      console.error("MANUAL ORDER REFUND NOTICE ERROR",error);
+      const message=String(error?.message||"");
+      let customerError=resendOnly?"Tilbakebetalingsbekreftelsen kunne ikke sendes.":"Tilbakebetalingen er registrert, men bekreftelsen kunne ikke sendes.";
+      if(message==="ORDER_REFUND_NOTICE_EMAIL_MISSING")customerError=resendOnly?"Kunden mangler e-postadresse.":"Tilbakebetalingen er registrert, men kunden mangler e-postadresse.";
+      if(message==="ORDER_REFUND_NOTICE_EMAIL_NOT_CONFIGURED")customerError=resendOnly?"E-post er ikke konfigurert.":"Tilbakebetalingen er registrert, men e-post er ikke konfigurert.";
+      return NextResponse.json({error:customerError,statusSaved:!resendOnly,refundResult},{status:500});
+    }
   }
 
   if(action==="record-paid-and-send-receipt"){
     const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
     if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
     if(order.order_type==="custom")return NextResponse.json({error:"Denne betalingsflyten gjelder produktbestillinger."},{status:400});
+    if((Number(order.payment_refunded_ore)||0)>0)return NextResponse.json({error:"Denne betalingen har allerede en registrert tilbakebetaling. Bruk tilbakebetalingsbekreftelsen i stedet."},{status:409});
     const email=String(order.customer?.email||"").trim().toLowerCase();
     if(!email)return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
     const total=Math.max(0,Number(order.total_ore)||0);
@@ -308,53 +655,144 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     }
   }
 
+  if(action==="mark-ready-and-notify"){
+    const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+    if(order.order_type==="custom")return NextResponse.json({error:"Denne handlingen gjelder produktbestillinger."},{status:400});
+    if(!["pickup","delivery"].includes(order.fulfillment_type))return NextResponse.json({error:"Klar-varsel gjelder bestillinger som skal hentes eller leveres."},{status:400});
+    if(!["in_progress","ready"].includes(order.status))return NextResponse.json({error:"Bestillingen må være under arbeid før den kan settes klar."},{status:409});
+    const customerEmail=String(order.customer?.email||"").trim().toLowerCase();
+    if(!customerEmail)return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
+
+    const now=new Date().toISOString();
+    const {error:updateError}=await s.from("orders").update({status:"ready",updated_at:now}).eq("id",id);
+    if(updateError)return NextResponse.json({error:"Bestillingen kunne ikke settes som klar."},{status:500});
+
+    const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
+    if(!resendKey)return NextResponse.json({error:"Bestillingen er satt som klar, men e-post er ikke konfigurert.",statusSaved:true},{status:503});
+
+    try{
+      const {Resend}=await import("resend");
+      const resend=new Resend(resendKey);
+      const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
+      const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+      const requestOrigin=new URL(req.url).origin;
+      const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
+      const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
+      const accountUrl=order.customer_user_id?base+"/min-side":"";
+      const pickup=order.fulfillment_type==="pickup";
+      const title=pickup?"Bestillingen din er klar for henting":"Bestillingen din er klar for levering";
+      const intro=pickup
+       ?"Bestillingen din er ferdig og klar for henting. Ta gjerne kontakt dersom du vil avtale nærmere tidspunkt."
+       :"Bestillingen din er ferdig og klar for levering. Vi tar kontakt for å avtale leveringstidspunkt dersom det ikke allerede er avtalt.";
+      const html=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111;padding:28px 12px"><tr><td align="center">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#181818;border:1px solid #34312b">
+<tr><td style="padding:22px 30px;background:#0d0d0d"><img src="https://www.aadland-service.no/aadland-service-logo.webp" alt="Aadland Service" width="180" style="display:block;width:180px;max-width:100%;height:auto;border:0"/><div style="margin-top:8px;color:#d9b365;font-size:10px;font-weight:800;letter-spacing:.12em">BESTILLING</div></td></tr>
+<tr><td style="padding:30px">
+<div style="color:#d9b365;font-size:11px;font-weight:800;letter-spacing:.12em">${esc(order.order_number)}</div>
+<h1 style="font-size:27px;line-height:1.15;margin:9px 0 14px;color:#fff">${esc(title)}</h1>
+<p style="color:#c9c3b8;line-height:1.65;margin:0 0 20px">Hei ${esc(order.customer?.name||"kunde")}! ${esc(intro)}</p>
+<div style="padding:16px;background:#101010;border:1px solid #2d2d2d">
+<div style="color:#8e887f;font-size:11px">STATUS</div>
+<div style="margin-top:5px;color:#fff;font-size:18px;font-weight:900">${pickup?"Klar for henting":"Klar for levering"}</div>
+</div>
+${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:""}
+<p style="margin:24px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Spørsmål? Svar på denne e-posten eller kontakt oss på 471 54 898.</p>
+</td></tr>
+<tr><td style="padding:18px 30px;border-top:1px solid #34312b;color:#8e887f;font-size:11px">Aadland Service · 471 54 898 · post@aadland-service.no</td></tr>
+</table></td></tr></table></body></html>`;
+      const sent=await resend.emails.send({
+        from,
+        to:customerEmail,
+        replyTo,
+        subject:(pickup?"Klar for henting – ":"Klar for levering – ")+order.order_number,
+        html
+      });
+      if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
+      const sentAt=new Date().toISOString();
+      const {error:stampError}=await s.from("orders").update({ready_notice_sent_at:sentAt,updated_at:sentAt}).eq("id",id);
+      if(stampError)console.error("ORDER READY NOTICE STAMP ERROR",stampError);
+      return NextResponse.json({ok:true,status:"ready",sentTo:customerEmail,sentAt});
+    }catch(error){
+      console.error("ORDER READY NOTICE EMAIL ERROR",error);
+      return NextResponse.json({error:"Bestillingen er satt som klar, men kundevarselet kunne ikke sendes.",statusSaved:true},{status:500});
+    }
+  }
+
+  if(action==="resend-dispatched-notice"||action==="resend-delivered-notice"){
+    const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
+    if(order.order_type==="custom")return NextResponse.json({error:"Denne handlingen gjelder produktbestillinger."},{status:400});
+    const kind=action==="resend-dispatched-notice"?"dispatched":"delivered";
+    if(kind==="dispatched"){
+      if(order.fulfillment_type!=="shipping")return NextResponse.json({error:"Sendt-varsel gjelder bare bestillinger som sendes."},{status:400});
+      if(!order.dispatched_at)return NextResponse.json({error:"Bestillingen er ikke registrert som sendt ennå."},{status:409});
+    }else{
+      if(order.fulfillment_type==="shipping")return NextResponse.json({error:"Levert-varsel gjelder bestillinger som hentes eller leveres lokalt."},{status:400});
+      if(!order.delivered_at)return NextResponse.json({error:"Bestillingen er ikke registrert som levert ennå."},{status:409});
+    }
+    try{
+      const notice=await sendOrderStatusNotice({
+        s,
+        order,
+        kind,
+        requestOrigin:new URL(req.url).origin
+      });
+      return NextResponse.json({ok:true,...notice});
+    }catch(error){
+      console.error("ORDER STATUS NOTICE RESEND ERROR",error);
+      const message=String(error?.message||"");
+      if(message==="ORDER_STATUS_NOTICE_EMAIL_MISSING")return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
+      if(message==="ORDER_STATUS_NOTICE_TRACKING_MISSING")return NextResponse.json({error:"Legg inn sporingsnummer eller sporingslenke før sendt-varselet sendes."},{status:400});
+      if(message==="ORDER_STATUS_NOTICE_EMAIL_NOT_CONFIGURED")return NextResponse.json({error:"E-post er ikke konfigurert."},{status:503});
+      return NextResponse.json({error:"Kundevarselet kunne ikke sendes."},{status:500});
+    }
+  }
+
   if (action === "mark-dispatched" || action === "mark-delivered") {
     const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
     if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
     if(order.order_type==="custom")return NextResponse.json({error:"Denne handlingen gjelder produktbestillinger."},{status:400});
     if(action==="mark-dispatched"&&order.fulfillment_type!=="shipping")return NextResponse.json({error:"Bare bestillinger som sendes kan markeres som sendt."},{status:400});
     if(action==="mark-delivered"&&order.fulfillment_type==="shipping")return NextResponse.json({error:"Bruk Sendt til kunde for bestillinger som sendes."},{status:400});
-    const now=new Date().toISOString();if(action==="mark-dispatched"&&!String(order.tracking_number||"").trim()&&!String(order.tracking_url||"").trim())return NextResponse.json({error:"Legg inn sporingsnummer eller sporingslenke før bestillingen markeres som sendt."},{status:400});const patch=action==="mark-dispatched"?{status:"completed",dispatched_at:now}:{status:"completed",delivered_at:now};
+    if(action==="mark-dispatched"&&order.status!=="in_progress")return NextResponse.json({error:"Bestillingen må være under arbeid før den kan markeres som sendt."},{status:409});
+    if(action==="mark-delivered"&&order.status!=="ready")return NextResponse.json({error:"Bestillingen må være klar før den kan markeres som levert."},{status:409});
+    if(action==="mark-dispatched"&&!String(order.tracking_number||"").trim()&&!safeHttpsUrl(order.tracking_url))return NextResponse.json({error:"Legg inn sporingsnummer eller sporingslenke før bestillingen markeres som sendt."},{status:400});
+    const now=new Date().toISOString();
+    const patch=action==="mark-dispatched"
+      ?{status:"completed",dispatched_at:order.dispatched_at||now,updated_at:now}
+      :{status:"completed",delivered_at:order.delivered_at||now,updated_at:now};
     const {error:updateError}=await s.from("orders").update(patch).eq("id",id);
     if(updateError)return NextResponse.json({error:"Handlingen kunne ikke lagres."},{status:500});
-    const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
-    if(resendKey&&order.customer?.email){
-      try{
-        const {Resend}=await import("resend");
-        const resend=new Resend(resendKey);
-        const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
-        const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
-        const sent=action==="mark-dispatched";
-        const requestOrigin=new URL(req.url).origin;
-        const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
-        const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
-        const accountUrl=order.customer_user_id?base+"/min-side":"";
-        const trackingUrl=sent?safeHttpsUrl(order.tracking_url):"";
-        const html=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111;padding:28px 12px"><tr><td align="center">
-<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#181818;border:1px solid #34312b">
-<tr><td style="padding:28px 30px;background:#0d0d0d;color:#fff"><div style="font-size:18px;font-weight:900;letter-spacing:.13em">AADLAND SERVICE</div><div style="margin-top:5px;color:#d9b365;font-size:11px;letter-spacing:.08em">BESTILLING</div></td></tr>
-<tr><td style="padding:30px">
-<div style="color:#d9b365;font-size:11px;font-weight:800;letter-spacing:.12em">${esc(order.order_number)}</div>
-<h1 style="font-size:27px;line-height:1.15;margin:9px 0 14px;color:#fff">${sent?"Bestillingen din er sendt":"Bestillingen din er levert"}</h1>
-<p style="color:#c9c3b8;line-height:1.65;margin:0 0 20px">Hei ${esc(order.customer.name||"kunde")}! ${sent?"Bestillingen er nå sendt fra oss.":"Bestillingen er registrert som levert."}</p>
-${sent&&order.tracking_number?`<div style="padding:14px;background:#101010;border:1px solid #2d2d2d"><div style="color:#8e887f;font-size:11px">Sporingsnummer</div><div style="margin-top:5px;color:#fff;font-weight:800">${esc(order.tracking_number)}</div></div>`:""}
-${trackingUrl?`<a href="${esc(trackingUrl)}" style="display:inline-block;margin-top:18px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Spor pakken →</a>`:""}
-${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:18px;${trackingUrl?"margin-left:8px;":""}border:1px solid #d7a74e;color:#d7a74e;text-decoration:none;font-weight:900;padding:12px 18px">Åpne Min side →</a>`:""}
-</td></tr>
-<tr><td style="padding:18px 30px;border-top:1px solid #34312b;color:#8e887f;font-size:11px">Aadland Service · 471 54 898 · post@aadland-service.no</td></tr>
-</table></td></tr></table></body></html>`;
-        await resend.emails.send({
-          from,
-          to:order.customer.email,
-          replyTo,
-          subject:sent?"Bestillingen din er sendt – "+order.order_number:"Bestillingen din er levert – "+order.order_number,
-          html
-        });
-        await s.from("orders").update(sent?{tracking_sent_at:now}:{delivery_notice_sent_at:now}).eq("id",id);
-      }catch(e){console.error("ORDER STATUS EMAIL ERROR",e)}
+
+    const updatedOrder={...order,...patch};
+    try{
+      const notice=await sendOrderStatusNotice({
+        s,
+        order:updatedOrder,
+        kind:action==="mark-dispatched"?"dispatched":"delivered",
+        requestOrigin:new URL(req.url).origin
+      });
+      return NextResponse.json({
+        ok:true,
+        ...notice,
+        paymentCaptureRequired:order.payment_status==="authorized",
+        paymentStatus:order.payment_status||"unpaid"
+      });
+    }catch(error){
+      console.error("ORDER STATUS NOTICE ERROR",error);
+      const message=String(error?.message||"");
+      let customerError="Status er lagret, men kundevarselet kunne ikke sendes.";
+      if(message==="ORDER_STATUS_NOTICE_EMAIL_MISSING")customerError="Status er lagret, men kunden mangler e-postadresse.";
+      if(message==="ORDER_STATUS_NOTICE_EMAIL_NOT_CONFIGURED")customerError="Status er lagret, men e-post er ikke konfigurert.";
+      return NextResponse.json({
+        error:customerError,
+        statusSaved:true,
+        paymentCaptureRequired:order.payment_status==="authorized",
+        paymentStatus:order.payment_status||"unpaid"
+      },{status:500});
     }
-    return NextResponse.json({ok:true,paymentCaptureRequired:order.payment_status==="authorized",paymentStatus:order.payment_status||"unpaid"});
   }
 
   let surveyOrder=null;

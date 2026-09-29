@@ -18,7 +18,7 @@ async function allowed(){
 export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;
  const user=await allowed();
  if(!user)return NextResponse.json({error:"Ingen tilgang."},{status:403});
- const {id}=await req.json().catch(()=>({}));
+ const {id,recipientEmail}=await req.json().catch(()=>({}));
  if(!id)return NextResponse.json({error:"Tilbud mangler."},{status:400});
 
  const s=db();
@@ -26,11 +26,25 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  const {data:quote,error}=await s.from("quotes").select("*").eq("id",id).maybeSingle();
  if(error||!quote)return NextResponse.json({error:"Tilbudet ble ikke funnet."},{status:404});
 
- if(["accepted","declined","cancelled"].includes(quote.status))return NextResponse.json({error:"Dette tilbudet er ferdigbehandlet og kan ikke sendes på nytt."},{status:409});
+ if(["accepted","declined","cancelled","superseded"].includes(quote.status))return NextResponse.json({error:"Dette tilbudet er ferdigbehandlet og kan ikke sendes på nytt."},{status:409});
+ if(quote.revised_from_id){
+  const {data:previous,error:previousError}=await s.from("quotes")
+   .select("status,superseded_by_id")
+   .eq("id",quote.revised_from_id)
+   .maybeSingle();
+  if(previousError||!previous)return NextResponse.json({error:"Forrige tilbudsversjon kunne ikke kontrolleres."},{status:409});
+  const alreadyLinked=previous.status==="superseded"&&previous.superseded_by_id===quote.id;
+  if(!alreadyLinked&&!["sent","expired"].includes(previous.status)){
+   return NextResponse.json({error:"Forrige tilbudsversjon er allerede ferdigbehandlet. Denne revisjonen kan derfor ikke sendes."},{status:409});
+  }
+ }
  const today=osloDateKey(new Date());
  if(quote.valid_until&&quote.valid_until<today)return NextResponse.json({error:"Tilbudet har passert gyldighetsdatoen. Oppdater datoen før du sender det."},{status:409});
- const email=String(quote.customer?.email||"").trim();
+ const customerEmail=String(quote.customer?.email||"").trim().toLowerCase();
+ const overrideEmail=String(recipientEmail||"").trim().toLowerCase();
+ const email=overrideEmail||customerEmail;
  if(!email)return NextResponse.json({error:"Kunden må ha e-postadresse før tilbudet kan sendes."},{status:400});
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return NextResponse.json({error:"E-postadressen er ugyldig."},{status:400});
  const resendKey=process.env.VERCEL_ENV==="preview"
   ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)
   :process.env.RESEND_API_KEY;
@@ -48,11 +62,13 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  const customerName=esc(quote.customer?.name||"");
  const title=esc(quote.title||"Tilbud");
  const number=esc(quote.quote_number||"");
+ const revisionNumber=Math.max(1,Number(quote.revision_number)||1);
+ const revisionLabel=revisionNumber>1?"REVISJON "+revisionNumber:"";
  const total=nok(quote.total_inc_vat_ore);
  const minSideUrl=base+"/min-side";
  let hasCustomerAccount=false;
  try{
-  const {data:profile}=await s.from("customer_profiles").select("id").eq("email",email.toLowerCase()).maybeSingle();
+  const {data:profile}=await s.from("customer_profiles").select("id").eq("email",(customerEmail||email).toLowerCase()).maybeSingle();
   hasCustomerAccount=Boolean(profile?.id);
  }catch{}
 
@@ -75,7 +91,7 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  <div style="margin-top:5px;color:#d9b365;font-size:11px;letter-spacing:.08em">HÅNDVERK · VEDLIKEHOLD · UTLEIE</div>
 </td></tr>
 <tr><td style="padding:30px">
- <div style="color:#b5863b;font-size:11px;font-weight:800;letter-spacing:.12em">TILBUD ${number}</div>
+ <div style="color:#b5863b;font-size:11px;font-weight:800;letter-spacing:.12em">TILBUD ${number}${revisionLabel?" · "+revisionLabel:""}</div>
  <h1 style="font-size:28px;line-height:1.1;margin:9px 0 14px">${title}</h1>
  <p style="margin:0 0 20px;color:#625d55;line-height:1.65">Hei ${customerName}. Vi har laget et tilbud til deg fra Aadland Service.</p>
  <table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #ece7df">${rows}</table>
@@ -104,7 +120,7 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
    from,
    to:email,
    replyTo,
-   subject:"Tilbud "+quote.quote_number+" – "+quote.title,
+   subject:(revisionNumber>1?"Revidert tilbud ":"Tilbud ")+quote.quote_number+" – "+quote.title,
    html
   });
   if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
@@ -114,20 +130,32 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  }
 
  const now=new Date().toISOString();
- let statusUpdate=await s.from("quotes").update({
-  status:"sent",
-  sent_at:now,
-  follow_up_sent_at:null,
-  updated_at:now
- }).eq("id",id);
- if(statusUpdate.error&&String(statusUpdate.error.code||"")==="42703"){
-  statusUpdate=await s.from("quotes").update({
-   status:"sent",
-   sent_at:now,
+ const {error:activationError}=await s.rpc("activate_quote_revision",{p_quote_id:id,p_sent_at:now});
+ if(activationError){
+  console.error("QUOTE REVISION ACTIVATE",activationError);
+  return NextResponse.json({error:"E-posten ble sendt, men revisjonsstatus kunne ikke lagres. Kontroller tilbudet før du sender på nytt."},{status:500});
+ }
+
+ try{
+  await s.from("quotes").update({
+   issued_via:quote.issued_via||"email",
    updated_at:now
   }).eq("id",id);
+ }catch(issueMethodError){
+  console.error("QUOTE EMAIL ISSUE METHOD",issueMethodError);
  }
- if(statusUpdate.error)return NextResponse.json({error:"E-posten ble sendt, men status kunne ikke lagres."},{status:500});
 
- return NextResponse.json({ok:true,sentTo:email,sentAt:now,link});
+ const deliveryType=overrideEmail&&overrideEmail!==customerEmail?"alternate":"primary";
+ try{
+  await s.from("quote_send_log").insert({
+   quote_id:id,
+   recipient:email,
+   delivery_type:deliveryType,
+   sent_at:now
+  });
+ }catch(logError){
+  console.error("QUOTE SEND LOG",logError);
+ }
+
+ return NextResponse.json({ok:true,sentTo:email,sentAt:now,deliveryType,link});
 }

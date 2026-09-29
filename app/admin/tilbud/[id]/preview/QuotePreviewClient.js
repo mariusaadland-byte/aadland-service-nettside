@@ -4,7 +4,7 @@ import {useEffect,useState} from "react";
 import Link from "next/link";
 
 const nok=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",minimumFractionDigits:2,maximumFractionDigits:2}).format((Number(ore)||0)/100);
-const statusLabels={draft:"Kladd",sent:"Sendt",accepted:"Godkjent",declined:"Avslått",expired:"Utløpt",cancelled:"Avbrutt"};
+const statusLabels={draft:"Kladd",sent:"Sendt",accepted:"Godkjent",declined:"Avslått",expired:"Utløpt",cancelled:"Avbrutt",superseded:"Erstattet"};
 const typeLabels={work:"Arbeid",material:"Materiale",other:"Annet"};
 
 export default function QuotePreviewClient({quoteId}){
@@ -55,7 +55,7 @@ export default function QuotePreviewClient({quoteId}){
 
    <section className="quoteDocTitle">
     <div>
-     <span className="quoteDocEyebrow">TILBUD</span>
+     <span className="quoteDocEyebrow">TILBUD{quote.revisionNumber>1?" · REVISJON "+quote.revisionNumber:""}</span>
      <h1>{quote.title}</h1>
     </div>
     <div className="quoteDocMeta">
@@ -123,10 +123,21 @@ export default function QuotePreviewClient({quoteId}){
    {quote.notes&&<section className="quoteDocText"><span className="quoteDocEyebrow">TILLEGGSINFORMASJON</span><p>{quote.notes}</p></section>}
    {quote.terms&&<section className="quoteDocText quoteDocTerms"><span className="quoteDocEyebrow">VILKÅR</span><p>{quote.terms}</p></section>}
 
+   <section className="quotePaperAcceptance">
+    <span className="quoteDocEyebrow">AKSEPT VED PAPIRUTGAVE</span>
+    <h2>Godkjenning av tilbud</h2>
+    <p>Fylles ut dersom tilbudet godkjennes på papir.</p>
+    <div className="quotePaperAcceptanceFields">
+     <span><small>Sted og dato</small><i></i></span>
+     <span><small>Kundens navn</small><i></i></span>
+     <span className="quotePaperSignature"><small>Signatur</small><i></i></span>
+    </div>
+   </section>
+
    <footer className="quoteDocFooter">
     <div><b>Aadland Service</b><span>Org.nr. 937 781 873 MVA</span></div>
     <div><span>471 54 898</span><span>post@aadland-service.no</span></div>
-    <div><span>{quote.quoteNumber}</span><span>Side 1</span></div>
+    <div><span>{quote.quoteNumber}</span><span>Tilbud</span></div>
    </footer>
   </article>
  </main>;

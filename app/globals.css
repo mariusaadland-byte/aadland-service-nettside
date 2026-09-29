@@ -1337,6 +1337,9 @@ html{scroll-behavior:smooth}
 .rentalHeroInner{position:relative;z-index:1;padding-top:92px;padding-bottom:82px}
 .rentalHero h1{max-width:850px;margin:12px 0 20px;font-size:clamp(54px,7vw,88px);line-height:.9;letter-spacing:-.055em}
 .rentalHero p{max-width:690px;margin:0;color:rgba(255,255,255,.68);font-size:17px;line-height:1.72}
+.rentalHeroActions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:26px}
+.rentalHeroAccount{min-height:46px;display:inline-flex;align-items:center;justify-content:center;padding:0 22px;border:1px solid rgba(215,167,78,.72);color:#d7a74e;font-size:12px;font-weight:800;transition:background .18s ease,color .18s ease,transform .18s ease}
+.rentalHeroAccount:hover{background:#d7a74e;color:#111;transform:translateY(-1px)}
 .rentalHeroTrust{display:flex;gap:22px;flex-wrap:wrap;margin-top:32px;padding-top:24px;border-top:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.7);font-size:11px;font-weight:700}
 .rentalHeroTrust span:before{color:#d7a74e}
 
@@ -1691,6 +1694,9 @@ html{scroll-behavior:smooth}
 .quoteEditorContent{display:grid;gap:18px}
 .quoteEditorSection{display:grid;gap:16px}
 .quoteEditorSection h3{margin:4px 0 0}
+.admin .field input,.admin .field select,.admin .field textarea,.loginbox .field input,.loginbox .field select,.loginbox .field textarea{color:#15130f!important;-webkit-text-fill-color:#15130f!important;caret-color:#15130f;color-scheme:light}
+.admin .field input::placeholder,.admin .field textarea::placeholder,.loginbox .field input::placeholder,.loginbox .field textarea::placeholder{color:#9b968e!important;-webkit-text-fill-color:#9b968e!important;opacity:1}
+.admin .field input:-webkit-autofill,.admin .field input:-webkit-autofill:hover,.admin .field input:-webkit-autofill:focus,.admin .field textarea:-webkit-autofill,.admin .field select:-webkit-autofill,.loginbox .field input:-webkit-autofill,.loginbox .field input:-webkit-autofill:hover,.loginbox .field input:-webkit-autofill:focus{-webkit-text-fill-color:#15130f!important;caret-color:#15130f!important;box-shadow:0 0 0 1000px #fff inset!important;-webkit-box-shadow:0 0 0 1000px #fff inset!important}
 .quoteFormGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .quoteSectionHead{display:flex;align-items:flex-end;justify-content:space-between;gap:18px}
 .quoteSectionHead>div:last-child{display:flex;gap:8px;flex-wrap:wrap}
@@ -1790,17 +1796,17 @@ html{scroll-behavior:smooth}
  .quoteFormGrid{grid-template-columns:1fr}
  .quoteSectionHead{align-items:stretch;flex-direction:column}
  .quoteSectionHead>div:last-child{display:grid;grid-template-columns:1fr 1fr}
- .quoteLineEditor{grid-template-columns:minmax(108px,.85fr) minmax(0,1fr) minmax(0,1.25fr);gap:9px}
+ .quoteLineEditor{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
  .quoteLineNumber{grid-column:1/2;grid-row:1;justify-self:start}
- .quoteLineDescription{grid-column:2/3;grid-row:1}
- .quoteLineType{grid-column:3/4;grid-row:1}
- .quoteLineQuantity{grid-column:1/2;grid-row:2;min-width:0}
- .quoteLineUnit{grid-column:2/3;grid-row:2}
- .quoteLinePrice{grid-column:3/4;grid-row:2}
- .quoteLineVat{grid-column:1/2;grid-row:3;min-width:0}
- .quoteLineQuantity input,.quoteLineVat select{width:100%;min-width:0}
- .quoteLineTotal{grid-column:2/3;grid-row:3}
- .quoteLineRemove{grid-column:3/4;grid-row:3;justify-self:end}
+ .quoteLineRemove{grid-column:2/3;grid-row:1;justify-self:end}
+ .quoteLineDescription{grid-column:1/-1;grid-row:2}
+ .quoteLineType{grid-column:1/2;grid-row:3}
+ .quoteLineVat{grid-column:2/3;grid-row:3;min-width:0}
+ .quoteLineQuantity{grid-column:1/2;grid-row:4;min-width:0}
+ .quoteLineUnit{grid-column:2/3;grid-row:4}
+ .quoteLinePrice{grid-column:1/2;grid-row:5}
+ .quoteLineTotal{grid-column:2/3;grid-row:5;align-self:end}
+ .quoteLineEditor .field input,.quoteLineEditor .field select{width:100%;min-width:0}
  .quotePaymentRow{grid-template-columns:1fr 100px}
  .quotePaymentRow .field:nth-child(3){grid-column:1/-1}
  .quotePaymentAmount{grid-column:1/-1}
@@ -1842,6 +1848,7 @@ html{scroll-behavior:smooth}
 .customerQuoteAccept:hover{background:#3d7a46}
 .customerQuoteAccepted h2{color:#2f6737}
 .customerQuoteDocument{box-shadow:0 20px 60px #0002}
+.quotePreviewShell .quoteDocument,.customerQuoteDocument{width:min(210mm,100%);min-height:0}
 
 @media(max-width:760px){
  .customerQuoteShell{padding:10px}
@@ -1850,6 +1857,21 @@ html{scroll-behavior:smooth}
  .customerQuoteDecision{align-items:stretch;flex-direction:column}
  .customerQuoteDecisionActions{display:grid;grid-template-columns:1fr}
  .customerQuoteDecisionActions .btn{text-align:center}
+ .quoteDocument{padding:24px 16px}
+ .quoteDocHeader{flex-direction:column;gap:12px}
+ .quoteDocCompany{text-align:left}
+ .quoteDocTitle{grid-template-columns:1fr;gap:14px;padding:20px 0 16px}
+ .quoteDocTitle h1{font-size:25px}
+ .quoteStartNotice{margin:0 0 14px}
+ .quoteDocCustomer{flex-direction:column;gap:10px}
+ .quoteDocCustomer>div:last-child{text-align:left}
+ .quoteDocLine{grid-template-columns:minmax(0,1.8fr) .65fr .85fr .5fr .9fr;gap:5px;padding:8px 4px;font-size:8.2px}
+ .quoteDocLineHead{font-size:7px;letter-spacing:0}
+ .quoteDocTotals{grid-template-columns:1fr}
+ .quoteDocPaymentGrid{grid-template-columns:1fr}
+ .quoteDocPaymentGrid p{min-height:0}
+ .quoteDocFooter{grid-template-columns:1fr;gap:6px}
+ .quoteDocFooter>div:nth-child(2),.quoteDocFooter>div:last-child{text-align:left}
 }
 @media print{
  .customerQuoteDecision{display:none!important}
@@ -2846,4 +2868,199 @@ body:has(.customerPage) .customerPage{
 }
 @media(max-width:700px){
  .orderPaymentFacts{grid-template-columns:1fr}
+}
+
+
+/* Quote editor professional workflow */
+.quoteSaveState{
+ display:inline-flex;
+ align-items:center;
+ gap:6px;
+ margin-top:8px;
+ padding:6px 9px;
+ border-radius:999px;
+ border:1px solid rgba(47,103,55,.22);
+ background:rgba(47,103,55,.08);
+ color:#2f6737;
+ font-size:10px;
+ font-weight:900;
+}
+.quoteSaveStateDirty{
+ border-color:rgba(183,134,54,.30);
+ background:rgba(207,161,83,.12);
+ color:#7b5a22;
+}
+.quoteEmailHistoryRow{
+ padding-top:8px;
+ border-top:1px dashed #ddd7cd;
+}
+.quoteEmailHistoryRow small{
+ overflow-wrap:anywhere;
+}
+.quoteModalBackdrop{
+ position:fixed;
+ inset:0;
+ z-index:1000;
+ display:grid;
+ place-items:center;
+ padding:20px;
+ background:rgba(10,10,10,.58);
+ backdrop-filter:blur(3px);
+}
+.quoteModal{
+ width:min(520px,100%);
+ display:grid;
+ gap:18px;
+ padding:24px;
+ border:1px solid #d9d0c5;
+ border-radius:18px;
+ background:#fff;
+ color:#15130f;
+ box-shadow:0 28px 90px rgba(0,0,0,.28);
+}
+.quoteModal h2{margin:6px 0 8px}
+.quoteModal p{margin:0}
+.quoteModalActions{
+ display:flex;
+ justify-content:flex-end;
+ gap:10px;
+}
+.quoteModal .field input{
+ color:#15130f!important;
+ -webkit-text-fill-color:#15130f!important;
+ background:#fff;
+}
+.quoteDocLine,.quoteDocPaymentGrid>div,.quoteDocText,.quoteDocCustomer,.quoteDocTotals{
+ break-inside:avoid;
+ page-break-inside:avoid;
+}
+@media(max-width:600px){
+ .quoteModal{padding:20px 16px}
+ .quoteModalActions{display:grid;grid-template-columns:1fr}
+ .quoteModalActions .btn{text-align:center}
+}
+
+
+/* Quote revisions */
+.quoteEditorFieldset{
+ border:0;
+ padding:0;
+ margin:0;
+ min-width:0;
+}
+.quoteEditorFieldset:disabled{opacity:1}
+.quoteEditorFieldset:disabled input,
+.quoteEditorFieldset:disabled textarea,
+.quoteEditorFieldset:disabled select,
+.quoteEditorFieldset:disabled button{
+ opacity:.82;
+ cursor:not-allowed;
+}
+.quoteRevisionButton{
+ background:#6f5426;
+ border-color:#6f5426;
+ color:#fff;
+}
+.quoteRevisionNotice{
+ display:grid;
+ grid-template-columns:minmax(0,1fr) auto;
+ gap:5px 18px;
+ align-items:center;
+ margin:0 0 18px;
+ padding:16px 18px;
+ border:1px solid rgba(207,161,83,.35);
+ border-left:4px solid #cfa153;
+ background:#fff8ea;
+ color:#332817;
+}
+.quoteRevisionNotice>b{font-size:14px}
+.quoteRevisionNotice>span{grid-column:1;color:#6c5a3b;font-size:12px;line-height:1.55}
+.quoteRevisionNotice>.btn{grid-column:2;grid-row:1/3}
+.quoteRevisionSuperseded{
+ border-color:#d8d3ca;
+ border-left-color:#857d72;
+ background:#f5f3ef;
+ color:#4c4842;
+}
+.quoteRevisionHistory{
+ display:grid;
+ gap:6px;
+ margin:4px 0 10px;
+}
+.quoteRevisionItem{
+ display:flex;
+ justify-content:space-between;
+ gap:12px;
+ align-items:center;
+ padding:9px 10px;
+ border:1px solid #ded8cf;
+ border-radius:10px;
+ background:#faf8f4;
+ color:#28241e;
+ text-decoration:none;
+}
+.quoteRevisionItem>span{display:grid;gap:2px}
+.quoteRevisionItem small{color:#777;font-size:10px}
+.quoteRevisionItem.active{
+ border-color:#cfa153;
+ background:#fff8e9;
+}
+.quoteStatus-superseded,
+.customerQuoteStatus-superseded{
+ background:#e9e5df!important;
+ color:#625d55!important;
+}
+.customerQuoteSuperseded{
+ width:min(1000px,100%);
+ margin:0 auto 14px;
+ padding:16px 18px;
+ border:1px solid #d6cfc5;
+ background:#fff8e9;
+ color:#5b4a2e;
+}
+.customerQuoteSuperseded h2{margin:0 0 6px}
+.customerQuoteSuperseded p{margin:0;line-height:1.55}
+@media(max-width:700px){
+ .quoteRevisionNotice{grid-template-columns:1fr}
+ .quoteRevisionNotice>span,.quoteRevisionNotice>.btn{grid-column:1;grid-row:auto}
+ .quoteRevisionNotice>.btn{width:100%}
+}
+
+
+/* Paper quote acceptance */
+.quotePaperAcceptance{
+ margin-top:26px;
+ padding:20px 0 8px;
+ border-top:1px solid #d8d2c8;
+ break-inside:avoid;
+ page-break-inside:avoid;
+}
+.quotePaperAcceptance h2{margin:6px 0 5px;font-size:18px}
+.quotePaperAcceptance>p{margin:0 0 18px;color:#6f6a62;font-size:11px}
+.quotePaperAcceptanceFields{
+ display:grid;
+ grid-template-columns:1fr 1fr;
+ gap:20px 24px;
+}
+.quotePaperAcceptanceFields span{
+ display:grid;
+ gap:10px;
+}
+.quotePaperAcceptanceFields small{
+ color:#777168;
+ font-size:9px;
+ font-weight:800;
+ letter-spacing:.06em;
+ text-transform:uppercase;
+}
+.quotePaperAcceptanceFields i{
+ display:block;
+ height:28px;
+ border-bottom:1px solid #625d55;
+}
+.quotePaperSignature{grid-column:1/-1}
+.quotePaperSignature i{height:42px}
+@media(max-width:600px){
+ .quotePaperAcceptanceFields{grid-template-columns:1fr}
+ .quotePaperSignature{grid-column:1}
 }

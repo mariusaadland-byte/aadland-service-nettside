@@ -200,3 +200,229 @@ end;
 $$;
 revoke all on function public.create_order_with_stock(jsonb,jsonb) from public, anon, authenticated;
 grant execute on function public.create_order_with_stock(jsonb,jsonb) to service_role;
+
+
+-- ============================================================
+-- PRODUKTORDRE: KLAR-VARSEL
+-- ============================================================
+
+-- Kundemelding når en produktbestilling er klar for henting/levering.
+alter table public.orders
+ add column if not exists ready_notice_sent_at timestamptz;
+
+create index if not exists orders_ready_notice_sent_at_idx
+on public.orders(ready_notice_sent_at)
+where ready_notice_sent_at is not null;
+
+
+-- ============================================================
+-- PRODUKTORDRE: SIKKER KANSELLERING
+-- ============================================================
+
+-- Sikker kansellering av produktordre med idempotent lagerfrigjøring.
+alter table public.orders
+ add column if not exists cancellation_reason text,
+ add column if not exists cancellation_sent_at timestamptz,
+ add column if not exists cancelled_at timestamptz,
+ add column if not exists stock_released_at timestamptz;
+
+create or replace function public.cancel_product_order_once(
+  target_order_id uuid,
+  customer_reason text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $order_cancel$
+declare
+  order_row public.orders%rowtype;
+  item jsonb;
+  product_id text;
+  quantity integer;
+  released_items integer := 0;
+  now_value timestamptz := now();
+begin
+  select * into order_row
+  from public.orders
+  where id=target_order_id
+  for update;
+
+  if not found then
+    raise exception 'ORDER_NOT_FOUND';
+  end if;
+
+  if order_row.order_type <> 'order' then
+    raise exception 'NOT_PRODUCT_ORDER';
+  end if;
+
+  if order_row.status='completed' then
+    raise exception 'ORDER_ALREADY_COMPLETED';
+  end if;
+
+  if order_row.stock_released_at is null then
+    for item in
+      select value from jsonb_array_elements(coalesce(order_row.items,'[]'::jsonb))
+    loop
+      if coalesce(item->>'inventoryMode','')='stock' then
+        product_id:=item->>'productId';
+        quantity:=greatest(coalesce((item->>'quantity')::integer,0),0);
+        if product_id is not null and quantity>0 then
+          update public.products
+          set stock_quantity=stock_quantity+quantity,
+              updated_at=now_value
+          where id=product_id
+            and inventory_mode='stock';
+          if found then
+            released_items:=released_items+1;
+          end if;
+        end if;
+      end if;
+    end loop;
+  end if;
+
+  update public.orders
+  set status='cancelled',
+      cancellation_reason=case
+        when nullif(trim(coalesce(customer_reason,'')),'') is not null
+          then left(trim(customer_reason),1000)
+        else cancellation_reason
+      end,
+      cancelled_at=coalesce(cancelled_at,now_value),
+      stock_released_at=coalesce(stock_released_at,now_value),
+      updated_at=now_value
+  where id=target_order_id;
+
+  return jsonb_build_object(
+    'ok',true,
+    'releasedItems',released_items,
+    'alreadyCancelled',order_row.status='cancelled',
+    'alreadyReleased',order_row.stock_released_at is not null
+  );
+end;
+$order_cancel$;
+
+revoke all on function public.cancel_product_order_once(uuid,text) from public,anon,authenticated;
+grant execute on function public.cancel_product_order_once(uuid,text) to service_role;
+
+
+-- ============================================================
+-- PRODUKTORDRE: FREMDRIFT
+-- ============================================================
+
+-- Tidsstempler for kundevendte milepæler på produktordre.
+alter table public.orders
+ add column if not exists confirmed_at timestamptz,
+ add column if not exists in_progress_at timestamptz,
+ add column if not exists confirmed_notice_sent_at timestamptz,
+ add column if not exists in_progress_notice_sent_at timestamptz;
+
+create index if not exists orders_confirmed_at_idx
+on public.orders(confirmed_at)
+where confirmed_at is not null;
+
+create index if not exists orders_in_progress_at_idx
+on public.orders(in_progress_at)
+where in_progress_at is not null;
+
+
+-- ============================================================
+-- PRODUKTORDRE: MANUELL REFUSJON
+-- ============================================================
+
+-- Manuell tilbakebetaling av produktordre.
+-- Bruker de samme summeringsfeltene som Vipps-integrasjonen senere vil bruke.
+alter table public.orders
+ add column if not exists payment_provider text,
+ add column if not exists payment_refunded_ore integer not null default 0,
+ add column if not exists payment_refunded_at timestamptz,
+ add column if not exists refund_last_ore integer not null default 0,
+ add column if not exists refund_reference text,
+ add column if not exists refund_note text,
+ add column if not exists refund_notice_sent_at timestamptz;
+
+create or replace function public.record_manual_order_refund(
+  target_order_id uuid,
+  refund_ore integer,
+  refund_reference_value text default null,
+  refund_note_value text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $manual_refund$
+declare
+  order_row public.orders%rowtype;
+  captured integer;
+  refunded_before integer;
+  refunded_after integer;
+  now_value timestamptz := now();
+  next_status text;
+begin
+  if refund_ore is null or refund_ore <= 0 then
+    raise exception 'INVALID_REFUND_AMOUNT';
+  end if;
+
+  select * into order_row
+  from public.orders
+  where id=target_order_id
+  for update;
+
+  if not found then
+    raise exception 'ORDER_NOT_FOUND';
+  end if;
+
+  if order_row.order_type <> 'order' then
+    raise exception 'NOT_PRODUCT_ORDER';
+  end if;
+
+  if lower(coalesce(order_row.payment_provider,''))='vipps' then
+    raise exception 'VIPPS_REFUND_REQUIRES_PROVIDER_FLOW';
+  end if;
+
+  captured:=greatest(coalesce(order_row.payment_captured_ore,0),0);
+  refunded_before:=greatest(coalesce(order_row.payment_refunded_ore,0),0);
+
+  if captured <= 0 then
+    raise exception 'NO_CAPTURED_PAYMENT';
+  end if;
+
+  if refunded_before >= captured then
+    raise exception 'PAYMENT_ALREADY_FULLY_REFUNDED';
+  end if;
+
+  refunded_after:=refunded_before+refund_ore;
+
+  if refunded_after > captured then
+    raise exception 'REFUND_EXCEEDS_CAPTURED_PAYMENT';
+  end if;
+
+  next_status:=case when refunded_after=captured then 'refunded' else order_row.payment_status end;
+
+  update public.orders
+  set payment_refunded_ore=refunded_after,
+      payment_refunded_at=now_value,
+      payment_status=next_status,
+      refund_last_ore=refund_ore,
+      refund_reference=nullif(left(trim(coalesce(refund_reference_value,'')),120),''),
+      refund_note=nullif(left(trim(coalesce(refund_note_value,'')),1000),''),
+      refund_notice_sent_at=null,
+      updated_at=now_value
+  where id=target_order_id;
+
+  return jsonb_build_object(
+    'ok',true,
+    'refundOre',refund_ore,
+    'refundedBeforeOre',refunded_before,
+    'refundedTotalOre',refunded_after,
+    'capturedOre',captured,
+    'remainingOre',captured-refunded_after,
+    'paymentStatus',next_status,
+    'refundedAt',now_value
+  );
+end;
+$manual_refund$;
+
+revoke all on function public.record_manual_order_refund(uuid,integer,text,text) from public,anon,authenticated;
+grant execute on function public.record_manual_order_refund(uuid,integer,text,text) to service_role;

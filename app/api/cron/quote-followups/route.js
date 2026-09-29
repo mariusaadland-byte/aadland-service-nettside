@@ -54,7 +54,16 @@ export async function GET(req){
  const failures=[];
 
  for(const quote of data||[]){
-  const email=String(quote.customer?.email||"").trim().toLowerCase();
+  let email=String(quote.customer?.email||"").trim().toLowerCase();
+  try{
+   const {data:lastSend}=await s.from("quote_send_log")
+    .select("recipient")
+    .eq("quote_id",quote.id)
+    .order("sent_at",{ascending:false})
+    .limit(1)
+    .maybeSingle();
+   if(lastSend?.recipient)email=String(lastSend.recipient).trim().toLowerCase();
+  }catch{}
   if(!email)continue;
 
   const claimedAt=new Date().toISOString();
