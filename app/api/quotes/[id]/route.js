@@ -88,8 +88,14 @@ export async function POST(req,{params}){ const originError=sameOriginGuard(req)
   ?{status:"accepted",accepted_at:now,declined_at:null,acceptance_method:"digital",paper_signed_date:null,accepted_recorded_by:null,auto_follow_up:false,updated_at:now}
   :{status:"declined",declined_at:now,accepted_at:null,acceptance_method:null,paper_signed_date:null,accepted_recorded_by:null,auto_follow_up:false,updated_at:now};
 
- const {data,error}=await loaded.s.from("quotes").update(patch).eq("id",id).select("*").single();
+ const {data,error}=await loaded.s.from("quotes")
+  .update(patch)
+  .eq("id",id)
+  .eq("status","sent")
+  .select("*")
+  .maybeSingle();
  if(error)return NextResponse.json({error:"Svaret kunne ikke lagres."},{status:500});
+ if(!data)return NextResponse.json({error:"Tilbudet er ikke lenger aktivt. Last siden på nytt for å se siste status."},{status:409});
 
  const resendKey=process.env.VERCEL_ENV==="preview"
   ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)
