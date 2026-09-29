@@ -435,7 +435,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     <div className="quoteEditorHeaderActions">
      {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Papirutgave / skriv ut</button>}
      {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
-     {quoteId&&v.status==="draft"&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
+     {quoteId&&v.status==="draft"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
+     {quoteId&&v.status==="sent"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy} onClick={registerPaperIssue}>Registrer utlevert på papir</button>}
      {quoteId&&v.status==="sent"&&<button type="button" className="btn alt" disabled={paperBusy} onClick={openPaperAcceptance}>Registrer papirgodkjenning</button>}
      {quoteId&&["sent","expired"].includes(v.status)&&<button type="button" className="btn quoteRevisionButton" disabled={revising} onClick={createRevision}>{revising?"Oppretter …":"Opprett revisjon"}</button>}
      {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
@@ -531,7 +532,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      <div className="quoteSummaryPlan">
       {v.paymentPlan.map(row=><span key={row.id}><small>{row.label} · {row.percent}%</small><b>{nok(calc.total*(Number(row.percent)||0)/100)}</b></span>)}
      </div>
-     {quoteId&&v.status==="draft"&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
+     {quoteId&&v.status==="draft"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
+     {quoteId&&v.status==="sent"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy} onClick={registerPaperIssue}>Registrer utlevert på papir</button>}
      {quoteId&&v.status==="sent"&&<button type="button" className="btn alt" disabled={paperBusy} onClick={openPaperAcceptance}>Registrer papirgodkjenning</button>}
      {quoteId&&["sent","expired"].includes(v.status)&&<button type="button" className="btn quoteRevisionButton" disabled={revising} onClick={createRevision}>{revising?"Oppretter …":"Opprett revisjon"}</button>}
      {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
