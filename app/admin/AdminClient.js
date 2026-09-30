@@ -4274,6 +4274,34 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
   setMessage((alreadyPaid?"Kvitteringen er sendt på nytt til ":"Leiebetalingen er registrert og kvitteringen er sendt til ")+(d.sentTo||booking.customer?.email)+".");
  }
 
+ async function refundRentalPayment(booking){
+  const input=document.getElementById("rental-refund-amount-"+booking.id);
+  const reference=document.getElementById("rental-refund-reference-"+booking.id)?.value||"";
+  const note=document.getElementById("rental-refund-note-"+booking.id)?.value||"";
+  const value=String(input?.value||"").trim().replace(",",".");
+  const amountOre=Math.round(Number(value)*100);
+  const remaining=Math.max(0,Number(booking.paymentCapturedOre||0)-Number(booking.paymentRefundedOre||0));
+  if(!Number.isFinite(amountOre)||amountOre<=0){setError("Skriv inn beløpet som er tilbakebetalt.");return;}
+  if(amountOre>remaining){setError("Tilbakebetalingen kan ikke være større enn "+nok(remaining)+".");return;}
+  const d=await runAction(
+   booking,
+   "record-manual-refund-and-notify",
+   {refundOre:amountOre,refundReference:reference,refundNote:note},
+   "Registrere "+nok(amountOre)+" som tilbakebetalt og sende bekreftelse til "+booking.customer?.email+"? Dette utfører ikke selve bank-/Vipps-overføringen."
+  );
+  if(d)setMessage("Tilbakebetalingen er registrert og kunden er varslet.");
+ }
+
+ async function resendRentalRefundNotice(booking){
+  const d=await runAction(
+   booking,
+   "resend-manual-refund-notice",
+   {},
+   "Sende siste tilbakebetalingsbekreftelse på nytt til "+booking.customer?.email+"?"
+  );
+  if(d)setMessage("Tilbakebetalingsbekreftelsen er sendt på nytt.");
+ }
+
  async function holdDeposit(booking){
   const reference=document.getElementById("rental-deposit-reference-"+booking.id)?.value||booking.depositReference||"";
   const d=await runAction(booking,"record-deposit-held",{depositReference:reference},"Registrere "+nok(booking.depositOre)+" som mottatt/holdt depositum? Beløpet regnes ikke som omsetning.");
@@ -4345,11 +4373,30 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
     <div className="orderPaymentFacts">
      <span><small>Status</small><b>{paymentLabels[b.paymentStatus]||b.paymentStatus}</b></span>
      <span><small>Registrert betalt</small><b>{nok(b.paymentCapturedOre||0)}</b></span>
+     {Number(b.paymentRefundedOre)>0&&<span><small>Tilbakebetalt</small><b>{nok(b.paymentRefundedOre)}</b></span>}
+     {Number(b.paymentCapturedOre)>Number(b.paymentRefundedOre||0)&&<span><small>Netto registrert</small><b>{nok(Number(b.paymentCapturedOre)-Number(b.paymentRefundedOre||0))}</b></span>}
      {b.receiptSentAt&&<span><small>Kvittering</small><b>Sendt {new Date(b.receiptSentAt).toLocaleString("nb-NO")}</b></span>}
     </div>
     <div className="field"><label>Betalingsreferanse <span className="muted">(Vipps, bank, kontant osv.)</span></label><input id={"rental-payment-reference-"+b.id} defaultValue={b.paymentReference||""} maxLength={120} placeholder="Valgfri referanse"/></div>
-    {canUpdate&&<button className="btn" type="button" disabled={savingId===b.id||paymentSetupRequired||!b.customer?.email} onClick={()=>registerPayment(b)}>{savingId===b.id?"Sender …":b.paymentStatus==="paid"?"Send kvittering på nytt":"Registrer leie betalt + send kvittering/PDF"}</button>}
+    {canUpdate&&<button className="btn" type="button" disabled={savingId===b.id||paymentSetupRequired||!b.customer?.email||Number(b.paymentRefundedOre)>0} onClick={()=>registerPayment(b)}>{savingId===b.id?"Sender …":Number(b.paymentRefundedOre)>0?"Tilbakebetaling registrert":b.paymentStatus==="paid"?"Send kvittering på nytt":"Registrer leie betalt + send kvittering/PDF"}</button>}
     <p className="muted">Betalingsstatus oppdateres automatisk når leien registreres som betalt. Dette hindrer at «Betalt» settes uten registrert beløp.</p>
+    {Number(b.paymentCapturedOre)>Number(b.paymentRefundedOre||0)&&canUpdate&&<div className="rentalRefundPanel">
+     <h5>Registrer tilbakebetaling</h5>
+     <p className="muted">Registrer bare penger som faktisk er tilbakebetalt i bank, Vipps eller kontant. Systemet utfører ikke selve overføringen.</p>
+     <div className="field"><label>Tilbakebetalt beløp (kr)</label><input id={"rental-refund-amount-"+b.id} type="number" min="0.01" step="0.01" max={(Number(b.paymentCapturedOre)-Number(b.paymentRefundedOre||0))/100} defaultValue={((Number(b.paymentCapturedOre)-Number(b.paymentRefundedOre||0))/100).toFixed(2)}/></div>
+     <div className="field"><label>Referanse <span className="muted">(valgfritt)</span></label><input id={"rental-refund-reference-"+b.id} maxLength={120} placeholder="F.eks. Vipps- eller bankreferanse"/></div>
+     <div className="field"><label>Merknad <span className="muted">(valgfritt)</span></label><textarea id={"rental-refund-note-"+b.id} maxLength={1000} rows="2" placeholder="Kort forklaring til kunden"/></div>
+     <button className="btn alt" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>refundRentalPayment(b)}>Registrer tilbakebetaling + varsle kunde</button>
+    </div>}
+    {Number(b.paymentRefundedOre)>0&&<div className="rentalNotificationState">
+     <span><b>{Number(b.paymentRefundedOre)>=Number(b.paymentCapturedOre||0)?"Betalingen er tilbakebetalt":"Delvis tilbakebetaling registrert"}</b></span>
+     {Number(b.refundLastOre)>0&&<span>Sist tilbakebetalt: {nok(b.refundLastOre)}</span>}
+     <span>Totalt tilbakebetalt: {nok(b.paymentRefundedOre)}</span>
+     {b.refundReference&&<span>Referanse: {b.refundReference}</span>}
+     {b.refundNote&&<span>Merknad: {b.refundNote}</span>}
+     {b.refundNoticeSentAt&&<span>Bekreftelse sendt {new Date(b.refundNoticeSentAt).toLocaleString("nb-NO")}</span>}
+     {canUpdate&&<button className="btn alt" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>resendRentalRefundNotice(b)}>Send tilbakebetalingsbekreftelse på nytt</button>}
+    </div>}
    </section>
 
    {Number(b.depositOre)>0&&<section className="orderPaymentPanel rentalDepositPanel">
