@@ -4349,7 +4349,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
     </div>
     <div className="field"><label>Betalingsreferanse <span className="muted">(Vipps, bank, kontant osv.)</span></label><input id={"rental-payment-reference-"+b.id} defaultValue={b.paymentReference||""} maxLength={120} placeholder="Valgfri referanse"/></div>
     {canUpdate&&<button className="btn" type="button" disabled={savingId===b.id||paymentSetupRequired||!b.customer?.email} onClick={()=>registerPayment(b)}>{savingId===b.id?"Sender …":b.paymentStatus==="paid"?"Send kvittering på nytt":"Registrer leie betalt + send kvittering/PDF"}</button>}
-    <div className="field"><label>Overstyr betalingsstatus</label><select disabled={!canUpdate||savingId===b.id} value={b.paymentStatus} onChange={e=>patch(b.id,{paymentStatus:e.target.value})}><option value="unpaid">Ikke betalt</option><option value="partial">Delvis betalt</option><option value="paid">Betalt</option><option value="refunded">Refundert</option></select></div>
+    <p className="muted">Betalingsstatus oppdateres automatisk når leien registreres som betalt. Dette hindrer at «Betalt» settes uten registrert beløp.</p>
    </section>
 
    {Number(b.depositOre)>0&&<section className="orderPaymentPanel rentalDepositPanel">
