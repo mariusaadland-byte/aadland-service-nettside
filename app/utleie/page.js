@@ -67,7 +67,7 @@ export default function Utleie(){
  }
 
  return <main className="catalogPage rentalPage">
-  <CatalogHeader/>
+  <CatalogHeader rental/>
 
   <section className="rentalHero">
    <div className="catalogWrap rentalHeroInner">
@@ -140,6 +140,6 @@ export default function Utleie(){
    </div>
   </section>
 
-  <CatalogFooter/>
+  <CatalogFooter rental/>
  </main>;
 }
