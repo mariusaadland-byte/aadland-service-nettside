@@ -253,7 +253,10 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     vatRate:25,
     numberLabel:"Bookingnummer",
     itemsSectionLabel:"Leie",
-    depositInfo:Number(current.deposit_ore)>0?{
+    brandName:"Aadland Utleie",
+  brandSiteUrl:"https://www.aadlandutleie.no",
+  brandEmail:"post@aadland-service.no",
+  depositInfo:Number(current.deposit_ore)>0?{
      amountOre:Number(current.deposit_ore)||0,
      statusLabel:current.deposit_status==="held"?"Holdes":current.deposit_status==="released"?"Frigitt":current.deposit_status==="partially_charged"?"Delvis brukt":current.deposit_status==="charged"?"Brukt":"Ikke registrert",
      reference:current.deposit_reference||"",
