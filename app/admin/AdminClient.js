@@ -4197,16 +4197,28 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
  const statuses={new:"Ny",confirmed:"Bekreftet",active:"Utlevert",returned:"Returnert",completed:"Ferdig",cancelled:"Avbrutt"};
  const paymentLabels={unpaid:"Ikke betalt",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert"};
  const depositLabels={not_paid:"Ikke mottatt",held:"Holdes",released:"Frigitt",partially_charged:"Delvis brukt",charged:"Brukt"};
- const statusChoices=status=>{
+ const settlementIssue=booking=>{
+  const total=Math.max(0,Number(booking.totalOre)||0);
+  const captured=Math.max(0,Number(booking.paymentCapturedOre)||0);
+  if(booking.paymentStatus!=="paid"||captured<total)return "Leien må registreres fullt betalt.";
+  if(Number(booking.depositOre||0)>0){
+   const settled=booking.depositStatus==="released"
+    ||booking.depositStatus==="charged"
+    ||(booking.depositStatus==="partially_charged"&&Boolean(booking.depositReleasedAt));
+   if(!settled)return "Depositumet må frigjøres eller gjøres ferdig opp.";
+  }
+  return "";
+ };
+ const statusChoices=booking=>{
   const next={
    new:[],
    confirmed:["active"],
    active:["returned"],
-   returned:["completed"],
+   returned:settlementIssue(booking)?[]:["completed"],
    completed:[],
    cancelled:[]
   };
-  return [status,...(next[status]||[])];
+  return [booking.status,...(next[booking.status]||[])];
  };
  const [savingId,setSavingId]=useState("");
  const [message,setMessage]=useState("");
@@ -4326,7 +4338,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
     {b.cancellationSentAt&&<span>✓ Avbestilling sendt {new Date(b.cancellationSentAt).toLocaleString("nb-NO")}</span>}
    </div>}
 
-   <div className="field"><label>Status</label><select disabled={!canUpdate||savingId===b.id||statusChoices(b.status).length===1} value={b.status} onChange={e=>patch(b.id,{status:e.target.value})}>{statusChoices(b.status).map(value=><option key={value} value={value}>{statuses[value]||value}</option>)}</select>{b.status==="new"&&<small className="muted">Bekreft eller avbryt bookingen med knappene nederst, slik at kunden alltid varsles.</small>}</div>
+   <div className="field"><label>Status</label><select disabled={!canUpdate||savingId===b.id||statusChoices(b).length===1} value={b.status} onChange={e=>patch(b.id,{status:e.target.value})}>{statusChoices(b).map(value=><option key={value} value={value}>{statuses[value]||value}</option>)}</select>{b.status==="new"&&<small className="muted">Bekreft eller avbryt bookingen med knappene nederst, slik at kunden alltid varsles.</small>}{b.status==="returned"&&settlementIssue(b)&&<small className="muted">Kan ikke settes som ferdig: {settlementIssue(b)}</small>}</div>
 
    <section className="orderPaymentPanel rentalPaymentPanel">
     <h4>Leiebetaling</h4>
@@ -4350,7 +4362,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
     <p className="muted">Depositumet holdes separat fra leieinntekten og inngår ikke i leiekvitteringens totalsum.</p>
     <div className="field"><label>Depositumreferanse</label><input id={"rental-deposit-reference-"+b.id} defaultValue={b.depositReference||""} maxLength={120} placeholder="F.eks. Vipps-ref. eller bank"/></div>
     {canUpdate&&<div className="rentalBookingActions">
-     <button className="btn alt" type="button" disabled={savingId===b.id||paymentSetupRequired} onClick={()=>holdDeposit(b)}>Registrer mottatt/holdt</button>
+     <button className="btn alt" type="button" disabled={savingId===b.id||paymentSetupRequired||b.depositStatus!=="not_paid"} onClick={()=>holdDeposit(b)}>Registrer mottatt/holdt</button>
      <button className="btn alt" type="button" disabled={savingId===b.id||paymentSetupRequired||!["held","partially_charged"].includes(b.depositStatus)} onClick={()=>releaseDeposit(b)}>Frigi depositum</button>
     </div>}
     <div className="field"><label>Beløp brukt av depositum (kr)</label><input id={"rental-deposit-charge-"+b.id} type="number" min="0" step="0.01" max={(Number(b.depositOre)||0)/100} defaultValue={b.depositChargedOre?((Number(b.depositChargedOre)||0)/100).toFixed(2):""} placeholder="0,00"/></div>
