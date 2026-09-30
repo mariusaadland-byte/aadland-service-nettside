@@ -4209,6 +4209,20 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
   }
   return "";
  };
+ const attentionIssue=booking=>{
+  if(booking.status==="returned")return settlementIssue(booking);
+  if(booking.status==="cancelled"){
+   const captured=Math.max(0,Number(booking.paymentCapturedOre)||0);
+   const refunded=Math.max(0,Number(booking.paymentRefundedOre)||0);
+   if(captured>refunded)return "Registrert betaling må avklares eller tilbakebetales.";
+   if(Number(booking.depositOre||0)>0){
+    const unresolved=booking.depositStatus==="held"
+     ||(booking.depositStatus==="partially_charged"&&!booking.depositReleasedAt);
+    if(unresolved)return "Depositumet må frigjøres eller gjøres ferdig opp.";
+   }
+  }
+  return "";
+ };
  const statusChoices=booking=>{
   const next={
    new:[],
@@ -4337,7 +4351,14 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
   }
  }
 
+ const attentionBookings=bookings.filter(booking=>attentionIssue(booking));
+ const attentionNetOre=attentionBookings.reduce((sum,booking)=>sum+Math.max(0,Number(booking.paymentCapturedOre||0)-Number(booking.paymentRefundedOre||0)),0);
+
  return <>
+  {attentionBookings.length>0&&<div className="adminProjectMigrationWarning">
+   <b>Krever oppmerksomhet · {attentionBookings.length} {attentionBookings.length===1?"booking":"bookinger"}</b>
+   <span>Returnerte eller avbrutte utleier har betaling/depositum som ikke er ferdig avklart.{attentionNetOre>0?" Netto registrert betaling som må vurderes: "+nok(attentionNetOre):""}</span>
+  </div>}
   {paymentSetupRequired&&<div className="adminProjectMigrationWarning">
    <b>Databaseoppdatering mangler for utleiebetaling</b>
    <span>Den nye kvitterings- og depositumsporingen er programmert, men de nye databasefeltene må opprettes før knappene kan brukes.</span>
@@ -4353,6 +4374,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
     <div><div className="kicker">{b.bookingNumber}</div><h3>{b.itemName}</h3></div>
     <span className={"rentalBookingStatus rentalBookingStatus-"+b.status}>{statuses[b.status]||b.status}</span>
    </div>
+   {attentionIssue(b)&&<div className="notice"><b>Krever oppmerksomhet</b><br/><span>{attentionIssue(b)}</span></div>}
    <p><b>{b.customer?.name}</b><br/>{b.customer?.phone} · {b.customer?.email}<br/>{b.customer?.fulfillment==="delivery"?"Levering":"Henting"}{b.customer?.address?" · "+b.customer.address:""}</p>
    <div className="rentalBookingSummary">
     <span><small>Periode</small><b>{b.startDate} – {b.endDate}</b></span>
