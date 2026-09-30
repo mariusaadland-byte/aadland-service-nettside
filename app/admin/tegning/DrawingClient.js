@@ -108,6 +108,7 @@ function nearestWall(o,walls){
 export default function DrawingClient(){
  const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null);
  const svg=useRef(null);
+ const linkedOrderHandled=useRef("");
  useEffect(()=>{try{const d=JSON.parse(localStorage.getItem(STORE)||"[]");if(d.length){setDocs(d);setDoc({...initial(),...d[0]})}else{const old=JSON.parse(localStorage.getItem("aadlandDrawing")||"null");if(old)setDoc({...initial(),...old})}}catch{} Promise.all([
   fetch("/api/admin/orders").then(r=>r.ok?r.json():null).catch(()=>null),
   fetch("/api/admin/projects").then(r=>r.ok?r.json():null).catch(()=>null)
@@ -135,6 +136,39 @@ export default function DrawingClient(){
  const loadProjectDrawings=async projectId=>{if(!projectId)return;try{const r=await fetch("/api/admin/project-drawings?projectId="+encodeURIComponent(projectId)),x=await r.json();if(!r.ok||x.setupRequired)return;const incoming=(x.drawings||[]).map(row=>({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||"",projectId:row.projectId,name:row.name,customer:row.customer,address:row.address,notes:row.notes}));mergeIncomingDrawings(incoming)}catch{}};
  const changeOrder=e=>{const orderId=e.target.value,order=orders.find(item=>item.id===orderId);setDoc(d=>({...d,orderId,projectId:orderId?"":d.projectId,customer:orderId?(order?.customerName||d.customer):d.customer,address:orderId?(order?.customer?.address||d.address):d.address,name:orderId&&d.name==="Ny tegning"?"Tegning – "+(order?.orderNumber||"oppdrag"):d.name}));if(orderId)loadOrderDrawings(orderId)};
  const changeProject=e=>{const projectId=e.target.value;setDoc(d=>({...d,projectId,orderId:projectId?"":d.orderId}));if(projectId)loadProjectDrawings(projectId)};
+ useEffect(()=>{
+  if(!orders.length||linkedOrderHandled.current)return;
+  const orderId=new URLSearchParams(window.location.search).get("orderId")||"";
+  if(!orderId)return;
+  const order=orders.find(item=>item.id===orderId);
+  if(!order)return;
+  linkedOrderHandled.current=orderId;
+  let cancelled=false;
+  (async()=>{
+   try{
+    const r=await fetch("/api/admin/project-drawings?orderId="+encodeURIComponent(orderId)),x=await r.json();
+    if(cancelled)return;
+    if(r.ok&&!x.setupRequired&&Array.isArray(x.drawings)&&x.drawings.length){
+     const incoming=x.drawings.map(row=>({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||orderId,projectId:row.projectId||"",name:row.name,customer:row.customer,address:row.address,notes:row.notes}));
+     const latest=incoming[0];
+     setDoc(latest);
+     setSelected(null);
+     setHistory([]);
+     setFuture([]);
+     setDocs(current=>{const merged=[...current];for(const drawing of incoming){const i=merged.findIndex(item=>item.serverId===drawing.serverId);if(i>=0)merged[i]=drawing;else merged.push(drawing)}localStorage.setItem(STORE,JSON.stringify(merged));return merged});
+     setMessage("Tegning hentet fra "+(order.orderNumber||"oppdraget"));
+     setTimeout(()=>setMessage(""),2200);
+     return;
+    }
+   }catch{}
+   if(cancelled)return;
+   const next={...initial(),orderId,customer:order.customerName||"",address:order.customer?.address||"",name:"Tegning – "+(order.orderNumber||"oppdrag")};
+   setDoc(next);setSelected(null);setHistory([]);setFuture([]);
+   setMessage("Ny tegning koblet til "+(order.orderNumber||"oppdraget"));
+   setTimeout(()=>setMessage(""),2200);
+  })();
+  return()=>{cancelled=true};
+ },[orders]);
  const makeRoom=()=>{const w=Number(prompt("Romlengde i mm","4000")),h=Number(prompt("Rombredde i mm","3000"));if(w<300||h<300)return;const x=1000,y=1000,t=Number(doc.defaultWallThickness)||98,H=Number(doc.defaultWallHeight)||2400,points=[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}],zone={id:uid(),name:"Rom "+((doc.zones||[]).length+1),points,ceilingHeight:H,floorFinish:"",notes:""};mutate(d=>({...d,walls:[...d.walls,{id:uid(),x1:x,y1:y,x2:x+w,y2:y,t,h:H},{id:uid(),x1:x+w,y1:y,x2:x+w,y2:y+h,t,h:H},{id:uid(),x1:x+w,y1:y+h,x2:x,y2:y+h,t,h:H},{id:uid(),x1:x,y1:y+h,x2:x,y2:y,t,h:H}],zones:[...(d.zones||[]),zone]}));setSelected({kind:"zone",id:zone.id})};
  const makeLRoom=()=>{const w=Number(prompt("Ytterlengde i mm","5000")),h=Number(prompt("Ytterbredde i mm","4000")),rw=Number(prompt("Bredde på innhakk fra høyre i mm","1800")),rh=Number(prompt("Dybde på innhakk ovenfra i mm","1500"));if(w<600||h<600||rw<300||rh<300||rw>=w-300||rh>=h-300){alert("Målene gir ikke et gyldig L-rom.");return}const x=1000,y=1000,t=Number(doc.defaultWallThickness)||98,H=Number(doc.defaultWallHeight)||2400,pts=[[x,y],[x+w-rw,y],[x+w-rw,y+rh],[x+w,y+rh],[x+w,y+h],[x,y+h],[x,y]],points=pts.slice(0,-1).map(p=>({x:p[0],y:p[1]})),zone={id:uid(),name:"Rom "+((doc.zones||[]).length+1),points,ceilingHeight:H,floorFinish:"",notes:""};mutate(d=>({...d,walls:[...d.walls,...pts.slice(0,-1).map((p,i)=>({id:uid(),x1:p[0],y1:p[1],x2:pts[i+1][0],y2:pts[i+1][1],t,h:H}))],zones:[...(d.zones||[]),zone]}));setSelected({kind:"zone",id:zone.id})};
  const addItem=(type,w,h)=>mutate(d=>({...d,items:[...d.items,{id:uid(),type,x:1800,y:1600,w,h,rot:0,...openingDefaults(type)}]}));
