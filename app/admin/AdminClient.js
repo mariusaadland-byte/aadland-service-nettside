@@ -4139,7 +4139,6 @@ function ServiceEditor({ service, reload, setError, close }) {
 }
 
 function RentalItems({items,categories,blocks,reload,setError}){
- const [showNew,setShowNew]=useState(Boolean(initialProject));
  const [block,setBlock]=useState({itemId:"",startDate:"",endDate:"",reason:""});
  async function addBlock(e){e.preventDefault();setError("");const r=await fetch("/api/admin/rental/blocks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(block)});const d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Perioden kunne ikke blokkeres.");return;}setBlock({itemId:"",startDate:"",endDate:"",reason:""});await reload();}
  async function removeBlock(id){const entry=blocks.find(item=>item.id===id);const label=entry?(items.find(item=>item.id===entry.itemId)?.name||"utstyret")+" · "+entry.startDate+" – "+entry.endDate:"denne blokkeringen";if(!window.confirm("Fjerne blokkeringen for "+label+"?"))return;const r=await fetch("/api/admin/rental/blocks",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});if(!r.ok){setError("Blokkeringen kunne ikke fjernes.");return;}await reload();}
