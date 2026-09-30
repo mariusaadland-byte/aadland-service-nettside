@@ -307,12 +307,17 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
  }
 
  if(action==="release-deposit"){
-  if(Number(current.deposit_ore||0)<=0)return NextResponse.json({error:"Denne bookingen har ikke depositum."},{status:400});
+  const maximum=Math.max(0,Number(current.deposit_ore)||0);
+  if(maximum<=0)return NextResponse.json({error:"Denne bookingen har ikke depositum."},{status:400});
+  if(!["held","partially_charged"].includes(current.deposit_status)){
+   return NextResponse.json({error:"Depositumet må være registrert som mottatt før det kan frigis."},{status:409});
+  }
+  const charged=Math.max(0,Math.min(maximum,Number(current.deposit_charged_ore)||0));
+  const status=charged>0?"partially_charged":"released";
   const now=new Date().toISOString();
   const {error}=await s.from("rental_bookings").update({
-   deposit_status:"released",
+   deposit_status:status,
    deposit_released_at:now,
-   deposit_charged_ore:0,
    updated_at:now
   }).eq("id",b.id);
   if(error){
@@ -320,19 +325,23 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
    console.error("RENTAL DEPOSIT RELEASE",error);
    return NextResponse.json({error:"Depositumet kunne ikke frigis."},{status:500});
   }
-  return NextResponse.json({ok:true,depositStatus:"released"});
+  return NextResponse.json({ok:true,depositStatus:status,depositChargedOre:charged,depositReleasedAt:now});
  }
 
  if(action==="record-deposit-charge"){
   const maximum=Math.max(0,Number(current.deposit_ore)||0);
   const amount=Math.max(0,Math.round(Number(b.depositChargedOre)||0));
   if(maximum<=0)return NextResponse.json({error:"Denne bookingen har ikke depositum."},{status:400});
+  if(!["held","partially_charged","charged"].includes(current.deposit_status)){
+   return NextResponse.json({error:"Registrer depositumet som mottatt/holdt før et beløp brukes."},{status:409});
+  }
   if(amount<=0||amount>maximum)return NextResponse.json({error:"Beløpet som brukes av depositumet må være større enn 0 og ikke høyere enn depositumet."},{status:400});
   const status=amount>=maximum?"charged":"partially_charged";
   const now=new Date().toISOString();
   const {error}=await s.from("rental_bookings").update({
    deposit_status:status,
    deposit_charged_ore:amount,
+   deposit_released_at:status==="charged"?now:null,
    updated_at:now
   }).eq("id",b.id);
   if(error){
@@ -380,6 +389,21 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
      ?"Bruk «Bekreft og send e-post» eller «Avbryt og varsle kunde» på nye bookinger."
      :"Status kan bare flyttes ett steg videre i utleieflyten."
    },{status:409});
+  }
+  if(b.status==="completed"&&current.status!=="completed"){
+   const total=Math.max(0,Number(current.total_ore)||0);
+   const captured=Math.max(0,Number(current.payment_captured_ore)||0);
+   if(current.payment_status!=="paid"||captured<total){
+    return NextResponse.json({error:"Leien må være registrert fullt betalt før bookingen kan settes som ferdig."},{status:409});
+   }
+   if(Number(current.deposit_ore||0)>0){
+    const depositSettled=current.deposit_status==="released"
+     ||current.deposit_status==="charged"
+     ||(current.deposit_status==="partially_charged"&&Boolean(current.deposit_released_at));
+    if(!depositSettled){
+     return NextResponse.json({error:"Depositumet må være frigitt eller ferdig oppgjort før bookingen kan settes som ferdig."},{status:409});
+    }
+   }
   }
   changes.status=b.status;
  }
