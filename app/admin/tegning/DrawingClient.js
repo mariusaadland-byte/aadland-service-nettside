@@ -109,6 +109,7 @@ export default function DrawingClient(){
  const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null);
  const svg=useRef(null);
  const linkedOrderHandled=useRef("");
+ const autosaveReady=useRef(false);
  useEffect(()=>{try{const d=JSON.parse(localStorage.getItem(STORE)||"[]");if(d.length){setDocs(d);setDoc({...initial(),...d[0]})}else{const old=JSON.parse(localStorage.getItem("aadlandDrawing")||"null");if(old)setDoc({...initial(),...old})}}catch{} Promise.all([
   fetch("/api/admin/orders").then(r=>r.ok?r.json():null).catch(()=>null),
   fetch("/api/admin/projects").then(r=>r.ok?r.json():null).catch(()=>null)
@@ -116,6 +117,23 @@ export default function DrawingClient(){
   setOrders((orderData?.orders||[]).filter(order=>order.orderType==="custom"&&!order.archivedAt));
   setProjects(projectData?.projects||[]);
  }).catch(()=>{});},[]);
+ useEffect(()=>{
+  const readyTimer=setTimeout(()=>{autosaveReady.current=true},700);
+  return()=>clearTimeout(readyTimer);
+ },[]);
+ useEffect(()=>{
+  if(!autosaveReady.current)return;
+  const timer=setTimeout(()=>{
+   try{
+    const stored=JSON.parse(localStorage.getItem(STORE)||"[]");
+    const list=Array.isArray(stored)?stored:[];
+    const next=[...list.filter(item=>item.id!==doc.id),doc];
+    localStorage.setItem(STORE,JSON.stringify(next));
+    setDocs(current=>[...current.filter(item=>item.id!==doc.id),doc]);
+   }catch{}
+  },650);
+  return()=>clearTimeout(timer);
+ },[doc]);
  const persistLocal=next=>{const list=[...docs.filter(x=>x.id!==next.id),next];setDocs(list);localStorage.setItem(STORE,JSON.stringify(list))};
  const persist=async(next=doc)=>{persistLocal(next);if(!next.orderId&&!next.projectId){setMessage("Lagret på enheten");setTimeout(()=>setMessage(""),1800);return}setMessage("Lagrer…");try{const body={id:next.serverId,orderId:next.orderId||null,projectId:next.projectId||null,name:next.name,customer:next.customer,address:next.address,notes:next.notes,drawingData:{...next,serverId:undefined}};const r=await fetch("/api/admin/project-drawings",{method:next.serverId?"PATCH":"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)}),x=await r.json();if(r.ok&&x.drawing){const saved={...next,serverId:x.drawing.id};setDoc(saved);persistLocal(saved);setMessage("Lagret i oppdraget")}else if(x.setupRequired)setMessage("Lokalt lagret · database ikke aktivert");else setMessage("Lokalt lagret · serverfeil")}catch{setMessage("Lokalt lagret · server utilgjengelig")}setTimeout(()=>setMessage(""),2600)};
  const checkpoint=()=>setHistory(h=>[...h.slice(-24),JSON.stringify(doc)]);
@@ -275,7 +293,7 @@ export default function DrawingClient(){
  const copyAiBrief=async(showMessage=true)=>{try{await navigator.clipboard.writeText(aiBrief());if(showMessage){setMessage("ChatGPT-brief kopiert");setTimeout(()=>setMessage(""),1800)}return true}catch{if(showMessage){setMessage("Kunne ikke kopiere brief");setTimeout(()=>setMessage(""),1800)}return false}};
  const prepareChatGptPackage=async()=>{const copied=await copyAiBrief(false);exportPng();setMessage(copied?"PNG eksporteres · ChatGPT-brief kopiert":"PNG eksporteres · brief kunne ikke kopieres");setTimeout(()=>setMessage(""),2600)};
  return <main className={styles.shell}>
-  <header className={styles.top}><Link href="/admin">← Backoffice</Link><strong>Tegning & visualisering</strong><input className={styles.name} value={doc.name} onChange={e=>setDoc(d=>({...d,name:e.target.value}))}/><span className={styles.saved}>{message}</span><button className={styles.btn} onClick={()=>persist()}>Lagre</button><button className={styles.btn} onClick={undo} disabled={!history.length}>Angre</button><button className={styles.btn} onClick={redo} disabled={!future.length}>Gjør om</button><button className={styles.btn} onClick={()=>zoomBy(-.25)}>−</button><span className={styles.zoom}>{Math.round((doc.zoom||1)*100)}%</span><button className={styles.btn} onClick={()=>zoomBy(.25)}>+</button><button className={styles.btn} onClick={fitView}>Tilpass</button><button className={tool==="pan"?styles.activeBtn:styles.btn} onClick={()=>{setTool(tool==="pan"?"select":"pan");setDraft(null);setMeasureDraft(null)}}>Flytt visning</button><button className={styles.btn} onClick={()=>window.print()}>PDF</button><button className={styles.btn} onClick={newQuoteFromDrawing}>Nytt tilbud fra tegning</button></header>
+  <header className={styles.top}><Link href="/admin">← Backoffice</Link><strong>Tegning & visualisering</strong><input className={styles.name} value={doc.name} onChange={e=>setDoc(d=>({...d,name:e.target.value}))}/><span className={styles.saved}>{message||"Autolagres lokalt"}</span><button className={styles.btn} onClick={()=>persist()}>Lagre på oppdrag</button><button className={styles.btn} onClick={undo} disabled={!history.length}>Angre</button><button className={styles.btn} onClick={redo} disabled={!future.length}>Gjør om</button><button className={styles.btn} onClick={()=>zoomBy(-.25)}>−</button><span className={styles.zoom}>{Math.round((doc.zoom||1)*100)}%</span><button className={styles.btn} onClick={()=>zoomBy(.25)}>+</button><button className={styles.btn} onClick={fitView}>Tilpass</button><button className={tool==="pan"?styles.activeBtn:styles.btn} onClick={()=>{setTool(tool==="pan"?"select":"pan");setDraft(null);setMeasureDraft(null)}}>Flytt visning</button><button className={styles.btn} onClick={()=>window.print()}>PDF</button><button className={styles.btn} onClick={newQuoteFromDrawing}>Nytt tilbud fra tegning</button></header>
   <div className={styles.layout}>
    <aside className={styles.panel}>
     <div className={styles.group}><h2>Tegninger</h2><div className={styles.row}><button className={styles.btn} onClick={newDoc}>+ Ny</button><button className={styles.btn} onClick={exportJson}>Eksporter</button><label className={styles.btn}>Importer<input className={styles.hiddenFile} type="file" accept="application/json,.json" onChange={importJson}/></label><button className={styles.btn+" "+styles.danger} onClick={deleteDoc}>Slett</button></div>{docs.length>0&&<select className={styles.select} value={doc.id} onChange={e=>openDoc(e.target.value)}>{docs.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select>}<div className={styles.field}><label>Koble til oppdrag</label><select className={styles.select} value={doc.orderId||""} onChange={changeOrder}><option value="">Ikke koblet</option>{orders.map(order=><option key={order.id} value={order.id}>{order.orderNumber} · {order.customerName||"Uten kundenavn"}</option>)}</select><small className={styles.muted}>Velger du et oppdrag, hentes kunde og arbeidsadresse automatisk og tegningen lagres på oppdraget.</small></div>{doc.projectId&&<div className={styles.field}><label>Eldre prosjektkobling</label><select className={styles.select} value={doc.projectId||""} onChange={changeProject}><option value="">Fjern eldre kobling</option>{projects.map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</select></div>}<div className={styles.field}><label>Kunde</label><input value={doc.customer||""} onChange={e=>setDoc(d=>({...d,customer:e.target.value}))}/></div><div className={styles.field}><label>Adresse</label><input value={doc.address||""} onChange={e=>setDoc(d=>({...d,address:e.target.value}))}/></div><div className={styles.field}><label>Notater</label><textarea className={styles.textarea} value={doc.notes||""} onChange={e=>setDoc(d=>({...d,notes:e.target.value}))}/></div></div>
