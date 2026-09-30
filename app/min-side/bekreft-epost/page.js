@@ -9,8 +9,11 @@ export default function BekreftEpost(){
  const [busy,setBusy]=useState(false);
  const [state,setState]=useState("idle");
  const [message,setMessage]=useState("");
+ const [rentalContext,setRentalContext]=useState(false);
 
  useEffect(()=>{
+  const host=String(window.location.hostname||"").toLowerCase();
+  setRentalContext(host==="aadlandutleie.no"||host==="www.aadlandutleie.no");
   const fragment=new URLSearchParams(window.location.hash.replace(/^#/,""));
   const value=fragment.get("token")||new URLSearchParams(window.location.search).get("token")||"";
   setToken(value);
@@ -52,9 +55,9 @@ export default function BekreftEpost(){
 
  return <main className="customerPage customerLoginPage">
   <Link href="/min-side">← Min side</Link>
-  <div className="kicker customerTopKicker">MIN SIDE</div>
+  <div className="kicker customerTopKicker">{rentalContext?"AADLAND UTLEIE · MIN SIDE":"MIN SIDE"}</div>
   <h1>Bekreft e-post</h1>
-  <p>For å aktivere kundekontoen må du bekrefte at e-postadressen tilhører deg.</p>
+  <p>For å aktivere kundekontoen hos {rentalContext?"Aadland Utleie":"Aadland Service"} må du bekrefte at e-postadressen tilhører deg.</p>
 
   <section className="card customerLoginCard">
    {!ready&&<p>Laster bekreftelsen …</p>}
