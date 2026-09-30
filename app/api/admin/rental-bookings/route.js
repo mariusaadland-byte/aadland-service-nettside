@@ -89,8 +89,8 @@ async function checkAvailability(s,booking){
    .gte("end_date",from)
  ]);
  if(conflictError||blockError)return {error:"Tilgjengelighet kunne ikke kontrolleres.",status:500};
- if((conflicts?.length||0)+(blocks?.length||0)>=Math.max(1,Number(item.quantity)||1)){
-  return {error:"Kan ikke bekrefte: utstyret er opptatt i perioden.",status:409};
+ if((blocks?.length||0)>0||(conflicts?.length||0)>=Math.max(1,Number(item.quantity)||1)){
+  return {error:"Kan ikke bekrefte: utstyret er opptatt eller manuelt blokkert i perioden.",status:409};
  }
  return {item};
 }
