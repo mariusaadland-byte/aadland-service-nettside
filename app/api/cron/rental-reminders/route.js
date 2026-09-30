@@ -2,7 +2,7 @@ import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {cronGuard} from "../../../../lib/cronAuth";
 import {osloDateKey,shiftDateKey} from "../../../../lib/osloTime";
-import {rentalEmailFrom,rentalReplyTo,rentalSiteUrl} from "../../../../lib/rentalEmailConfig";
+import {rentalBookingSiteUrl,rentalEmailFrom,rentalReplyTo} from "../../../../lib/rentalEmailConfig";
 
 const MAX_PER_RUN=50;
 
@@ -44,7 +44,6 @@ export async function GET(req){
 
  const {Resend}=await import("resend");
  const resend=new Resend(resendKey);
- const base=rentalSiteUrl(req);
  let sentCount=0;
  const failures=[];
 
@@ -71,6 +70,7 @@ export async function GET(req){
    const itemName=esc(booking.rental_items?.name||"utstyret");
    const fulfillment=booking.customer?.fulfillment==="delivery"?"Levering":"Henting";
    const address=String(booking.customer?.address||"").trim();
+   const base=rentalBookingSiteUrl(booking,req);
    const accountUrl=booking.customer_user_id?base+"/min-side":"";
    const html=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111;padding:28px 12px"><tr><td align="center">
