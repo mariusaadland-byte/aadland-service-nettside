@@ -31,6 +31,7 @@ export default function MinSide(){
  const [info,setInfo]=useState("");
  const [editingProfile,setEditingProfile]=useState(false);
  const [profileForm,setProfileForm]=useState({name:"",phone:"",address:""});
+ const [rentalContext,setRentalContext]=useState(false);
 
  async function load(){
   try{
@@ -48,6 +49,8 @@ export default function MinSide(){
  }
 
  useEffect(()=>{
+  const host=String(window.location.hostname||"").toLowerCase();
+  setRentalContext(host==="aadlandutleie.no"||host==="www.aadlandutleie.no");
   const params=new URLSearchParams(window.location.search);
   const verification=params.get("verification");
   if(verification==="success")setInfo("E-postadressen er bekreftet. Velkommen til Min side.");
@@ -181,10 +184,12 @@ export default function MinSide(){
  if(loading)return <main className="customerPage"><p>Laster …</p></main>;
 
  if(!data)return <main className="customerPage customerLoginPage">
-  <Link href="/">← Aadland Service</Link>
-  <div className="kicker customerTopKicker">MIN SIDE</div>
+  <Link href={rentalContext?"/utleie":"/"}>← {rentalContext?"Aadland Utleie":"Aadland Service"}</Link>
+  <div className="kicker customerTopKicker">{rentalContext?"AADLAND UTLEIE · MIN SIDE":"MIN SIDE"}</div>
   <h1>{mode==="login"?"Logg inn":"Opprett kundekonto"}</h1>
-  <p>Det er frivillig å ha konto. Med Min side kan du samle tilbud, oppdrag, kjøp og utleie på ett sted.</p>
+  <p>{rentalContext
+   ?"Det er frivillig å ha konto. Med Min side kan du følge utleiebookinger og administrere kontaktopplysningene dine. Kontoen er den samme som hos Aadland Service."
+   :"Det er frivillig å ha konto. Med Min side kan du samle tilbud, oppdrag, kjøp og utleie på ett sted."}</p>
   <form className="card customerLoginCard" onSubmit={submit}>
    {mode==="register"&&<>
     <div className="field"><label>Navn</label><input required maxLength={120} value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></div>
@@ -264,10 +269,10 @@ export default function MinSide(){
  ].filter(item=>item.date).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,6);
 
  return <main className="customerPage">
-  <Link href="/">← Aadland Service</Link>
+  <Link href={rentalContext?"/utleie":"/"}>← {rentalContext?"Aadland Utleie":"Aadland Service"}</Link>
   <header className="customerDashboardHeader">
    <div>
-    <div className="kicker">MIN SIDE</div>
+    <div className="kicker">{rentalContext?"AADLAND UTLEIE · MIN SIDE":"MIN SIDE"}</div>
     <h1>Hei, {data.customer.name||"kunde"}</h1>
     <p>{data.customer.email}</p>
    </div>
@@ -329,7 +334,7 @@ export default function MinSide(){
   <section id="foresporsler" className="customerDashboardSection">
    <div className="customerSectionHead">
     <div><div className="kicker">KONTAKT</div><h2>Forespørsler og befaring</h2></div>
-    <div className="customerSectionActions"><span>{enquiries.length}</span><a className="btn alt" href="/#befaring">Ny forespørsel</a></div>
+    <div className="customerSectionActions"><span>{enquiries.length}</span><a className="btn alt" href={rentalContext?"https://www.aadland-service.no/#befaring":"/#befaring"}>Ny forespørsel</a></div>
    </div>
    {!enquiries.length?<div className="card customerEmpty"><p>Ingen forespørsler knyttet til kontoen ennå.</p></div>:
    <div className="customerGrid">{enquiries.map(o=><article className="card customerHistoryCard" key={o.id}>
@@ -430,7 +435,7 @@ export default function MinSide(){
   </section>
 
   <section id="bestillinger" className="customerDashboardSection">
-   <div className="customerSectionHead"><div><div className="kicker">HANDEL</div><h2>Bestillinger</h2></div><div className="customerSectionActions"><span>{purchases.length}</span><Link className="btn alt" href="/produkter">Se produkter</Link></div></div>
+   <div className="customerSectionHead"><div><div className="kicker">HANDEL</div><h2>Bestillinger</h2></div><div className="customerSectionActions"><span>{purchases.length}</span><a className="btn alt" href={rentalContext?"https://www.aadland-service.no/produkter":"/produkter"}>Se produkter</a></div></div>
    {!purchases.length?<div className="card customerEmpty"><p>Ingen produktbestillinger knyttet til kontoen ennå.</p></div>:
    <div className="customerGrid">{purchases.map(o=><article className="card customerHistoryCard" key={o.id}>
     <div className="customerCardTop"><div><small>{o.order_number}</small><h3>Bestilling</h3><p className="customerHistoryDate">Bestilt {dateTime(o.created_at)}</p></div><span className={"customerStatus customerStatus-"+o.status}>{orderStatus[o.status]||o.status}</span></div>
