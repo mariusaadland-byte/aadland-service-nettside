@@ -287,6 +287,9 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
  if(action==="record-deposit-held"){
   const amount=Math.max(0,Number(current.deposit_ore)||0);
   if(amount<=0)return NextResponse.json({error:"Denne bookingen har ikke depositum."},{status:400});
+  if(current.deposit_status!=="not_paid"){
+   return NextResponse.json({error:"Depositumet er allerede registrert og kan ikke registreres på nytt."},{status:409});
+  }
   const reference=String(b.depositReference??current.deposit_reference??"").trim()||"Manuelt registrert";
   const now=new Date().toISOString();
   const {error}=await s.from("rental_bookings").update({
