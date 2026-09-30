@@ -5,6 +5,7 @@ import {db} from "../../../../lib/supabase";
 import {buildReceiptEmail} from "../../../../lib/receiptEmail";
 import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
 import {rentalBookingSiteUrl,rentalEmailFrom,rentalReplyTo} from "../../../../lib/rentalEmailConfig";
+import {sendManualRentalRefundNotice} from "../../../../lib/rentalRefundNotice";
 
 async function canView(){
  return Boolean(await getAdminUser())&&Boolean(await hasPermission("canViewOrders"));
@@ -39,6 +40,12 @@ const map=b=>({
  paymentStatus:b.payment_status||"unpaid",
  paymentReference:b.payment_reference||"",
  paymentCapturedOre:Number(b.payment_captured_ore)||0,
+ paymentRefundedOre:Number(b.payment_refunded_ore)||0,
+ paymentRefundedAt:b.payment_refunded_at||null,
+ refundLastOre:Number(b.refund_last_ore)||0,
+ refundReference:b.refund_reference||"",
+ refundNote:b.refund_note||"",
+ refundNoticeSentAt:b.refund_notice_sent_at||null,
  receiptSentAt:b.receipt_sent_at||null,
  depositStatus:b.deposit_status||"not_paid",
  depositReference:b.deposit_reference||"",
@@ -155,7 +162,7 @@ export async function GET(){
  const [{data,error},{error:paymentProbeError}]=await Promise.all([
   s.from("rental_bookings").select("*,rental_items(name)").order("start_date",{ascending:true}),
   s.from("rental_bookings")
-   .select("id,payment_reference,payment_captured_ore,receipt_sent_at,deposit_reference,deposit_held_ore,deposit_received_at,deposit_released_at,deposit_charged_ore")
+   .select("id,payment_reference,payment_captured_ore,payment_refunded_ore,payment_refunded_at,refund_last_ore,refund_reference,refund_note,refund_notice_sent_at,receipt_sent_at,deposit_reference,deposit_held_ore,deposit_received_at,deposit_released_at,deposit_charged_ore")
    .limit(1)
  ]);
  if(error){
@@ -197,7 +204,60 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
   return NextResponse.json({error:"Bare nye eller bekreftede bookinger kan avbrytes med kundevarsel."},{status:409});
  }
 
+ if(action==="record-manual-refund-and-notify"||action==="resend-manual-refund-notice"){
+  const resendOnly=action==="resend-manual-refund-notice";
+  let refundResult=null;
+  let updated=current;
+
+  if(!resendOnly){
+   const amount=Math.round(Number(b.refundOre)||0);
+   if(amount<=0)return NextResponse.json({error:"Tilbakebetalingsbeløpet må være større enn 0."},{status:400});
+   if(String(b.refundReference||"").length>120)return NextResponse.json({error:"Tilbakebetalingsreferansen kan være maks 120 tegn."},{status:400});
+   if(String(b.refundNote||"").length>1000)return NextResponse.json({error:"Merknaden kan være maks 1000 tegn."},{status:400});
+
+   const {data,error:refundError}=await s.rpc("record_manual_rental_refund",{
+    target_booking_id:b.id,
+    refund_ore:amount,
+    refund_reference_value:String(b.refundReference||"").trim()||null,
+    refund_note_value:String(b.refundNote||"").trim()||null
+   });
+   if(refundError){
+    console.error("MANUAL RENTAL REFUND ERROR",refundError);
+    const message=String(refundError.message||"");
+    if(message.includes("NO_CAPTURED_PAYMENT"))return NextResponse.json({error:"Det er ikke registrert noen leiebetaling å tilbakebetale."},{status:409});
+    if(message.includes("PAYMENT_ALREADY_FULLY_REFUNDED"))return NextResponse.json({error:"Hele den registrerte leiebetalingen er allerede tilbakebetalt."},{status:409});
+    if(message.includes("REFUND_EXCEEDS_CAPTURED_PAYMENT"))return NextResponse.json({error:"Tilbakebetalingen kan ikke være større enn gjenstående registrert betaling."},{status:409});
+    return NextResponse.json({error:"Tilbakebetalingen kunne ikke registreres."},{status:500});
+   }
+   refundResult=data||null;
+   const {data:fresh,error:freshError}=await s.from("rental_bookings").select("*,rental_items(name)").eq("id",b.id).single();
+   if(freshError||!fresh)return NextResponse.json({error:"Tilbakebetalingen er registrert, men bookingen kunne ikke lastes på nytt.",statusSaved:true},{status:500});
+   updated=fresh;
+  }else if((Number(current.refund_last_ore)||0)<=0||(Number(current.payment_refunded_ore)||0)<=0){
+   return NextResponse.json({error:"Det finnes ingen registrert tilbakebetaling å sende bekreftelse for."},{status:409});
+  }
+
+  try{
+   const notice=await sendManualRentalRefundNotice({s,booking:updated,req});
+   return NextResponse.json({
+    ok:true,...notice,refundResult,
+    paymentStatus:updated.payment_status||"paid",
+    refundedTotalOre:Number(updated.payment_refunded_ore)||0
+   });
+  }catch(error){
+   console.error("MANUAL RENTAL REFUND NOTICE ERROR",error);
+   const message=String(error?.message||"");
+   let customerError=resendOnly?"Tilbakebetalingsbekreftelsen kunne ikke sendes.":"Tilbakebetalingen er registrert, men bekreftelsen kunne ikke sendes.";
+   if(message==="RENTAL_REFUND_NOTICE_EMAIL_MISSING")customerError=resendOnly?"Kunden mangler e-postadresse.":"Tilbakebetalingen er registrert, men kunden mangler e-postadresse.";
+   if(message==="RENTAL_REFUND_NOTICE_EMAIL_NOT_CONFIGURED")customerError=resendOnly?"E-post er ikke konfigurert.":"Tilbakebetalingen er registrert, men e-post er ikke konfigurert.";
+   return NextResponse.json({error:customerError,statusSaved:!resendOnly,refundResult},{status:500});
+  }
+ }
+
  if(action==="record-paid-and-send-receipt"){
+  if((Number(current.payment_refunded_ore)||0)>0){
+   return NextResponse.json({error:"Denne leiebetalingen har allerede en registrert tilbakebetaling. Bruk tilbakebetalingsdelen i stedet."},{status:409});
+  }
   const email=String(current.customer?.email||"").trim().toLowerCase();
   if(!email)return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
   const total=Math.max(0,Number(current.total_ore)||0);
