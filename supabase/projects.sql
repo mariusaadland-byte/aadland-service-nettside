@@ -38,3 +38,11 @@ create index if not exists project_drawings_project_idx on public.project_drawin
 -- Fleksibel prosjektfortelling med bilde- og tekstblokker.
 alter table public.projects
  add column if not exists content_blocks jsonb not null default '[]'::jsonb;
+
+
+-- Link technical drawings to real customer jobs.
+alter table public.project_drawings
+  add column if not exists order_id uuid references public.orders(id) on delete set null;
+
+create index if not exists project_drawings_order_id_idx
+  on public.project_drawings(order_id);
