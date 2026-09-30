@@ -4,7 +4,7 @@ import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
 import {buildReceiptEmail} from "../../../../lib/receiptEmail";
 import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
-import {rentalEmailFrom,rentalReplyTo,rentalSiteUrl} from "../../../../lib/rentalEmailConfig";
+import {rentalBookingSiteUrl,rentalEmailFrom,rentalReplyTo} from "../../../../lib/rentalEmailConfig";
 
 async function canView(){
  return Boolean(await getAdminUser())&&Boolean(await hasPermission("canViewOrders"));
@@ -108,7 +108,7 @@ async function sendCustomerMessage(req,s,booking,item,kind){
  const resend=new Resend(resendKey);
  const from=rentalEmailFrom();
  const replyTo=rentalReplyTo();
- const base=rentalSiteUrl(req);
+ const base=rentalBookingSiteUrl(booking,req);
  const accountUrl=booking.customer_user_id?base+"/min-side":"";
  const confirmed=kind==="confirmation";
  const title=confirmed?"Utleien er bekreftet":"Utleiebookingen er avbrutt";
@@ -218,7 +218,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
    const resend=new Resend(resendKey);
    const from=rentalEmailFrom();
    const replyTo=rentalReplyTo();
-   const base=rentalSiteUrl(req);
+   const base=rentalBookingSiteUrl(current,req);
    const accountUrl=current.customer_user_id?base+"/min-side":"";
    const fulfillment=current.customer?.fulfillment==="delivery"?"Levering":"Henting";
    const customerAddress=String(current.customer?.address||"").trim();
