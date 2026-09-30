@@ -402,13 +402,14 @@ create or replace function public.create_rental_booking_if_available(
 returns uuid
 language plpgsql
 security definer
-set search_path = public
+set search_path = pg_catalog, public
 as $$
 declare
   item_id uuid;
   item_quantity integer;
   item_status text;
-  used_count integer;
+  booked_count integer;
+  is_manually_blocked boolean;
   new_id uuid;
 begin
   item_id := (booking_record->>'rental_item_id')::uuid;
@@ -423,16 +424,27 @@ begin
     raise exception 'RENTAL_UNAVAILABLE';
   end if;
 
-  select
-    (select count(*) from public.rental_blocks
-      where rental_item_id=item_id and start_date <= buffered_end and end_date >= buffered_start)
-    +
-    (select count(*) from public.rental_bookings
-      where rental_item_id=item_id and status in ('new','confirmed','active')
-        and start_date <= buffered_end and end_date >= buffered_start)
-  into used_count;
+  select exists(
+    select 1
+    from public.rental_blocks
+    where rental_item_id=item_id
+      and start_date <= buffered_end
+      and end_date >= buffered_start
+  ) into is_manually_blocked;
 
-  if used_count >= greatest(1,item_quantity) then
+  if is_manually_blocked then
+    raise exception 'RENTAL_UNAVAILABLE';
+  end if;
+
+  select count(*)
+  into booked_count
+  from public.rental_bookings
+  where rental_item_id=item_id
+    and status in ('new','confirmed','active')
+    and start_date <= buffered_end
+    and end_date >= buffered_start;
+
+  if booked_count >= greatest(1,item_quantity) then
     raise exception 'RENTAL_UNAVAILABLE';
   end if;
 
