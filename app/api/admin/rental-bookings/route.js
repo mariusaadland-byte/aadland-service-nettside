@@ -175,8 +175,6 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
 
  const b=await req.json().catch(()=>({}));
  const allowed=["new","confirmed","active","returned","completed","cancelled"];
- const payment=["unpaid","partial","paid","refunded"];
- const deposit=["not_paid","held","released","partially_charged","charged"];
  if(!b.id)return NextResponse.json({error:"Booking mangler."},{status:400});
  if(b.startDate!==undefined&&!validDate(b.startDate))return NextResponse.json({error:"Ugyldig startdato."},{status:400});
  if(b.endDate!==undefined&&!validDate(b.endDate))return NextResponse.json({error:"Ugyldig sluttdato."},{status:400});
@@ -411,13 +409,8 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
   changes.status=b.status;
  }
 
- if(b.paymentStatus!==undefined){
-  if(!payment.includes(b.paymentStatus))return NextResponse.json({error:"Ugyldig betalingsstatus."},{status:400});
-  changes.payment_status=b.paymentStatus;
- }
- if(b.depositStatus!==undefined){
-  if(!deposit.includes(b.depositStatus))return NextResponse.json({error:"Ugyldig depositumstatus."},{status:400});
-  changes.deposit_status=b.depositStatus;
+ if(b.paymentStatus!==undefined||b.depositStatus!==undefined){
+  return NextResponse.json({error:"Betaling og depositum må registreres med de egne oppgjørshandlingene."},{status:400});
  }
  if(b.adminNote!==undefined){
   if(String(b.adminNote||"").length>5000)return NextResponse.json({error:"Internt notat kan være maks 5000 tegn."},{status:400});
