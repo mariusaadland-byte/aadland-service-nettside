@@ -52,6 +52,9 @@ export async function POST(req){
   vatRate:25,
   numberLabel:"Bookingnummer",
   itemsSectionLabel:"Leie",
+  brandName:"Aadland Utleie",
+  brandSiteUrl:"https://www.aadlandutleie.no",
+  brandEmail:"post@aadland-service.no",
   depositInfo:{
    amountOre:depositOre,
    statusLabel:"Holdes",
