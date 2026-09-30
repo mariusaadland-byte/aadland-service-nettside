@@ -523,6 +523,16 @@ export default function MinSide(){
      <span><small>Utlevering</small><b>{fulfillmentStatus[r.customer?.fulfillment]||"Ikke registrert"}</b></span>
      {Number(r.deposit_ore)>0&&<span><small>Depositum</small><b>{kr(r.deposit_ore)} · {depositStatus[r.deposit_status]||r.deposit_status||"Ikke registrert"}</b></span>}
     </div>
+    {(r.confirmation_sent_at||r.reminder_sent_at||r.cancellation_sent_at)&&<div className="customerPaymentConfirmation">
+     <b>Varsler</b>
+     {r.confirmation_sent_at&&<span>✓ Bookingbekreftelse sendt {dateTimeFull(r.confirmation_sent_at)}</span>}
+     {r.reminder_sent_at&&<span>✓ Påminnelse sendt {dateTimeFull(r.reminder_sent_at)}</span>}
+     {r.cancellation_sent_at&&<span>✓ Avbestillingsbekreftelse sendt {dateTimeFull(r.cancellation_sent_at)}</span>}
+    </div>}
+    {r.status==="active"&&<div className="customerPaymentConfirmation"><b>Utstyret er utlevert</b><span>Bookingen er registrert som aktiv.</span></div>}
+    {r.status==="returned"&&<div className="customerPaymentConfirmation"><b>✓ Utstyret er returnert</b><span>{r.payment_status==="paid"?"Leiebetalingen er registrert.":"Oppgjøret er ikke ferdig registrert ennå."}</span></div>}
+    {r.status==="completed"&&<div className="customerPaymentConfirmation"><b>✓ Utleien er ferdigbehandlet</b><span>Betaling og eventuelt depositum er avklart.</span></div>}
+    {r.status==="cancelled"&&<div className="customerPaymentConfirmation"><b>Bookingen er avbrutt</b><span>Ta kontakt dersom noe rundt betaling eller depositum ikke stemmer.</span></div>}
     {r.payment_status==="paid"&&r.receipt_sent_at&&<div className="customerPaymentConfirmation">
      <b>✓ Leiebetaling registrert</b>
      <span>Betalingsbekreftelse sendt {dateTimeFull(r.receipt_sent_at)}</span>
