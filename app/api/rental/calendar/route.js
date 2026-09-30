@@ -77,22 +77,21 @@ export async function GET(req){
   return NextResponse.json({error:"Tilgjengeligheten kunne ikke hentes."},{status:500});
  }
 
- const reservations=[
-  ...(blocks||[]).map(entry=>({
-   start:shiftDate(entry.start_date,-buffer),
-   end:shiftDate(entry.end_date,buffer)
-  })),
-  ...(bookings||[]).map(entry=>({
-   start:shiftDate(entry.start_date,-buffer),
-   end:shiftDate(entry.end_date,buffer)
-  }))
- ];
+ const blockPeriods=(blocks||[]).map(entry=>({
+  start:shiftDate(entry.start_date,-buffer),
+  end:shiftDate(entry.end_date,buffer)
+ }));
+ const bookingPeriods=(bookings||[]).map(entry=>({
+  start:shiftDate(entry.start_date,-buffer),
+  end:shiftDate(entry.end_date,buffer)
+ }));
 
  const quantity=Math.max(1,Number(item.quantity)||1);
  const unavailableDates=eachDate(bounds.start,bounds.end).filter(date=>{
   if(item.status!=="available")return true;
-  const used=reservations.filter(entry=>entry.start<=date&&entry.end>=date).length;
-  return used>=quantity;
+  if(blockPeriods.some(entry=>entry.start<=date&&entry.end>=date))return true;
+  const booked=bookingPeriods.filter(entry=>entry.start<=date&&entry.end>=date).length;
+  return booked>=quantity;
  });
 
  return NextResponse.json({
