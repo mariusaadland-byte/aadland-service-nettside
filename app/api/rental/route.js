@@ -108,8 +108,13 @@ export async function GET(req){
    console.error("RENTAL AVAILABILITY ERROR",blockError||bookingError);
    return NextResponse.json({error:"Tilgjengelighet kunne ikke kontrolleres."},{status:500});
   }
-  const used=(blocks?.length||0)+(bookings?.length||0);
-  out.push({...item,available:item.status==="available"&&used<Math.max(1,Number(item.quantity)||1),pricing:price(item,start,end)});
+  const manuallyBlocked=(blocks?.length||0)>0;
+  const booked=bookings?.length||0;
+  out.push({
+   ...item,
+   available:item.status==="available"&&!manuallyBlocked&&booked<Math.max(1,Number(item.quantity)||1),
+   pricing:price(item,start,end)
+  });
  }
 
  return NextResponse.json({items:out,categories,categorySetupRequired});
