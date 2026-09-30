@@ -533,9 +533,18 @@ export default function MinSide(){
     {r.status==="returned"&&<div className="customerPaymentConfirmation"><b>✓ Utstyret er returnert</b><span>{r.payment_status==="paid"?"Leiebetalingen er registrert.":"Oppgjøret er ikke ferdig registrert ennå."}</span></div>}
     {r.status==="completed"&&<div className="customerPaymentConfirmation"><b>✓ Utleien er ferdigbehandlet</b><span>Betaling og eventuelt depositum er avklart.</span></div>}
     {r.status==="cancelled"&&<div className="customerPaymentConfirmation"><b>Bookingen er avbrutt</b><span>Ta kontakt dersom noe rundt betaling eller depositum ikke stemmer.</span></div>}
-    {r.payment_status==="paid"&&r.receipt_sent_at&&<div className="customerPaymentConfirmation">
+    {["paid","refunded"].includes(r.payment_status)&&r.receipt_sent_at&&<div className="customerPaymentConfirmation">
      <b>✓ Leiebetaling registrert</b>
      <span>Betalingsbekreftelse sendt {dateTimeFull(r.receipt_sent_at)}</span>
+    </div>}
+    {Number(r.payment_refunded_ore)>0&&<div className="customerPaymentConfirmation">
+     <b>{Number(r.payment_refunded_ore)>=Number(r.payment_captured_ore||0)?"✓ Leiebetalingen er tilbakebetalt":"✓ Delvis tilbakebetaling registrert"}</b>
+     {Number(r.refund_last_ore)>0&&<span>Sist tilbakebetalt: {kr(r.refund_last_ore)}</span>}
+     <span>Totalt tilbakebetalt: {kr(r.payment_refunded_ore)}</span>
+     {Number(r.payment_captured_ore)>Number(r.payment_refunded_ore)&&<span>Gjenstående registrert betaling: {kr(Number(r.payment_captured_ore)-Number(r.payment_refunded_ore))}</span>}
+     {r.refund_reference&&<span>Referanse: {r.refund_reference}</span>}
+     {r.refund_note&&<span>Merknad: {r.refund_note}</span>}
+     {r.refund_notice_sent_at&&<span>Tilbakebetalingsbekreftelse sendt {dateTimeFull(r.refund_notice_sent_at)}</span>}
     </div>}
     {Number(r.deposit_ore)>0&&["held","released","partially_charged","charged"].includes(r.deposit_status)&&<div className="customerPaymentConfirmation">
      <b>{r.deposit_status==="released"?"✓ Depositum frigitt":r.deposit_status==="held"?"✓ Depositum mottatt":"Depositum oppgjort"}</b>
