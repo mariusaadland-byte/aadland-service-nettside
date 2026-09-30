@@ -31,6 +31,7 @@ export default function MinSide(){
  const [info,setInfo]=useState("");
  const [editingProfile,setEditingProfile]=useState(false);
  const [profileForm,setProfileForm]=useState({name:"",phone:"",address:""});
+ const [rentalContext,setRentalContext]=useState(false);
 
  async function load(){
   try{
@@ -48,6 +49,8 @@ export default function MinSide(){
  }
 
  useEffect(()=>{
+  const host=String(window.location.hostname||"").toLowerCase();
+  setRentalContext(host==="aadlandutleie.no"||host==="www.aadlandutleie.no");
   const params=new URLSearchParams(window.location.search);
   const verification=params.get("verification");
   if(verification==="success")setInfo("E-postadressen er bekreftet. Velkommen til Min side.");
@@ -181,10 +184,12 @@ export default function MinSide(){
  if(loading)return <main className="customerPage"><p>Laster …</p></main>;
 
  if(!data)return <main className="customerPage customerLoginPage">
-  <Link href="/">← Aadland Service</Link>
-  <div className="kicker customerTopKicker">MIN SIDE</div>
+  <Link href={rentalContext?"/utleie":"/"}>← {rentalContext?"Aadland Utleie":"Aadland Service"}</Link>
+  <div className="kicker customerTopKicker">{rentalContext?"AADLAND UTLEIE · MIN SIDE":"MIN SIDE"}</div>
   <h1>{mode==="login"?"Logg inn":"Opprett kundekonto"}</h1>
-  <p>Det er frivillig å ha konto. Med Min side kan du samle tilbud, oppdrag, kjøp og utleie på ett sted.</p>
+  <p>{rentalContext
+   ?"Det er frivillig å ha konto. Med Min side kan du følge utleiebookinger og administrere kontaktopplysningene dine. Kontoen er den samme som hos Aadland Service."
+   :"Det er frivillig å ha konto. Med Min side kan du samle tilbud, oppdrag, kjøp og utleie på ett sted."}</p>
   <form className="card customerLoginCard" onSubmit={submit}>
    {mode==="register"&&<>
     <div className="field"><label>Navn</label><input required maxLength={120} value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></div>
@@ -264,10 +269,10 @@ export default function MinSide(){
  ].filter(item=>item.date).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,6);
 
  return <main className="customerPage">
-  <Link href="/">← Aadland Service</Link>
+  <Link href={rentalContext?"/utleie":"/"}>← {rentalContext?"Aadland Utleie":"Aadland Service"}</Link>
   <header className="customerDashboardHeader">
    <div>
-    <div className="kicker">MIN SIDE</div>
+    <div className="kicker">{rentalContext?"AADLAND UTLEIE · MIN SIDE":"MIN SIDE"}</div>
     <h1>Hei, {data.customer.name||"kunde"}</h1>
     <p>{data.customer.email}</p>
    </div>
@@ -329,7 +334,7 @@ export default function MinSide(){
   <section id="foresporsler" className="customerDashboardSection">
    <div className="customerSectionHead">
     <div><div className="kicker">KONTAKT</div><h2>Forespørsler og befaring</h2></div>
-    <div className="customerSectionActions"><span>{enquiries.length}</span><a className="btn alt" href="/#befaring">Ny forespørsel</a></div>
+    <div className="customerSectionActions"><span>{enquiries.length}</span><a className="btn alt" href={rentalContext?"https://www.aadland-service.no/#befaring":"/#befaring"}>Ny forespørsel</a></div>
    </div>
    {!enquiries.length?<div className="card customerEmpty"><p>Ingen forespørsler knyttet til kontoen ennå.</p></div>:
    <div className="customerGrid">{enquiries.map(o=><article className="card customerHistoryCard" key={o.id}>
@@ -430,7 +435,7 @@ export default function MinSide(){
   </section>
 
   <section id="bestillinger" className="customerDashboardSection">
-   <div className="customerSectionHead"><div><div className="kicker">HANDEL</div><h2>Bestillinger</h2></div><div className="customerSectionActions"><span>{purchases.length}</span><Link className="btn alt" href="/produkter">Se produkter</Link></div></div>
+   <div className="customerSectionHead"><div><div className="kicker">HANDEL</div><h2>Bestillinger</h2></div><div className="customerSectionActions"><span>{purchases.length}</span><a className="btn alt" href={rentalContext?"https://www.aadland-service.no/produkter":"/produkter"}>Se produkter</a></div></div>
    {!purchases.length?<div className="card customerEmpty"><p>Ingen produktbestillinger knyttet til kontoen ennå.</p></div>:
    <div className="customerGrid">{purchases.map(o=><article className="card customerHistoryCard" key={o.id}>
     <div className="customerCardTop"><div><small>{o.order_number}</small><h3>Bestilling</h3><p className="customerHistoryDate">Bestilt {dateTime(o.created_at)}</p></div><span className={"customerStatus customerStatus-"+o.status}>{orderStatus[o.status]||o.status}</span></div>
@@ -518,9 +523,28 @@ export default function MinSide(){
      <span><small>Utlevering</small><b>{fulfillmentStatus[r.customer?.fulfillment]||"Ikke registrert"}</b></span>
      {Number(r.deposit_ore)>0&&<span><small>Depositum</small><b>{kr(r.deposit_ore)} · {depositStatus[r.deposit_status]||r.deposit_status||"Ikke registrert"}</b></span>}
     </div>
-    {r.payment_status==="paid"&&r.receipt_sent_at&&<div className="customerPaymentConfirmation">
+    {(r.confirmation_sent_at||r.reminder_sent_at||r.cancellation_sent_at)&&<div className="customerPaymentConfirmation">
+     <b>Varsler</b>
+     {r.confirmation_sent_at&&<span>✓ Bookingbekreftelse sendt {dateTimeFull(r.confirmation_sent_at)}</span>}
+     {r.reminder_sent_at&&<span>✓ Påminnelse sendt {dateTimeFull(r.reminder_sent_at)}</span>}
+     {r.cancellation_sent_at&&<span>✓ Avbestillingsbekreftelse sendt {dateTimeFull(r.cancellation_sent_at)}</span>}
+    </div>}
+    {r.status==="active"&&<div className="customerPaymentConfirmation"><b>Utstyret er utlevert</b><span>Bookingen er registrert som aktiv.</span></div>}
+    {r.status==="returned"&&<div className="customerPaymentConfirmation"><b>✓ Utstyret er returnert</b><span>{r.payment_status==="paid"?"Leiebetalingen er registrert.":"Oppgjøret er ikke ferdig registrert ennå."}</span></div>}
+    {r.status==="completed"&&<div className="customerPaymentConfirmation"><b>✓ Utleien er ferdigbehandlet</b><span>Betaling og eventuelt depositum er avklart.</span></div>}
+    {r.status==="cancelled"&&<div className="customerPaymentConfirmation"><b>Bookingen er avbrutt</b><span>Ta kontakt dersom noe rundt betaling eller depositum ikke stemmer.</span></div>}
+    {["paid","refunded"].includes(r.payment_status)&&r.receipt_sent_at&&<div className="customerPaymentConfirmation">
      <b>✓ Leiebetaling registrert</b>
      <span>Betalingsbekreftelse sendt {dateTimeFull(r.receipt_sent_at)}</span>
+    </div>}
+    {Number(r.payment_refunded_ore)>0&&<div className="customerPaymentConfirmation">
+     <b>{Number(r.payment_refunded_ore)>=Number(r.payment_captured_ore||0)?"✓ Leiebetalingen er tilbakebetalt":"✓ Delvis tilbakebetaling registrert"}</b>
+     {Number(r.refund_last_ore)>0&&<span>Sist tilbakebetalt: {kr(r.refund_last_ore)}</span>}
+     <span>Totalt tilbakebetalt: {kr(r.payment_refunded_ore)}</span>
+     {Number(r.payment_captured_ore)>Number(r.payment_refunded_ore)&&<span>Gjenstående registrert betaling: {kr(Number(r.payment_captured_ore)-Number(r.payment_refunded_ore))}</span>}
+     {r.refund_reference&&<span>Referanse: {r.refund_reference}</span>}
+     {r.refund_note&&<span>Merknad: {r.refund_note}</span>}
+     {r.refund_notice_sent_at&&<span>Tilbakebetalingsbekreftelse sendt {dateTimeFull(r.refund_notice_sent_at)}</span>}
     </div>}
     {Number(r.deposit_ore)>0&&["held","released","partially_charged","charged"].includes(r.deposit_status)&&<div className="customerPaymentConfirmation">
      <b>{r.deposit_status==="released"?"✓ Depositum frigitt":r.deposit_status==="held"?"✓ Depositum mottatt":"Depositum oppgjort"}</b>

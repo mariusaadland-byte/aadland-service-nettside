@@ -668,6 +668,26 @@ html{scroll-behavior:smooth}
 .catalogNav{height:100%;display:flex;align-items:center;gap:28px}
 .catalogBrand{display:flex;align-items:center;flex:none}
 .catalogBrand img{display:block;width:auto;max-width:188px;max-height:58px;object-fit:contain}
+.catalogRentalBrand{gap:12px}
+.catalogRentalBrand>span{
+ display:inline-flex;
+ align-items:center;
+ min-height:25px;
+ padding:0 8px;
+ border-left:1px solid rgba(215,167,78,.55);
+ color:#d7a74e;
+ font-size:10px;
+ font-weight:900;
+ letter-spacing:.18em;
+}
+.catalogFooterRentalLabel{
+ display:block;
+ margin-top:11px;
+ color:#d7a74e;
+ font-size:10px;
+ letter-spacing:.18em;
+}
+
 .catalogLinks{display:flex;align-items:center;gap:24px;margin-left:auto}
 .catalogLinks a{font-size:12px;font-weight:650;color:rgba(255,255,255,.82);transition:color .18s ease}
 .catalogLinks a:hover{color:#d7a74e}

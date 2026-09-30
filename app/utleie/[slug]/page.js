@@ -282,14 +282,14 @@ export default function RentalDetailPage(){
   }
  }
 
- if(loading)return <main className="catalogPage rentalPage"><CatalogHeader/><div className="catalogWrap rentalDetailState">Laster utstyr …</div><CatalogFooter/></main>;
- if(!item)return <main className="catalogPage rentalPage"><CatalogHeader/><div className="catalogWrap rentalDetailState"><Link href="/utleie">← Tilbake til utleie</Link><h1>Utstyret ble ikke funnet</h1>{error&&<p>{error}</p>}</div><CatalogFooter/></main>;
+ if(loading)return <main className="catalogPage rentalPage"><CatalogHeader rental/><div className="catalogWrap rentalDetailState">Laster utstyr …</div><CatalogFooter rental/></main>;
+ if(!item)return <main className="catalogPage rentalPage"><CatalogHeader rental/><div className="catalogWrap rentalDetailState"><Link href="/utleie">← Tilbake til utleie</Link><h1>Utstyret ble ikke funnet</h1>{error&&<p>{error}</p>}</div><CatalogFooter rental/></main>;
 
  const images=item.imageUrls||[];
  const canFulfill=item.pickupAvailable||item.deliveryAvailable;
 
  return <main className="catalogPage rentalPage">
-  <CatalogHeader/>
+  <CatalogHeader rental/>
 
   <section className="rentalDetailHero">
    <div className="catalogWrap">
@@ -356,6 +356,6 @@ export default function RentalDetailPage(){
    </div>
   </section>}
 
-  <CatalogFooter/>
+  <CatalogFooter rental/>
  </main>;
 }

@@ -27,12 +27,14 @@ Utleie-e-post bruker egne innstillinger:
 - `RENTAL_REPLY_TO=post@aadland-service.no`
 - `RENTAL_SITE_URL=https://www.aadlandutleie.no`
 
-I Production faller avsenderen tilbake til `noreplay@aadlandutleie.no` dersom `RENTAL_EMAIL_FROM` ikke er satt. I Preview brukes eksisterende ordreavsender som fallback inntil utleiedomenet er verifisert i Resend; sett `RENTAL_EMAIL_FROM` eksplisitt i Preview når domenet er klart for test.
+Hvis `RENTAL_EMAIL_FROM` ikke er satt, bruker systemet `Aadland Utleie <noreplay@aadlandutleie.no>`. Det verifiserte Aadland Utleie-domenet brukes også i Preview, slik at testmailer følger samme avsenderprofil som produksjon.
 
-Før produksjonsaktivering må `aadlandutleie.no` være:
-1. lagt til på samme Vercel-prosjekt som Aadland Service,
-2. pekt til Vercel via DNS hos domeneleverandøren,
-3. verifisert som sending domain i Resend.
+Status per 30. september 2026:
+1. `aadlandutleie.no` og `www.aadlandutleie.no` er lagt til på samme Vercel-prosjekt som Aadland Service,
+2. DNS er konfigurert og Vercel viser begge som `Valid Configuration`,
+3. `aadlandutleie.no` er verifisert som sending domain i Resend,
+4. bookingene lagrer hvilket nettsted kunden brukte, slik at senere Min side-lenker beholder riktig domene,
+5. utleiedomenet får eget sitemap og robots-oppsett, mens Aadland Service sitt sitemap ikke annonserer dupliserte utleiekanoniske URL-er.
 
 ## Database
 SQL-filene i `supabase/` beskriver databasegrunnlaget og senere utvidelser. De må kjøres kontrollert i riktig rekkefølge mot Supabase før funksjoner som bruker de nye tabellene/feltene tas i produksjon.

@@ -4,7 +4,8 @@ import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
 import {buildReceiptEmail} from "../../../../lib/receiptEmail";
 import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
-import {rentalEmailFrom,rentalReplyTo,rentalSiteUrl} from "../../../../lib/rentalEmailConfig";
+import {rentalBookingSiteUrl,rentalEmailFrom,rentalReplyTo} from "../../../../lib/rentalEmailConfig";
+import {sendManualRentalRefundNotice} from "../../../../lib/rentalRefundNotice";
 
 async function canView(){
  return Boolean(await getAdminUser())&&Boolean(await hasPermission("canViewOrders"));
@@ -39,6 +40,12 @@ const map=b=>({
  paymentStatus:b.payment_status||"unpaid",
  paymentReference:b.payment_reference||"",
  paymentCapturedOre:Number(b.payment_captured_ore)||0,
+ paymentRefundedOre:Number(b.payment_refunded_ore)||0,
+ paymentRefundedAt:b.payment_refunded_at||null,
+ refundLastOre:Number(b.refund_last_ore)||0,
+ refundReference:b.refund_reference||"",
+ refundNote:b.refund_note||"",
+ refundNoticeSentAt:b.refund_notice_sent_at||null,
  receiptSentAt:b.receipt_sent_at||null,
  depositStatus:b.deposit_status||"not_paid",
  depositReference:b.deposit_reference||"",
@@ -89,8 +96,8 @@ async function checkAvailability(s,booking){
    .gte("end_date",from)
  ]);
  if(conflictError||blockError)return {error:"Tilgjengelighet kunne ikke kontrolleres.",status:500};
- if((conflicts?.length||0)+(blocks?.length||0)>=Math.max(1,Number(item.quantity)||1)){
-  return {error:"Kan ikke bekrefte: utstyret er opptatt i perioden.",status:409};
+ if((blocks?.length||0)>0||(conflicts?.length||0)>=Math.max(1,Number(item.quantity)||1)){
+  return {error:"Kan ikke bekrefte: utstyret er opptatt eller manuelt blokkert i perioden.",status:409};
  }
  return {item};
 }
@@ -108,7 +115,7 @@ async function sendCustomerMessage(req,s,booking,item,kind){
  const resend=new Resend(resendKey);
  const from=rentalEmailFrom();
  const replyTo=rentalReplyTo();
- const base=rentalSiteUrl(req);
+ const base=rentalBookingSiteUrl(booking,req);
  const accountUrl=booking.customer_user_id?base+"/min-side":"";
  const confirmed=kind==="confirmation";
  const title=confirmed?"Utleien er bekreftet":"Utleiebookingen er avbrutt";
@@ -155,7 +162,7 @@ export async function GET(){
  const [{data,error},{error:paymentProbeError}]=await Promise.all([
   s.from("rental_bookings").select("*,rental_items(name)").order("start_date",{ascending:true}),
   s.from("rental_bookings")
-   .select("id,payment_reference,payment_captured_ore,receipt_sent_at,deposit_reference,deposit_held_ore,deposit_received_at,deposit_released_at,deposit_charged_ore")
+   .select("id,payment_reference,payment_captured_ore,payment_refunded_ore,payment_refunded_at,refund_last_ore,refund_reference,refund_note,refund_notice_sent_at,receipt_sent_at,deposit_reference,deposit_held_ore,deposit_received_at,deposit_released_at,deposit_charged_ore")
    .limit(1)
  ]);
  if(error){
@@ -175,8 +182,6 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
 
  const b=await req.json().catch(()=>({}));
  const allowed=["new","confirmed","active","returned","completed","cancelled"];
- const payment=["unpaid","partial","paid","refunded"];
- const deposit=["not_paid","held","released","partially_charged","charged"];
  if(!b.id)return NextResponse.json({error:"Booking mangler."},{status:400});
  if(b.startDate!==undefined&&!validDate(b.startDate))return NextResponse.json({error:"Ugyldig startdato."},{status:400});
  if(b.endDate!==undefined&&!validDate(b.endDate))return NextResponse.json({error:"Ugyldig sluttdato."},{status:400});
@@ -192,7 +197,67 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
  const action=String(b.action||"");
  let item=current.rental_items||null;
 
+ if(action==="confirm-and-send"&&!["new","confirmed"].includes(current.status)){
+  return NextResponse.json({error:"Bare nye eller allerede bekreftede bookinger kan bekreftes/sendes på nytt."},{status:409});
+ }
+ if(action==="cancel-and-send"&&!["new","confirmed"].includes(current.status)){
+  return NextResponse.json({error:"Bare nye eller bekreftede bookinger kan avbrytes med kundevarsel."},{status:409});
+ }
+
+ if(action==="record-manual-refund-and-notify"||action==="resend-manual-refund-notice"){
+  const resendOnly=action==="resend-manual-refund-notice";
+  let refundResult=null;
+  let updated=current;
+
+  if(!resendOnly){
+   const amount=Math.round(Number(b.refundOre)||0);
+   if(amount<=0)return NextResponse.json({error:"Tilbakebetalingsbeløpet må være større enn 0."},{status:400});
+   if(String(b.refundReference||"").length>120)return NextResponse.json({error:"Tilbakebetalingsreferansen kan være maks 120 tegn."},{status:400});
+   if(String(b.refundNote||"").length>1000)return NextResponse.json({error:"Merknaden kan være maks 1000 tegn."},{status:400});
+
+   const {data,error:refundError}=await s.rpc("record_manual_rental_refund",{
+    target_booking_id:b.id,
+    refund_ore:amount,
+    refund_reference_value:String(b.refundReference||"").trim()||null,
+    refund_note_value:String(b.refundNote||"").trim()||null
+   });
+   if(refundError){
+    console.error("MANUAL RENTAL REFUND ERROR",refundError);
+    const message=String(refundError.message||"");
+    if(message.includes("NO_CAPTURED_PAYMENT"))return NextResponse.json({error:"Det er ikke registrert noen leiebetaling å tilbakebetale."},{status:409});
+    if(message.includes("PAYMENT_ALREADY_FULLY_REFUNDED"))return NextResponse.json({error:"Hele den registrerte leiebetalingen er allerede tilbakebetalt."},{status:409});
+    if(message.includes("REFUND_EXCEEDS_CAPTURED_PAYMENT"))return NextResponse.json({error:"Tilbakebetalingen kan ikke være større enn gjenstående registrert betaling."},{status:409});
+    return NextResponse.json({error:"Tilbakebetalingen kunne ikke registreres."},{status:500});
+   }
+   refundResult=data||null;
+   const {data:fresh,error:freshError}=await s.from("rental_bookings").select("*,rental_items(name)").eq("id",b.id).single();
+   if(freshError||!fresh)return NextResponse.json({error:"Tilbakebetalingen er registrert, men bookingen kunne ikke lastes på nytt.",statusSaved:true},{status:500});
+   updated=fresh;
+  }else if((Number(current.refund_last_ore)||0)<=0||(Number(current.payment_refunded_ore)||0)<=0){
+   return NextResponse.json({error:"Det finnes ingen registrert tilbakebetaling å sende bekreftelse for."},{status:409});
+  }
+
+  try{
+   const notice=await sendManualRentalRefundNotice({s,booking:updated,req});
+   return NextResponse.json({
+    ok:true,...notice,refundResult,
+    paymentStatus:updated.payment_status||"paid",
+    refundedTotalOre:Number(updated.payment_refunded_ore)||0
+   });
+  }catch(error){
+   console.error("MANUAL RENTAL REFUND NOTICE ERROR",error);
+   const message=String(error?.message||"");
+   let customerError=resendOnly?"Tilbakebetalingsbekreftelsen kunne ikke sendes.":"Tilbakebetalingen er registrert, men bekreftelsen kunne ikke sendes.";
+   if(message==="RENTAL_REFUND_NOTICE_EMAIL_MISSING")customerError=resendOnly?"Kunden mangler e-postadresse.":"Tilbakebetalingen er registrert, men kunden mangler e-postadresse.";
+   if(message==="RENTAL_REFUND_NOTICE_EMAIL_NOT_CONFIGURED")customerError=resendOnly?"E-post er ikke konfigurert.":"Tilbakebetalingen er registrert, men e-post er ikke konfigurert.";
+   return NextResponse.json({error:customerError,statusSaved:!resendOnly,refundResult},{status:500});
+  }
+ }
+
  if(action==="record-paid-and-send-receipt"){
+  if((Number(current.payment_refunded_ore)||0)>0){
+   return NextResponse.json({error:"Denne leiebetalingen har allerede en registrert tilbakebetaling. Bruk tilbakebetalingsdelen i stedet."},{status:409});
+  }
   const email=String(current.customer?.email||"").trim().toLowerCase();
   if(!email)return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
   const total=Math.max(0,Number(current.total_ore)||0);
@@ -218,7 +283,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
    const resend=new Resend(resendKey);
    const from=rentalEmailFrom();
    const replyTo=rentalReplyTo();
-   const base=rentalSiteUrl(req);
+   const base=rentalBookingSiteUrl(current,req);
    const accountUrl=current.customer_user_id?base+"/min-side":"";
    const fulfillment=current.customer?.fulfillment==="delivery"?"Levering":"Henting";
    const customerAddress=String(current.customer?.address||"").trim();
@@ -248,7 +313,10 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     vatRate:25,
     numberLabel:"Bookingnummer",
     itemsSectionLabel:"Leie",
-    depositInfo:Number(current.deposit_ore)>0?{
+    brandName:"Aadland Utleie",
+  brandSiteUrl:"https://www.aadlandutleie.no",
+  brandEmail:"post@aadland-service.no",
+  depositInfo:Number(current.deposit_ore)>0?{
      amountOre:Number(current.deposit_ore)||0,
      statusLabel:current.deposit_status==="held"?"Holdes":current.deposit_status==="released"?"Frigitt":current.deposit_status==="partially_charged"?"Delvis brukt":current.deposit_status==="charged"?"Brukt":"Ikke registrert",
      reference:current.deposit_reference||"",
@@ -280,6 +348,9 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
  if(action==="record-deposit-held"){
   const amount=Math.max(0,Number(current.deposit_ore)||0);
   if(amount<=0)return NextResponse.json({error:"Denne bookingen har ikke depositum."},{status:400});
+  if(current.deposit_status!=="not_paid"){
+   return NextResponse.json({error:"Depositumet er allerede registrert og kan ikke registreres på nytt."},{status:409});
+  }
   const reference=String(b.depositReference??current.deposit_reference??"").trim()||"Manuelt registrert";
   const now=new Date().toISOString();
   const {error}=await s.from("rental_bookings").update({
@@ -300,12 +371,17 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
  }
 
  if(action==="release-deposit"){
-  if(Number(current.deposit_ore||0)<=0)return NextResponse.json({error:"Denne bookingen har ikke depositum."},{status:400});
+  const maximum=Math.max(0,Number(current.deposit_ore)||0);
+  if(maximum<=0)return NextResponse.json({error:"Denne bookingen har ikke depositum."},{status:400});
+  if(!["held","partially_charged"].includes(current.deposit_status)){
+   return NextResponse.json({error:"Depositumet må være registrert som mottatt før det kan frigis."},{status:409});
+  }
+  const charged=Math.max(0,Math.min(maximum,Number(current.deposit_charged_ore)||0));
+  const status=charged>0?"partially_charged":"released";
   const now=new Date().toISOString();
   const {error}=await s.from("rental_bookings").update({
-   deposit_status:"released",
+   deposit_status:status,
    deposit_released_at:now,
-   deposit_charged_ore:0,
    updated_at:now
   }).eq("id",b.id);
   if(error){
@@ -313,19 +389,23 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
    console.error("RENTAL DEPOSIT RELEASE",error);
    return NextResponse.json({error:"Depositumet kunne ikke frigis."},{status:500});
   }
-  return NextResponse.json({ok:true,depositStatus:"released"});
+  return NextResponse.json({ok:true,depositStatus:status,depositChargedOre:charged,depositReleasedAt:now});
  }
 
  if(action==="record-deposit-charge"){
   const maximum=Math.max(0,Number(current.deposit_ore)||0);
   const amount=Math.max(0,Math.round(Number(b.depositChargedOre)||0));
   if(maximum<=0)return NextResponse.json({error:"Denne bookingen har ikke depositum."},{status:400});
+  if(!["held","partially_charged","charged"].includes(current.deposit_status)){
+   return NextResponse.json({error:"Registrer depositumet som mottatt/holdt før et beløp brukes."},{status:409});
+  }
   if(amount<=0||amount>maximum)return NextResponse.json({error:"Beløpet som brukes av depositumet må være større enn 0 og ikke høyere enn depositumet."},{status:400});
   const status=amount>=maximum?"charged":"partially_charged";
   const now=new Date().toISOString();
   const {error}=await s.from("rental_bookings").update({
    deposit_status:status,
    deposit_charged_ore:amount,
+   deposit_released_at:status==="charged"?now:null,
    updated_at:now
   }).eq("id",b.id);
   if(error){
@@ -359,16 +439,41 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
   changes.status="cancelled";
  }else if(b.status!==undefined){
   if(!allowed.includes(b.status))return NextResponse.json({error:"Ugyldig status."},{status:400});
+  const directTransitions={
+   new:[],
+   confirmed:["active"],
+   active:["returned"],
+   returned:["completed"],
+   completed:[],
+   cancelled:[]
+  };
+  if(b.status!==current.status&&!directTransitions[current.status]?.includes(b.status)){
+   return NextResponse.json({
+    error:current.status==="new"
+     ?"Bruk «Bekreft og send e-post» eller «Avbryt og varsle kunde» på nye bookinger."
+     :"Status kan bare flyttes ett steg videre i utleieflyten."
+   },{status:409});
+  }
+  if(b.status==="completed"&&current.status!=="completed"){
+   const total=Math.max(0,Number(current.total_ore)||0);
+   const captured=Math.max(0,Number(current.payment_captured_ore)||0);
+   if(current.payment_status!=="paid"||captured<total){
+    return NextResponse.json({error:"Leien må være registrert fullt betalt før bookingen kan settes som ferdig."},{status:409});
+   }
+   if(Number(current.deposit_ore||0)>0){
+    const depositSettled=current.deposit_status==="released"
+     ||current.deposit_status==="charged"
+     ||(current.deposit_status==="partially_charged"&&Boolean(current.deposit_released_at));
+    if(!depositSettled){
+     return NextResponse.json({error:"Depositumet må være frigitt eller ferdig oppgjort før bookingen kan settes som ferdig."},{status:409});
+    }
+   }
+  }
   changes.status=b.status;
  }
 
- if(b.paymentStatus!==undefined){
-  if(!payment.includes(b.paymentStatus))return NextResponse.json({error:"Ugyldig betalingsstatus."},{status:400});
-  changes.payment_status=b.paymentStatus;
- }
- if(b.depositStatus!==undefined){
-  if(!deposit.includes(b.depositStatus))return NextResponse.json({error:"Ugyldig depositumstatus."},{status:400});
-  changes.deposit_status=b.depositStatus;
+ if(b.paymentStatus!==undefined||b.depositStatus!==undefined){
+  return NextResponse.json({error:"Betaling og depositum må registreres med de egne oppgjørshandlingene."},{status:400});
  }
  if(b.adminNote!==undefined){
   if(String(b.adminNote||"").length>5000)return NextResponse.json({error:"Internt notat kan være maks 5000 tegn."},{status:400});
