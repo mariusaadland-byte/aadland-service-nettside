@@ -2,7 +2,7 @@ import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
-async function allowed(){return (await getAdminUser())&&(await hasPermission("canManageProducts"))}
+async function allowed(){return (await getAdminUser())&&((await hasPermission("canManageProducts"))||(await hasPermission("canViewOrders")))}
 const map=r=>({id:r.id,projectId:r.project_id||"",orderId:r.order_id||"",name:r.name||"Ny tegning",customer:r.customer||"",address:r.address||"",notes:r.notes||"",drawingData:r.drawing_data||{},createdAt:r.created_at,updatedAt:r.updated_at});
 const vals=b=>({project_id:b.projectId||null,order_id:b.orderId||null,name:String(b.name||"Ny tegning").trim(),customer:String(b.customer||"").trim(),address:String(b.address||"").trim(),notes:String(b.notes||"").trim(),drawing_data:b.drawingData&&typeof b.drawingData==="object"?b.drawingData:{},updated_at:new Date().toISOString()});
 const missing=e=>e?.code==="42P01";
