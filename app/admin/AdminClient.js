@@ -4197,6 +4197,17 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
  const statuses={new:"Ny",confirmed:"Bekreftet",active:"Utlevert",returned:"Returnert",completed:"Ferdig",cancelled:"Avbrutt"};
  const paymentLabels={unpaid:"Ikke betalt",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert"};
  const depositLabels={not_paid:"Ikke mottatt",held:"Holdes",released:"Frigitt",partially_charged:"Delvis brukt",charged:"Brukt"};
+ const statusChoices=status=>{
+  const next={
+   new:[],
+   confirmed:["active"],
+   active:["returned"],
+   returned:["completed"],
+   completed:[],
+   cancelled:[]
+  };
+  return [status,...(next[status]||[])];
+ };
  const [savingId,setSavingId]=useState("");
  const [message,setMessage]=useState("");
  const [migrationCopied,setMigrationCopied]=useState(false);
@@ -4315,7 +4326,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
     {b.cancellationSentAt&&<span>✓ Avbestilling sendt {new Date(b.cancellationSentAt).toLocaleString("nb-NO")}</span>}
    </div>}
 
-   <div className="field"><label>Status</label><select disabled={!canUpdate||savingId===b.id} value={b.status} onChange={e=>patch(b.id,{status:e.target.value})}>{Object.entries(statuses).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></div>
+   <div className="field"><label>Status</label><select disabled={!canUpdate||savingId===b.id||statusChoices(b.status).length===1} value={b.status} onChange={e=>patch(b.id,{status:e.target.value})}>{statusChoices(b.status).map(value=><option key={value} value={value}>{statuses[value]||value}</option>)}</select>{b.status==="new"&&<small className="muted">Bekreft eller avbryt bookingen med knappene nederst, slik at kunden alltid varsles.</small>}</div>
 
    <section className="orderPaymentPanel rentalPaymentPanel">
     <h4>Leiebetaling</h4>
@@ -4353,8 +4364,8 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
    <div className="field"><label>Internt notat</label><textarea defaultValue={b.adminNote} id={"rental-note-"+b.id}/></div>
    {canUpdate&&<div className="rentalBookingActions">
     <button className="btn alt" type="button" disabled={savingId===b.id} onClick={()=>patch(b.id,{adminNote:document.getElementById("rental-note-"+b.id).value})}>{savingId===b.id?"Lagrer …":"Lagre notat"}</button>
-    {b.status!=="cancelled"&&b.status!=="completed"&&<button className="btn" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>notify(b,"confirm-and-send")}>{savingId===b.id?"Sender …":b.confirmationSentAt?"Send bekreftelse på nytt":"Bekreft og send e-post"}</button>}
-    {b.status!=="cancelled"&&<button className="btn alt rentalCancelButton" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>notify(b,"cancel-and-send")}>{savingId===b.id?"Sender …":"Avbryt og varsle kunde"}</button>}
+    {["new","confirmed"].includes(b.status)&&<button className="btn" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>notify(b,"confirm-and-send")}>{savingId===b.id?"Sender …":b.status==="confirmed"?"Send bekreftelse på nytt":"Bekreft og send e-post"}</button>}
+    {["new","confirmed"].includes(b.status)&&<button className="btn alt rentalCancelButton" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>notify(b,"cancel-and-send")}>{savingId===b.id?"Sender …":"Avbryt og varsle kunde"}</button>}
    </div>}
   </article>)}</div>}
  </>;
