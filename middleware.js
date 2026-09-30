@@ -7,10 +7,20 @@ export function middleware(req){
  const host=String(req.headers.get("host")||"").split(":")[0].toLowerCase();
  const pathname=req.nextUrl.pathname;
 
- if((req.method==="GET"||req.method==="HEAD")&&rentalHosts.has(host)&&pathname==="/"){
+ if((req.method==="GET"||req.method==="HEAD")&&rentalHosts.has(host)){
   const url=req.nextUrl.clone();
-  url.pathname="/utleie";
-  return NextResponse.rewrite(url);
+  if(pathname==="/"){
+   url.pathname="/utleie";
+   return NextResponse.rewrite(url);
+  }
+  if(pathname==="/sitemap.xml"){
+   url.pathname="/rental-sitemap.xml";
+   return NextResponse.rewrite(url);
+  }
+  if(pathname==="/robots.txt"){
+   url.pathname="/rental-robots.txt";
+   return NextResponse.rewrite(url);
+  }
  }
 
  if(!mutatingMethods.has(req.method))return NextResponse.next();
@@ -41,5 +51,5 @@ export function middleware(req){
 }
 
 export const config={
- matcher:["/","/api/admin/:path*"]
+ matcher:["/","/sitemap.xml","/robots.txt","/api/admin/:path*"]
 };
