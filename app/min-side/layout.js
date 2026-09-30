@@ -1,1 +1,1 @@
-export const metadata={title:"Min side",description:"Felles kundekonto for Aadland Service og Aadland Utleie.",robots:{index:false,follow:false}};export default function CustomerLayout({children}){return children}
+export const metadata={title:{absolute:"Min side | Aadland Service og Aadland Utleie"},description:"Felles kundekonto for Aadland Service og Aadland Utleie.",robots:{index:false,follow:false}};export default function CustomerLayout({children}){return children}
