@@ -8,11 +8,14 @@ export default function NyttPassord(){
  const [password,setPassword]=useState("");
  const [confirm,setConfirm]=useState("");
  const [message,setMessage]=useState("");
+ const [rentalContext,setRentalContext]=useState(false);
  const [error,setError]=useState("");
  const [busy,setBusy]=useState(false);
  const [ready,setReady]=useState(false);
 
  useEffect(()=>{
+  const host=String(window.location.hostname||"").toLowerCase();
+  setRentalContext(host==="aadlandutleie.no"||host==="www.aadlandutleie.no");
   const fragment=new URLSearchParams(window.location.hash.replace(/^#/,""));
   const value=fragment.get("token")||new URLSearchParams(window.location.search).get("token")||"";
   setToken(value);
@@ -55,9 +58,9 @@ export default function NyttPassord(){
 
  return <main className="customerPage customerLoginPage">
   <Link href="/min-side">← Min side</Link>
-  <div className="kicker customerTopKicker">MIN SIDE</div>
+  <div className="kicker customerTopKicker">{rentalContext?"AADLAND UTLEIE · MIN SIDE":"MIN SIDE"}</div>
   <h1>Nytt passord</h1>
-  <p>Velg et nytt passord til kundekontoen din.</p>
+  <p>Velg et nytt passord til kundekontoen din hos {rentalContext?"Aadland Utleie":"Aadland Service"}.</p>
 
   <form className="card customerLoginCard" onSubmit={go}>
    {!ready&&<p>Laster lenken …</p>}
