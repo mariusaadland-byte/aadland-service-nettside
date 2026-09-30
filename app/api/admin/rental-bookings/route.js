@@ -192,6 +192,13 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
  const action=String(b.action||"");
  let item=current.rental_items||null;
 
+ if(action==="confirm-and-send"&&!["new","confirmed"].includes(current.status)){
+  return NextResponse.json({error:"Bare nye eller allerede bekreftede bookinger kan bekreftes/sendes på nytt."},{status:409});
+ }
+ if(action==="cancel-and-send"&&!["new","confirmed"].includes(current.status)){
+  return NextResponse.json({error:"Bare nye eller bekreftede bookinger kan avbrytes med kundevarsel."},{status:409});
+ }
+
  if(action==="record-paid-and-send-receipt"){
   const email=String(current.customer?.email||"").trim().toLowerCase();
   if(!email)return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
@@ -359,6 +366,21 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
   changes.status="cancelled";
  }else if(b.status!==undefined){
   if(!allowed.includes(b.status))return NextResponse.json({error:"Ugyldig status."},{status:400});
+  const directTransitions={
+   new:[],
+   confirmed:["active"],
+   active:["returned"],
+   returned:["completed"],
+   completed:[],
+   cancelled:[]
+  };
+  if(b.status!==current.status&&!directTransitions[current.status]?.includes(b.status)){
+   return NextResponse.json({
+    error:current.status==="new"
+     ?"Bruk «Bekreft og send e-post» eller «Avbryt og varsle kunde» på nye bookinger."
+     :"Status kan bare flyttes ett steg videre i utleieflyten."
+   },{status:409});
+  }
   changes.status=b.status;
  }
 
