@@ -6,7 +6,7 @@ import {getCustomerUserId} from "../../../lib/customer-auth";
 import {db,fromDbProduct} from "../../../lib/supabase";
 import {productPrice} from "../../../lib/catalog";
 import {buildOrderConfirmationEmail} from "../../../lib/orderConfirmationEmail";
-const SALES_TERMS_VERSION="2026-09";
+const SALES_TERMS_VERSION="2026-10";
 function num(){return "AS-"+Date.now().toString().slice(-8)+"-"+crypto.randomBytes(2).toString("hex").toUpperCase()}
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;
