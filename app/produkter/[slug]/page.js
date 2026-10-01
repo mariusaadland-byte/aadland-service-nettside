@@ -583,7 +583,7 @@ export default function ProductPage() {
                 </select>
               </div>
 
-              <label style={{display:"flex",gap:8,alignItems:"flex-start",margin:"14px 0"}}><input type="checkbox" required checked={acceptedTerms} onChange={e=>setAcceptedTerms(e.target.checked)}/><span>Jeg godtar <a href="/vilkar/salg" target="_blank" rel="noreferrer">salgsbetingelsene</a>.</span></label>
+              <label style={{display:"flex",gap:8,alignItems:"flex-start",margin:"14px 0"}}><input type="checkbox" required checked={acceptedTerms} onChange={e=>setAcceptedTerms(e.target.checked)}/><span>Jeg har lest og godtar <a href="/vilkar/salg" target="_blank" rel="noreferrer">salgsbetingelsene</a>, inkludert informasjon om angrerett, retur, reklamasjon og konfliktløsning.</span></label>
 
               {error && <p className="notice">{error}</p>}
 
