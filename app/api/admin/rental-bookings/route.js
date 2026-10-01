@@ -6,6 +6,7 @@ import {buildReceiptEmail} from "../../../../lib/receiptEmail";
 import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
 import {rentalBookingSiteUrl,rentalEmailFrom,rentalReplyTo} from "../../../../lib/rentalEmailConfig";
 import {sendManualRentalRefundNotice} from "../../../../lib/rentalRefundNotice";
+import {RENTAL_CHANGE_DEADLINE_HOURS} from "../../../../lib/companyInfo";
 
 async function canView(){
  return Boolean(await getAdminUser())&&Boolean(await hasPermission("canViewOrders"));
@@ -141,7 +142,7 @@ ${confirmed&&Number(booking.deposit_ore)>0?`<div style="display:flex;justify-con
 ${confirmed&&address?`<div style="margin-top:12px;color:#8e887f;font-size:11px">ADRESSE</div><div style="margin-top:4px;color:#fff;font-weight:700">${esc(address)}</div>`:""}
 </div>
 ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:""}
-<p style="margin:24px 0 0;color:#8e887f;font-size:11px;line-height:1.55">${confirmed?"Ta kontakt dersom noe rundt henting eller levering må avklares.":"Hvis dette ikke stemmer, svar direkte på e-posten eller ring 471 54 898."}</p>
+<p style="margin:24px 0 0;color:#8e887f;font-size:11px;line-height:1.55">${confirmed?`Endring, ombooking eller avbestilling kan gjøres kostnadsfritt frem til ${RENTAL_CHANGE_DEADLINE_HOURS} timer før avtalt leiestart. Ta kontakt dersom noe rundt henting eller levering må avklares. Se <a href="${esc(base+"/vilkar/utleie")}" style="color:#d9b365">utleiebetingelsene</a>.`:"Hvis dette ikke stemmer, svar direkte på e-posten eller ring 471 54 898."}</p>
 </td></tr>
 <tr><td style="padding:18px 30px;border-top:1px solid #34312b;color:#8e887f;font-size:11px">Aadland Utleie · 471 54 898 · post@aadland-service.no</td></tr>
 </table></td></tr></table></body></html>`;
