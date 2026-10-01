@@ -5,7 +5,7 @@ import crypto from "crypto";
 import {getCustomerUserId} from "../../../lib/customer-auth";
 import {db,fromDbRentalItem} from "../../../lib/supabase";
 import {rentalEmailFrom,rentalReplyTo,rentalRequestSiteUrl,rentalSiteUrl} from "../../../lib/rentalEmailConfig";
-const RENTAL_TERMS_VERSION="2026-09";
+const RENTAL_TERMS_VERSION="2026-10";
 function valid(a,b){if(!/^\d{4}-\d{2}-\d{2}$/.test(a||"")||!/^\d{4}-\d{2}-\d{2}$/.test(b||"")||b<a)return false;const A=new Date(a+"T12:00:00Z"),B=new Date(b+"T12:00:00Z");return !Number.isNaN(A.valueOf())&&!Number.isNaN(B.valueOf())&&A.toISOString().slice(0,10)===a&&B.toISOString().slice(0,10)===b}
 function todayOslo(){const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Oslo",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date()),v=Object.fromEntries(parts.map(p=>[p.type,p.value]));return `${v.year}-${v.month}-${v.day}`}
 function num(){return "AS-U-"+Date.now().toString().slice(-6)+"-"+crypto.randomBytes(2).toString("hex").toUpperCase()}
