@@ -5,6 +5,7 @@ import crypto from "crypto";
 import {getCustomerUserId} from "../../../lib/customer-auth";
 import {db,fromDbRentalItem} from "../../../lib/supabase";
 import {rentalEmailFrom,rentalReplyTo,rentalRequestSiteUrl,rentalSiteUrl} from "../../../lib/rentalEmailConfig";
+import {RENTAL_CHANGE_DEADLINE_HOURS} from "../../../lib/companyInfo";
 const RENTAL_TERMS_VERSION="2026-10";
 function valid(a,b){if(!/^\d{4}-\d{2}-\d{2}$/.test(a||"")||!/^\d{4}-\d{2}-\d{2}$/.test(b||"")||b<a)return false;const A=new Date(a+"T12:00:00Z"),B=new Date(b+"T12:00:00Z");return !Number.isNaN(A.valueOf())&&!Number.isNaN(B.valueOf())&&A.toISOString().slice(0,10)===a&&B.toISOString().slice(0,10)===b}
 function todayOslo(){const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Oslo",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date()),v=Object.fromEntries(parts.map(p=>[p.type,p.value]));return `${v.year}-${v.month}-${v.day}`}
@@ -39,7 +40,7 @@ if(resendKey){
 ${p.depositOre?`<tr><td style="padding:12px 14px;color:#8e887f;font-size:11px;border-top:1px solid #2d2d2d">Depositum</td><td style="padding:12px 14px;color:#fff;font-weight:700;text-align:right;border-top:1px solid #2d2d2d">${esc(depositText)}</td></tr>`:""}
 </table>
 ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:`<a href="${esc(minSideUrl)}" style="display:inline-block;margin-top:20px;border:1px solid #d7a74e;color:#d7a74e;text-decoration:none;font-weight:900;padding:12px 18px">Opprett Min side →</a><p style="margin:10px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Opprett konto med samme e-postadresse, så kobles utleien automatisk til kontoen din.</p>`}
-<p style="margin:22px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Vi tar kontakt når bookingen er behandlet.</p>
+<p style="margin:22px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Vi tar kontakt når bookingen er behandlet. Etter bekreftelse kan bookingen endres, ombookes eller avbestilles kostnadsfritt frem til ${RENTAL_CHANGE_DEADLINE_HOURS} timer før avtalt leiestart. Se <a href="${esc(siteOrigin+"/vilkar/utleie")}" style="color:#d9b365">utleiebetingelsene</a>.</p>
 </td></tr>
 <tr><td style="padding:18px 30px;border-top:1px solid #34312b;color:#8e887f;font-size:11px">Aadland Utleie · 471 54 898 · post@aadland-service.no</td></tr>
 </table></td></tr></table></body></html>`;
