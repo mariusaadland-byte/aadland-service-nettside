@@ -42,6 +42,8 @@ Aadland Service og Aadland Utleie skal bruke hvert sitt Vipps-salgssted under sa
 
 Server-side miljøvariabler:
 - `VIPPS_ENV=production` eller `test`
+- `VIPPS_PAYMENTS_ENABLED=false` frem til kontrollert aktivering
+- `VIPPS_WEBHOOK_URL=https://www.aadland-service.no/api/vipps/webhook`
 - `VIPPS_SERVICE_CLIENT_ID`
 - `VIPPS_SERVICE_CLIENT_SECRET`
 - `VIPPS_SERVICE_SUBSCRIPTION_KEY`
@@ -53,7 +55,7 @@ Server-side miljøvariabler:
 
 `lib/vippsConfig.js` holder salgsstedene adskilt og velger Aadland Utleie for `aadlandutleie.no` og Aadland Service for `aadland-service.no`. Ingen Vipps-hemmeligheter skal bruke `NEXT_PUBLIC_` eller sendes til nettleseren.
 
-Backoffice-siden `/admin/vipps` viser bare om de fire nødvendige verdiene finnes for hvert salgssted; den viser aldri verdiene. Selve ePayment-integrasjonen er **ikke aktivert ennå**. Før aktivering må begge salgsstedene være opprettet i Vipps bedriftsportal og de riktige salgsstedsnøklene legges i Vercel.
+Backoffice-siden `/admin/vipps` viser bare om de fire nødvendige verdiene finnes for hvert salgssted; den viser aldri verdiene. Den viser også webhook-status og kan registrere/erstatte webhook når betalingsmotoren eksplisitt er slått på. Webhook-secret lagres i privat Supabase-schema, ikke i nettleseren eller vanlig appdata. Selve kundebetalingen er **ikke aktivert ennå**. Før aktivering må begge salgsstedene være opprettet i Vipps bedriftsportal og de riktige salgsstedsnøklene legges i Vercel.
 
 Nettsidegrunnlaget for Vipps er oppdatert i oktober 2026:
 - registrert forretningsadresse vises på nettstedet,
