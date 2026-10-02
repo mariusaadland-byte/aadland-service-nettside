@@ -9,6 +9,7 @@ import {
  refundVippsPayment,
  vippsPaymentsEnabled
 } from "../../../../lib/vippsClient";
+import {syncVippsPaymentSnapshot} from "../../../../lib/vippsPaymentSync";
 
 export const runtime="nodejs";
 
@@ -16,16 +17,6 @@ async function allowed(){
  const user=await getAdminUser();
  if(!user)return false;
  return user.role==="owner"||await hasPermission("canUpdateOrders");
-}
-
-function amountValue(obj){
- const value=Number(obj?.value);
- return Number.isInteger(value)&&value>=0?value:0;
-}
-
-function ensureNok(obj){
- const currency=String(obj?.currency||"NOK").toUpperCase();
- if(currency!=="NOK")throw new Error("VIPPS_UNEXPECTED_CURRENCY");
 }
 
 async function findTarget(s,unit,reference){
@@ -133,7 +124,7 @@ export async function POST(req){
    payment=await getVippsPayment(unit,reference);
   }
 
-  const snapshot=await syncSnapshot(s,unit,reference,payment);
+  const snapshot=await syncVippsPaymentSnapshot(s,unit,reference,payment);
   return NextResponse.json({ok:true,action,unit,reference,snapshot});
  }catch(error){
   console.error("VIPPS ADMIN PAYMENT ACTION ERROR",{
