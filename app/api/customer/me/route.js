@@ -61,7 +61,7 @@ export async function GET(){
    .order("created_at",{ascending:false})
    .limit(100),
   s.from("rental_bookings")
-   .select("id,payment_reference,payment_captured_ore,payment_refunded_ore,payment_refunded_at,refund_last_ore,refund_reference,refund_note,refund_notice_sent_at,receipt_sent_at,deposit_held_ore,deposit_received_at,deposit_released_at,deposit_charged_ore")
+   .select("id,payment_provider,payment_reference,payment_psp_reference,payment_reserved_ore,payment_captured_ore,payment_authorized_at,payment_captured_at,payment_cancelled_at,payment_capture_guaranteed_until,vipps_checkout_started_at,payment_refunded_ore,payment_refunded_at,refund_last_ore,refund_reference,refund_note,refund_notice_sent_at,receipt_sent_at,deposit_held_ore,deposit_received_at,deposit_released_at,deposit_charged_ore")
    .eq("customer_user_id",customer.id)
    .order("created_at",{ascending:false})
    .limit(100),
