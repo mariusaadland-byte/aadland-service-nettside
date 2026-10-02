@@ -13,17 +13,37 @@ const labels={
 export default function VippsStatusClient(){
  const [data,setData]=useState(null);
  const [error,setError]=useState("");
+ const [message,setMessage]=useState("");
+ const [savingUnit,setSavingUnit]=useState("");
 
- useEffect(()=>{
-  fetch("/api/admin/vipps-status")
-   .then(async response=>{
-    const body=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(body.error||"Vipps-status kunne ikke hentes.");
-    return body;
-   })
-   .then(setData)
-   .catch(err=>setError(err.message||"Vipps-status kunne ikke hentes."));
- },[]);
+ async function load(){
+  const response=await fetch("/api/admin/vipps-status");
+  const body=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(body.error||"Vipps-status kunne ikke hentes.");
+  setData(body);
+ }
+ useEffect(()=>{load().catch(err=>setError(err.message||"Vipps-status kunne ikke hentes."))},[]);
+
+ async function registerWebhook(unit,replace=false){
+  setError("");setMessage("");
+  if(replace&&!window.confirm("Registrere en ny webhook og erstatte den aktive for "+unit.label+"?"))return;
+  setSavingUnit(unit.unit);
+  try{
+   const response=await fetch("/api/admin/vipps-webhook",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({unit:unit.unit,replace})
+   });
+   const body=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(body.error||"Webhooken kunne ikke registreres.");
+   setMessage((body.warning?body.warning+" ":"")+"Webhook er registrert for "+unit.label+".");
+   await load();
+  }catch(err){
+   setError(err.message||"Webhooken kunne ikke registreres.");
+  }finally{
+   setSavingUnit("");
+  }
+ }
 
  return <main className="admin">
   <div className="adminPageTop">
@@ -36,6 +56,7 @@ export default function VippsStatusClient(){
   </div>
 
   {error&&<p className="notice">{error}</p>}
+  {message&&<p className="notice">{message}</p>}
   {!data&&!error&&<p className="muted">Laster Vipps-status …</p>}
 
   {data&&<>
@@ -58,6 +79,9 @@ export default function VippsStatusClient(){
      </div>
      {!unit.configured&&<p className="muted">Mangler: {unit.missing.map(key=>labels[key]||key).join(", ")}.</p>}
      {unit.webhook&&<p className="muted">Webhook aktiv · sist oppdatert {unit.webhook.updatedAt?new Date(unit.webhook.updatedAt).toLocaleString("nb-NO"):"ukjent"}. Secret lagres privat og vises aldri.</p>}
+     {unit.configured&&data.enabled&&!unit.webhook&&<button className="btn" type="button" disabled={savingUnit===unit.unit} onClick={()=>registerWebhook(unit)}>{savingUnit===unit.unit?"Registrerer …":"Registrer webhook"}</button>}
+     {unit.configured&&data.enabled&&unit.webhook&&<button className="btn alt" type="button" disabled={savingUnit===unit.unit} onClick={()=>registerWebhook(unit,true)}>{savingUnit===unit.unit?"Registrerer …":"Registrer webhook på nytt"}</button>}
+     {unit.configured&&!data.enabled&&<p className="muted">Webhook kan registreres når <code>VIPPS_PAYMENTS_ENABLED=true</code> settes under kontrollert oppsett.</p>}
     </section>)}
    </div>
 
