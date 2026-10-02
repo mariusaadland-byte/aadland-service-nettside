@@ -32,6 +32,7 @@ export default function MinSide(){
  const [editingProfile,setEditingProfile]=useState(false);
  const [profileForm,setProfileForm]=useState({name:"",phone:"",address:""});
  const [rentalContext,setRentalContext]=useState(false);
+ const [serviceVippsAvailable,setServiceVippsAvailable]=useState(false);
  const [rentalVippsAvailable,setRentalVippsAvailable]=useState(false);
  const [paymentBusyId,setPaymentBusyId]=useState("");
 
@@ -61,7 +62,10 @@ export default function MinSide(){
   fetch("/api/payment-options")
    .then(async response=>{
     const options=await response.json().catch(()=>({}));
-    if(response.ok)setRentalVippsAvailable(options?.vipps?.rental===true);
+    if(response.ok){
+     setServiceVippsAvailable(options?.vipps?.service===true);
+     setRentalVippsAvailable(options?.vipps?.rental===true);
+    }
    })
    .catch(()=>{});
   load();
@@ -175,6 +179,33 @@ export default function MinSide(){
    }));
   }catch{}
   window.location.href="/produkter/"+encodeURIComponent(item.productSlug);
+ }
+
+ async function resumeOrderVipps(order){
+  setError("");setInfo("");
+  setPaymentBusyId(order.id);
+  try{
+   const response=await fetch("/api/customer/order-vipps",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({orderId:order.id})
+   });
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok){
+    setError(result.error||"Vipps-betalingen kunne ikke åpnes.");
+    await load();
+    return;
+   }
+   if(!result.redirectUrl){
+    setError("Vipps svarte uten betalingslenke. Prøv igjen.");
+    return;
+   }
+   window.location.assign(result.redirectUrl);
+  }catch{
+   setError("Vipps-betalingen kunne ikke åpnes akkurat nå.");
+  }finally{
+   setPaymentBusyId("");
+  }
  }
 
  async function startRentalVipps(rental){
@@ -481,10 +512,21 @@ export default function MinSide(){
     <div className="customerCardMeta">
      <span><small>Sum</small><b>{kr(o.total_ore)}</b></span>
      <span><small>Betaling</small><b>{paymentStatus[o.payment_status]||o.payment_status||"Ikke registrert"}</b></span>
+     {String(o.payment_provider||"").toLowerCase()==="vipps"&&Number(o.payment_reserved_ore)>0&&<span><small>Reservert i Vipps</small><b>{kr(o.payment_reserved_ore)}</b></span>}
      {Number(o.payment_captured_ore)>0&&<span><small>Registrert betalt</small><b>{kr(o.payment_captured_ore)}</b></span>}
+     {String(o.payment_provider||"").toLowerCase()==="vipps"&&o.payment_capture_guaranteed_until&&<span><small>Reservasjon gyldig til</small><b>{dateTimeFull(o.payment_capture_guaranteed_until)}</b></span>}
      <span><small>Levering</small><b>{fulfillmentStatus[o.fulfillment_type]||o.fulfillment_type||"Ikke registrert"}</b></span>
      {Number(o.shipping_ore)>0&&<span><small>Frakt</small><b>{kr(o.shipping_ore)}</b></span>}
     </div>
+    {String(o.payment_provider||"").toLowerCase()==="vipps"&&o.payment_status==="authorized"&&<div className="customerPaymentConfirmation">
+     <b>✓ Vipps-beløpet er reservert</b>
+     <span>Beløpet trekkes først når varen eller tjenesten kan leveres.</span>
+    </div>}
+    {serviceVippsAvailable&&String(o.payment_provider||"").toLowerCase()==="vipps"&&o.payment_status==="pending"&&o.status!=="cancelled"&&<div className="customerPaymentConfirmation">
+     <b>Vipps-betalingen er startet</b>
+     <span>Hvis betalingsvinduet ble lukket, kan du åpne samme betaling igjen uten å lage en ny bestilling.</span>
+     <button type="button" className="btn" disabled={paymentBusyId===o.id} onClick={()=>resumeOrderVipps(o)}>{paymentBusyId===o.id?"Åpner Vipps …":"Fortsett Vipps-betaling"}</button>
+    </div>}
     {o.fulfillment_type==="delivery"&&<div className="customerPaymentConfirmation">
      <b>{o.delivery_within_radius===true?"✓ Leveringsområdet er godkjent":o.delivery_within_radius===false?"Leveringsadressen er utenfor 15 km":"Leveringsområdet kontrolleres"}</b>
      <span>{o.delivery_within_radius===true
