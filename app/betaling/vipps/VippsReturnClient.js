@@ -13,7 +13,7 @@ const statusText={
  },
  paid:{
   title:"Betalingen er registrert",
-  text:"Betalingen er captured og registrert."
+  text:"Betalingen er trukket og registrert."
  },
  partial:{
   title:"Betalingen behandles",
@@ -21,7 +21,7 @@ const statusText={
  },
  refunded:{
   title:"Betalingen er tilbakebetalt",
-  text:"Vipps viser at det captured beløpet er refundert."
+  text:"Vipps viser at det trukne beløpet er tilbakebetalt."
  },
  cancelled:{
   title:"Betalingen ble ikke fullført",
