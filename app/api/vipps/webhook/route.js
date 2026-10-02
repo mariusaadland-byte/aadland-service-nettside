@@ -59,16 +59,22 @@ export async function POST(req){
  const reference=String(payload?.reference||"").trim();
  const pspReference=String(payload?.pspReference||"").trim();
  const eventName=String(payload?.name||"").trim().toUpperCase();
- const idempotencyKey=String(payload?.idempotencyKey||"").trim();
+ const rawIdempotencyKey=String(payload?.idempotencyKey||"").trim();
+ const idempotencyKey=rawIdempotencyKey||("psp-"+eventName+"-"+pspReference);
  const amountOre=Number(payload?.amount?.value);
  const timestamp=String(payload?.timestamp||"").trim()||null;
  const captureGuaranteedUntil=String(payload?.captureGuaranteedUntil||"").trim()||null;
 
- if(!reference||!pspReference||!eventName||!idempotencyKey){
+ if(!reference||!pspReference||!eventName){
   return NextResponse.json({error:"Incomplete webhook payload."},{status:400});
  }
  if(!Number.isInteger(amountOre)||amountOre<0){
   return NextResponse.json({error:"Invalid webhook amount."},{status:400});
+ }
+
+ if(payload?.success===false){
+  console.warn("VIPPS WEBHOOK UNSUCCESSFUL EVENT",{webhookId,unit,reference,eventName,pspReference});
+  return NextResponse.json({ok:true,ignored:true});
  }
 
  const {data:processed,error:processError}=await s.rpc("process_vipps_payment_event_once",{
