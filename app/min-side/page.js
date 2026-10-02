@@ -572,7 +572,7 @@ export default function MinSide(){
     {String(r.payment_provider||"").toLowerCase()==="vipps"&&r.payment_status==="authorized"&&<div className="customerPaymentConfirmation">
      <b>✓ Vipps-beløpet er reservert</b>
      <span>Leiebeløpet trekkes først når utleien kan leveres eller utleveres.</span>
-     {r.payment_capture_guaranteed_until&&<span>Reservasjonen kan captures frem til {dateTimeFull(r.payment_capture_guaranteed_until)}.</span>}
+     {r.payment_capture_guaranteed_until&&<span>Reservasjonen kan trekkes frem til {dateTimeFull(r.payment_capture_guaranteed_until)}.</span>}
     </div>}
     {rentalVippsAvailable&&r.status==="confirmed"&&["unpaid","pending","cancelled"].includes(String(r.payment_status||"unpaid"))&&Number(r.payment_captured_ore||0)===0&&<div className="customerPaymentConfirmation">
      <b>Betal leien med Vipps</b>
