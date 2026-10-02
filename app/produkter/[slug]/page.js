@@ -607,7 +607,7 @@ export default function ProductPage() {
                   <option value="manual">Bestill nå – betaling avtales/bekreftes senere</option>
                   <option value="vipps">Vipps</option>
                 </select>
-                {paymentMethod==="vipps"&&<small className="muted">Beløpet reserveres i Vipps. Det captures først når varen eller tjenesten kan leveres.</small>}
+                {paymentMethod==="vipps"&&<small className="muted">Beløpet reserveres i Vipps. Beløpet trekkes først når varen eller tjenesten kan leveres.</small>}
               </div>}
 
               <label style={{display:"flex",gap:8,alignItems:"flex-start",margin:"14px 0"}}><input type="checkbox" required checked={acceptedTerms} onChange={e=>setAcceptedTerms(e.target.checked)}/><span>Jeg har lest og godtar <a href="/vilkar/salg" target="_blank" rel="noreferrer">salgsbetingelsene</a>, inkludert informasjon om angrerett, retur, reklamasjon og konfliktløsning.</span></label>
