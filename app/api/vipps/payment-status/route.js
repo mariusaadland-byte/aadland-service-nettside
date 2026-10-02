@@ -12,14 +12,16 @@ async function findPaymentTarget(s,unit,reference){
  if(unit==="service"){
   const {data,error}=await s.from("orders")
    .select("id,order_number,payment_provider,payment_reference,payment_status")
-   .eq("order_number",reference)
+   .or("order_number.eq."+reference+",payment_reference.eq."+reference)
+   .limit(1)
    .maybeSingle();
   if(error)throw error;
   return data||null;
  }
  const {data,error}=await s.from("rental_bookings")
   .select("id,booking_number,payment_provider,payment_reference,payment_status")
-  .eq("booking_number",reference)
+  .or("booking_number.eq."+reference+",payment_reference.eq."+reference)
+  .limit(1)
   .maybeSingle();
  if(error)throw error;
  return data||null;
