@@ -33,10 +33,22 @@ export default function ProductPage() {
   const [customerAccount,setCustomerAccount]=useState(null);
 
   const [fulfillment, setFulfillment] = useState("pickup");
+  const [paymentMethod,setPaymentMethod]=useState("manual");
+  const [vippsAvailable,setVippsAvailable]=useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState(null);
   const [acceptedTerms,setAcceptedTerms]=useState(false);
+
+  useEffect(() => {
+    fetch("/api/payment-options")
+      .then(async response=>{
+        const data=await response.json().catch(()=>({}));
+        if(!response.ok)return;
+        setVippsAvailable(data?.vipps?.service===true);
+      })
+      .catch(()=>{});
+  }, []);
 
   useEffect(() => {
     fetch("/api/customer/profile")
@@ -172,6 +184,7 @@ export default function ProductPage() {
           fulfillmentType: fulfillment,
           deliveryWithinRadius: customer.deliveryWithinRadius,
           acceptedTerms,
+          paymentMethod:vippsAvailable?paymentMethod:"manual",
           items: [
             {
               productId: product.id,
@@ -186,6 +199,11 @@ export default function ProductPage() {
 
       if (!response.ok) {
         setError(data.error || "Bestillingen kunne ikke sendes.");
+        return;
+      }
+
+      if(data?.payment?.method==="vipps"&&data?.payment?.redirectUrl){
+        window.location.assign(data.payment.redirectUrl);
         return;
       }
 
@@ -583,6 +601,15 @@ export default function ProductPage() {
                 </select>
               </div>
 
+              {vippsAvailable&&<div className="field">
+                <label>Betaling</label>
+                <select value={paymentMethod} onChange={e=>setPaymentMethod(e.target.value)}>
+                  <option value="manual">Bestill nå – betaling avtales/bekreftes senere</option>
+                  <option value="vipps">Vipps</option>
+                </select>
+                {paymentMethod==="vipps"&&<small className="muted">Beløpet reserveres i Vipps. Det captures først når varen eller tjenesten kan leveres.</small>}
+              </div>}
+
               <label style={{display:"flex",gap:8,alignItems:"flex-start",margin:"14px 0"}}><input type="checkbox" required checked={acceptedTerms} onChange={e=>setAcceptedTerms(e.target.checked)}/><span>Jeg har lest og godtar <a href="/vilkar/salg" target="_blank" rel="noreferrer">salgsbetingelsene</a>, inkludert informasjon om angrerett, retur, reklamasjon og konfliktløsning.</span></label>
 
               {error && <p className="notice">{error}</p>}
@@ -593,8 +620,10 @@ export default function ProductPage() {
                 style={{ width: "100%" }}
               >
                 {sending
-                  ? "Sender..."
-                  : `Send bestilling · ${nok(total)}`}
+                  ? (paymentMethod==="vipps"&&vippsAvailable?"Åpner Vipps...":"Sender...")
+                  : paymentMethod==="vipps"&&vippsAvailable
+                   ? `Betal med Vipps · ${nok(total)}`
+                   : `Send bestilling · ${nok(total)}`}
               </button>
             </form>
           </div>
