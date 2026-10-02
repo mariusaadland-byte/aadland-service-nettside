@@ -8,7 +8,7 @@ const orderStatus={new:"Mottatt",confirmed:"Bekreftet",processing:"Under behandl
 const enquiryStatus={new:"Mottatt",confirmed:"Befaring avtalt",processing:"Under behandling",in_progress:"Under arbeid",ready:"Klar for oppfølging",completed:"Ferdig",cancelled:"Avbrutt"};
 const rentalStatus={new:"Mottatt",confirmed:"Bekreftet",active:"Pågående",returned:"Returnert",completed:"Fullført",cancelled:"Kansellert"};
 const quoteStatus={sent:"Sendt",accepted:"Godkjent",declined:"Avslått",expired:"Utløpt",cancelled:"Avbrutt",superseded:"Erstattet"};
-const paymentStatus={unpaid:"Ikke betalt",pending:"Avventer betaling",authorized:"Reservert",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert"};
+const paymentStatus={unpaid:"Ikke betalt",pending:"Avventer betaling",authorized:"Reservert",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert",cancelled:"Kansellert"};
 const depositStatus={not_paid:"Ikke mottatt",held:"Holdes",released:"Frigitt",partially_charged:"Delvis trukket",charged:"Trukket"};
 const fulfillmentStatus={pickup:"Henting",delivery:"Levering",shipping:"Post / Bring"};
 
@@ -32,6 +32,8 @@ export default function MinSide(){
  const [editingProfile,setEditingProfile]=useState(false);
  const [profileForm,setProfileForm]=useState({name:"",phone:"",address:""});
  const [rentalContext,setRentalContext]=useState(false);
+ const [rentalVippsAvailable,setRentalVippsAvailable]=useState(false);
+ const [paymentBusyId,setPaymentBusyId]=useState("");
 
  async function load(){
   try{
@@ -56,6 +58,12 @@ export default function MinSide(){
   if(verification==="success")setInfo("E-postadressen er bekreftet. Velkommen til Min side.");
   if(verification==="invalid")setError("Bekreftelseslenken er ugyldig eller utløpt.");
   if(verification==="error")setError("E-postadressen kunne ikke bekreftes akkurat nå. Prøv igjen.");
+  fetch("/api/payment-options")
+   .then(async response=>{
+    const options=await response.json().catch(()=>({}));
+    if(response.ok)setRentalVippsAvailable(options?.vipps?.rental===true);
+   })
+   .catch(()=>{});
   load();
  },[]);
 
@@ -167,6 +175,33 @@ export default function MinSide(){
    }));
   }catch{}
   window.location.href="/produkter/"+encodeURIComponent(item.productSlug);
+ }
+
+ async function startRentalVipps(rental){
+  setError("");setInfo("");
+  setPaymentBusyId(rental.id);
+  try{
+   const response=await fetch("/api/customer/rental-vipps",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({bookingId:rental.id})
+   });
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok){
+    setError(result.error||"Vipps-betalingen kunne ikke startes.");
+    await load();
+    return;
+   }
+   if(!result.redirectUrl){
+    setError("Vipps svarte uten betalingslenke. Prøv igjen.");
+    return;
+   }
+   window.location.assign(result.redirectUrl);
+  }catch{
+   setError("Vipps-betalingen kunne ikke startes akkurat nå.");
+  }finally{
+   setPaymentBusyId("");
+  }
  }
 
  function repeatRental(rental){
@@ -519,6 +554,7 @@ export default function MinSide(){
      <span><small>Periode</small><b>{date(r.start_date)} – {date(r.end_date)}</b></span>
      <span><small>Leiepris</small><b>{kr(r.total_ore)}</b></span>
      <span><small>Betaling</small><b>{paymentStatus[r.payment_status]||r.payment_status||"Ikke registrert"}</b></span>
+     {String(r.payment_provider||"").toLowerCase()==="vipps"&&Number(r.payment_reserved_ore)>0&&<span><small>Reservert i Vipps</small><b>{kr(r.payment_reserved_ore)}</b></span>}
      {Number(r.payment_captured_ore)>0&&<span><small>Registrert betalt</small><b>{kr(r.payment_captured_ore)}</b></span>}
      <span><small>Utlevering</small><b>{fulfillmentStatus[r.customer?.fulfillment]||"Ikke registrert"}</b></span>
      {Number(r.deposit_ore)>0&&<span><small>Depositum</small><b>{kr(r.deposit_ore)} · {depositStatus[r.deposit_status]||r.deposit_status||"Ikke registrert"}</b></span>}
@@ -533,6 +569,17 @@ export default function MinSide(){
     {r.status==="returned"&&<div className="customerPaymentConfirmation"><b>✓ Utstyret er returnert</b><span>{r.payment_status==="paid"?"Leiebetalingen er registrert.":"Oppgjøret er ikke ferdig registrert ennå."}</span></div>}
     {r.status==="completed"&&<div className="customerPaymentConfirmation"><b>✓ Utleien er ferdigbehandlet</b><span>Betaling og eventuelt depositum er avklart.</span></div>}
     {r.status==="cancelled"&&<div className="customerPaymentConfirmation"><b>Bookingen er avbrutt</b><span>Ta kontakt dersom noe rundt betaling eller depositum ikke stemmer.</span></div>}
+    {String(r.payment_provider||"").toLowerCase()==="vipps"&&r.payment_status==="authorized"&&<div className="customerPaymentConfirmation">
+     <b>✓ Vipps-beløpet er reservert</b>
+     <span>Leiebeløpet trekkes først når utleien kan leveres eller utleveres.</span>
+     {r.payment_capture_guaranteed_until&&<span>Reservasjonen kan captures frem til {dateTimeFull(r.payment_capture_guaranteed_until)}.</span>}
+    </div>}
+    {rentalVippsAvailable&&r.status==="confirmed"&&["unpaid","pending","cancelled"].includes(String(r.payment_status||"unpaid"))&&Number(r.payment_captured_ore||0)===0&&<div className="customerPaymentConfirmation">
+     <b>Betal leien med Vipps</b>
+     <span>Vipps gjelder bare leiebeløpet på {kr(r.total_ore)}. Eventuelt depositum håndteres separat.</span>
+     <span>Ved å fortsette bruker du vilkårene du godtok ved bookingen. <a href="/vilkar/utleie" target="_blank" rel="noreferrer">Se utleiebetingelsene</a>.</span>
+     <button type="button" className="btn" disabled={paymentBusyId===r.id} onClick={()=>startRentalVipps(r)}>{paymentBusyId===r.id?"Åpner Vipps …":r.payment_status==="pending"&&String(r.payment_provider||"").toLowerCase()==="vipps"?"Fortsett Vipps-betaling":"Betal med Vipps · "+kr(r.total_ore)}</button>
+    </div>}
     {["paid","refunded"].includes(r.payment_status)&&r.receipt_sent_at&&<div className="customerPaymentConfirmation">
      <b>✓ Leiebetaling registrert</b>
      <span>Betalingsbekreftelse sendt {dateTimeFull(r.receipt_sent_at)}</span>
