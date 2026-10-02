@@ -3,6 +3,7 @@ import {db} from "../../../../lib/supabase";
 import {vippsUnitReadiness} from "../../../../lib/vippsReadiness";
 import {getVippsPayment} from "../../../../lib/vippsClient";
 import {syncVippsPaymentSnapshot} from "../../../../lib/vippsPaymentSync";
+import {rateLimitRequest} from "../../../../lib/rateLimit";
 
 export const runtime="nodejs";
 
@@ -38,6 +39,13 @@ function publicState(status){
 }
 
 export async function GET(req){
+ const rateError=await rateLimitRequest(req,{
+  scope:"vipps-public-status",
+  max:30,
+  windowSeconds:60,
+  message:"For mange statusforespørsler. Vent litt og prøv igjen."
+ });
+ if(rateError)return rateError;
  const url=new URL(req.url);
  const unit=url.searchParams.get("unit")==="rental"?"rental":url.searchParams.get("unit")==="service"?"service":"";
  const reference=String(url.searchParams.get("reference")||"").trim();
