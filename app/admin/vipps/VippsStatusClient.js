@@ -40,22 +40,24 @@ export default function VippsStatusClient(){
 
   {data&&<>
    <div className="notice">
-    <b>Miljø: {data.environment==="test"?"TEST":"PRODUKSJON"}</b><br/>
-    <span>Selve ePayment-flyten er {data.paymentIntegrationImplemented?"implementert":"ikke aktivert ennå"}. Denne siden kontrollerer bare at salgsstedenes konfigurasjon holdes adskilt.</span>
+    <b>Miljø: {data.environment==="test"?"TEST":"PRODUKSJON"} · Betalingsmotor: {data.enabled?"PÅ":"AV"}</b><br/>
+    <span>ePayment-grunnmuren er {data.paymentIntegrationFoundation?"bygget":"ikke ferdig"}, mens kundebetalingen er {data.paymentIntegrationImplemented?"koblet inn":"fortsatt deaktivert"}. Betalingsmotoren må være AV til testnøkler/webhooks er kontrollert.</span>
    </div>
 
    <div className="grid" style={{alignItems:"start"}}>
     {data.units.map(unit=><section className="card" key={unit.unit}>
      <div className="kicker">{unit.unit==="rental"?"UTLEIE":"SERVICE"}</div>
      <h3>{unit.label}</h3>
-     <p><b>{unit.configured?"✓ Konfigurasjon komplett":"Ikke ferdig konfigurert"}</b></p>
+     <p><b>{unit.configured&&unit.webhook?"✓ Teknisk konfigurasjon komplett":unit.configured?"API-nøkler klare · webhook mangler":"Ikke ferdig konfigurert"}</b></p>
      <div className="customerCardMeta">
       <span><small>client_id</small><b>{unit.clientIdConfigured?"✓ satt":"mangler"}</b></span>
       <span><small>client_secret</small><b>{unit.clientSecretConfigured?"✓ satt":"mangler"}</b></span>
       <span><small>Subscription key</small><b>{unit.subscriptionKeyConfigured?"✓ satt":"mangler"}</b></span>
       <span><small>MSN</small><b>{unit.msnConfigured?"✓ satt":"mangler"}</b></span>
+      <span><small>Webhook</small><b>{unit.webhook?"✓ registrert":"mangler"}</b></span>
      </div>
      {!unit.configured&&<p className="muted">Mangler: {unit.missing.map(key=>labels[key]||key).join(", ")}.</p>}
+     {unit.webhook&&<p className="muted">Webhook aktiv · sist oppdatert {unit.webhook.updatedAt?new Date(unit.webhook.updatedAt).toLocaleString("nb-NO"):"ukjent"}. Secret lagres privat og vises aldri.</p>}
     </section>)}
    </div>
 
@@ -64,7 +66,7 @@ export default function VippsStatusClient(){
     <h3>Automatisk valg av riktig salgssted</h3>
     <p><code>aadland-service.no</code> → Aadland Service</p>
     <p><code>aadlandutleie.no</code> → Aadland Utleie</p>
-    <p className="muted">Når ePayment implementeres, hentes credentials server-side ut fra domenet/handelsflyten. Hemmelighetene skal aldri sendes til nettleseren.</p>
+    <p className="muted">Serveren har nå egne ePayment-klienter for opprettelse, status, capture, cancel og refund. Kundeknappene er fortsatt ikke aktivert. Credentials hentes server-side og hemmeligheter sendes aldri til nettleseren.</p>
    </section>
   </>}
  </main>;
