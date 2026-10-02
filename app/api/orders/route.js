@@ -6,6 +6,8 @@ import {getCustomerUserId} from "../../../lib/customer-auth";
 import {db,fromDbProduct} from "../../../lib/supabase";
 import {productPrice} from "../../../lib/catalog";
 import {buildOrderConfirmationEmail} from "../../../lib/orderConfirmationEmail";
+import {createVippsPayment} from "../../../lib/vippsClient";
+import {vippsUnitReadiness} from "../../../lib/vippsReadiness";
 const SALES_TERMS_VERSION="2026-10";
 function num(){return "AS-"+Date.now().toString().slice(-8)+"-"+crypto.randomBytes(2).toString("hex").toUpperCase()}
 export async function POST(req){
@@ -21,6 +23,12 @@ export async function POST(req){
   if(body.orderType==="custom"&&!String(body.customRequest||"").trim())return NextResponse.json({error:"Beskriv hva du ønsker hjelp med."},{status:400});
   if(String(body.customRequest||"").length>12000)return NextResponse.json({error:"Forespørselen er for lang."},{status:400});
   const s=db(); if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+  const requestedPaymentMethod=body.orderType==="order"&&body.paymentMethod==="vipps"?"vipps":"manual";
+  if(body.orderType==="order"&&body.paymentMethod&&!["manual","vipps"].includes(body.paymentMethod))return NextResponse.json({error:"Ugyldig betalingsmåte."},{status:400});
+  if(requestedPaymentMethod==="vipps"){
+   const readiness=await vippsUnitReadiness(s,"service");
+   if(!readiness.ready)return NextResponse.json({error:"Vipps er ikke klart for betaling ennå. Velg vanlig bestilling eller prøv senere."},{status:409});
+  }
   let items=[],total=0,shipping=0,stockRequests=[];
   if(body.orderType==="order"){
    if(body.acceptedTerms!==true)return NextResponse.json({error:"Du må godta salgsbetingelsene før bestilling."},{status:400});
@@ -55,7 +63,8 @@ export async function POST(req){
   }
   const orderNumber=num(),now=new Date().toISOString(),customerUserId=await getCustomerUserId();
   const safeCustomer={name,email,phone,address,postalCode,city,note:String(body.customer?.note||"").trim().slice(0,2000)};
-  const record={customer_user_id:customerUserId,order_number:orderNumber,order_type:body.orderType==="custom"?"custom":"order",status:"new",customer:safeCustomer,fulfillment_type:body.fulfillmentType||"pickup",delivery_within_radius:body.fulfillmentType==="delivery"?null:false,items,custom_request:body.customRequest?String(body.customRequest).trim():null,total_ore:total,shipping_ore:shipping,payment_status:body.orderType==="order"?"pending":"unpaid",terms_version:body.orderType==="order"?SALES_TERMS_VERSION:null,terms_accepted_at:body.orderType==="order"?now:null};
+  const useVipps=body.orderType==="order"&&requestedPaymentMethod==="vipps";
+  const record={customer_user_id:customerUserId,order_number:orderNumber,order_type:body.orderType==="custom"?"custom":"order",status:"new",customer:safeCustomer,fulfillment_type:body.fulfillmentType||"pickup",delivery_within_radius:body.fulfillmentType==="delivery"?null:false,items,custom_request:body.customRequest?String(body.customRequest).trim():null,total_ore:total,shipping_ore:shipping,payment_status:body.orderType==="order"?"pending":"unpaid",payment_provider:useVipps?"vipps":null,payment_reference:useVipps?orderNumber:null,vipps_checkout_started_at:useVipps?now:null,terms_version:body.orderType==="order"?SALES_TERMS_VERSION:null,terms_accepted_at:body.orderType==="order"?now:null};
   if(stockRequests.length){
    const {error:orderError}=await s.rpc("create_order_with_stock",{order_record:record,stock_requests:stockRequests});
    if(orderError){
@@ -67,6 +76,45 @@ export async function POST(req){
    const {error:orderError}=await s.from("orders").insert(record);
    if(orderError)throw orderError;
   }
+
+  const {data:createdOrder,error:createdOrderError}=await s.from("orders").select("id").eq("order_number",orderNumber).single();
+  if(createdOrderError||!createdOrder?.id)throw createdOrderError||new Error("ORDER_ID_MISSING");
+  const orderId=createdOrder.id;
+
+  let vippsRedirectUrl="";
+  if(useVipps){
+   const requestOrigin=new URL(req.url).origin;
+   const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
+   const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
+   try{
+    const payment=await createVippsPayment({
+     unit:"service",
+     reference:orderNumber,
+     amountOre:total,
+     phone:safeCustomer.phone,
+     returnUrl:base+"/betaling/vipps?unit=service&reference="+encodeURIComponent(orderNumber),
+     description:"Aadland Service "+orderNumber
+    });
+    vippsRedirectUrl=String(payment?.redirectUrl||"").trim();
+    if(!vippsRedirectUrl)throw new Error("VIPPS_REDIRECT_URL_MISSING");
+    if(payment?.pspReference){
+     const stampAt=new Date().toISOString();
+     const {error:stampError}=await s.from("orders").update({payment_psp_reference:String(payment.pspReference),updated_at:stampAt}).eq("id",orderId);
+     if(stampError)console.error("VIPPS PRODUCT PSP STAMP ERROR",{orderNumber,message:stampError.message});
+    }
+   }catch(error){
+    console.error("VIPPS PRODUCT CHECKOUT CREATE ERROR",{orderNumber,status:error?.status,code:error?.code});
+    const failedAt=new Date().toISOString();
+    try{
+     await s.rpc("cancel_product_order_once",{target_order_id:orderId,customer_reason:"Vipps-betalingen kunne ikke startes."});
+     await s.from("orders").update({payment_status:"cancelled",payment_cancelled_at:failedAt,updated_at:failedAt}).eq("id",orderId);
+    }catch(cleanupError){
+     console.error("VIPPS PRODUCT CHECKOUT CLEANUP ERROR",{orderNumber,message:cleanupError?.message});
+    }
+    return NextResponse.json({error:"Vipps-betalingen kunne ikke startes. Ingen betaling er gjennomført. Prøv igjen."},{status:502});
+   }
+  }
+
   let confirmationSent=false;
   const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
   if(resendKey){
@@ -87,7 +135,8 @@ export async function POST(req){
     isCustom,
     fulfillmentType:body.fulfillmentType||"pickup",
     accountUrl,
-    minSideUrl
+    minSideUrl,
+    vippsPending:useVipps
    });
 
    try{
@@ -122,6 +171,6 @@ export async function POST(req){
     }
    }
   }
-    return NextResponse.json({orderNumber,confirmationSent,message:"Takk! Vi tar kontakt for å bekrefte bestillingen."});
+    return NextResponse.json({orderNumber,confirmationSent,payment:useVipps?{method:"vipps",redirectUrl:vippsRedirectUrl}:{method:"manual"},message:useVipps?"Bestillingen er registrert. Du sendes videre til Vipps.":"Takk! Vi tar kontakt for å bekrefte bestillingen."});
  }catch(e){console.error(e);return NextResponse.json({error:"Bestillingen kunne ikke lagres."},{status:500})}
 }
