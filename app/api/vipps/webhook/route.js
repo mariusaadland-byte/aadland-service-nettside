@@ -1,0 +1,98 @@
+import {NextResponse} from "next/server";
+import {db} from "../../../../lib/supabase";
+import {vippsPaymentsEnabled} from "../../../../lib/vippsClient";
+import {verifyVippsWebhookRequest} from "../../../../lib/vippsWebhook";
+
+export const runtime="nodejs";
+
+function environment(){
+ return String(process.env.VIPPS_ENV||"production").trim().toLowerCase()==="test"?"test":"production";
+}
+
+export async function POST(req){
+ if(!vippsPaymentsEnabled()){
+  return NextResponse.json({error:"Vipps payment handling is disabled."},{status:503});
+ }
+
+ const webhookId=String(req.headers.get("webhook-id")||"").trim();
+ if(!webhookId)return NextResponse.json({error:"Missing webhook id."},{status:401});
+
+ const s=db();
+ if(!s)return NextResponse.json({error:"Database unavailable."},{status:503});
+
+ const {data:auth,error:authError}=await s.rpc("get_vipps_webhook_auth",{
+  target_webhook_id:webhookId,
+  target_environment:environment()
+ });
+ if(authError){
+  console.error("VIPPS WEBHOOK AUTH LOOKUP ERROR",{webhookId,error:authError.message});
+  return NextResponse.json({error:"Webhook authentication unavailable."},{status:503});
+ }
+ if(!auth?.secret||!auth?.unit){
+  return NextResponse.json({error:"Unknown webhook."},{status:401});
+ }
+
+ const rawBody=await req.text();
+ const verified=verifyVippsWebhookRequest(req,rawBody,auth.secret);
+ if(!verified.ok){
+  console.warn("VIPPS WEBHOOK REJECTED",{webhookId,reason:verified.error});
+  return NextResponse.json({error:"Invalid webhook signature."},{status:401});
+ }
+
+ let payload;
+ try{payload=JSON.parse(rawBody)}catch{
+  return NextResponse.json({error:"Invalid JSON."},{status:400});
+ }
+
+ const unit=String(auth.unit||"").toLowerCase();
+ if(!["service","rental"].includes(unit)){
+  return NextResponse.json({error:"Invalid webhook unit."},{status:409});
+ }
+
+ const payloadMsn=String(payload?.msn||"").trim();
+ const registeredMsn=String(auth.msn||"").trim();
+ if(registeredMsn&&payloadMsn&&!safeMsnMatch(registeredMsn,payloadMsn)){
+  console.warn("VIPPS WEBHOOK MSN MISMATCH",{webhookId,unit});
+  return NextResponse.json({error:"Webhook sales unit mismatch."},{status:401});
+ }
+
+ const reference=String(payload?.reference||"").trim();
+ const pspReference=String(payload?.pspReference||"").trim();
+ const eventName=String(payload?.name||"").trim().toUpperCase();
+ const idempotencyKey=String(payload?.idempotencyKey||"").trim();
+ const amountOre=Number(payload?.amount?.value);
+ const timestamp=String(payload?.timestamp||"").trim()||null;
+ const captureGuaranteedUntil=String(payload?.captureGuaranteedUntil||"").trim()||null;
+
+ if(!reference||!pspReference||!eventName||!idempotencyKey){
+  return NextResponse.json({error:"Incomplete webhook payload."},{status:400});
+ }
+ if(!Number.isInteger(amountOre)||amountOre<0){
+  return NextResponse.json({error:"Invalid webhook amount."},{status:400});
+ }
+
+ const {data:processed,error:processError}=await s.rpc("process_vipps_payment_event_once",{
+  event_unit:unit,
+  event_idempotency_key:idempotencyKey,
+  event_psp_reference:pspReference,
+  event_payment_reference:reference,
+  event_name:eventName,
+  event_amount_ore:amountOre,
+  event_timestamp_value:timestamp,
+  capture_guaranteed_until_value:captureGuaranteedUntil,
+  event_payload:payload
+ });
+
+ if(processError){
+  console.error("VIPPS WEBHOOK PROCESS ERROR",{
+   webhookId,unit,reference,eventName,error:processError.message
+  });
+  return NextResponse.json({error:"Webhook processing failed."},{status:500});
+ }
+
+ return NextResponse.json({ok:true,duplicate:processed?.duplicate===true});
+}
+
+function safeMsnMatch(a,b){
+ return String(a).trim()===String(b).trim();
+}
