@@ -94,6 +94,15 @@ function polygonCentroid(points){
  for(const p of points){x+=p.x;y+=p.y}
  return{x:x/points.length,y:y/points.length};
 }
+function syncLinkedZones(walls,zones){
+ const byId=new Map((walls||[]).map(w=>[w.id,w]));
+ return (zones||[]).map(zone=>{
+  if(!Array.isArray(zone.wallIds)||zone.wallIds.length<3)return zone;
+  const linked=zone.wallIds.map(id=>byId.get(id));
+  if(linked.some(w=>!w))return {...zone,wallIds:undefined};
+  return {...zone,points:linked.map(w=>({x:w.x1,y:w.y1}))};
+ });
+}
 
 const initial=()=>({id:uid(),name:"Ny tegning",orderId:"",projectId:"",customer:"",address:"",notes:"",visualizationNotes:"",walls:[],items:[],zones:[],measurements:[],snapSize:50,showGrid:true,scale:"1:50",zoom:1,defaultWallThickness:98,defaultWallHeight:2400});
 const wallTypes=new Set(["door","sliding","window","opening","railing","screen"]);
@@ -283,12 +292,14 @@ export default function DrawingClient(){
    const rw=Number(roomBuilder.rw),rh=Number(roomBuilder.rh);
    if(!Number.isFinite(rw)||!Number.isFinite(rh)||w<600||h<600||rw<300||rh<300||rw>=w-300||rh>=h-300){setMessage("Innhakket passer ikke i L-rommet");setTimeout(()=>setMessage(""),2200);return}
    const pts=[[x,y],[x+w-rw,y],[x+w-rw,y+rh],[x+w,y+rh],[x+w,y+h],[x,y+h],[x,y]];
-   const points=pts.slice(0,-1).map(p=>({x:p[0],y:p[1]})),zone={id:uid(),name,points,ceilingHeight:H,floorFinish:"",notes:""};
-   mutate(d=>({...d,walls:[...d.walls,...pts.slice(0,-1).map((p,i)=>({id:uid(),x1:p[0],y1:p[1],x2:pts[i+1][0],y2:pts[i+1][1],t,h:H}))],zones:[...(d.zones||[]),zone]}));
+   const walls=pts.slice(0,-1).map((p,i)=>({id:uid(),x1:p[0],y1:p[1],x2:pts[i+1][0],y2:pts[i+1][1],t,h:H}));
+   const points=walls.map(wall=>({x:wall.x1,y:wall.y1})),zone={id:uid(),name,points,wallIds:walls.map(wall=>wall.id),ceilingHeight:H,floorFinish:"",notes:""};
+   mutate(d=>({...d,walls:[...d.walls,...walls],zones:[...(d.zones||[]),zone]}));
    setSelected({kind:"zone",id:zone.id});
   }else{
-   const points=[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}],zone={id:uid(),name,points,ceilingHeight:H,floorFinish:"",notes:""};
-   mutate(d=>({...d,walls:[...d.walls,{id:uid(),x1:x,y1:y,x2:x+w,y2:y,t,h:H},{id:uid(),x1:x+w,y1:y,x2:x+w,y2:y+h,t,h:H},{id:uid(),x1:x+w,y1:y+h,x2:x,y2:y+h,t,h:H},{id:uid(),x1:x,y1:y+h,x2:x,y2:y,t,h:H}],zones:[...(d.zones||[]),zone]}));
+   const walls=[{id:uid(),x1:x,y1:y,x2:x+w,y2:y,t,h:H},{id:uid(),x1:x+w,y1:y,x2:x+w,y2:y+h,t,h:H},{id:uid(),x1:x+w,y1:y+h,x2:x,y2:y+h,t,h:H},{id:uid(),x1:x,y1:y+h,x2:x,y2:y,t,h:H}];
+   const points=walls.map(wall=>({x:wall.x1,y:wall.y1})),zone={id:uid(),name,points,wallIds:walls.map(wall=>wall.id),ceilingHeight:H,floorFinish:"",notes:""};
+   mutate(d=>({...d,walls:[...d.walls,...walls],zones:[...(d.zones||[]),zone]}));
    setSelected({kind:"zone",id:zone.id});
   }
   const focusZoom=clamp(VIEW/Math.max(500,Math.max(w,h)*1.18),.5,5),focusView=VIEW/focusZoom;
@@ -331,8 +342,8 @@ export default function DrawingClient(){
  };
  const sel=useMemo(()=>selected?.kind==="wall"?doc.walls.find(x=>x.id===selected.id):selected?.kind==="item"?doc.items.find(x=>x.id===selected.id):selected?.kind==="zone"?(doc.zones||[]).find(x=>x.id===selected.id):selected?.kind==="measurement"?(doc.measurements||[]).find(x=>x.id===selected.id):null,[selected,doc]);
  useEffect(()=>{setMobileEditOpen(false)},[selected?.kind,selected?.id]);
- const update=(key,value)=>{const n=Number(value);if(!Number.isFinite(n))return;mutate(d=>{if(selected?.kind==="item"){return {...d,items:d.items.map(o=>{if(o.id!==selected.id)return o;if((key==="wallOffset"||key==="wallStartGap"||key==="wallEndGap")&&o.wallId){const w=d.walls.find(x=>x.id===o.wallId);if(!w)return o;const limits=mountedLimits(o,w),half=Math.max(0,Number(o.w)||0)/2;let desired=n;if(key==="wallStartGap")desired=n+half;if(key==="wallEndGap")desired=limits.L-n-half;const off=clamp(desired,limits.min,limits.max),a=Math.atan2(w.y2-w.y1,w.x2-w.x1),cx=w.x1+Math.cos(a)*off,cy=w.y1+Math.sin(a)*off;return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off}}return {...o,[key]:n}})}}const walls=d.walls.map(w=>{if(w.id!==selected?.id)return w;if(key==="len"||key==="angle"){const L=key==="len"?n:len(w),A=(key==="angle"?n:angle(w))*Math.PI/180;return {...w,x2:w.x1+L*Math.cos(A),y2:w.y1+L*Math.sin(A)}}if(key==="x1"||key==="y1"){const dx=key==="x1"?n-w.x1:0,dy=key==="y1"?n-w.y1:0;return {...w,x1:w.x1+dx,y1:w.y1+dy,x2:w.x2+dx,y2:w.y2+dy}}return {...w,[key]:n}});return {...d,walls,items:syncMounted(walls,d.items)}})};
- const remove=()=>{checkpoint();setFuture([]);setDoc(d=>selected?.kind==="wall"?{...d,walls:d.walls.filter(x=>x.id!==selected.id),items:d.items.map(o=>o.wallId===selected.id?{...o,wallId:null,wallOffset:null}:o)}:selected?.kind==="zone"?{...d,zones:(d.zones||[]).filter(x=>x.id!==selected.id)}:selected?.kind==="measurement"?{...d,measurements:(d.measurements||[]).filter(x=>x.id!==selected.id)}:{...d,items:d.items.filter(x=>x.id!==selected.id)});setSelected(null)};
+ const update=(key,value)=>{const n=Number(value);if(!Number.isFinite(n))return;mutate(d=>{if(selected?.kind==="item"){return {...d,items:d.items.map(o=>{if(o.id!==selected.id)return o;if((key==="wallOffset"||key==="wallStartGap"||key==="wallEndGap")&&o.wallId){const w=d.walls.find(x=>x.id===o.wallId);if(!w)return o;const limits=mountedLimits(o,w),half=Math.max(0,Number(o.w)||0)/2;let desired=n;if(key==="wallStartGap")desired=n+half;if(key==="wallEndGap")desired=limits.L-n-half;const off=clamp(desired,limits.min,limits.max),a=Math.atan2(w.y2-w.y1,w.x2-w.x1),cx=w.x1+Math.cos(a)*off,cy=w.y1+Math.sin(a)*off;return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off}}return {...o,[key]:n}})}}const walls=d.walls.map(w=>{if(w.id!==selected?.id)return w;if(key==="len"||key==="angle"){const L=key==="len"?n:len(w),A=(key==="angle"?n:angle(w))*Math.PI/180;return {...w,x2:w.x1+L*Math.cos(A),y2:w.y1+L*Math.sin(A)}}if(key==="x1"||key==="y1"){const dx=key==="x1"?n-w.x1:0,dy=key==="y1"?n-w.y1:0;return {...w,x1:w.x1+dx,y1:w.y1+dy,x2:w.x2+dx,y2:w.y2+dy}}return {...w,[key]:n}});return {...d,walls,zones:syncLinkedZones(walls,d.zones),items:syncMounted(walls,d.items)}})};
+ const remove=()=>{checkpoint();setFuture([]);setDoc(d=>selected?.kind==="wall"?(()=>{const walls=d.walls.filter(x=>x.id!==selected.id);return {...d,walls,zones:syncLinkedZones(walls,d.zones),items:d.items.map(o=>o.wallId===selected.id?{...o,wallId:null,wallOffset:null}:o)}})():selected?.kind==="zone"?{...d,zones:(d.zones||[]).filter(x=>x.id!==selected.id)}:selected?.kind==="measurement"?{...d,measurements:(d.measurements||[]).filter(x=>x.id!==selected.id)}:{...d,items:d.items.filter(x=>x.id!==selected.id)});setSelected(null)};
  const flipDoor=()=>{if(selected?.kind!=="item"||!sel||sel.type!=="door")return;mutate(d=>({...d,items:d.items.map(o=>o.id===sel.id?{...o,flip:!o.flip}:o)}))};
  const detach=()=>{if(selected?.kind!=="item"||!sel)return;mutate(d=>({...d,items:d.items.map(o=>o.id===sel.id?{...o,wallId:null}:o)}))};
  const duplicate=()=>{if(selected?.kind!=="item"||!sel)return;mutate(d=>({...d,items:[...d.items,{...sel,id:uid(),x:sel.x+200,y:sel.y+200}]}))};
