@@ -210,15 +210,18 @@ export async function DELETE(req){
  if(!UUID_RE.test(id))return NextResponse.json({error:"Registreringen mangler."},{status:400});
  const s=db();
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
- const {data,error}=await s.from("work_time_entries")
-  .delete().eq("id",id).eq("admin_user_id",user.id)
-  .select("id,started_at,ended_at").maybeSingle();
+ const existing=await s.from("work_time_entries")
+  .select("id,started_at,ended_at").eq("id",id).eq("admin_user_id",user.id).maybeSingle();
+ if(existing.error){
+  if(tableError(existing.error))return NextResponse.json({error:"Databaseoppdatering mangler for arbeidsklokken.",setupRequired:true},{status:503});
+  return NextResponse.json({error:"Registreringen kunne ikke hentes."},{status:500});
+ }
+ if(!existing.data)return NextResponse.json({error:"Registreringen ble ikke funnet."},{status:404});
+ if(existing.data.started_at&&!existing.data.ended_at)return NextResponse.json({error:"En aktiv klokke må stoppes før den kan slettes."},{status:409});
+ const {error}=await s.from("work_time_entries").delete().eq("id",id).eq("admin_user_id",user.id);
  if(error){
-  if(tableError(error))return NextResponse.json({error:"Databaseoppdatering mangler for arbeidsklokken.",setupRequired:true},{status:503});
   console.error("WORK TIME DELETE",error);
   return NextResponse.json({error:"Registreringen kunne ikke slettes."},{status:500});
  }
- if(!data)return NextResponse.json({error:"Registreringen ble ikke funnet."},{status:404});
- if(data.started_at&&!data.ended_at)return NextResponse.json({error:"En aktiv klokke må stoppes før den kan slettes."},{status:409});
  return NextResponse.json({ok:true});
 }
