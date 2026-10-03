@@ -106,7 +106,7 @@ function nearestWall(o,walls){
 }
 
 export default function DrawingClient(){
- const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null),[mobileEditOpen,setMobileEditOpen]=useState(false);
+ const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null),[mobileEditOpen,setMobileEditOpen]=useState(false),[roomBuilder,setRoomBuilder]=useState(null),[quickAddOpen,setQuickAddOpen]=useState(false);
  const svg=useRef(null);
  const leftPanel=useRef(null),rightPanel=useRef(null);
  const touchPointers=useRef(new Map()),pinchGesture=useRef(null),pendingCanvasTouch=useRef(null);
@@ -240,9 +240,37 @@ export default function DrawingClient(){
   })();
   return()=>{cancelled=true};
  },[orders]);
- const makeRoom=()=>{const w=Number(prompt("Romlengde i mm","4000")),h=Number(prompt("Rombredde i mm","3000"));if(w<300||h<300)return;const x=1000,y=1000,t=Number(doc.defaultWallThickness)||98,H=Number(doc.defaultWallHeight)||2400,points=[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}],zone={id:uid(),name:"Rom "+((doc.zones||[]).length+1),points,ceilingHeight:H,floorFinish:"",notes:""};mutate(d=>({...d,walls:[...d.walls,{id:uid(),x1:x,y1:y,x2:x+w,y2:y,t,h:H},{id:uid(),x1:x+w,y1:y,x2:x+w,y2:y+h,t,h:H},{id:uid(),x1:x+w,y1:y+h,x2:x,y2:y+h,t,h:H},{id:uid(),x1:x,y1:y+h,x2:x,y2:y,t,h:H}],zones:[...(d.zones||[]),zone]}));setSelected({kind:"zone",id:zone.id})};
- const makeLRoom=()=>{const w=Number(prompt("Ytterlengde i mm","5000")),h=Number(prompt("Ytterbredde i mm","4000")),rw=Number(prompt("Bredde på innhakk fra høyre i mm","1800")),rh=Number(prompt("Dybde på innhakk ovenfra i mm","1500"));if(w<600||h<600||rw<300||rh<300||rw>=w-300||rh>=h-300){alert("Målene gir ikke et gyldig L-rom.");return}const x=1000,y=1000,t=Number(doc.defaultWallThickness)||98,H=Number(doc.defaultWallHeight)||2400,pts=[[x,y],[x+w-rw,y],[x+w-rw,y+rh],[x+w,y+rh],[x+w,y+h],[x,y+h],[x,y]],points=pts.slice(0,-1).map(p=>({x:p[0],y:p[1]})),zone={id:uid(),name:"Rom "+((doc.zones||[]).length+1),points,ceilingHeight:H,floorFinish:"",notes:""};mutate(d=>({...d,walls:[...d.walls,...pts.slice(0,-1).map((p,i)=>({id:uid(),x1:p[0],y1:p[1],x2:pts[i+1][0],y2:pts[i+1][1],t,h:H}))],zones:[...(d.zones||[]),zone]}));setSelected({kind:"zone",id:zone.id})};
- const addItem=(type,w,h)=>mutate(d=>({...d,items:[...d.items,{id:uid(),type,x:1800,y:1600,w,h,rot:0,...openingDefaults(type)}]}));
+ const openRoomBuilder=type=>setRoomBuilder(type==="l"
+  ?{type:"l",name:"Rom "+((doc.zones||[]).length+1),w:"5000",h:"4000",rw:"1800",rh:"1500"}
+  :{type:"rect",name:"Rom "+((doc.zones||[]).length+1),w:"4000",h:"3000"});
+ const roomStart=(w,h)=>{const cx=pan.x+viewSize/2,cy=pan.y+viewSize/2;return{x:clamp(snapTo(cx-w/2,doc.snapSize||50),100,Math.max(100,VIEW-w-100)),y:clamp(snapTo(cy-h/2,doc.snapSize||50),100,Math.max(100,VIEW-h-100))}};
+ const createRoom=()=>{
+  if(!roomBuilder)return;
+  const w=Number(roomBuilder.w),h=Number(roomBuilder.h),name=String(roomBuilder.name||"").trim()||"Rom "+((doc.zones||[]).length+1);
+  if(!Number.isFinite(w)||!Number.isFinite(h)||w<300||h<300||w>7000||h>7000){setMessage("Sjekk rommålene");setTimeout(()=>setMessage(""),1800);return}
+  const t=Number(doc.defaultWallThickness)||98,H=Number(doc.defaultWallHeight)||2400,{x,y}=roomStart(w,h);
+  if(roomBuilder.type==="l"){
+   const rw=Number(roomBuilder.rw),rh=Number(roomBuilder.rh);
+   if(!Number.isFinite(rw)||!Number.isFinite(rh)||w<600||h<600||rw<300||rh<300||rw>=w-300||rh>=h-300){setMessage("Innhakket passer ikke i L-rommet");setTimeout(()=>setMessage(""),2200);return}
+   const pts=[[x,y],[x+w-rw,y],[x+w-rw,y+rh],[x+w,y+rh],[x+w,y+h],[x,y+h],[x,y]];
+   const points=pts.slice(0,-1).map(p=>({x:p[0],y:p[1]})),zone={id:uid(),name,points,ceilingHeight:H,floorFinish:"",notes:""};
+   mutate(d=>({...d,walls:[...d.walls,...pts.slice(0,-1).map((p,i)=>({id:uid(),x1:p[0],y1:p[1],x2:pts[i+1][0],y2:pts[i+1][1],t,h:H}))],zones:[...(d.zones||[]),zone]}));
+   setSelected({kind:"zone",id:zone.id});
+  }else{
+   const points=[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}],zone={id:uid(),name,points,ceilingHeight:H,floorFinish:"",notes:""};
+   mutate(d=>({...d,walls:[...d.walls,{id:uid(),x1:x,y1:y,x2:x+w,y2:y,t,h:H},{id:uid(),x1:x+w,y1:y,x2:x+w,y2:y+h,t,h:H},{id:uid(),x1:x+w,y1:y+h,x2:x,y2:y+h,t,h:H},{id:uid(),x1:x,y1:y+h,x2:x,y2:y,t,h:H}],zones:[...(d.zones||[]),zone]}));
+   setSelected({kind:"zone",id:zone.id});
+  }
+  setRoomBuilder(null);setTool("select");
+  setTimeout(()=>fitView(),0);
+ };
+ const makeRoom=()=>openRoomBuilder("rect");
+ const makeLRoom=()=>openRoomBuilder("l");
+ const addItem=(type,w,h)=>{
+  const id=uid(),cx=pan.x+viewSize/2,cy=pan.y+viewSize/2,x=snapTo(cx-w/2,doc.snapSize||50),y=snapTo(cy-h/2,doc.snapSize||50);
+  mutate(d=>({...d,items:[...d.items,{id,type,x:clamp(x,0,VIEW-w),y:clamp(y,0,VIEW-h),w,h,rot:0,...openingDefaults(type)}]}));
+  setSelected({kind:"item",id});setTool("select");setQuickAddOpen(false);
+ };
  const sel=useMemo(()=>selected?.kind==="wall"?doc.walls.find(x=>x.id===selected.id):selected?.kind==="item"?doc.items.find(x=>x.id===selected.id):selected?.kind==="zone"?(doc.zones||[]).find(x=>x.id===selected.id):null,[selected,doc]);
  useEffect(()=>{setMobileEditOpen(false)},[selected?.kind,selected?.id]);
  const update=(key,value)=>{const n=Number(value);if(!Number.isFinite(n))return;mutate(d=>{if(selected?.kind==="item"){return {...d,items:d.items.map(o=>{if(o.id!==selected.id)return o;if((key==="wallOffset"||key==="wallStartGap"||key==="wallEndGap")&&o.wallId){const w=d.walls.find(x=>x.id===o.wallId);if(!w)return o;const limits=mountedLimits(o,w),half=Math.max(0,Number(o.w)||0)/2;let desired=n;if(key==="wallStartGap")desired=n+half;if(key==="wallEndGap")desired=limits.L-n-half;const off=clamp(desired,limits.min,limits.max),a=Math.atan2(w.y2-w.y1,w.x2-w.x1),cx=w.x1+Math.cos(a)*off,cy=w.y1+Math.sin(a)*off;return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off}}return {...o,[key]:n}})}}const walls=d.walls.map(w=>{if(w.id!==selected?.id)return w;if(key==="len"||key==="angle"){const L=key==="len"?n:len(w),A=(key==="angle"?n:angle(w))*Math.PI/180;return {...w,x2:w.x1+L*Math.cos(A),y2:w.y1+L*Math.sin(A)}}if(key==="x1"||key==="y1"){const dx=key==="x1"?n-w.x1:0,dy=key==="y1"?n-w.y1:0;return {...w,x1:w.x1+dx,y1:w.y1+dy,x2:w.x2+dx,y2:w.y2+dy}}return {...w,[key]:n}});return {...d,walls,items:syncMounted(walls,d.items)}})};
@@ -368,6 +396,7 @@ export default function DrawingClient(){
    <button type="button" className={tool==="pan"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("pan");setDraft(null);setMeasureDraft(null);setZoneDraft([])}}>Flytt</button>
    <button type="button" className={tool==="measure"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("measure");setDraft(null);setZoneDraft([]);setMeasureDraft(null)}}>Mål</button>
    <button type="button" className={tool==="zone"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("zone");setDraft(null);setMeasureDraft(null);setZoneDraft([])}}>Romsone</button>
+   <button type="button" className={quickAddOpen?styles.mobileActive:styles.mobileTool} onClick={()=>setQuickAddOpen(value=>!value)}>+ Legg til</button>
    {(draft||measureDraft||zoneDraft.length>0)&&<button type="button" className={styles.mobileDone} onClick={()=>{if(tool==="zone"&&zoneDraft.length>=3)finishZone();else{setDraft(null);setMeasureDraft(null);setZoneDraft([]);setTool("select")}}}>{tool==="zone"&&zoneDraft.length>=3?"Lukk sone":"Ferdig"}</button>}
    <span className={styles.mobileDivider}/>
    <button type="button" className={styles.mobileTool} onClick={undo} disabled={!history.length}>↶</button>
@@ -381,6 +410,18 @@ export default function DrawingClient(){
    <button type="button" className={styles.mobileTool} onClick={()=>scrollPanel(rightPanel)}>Egenskaper</button>
    <button type="button" className={styles.mobileSave} onClick={()=>persist()}>Lagre</button>
   </nav>
+  {quickAddOpen&&<div className={styles.mobileQuickAdd}>
+   <button type="button" onClick={makeRoom}>▭ Rektangulært rom</button>
+   <button type="button" onClick={makeLRoom}>⌞ L-rom</button>
+   <button type="button" onClick={()=>addItem("door",900,100)}>Dør 90</button>
+   <button type="button" onClick={()=>addItem("window",1200,100)}>Vindu 120</button>
+   <button type="button" onClick={()=>addItem("opening",1000,100)}>Åpning 100</button>
+   <button type="button" onClick={()=>addItem("shower",900,900)}>Dusj 90×90</button>
+   <button type="button" onClick={()=>addItem("toilet",400,700)}>Toalett</button>
+   <button type="button" onClick={()=>addItem("sink",600,500)}>Servant 60</button>
+   <button type="button" onClick={()=>addItem("base",600,600)}>Benkeskap 60</button>
+   <button type="button" onClick={()=>addItem("washer",600,600)}>Vaskemaskin</button>
+  </div>}
   {sel&&<div className={styles.mobileSelection}>
    <div><span>VALGT</span><strong>{selected.kind==="wall"?"Vegg · "+len(sel)+" mm · "+angle(sel)+"°":selected.kind==="zone"?(sel.name||"Romsone")+" · "+polygonAreaM2(sel.points).toFixed(2)+" m²":labelFor(sel.type)+" · "+Math.round(sel.w)+" × "+Math.round(sel.h)+" mm"}</strong></div>
    <button type="button" onClick={()=>setMobileEditOpen(value=>!value)}>{mobileEditOpen?"Lukk":"Rediger mål"}</button>
@@ -403,6 +444,23 @@ export default function DrawingClient(){
     {sel.type==="window"&&<label>Brystning (mm)<input key={"is-"+sel.id+"-"+sel.sillHeight} type="number" inputMode="numeric" defaultValue={Math.round(Number(sel.sillHeight)||0)} onBlur={e=>update("sillHeight",e.target.value)}/></label>}
    </>}
    <button type="button" className={styles.mobileAllProps} onClick={()=>scrollPanel(rightPanel)}>Vis alle egenskaper</button>
+  </div>}
+  {roomBuilder&&<div className={styles.roomModalBackdrop} role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)setRoomBuilder(null)}}>
+   <section className={styles.roomModal} role="dialog" aria-modal="true" aria-label={roomBuilder.type==="l"?"Lag L-rom":"Lag rektangulært rom"}>
+    <div className={styles.roomModalHead}><div><span>NYTT ROM</span><h2>{roomBuilder.type==="l"?"L-formet rom":"Rektangulært rom"}</h2></div><button type="button" onClick={()=>setRoomBuilder(null)} aria-label="Lukk">×</button></div>
+    <label>Romnavn<input autoFocus value={roomBuilder.name} onChange={e=>setRoomBuilder(v=>({...v,name:e.target.value}))}/></label>
+    <div className={styles.roomModalGrid}>
+     <label>Lengde (mm)<input type="number" inputMode="numeric" min="300" max="7000" value={roomBuilder.w} onChange={e=>setRoomBuilder(v=>({...v,w:e.target.value}))}/></label>
+     <label>Bredde (mm)<input type="number" inputMode="numeric" min="300" max="7000" value={roomBuilder.h} onChange={e=>setRoomBuilder(v=>({...v,h:e.target.value}))}/></label>
+     {roomBuilder.type==="l"&&<>
+      <label>Innhakk bredde (mm)<input type="number" inputMode="numeric" min="300" value={roomBuilder.rw} onChange={e=>setRoomBuilder(v=>({...v,rw:e.target.value}))}/></label>
+      <label>Innhakk dybde (mm)<input type="number" inputMode="numeric" min="300" value={roomBuilder.rh} onChange={e=>setRoomBuilder(v=>({...v,rh:e.target.value}))}/></label>
+     </>}
+    </div>
+    <div className={styles.roomPreview} aria-hidden="true"><div className={roomBuilder.type==="l"?styles.roomLShape:styles.roomRectShape}/></div>
+    <p>Rommet plasseres midt i det du ser på tegneflaten. Vegger får standard tykkelse <b>{doc.defaultWallThickness||98} mm</b> og høyde <b>{doc.defaultWallHeight||2400} mm</b>.</p>
+    <div className={styles.roomModalActions}><button type="button" onClick={()=>setRoomBuilder(null)}>Avbryt</button><button type="button" onClick={createRoom}>Lag rom</button></div>
+   </section>
   </div>}
   <div className={styles.layout}>
    <aside ref={leftPanel} className={styles.panel+" "+styles.left}>
