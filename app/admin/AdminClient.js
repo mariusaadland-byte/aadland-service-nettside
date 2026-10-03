@@ -1183,8 +1183,9 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
   const data=await response.json().catch(()=>({}));
   setSavingId(null);
   if(!response.ok){setMessage(data.error||"Vipps-handlingen kunne ikke utføres.");return;}
-  const labels={sync:"Vipps-status er synkronisert.",capture:"Vipps-beløpet er captured.",cancel:"Gjenværende Vipps-reservasjon er kansellert.",refund:"Vipps-refusjonen er registrert."};
-  setMessage(labels[action]||"Vipps-betalingen er oppdatert.");
+  const labels={sync:"Vipps-status er synkronisert.",capture:"Vipps-beløpet er trukket.",cancel:"Gjenværende Vipps-reservasjon er kansellert.",refund:"Vipps-refusjonen er registrert."};
+  const receiptText=data?.receipt?.sent?" Kvittering er sendt automatisk til kunden.":data?.receiptWarning?" "+data.receiptWarning:"";
+  setMessage((labels[action]||"Vipps-betalingen er oppdatert.")+receiptText);
   if(typeof reload==="function")await reload();
  }
  return <><>{message&&<p className="notice">{message}</p>}</><div className="orderCards">{orders.length?orders.map(order=><article className="card orderCard" key={order.id}>
@@ -4365,8 +4366,9 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
   const data=await response.json().catch(()=>({}));
   setSavingId("");
   if(!response.ok){setError(data.error||"Vipps-handlingen kunne ikke utføres.");return;}
-  const labels={sync:"Vipps-status er synkronisert.",capture:"Vipps-beløpet er captured.",cancel:"Gjenværende Vipps-reservasjon er kansellert.",refund:"Vipps-refusjonen er registrert."};
-  setMessage(labels[action]||"Vipps-betalingen er oppdatert.");
+  const labels={sync:"Vipps-status er synkronisert.",capture:"Vipps-beløpet er trukket.",cancel:"Gjenværende Vipps-reservasjon er kansellert.",refund:"Vipps-refusjonen er registrert."};
+  const receiptText=data?.receipt?.sent?" Kvittering er sendt automatisk til kunden.":data?.receiptWarning?" "+data.receiptWarning:"";
+  setMessage((labels[action]||"Vipps-betalingen er oppdatert.")+receiptText);
   await reload();
  }
 
