@@ -2,6 +2,7 @@ import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {vippsPaymentsEnabled} from "../../../../lib/vippsClient";
 import {verifyVippsWebhookRequest} from "../../../../lib/vippsWebhook";
+import {sendVippsPaymentReceiptIfNeeded} from "../../../../lib/vippsPaymentReceipt";
 
 export const runtime="nodejs";
 
@@ -94,6 +95,28 @@ export async function POST(req){
    webhookId,unit,reference,eventName,error:processError.message
   });
   return NextResponse.json({error:"Webhook processing failed."},{status:500});
+ }
+
+ if(eventName==="CAPTURED"){
+  try{
+   let targetId=processed?.applied?.id||null;
+   if(!targetId){
+    const table=unit==="rental"?"rental_bookings":"orders";
+    const numberColumn=unit==="rental"?"booking_number":"order_number";
+    const {data:target}=await s.from(table)
+     .select("id")
+     .or(numberColumn+".eq."+reference+",payment_reference.eq."+reference)
+     .limit(1)
+     .maybeSingle();
+    targetId=target?.id||null;
+   }
+   if(targetId){
+    const receipt=await sendVippsPaymentReceiptIfNeeded({s,unit,id:targetId,req});
+    if(receipt?.sent)console.log("VIPPS RECEIPT SENT",{unit,reference});
+   }
+  }catch(error){
+   console.error("VIPPS RECEIPT BEST EFFORT ERROR",{unit,reference,message:error?.message});
+  }
  }
 
  return NextResponse.json({ok:true,duplicate:processed?.duplicate===true});
