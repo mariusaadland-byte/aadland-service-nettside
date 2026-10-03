@@ -109,6 +109,7 @@ export default function DrawingClient(){
  const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null);
  const svg=useRef(null);
  const leftPanel=useRef(null),rightPanel=useRef(null);
+ const touchPointers=useRef(new Map()),pinchGesture=useRef(null),pendingCanvasTouch=useRef(null);
  const linkedOrderHandled=useRef("");
  const autosaveReady=useRef(false);
  useEffect(()=>{try{const d=JSON.parse(localStorage.getItem(STORE)||"[]");if(d.length){setDocs(d);setDoc({...initial(),...d[0]})}else{const old=JSON.parse(localStorage.getItem("aadlandDrawing")||"null");if(old)setDoc({...initial(),...old})}}catch{} Promise.all([
@@ -143,14 +144,59 @@ export default function DrawingClient(){
  const undo=()=>{const last=history.at(-1);if(!last)return;setFuture(f=>[JSON.stringify(doc),...f].slice(0,25));setDoc(JSON.parse(last));setHistory(h=>h.slice(0,-1));setSelected(null)};
  const redo=()=>{const next=future[0];if(!next)return;setHistory(h=>[...h.slice(-24),JSON.stringify(doc)]);setDoc(JSON.parse(next));setFuture(f=>f.slice(1));setSelected(null)};
  const viewSize=VIEW/(doc.zoom||1);
- const point=e=>{const r=svg.current.getBoundingClientRect();return{x:pan.x+(e.clientX-r.left)*viewSize/r.width,y:pan.y+(e.clientY-r.top)*viewSize/r.height}};
- const zoomBy=delta=>setDoc(d=>({...d,zoom:clamp((d.zoom||1)+delta,.5,3)}));
+ const pointFromClient=(clientX,clientY)=>{const r=svg.current.getBoundingClientRect();return{x:pan.x+(clientX-r.left)*viewSize/r.width,y:pan.y+(clientY-r.top)*viewSize/r.height}};
+ const point=e=>pointFromClient(e.clientX,e.clientY);
+ const clampPanForZoom=(value,zoom)=>{const size=VIEW/zoom,max=Math.max(0,VIEW-size);return{x:clamp(value.x,0,max),y:clamp(value.y,0,max)}};
+ const zoomBy=delta=>setDoc(d=>{const zoom=clamp((d.zoom||1)+delta,.5,5);setPan(p=>clampPanForZoom(p,zoom));return {...d,zoom}});
  const fitView=()=>{setPan({x:0,y:0});setDoc(d=>({...d,zoom:1}))};
  const capturePointer=e=>{try{svg.current?.setPointerCapture?.(e.pointerId)}catch{}};
  const releasePointer=e=>{try{if(svg.current?.hasPointerCapture?.(e.pointerId))svg.current.releasePointerCapture(e.pointerId)}catch{}};
  const scrollPanel=ref=>ref.current?.scrollIntoView?.({behavior:"smooth",block:"start"});
+ const clearPendingCanvasTouch=()=>{if(pendingCanvasTouch.current){clearTimeout(pendingCanvasTouch.current);pendingCanvasTouch.current=null}};
+ const rollbackGestureDrag=()=>{const start=drag?.start||wallDrag?.start||zoneDrag?.start;if(start){try{setDoc(JSON.parse(start))}catch{}}setDrag(null);setWallDrag(null);setZoneDrag(null);setPanning(null)};
+ const beginPinch=()=>{
+  const points=[...touchPointers.current.values()];
+  if(points.length<2||!svg.current)return;
+  clearPendingCanvasTouch();rollbackGestureDrag();
+  const a=points[0],b=points[1],r=svg.current.getBoundingClientRect(),startZoom=doc.zoom||1,startView=VIEW/startZoom;
+  const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+  pinchGesture.current={
+   startDistance:Math.max(1,Math.hypot(b.x-a.x,b.y-a.y)),
+   startZoom,
+   worldX:pan.x+(mx-r.left)*startView/r.width,
+   worldY:pan.y+(my-r.top)*startView/r.height
+  };
+ };
+ const pointerDownCapture=e=>{
+  if(e.pointerType!=="touch")return;
+  capturePointer(e);
+  touchPointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(touchPointers.current.size===2)beginPinch();
+ };
+ const pointerMoveCapture=e=>{
+  if(e.pointerType!=="touch"||!touchPointers.current.has(e.pointerId))return;
+  touchPointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  const gesture=pinchGesture.current,points=[...touchPointers.current.values()];
+  if(!gesture||points.length<2||!svg.current)return;
+  e.preventDefault();e.stopPropagation();
+  const a=points[0],b=points[1],distance=Math.max(1,Math.hypot(b.x-a.x,b.y-a.y));
+  const zoom=clamp(gesture.startZoom*(distance/gesture.startDistance),.5,5);
+  const r=svg.current.getBoundingClientRect(),nextView=VIEW/zoom,mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+  const nextPan=clampPanForZoom({
+   x:gesture.worldX-(mx-r.left)*nextView/r.width,
+   y:gesture.worldY-(my-r.top)*nextView/r.height
+  },zoom);
+  setPan(nextPan);setDoc(d=>Math.abs((d.zoom||1)-zoom)<.002?d:{...d,zoom});
+ };
+ const pointerUpCapture=e=>{
+  if(e.pointerType!=="touch")return;
+  const wasPinching=!!pinchGesture.current;
+  touchPointers.current.delete(e.pointerId);releasePointer(e);
+  if(touchPointers.current.size<2)pinchGesture.current=null;
+  if(wasPinching){e.preventDefault();e.stopPropagation()}
+ };
  const startPan=e=>{if(tool!=="pan")return;capturePointer(e);setPanning({cx:e.clientX,cy:e.clientY,x:pan.x,y:pan.y})};
- const movePan=e=>{if(!panning)return;const r=svg.current.getBoundingClientRect();setPan({x:panning.x-(e.clientX-panning.cx)*viewSize/r.width,y:panning.y-(e.clientY-panning.cy)*viewSize/r.height})};
+ const movePan=e=>{if(!panning)return;const r=svg.current.getBoundingClientRect();setPan(clampPanForZoom({x:panning.x-(e.clientX-panning.cx)*viewSize/r.width,y:panning.y-(e.clientY-panning.cy)*viewSize/r.height},doc.zoom||1))};
  const newDoc=()=>{const d=initial();setDoc(d);setSelected(null);setHistory([]);setFuture([])};
  const openDoc=id=>{const d=docs.find(x=>x.id===id);if(d){setDoc(d);setSelected(null);setHistory([]);setFuture([])}};
  const mergeIncomingDrawings=incoming=>{if(!incoming.length)return;const merged=[...docs];for(const drawing of incoming){const i=merged.findIndex(x=>x.serverId===drawing.serverId);if(i>=0)merged[i]=drawing;else merged.push(drawing)}setDocs(merged);localStorage.setItem(STORE,JSON.stringify(merged));setMessage(incoming.length+" tegning(er) hentet");setTimeout(()=>setMessage(""),2200)};
@@ -230,7 +276,21 @@ export default function DrawingClient(){
  const downItem=(e,o)=>{e.stopPropagation();capturePointer(e);setTool("select");setSelected({kind:"item",id:o.id});const p=point(e);setDrag({id:o.id,dx:p.x-o.x,dy:p.y-o.y,start:JSON.stringify(doc)})};
  const move=e=>{if(panning){movePan(e);return}if(wallDrag){moveWallEnd(e);return}if(zoneDrag){moveZonePoint(e);return}if(!drag)return;const p=point(e);setDoc(d=>({...d,items:d.items.map(o=>o.id===drag.id?{...o,x:snapTo(p.x-drag.dx,d.snapSize||50),y:snapTo(p.y-drag.dy,d.snapSize||50)}:o)}))};
  const up=e=>{if(e)releasePointer(e);if(panning){setPanning(null);return}if(wallDrag){endWallDrag();return}if(zoneDrag){endZoneDrag();return}if(!drag)return;setHistory(h=>[...h.slice(-24),drag.start]);setFuture([]);setDoc(d=>{const o=d.items.find(x=>x.id===drag.id);if(!o||!wallTypes.has(o.type))return d;const n=nearestWall({x:o.x+o.w/2,y:o.y+o.h/2},d.walls);if(!n||n.dist>450)return {...d,items:d.items.map(x=>x.id!==o.id?x:{...x,wallId:null,wallOffset:null})};const a=Math.atan2(n.wall.y2-n.wall.y1,n.wall.x2-n.wall.x1)*180/Math.PI,limits=mountedLimits(o,n.wall),off=clamp(Math.round(n.t*limits.L),limits.min,limits.max),cx=n.wall.x1+Math.cos(a*Math.PI/180)*off,cy=n.wall.y1+Math.sin(a*Math.PI/180)*off;return {...d,items:d.items.map(x=>x.id!==o.id?x:{...x,x:cx-o.w/2,y:cy-o.h/2,rot:a,wallId:n.wall.id,wallOffset:off})}});setDrag(null)};
- const canvasDown=e=>{if(e.target.dataset?.canvas!=="yes")return;capturePointer(e);if(tool==="pan"){startPan(e);return}setSelected(null);const p=point(e),q={x:snapTo(p.x,doc.snapSize||50),y:snapTo(p.y,doc.snapSize||50)};if(tool==="zone"){setZoneDraft(points=>[...points,q]);return}if(tool==="measure"){if(!measureDraft)setMeasureDraft(q);else{mutate(d=>({...d,measurements:[...(d.measurements||[]),{id:uid(),x1:measureDraft.x,y1:measureDraft.y,x2:q.x,y2:q.y}]}));setMeasureDraft(null)}return}if(tool!=="wall")return;if(!draft)setDraft(q);else{mutate(d=>({...d,walls:[...d.walls,{id:uid(),x1:draft.x,y1:draft.y,x2:q.x,y2:q.y,t:Number(d.defaultWallThickness)||98,h:Number(d.defaultWallHeight)||2400}]}));setDraft(q)}};
+ const applyCanvasPoint=p=>{setSelected(null);const q={x:snapTo(p.x,doc.snapSize||50),y:snapTo(p.y,doc.snapSize||50)};if(tool==="zone"){setZoneDraft(points=>[...points,q]);return}if(tool==="measure"){if(!measureDraft)setMeasureDraft(q);else{mutate(d=>({...d,measurements:[...(d.measurements||[]),{id:uid(),x1:measureDraft.x,y1:measureDraft.y,x2:q.x,y2:q.y}]}));setMeasureDraft(null)}return}if(tool!=="wall")return;if(!draft)setDraft(q);else{mutate(d=>({...d,walls:[...d.walls,{id:uid(),x1:draft.x,y1:draft.y,x2:q.x,y2:q.y,t:Number(d.defaultWallThickness)||98,h:Number(d.defaultWallHeight)||2400}]}));setDraft(q)}};
+ const canvasDown=e=>{
+  if(e.target.dataset?.canvas!=="yes")return;
+  capturePointer(e);
+  if(tool==="pan"){startPan(e);return}
+  const p=point(e);
+  if(e.pointerType==="touch"&&["wall","zone","measure"].includes(tool)){
+   clearPendingCanvasTouch();
+   const x=p.x,y=p.y;
+   pendingCanvasTouch.current=setTimeout(()=>{pendingCanvasTouch.current=null;if(!pinchGesture.current&&touchPointers.current.size<=1)applyCanvasPoint({x,y})},130);
+   return;
+  }
+  if(tool==="select"){setSelected(null);return}
+  applyCanvasPoint(p);
+ };
  const summary=useMemo(()=>{const wallM=doc.walls.reduce((s,w)=>s+len(w),0)/1000,wallM2=doc.walls.reduce((s,w)=>s+len(w)*(w.h||2400),0)/1000000,deckM2=doc.items.filter(o=>o.type==="deck").reduce((s,o)=>s+o.w*o.h,0)/1000000,floorM2=closedWallAreaM2(doc.walls),openingM2=doc.items.filter(o=>o.wallId&&openingTypes.has(o.type)).reduce((s,o)=>s+(Number(o.w)||0)*(Number(o.openingHeight)||openingDefaults(o.type).openingHeight||0),0)/1000000,netWallM2=Math.max(0,wallM2-openingM2),zoneRows=(doc.zones||[]).map(z=>{const area=polygonAreaM2(z.points),perimeter=polygonPerimeterM(z.points),height=(Number(z.ceilingHeight)||Number(doc.defaultWallHeight)||2400)/1000;return {...z,area,perimeter,wallArea:perimeter*height}}),zonedFloorM2=zoneRows.reduce((s,z)=>s+z.area,0),zonePerimeterM=zoneRows.reduce((s,z)=>s+z.perimeter,0),zoneWallM2=zoneRows.reduce((s,z)=>s+z.wallArea,0);const count=t=>doc.items.filter(o=>o.type===t).length;return {wallM,wallM2,openingM2,netWallM2,deckM2,floorM2,zoneRows,zonedFloorM2,zonePerimeterM,zoneWallM2,objects:doc.items.length,doors:count("door")+count("sliding"),windows:count("window"),posts:count("post")}},[doc]);
  const selectedOrder=orders.find(order=>order.id===doc.orderId);
  const selectedProject=projects.find(p=>p.id===doc.projectId);
@@ -317,13 +377,17 @@ export default function DrawingClient(){
    <button type="button" className={styles.mobileTool} onClick={()=>scrollPanel(rightPanel)}>Egenskaper</button>
    <button type="button" className={styles.mobileSave} onClick={()=>persist()}>Lagre</button>
   </nav>
+  {sel&&<div className={styles.mobileSelection}>
+   <div><span>VALGT</span><strong>{selected.kind==="wall"?"Vegg · "+len(sel)+" mm · "+angle(sel)+"°":selected.kind==="zone"?(sel.name||"Romsone")+" · "+polygonAreaM2(sel.points).toFixed(2)+" m²":labelFor(sel.type)+" · "+Math.round(sel.w)+" × "+Math.round(sel.h)+" mm"}</strong></div>
+   <button type="button" onClick={()=>scrollPanel(rightPanel)}>Rediger mål</button>
+  </div>}
   <div className={styles.layout}>
    <aside ref={leftPanel} className={styles.panel+" "+styles.left}>
     <div className={styles.group}><h2>Tegninger</h2><div className={styles.row}><button className={styles.btn} onClick={newDoc}>+ Ny</button><button className={styles.btn} onClick={exportJson}>Eksporter</button><label className={styles.btn}>Importer<input className={styles.hiddenFile} type="file" accept="application/json,.json" onChange={importJson}/></label><button className={styles.btn+" "+styles.danger} onClick={deleteDoc}>Slett</button></div>{docs.length>0&&<select className={styles.select} value={doc.id} onChange={e=>openDoc(e.target.value)}>{docs.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select>}<div className={styles.field}><label>Koble til oppdrag</label><select className={styles.select} value={doc.orderId||""} onChange={changeOrder}><option value="">Ikke koblet</option>{orders.map(order=><option key={order.id} value={order.id}>{order.orderNumber} · {order.customerName||"Uten kundenavn"}</option>)}</select><small className={styles.muted}>Velger du et oppdrag, hentes kunde og arbeidsadresse automatisk og tegningen lagres på oppdraget.</small></div>{doc.projectId&&<div className={styles.field}><label>Eldre prosjektkobling</label><select className={styles.select} value={doc.projectId||""} onChange={changeProject}><option value="">Fjern eldre kobling</option>{projects.map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</select></div>}<div className={styles.field}><label>Kunde</label><input value={doc.customer||""} onChange={e=>setDoc(d=>({...d,customer:e.target.value}))}/></div><div className={styles.field}><label>Adresse</label><input value={doc.address||""} onChange={e=>setDoc(d=>({...d,address:e.target.value}))}/></div><div className={styles.field}><label>Notater</label><textarea className={styles.textarea} value={doc.notes||""} onChange={e=>setDoc(d=>({...d,notes:e.target.value}))}/></div></div>
     <div className={styles.group}><h2>Innstillinger</h2><div className={styles.field}><label>Snap/rutenett</label><select className={styles.select} value={doc.snapSize||50} onChange={e=>setDoc(d=>({...d,snapSize:Number(e.target.value)}))}><option value="10">10 mm</option><option value="25">25 mm</option><option value="50">50 mm</option><option value="100">100 mm</option></select></div><div className={styles.field}><label>Standard veggtykkelse</label><select className={styles.select} value={doc.defaultWallThickness||98} onChange={e=>setDoc(d=>({...d,defaultWallThickness:Number(e.target.value)}))}><option value="70">70 mm</option><option value="98">98 mm</option><option value="120">120 mm</option><option value="198">198 mm</option><option value="248">248 mm</option></select></div><div className={styles.field}><label>Standard vegghøyde</label><select className={styles.select} value={doc.defaultWallHeight||2400} onChange={e=>setDoc(d=>({...d,defaultWallHeight:Number(e.target.value)}))}><option value="2200">2200 mm</option><option value="2400">2400 mm</option><option value="2500">2500 mm</option><option value="2600">2600 mm</option><option value="2700">2700 mm</option></select></div><div className={styles.field}><label>PDF-målestokk</label><select className={styles.select} value={doc.scale||"1:50"} onChange={e=>setDoc(d=>({...d,scale:e.target.value}))}><option>1:20</option><option>1:25</option><option>1:50</option><option>1:100</option></select></div><label className={styles.check}><input type="checkbox" checked={doc.showGrid!==false} onChange={e=>setDoc(d=>({...d,showGrid:e.target.checked}))}/> Vis rutenett</label></div><div className={styles.group}><h2>Rom og vegger</h2><div className={styles.row}><button className={tool==="wall"?styles.activeBtn:styles.btn} onClick={()=>{setTool("wall");setDraft(null)}}>Tegn vegg</button><button className={styles.btn} onClick={makeRoom}>Rektangulært rom</button><button className={styles.btn} onClick={makeLRoom}>L-formet rom</button><button className={tool==="zone"?styles.activeBtn:styles.btn} onClick={()=>{setTool("zone");setDraft(null);setMeasureDraft(null);setZoneDraft([])}}>Tegn romsone</button>{tool==="zone"&&<><button className={styles.btn} onClick={finishZone} disabled={zoneDraft.length<3}>Lukk romsone</button><button className={styles.btn} onClick={cancelZone}>Avbryt sone</button></>}<button className={tool==="measure"?styles.activeBtn:styles.btn} onClick={()=>{setTool("measure");setDraft(null);setZoneDraft([]);setMeasureDraft(null)}}>Mål avstand</button><button className={styles.btn} onClick={clearMeasures}>Fjern mål</button></div><p className={styles.muted}>Nye vegger bruker standard tykkelse og høyde over. Med «Tegn romsone» klikker du rundt innsiden av et rom og avslutter med «Lukk romsone». Da beregnes gulv/tak, brutto listelengde og veggflate per rom.</p></div>
     {catalog.map(g=><div className={styles.group} key={g.group}><h2>{g.group}</h2><div className={styles.library}>{g.items.map(([t,l,w,h])=><button key={t} onClick={()=>addItem(t,w,h)}>{l}<small>{w} × {h} mm</small></button>)}</div></div>)}
    </aside>
-   <section className={styles.workspace}><div className={styles.printHead}><h1>{doc.name}</h1><p>{[doc.customer,doc.address].filter(Boolean).join(" · ")}</p><p>Oppdrag: {projectLabel}</p><p>Målestokk: {doc.scale||"1:50"} · Alle mål i mm · Aadland Service</p></div><div className={styles.printSummary}><div><span>Vegger</span><b>{summary.wallM.toFixed(2)} lm</b></div><div><span>Gulvareal</span><b>{summary.floorM2==null?"—":summary.floorM2.toFixed(2)+" m²"}</b></div><div><span>Brutto veggflate</span><b>{summary.wallM2.toFixed(2)} m²</b></div><div><span>Åpningsareal</span><b>{summary.openingM2.toFixed(2)} m²</b></div><div><span>Netto veggflate</span><b>{summary.netWallM2.toFixed(2)} m²</b></div><div><span>Dører / vinduer</span><b>{summary.doors} / {summary.windows}</b></div>{summary.zoneRows.length>0&&<><div><span>Romsone gulv/tak</span><b>{summary.zonedFloorM2.toFixed(2)} m²</b></div><div><span>Brutto listelengde</span><b>{summary.zonePerimeterM.toFixed(2)} lm</b></div><div><span>Romsone veggflate</span><b>{summary.zoneWallM2.toFixed(2)} m²</b></div></>}{doc.notes&&<div className={styles.printNotes}><span>Notater</span><b>{doc.notes}</b></div>}</div><div className={styles.canvasWrap}><svg ref={svg} className={styles.canvas} viewBox={pan.x+" "+pan.y+" "+viewSize+" "+viewSize} onPointerDown={canvasDown} onPointerMove={move} onPointerUp={up} onPointerLeave={up} onWheel={e=>{e.preventDefault();zoomBy(e.deltaY<0?.15:-.15)}}>
+   <section className={styles.workspace}><div className={styles.printHead}><h1>{doc.name}</h1><p>{[doc.customer,doc.address].filter(Boolean).join(" · ")}</p><p>Oppdrag: {projectLabel}</p><p>Målestokk: {doc.scale||"1:50"} · Alle mål i mm · Aadland Service</p></div><div className={styles.printSummary}><div><span>Vegger</span><b>{summary.wallM.toFixed(2)} lm</b></div><div><span>Gulvareal</span><b>{summary.floorM2==null?"—":summary.floorM2.toFixed(2)+" m²"}</b></div><div><span>Brutto veggflate</span><b>{summary.wallM2.toFixed(2)} m²</b></div><div><span>Åpningsareal</span><b>{summary.openingM2.toFixed(2)} m²</b></div><div><span>Netto veggflate</span><b>{summary.netWallM2.toFixed(2)} m²</b></div><div><span>Dører / vinduer</span><b>{summary.doors} / {summary.windows}</b></div>{summary.zoneRows.length>0&&<><div><span>Romsone gulv/tak</span><b>{summary.zonedFloorM2.toFixed(2)} m²</b></div><div><span>Brutto listelengde</span><b>{summary.zonePerimeterM.toFixed(2)} lm</b></div><div><span>Romsone veggflate</span><b>{summary.zoneWallM2.toFixed(2)} m²</b></div></>}{doc.notes&&<div className={styles.printNotes}><span>Notater</span><b>{doc.notes}</b></div>}</div><div className={styles.canvasWrap}><div className={styles.mobileCanvasHint}>Én finger: tegn/velg · To fingre: zoom og flytt</div><svg ref={svg} className={styles.canvas} viewBox={pan.x+" "+pan.y+" "+viewSize+" "+viewSize} onPointerDownCapture={pointerDownCapture} onPointerMoveCapture={pointerMoveCapture} onPointerUpCapture={pointerUpCapture} onPointerCancelCapture={pointerUpCapture} onPointerDown={canvasDown} onPointerMove={move} onPointerUp={up} onPointerLeave={e=>{if(e.pointerType!=="touch")up(e)}} onWheel={e=>{e.preventDefault();zoomBy(e.deltaY<0?.15:-.15)}}>
     <defs><pattern id="minor" width={GRID} height={GRID} patternUnits="userSpaceOnUse"><path d={"M "+GRID+" 0 L 0 0 0 "+GRID} fill="none" stroke="#ece9e1" strokeWidth="6"/></pattern><pattern id="major" width="1000" height="1000" patternUnits="userSpaceOnUse"><rect width="1000" height="1000" fill="url(#minor)"/><path d="M1000 0L0 0 0 1000" fill="none" stroke="#d9d5ca" strokeWidth="12"/></pattern></defs>
     <rect data-canvas="yes" width={VIEW} height={VIEW} fill={doc.showGrid===false?"#fff":"url(#major)"}/>
     {(doc.zones||[]).map(z=>{const c=polygonCentroid(z.points),active=selected?.kind==="zone"&&selected.id===z.id;return <g key={z.id} onPointerDown={e=>{if(tool==="zone")return;e.stopPropagation();setTool("select");setSelected({kind:"zone",id:z.id})}} style={{pointerEvents:tool==="zone"?"none":"auto",cursor:"pointer"}}><polygon points={z.points.map(p=>p.x+","+p.y).join(" ")} fill={active?"rgba(207,161,83,.28)":"rgba(50,106,118,.10)"} stroke={active?"#9b7a39":"#326a76"} strokeWidth={active?28:18} strokeDasharray="45 22"/><text x={c.x} y={c.y-35} textAnchor="middle" fontSize="120" fontWeight="700" fill="#274e57">{z.name||"Rom"}</text><text x={c.x} y={c.y+95} textAnchor="middle" fontSize="90" fill="#326a76">{polygonAreaM2(z.points).toFixed(2)} m²</text>{active&&z.points.map((p,i)=><g key={i}><circle cx={p.x} cy={p.y} r="190" fill="transparent" onPointerDown={e=>downZonePoint(e,z,i)}/><circle cx={p.x} cy={p.y} r="55" fill="#fff" stroke="#9b7a39" strokeWidth="20" pointerEvents="none"/></g>)}</g>})}
