@@ -89,3 +89,40 @@
  .mobileAngles button,.mobileAllProps{min-height:40px;border:1px solid #c6b17b;border-radius:8px;background:#faf5e9;font-weight:800}
  .mobileAllProps{grid-column:1/-1;background:#20211f;color:#fff;border-color:#20211f}
 }
+
+.mobileQuickAdd{display:none}
+.roomModalBackdrop{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:18px;background:#0008}
+.roomModal{width:min(520px,100%);max-height:min(780px,90vh);overflow:auto;background:#fff;color:#1d1d1b;border-radius:16px;box-shadow:0 24px 70px #0005;padding:18px}
+.roomModalHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.roomModalHead span{font-size:10px;letter-spacing:.11em;color:#9b7a39;font-weight:900}
+.roomModalHead h2{margin:3px 0 0;font-size:21px}
+.roomModalHead button{width:40px;height:40px;border:1px solid #ddd;border-radius:10px;background:#fafafa;font-size:25px;line-height:1}
+.roomModal>label,.roomModalGrid label{display:grid;gap:5px;font-size:12px;color:#666;font-weight:700}
+.roomModal input{box-sizing:border-box;width:100%;min-height:46px;padding:0 11px;border:1px solid #cfcfcf;border-radius:9px;background:#fff;color:#1d1d1b;font-size:16px}
+.roomModalGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.roomPreview{height:110px;margin:14px 0 8px;border-radius:10px;background:#f4f2ec;display:grid;place-items:center;overflow:hidden}
+.roomRectShape{width:160px;height:82px;border:10px solid #2d2d2b;background:#fff}
+.roomLShape{width:170px;height:95px;background:#2d2d2b;clip-path:polygon(0 0,58% 0,58% 38%,100% 38%,100% 100%,0 100%);position:relative}
+.roomLShape:after{content:"";position:absolute;inset:10px;background:#fff;clip-path:polygon(0 0,55% 0,55% 38%,100% 38%,100% 100%,0 100%)}
+.roomModal p{font-size:12px;line-height:1.5;color:#666}
+.roomModalActions{display:grid;grid-template-columns:1fr 1.3fr;gap:9px;margin-top:14px}
+.roomModalActions button{min-height:46px;border-radius:9px;border:1px solid #ccc;background:#fafafa;font-weight:800}
+.roomModalActions button:last-child{background:#d7a74e;border-color:#d7a74e;color:#1c160b}
+@media(max-width:900px){
+ .mobileQuickAdd{
+  display:flex;gap:7px;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;
+  padding:8px 10px;background:#f7f3e9;border-bottom:1px solid #ddcfaf;scrollbar-width:none
+ }
+ .mobileQuickAdd::-webkit-scrollbar{display:none}
+ .mobileQuickAdd button{
+  flex:0 0 auto;min-height:40px;padding:0 11px;border-radius:9px;border:1px solid #cdb77e;
+  background:#fffaf0;color:#342817;font-size:12px;font-weight:800;white-space:nowrap
+ }
+ .roomModalBackdrop{align-items:end;padding:0;background:#0007}
+ .roomModal{width:100%;max-height:88dvh;border-radius:18px 18px 0 0;padding:16px 14px 20px}
+ .roomModalHead{position:sticky;top:-16px;z-index:2;background:#fff;padding-top:16px}
+}
+@media(max-width:480px){
+ .roomModalGrid{grid-template-columns:1fr 1fr;gap:8px}
+ .roomPreview{height:90px}
+}
