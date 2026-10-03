@@ -147,8 +147,8 @@ export default function DrawingClient(){
  const pointFromClient=(clientX,clientY)=>{const r=svg.current.getBoundingClientRect();return{x:pan.x+(clientX-r.left)*viewSize/r.width,y:pan.y+(clientY-r.top)*viewSize/r.height}};
  const point=e=>pointFromClient(e.clientX,e.clientY);
  const clampPanForZoom=(value,zoom)=>{const size=VIEW/zoom,max=Math.max(0,VIEW-size);return{x:clamp(value.x,0,max),y:clamp(value.y,0,max)}};
- const zoomBy=delta=>setDoc(d=>{const zoom=clamp((d.zoom||1)+delta,.5,5);setPan(p=>clampPanForZoom(p,zoom));return {...d,zoom}});
- const fitView=()=>{setPan({x:0,y:0});setDoc(d=>({...d,zoom:1}))};
+ const zoomBy=delta=>setDoc(d=>{const oldZoom=d.zoom||1,oldView=VIEW/oldZoom,zoom=clamp(oldZoom+delta,.5,5),nextView=VIEW/zoom;setPan(p=>clampPanForZoom({x:p.x+oldView/2-nextView/2,y:p.y+oldView/2-nextView/2},zoom));return {...d,zoom}});
+ const fitView=()=>{const b=drawingBounds(),size=Math.max(b.w,b.h)*1.12,zoom=clamp(VIEW/Math.max(500,size),.5,5),nextView=VIEW/zoom;setPan(clampPanForZoom({x:b.x+b.w/2-nextView/2,y:b.y+b.h/2-nextView/2},zoom));setDoc(d=>({...d,zoom}))};
  const capturePointer=e=>{try{svg.current?.setPointerCapture?.(e.pointerId)}catch{}};
  const releasePointer=e=>{try{if(svg.current?.hasPointerCapture?.(e.pointerId))svg.current.releasePointerCapture(e.pointerId)}catch{}};
  const scrollPanel=ref=>ref.current?.scrollIntoView?.({behavior:"smooth",block:"start"});
