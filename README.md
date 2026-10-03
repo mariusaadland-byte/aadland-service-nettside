@@ -20,6 +20,16 @@ Kopier `.env.example` til `.env.local` og fyll inn verdiene. Ikke legg hemmelige
 
 I Vercel må `RESEND_API_KEY` være satt i **Production** for at kundekonto, passordgjenoppretting og andre kunde-e-poster skal kunne sendes fra produksjon. Preview kan bruke `RESEND_PREVIEW_API_KEY`. `CRON_SECRET` er påkrevd i Production for at automatiske tilbudsoppfølginger og påminnelser skal kjøre; cron-rutene avviser alle kall dersom hemmeligheten mangler eller Authorization-headeren ikke matcher. Produksjonsbuilden stopper automatisk dersom Supabase-konfigurasjon, `SESSION_SECRET`, `RESEND_API_KEY`, `CRON_SECRET` eller `NEXT_PUBLIC_SITE_URL` mangler. Etter endring av en miljøvariabel må det kjøres en ny deployment.
 
+## Aadland Service – e-postroller
+
+Automatiske Aadland Service-meldinger bruker en egen avsenderrolle:
+- `SERVICE_EMAIL_FROM=Aadland Service <noreplay@aadland-service.no>`
+- `SERVICE_REPLY_TO=post@aadland-service.no`
+
+Dette gjelder blant annet ordrebekreftelser, betalingskvitteringer, ordrestatus, refusjonsvarsler og automatiske konto-/påminnelsesmailer. Kunden kan fortsatt svare til `post@aadland-service.no` fordi Reply-To peker dit. Tilbud og tilbudsoppfølging sendes fortsatt fra `post@aadland-service.no`.
+
+Den gamle `ORDER_EMAIL_FROM`-variabelen brukes ikke lenger som avsender, slik at en gammel Vercel-verdi ikke kan tvinge automatiske e-poster tilbake til `bestilling@` eller `noreply@`.
+
 ## Aadland Utleie-domene og e-post
 
 Utleiedelen er fortsatt tilgjengelig på `https://www.aadland-service.no/utleie`, men kan i tillegg bruke `https://www.aadlandutleie.no` som eget utleiedomene. Middleware viser utleiekatalogen på roten av utleiedomenet, mens eksisterende `/utleie`-ruter fortsatt fungerer.
