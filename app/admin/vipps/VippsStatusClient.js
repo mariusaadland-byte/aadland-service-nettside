@@ -122,6 +122,7 @@ export default function VippsStatusClient(){
        <span>Nødvendige hendelser registrert: {diagnostics[unit.unit].checks.eventsComplete?"✓":"mangler"}</span>
        <span>MSN samsvarer: {diagnostics[unit.unit].checks.msnMatches?"✓":"mangler"}</span>
        <span>Ingen duplikat-webhook på samme URL: {diagnostics[unit.unit].checks.noDuplicateCallback?"✓":"må ryddes"}</span>
+       <span>Én aktiv lokal webhook: {diagnostics[unit.unit].checks.oneLocalActiveWebhook?"✓":"må ryddes"}</span>
       </>}
      </div>}
     </section>)}
