@@ -374,12 +374,18 @@ export default function DrawingClient(){
   if(tool==="measure"){if(!measureDraft)setMeasureDraft(q);else{mutate(d=>({...d,measurements:[...(d.measurements||[]),{id:uid(),x1:measureDraft.x,y1:measureDraft.y,x2:q.x,y2:q.y}]}));setMeasureDraft(null)}setTimeout(()=>setSnapHint(null),350);return}
   if(tool!=="wall")return;
   if(!draft){
-   setDraft(q);setWallChain({start:q,count:0});setTimeout(()=>setSnapHint(null),350);return;
+   setDraft(q);setWallChain({start:q,count:0,points:[q]});setTimeout(()=>setSnapHint(null),350);return;
   }
   const nextCount=(wallChain?.count||0)+1,closing=wallChain?.start&&nextCount>=3&&Math.hypot(q.x-wallChain.start.x,q.y-wallChain.start.y)<2;
-  mutate(d=>({...d,walls:[...d.walls,{id:uid(),x1:draft.x,y1:draft.y,x2:q.x,y2:q.y,t:Number(d.defaultWallThickness)||98,h:Number(d.defaultWallHeight)||2400}]}));
-  if(closing){setDraft(null);setWallChain(null);setTool("select");setSnapHint(null);setMessage("Romkontur lukket");setTimeout(()=>setMessage(""),1500)}
-  else{setDraft(q);setWallChain(chain=>({...chain,start:chain?.start||draft,count:nextCount}));setTimeout(()=>setSnapHint(null),350)}
+  const chainPoints=[...(wallChain?.points||[draft]),q],zonePoints=closing?chainPoints.slice(0,-1):null,zoneId=closing?uid():null;
+  mutate(d=>{
+   const wall={id:uid(),x1:draft.x,y1:draft.y,x2:q.x,y2:q.y,t:Number(d.defaultWallThickness)||98,h:Number(d.defaultWallHeight)||2400};
+   if(!closing)return {...d,walls:[...d.walls,wall]};
+   const zone={id:zoneId,name:"Rom "+((d.zones||[]).length+1),points:zonePoints,ceilingHeight:Number(d.defaultWallHeight)||2400,floorFinish:"",notes:""};
+   return {...d,walls:[...d.walls,wall],zones:[...(d.zones||[]),zone]};
+  });
+  if(closing){setDraft(null);setWallChain(null);setTool("select");setSnapHint(null);setSelected({kind:"zone",id:zoneId});setMessage("Rom lukket · areal beregnet");setTimeout(()=>setMessage(""),1800)}
+  else{setDraft(q);setWallChain(chain=>({...chain,start:chain?.start||draft,count:nextCount,points:[...(chain?.points||[draft]),q]}));setTimeout(()=>setSnapHint(null),350)}
  };
  const canvasDown=e=>{
   if(e.target.dataset?.canvas!=="yes")return;
