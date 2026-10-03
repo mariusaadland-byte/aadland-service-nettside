@@ -654,6 +654,15 @@ export default function DrawingClient(){
    </>:selected.kind==="zone"?<>
     <label>Romnavn<input key={"zn-"+sel.id+"-"+sel.name} defaultValue={sel.name||""} onBlur={e=>updateZoneField("name",e.target.value)}/></label>
     <label>Takhøyde (mm)<input key={"zh-"+sel.id+"-"+sel.ceilingHeight} type="number" inputMode="numeric" defaultValue={Number(sel.ceilingHeight)||Number(doc.defaultWallHeight)||2400} onBlur={e=>updateZoneField("ceilingHeight",e.target.value,true)}/></label>
+    <div className={styles.mobileRoomMetrics}><span><small>Gulv/tak</small><strong>{polygonAreaM2(sel.points).toFixed(2)} m²</strong></span><span><small>Omkrets</small><strong>{polygonPerimeterM(sel.points).toFixed(2)} m</strong></span></div>
+    {selectedZoneWalls.length>0&&<div className={styles.mobileRoomWalls}>
+     <div className={styles.mobileRoomWallsHead}><div><strong>Veggmål</strong><small>Mål rundt rommet i rekkefølge</small></div><span>{selectedZoneWalls.length} vegger</span></div>
+     {selectedZoneWalls.map((wall,index)=><div className={styles.mobileRoomWallRow} key={wall.id}>
+      <button type="button" className={styles.mobileWallSelect} onClick={()=>{setSelected({kind:"wall",id:wall.id});setMobileEditOpen(false)}}><b>{index+1}</b><span>Vegg {index+1}<small>{angle(wall)}°</small></span></button>
+      <label><span>Lengde mm</span><input key={"zw-"+wall.id+"-"+len(wall)} type="number" inputMode="numeric" min="100" max="12000" defaultValue={len(wall)} onBlur={e=>updateWallById(wall.id,"len",e.target.value)}/></label>
+     </div>)}
+     <p>Endring av en vegg flytter neste hjørne. Gå rundt rommet i samme rekkefølge og kontroller siste vegg når alle mål er lagt inn.</p>
+    </div>}
    </>:selected.kind==="measurement"?<>
     <label className={styles.mobileWide}>Navn på mål<input key={"mn-"+sel.id+"-"+sel.label} defaultValue={sel.label||""} placeholder="F.eks. vegg til vindu" onBlur={e=>updateMeasurementField("label",e.target.value)}/></label>
     <div className={styles.mobileMeasureReadout}><span>Målt avstand</span><strong>{Math.round(Math.hypot(sel.x2-sel.x1,sel.y2-sel.y1))} mm</strong></div>
