@@ -101,6 +101,9 @@ export default function VippsStatusClient(){
       <span><small>Webhook</small><b>{unit.webhook?"✓ registrert":"mangler"}</b></span>
      </div>
      {!unit.configured&&<p className="muted">Mangler: {unit.missing.map(key=>labels[key]||key).join(", ")}.</p>}
+     <p className="muted"><small>Vercel: {unit.unit==="rental"
+      ?"VIPPS_RENTAL_CLIENT_ID · VIPPS_RENTAL_CLIENT_SECRET · VIPPS_RENTAL_SUBSCRIPTION_KEY · VIPPS_RENTAL_MSN"
+      :"VIPPS_SERVICE_CLIENT_ID · VIPPS_SERVICE_CLIENT_SECRET · VIPPS_SERVICE_SUBSCRIPTION_KEY · VIPPS_SERVICE_MSN"}</small></p>
      {unit.webhook&&<p className="muted">Webhook aktiv · sist oppdatert {unit.webhook.updatedAt?new Date(unit.webhook.updatedAt).toLocaleString("nb-NO"):"ukjent"}. Secret lagres privat og vises aldri.</p>}
      {unit.configured&&<div className="rentalBookingActions">
       <button className="btn alt" type="button" disabled={savingUnit===unit.unit} onClick={()=>testSetup(unit)}>{savingUnit===unit.unit?"Tester …":"Test oppsett"}</button>
