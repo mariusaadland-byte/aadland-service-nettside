@@ -106,7 +106,7 @@ function nearestWall(o,walls){
 }
 
 export default function DrawingClient(){
- const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null),[mobileEditOpen,setMobileEditOpen]=useState(false),[roomBuilder,setRoomBuilder]=useState(null),[quickAddOpen,setQuickAddOpen]=useState(false),[fieldMode,setFieldMode]=useState(false),[canvasAspect,setCanvasAspect]=useState(1);
+ const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null),[mobileEditOpen,setMobileEditOpen]=useState(false),[roomBuilder,setRoomBuilder]=useState(null),[quickAddOpen,setQuickAddOpen]=useState(false),[fieldMode,setFieldMode]=useState(false),[canvasAspect,setCanvasAspect]=useState(1),[wallBuilder,setWallBuilder]=useState(null);
  const svg=useRef(null);
  const leftPanel=useRef(null),rightPanel=useRef(null);
  const touchPointers=useRef(new Map()),pinchGesture=useRef(null),pendingCanvasTouch=useRef(null);
@@ -273,6 +273,26 @@ export default function DrawingClient(){
  };
  const makeRoom=()=>openRoomBuilder("rect");
  const makeLRoom=()=>openRoomBuilder("l");
+ const openWallBuilder=()=>{
+  const wall=selected?.kind==="wall"?doc.walls.find(item=>item.id===selected.id):null;
+  setWallBuilder({
+   length:"3000",angle:wall?String(Math.round(angle(wall))):"0",
+   thickness:String(doc.defaultWallThickness||98),height:String(doc.defaultWallHeight||2400),
+   connectToSelected:!!wall
+  });
+ };
+ const createExactWall=()=>{
+  if(!wallBuilder)return;
+  const L=Number(wallBuilder.length),A=Number(wallBuilder.angle),t=Number(wallBuilder.thickness),h=Number(wallBuilder.height);
+  if(!Number.isFinite(L)||L<100||L>12000||!Number.isFinite(A)||!Number.isFinite(t)||t<40||!Number.isFinite(h)||h<300){setMessage("Sjekk veggmålene");setTimeout(()=>setMessage(""),1800);return}
+  const selectedWall=wallBuilder.connectToSelected&&selected?.kind==="wall"?doc.walls.find(item=>item.id===selected.id):null;
+  const dims=viewDimsFor(),rad=A*Math.PI/180;
+  const x1=selectedWall?selectedWall.x2:snapTo(pan.x+dims.w/2-Math.cos(rad)*L/2,doc.snapSize||50);
+  const y1=selectedWall?selectedWall.y2:snapTo(pan.y+dims.h/2-Math.sin(rad)*L/2,doc.snapSize||50);
+  const id=uid(),wall={id,x1:clamp(x1,0,VIEW),y1:clamp(y1,0,VIEW),x2:clamp(x1+Math.cos(rad)*L,0,VIEW),y2:clamp(y1+Math.sin(rad)*L,0,VIEW),t,h};
+  mutate(d=>({...d,walls:[...d.walls,wall]}));
+  setSelected({kind:"wall",id});setTool("select");setWallBuilder(null);setQuickAddOpen(false);
+ };
  const addItem=(type,w,h)=>{
   const id=uid(),selectedWall=selected?.kind==="wall"?doc.walls.find(wall=>wall.id===selected.id):null;
   if(selectedWall&&wallTypes.has(type)){
@@ -424,6 +444,7 @@ export default function DrawingClient(){
    <button type="button" className={styles.mobileSave} onClick={()=>persist()}>Lagre</button>
   </nav>
   {quickAddOpen&&<div className={styles.mobileQuickAdd}>
+   <button type="button" onClick={openWallBuilder}>↔ Vegg med mål</button>
    <button type="button" onClick={makeRoom}>▭ Rektangulært rom</button>
    <button type="button" onClick={makeLRoom}>⌞ L-rom</button>
    <button type="button" onClick={()=>addItem("door",900,100)}>Dør 90</button>
@@ -463,6 +484,21 @@ export default function DrawingClient(){
     <button type="button" className={styles.mobileDanger} onClick={remove}>Slett valgt</button>
    </div>
    <button type="button" className={styles.mobileAllProps} onClick={()=>scrollPanel(rightPanel)}>Vis alle egenskaper</button>
+  </div>}
+  {wallBuilder&&<div className={styles.roomModalBackdrop} role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)setWallBuilder(null)}}>
+   <section className={styles.roomModal} role="dialog" aria-modal="true" aria-label="Lag vegg med mål">
+    <div className={styles.roomModalHead}><div><span>NY VEGG</span><h2>Vegg med eksakte mål</h2></div><button type="button" onClick={()=>setWallBuilder(null)} aria-label="Lukk">×</button></div>
+    <div className={styles.roomModalGrid}>
+     <label>Lengde (mm)<input autoFocus type="number" inputMode="numeric" min="100" max="12000" value={wallBuilder.length} onChange={e=>setWallBuilder(v=>({...v,length:e.target.value}))}/></label>
+     <label>Vinkel (°)<input type="number" inputMode="decimal" value={wallBuilder.angle} onChange={e=>setWallBuilder(v=>({...v,angle:e.target.value}))}/></label>
+     <label>Tykkelse (mm)<input type="number" inputMode="numeric" min="40" value={wallBuilder.thickness} onChange={e=>setWallBuilder(v=>({...v,thickness:e.target.value}))}/></label>
+     <label>Høyde (mm)<input type="number" inputMode="numeric" min="300" value={wallBuilder.height} onChange={e=>setWallBuilder(v=>({...v,height:e.target.value}))}/></label>
+    </div>
+    <div className={styles.wallAngleButtons}>{[0,45,90,135,180,225,270,315].map(value=><button type="button" key={value} onClick={()=>setWallBuilder(v=>({...v,angle:String(value)}))}>{value}°</button>)}</div>
+    {selected?.kind==="wall"&&<label className={styles.wallConnect}><input type="checkbox" checked={wallBuilder.connectToSelected} onChange={e=>setWallBuilder(v=>({...v,connectToSelected:e.target.checked}))}/> Start fra enden av valgt vegg</label>}
+    <p>{wallBuilder.connectToSelected&&selected?.kind==="wall"?"Den nye veggen starter nøyaktig i endepunktet på veggen du valgte.":"Veggen plasseres midt i området du ser på."}</p>
+    <div className={styles.roomModalActions}><button type="button" onClick={()=>setWallBuilder(null)}>Avbryt</button><button type="button" onClick={createExactWall}>Lag vegg</button></div>
+   </section>
   </div>}
   {roomBuilder&&<div className={styles.roomModalBackdrop} role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)setRoomBuilder(null)}}>
    <section className={styles.roomModal} role="dialog" aria-modal="true" aria-label={roomBuilder.type==="l"?"Lag L-rom":"Lag rektangulært rom"}>
