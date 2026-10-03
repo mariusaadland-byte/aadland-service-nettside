@@ -261,8 +261,10 @@ export default function DrawingClient(){
    mutate(d=>({...d,walls:[...d.walls,{id:uid(),x1:x,y1:y,x2:x+w,y2:y,t,h:H},{id:uid(),x1:x+w,y1:y,x2:x+w,y2:y+h,t,h:H},{id:uid(),x1:x+w,y1:y+h,x2:x,y2:y+h,t,h:H},{id:uid(),x1:x,y1:y+h,x2:x,y2:y,t,h:H}],zones:[...(d.zones||[]),zone]}));
    setSelected({kind:"zone",id:zone.id});
   }
+  const focusZoom=clamp(VIEW/Math.max(500,Math.max(w,h)*1.18),.5,5),focusView=VIEW/focusZoom;
+  setPan(clampPanForZoom({x:x+w/2-focusView/2,y:y+h/2-focusView/2},focusZoom));
+  setDoc(d=>({...d,zoom:focusZoom}));
   setRoomBuilder(null);setTool("select");
-  setTimeout(()=>fitView(),0);
  };
  const makeRoom=()=>openRoomBuilder("rect");
  const makeLRoom=()=>openRoomBuilder("l");
