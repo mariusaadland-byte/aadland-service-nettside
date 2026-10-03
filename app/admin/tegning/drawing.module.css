@@ -251,3 +251,11 @@
 .roomWallEditorRow>span{display:grid;font-size:12px;font-weight:800}
 .roomWallEditorRow>span small{font-size:9px;color:#777;font-weight:700}
 .roomWallEditorRow input{width:100%;min-height:38px;box-sizing:border-box;border:1px solid #ccc;border-radius:7px;padding:0 8px}
+
+@media(max-width:900px){
+ .mobileWallOpenings{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;padding:1px 0 2px 41px}
+ .mobileWallOpenings button{
+  min-height:34px;padding:0 9px;border:1px solid #ccb77f;border-radius:8px;
+  background:#fffaf0;color:#3a2c17;font-size:10px;font-weight:800
+ }
+}
