@@ -85,12 +85,35 @@ export default function VippsStatusClient(){
     </section>)}
    </div>
 
+   {Array.isArray(data.captureAlerts)&&data.captureAlerts.length>0&&<section className="card" style={{marginTop:24}}>
+    <div className="kicker">MÅ FØLGES OPP</div>
+    <h3>Vipps-reservasjoner nær capture-fristen</h3>
+    <p className="muted">Viser reserverte betalinger der Vipps sin registrerte capture-frist er passert eller er mindre enn 48 timer unna.</p>
+    <div className="adminList">
+     {data.captureAlerts.map(item=>{
+      const deadline=new Date(item.deadline);
+      const hours=Math.round((deadline.getTime()-Date.now())/3600000);
+      return <div className="adminListItem" key={item.unit+":"+item.id}>
+       <div>
+        <b>{item.reference}</b>
+        <div className="muted">{item.unit==="rental"?"Aadland Utleie":"Aadland Service"} · Reservert {(Number(item.reservedOre||0)/100).toLocaleString("nb-NO",{style:"currency",currency:"NOK"})}</div>
+       </div>
+       <div style={{textAlign:"right"}}>
+        <b>{item.expired?"UTLØPT":hours<=1?"UNDER 1 TIME":hours+" t igjen"}</b>
+        <div className="muted">{deadline.toLocaleString("nb-NO")}</div>
+       </div>
+      </div>;
+     })}
+    </div>
+    <p style={{marginTop:16}}><Link className="btn alt" href="/admin">Åpne backoffice →</Link></p>
+   </section>}
+
    <section className="card" style={{marginTop:24}}>
-    <div className="kicker">PLANLAGT KOBLING</div>
+    <div className="kicker">KOBLING</div>
     <h3>Automatisk valg av riktig salgssted</h3>
     <p><code>aadland-service.no</code> → Aadland Service</p>
     <p><code>aadlandutleie.no</code> → Aadland Utleie</p>
-    <p className="muted">Serveren har nå egne ePayment-klienter for opprettelse, status, capture, cancel og refund. Kundeknappene er fortsatt ikke aktivert. Credentials hentes server-side og hemmeligheter sendes aldri til nettleseren.</p>
+    <p className="muted">Serveren har egne ePayment-klienter for opprettelse, status, capture, cancel og refund. Kundeknappene vises bare når riktig salgssted, webhook og betalingsmotor faktisk er klare. Credentials hentes server-side og hemmeligheter sendes aldri til nettleseren.</p>
    </section>
   </>}
  </main>;
