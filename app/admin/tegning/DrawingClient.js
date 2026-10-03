@@ -439,10 +439,10 @@ export default function DrawingClient(){
   return wallOpeningLayout(wall,items).rows.some(row=>row.item.id!==itemId&&start<row.gaps.start+Number(row.item.w||0)&&end>row.gaps.start);
  };
  const findOpeningStart=(wall,width,items=doc.items,excludeId=null,preferredValue=null)=>{
-  const filtered=(items||[]).filter(item=>item.id!==excludeId),layout=wallOpeningLayout(wall,filtered),preferred=preferredValue==null?Math.max(0,(layout.L-width)/2):clamp(preferredValue,0,Math.max(0,layout.L-width));
+  const W=Math.max(0,Number(width)||0),filtered=(items||[]).filter(item=>item.id!==excludeId),layout=wallOpeningLayout(wall,filtered),preferred=preferredValue==null?Math.max(0,(layout.L-W)/2):clamp(Number(preferredValue)||0,0,Math.max(0,layout.L-W));
   const intervals=layout.rows.map(row=>({start:row.gaps.start,end:row.gaps.start+Number(row.item.w||0)}));
-  const candidates=[preferred,0,...intervals.flatMap(x=>[x.end,Math.max(0,x.start-width)])].filter(value=>value>=0&&value+width<=layout.L).sort((a,b)=>Math.abs(a-preferred)-Math.abs(b-preferred));
-  return candidates.find(start=>!intervals.some(x=>start<x.end&&start+width>x.start))??null;
+  const candidates=[preferred,0,...intervals.flatMap(x=>[x.end,Math.max(0,x.start-W)])].filter(value=>value>=0&&value+W<=layout.L).sort((a,b)=>Math.abs(a-preferred)-Math.abs(b-preferred));
+  return candidates.find(start=>!intervals.some(x=>start<x.end&&start+W>x.start))??null;
  };
  const addItemToWall=(type,w,h,wallId=null,returnZoneId=null)=>{
   const id=uid(),selectedWall=wallId?doc.walls.find(wall=>wall.id===wallId):selected?.kind==="wall"?doc.walls.find(wall=>wall.id===selected.id):null;
