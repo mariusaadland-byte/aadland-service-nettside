@@ -106,7 +106,7 @@ function nearestWall(o,walls){
 }
 
 export default function DrawingClient(){
- const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null);
+ const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null),[mobileEditOpen,setMobileEditOpen]=useState(false);
  const svg=useRef(null);
  const leftPanel=useRef(null),rightPanel=useRef(null);
  const touchPointers=useRef(new Map()),pinchGesture=useRef(null),pendingCanvasTouch=useRef(null);
@@ -244,6 +244,7 @@ export default function DrawingClient(){
  const makeLRoom=()=>{const w=Number(prompt("Ytterlengde i mm","5000")),h=Number(prompt("Ytterbredde i mm","4000")),rw=Number(prompt("Bredde på innhakk fra høyre i mm","1800")),rh=Number(prompt("Dybde på innhakk ovenfra i mm","1500"));if(w<600||h<600||rw<300||rh<300||rw>=w-300||rh>=h-300){alert("Målene gir ikke et gyldig L-rom.");return}const x=1000,y=1000,t=Number(doc.defaultWallThickness)||98,H=Number(doc.defaultWallHeight)||2400,pts=[[x,y],[x+w-rw,y],[x+w-rw,y+rh],[x+w,y+rh],[x+w,y+h],[x,y+h],[x,y]],points=pts.slice(0,-1).map(p=>({x:p[0],y:p[1]})),zone={id:uid(),name:"Rom "+((doc.zones||[]).length+1),points,ceilingHeight:H,floorFinish:"",notes:""};mutate(d=>({...d,walls:[...d.walls,...pts.slice(0,-1).map((p,i)=>({id:uid(),x1:p[0],y1:p[1],x2:pts[i+1][0],y2:pts[i+1][1],t,h:H}))],zones:[...(d.zones||[]),zone]}));setSelected({kind:"zone",id:zone.id})};
  const addItem=(type,w,h)=>mutate(d=>({...d,items:[...d.items,{id:uid(),type,x:1800,y:1600,w,h,rot:0,...openingDefaults(type)}]}));
  const sel=useMemo(()=>selected?.kind==="wall"?doc.walls.find(x=>x.id===selected.id):selected?.kind==="item"?doc.items.find(x=>x.id===selected.id):selected?.kind==="zone"?(doc.zones||[]).find(x=>x.id===selected.id):null,[selected,doc]);
+ useEffect(()=>{setMobileEditOpen(false)},[selected?.kind,selected?.id]);
  const update=(key,value)=>{const n=Number(value);if(!Number.isFinite(n))return;mutate(d=>{if(selected?.kind==="item"){return {...d,items:d.items.map(o=>{if(o.id!==selected.id)return o;if((key==="wallOffset"||key==="wallStartGap"||key==="wallEndGap")&&o.wallId){const w=d.walls.find(x=>x.id===o.wallId);if(!w)return o;const limits=mountedLimits(o,w),half=Math.max(0,Number(o.w)||0)/2;let desired=n;if(key==="wallStartGap")desired=n+half;if(key==="wallEndGap")desired=limits.L-n-half;const off=clamp(desired,limits.min,limits.max),a=Math.atan2(w.y2-w.y1,w.x2-w.x1),cx=w.x1+Math.cos(a)*off,cy=w.y1+Math.sin(a)*off;return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off}}return {...o,[key]:n}})}}const walls=d.walls.map(w=>{if(w.id!==selected?.id)return w;if(key==="len"||key==="angle"){const L=key==="len"?n:len(w),A=(key==="angle"?n:angle(w))*Math.PI/180;return {...w,x2:w.x1+L*Math.cos(A),y2:w.y1+L*Math.sin(A)}}if(key==="x1"||key==="y1"){const dx=key==="x1"?n-w.x1:0,dy=key==="y1"?n-w.y1:0;return {...w,x1:w.x1+dx,y1:w.y1+dy,x2:w.x2+dx,y2:w.y2+dy}}return {...w,[key]:n}});return {...d,walls,items:syncMounted(walls,d.items)}})};
  const remove=()=>{checkpoint();setFuture([]);setDoc(d=>selected?.kind==="wall"?{...d,walls:d.walls.filter(x=>x.id!==selected.id),items:d.items.map(o=>o.wallId===selected.id?{...o,wallId:null,wallOffset:null}:o)}:selected?.kind==="zone"?{...d,zones:(d.zones||[]).filter(x=>x.id!==selected.id)}:{...d,items:d.items.filter(x=>x.id!==selected.id)});setSelected(null)};
  const flipDoor=()=>{if(selected?.kind!=="item"||!sel||sel.type!=="door")return;mutate(d=>({...d,items:d.items.map(o=>o.id===sel.id?{...o,flip:!o.flip}:o)}))};
@@ -382,7 +383,26 @@ export default function DrawingClient(){
   </nav>
   {sel&&<div className={styles.mobileSelection}>
    <div><span>VALGT</span><strong>{selected.kind==="wall"?"Vegg · "+len(sel)+" mm · "+angle(sel)+"°":selected.kind==="zone"?(sel.name||"Romsone")+" · "+polygonAreaM2(sel.points).toFixed(2)+" m²":labelFor(sel.type)+" · "+Math.round(sel.w)+" × "+Math.round(sel.h)+" mm"}</strong></div>
-   <button type="button" onClick={()=>scrollPanel(rightPanel)}>Rediger mål</button>
+   <button type="button" onClick={()=>setMobileEditOpen(value=>!value)}>{mobileEditOpen?"Lukk":"Rediger mål"}</button>
+  </div>}
+  {sel&&mobileEditOpen&&<div className={styles.mobileInspector}>
+   {selected.kind==="wall"?<>
+    <label>Lengde (mm)<input key={"ml-"+sel.id+"-"+len(sel)} type="number" inputMode="numeric" defaultValue={len(sel)} onBlur={e=>update("len",e.target.value)}/></label>
+    <label>Vinkel (°)<input key={"ma-"+sel.id+"-"+angle(sel)} type="number" inputMode="decimal" defaultValue={angle(sel)} onBlur={e=>update("angle",e.target.value)}/></label>
+    <label>Høyde (mm)<input key={"mh-"+sel.id+"-"+sel.h} type="number" inputMode="numeric" defaultValue={Math.round(sel.h||2400)} onBlur={e=>update("h",e.target.value)}/></label>
+    <label>Tykkelse (mm)<input key={"mt-"+sel.id+"-"+sel.t} type="number" inputMode="numeric" defaultValue={Math.round(sel.t||98)} onBlur={e=>update("t",e.target.value)}/></label>
+    <div className={styles.mobileAngles}>{[0,90,180,270].map(value=><button type="button" key={value} onClick={()=>update("angle",value)}>{value}°</button>)}</div>
+   </>:selected.kind==="zone"?<>
+    <label>Romnavn<input key={"zn-"+sel.id+"-"+sel.name} defaultValue={sel.name||""} onBlur={e=>updateZoneField("name",e.target.value)}/></label>
+    <label>Takhøyde (mm)<input key={"zh-"+sel.id+"-"+sel.ceilingHeight} type="number" inputMode="numeric" defaultValue={Number(sel.ceilingHeight)||Number(doc.defaultWallHeight)||2400} onBlur={e=>updateZoneField("ceilingHeight",e.target.value,true)}/></label>
+   </>:<>
+    <label>Bredde (mm)<input key={"iw-"+sel.id+"-"+sel.w} type="number" inputMode="numeric" defaultValue={Math.round(sel.w)} onBlur={e=>update("w",e.target.value)}/></label>
+    <label>Dybde/lengde (mm)<input key={"ih-"+sel.id+"-"+sel.h} type="number" inputMode="numeric" defaultValue={Math.round(sel.h)} onBlur={e=>update("h",e.target.value)}/></label>
+    <label>Rotasjon (°)<input key={"ir-"+sel.id+"-"+sel.rot} type="number" inputMode="decimal" defaultValue={Math.round(Number(sel.rot)||0)} onBlur={e=>update("rot",e.target.value)}/></label>
+    {openingTypes.has(sel.type)&&<label>{sel.type==="window"?"Vindushøyde (mm)":"Åpningshøyde (mm)"}<input key={"io-"+sel.id+"-"+sel.openingHeight} type="number" inputMode="numeric" defaultValue={Math.round(Number(sel.openingHeight)||openingDefaults(sel.type).openingHeight||2100)} onBlur={e=>update("openingHeight",e.target.value)}/></label>}
+    {sel.type==="window"&&<label>Brystning (mm)<input key={"is-"+sel.id+"-"+sel.sillHeight} type="number" inputMode="numeric" defaultValue={Math.round(Number(sel.sillHeight)||0)} onBlur={e=>update("sillHeight",e.target.value)}/></label>}
+   </>}
+   <button type="button" className={styles.mobileAllProps} onClick={()=>scrollPanel(rightPanel)}>Vis alle egenskaper</button>
   </div>}
   <div className={styles.layout}>
    <aside ref={leftPanel} className={styles.panel+" "+styles.left}>
