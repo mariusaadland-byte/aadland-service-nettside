@@ -6,7 +6,6 @@ import {vippsUnitConfig} from "../../../../lib/vippsConfig";
 import {
  registerVippsWebhook,
  deleteVippsWebhook,
- vippsPaymentsEnabled,
  VIPPS_PAYMENT_WEBHOOK_EVENTS
 } from "../../../../lib/vippsClient";
 
@@ -32,7 +31,6 @@ function callbackUrl(){
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;
  if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
- if(!vippsPaymentsEnabled())return NextResponse.json({error:"Vipps-betalingsmotoren er AV. Slå den på først når testnøkler og oppsett skal aktiveres."},{status:409});
 
  const body=await req.json().catch(()=>({}));
  const unit=body.unit==="rental"?"rental":body.unit==="service"?"service":"";
@@ -57,7 +55,7 @@ export async function POST(req){
 
  let registration;
  try{
-  registration=await registerVippsWebhook(unit,url,VIPPS_PAYMENT_WEBHOOK_EVENTS);
+  registration=await registerVippsWebhook(unit,url,VIPPS_PAYMENT_WEBHOOK_EVENTS,{allowDisabled:true});
  }catch(error){
   console.error("VIPPS WEBHOOK REGISTER ERROR",{unit,status:error.status,body:error.body});
   return NextResponse.json({error:"Vipps-webhooken kunne ikke registreres."},{status:502});
@@ -80,14 +78,14 @@ export async function POST(req){
  });
  if(saveError){
   console.error("VIPPS WEBHOOK SAVE ERROR",{unit,webhookId,error:saveError.message});
-  try{await deleteVippsWebhook(unit,webhookId)}catch{}
+  try{await deleteVippsWebhook(unit,webhookId,{allowDisabled:true})}catch{}
   return NextResponse.json({error:"Webhooken ble opprettet hos Vipps, men kunne ikke lagres sikkert. Den nye registreringen er forsøkt slettet."},{status:500});
  }
 
  let replacementWarning="";
  if(current?.webhookId&&replace){
   try{
-   await deleteVippsWebhook(unit,current.webhookId);
+   await deleteVippsWebhook(unit,current.webhookId,{allowDisabled:true});
    await s.rpc("deactivate_vipps_webhook_registration",{
     target_webhook_id:current.webhookId,
     target_environment:env()
