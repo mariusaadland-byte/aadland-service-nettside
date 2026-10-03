@@ -86,7 +86,8 @@ export async function POST(req){
   return NextResponse.json({error:"Lokal webhook-status kunne ikke leses."},{status:500});
  }
 
- const local=(Array.isArray(stored)?stored:[]).find(item=>item?.unit===unit)||null;
+ const localRegistrations=(Array.isArray(stored)?stored:[]).filter(item=>item?.unit===unit);
+ const local=localRegistrations[0]||null;
  const remoteWebhooks=Array.isArray(remote?.webhooks)?remote.webhooks:[];
  const remoteById=local?.webhookId
   ?remoteWebhooks.find(item=>String(item?.id||"")===String(local.webhookId))
@@ -111,7 +112,8 @@ export async function POST(req){
   callbackUrlMatches,
   eventsComplete,
   msnMatches,
-  noDuplicateCallback:duplicateCallbackCount<=1
+  noDuplicateCallback:duplicateCallbackCount<=1,
+  oneLocalActiveWebhook:localRegistrations.length===1
  };
  const readyForEnable=Object.values(checks).every(Boolean);
 
@@ -124,6 +126,7 @@ export async function POST(req){
   readyForEnable,
   checks,
   duplicateCallbackCount,
+  localActiveWebhookCount:localRegistrations.length,
   remoteWebhookCount:remoteWebhooks.length,
   expectedCallbackConfigured:Boolean(expectedUrl)
  });
