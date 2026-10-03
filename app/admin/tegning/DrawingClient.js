@@ -175,7 +175,7 @@ export default function DrawingClient(){
   return()=>clearTimeout(timer);
  },[doc]);
  useEffect(()=>{
-  const flush=()=>writeLocalSnapshot(docRef.current,{silent:true});
+  const flush=()=>{if(autosaveReady.current)writeLocalSnapshot(docRef.current,{silent:true})};
   const onVisibility=()=>{if(document.visibilityState==="hidden")flush()};
   window.addEventListener("pagehide",flush);
   document.addEventListener("visibilitychange",onVisibility);
@@ -194,9 +194,12 @@ export default function DrawingClient(){
   try{
    const r=await fetch("/api/admin/project-drawings",{method:next.serverId?"PATCH":"POST",headers:{"content-type":"application/json"},body:JSON.stringify(serverPayload(next))}),x=await r.json();
    if(r.ok&&x.drawing){
-    const latest=docRef.current,saved=latest.id===next.id?{...latest,serverId:x.drawing.id}:{...next,serverId:x.drawing.id};
-    serverSyncedSignature.current=serverSignature(saved);docRef.current=saved;setDoc(saved);writeLocalSnapshot(saved);setSaveState("server");setLastSavedAt(Date.now());
-    if(!quiet){setMessage("Lagret i oppdraget");setTimeout(()=>setMessage(""),1800)}
+    const serverSnapshot={...next,serverId:x.drawing.id},latest=docRef.current,saved=latest.id===next.id?{...latest,serverId:x.drawing.id}:serverSnapshot;
+    serverSyncedSignature.current=serverSignature(serverSnapshot);docRef.current=saved;setDoc(saved);writeLocalSnapshot(saved);
+    const fullySynced=serverSignature(saved)===serverSyncedSignature.current;
+    setSaveState(fullySynced?"server":"local");setLastSavedAt(Date.now());
+    if(!fullySynced)serverSyncQueued.current=true;
+    if(!quiet){setMessage(fullySynced?"Lagret i oppdraget":"Lagret · synkroniserer siste endringer");setTimeout(()=>setMessage(""),1800)}
     return true;
    }
    setSaveState("local");
@@ -525,7 +528,7 @@ export default function DrawingClient(){
  const saveStatusText=()=>!online?"Offline · lagret på telefonen":saveState==="syncing"?"Synkroniserer…":saveState==="server"?"Synkronisert med oppdrag":lastSavedAt?"Lokalt lagret":"Autolagres lokalt";
  const clearMeasures=()=>mutate(d=>({...d,measurements:[]}));
  const importJson=e=>{const file=e.target.files?.[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(String(r.result));if(!Array.isArray(x.walls)||!Array.isArray(x.items))throw new Error();const next={...initial(),...x,id:uid(),name:(x.name||"Importert tegning")+" – kopi"};setDoc(next);setSelected(null);setHistory([]);setMessage("Importert – trykk Lagre")}catch{alert("Filen ser ikke ut som en gyldig Aadland-tegning.")}};r.readAsText(file);e.target.value=""};
- const deleteDoc=async()=>{if(!confirm("Slette denne tegningen?"))return;if(doc.serverId){try{const r=await fetch("/api/admin/project-drawings",{method:"DELETE",headers:{"content-type":"application/json"},body:JSON.stringify({id:doc.serverId})});const x=await r.json();if(!r.ok&&!x.setupRequired){setMessage("Kunne ikke slette fra oppdraget");return}}catch{setMessage("Server utilgjengelig");return}}const list=docs.filter(x=>x.id!==doc.id);setDocs(list);localStorage.setItem(STORE,JSON.stringify(list));setDoc(list[0]||initial());setSelected(null);setHistory([]);setFuture([])};
+ const deleteDoc=async()=>{if(!confirm("Slette denne tegningen?"))return;if(doc.serverId){try{const r=await fetch("/api/admin/project-drawings",{method:"DELETE",headers:{"content-type":"application/json"},body:JSON.stringify({id:doc.serverId})});const x=await r.json();if(!r.ok&&!x.setupRequired){setMessage("Kunne ikke slette fra oppdraget");return}}catch{setMessage("Server utilgjengelig");return}}const list=docs.filter(x=>x.id!==doc.id),next=list[0]||initial();setDocs(list);docsRef.current=list;localStorage.setItem(STORE,JSON.stringify(list));localStorage.setItem(LAST_STORE,next.id);docRef.current=next;setDoc(next);setSelected(null);setHistory([]);setFuture([])};
  const exportJson=()=>{const blob=new Blob([JSON.stringify(doc,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=(doc.name||"tegning").replace(/[^a-z0-9æøå]+/gi,"-")+".json";a.click();URL.revokeObjectURL(a.href)};
  const quantityText=()=>{const lines=["Mengdegrunnlag fra tegning: "+(doc.name||"Tegning"),""];if(summary.zoneRows.length){for(const z of summary.zoneRows){lines.push((z.name||"Rom")+": "+z.area.toFixed(2)+" m² gulv/tak · "+z.perimeter.toFixed(2)+" lm brutto list · "+z.wallArea.toFixed(2)+" m² brutto vegg"+(z.floorFinish?" · "+z.floorFinish:""));}}else{lines.push("Gulvareal lukket rom: "+(summary.floorM2==null?"ikke beregnet":summary.floorM2.toFixed(2)+" m²"));lines.push("Netto veggflate: "+summary.netWallM2.toFixed(2)+" m²");}lines.push("Åpningsareal: "+summary.openingM2.toFixed(2)+" m²");lines.push("Dører/skyvedører: "+summary.doors+" · Vinduer: "+summary.windows);if(doc.notes)lines.push("","Tegningsnotat: "+doc.notes);return lines.join("\n")};
  const quoteLinesFromDrawing=()=>{const rows=[];if(summary.zoneRows.length){for(const z of summary.zoneRows){const name=z.name||"Rom",finish=z.floorFinish?" · "+z.floorFinish:"";rows.push({type:"other",description:"Gulvareal – "+name+finish,quantity:Number(z.area.toFixed(2)),unit:"m²",unitPriceOre:"",vatRate:25});rows.push({type:"other",description:"Takareal – "+name,quantity:Number(z.area.toFixed(2)),unit:"m²",unitPriceOre:"",vatRate:25});rows.push({type:"other",description:"Gulvlister, brutto – "+name,quantity:Number(z.perimeter.toFixed(2)),unit:"lm",unitPriceOre:"",vatRate:25});rows.push({type:"other",description:"Veggflate, brutto – "+name,quantity:Number(z.wallArea.toFixed(2)),unit:"m²",unitPriceOre:"",vatRate:25});}}else{if(summary.floorM2!=null&&summary.floorM2>0){rows.push({type:"other",description:"Gulvareal fra tegning",quantity:Number(summary.floorM2.toFixed(2)),unit:"m²",unitPriceOre:"",vatRate:25});rows.push({type:"other",description:"Takareal fra tegning",quantity:Number(summary.floorM2.toFixed(2)),unit:"m²",unitPriceOre:"",vatRate:25});}if(summary.netWallM2>0)rows.push({type:"other",description:"Netto veggflate fra tegning",quantity:Number(summary.netWallM2.toFixed(2)),unit:"m²",unitPriceOre:"",vatRate:25});}return rows};
