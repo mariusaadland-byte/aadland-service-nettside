@@ -438,10 +438,10 @@ export default function DrawingClient(){
   const end=start+width;
   return wallOpeningLayout(wall,items).rows.some(row=>row.item.id!==itemId&&start<row.gaps.start+Number(row.item.w||0)&&end>row.gaps.start);
  };
- const findOpeningStart=(wall,width,items=doc.items)=>{
-  const layout=wallOpeningLayout(wall,items),preferred=Math.max(0,(layout.L-width)/2);
+ const findOpeningStart=(wall,width,items=doc.items,excludeId=null,preferredValue=null)=>{
+  const filtered=(items||[]).filter(item=>item.id!==excludeId),layout=wallOpeningLayout(wall,filtered),preferred=preferredValue==null?Math.max(0,(layout.L-width)/2):clamp(preferredValue,0,Math.max(0,layout.L-width));
   const intervals=layout.rows.map(row=>({start:row.gaps.start,end:row.gaps.start+Number(row.item.w||0)}));
-  const candidates=[preferred,0,...intervals.map(x=>x.end)].filter(value=>value>=0&&value+width<=layout.L);
+  const candidates=[preferred,0,...intervals.flatMap(x=>[x.end,Math.max(0,x.start-width)])].filter(value=>value>=0&&value+width<=layout.L).sort((a,b)=>Math.abs(a-preferred)-Math.abs(b-preferred));
   return candidates.find(start=>!intervals.some(x=>start<x.end&&start+width>x.start))??null;
  };
  const addItemToWall=(type,w,h,wallId=null,returnZoneId=null)=>{
@@ -506,7 +506,16 @@ export default function DrawingClient(){
  const remove=()=>{checkpoint();setFuture([]);setDoc(d=>selected?.kind==="wall"?(()=>{const walls=d.walls.filter(x=>x.id!==selected.id);return {...d,walls,zones:syncLinkedZones(walls,d.zones),measurements:syncAnchoredMeasurements(walls,d.measurements),items:d.items.map(o=>o.wallId===selected.id?{...o,wallId:null,wallOffset:null}:o)}})():selected?.kind==="zone"?{...d,zones:(d.zones||[]).filter(x=>x.id!==selected.id)}:selected?.kind==="measurement"?{...d,measurements:(d.measurements||[]).filter(x=>x.id!==selected.id)}:{...d,items:d.items.filter(x=>x.id!==selected.id)});setSelected(null)};
  const flipDoor=()=>{if(selected?.kind!=="item"||!sel||sel.type!=="door")return;mutate(d=>({...d,items:d.items.map(o=>o.id===sel.id?{...o,flip:!o.flip}:o)}))};
  const detach=()=>{if(selected?.kind!=="item"||!sel)return;mutate(d=>({...d,items:d.items.map(o=>o.id===sel.id?{...o,wallId:null}:o)}))};
- const duplicate=()=>{if(selected?.kind!=="item"||!sel)return;mutate(d=>({...d,items:[...d.items,{...sel,id:uid(),x:sel.x+200,y:sel.y+200}]}))};
+ const duplicate=()=>{if(selected?.kind!=="item"||!sel)return;
+  if(sel.wallId&&openingTypes.has(sel.type)){
+   const wall=doc.walls.find(w=>w.id===sel.wallId);if(!wall)return;
+   const current=wallEdgeOffsets(sel,wall),start=findOpeningStart(wall,Number(sel.w)||0,doc.items,null,current.start+Number(sel.w||0)+100);
+   if(start==null){setMessage("Ikke ledig plass til kopi på veggen");setTimeout(()=>setMessage(""),2000);return}
+   const id=uid(),a=Math.atan2(wall.y2-wall.y1,wall.x2-wall.x1),center=start+sel.w/2,cx=wall.x1+Math.cos(a)*center,cy=wall.y1+Math.sin(a)*center;
+   mutate(d=>({...d,items:[...d.items,{...sel,id,x:cx-sel.w/2,y:cy-sel.h/2,wallOffset:center,rot:a*180/Math.PI}]}));setSelected({kind:"item",id});return;
+  }
+  mutate(d=>({...d,items:[...d.items,{...sel,id:uid(),x:sel.x+200,y:sel.y+200}]}))
+ };
  const applySizePreset=value=>{if(selected?.kind!=="item"||!sel||!value)return;const [w,h]=value.split("x").map(Number);if(!Number.isFinite(w)||!Number.isFinite(h)||w<=0||h<=0)return;
   if(sel.wallId&&openingTypes.has(sel.type)){updateWallItemById(sel.id,"w",w);return}
   mutate(d=>{const items=d.items.map(o=>o.id!==sel.id?o:{...o,x:o.x+(o.w-w)/2,y:o.y+(o.h-h)/2,w,h});return {...d,items:syncMounted(d.walls,items)}})
@@ -550,7 +559,7 @@ export default function DrawingClient(){
  const endMeasurementDrag=()=>{if(!measureDrag)return;setSnapHint(null);setHistory(h=>[...h.slice(-24),measureDrag.start]);setFuture([]);setMeasureDrag(null)};
  const downItem=(e,o)=>{if(["wall","measure","zone"].includes(tool)){e.stopPropagation();drawingPointDown(e);return}e.stopPropagation();capturePointer(e);setTool("select");setSelected({kind:"item",id:o.id});const p=point(e);setDrag({id:o.id,dx:p.x-o.x,dy:p.y-o.y,start:JSON.stringify(doc)})};
  const move=e=>{if(panning){movePan(e);return}if(wallDrag){moveWallEnd(e);return}if(zoneDrag){moveZonePoint(e);return}if(measureDrag){moveMeasurementEnd(e);return}if(!drag)return;const p=point(e);setDoc(d=>({...d,items:d.items.map(o=>o.id===drag.id?{...o,x:snapTo(p.x-drag.dx,d.snapSize||50),y:snapTo(p.y-drag.dy,d.snapSize||50)}:o)}))};
- const up=e=>{if(e)releasePointer(e);if(panning){setPanning(null);return}if(wallDrag){endWallDrag();return}if(zoneDrag){endZoneDrag();return}if(measureDrag){endMeasurementDrag();return}if(!drag)return;setHistory(h=>[...h.slice(-24),drag.start]);setFuture([]);setDoc(d=>{const o=d.items.find(x=>x.id===drag.id);if(!o||!wallTypes.has(o.type))return d;const n=nearestWall({x:o.x+o.w/2,y:o.y+o.h/2},d.walls);if(!n||n.dist>450)return {...d,items:d.items.map(x=>x.id!==o.id?x:{...x,wallId:null,wallOffset:null})};const a=Math.atan2(n.wall.y2-n.wall.y1,n.wall.x2-n.wall.x1)*180/Math.PI,limits=mountedLimits(o,n.wall),off=clamp(Math.round(n.t*limits.L),limits.min,limits.max),cx=n.wall.x1+Math.cos(a*Math.PI/180)*off,cy=n.wall.y1+Math.sin(a*Math.PI/180)*off;return {...d,items:d.items.map(x=>x.id!==o.id?x:{...x,x:cx-o.w/2,y:cy-o.h/2,rot:a,wallId:n.wall.id,wallOffset:off})}});setDrag(null)};
+ const up=e=>{if(e)releasePointer(e);if(panning){setPanning(null);return}if(wallDrag){endWallDrag();return}if(zoneDrag){endZoneDrag();return}if(measureDrag){endMeasurementDrag();return}if(!drag)return;setHistory(h=>[...h.slice(-24),drag.start]);setFuture([]);setDoc(d=>{const o=d.items.find(x=>x.id===drag.id);if(!o||!wallTypes.has(o.type))return d;const n=nearestWall({x:o.x+o.w/2,y:o.y+o.h/2},d.walls);if(!n||n.dist>450)return {...d,items:d.items.map(x=>x.id!==o.id?x:{...x,wallId:null,wallOffset:null})};const a=Math.atan2(n.wall.y2-n.wall.y1,n.wall.x2-n.wall.x1)*180/Math.PI,limits=mountedLimits(o,n.wall),preferred=clamp(Math.round(n.t*limits.L)-o.w/2,0,Math.max(0,limits.L-o.w)),safeStart=openingTypes.has(o.type)?findOpeningStart(n.wall,o.w,d.items,o.id,preferred):preferred;if(safeStart==null)return JSON.parse(drag.start);const off=safeStart+o.w/2,cx=n.wall.x1+Math.cos(a*Math.PI/180)*off,cy=n.wall.y1+Math.sin(a*Math.PI/180)*off;return {...d,items:d.items.map(x=>x.id!==o.id?x:{...x,x:cx-o.w/2,y:cy-o.h/2,rot:a,wallId:n.wall.id,wallOffset:off})}});setDrag(null)};
  const applyCanvasPoint=p=>{
   setSelected(null);
   const magnet=tool==="wall"&&draft?wallMagneticPoint(p,draft):magneticPoint(p),q=magnet.point;
