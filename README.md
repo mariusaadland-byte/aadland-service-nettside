@@ -10,6 +10,7 @@ Nettsted og backoffice for Aadland Service.
 - Utleie med datokontroll, blokkeringer og administrasjon
 - Backoffice på `/admin` med ordre, kunder, produkter, tjenester, utleie, prosjekter og forsideinnhold
 - Tegning og visualisering på `/admin/tegning`
+- Pris- og fastpriskalkulator på `/admin/kalkulator` med arbeid, materialpåslag, reise, bom og MVA-visning
 - Supabase som database og Resend for e-post
 - Betalingsstatus er separat fra ordrestatus. Betalingsleverandør er ikke koblet til ennå.
 
