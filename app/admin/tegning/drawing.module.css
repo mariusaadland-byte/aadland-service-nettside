@@ -243,3 +243,11 @@
  .mobileRoomWallRow input{min-height:44px!important}
  .mobileRoomWalls>p{margin:2px 2px 0;font-size:10px;line-height:1.4;color:#776f61}
 }
+
+.roomWallEditor{display:grid;gap:7px;margin:12px 0;padding:10px;border:1px solid #ddd3bc;border-radius:10px;background:#fffdf8}
+.roomWallEditor h4{margin:0 0 2px;font-size:13px}
+.roomWallEditorRow{display:grid;grid-template-columns:34px 1fr 104px;gap:7px;align-items:center}
+.roomWallEditorRow>button{width:32px;height:32px;border-radius:50%;border:0;background:#292a27;color:#fff;font-weight:800}
+.roomWallEditorRow>span{display:grid;font-size:12px;font-weight:800}
+.roomWallEditorRow>span small{font-size:9px;color:#777;font-weight:700}
+.roomWallEditorRow input{width:100%;min-height:38px;box-sizing:border-box;border:1px solid #ccc;border-radius:7px;padding:0 8px}
