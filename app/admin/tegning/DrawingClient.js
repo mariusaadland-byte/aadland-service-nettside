@@ -662,6 +662,7 @@ export default function DrawingClient(){
       <button type="button" className={styles.mobileWallSelect} onClick={()=>{setSelected({kind:"wall",id:wall.id});setMobileEditOpen(false)}}><b>{index+1}</b><span>Vegg {index+1}<small>{angle(wall)}°</small></span></button>
       <label><span>Lengde mm</span><input key={"zw-"+wall.id+"-"+len(wall)} type="number" inputMode="numeric" min="100" max="12000" defaultValue={len(wall)} onBlur={e=>updateWallById(wall.id,"len",e.target.value)}/></label>
       <div className={styles.mobileWallOpenings}><button type="button" onClick={()=>addItemToWall("door",900,100,wall.id,sel.id)}>+ Dør</button><button type="button" onClick={()=>addItemToWall("window",1200,100,wall.id,sel.id)}>+ Vindu</button><button type="button" onClick={()=>addItemToWall("opening",1000,100,wall.id,sel.id)}>+ Åpning</button></div>
+      {doc.items.filter(item=>item.wallId===wall.id&&openingTypes.has(item.type)).length>0&&<div className={styles.mobileExistingOpenings}>{doc.items.filter(item=>item.wallId===wall.id&&openingTypes.has(item.type)).map(item=><button type="button" key={item.id} onClick={()=>{setFieldReturnZoneId(sel.id);setSelected({kind:"item",id:item.id});setTimeout(()=>setMobileEditOpen(true),0)}}><span>{labelFor(item.type)}</span><b>{Math.round(item.w)} mm</b></button>)}</div>}
      </div>)}
      <p>Endring av en vegg flytter neste hjørne. Gå rundt rommet i samme rekkefølge og kontroller siste vegg når alle mål er lagt inn.</p>
     </div>}
