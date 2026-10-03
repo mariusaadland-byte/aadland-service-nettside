@@ -371,9 +371,9 @@ export default function DrawingClient(){
    nextTarget={...target,x1:moveStart.to.x,y1:moveStart.to.y,x2:moveEnd.to.x,y2:moveEnd.to.y};
   }else nextTarget={...target,[key]:n};
   const walls=d.walls.map(w=>{if(w.id===target.id)return nextTarget;let out={...w};for(const change of [moveStart,moveEnd].filter(Boolean)){if(Math.hypot(w.x1-change.from.x,w.y1-change.from.y)<5){out.x1=change.to.x;out.y1=change.to.y}if(Math.hypot(w.x2-change.from.x,w.y2-change.from.y)<5){out.x2=change.to.x;out.y2=change.to.y}}return out});
-  return {...d,walls,zones:syncLinkedZones(walls,d.zones),items:syncMounted(walls,d.items)};
+  return {...d,walls,zones:syncLinkedZones(walls,d.zones),measurements:syncAnchoredMeasurements(walls,d.measurements),items:syncMounted(walls,d.items)};
  })};
- const remove=()=>{checkpoint();setFuture([]);setDoc(d=>selected?.kind==="wall"?(()=>{const walls=d.walls.filter(x=>x.id!==selected.id);return {...d,walls,zones:syncLinkedZones(walls,d.zones),items:d.items.map(o=>o.wallId===selected.id?{...o,wallId:null,wallOffset:null}:o)}})():selected?.kind==="zone"?{...d,zones:(d.zones||[]).filter(x=>x.id!==selected.id)}:selected?.kind==="measurement"?{...d,measurements:(d.measurements||[]).filter(x=>x.id!==selected.id)}:{...d,items:d.items.filter(x=>x.id!==selected.id)});setSelected(null)};
+ const remove=()=>{checkpoint();setFuture([]);setDoc(d=>selected?.kind==="wall"?(()=>{const walls=d.walls.filter(x=>x.id!==selected.id);return {...d,walls,zones:syncLinkedZones(walls,d.zones),measurements:syncAnchoredMeasurements(walls,d.measurements),items:d.items.map(o=>o.wallId===selected.id?{...o,wallId:null,wallOffset:null}:o)}})():selected?.kind==="zone"?{...d,zones:(d.zones||[]).filter(x=>x.id!==selected.id)}:selected?.kind==="measurement"?{...d,measurements:(d.measurements||[]).filter(x=>x.id!==selected.id)}:{...d,items:d.items.filter(x=>x.id!==selected.id)});setSelected(null)};
  const flipDoor=()=>{if(selected?.kind!=="item"||!sel||sel.type!=="door")return;mutate(d=>({...d,items:d.items.map(o=>o.id===sel.id?{...o,flip:!o.flip}:o)}))};
  const detach=()=>{if(selected?.kind!=="item"||!sel)return;mutate(d=>({...d,items:d.items.map(o=>o.id===sel.id?{...o,wallId:null}:o)}))};
  const duplicate=()=>{if(selected?.kind!=="item"||!sel)return;mutate(d=>({...d,items:[...d.items,{...sel,id:uid(),x:sel.x+200,y:sel.y+200}]}))};
@@ -407,7 +407,7 @@ export default function DrawingClient(){
   if(Array.isArray(zoneDrag.wallIds)&&zoneDrag.wallIds.length>=3){
    const ids=zoneDrag.wallIds,index=zoneDrag.index,currentId=ids[index],prevId=ids[(index-1+ids.length)%ids.length];
    const walls=d.walls.map(w=>w.id===currentId?{...w,x1:q.x,y1:q.y}:w.id===prevId?{...w,x2:q.x,y2:q.y}:w);
-   return {...d,walls,zones:syncLinkedZones(walls,d.zones),items:syncMounted(walls,d.items)};
+   return {...d,walls,zones:syncLinkedZones(walls,d.zones),measurements:syncAnchoredMeasurements(walls,d.measurements),items:syncMounted(walls,d.items)};
   }
   return {...d,zones:(d.zones||[]).map(z=>z.id!==zoneDrag.id?z:{...z,points:z.points.map((pt,i)=>i===zoneDrag.index?q:pt)})};
  })};
