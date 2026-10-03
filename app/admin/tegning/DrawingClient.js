@@ -527,6 +527,7 @@ export default function DrawingClient(){
     {sel.type==="window"&&<label>Brystning (mm)<input key={"is-"+sel.id+"-"+sel.sillHeight} type="number" inputMode="numeric" defaultValue={Math.round(Number(sel.sillHeight)||0)} onBlur={e=>update("sillHeight",e.target.value)}/></label>}
    </>}
    <div className={styles.mobileObjectActions}>
+    {selected.kind==="measurement"&&<button type="button" onClick={()=>{setSelected(null);setMobileEditOpen(false);setTool("measure");setMeasureDraft(null);setSnapHint(null)}}>+ Nytt mål</button>}
     {selected.kind==="item"&&sel.type==="door"&&<button type="button" onClick={flipDoor}>Speil dør</button>}
     {selected.kind==="item"&&sel.wallId&&<button type="button" onClick={detach}>Løsne</button>}
     {selected.kind==="item"&&<button type="button" onClick={duplicate}>Dupliser</button>}
