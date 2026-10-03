@@ -65,8 +65,22 @@ if(vippsEnabled){
   console.error("VIPPS_WEBHOOK_URL must be a valid absolute URL when Vipps is enabled.");
   process.exit(1);
  }
- if(webhookUrl.protocol!=="https:"||webhookUrl.pathname!=="/api/vipps/webhook"){
-  console.error("VIPPS_WEBHOOK_URL must use https and point to /api/vipps/webhook.");
+ const allowedVippsHosts=new Set([
+  "aadland-service.no",
+  "www.aadland-service.no",
+  "aadlandutleie.no",
+  "www.aadlandutleie.no"
+ ]);
+ if(
+  webhookUrl.protocol!=="https:"||
+  webhookUrl.pathname!=="/api/vipps/webhook"||
+  webhookUrl.search||
+  webhookUrl.hash||
+  webhookUrl.username||
+  webhookUrl.password||
+  !allowedVippsHosts.has(webhookUrl.hostname.toLowerCase())
+ ){
+  console.error("VIPPS_WEBHOOK_URL must be a clean https URL on an Aadland production domain and point exactly to /api/vipps/webhook.");
   process.exit(1);
  }
 }
