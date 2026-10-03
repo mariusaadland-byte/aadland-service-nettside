@@ -296,3 +296,27 @@
  display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:32px;padding:0 8px;
  border:1px solid #b9cdd1;border-radius:7px;background:#f3f8f9;color:#315c64;font-size:10px
 }
+
+@media(max-width:900px){
+ .mobileWallChain{
+  grid-column:1/-1;display:grid;gap:5px;padding:7px 8px;margin:1px 0 2px 41px;
+  border:1px dashed #c9b57e;border-radius:8px;background:#fffaf0
+ }
+ .mobileWallChain>strong{font-size:10px;color:#5f5135}
+ .mobileWallChain>div{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+ .mobileWallChain span{display:flex;align-items:center;gap:4px}
+ .mobileWallChain em,.mobileWallChain b{
+  min-height:24px;display:inline-flex;align-items:center;padding:0 6px;border-radius:6px;font-size:9px;font-style:normal
+ }
+ .mobileWallChain em{background:#ece9e1;color:#575348}
+ .mobileWallChain b{background:#dcebee;color:#315c64}
+ .mobileWallChain[data-overlap="true"]{border-color:#c87575;background:#fff4f4}
+ .mobileWallChain>small{font-size:9px;color:#983b3b;font-weight:800}
+}
+.roomWallOpeningList[data-overlap="true"]{border-left:3px solid #b84d4d;padding-left:7px}
+.roomWallChain{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:3px 0}
+.roomWallChain span{display:flex;align-items:center;gap:4px}
+.roomWallChain em,.roomWallChain b{padding:3px 6px;border-radius:5px;font-size:9px;font-style:normal}
+.roomWallChain em{background:#ece9e1;color:#565248}
+.roomWallChain b{background:#dcebee;color:#315c64}
+.roomWallOpeningList>small{color:#9e3838;font-weight:800}
