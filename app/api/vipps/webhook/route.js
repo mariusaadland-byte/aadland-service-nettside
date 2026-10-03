@@ -3,6 +3,7 @@ import {db} from "../../../../lib/supabase";
 import {vippsPaymentsEnabled} from "../../../../lib/vippsClient";
 import {verifyVippsWebhookRequest} from "../../../../lib/vippsWebhook";
 import {sendVippsPaymentReceiptIfNeeded} from "../../../../lib/vippsPaymentReceipt";
+import {sendVippsRefundNoticeIfNeeded} from "../../../../lib/vippsRefundNotice";
 
 export const runtime="nodejs";
 
@@ -97,7 +98,7 @@ export async function POST(req){
   return NextResponse.json({error:"Webhook processing failed."},{status:500});
  }
 
- if(eventName==="CAPTURED"){
+ if(eventName==="CAPTURED"||eventName==="REFUNDED"){
   try{
    let targetId=processed?.applied?.id||null;
    if(!targetId){
@@ -110,12 +111,16 @@ export async function POST(req){
      .maybeSingle();
     targetId=target?.id||null;
    }
-   if(targetId){
+   if(targetId&&eventName==="CAPTURED"){
     const receipt=await sendVippsPaymentReceiptIfNeeded({s,unit,id:targetId,req});
     if(receipt?.sent)console.log("VIPPS RECEIPT SENT",{unit,reference});
    }
+   if(targetId&&eventName==="REFUNDED"){
+    const notice=await sendVippsRefundNoticeIfNeeded({s,unit,id:targetId,req});
+    if(notice?.sent)console.log("VIPPS REFUND NOTICE SENT",{unit,reference});
+   }
   }catch(error){
-   console.error("VIPPS RECEIPT BEST EFFORT ERROR",{unit,reference,message:error?.message});
+   console.error("VIPPS PAYMENT NOTICE BEST EFFORT ERROR",{unit,reference,eventName,message:error?.message});
   }
  }
 
