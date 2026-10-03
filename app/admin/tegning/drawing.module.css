@@ -189,3 +189,13 @@
  .wallAngleButtons{grid-template-columns:repeat(4,1fr);gap:6px}
  .wallAngleButtons button{min-height:38px;font-size:12px}
 }
+
+@media(max-width:900px){
+ .mobileWide{grid-column:1/-1}
+ .mobileMeasureReadout{
+  grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  min-height:44px;padding:9px 11px;border:1px solid #c9d7d9;border-radius:9px;background:#f3f8f9
+ }
+ .mobileMeasureReadout span{font-size:11px;color:#597177;font-weight:700}
+ .mobileMeasureReadout strong{font-size:16px;color:#315c64}
+}
