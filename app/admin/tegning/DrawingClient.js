@@ -432,7 +432,7 @@ export default function DrawingClient(){
    const cx=pan.x+viewWidth/2,cy=pan.y+viewHeight/2,x=snapTo(cx-w/2,doc.snapSize||50),y=snapTo(cy-h/2,doc.snapSize||50);
    mutate(d=>({...d,items:[...d.items,{id,type,x:clamp(x,0,VIEW-w),y:clamp(y,0,VIEW-h),w,h,rot:0,...openingDefaults(type)}]}));
   }
-  setFieldReturnZoneId(returnZoneId||null);setSelected({kind:"item",id});setTool("select");setQuickAddOpen(false);setMobileEditOpen(true);
+  setFieldReturnZoneId(returnZoneId||null);setSelected({kind:"item",id});setTool("select");setQuickAddOpen(false);setTimeout(()=>setMobileEditOpen(true),0);
  };
  const addItem=(type,w,h)=>addItemToWall(type,w,h);
  const sel=useMemo(()=>selected?.kind==="wall"?doc.walls.find(x=>x.id===selected.id):selected?.kind==="item"?doc.items.find(x=>x.id===selected.id):selected?.kind==="zone"?(doc.zones||[]).find(x=>x.id===selected.id):selected?.kind==="measurement"?(doc.measurements||[]).find(x=>x.id===selected.id):null,[selected,doc]);
