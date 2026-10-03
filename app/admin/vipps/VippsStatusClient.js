@@ -148,6 +148,19 @@ export default function VippsStatusClient(){
    </section>}
 
    <section className="card" style={{marginTop:24}}>
+    <div className="kicker">AKTIVERINGSREKKEFØLGE</div>
+    <h3>Trygg vei fra test til live</h3>
+    <div className="adminList">
+     <div className="adminListItem"><div><b>1. Legg inn testnøkler</b><div className="muted">Service og Utleie får hvert sitt client_id, client_secret, subscription key og MSN.</div></div></div>
+     <div className="adminListItem"><div><b>2. Hold betalingsmotoren AV</b><div className="muted">Webhook kan registreres og API-et kan testes uten at kundene får Vipps-knapper.</div></div></div>
+     <div className="adminListItem"><div><b>3. Kjør «Test oppsett»</b><div className="muted">Begge salgssteder skal være grønne: API, webhook-ID, callback, hendelser og MSN må samsvare.</div></div></div>
+     <div className="adminListItem"><div><b>4. Kjør Vipps testbetaling</b><div className="muted">Test reserve, retur, capture, kvittering, cancel og refund før produksjon.</div></div></div>
+     <div className="adminListItem"><div><b>5. Bytt til produksjonsnøkler og test oppsett på nytt</b><div className="muted">Produksjonsbuild stopper automatisk dersom Vipps er slått på med ufullstendige variabler eller ugyldig webhook-URL.</div></div></div>
+     <div className="adminListItem"><div><b>6. Slå på kundebetaling</b><div className="muted">Sett <code>VIPPS_PAYMENTS_ENABLED=true</code> først når begge salgssteder er kontrollert.</div></div></div>
+    </div>
+   </section>
+
+   <section className="card" style={{marginTop:24}}>
     <div className="kicker">KOBLING</div>
     <h3>Automatisk valg av riktig salgssted</h3>
     <p><code>aadland-service.no</code> → Aadland Service</p>
