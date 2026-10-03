@@ -132,3 +132,51 @@
  .mobileObjectActions button{min-height:40px;padding:0 11px;border:1px solid #cfcfcf;border-radius:8px;background:#fafafa;font-weight:800}
  .mobileObjectActions .mobileDanger{color:#8d2424;border-color:#d8aaaa;background:#fff6f6}
 }
+
+@media(max-width:900px){
+ .mobileTools{padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right))}
+ .fieldMode{height:100dvh;overflow:hidden;background:#e8e6df}
+ .fieldMode .top{display:none}
+ .fieldMode .mobileTools{
+  position:fixed;top:0;left:0;right:0;z-index:60;
+  padding-top:max(7px,env(safe-area-inset-top));
+  min-height:calc(52px + env(safe-area-inset-top))
+ }
+ .fieldMode .layout{
+  height:100dvh;overflow:hidden;padding-top:calc(52px + env(safe-area-inset-top));
+  box-sizing:border-box;background:#e8e6df
+ }
+ .fieldMode .left,.fieldMode .right{display:none!important}
+ .fieldMode .workspace{
+  display:block;order:1;height:100%;min-height:0;padding:0;overflow:hidden
+ }
+ .fieldMode .canvasWrap{
+  width:100%;height:100%;padding:0;margin:0;display:block;position:relative;background:#fff
+ }
+ .fieldMode .canvas{
+  width:100%;height:100%;max-width:none;aspect-ratio:auto;border:0;border-radius:0;box-shadow:none
+ }
+ .fieldMode .mobileCanvasHint{
+  position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:8;
+  width:max-content;max-width:calc(100% - 20px);margin:0;opacity:.88;pointer-events:none
+ }
+ .fieldMode .mobileSelection{
+  position:fixed;top:calc(60px + env(safe-area-inset-top));left:8px;right:8px;z-index:55;
+  border:1px solid #d5c7a8;border-radius:10px;box-shadow:0 4px 14px #0002
+ }
+ .fieldMode .mobileInspector{
+  position:fixed;left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));z-index:58;
+  max-height:48dvh;overflow:auto;border:1px solid #d6d6d6;border-radius:12px;
+  box-shadow:0 12px 34px #0004;padding-bottom:max(10px,env(safe-area-inset-bottom))
+ }
+ .fieldMode .mobileQuickAdd{
+  position:fixed;top:calc(60px + env(safe-area-inset-top));left:0;right:0;z-index:56;
+  box-shadow:0 4px 12px #0002
+ }
+}
+@media(max-width:900px) and (orientation:landscape){
+ .fieldMode .layout{padding-top:calc(48px + env(safe-area-inset-top))}
+ .fieldMode .mobileTools{min-height:calc(48px + env(safe-area-inset-top))}
+ .fieldMode .canvasWrap{width:100%;min-width:0;height:100%;margin:0}
+ .fieldMode .mobileSelection,.fieldMode .mobileQuickAdd{top:calc(54px + env(safe-area-inset-top))}
+}
