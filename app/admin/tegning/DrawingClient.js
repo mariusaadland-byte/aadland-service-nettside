@@ -130,12 +130,19 @@ function nearestWall(o,walls){
 }
 
 export default function DrawingClient(){
- const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[measureDrag,setMeasureDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null),[mobileEditOpen,setMobileEditOpen]=useState(false),[roomBuilder,setRoomBuilder]=useState(null),[quickAddOpen,setQuickAddOpen]=useState(false),[fieldMode,setFieldMode]=useState(false),[canvasAspect,setCanvasAspect]=useState(1),[wallBuilder,setWallBuilder]=useState(null),[snapHint,setSnapHint]=useState(null),[wallChain,setWallChain]=useState(null);
+ const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[measureDrag,setMeasureDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null),[mobileEditOpen,setMobileEditOpen]=useState(false),[roomBuilder,setRoomBuilder]=useState(null),[quickAddOpen,setQuickAddOpen]=useState(false),[fieldMode,setFieldMode]=useState(false),[canvasAspect,setCanvasAspect]=useState(1),[wallBuilder,setWallBuilder]=useState(null),[snapHint,setSnapHint]=useState(null),[wallChain,setWallChain]=useState(null),[online,setOnline]=useState(true),[saveState,setSaveState]=useState("local"),[lastSavedAt,setLastSavedAt]=useState(null);
  const svg=useRef(null);
  const leftPanel=useRef(null),rightPanel=useRef(null);
  const touchPointers=useRef(new Map()),pinchGesture=useRef(null),pendingCanvasTouch=useRef(null);
  const linkedOrderHandled=useRef("");
- const autosaveReady=useRef(false);
+ const autosaveReady=useRef(false),docRef=useRef(doc),docsRef=useRef(docs),serverSyncInFlight=useRef(false),serverSyncQueued=useRef(false),serverSyncedSignature=useRef("");
+ useEffect(()=>{docRef.current=doc},[doc]);
+ useEffect(()=>{docsRef.current=docs},[docs]);
+ useEffect(()=>{
+  const update=()=>setOnline(navigator.onLine);
+  update();window.addEventListener("online",update);window.addEventListener("offline",update);
+  return()=>{window.removeEventListener("online",update);window.removeEventListener("offline",update)};
+ },[]);
  useEffect(()=>{const el=svg.current;if(!el||typeof ResizeObserver==="undefined")return;const update=()=>{const r=el.getBoundingClientRect();if(r.width>0&&r.height>0)setCanvasAspect(clamp(r.width/r.height,.35,2.8))};update();const observer=new ResizeObserver(update);observer.observe(el);window.addEventListener("orientationchange",update);return()=>{observer.disconnect();window.removeEventListener("orientationchange",update)}},[]);
  useEffect(()=>{try{const d=JSON.parse(localStorage.getItem(STORE)||"[]");if(d.length){setDocs(d);setDoc({...initial(),...d[0]})}else{const old=JSON.parse(localStorage.getItem("aadlandDrawing")||"null");if(old)setDoc({...initial(),...old})}}catch{} Promise.all([
   fetch("/api/admin/orders").then(r=>r.ok?r.json():null).catch(()=>null),
@@ -148,21 +155,66 @@ export default function DrawingClient(){
   const readyTimer=setTimeout(()=>{autosaveReady.current=true},700);
   return()=>clearTimeout(readyTimer);
  },[]);
+ const writeLocalSnapshot=(next=docRef.current)=>{
+  try{
+   const current=docsRef.current||[],list=[...current.filter(x=>x.id!==next.id),next];
+   localStorage.setItem(STORE,JSON.stringify(list));
+   docsRef.current=list;setDocs(list);setSaveState("local");setLastSavedAt(Date.now());
+   return list;
+  }catch{return null}
+ };
  useEffect(()=>{
   if(!autosaveReady.current)return;
-  const timer=setTimeout(()=>{
-   try{
-    const stored=JSON.parse(localStorage.getItem(STORE)||"[]");
-    const list=Array.isArray(stored)?stored:[];
-    const next=[...list.filter(item=>item.id!==doc.id),doc];
-    localStorage.setItem(STORE,JSON.stringify(next));
-    setDocs(current=>[...current.filter(item=>item.id!==doc.id),doc]);
-   }catch{}
-  },650);
+  const timer=setTimeout(()=>writeLocalSnapshot(doc),220);
   return()=>clearTimeout(timer);
  },[doc]);
- const persistLocal=next=>{const list=[...docs.filter(x=>x.id!==next.id),next];setDocs(list);localStorage.setItem(STORE,JSON.stringify(list))};
- const persist=async(next=doc)=>{persistLocal(next);if(!next.orderId&&!next.projectId){setMessage("Lagret på enheten");setTimeout(()=>setMessage(""),1800);return}setMessage("Lagrer…");try{const body={id:next.serverId,orderId:next.orderId||null,projectId:next.projectId||null,name:next.name,customer:next.customer,address:next.address,notes:next.notes,drawingData:{...next,serverId:undefined}};const r=await fetch("/api/admin/project-drawings",{method:next.serverId?"PATCH":"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)}),x=await r.json();if(r.ok&&x.drawing){const saved={...next,serverId:x.drawing.id};setDoc(saved);persistLocal(saved);setMessage("Lagret i oppdraget")}else if(x.setupRequired)setMessage("Lokalt lagret · database ikke aktivert");else setMessage("Lokalt lagret · serverfeil")}catch{setMessage("Lokalt lagret · server utilgjengelig")}setTimeout(()=>setMessage(""),2600)};
+ useEffect(()=>{
+  const flush=()=>writeLocalSnapshot(docRef.current);
+  const onVisibility=()=>{if(document.visibilityState==="hidden")flush()};
+  window.addEventListener("pagehide",flush);
+  document.addEventListener("visibilitychange",onVisibility);
+  return()=>{window.removeEventListener("pagehide",flush);document.removeEventListener("visibilitychange",onVisibility)};
+ },[]);
+ const persistLocal=next=>writeLocalSnapshot(next);
+ const serverPayload=next=>({id:next.serverId,orderId:next.orderId||null,projectId:next.projectId||null,name:next.name,customer:next.customer,address:next.address,notes:next.notes,drawingData:{...next,serverId:undefined}});
+ const serverSignature=next=>JSON.stringify(serverPayload(next));
+ const syncServer=async(next=docRef.current,{quiet=false}={})=>{
+  if(!next?.orderId&&!next?.projectId)return false;
+  if(typeof navigator!=="undefined"&&!navigator.onLine){setSaveState("offline");return false}
+  const signature=serverSignature(next);
+  if(quiet&&signature===serverSyncedSignature.current)return true;
+  if(serverSyncInFlight.current){serverSyncQueued.current=true;return false}
+  serverSyncInFlight.current=true;serverSyncQueued.current=false;if(!quiet)setMessage("Lagrer…");setSaveState("syncing");
+  try{
+   const r=await fetch("/api/admin/project-drawings",{method:next.serverId?"PATCH":"POST",headers:{"content-type":"application/json"},body:JSON.stringify(serverPayload(next))}),x=await r.json();
+   if(r.ok&&x.drawing){
+    const latest=docRef.current,saved=latest.id===next.id?{...latest,serverId:x.drawing.id}:{...next,serverId:x.drawing.id};
+    serverSyncedSignature.current=serverSignature(saved);docRef.current=saved;setDoc(saved);writeLocalSnapshot(saved);setSaveState("server");setLastSavedAt(Date.now());
+    if(!quiet){setMessage("Lagret i oppdraget");setTimeout(()=>setMessage(""),1800)}
+    return true;
+   }
+   setSaveState("local");
+   if(!quiet){setMessage(x.setupRequired?"Lokalt lagret · database ikke aktivert":"Lokalt lagret · serverfeil");setTimeout(()=>setMessage(""),2600)}
+  }catch{
+   setSaveState(typeof navigator!=="undefined"&&!navigator.onLine?"offline":"local");
+   if(!quiet){setMessage("Lokalt lagret · server utilgjengelig");setTimeout(()=>setMessage(""),2600)}
+  }finally{
+   serverSyncInFlight.current=false;
+   if(serverSyncQueued.current){serverSyncQueued.current=false;setTimeout(()=>syncServer(docRef.current,{quiet:true}),0)}
+  }
+  return false;
+ };
+ useEffect(()=>{
+  if(!autosaveReady.current||(!doc.orderId&&!doc.projectId))return;
+  const timer=setTimeout(()=>syncServer(docRef.current,{quiet:true}),8000);
+  return()=>clearTimeout(timer);
+ },[doc]);
+ useEffect(()=>{
+  if(!online)return;
+  const current=docRef.current;
+  if(current?.orderId||current?.projectId){const timer=setTimeout(()=>syncServer(current,{quiet:true}),500);return()=>clearTimeout(timer)}
+ },[online]);
+ const persist=async(next=docRef.current)=>{writeLocalSnapshot(next);if(!next.orderId&&!next.projectId){setMessage("Lagret på enheten");setTimeout(()=>setMessage(""),1800);return}await syncServer(next,{quiet:false})};
  const checkpoint=()=>setHistory(h=>[...h.slice(-24),JSON.stringify(doc)]);
  const syncMounted=(walls,items)=>items.map(o=>{if(!o.wallId)return o;const w=walls.find(x=>x.id===o.wallId);if(!w)return {...o,wallId:null,wallOffset:null};const limits=mountedLimits(o,w),off=clamp(Number.isFinite(o.wallOffset)?o.wallOffset:wallOffset(o,w),limits.min,limits.max),a=Math.atan2(w.y2-w.y1,w.x2-w.x1),cx=w.x1+Math.cos(a)*off,cy=w.y1+Math.sin(a)*off;return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off}});
  const mutate=fn=>{checkpoint();setFuture([]);setDoc(d=>fn(d))};
@@ -464,6 +516,7 @@ export default function DrawingClient(){
   :selectedProject?.title
    ?selectedProject.title+" (eldre prosjektkobling)"
    :"Ikke koblet til oppdrag";
+ const saveStatusText=()=>!online?"Offline · lagret på telefonen":saveState==="syncing"?"Synkroniserer…":saveState==="server"?"Synkronisert med oppdrag":lastSavedAt?"Lokalt lagret":"Autolagres lokalt";
  const clearMeasures=()=>mutate(d=>({...d,measurements:[]}));
  const importJson=e=>{const file=e.target.files?.[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(String(r.result));if(!Array.isArray(x.walls)||!Array.isArray(x.items))throw new Error();const next={...initial(),...x,id:uid(),name:(x.name||"Importert tegning")+" – kopi"};setDoc(next);setSelected(null);setHistory([]);setMessage("Importert – trykk Lagre")}catch{alert("Filen ser ikke ut som en gyldig Aadland-tegning.")}};r.readAsText(file);e.target.value=""};
  const deleteDoc=async()=>{if(!confirm("Slette denne tegningen?"))return;if(doc.serverId){try{const r=await fetch("/api/admin/project-drawings",{method:"DELETE",headers:{"content-type":"application/json"},body:JSON.stringify({id:doc.serverId})});const x=await r.json();if(!r.ok&&!x.setupRequired){setMessage("Kunne ikke slette fra oppdraget");return}}catch{setMessage("Server utilgjengelig");return}}const list=docs.filter(x=>x.id!==doc.id);setDocs(list);localStorage.setItem(STORE,JSON.stringify(list));setDoc(list[0]||initial());setSelected(null);setHistory([]);setFuture([])};
@@ -522,7 +575,7 @@ export default function DrawingClient(){
  const copyAiBrief=async(showMessage=true)=>{try{await navigator.clipboard.writeText(aiBrief());if(showMessage){setMessage("ChatGPT-brief kopiert");setTimeout(()=>setMessage(""),1800)}return true}catch{if(showMessage){setMessage("Kunne ikke kopiere brief");setTimeout(()=>setMessage(""),1800)}return false}};
  const prepareChatGptPackage=async()=>{const copied=await copyAiBrief(false);exportPng();setMessage(copied?"PNG eksporteres · ChatGPT-brief kopiert":"PNG eksporteres · brief kunne ikke kopieres");setTimeout(()=>setMessage(""),2600)};
  return <main className={styles.shell+(fieldMode?" "+styles.fieldMode:"")}>
-  <header className={styles.top}><Link href="/admin">← Backoffice</Link><strong>Tegning & visualisering</strong><input className={styles.name} value={doc.name} onChange={e=>setDoc(d=>({...d,name:e.target.value}))}/><span className={styles.saved}>{message||"Autolagres lokalt"}</span><button className={styles.btn} onClick={()=>persist()}>Lagre på oppdrag</button><button className={styles.btn} onClick={undo} disabled={!history.length}>Angre</button><button className={styles.btn} onClick={redo} disabled={!future.length}>Gjør om</button><button className={styles.btn} onClick={()=>zoomBy(-.25)}>−</button><span className={styles.zoom}>{Math.round((doc.zoom||1)*100)}%</span><button className={styles.btn} onClick={()=>zoomBy(.25)}>+</button><button className={styles.btn} onClick={fitView}>Tilpass</button><button className={tool==="pan"?styles.activeBtn:styles.btn} onClick={()=>{setTool(tool==="pan"?"select":"pan");setDraft(null);setMeasureDraft(null)}}>Flytt visning</button><button className={styles.btn} onClick={()=>window.print()}>PDF</button><button className={styles.btn} onClick={newQuoteFromDrawing}>Nytt tilbud fra tegning</button></header>
+  <header className={styles.top}><Link href="/admin">← Backoffice</Link><strong>Tegning & visualisering</strong><input className={styles.name} value={doc.name} onChange={e=>setDoc(d=>({...d,name:e.target.value}))}/><span className={styles.saved}>{message||saveStatusText()}</span><button className={styles.btn} onClick={()=>persist()}>Lagre på oppdrag</button><button className={styles.btn} onClick={undo} disabled={!history.length}>Angre</button><button className={styles.btn} onClick={redo} disabled={!future.length}>Gjør om</button><button className={styles.btn} onClick={()=>zoomBy(-.25)}>−</button><span className={styles.zoom}>{Math.round((doc.zoom||1)*100)}%</span><button className={styles.btn} onClick={()=>zoomBy(.25)}>+</button><button className={styles.btn} onClick={fitView}>Tilpass</button><button className={tool==="pan"?styles.activeBtn:styles.btn} onClick={()=>{setTool(tool==="pan"?"select":"pan");setDraft(null);setMeasureDraft(null)}}>Flytt visning</button><button className={styles.btn} onClick={()=>window.print()}>PDF</button><button className={styles.btn} onClick={newQuoteFromDrawing}>Nytt tilbud fra tegning</button></header>
   <nav className={styles.mobileTools} aria-label="Tegneverktøy mobil">
    <button type="button" className={tool==="select"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("select");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Velg</button>
    <button type="button" className={tool==="wall"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("wall");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Vegg</button>
@@ -541,6 +594,7 @@ export default function DrawingClient(){
    <span className={styles.mobileDivider}/>
    <button type="button" className={styles.mobileTool} onClick={()=>scrollPanel(leftPanel)}>Objekter</button>
    <button type="button" className={styles.mobileTool} onClick={()=>scrollPanel(rightPanel)}>Egenskaper</button>
+   <span className={styles.mobileSyncStatus} data-state={online?saveState:"offline"}>{!online?"Offline":saveState==="syncing"?"Synk…":saveState==="server"?"Synket":"Lokalt"}</span>
    <button type="button" className={styles.mobileSave} onClick={()=>persist()}>Lagre</button>
   </nav>
   {quickAddOpen&&<div className={styles.mobileQuickAdd}>
