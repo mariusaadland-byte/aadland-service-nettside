@@ -10,6 +10,8 @@ Nettsted og backoffice for Aadland Service.
 - Utleie med datokontroll, blokkeringer og administrasjon
 - Backoffice på `/admin` med ordre, kunder, produkter, tjenester, utleie, prosjekter og forsideinnhold
 - Tegning og visualisering på `/admin/tegning`
+- Pris- og fastpriskalkulator på `/admin/kalkulator` med arbeid, materialpåslag, reise, bom og MVA-visning
+- Arbeidsklokke på `/admin/arbeidsklokke` med start/stopp, manuelle timer, flytting/redigering, km, bom og Excel-eksport
 - Supabase som database og Resend for e-post
 - Betalingsstatus er separat fra ordrestatus. Betalingsleverandør er ikke koblet til ennå.
 
@@ -17,6 +19,16 @@ Nettsted og backoffice for Aadland Service.
 Kopier `.env.example` til `.env.local` og fyll inn verdiene. Ikke legg hemmelige nøkler i Git.
 
 I Vercel må `RESEND_API_KEY` være satt i **Production** for at kundekonto, passordgjenoppretting og andre kunde-e-poster skal kunne sendes fra produksjon. Preview kan bruke `RESEND_PREVIEW_API_KEY`. `CRON_SECRET` er påkrevd i Production for at automatiske tilbudsoppfølginger og påminnelser skal kjøre; cron-rutene avviser alle kall dersom hemmeligheten mangler eller Authorization-headeren ikke matcher. Produksjonsbuilden stopper automatisk dersom Supabase-konfigurasjon, `SESSION_SECRET`, `RESEND_API_KEY`, `CRON_SECRET` eller `NEXT_PUBLIC_SITE_URL` mangler. Etter endring av en miljøvariabel må det kjøres en ny deployment.
+
+## Aadland Service – e-postroller
+
+Automatiske Aadland Service-meldinger bruker en egen avsenderrolle:
+- `SERVICE_EMAIL_FROM=Aadland Service <noreplay@aadland-service.no>`
+- `SERVICE_REPLY_TO=post@aadland-service.no`
+
+Dette gjelder blant annet ordrebekreftelser, betalingskvitteringer, ordrestatus, refusjonsvarsler og automatiske konto-/påminnelsesmailer. Kunden kan fortsatt svare til `post@aadland-service.no` fordi Reply-To peker dit. Tilbud og tilbudsoppfølging sendes fortsatt fra `post@aadland-service.no`.
+
+Den gamle `ORDER_EMAIL_FROM`-variabelen brukes ikke lenger som avsender, slik at en gammel Vercel-verdi ikke kan tvinge automatiske e-poster tilbake til `bestilling@` eller `noreply@`.
 
 ## Aadland Utleie-domene og e-post
 
@@ -35,6 +47,34 @@ Status per 30. september 2026:
 3. `aadlandutleie.no` er verifisert som sending domain i Resend,
 4. bookingene lagrer hvilket nettsted kunden brukte, slik at senere Min side-lenker beholder riktig domene,
 5. utleiedomenet får eget sitemap og robots-oppsett, mens Aadland Service sitt sitemap ikke annonserer dupliserte utleiekanoniske URL-er.
+
+## Vipps MobilePay – planlagt to-salgssted-oppsett
+
+Aadland Service og Aadland Utleie skal bruke hvert sitt Vipps-salgssted under samme foretak. Salgsstedene må ikke dele credentials i appen.
+
+Server-side miljøvariabler:
+- `VIPPS_ENV=production` eller `test`
+- `VIPPS_PAYMENTS_ENABLED=false` frem til kontrollert aktivering
+- `VIPPS_WEBHOOK_URL=https://www.aadland-service.no/api/vipps/webhook`
+- `VIPPS_SERVICE_CLIENT_ID`
+- `VIPPS_SERVICE_CLIENT_SECRET`
+- `VIPPS_SERVICE_SUBSCRIPTION_KEY`
+- `VIPPS_SERVICE_MSN`
+- `VIPPS_RENTAL_CLIENT_ID`
+- `VIPPS_RENTAL_CLIENT_SECRET`
+- `VIPPS_RENTAL_SUBSCRIPTION_KEY`
+- `VIPPS_RENTAL_MSN`
+
+`lib/vippsConfig.js` holder salgsstedene adskilt og velger Aadland Utleie for `aadlandutleie.no` og Aadland Service for `aadland-service.no`. Ingen Vipps-hemmeligheter skal bruke `NEXT_PUBLIC_` eller sendes til nettleseren.
+
+Backoffice-siden `/admin/vipps` viser bare om de fire nødvendige verdiene finnes for hvert salgssted; den viser aldri verdiene. API-tilkobling og webhook kan testes/registreres mens betalingsmotoren fortsatt er AV. «Test oppsett» sammenligner lokal webhook-registrering med Vipps, callback-URL, hendelser og MSN uten å opprette en betaling. Webhook-secret lagres i privat Supabase-schema, ikke i nettleseren eller vanlig appdata. Kundebetaling skal først aktiveres etter at begge salgssteder er grønne og Vipps-testflyten er gjennomført. Før aktivering må begge salgsstedene være opprettet i Vipps bedriftsportal og de riktige salgsstedsnøklene legges i Vercel.
+
+Nettsidegrunnlaget for Vipps er oppdatert i oktober 2026:
+- registrert forretningsadresse vises på nettstedet,
+- salgsvilkår dekker betaling, levering, angrerett, retur, reklamasjon og konfliktløsning,
+- utleievilkår har konkret 24-timers frist for endring/ombooking/avbestilling og beskriver avslutning av leieforhold,
+- vilkår må godtas aktivt før bestilling og senere før eventuell Vipps-betaling initieres,
+- nye ordre/bookinger lagrer vilkårsversjon `2026-10`.
 
 ## Database
 SQL-filene i `supabase/` beskriver databasegrunnlaget og senere utvidelser. De må kjøres kontrollert i riktig rekkefølge mot Supabase før funksjoner som bruker de nye tabellene/feltene tas i produksjon.

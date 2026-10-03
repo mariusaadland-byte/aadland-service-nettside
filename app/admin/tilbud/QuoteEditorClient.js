@@ -88,7 +88,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  },[isDirty]);
 
  useEffect(()=>{
-  if(quoteId||sourceOrderId)return;
+  if(quoteId)return;
   try{
    const raw=sessionStorage.getItem("aadlandQuoteDraftFromDrawing");
    if(!raw)return;
@@ -116,7 +116,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    }));
    if(importedLines.length)setSavedMessage(importedLines.length+" mengdelinjer er hentet fra tegningen. Fyll inn pris på hver linje før tilbudet lagres.");
   }catch{}
- },[quoteId,sourceOrderId]);
+ },[quoteId]);
 
  useEffect(()=>{
   if(quoteId||sourceOrderId||!initialCustomer)return;

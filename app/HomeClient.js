@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {safeSiteHref} from "../lib/safeUrl";
 import {osloDateKey} from "../lib/osloTime";
+import {COMPANY_ADDRESS} from "../lib/companyInfo";
 
 const emptyCustomer={name:"",email:"",phone:"",address:"",postalCode:"",city:"",note:"",deliveryWithinRadius:true};
 
@@ -280,7 +281,7 @@ export default function Home(){
 
   <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="footerIdentity"><div className="homeBrand"><img className="brandLogo footerLogo" src="/aadland-service-logo.webp" alt="Aadland Service"/></div><p className="footerTagline">Lokalt håndverk – solide resultater</p></div><div><b>Kontakt</b><div className="footerServices"><a href={"tel:"+siteSettings.phone.replace(/\s/g,"")}>{siteSettings.phone}</a><a href={"mailto:"+siteSettings.email}>{siteSettings.email}</a></div></div><div><b>Tjenester</b><div className="footerServices">
  {footerServices.map(service=><a key={service.slug} href={serviceHref(service)}>{service.title}</a>)}
- </div></div><div><b>Firma</b><div className="footerServices"><a href="#om">Om oss</a><a href="/prosjekter">Tidligere oppdrag</a><a href="#befaring">Gratis befaring</a><a href="/vilkar/utleie">Utleiebetingelser</a><a href="/vilkar/salg">Salgsbetingelser</a><a href="/personvern">Personvern</a></div><p>Org.nr. {siteSettings.orgNumber}<br/>{siteSettings.location}</p></div></div><div className="homeWrap footerBottom"><span>© Aadland Service</span><div><a href="/min-side">Min side</a><a href="/personvern">Personvern</a><a href="/produkter">Produkter</a><a href="#tjenester">Tjenester</a><a href="#kontakt">Kontakt</a></div></div></footer>
+ </div></div><div><b>Firma</b><div className="footerServices"><a href="#om">Om oss</a><a href="/prosjekter">Tidligere oppdrag</a><a href="#befaring">Gratis befaring</a><a href="/vilkar/utleie">Utleiebetingelser</a><a href="/vilkar/salg">Salgsbetingelser</a><a href="/personvern">Personvern</a></div><p>Org.nr. {siteSettings.orgNumber}<br/>{COMPANY_ADDRESS}<br/><span>{siteSettings.location}</span></p></div></div><div className="homeWrap footerBottom"><span>© Aadland Service</span><div><a href="/min-side">Min side</a><a href="/personvern">Personvern</a><a href="/produkter">Produkter</a><a href="#tjenester">Tjenester</a><a href="#kontakt">Kontakt</a></div></div></footer>
  </main>;
 }
 function Field({label,children}){return <label className="homeField"><span>{label}</span>{children}</label>}

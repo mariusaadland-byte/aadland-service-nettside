@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import styles from "./drawing.module.css";
 
-const GRID=100, VIEW=8000, STORE="aadlandDrawingsV2";
+const GRID=100, VIEW=8000, STORE="aadlandDrawingsV2", LAST_STORE="aadlandDrawingsV2:last";
 const catalog=[
  {group:"Bygg",items:[["door","Dør",900,100],["sliding","Skyvedør",1800,100],["window","Vindu",1200,100],["opening","Åpning",1000,100],["stairs","Trapp",900,2500],["post","Stolpe",98,98]]},
  {group:"Bad",items:[["toilet","Toalett",400,700],["walltoilet","Vegghengt toalett",400,600],["shower","Dusj",900,900],["bath","Badekar",750,1700],["sink","Servant",600,500],["washer","Vaskemaskin",600,600]]},
@@ -46,6 +46,19 @@ const len=w=>Math.round(Math.hypot(w.x2-w.x1,w.y2-w.y1));
 const angle=w=>Math.round(Math.atan2(w.y2-w.y1,w.x2-w.x1)*180/Math.PI*10)/10;
 const wallOffset=(o,w)=>{const dx=w.x2-w.x1,dy=w.y2-w.y1,L=Math.hypot(dx,dy)||1;return Math.round(((o.x+o.w/2-w.x1)*dx+(o.y+o.h/2-w.y1)*dy)/L)};
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+const mountedLimits=(o,w)=>{const L=len(w),width=Math.max(0,Number(o?.w)||0),half=width/2;if(L<=0)return{L:0,min:0,max:0,tooWide:width>0};if(width>=L)return{L,min:L/2,max:L/2,tooWide:width>L};return{L,min:half,max:L-half,tooWide:false}};
+const wallEdgeOffsets=(o,w)=>{const limits=mountedLimits(o,w),center=clamp(Number.isFinite(o?.wallOffset)?o.wallOffset:wallOffset(o,w),limits.min,limits.max),half=Math.max(0,Number(o?.w)||0)/2;return{start:Math.max(0,Math.round(center-half)),end:Math.max(0,Math.round(limits.L-center-half)),center:Math.round(center),tooWide:limits.tooWide,L:limits.L}};
+const wallOpeningLayout=(wall,items)=>{
+ const rows=(items||[]).filter(item=>item.wallId===wall.id&&openingTypes.has(item.type)).map(item=>({item,gaps:wallEdgeOffsets(item,wall)})).sort((a,b)=>a.gaps.start-b.gaps.start);
+ let cursor=0,overlap=false;const parts=[];
+ for(const row of rows){
+  const gap=row.gaps.start-cursor;if(gap<0)overlap=true;
+  parts.push({gap:Math.max(0,gap),item:row.item,gaps:row.gaps});
+  cursor=Math.max(cursor,row.gaps.start+Number(row.item.w||0));
+ }
+ return {rows,parts,endGap:Math.max(0,len(wall)-cursor),overlap,L:len(wall)};
+};
+
 const dim=w=>{const dx=w.x2-w.x1,dy=w.y2-w.y1,L=Math.hypot(dx,dy)||1,nx=-dy/L,ny=dx/L,off=150;return {ax:w.x1+nx*off,ay:w.y1+ny*off,bx:w.x2+nx*off,by:w.y2+ny*off,nx,ny,mx:(w.x1+w.x2)/2+nx*(off+70),my:(w.y1+w.y2)/2+ny*(off+70)}};
 const wallPresets=[
  ["Lettvegg · 70 mm / 2400 mm",70,2400],
@@ -92,8 +105,32 @@ function polygonCentroid(points){
  for(const p of points){x+=p.x;y+=p.y}
  return{x:x/points.length,y:y/points.length};
 }
+function syncLinkedZones(walls,zones){
+ const byId=new Map((walls||[]).map(w=>[w.id,w]));
+ return (zones||[]).map(zone=>{
+  if(!Array.isArray(zone.wallIds)||zone.wallIds.length<3)return zone;
+  const linked=zone.wallIds.map(id=>byId.get(id));
+  if(linked.some(w=>!w))return {...zone,wallIds:undefined};
+  return {...zone,points:linked.map(w=>({x:w.x1,y:w.y1}))};
+ });
+}
+function syncAnchoredMeasurements(walls,measurements){
+ const byId=new Map((walls||[]).map(w=>[w.id,w]));
+ return (measurements||[]).map(m=>{
+  let next={...m};
+  for(const i of [1,2]){
+   const anchor=m["anchor"+i];
+   if(!anchor?.wallId)continue;
+   const wall=byId.get(anchor.wallId);
+   if(!wall){delete next["anchor"+i];continue}
+   next["x"+i]=anchor.end===1?wall.x1:wall.x2;
+   next["y"+i]=anchor.end===1?wall.y1:wall.y2;
+  }
+  return next;
+ });
+}
 
-const initial=()=>({id:uid(),name:"Ny tegning",projectId:"",customer:"",address:"",notes:"",walls:[],items:[],zones:[],measurements:[],snapSize:50,showGrid:true,scale:"1:50",zoom:1,defaultWallThickness:98,defaultWallHeight:2400});
+const initial=()=>({id:uid(),name:"Ny tegning",orderId:"",projectId:"",customer:"",address:"",notes:"",visualizationNotes:"",walls:[],items:[],zones:[],measurements:[],snapSize:50,showGrid:true,scale:"1:50",zoom:1,defaultWallThickness:98,defaultWallHeight:2400});
 const wallTypes=new Set(["door","sliding","window","opening","railing","screen"]);
 const openingTypes=new Set(["door","sliding","window","opening"]);
 const openingDefaults=type=>type==="window"?{openingHeight:1200,sillHeight:900}:openingTypes.has(type)?{openingHeight:2100,sillHeight:0}:{};
@@ -104,40 +141,390 @@ function nearestWall(o,walls){
 }
 
 export default function DrawingClient(){
- const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[projects,setProjects]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null);
+ const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[measureDrag,setMeasureDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null),[mobileEditOpen,setMobileEditOpen]=useState(false),[roomBuilder,setRoomBuilder]=useState(null),[quickAddOpen,setQuickAddOpen]=useState(false),[fieldMode,setFieldMode]=useState(false),[canvasAspect,setCanvasAspect]=useState(1),[wallBuilder,setWallBuilder]=useState(null),[snapHint,setSnapHint]=useState(null),[wallChain,setWallChain]=useState(null),[online,setOnline]=useState(true),[saveState,setSaveState]=useState("local"),[lastSavedAt,setLastSavedAt]=useState(null),[fieldReturnZoneId,setFieldReturnZoneId]=useState(null);
  const svg=useRef(null);
- useEffect(()=>{try{const d=JSON.parse(localStorage.getItem(STORE)||"[]");if(d.length){setDocs(d);setDoc(d[0])}else{const old=JSON.parse(localStorage.getItem("aadlandDrawing")||"null");if(old)setDoc({...initial(),...old})}}catch{} fetch("/api/admin/projects").then(r=>r.ok?r.json():null).then(x=>setProjects(x?.projects||[])).catch(()=>{});},[]);
- const persistLocal=next=>{const list=[...docs.filter(x=>x.id!==next.id),next];setDocs(list);localStorage.setItem(STORE,JSON.stringify(list))};
- const persist=async(next=doc)=>{persistLocal(next);if(!next.projectId){setMessage("Lagret på enheten");setTimeout(()=>setMessage(""),1800);return}setMessage("Lagrer…");try{const body={id:next.serverId,projectId:next.projectId,name:next.name,customer:next.customer,address:next.address,notes:next.notes,drawingData:{...next,serverId:undefined}};const r=await fetch("/api/admin/project-drawings",{method:next.serverId?"PATCH":"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)}),x=await r.json();if(r.ok&&x.drawing){const saved={...next,serverId:x.drawing.id};setDoc(saved);persistLocal(saved);setMessage("Lagret i oppdraget")}else if(x.setupRequired)setMessage("Lokalt lagret · database ikke aktivert");else setMessage("Lokalt lagret · serverfeil")}catch{setMessage("Lokalt lagret · server utilgjengelig")}setTimeout(()=>setMessage(""),2600)};
+ const leftPanel=useRef(null),rightPanel=useRef(null);
+ const touchPointers=useRef(new Map()),pinchGesture=useRef(null),pendingCanvasTouch=useRef(null);
+ const linkedOrderHandled=useRef("");
+ const autosaveReady=useRef(false),docRef=useRef(doc),docsRef=useRef(docs),serverSyncInFlight=useRef(false),serverSyncQueued=useRef(false),serverSyncedSignature=useRef("");
+ useEffect(()=>{docRef.current=doc},[doc]);
+ useEffect(()=>{docsRef.current=docs},[docs]);
+ useEffect(()=>{
+  const update=()=>setOnline(navigator.onLine);
+  update();window.addEventListener("online",update);window.addEventListener("offline",update);
+  return()=>{window.removeEventListener("online",update);window.removeEventListener("offline",update)};
+ },[]);
+ useEffect(()=>{const el=svg.current;if(!el||typeof ResizeObserver==="undefined")return;const update=()=>{const r=el.getBoundingClientRect();if(r.width>0&&r.height>0)setCanvasAspect(clamp(r.width/r.height,.35,2.8))};update();const observer=new ResizeObserver(update);observer.observe(el);window.addEventListener("orientationchange",update);return()=>{observer.disconnect();window.removeEventListener("orientationchange",update)}},[]);
+ useEffect(()=>{try{const d=JSON.parse(localStorage.getItem(STORE)||"[]");if(d.length){const lastId=localStorage.getItem(LAST_STORE),active=d.find(item=>item.id===lastId)||d[0];setDocs(d);setDoc({...initial(),...active})}else{const old=JSON.parse(localStorage.getItem("aadlandDrawing")||"null");if(old)setDoc({...initial(),...old})}}catch{} Promise.all([
+  fetch("/api/admin/orders").then(r=>r.ok?r.json():null).catch(()=>null),
+  fetch("/api/admin/projects").then(r=>r.ok?r.json():null).catch(()=>null)
+ ]).then(([orderData,projectData])=>{
+  setOrders((orderData?.orders||[]).filter(order=>order.orderType==="custom"&&!order.archivedAt));
+  setProjects(projectData?.projects||[]);
+ }).catch(()=>{});},[]);
+ useEffect(()=>{
+  const readyTimer=setTimeout(()=>{autosaveReady.current=true},700);
+  return()=>clearTimeout(readyTimer);
+ },[]);
+ const writeLocalSnapshot=(next=docRef.current,{silent=false}={})=>{
+  try{
+   const savedAt=Date.now(),storedNext={...next,_localSavedAt:savedAt},current=docsRef.current||[],list=[storedNext,...current.filter(x=>x.id!==next.id)];
+   localStorage.setItem(STORE,JSON.stringify(list));localStorage.setItem(LAST_STORE,next.id);
+   docsRef.current=list;
+   if(!silent){
+    setDocs(list);
+    const synced=!!serverSyncedSignature.current&&(next.orderId||next.projectId)&&serverSignature(next)===serverSyncedSignature.current;
+    setSaveState(typeof navigator!=="undefined"&&!navigator.onLine?"offline":synced?"server":"local");
+    setLastSavedAt(savedAt);
+   }
+   return list;
+  }catch{return null}
+ };
+ useEffect(()=>{
+  if(!autosaveReady.current)return;
+  const timer=setTimeout(()=>writeLocalSnapshot(doc),220);
+  return()=>clearTimeout(timer);
+ },[doc]);
+ useEffect(()=>{
+  const flush=()=>{if(autosaveReady.current)writeLocalSnapshot(docRef.current,{silent:true})};
+  const onVisibility=()=>{if(document.visibilityState==="hidden")flush()};
+  window.addEventListener("pagehide",flush);
+  document.addEventListener("visibilitychange",onVisibility);
+  return()=>{window.removeEventListener("pagehide",flush);document.removeEventListener("visibilitychange",onVisibility)};
+ },[]);
+ const persistLocal=next=>writeLocalSnapshot(next);
+ const serverPayload=next=>{const {_localSavedAt,_serverUpdatedAt,serverId,...drawingData}=next;return {id:serverId,orderId:next.orderId||null,projectId:next.projectId||null,name:next.name,customer:next.customer,address:next.address,notes:next.notes,drawingData}};
+ const serverSignature=next=>JSON.stringify(serverPayload(next));
+ const syncServer=async(next=docRef.current,{quiet=false}={})=>{
+  if(!next?.orderId&&!next?.projectId)return false;
+  if(typeof navigator!=="undefined"&&!navigator.onLine){setSaveState("offline");return false}
+  const signature=serverSignature(next);
+  if(quiet&&signature===serverSyncedSignature.current)return true;
+  if(serverSyncInFlight.current){serverSyncQueued.current=true;return false}
+  serverSyncInFlight.current=true;serverSyncQueued.current=false;if(!quiet)setMessage("Lagrer…");setSaveState("syncing");
+  try{
+   const r=await fetch("/api/admin/project-drawings",{method:next.serverId?"PATCH":"POST",headers:{"content-type":"application/json"},body:JSON.stringify(serverPayload(next))}),x=await r.json();
+   if(r.ok&&x.drawing){
+    const serverSnapshot={...next,serverId:x.drawing.id},latest=docRef.current,saved=latest.id===next.id?{...latest,serverId:x.drawing.id}:serverSnapshot;
+    serverSyncedSignature.current=serverSignature(serverSnapshot);docRef.current=saved;setDoc(saved);writeLocalSnapshot(saved);
+    const fullySynced=serverSignature(saved)===serverSyncedSignature.current;
+    setSaveState(fullySynced?"server":"local");setLastSavedAt(Date.now());
+    if(!fullySynced)serverSyncQueued.current=true;
+    if(!quiet){setMessage(fullySynced?"Lagret i oppdraget":"Lagret · synkroniserer siste endringer");setTimeout(()=>setMessage(""),1800)}
+    return true;
+   }
+   setSaveState("local");
+   if(!quiet){setMessage(x.setupRequired?"Lokalt lagret · database ikke aktivert":"Lokalt lagret · serverfeil");setTimeout(()=>setMessage(""),2600)}
+  }catch{
+   setSaveState(typeof navigator!=="undefined"&&!navigator.onLine?"offline":"local");
+   if(!quiet){setMessage("Lokalt lagret · server utilgjengelig");setTimeout(()=>setMessage(""),2600)}
+  }finally{
+   serverSyncInFlight.current=false;
+   if(serverSyncQueued.current){serverSyncQueued.current=false;setTimeout(()=>syncServer(docRef.current,{quiet:true}),0)}
+  }
+  return false;
+ };
+ useEffect(()=>{
+  if(!autosaveReady.current||(!doc.orderId&&!doc.projectId))return;
+  const timer=setTimeout(()=>syncServer(docRef.current,{quiet:true}),8000);
+  return()=>clearTimeout(timer);
+ },[doc]);
+ useEffect(()=>{
+  if(!online)return;
+  const current=docRef.current;
+  if(current?.orderId||current?.projectId){const timer=setTimeout(()=>syncServer(current,{quiet:true}),500);return()=>clearTimeout(timer)}
+ },[online]);
+ const persist=async(next=docRef.current)=>{writeLocalSnapshot(next);if(!next.orderId&&!next.projectId){setMessage("Lagret på enheten");setTimeout(()=>setMessage(""),1800);return}await syncServer(next,{quiet:false})};
  const checkpoint=()=>setHistory(h=>[...h.slice(-24),JSON.stringify(doc)]);
- const syncMounted=(walls,items)=>items.map(o=>{if(!o.wallId)return o;const w=walls.find(x=>x.id===o.wallId);if(!w)return {...o,wallId:null,wallOffset:null};const L=len(w),off=clamp(Number.isFinite(o.wallOffset)?o.wallOffset:wallOffset(o,w),0,L),a=Math.atan2(w.y2-w.y1,w.x2-w.x1),cx=w.x1+Math.cos(a)*off,cy=w.y1+Math.sin(a)*off;return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off}});
+ const syncMounted=(walls,items)=>items.map(o=>{if(!o.wallId)return o;const w=walls.find(x=>x.id===o.wallId);if(!w)return {...o,wallId:null,wallOffset:null};const limits=mountedLimits(o,w),off=clamp(Number.isFinite(o.wallOffset)?o.wallOffset:wallOffset(o,w),limits.min,limits.max),a=Math.atan2(w.y2-w.y1,w.x2-w.x1),cx=w.x1+Math.cos(a)*off,cy=w.y1+Math.sin(a)*off;return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off}});
  const mutate=fn=>{checkpoint();setFuture([]);setDoc(d=>fn(d))};
  const undo=()=>{const last=history.at(-1);if(!last)return;setFuture(f=>[JSON.stringify(doc),...f].slice(0,25));setDoc(JSON.parse(last));setHistory(h=>h.slice(0,-1));setSelected(null)};
  const redo=()=>{const next=future[0];if(!next)return;setHistory(h=>[...h.slice(-24),JSON.stringify(doc)]);setDoc(JSON.parse(next));setFuture(f=>f.slice(1));setSelected(null)};
- const viewSize=VIEW/(doc.zoom||1);
- const point=e=>{const r=svg.current.getBoundingClientRect();return{x:pan.x+(e.clientX-r.left)*viewSize/r.width,y:pan.y+(e.clientY-r.top)*viewSize/r.height}};
- const zoomBy=delta=>setDoc(d=>({...d,zoom:clamp((d.zoom||1)+delta,.5,3)}));
- const fitView=()=>{setPan({x:0,y:0});setDoc(d=>({...d,zoom:1}))};
- const startPan=e=>{if(tool!=="pan")return;setPanning({cx:e.clientX,cy:e.clientY,x:pan.x,y:pan.y})};
- const movePan=e=>{if(!panning)return;const r=svg.current.getBoundingClientRect();setPan({x:panning.x-(e.clientX-panning.cx)*viewSize/r.width,y:panning.y-(e.clientY-panning.cy)*viewSize/r.height})};
- const newDoc=()=>{const d=initial();setDoc(d);setSelected(null);setHistory([]);setFuture([])};
- const openDoc=id=>{const d=docs.find(x=>x.id===id);if(d){setDoc(d);setSelected(null);setHistory([]);setFuture([])}};
- const loadProjectDrawings=async projectId=>{if(!projectId)return;try{const r=await fetch("/api/admin/project-drawings?projectId="+encodeURIComponent(projectId)),x=await r.json();if(!r.ok||x.setupRequired)return;const incoming=(x.drawings||[]).map(row=>({...initial(),...(row.drawingData||{}),serverId:row.id,projectId:row.projectId,name:row.name,customer:row.customer,address:row.address,notes:row.notes}));if(incoming.length){const merged=[...docs];for(const d of incoming){const i=merged.findIndex(x=>x.serverId===d.serverId);if(i>=0)merged[i]=d;else merged.push(d)}setDocs(merged);localStorage.setItem(STORE,JSON.stringify(merged));setMessage(incoming.length+" tegning(er) hentet fra oppdrag");setTimeout(()=>setMessage(""),2200)}}catch{}};
- const changeProject=e=>{const projectId=e.target.value;setDoc(d=>({...d,projectId}));if(projectId)loadProjectDrawings(projectId)};
- const makeRoom=()=>{const w=Number(prompt("Romlengde i mm","4000")),h=Number(prompt("Rombredde i mm","3000"));if(w<300||h<300)return;const x=1000,y=1000,t=Number(doc.defaultWallThickness)||98,H=Number(doc.defaultWallHeight)||2400,points=[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}],zone={id:uid(),name:"Rom "+((doc.zones||[]).length+1),points,ceilingHeight:H,floorFinish:"",notes:""};mutate(d=>({...d,walls:[...d.walls,{id:uid(),x1:x,y1:y,x2:x+w,y2:y,t,h:H},{id:uid(),x1:x+w,y1:y,x2:x+w,y2:y+h,t,h:H},{id:uid(),x1:x+w,y1:y+h,x2:x,y2:y+h,t,h:H},{id:uid(),x1:x,y1:y+h,x2:x,y2:y,t,h:H}],zones:[...(d.zones||[]),zone]}));setSelected({kind:"zone",id:zone.id})};
- const makeLRoom=()=>{const w=Number(prompt("Ytterlengde i mm","5000")),h=Number(prompt("Ytterbredde i mm","4000")),rw=Number(prompt("Bredde på innhakk fra høyre i mm","1800")),rh=Number(prompt("Dybde på innhakk ovenfra i mm","1500"));if(w<600||h<600||rw<300||rh<300||rw>=w-300||rh>=h-300){alert("Målene gir ikke et gyldig L-rom.");return}const x=1000,y=1000,t=Number(doc.defaultWallThickness)||98,H=Number(doc.defaultWallHeight)||2400,pts=[[x,y],[x+w-rw,y],[x+w-rw,y+rh],[x+w,y+rh],[x+w,y+h],[x,y+h],[x,y]],points=pts.slice(0,-1).map(p=>({x:p[0],y:p[1]})),zone={id:uid(),name:"Rom "+((doc.zones||[]).length+1),points,ceilingHeight:H,floorFinish:"",notes:""};mutate(d=>({...d,walls:[...d.walls,...pts.slice(0,-1).map((p,i)=>({id:uid(),x1:p[0],y1:p[1],x2:pts[i+1][0],y2:pts[i+1][1],t,h:H}))],zones:[...(d.zones||[]),zone]}));setSelected({kind:"zone",id:zone.id})};
- const addItem=(type,w,h)=>mutate(d=>({...d,items:[...d.items,{id:uid(),type,x:1800,y:1600,w,h,rot:0,...openingDefaults(type)}]}));
- const sel=useMemo(()=>selected?.kind==="wall"?doc.walls.find(x=>x.id===selected.id):selected?.kind==="item"?doc.items.find(x=>x.id===selected.id):selected?.kind==="zone"?(doc.zones||[]).find(x=>x.id===selected.id):null,[selected,doc]);
- const update=(key,value)=>{const n=Number(value);if(!Number.isFinite(n))return;mutate(d=>{if(selected?.kind==="item"){return {...d,items:d.items.map(o=>{if(o.id!==selected.id)return o;if(key==="wallOffset"&&o.wallId){const w=d.walls.find(x=>x.id===o.wallId);if(!w)return o;const L=len(w),off=clamp(n,0,L),a=Math.atan2(w.y2-w.y1,w.x2-w.x1),cx=w.x1+Math.cos(a)*off,cy=w.y1+Math.sin(a)*off;return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off}}return {...o,[key]:n}})}}const walls=d.walls.map(w=>{if(w.id!==selected?.id)return w;if(key==="len"||key==="angle"){const L=key==="len"?n:len(w),A=(key==="angle"?n:angle(w))*Math.PI/180;return {...w,x2:w.x1+L*Math.cos(A),y2:w.y1+L*Math.sin(A)}}return {...w,[key]:n}});return {...d,walls,items:syncMounted(walls,d.items)}})};
- const remove=()=>{checkpoint();setFuture([]);setDoc(d=>selected?.kind==="wall"?{...d,walls:d.walls.filter(x=>x.id!==selected.id),items:d.items.map(o=>o.wallId===selected.id?{...o,wallId:null,wallOffset:null}:o)}:selected?.kind==="zone"?{...d,zones:(d.zones||[]).filter(x=>x.id!==selected.id)}:{...d,items:d.items.filter(x=>x.id!==selected.id)});setSelected(null)};
+ const viewDimsFor=(zoom=doc.zoom||1)=>{
+  const aspect=clamp(canvasAspect||1,.35,2.8),base=VIEW/zoom;
+  return aspect>=1?{w:base,h:base/aspect}:{w:base*aspect,h:base};
+ };
+ const {w:viewWidth,h:viewHeight}=viewDimsFor();
+ const pointFromClient=(clientX,clientY)=>{const r=svg.current.getBoundingClientRect();return{x:pan.x+(clientX-r.left)*viewWidth/r.width,y:pan.y+(clientY-r.top)*viewHeight/r.height}};
+ const point=e=>pointFromClient(e.clientX,e.clientY);
+ const magneticPoint=(p,walls=doc.walls,excludeWallId=null,ignoreNear=null)=>{
+  const threshold=Math.max(55,220/(doc.zoom||1));
+  let best=null;
+  for(const wall of walls){
+   if(wall.id===excludeWallId)continue;
+   for(const [end,endpoint] of [[1,{x:wall.x1,y:wall.y1}],[2,{x:wall.x2,y:wall.y2}]]){
+    if(ignoreNear&&Math.hypot(endpoint.x-ignoreNear.x,endpoint.y-ignoreNear.y)<8)continue;
+    const dist=Math.hypot(p.x-endpoint.x,p.y-endpoint.y);
+    if(dist<=threshold&&(!best||dist<best.dist))best={...endpoint,dist,wallId:wall.id,end};
+   }
+  }
+  return best?{point:{x:best.x,y:best.y},snapped:true,anchor:{wallId:best.wallId,end:best.end}}:{point:{x:snapTo(p.x,doc.snapSize||50),y:snapTo(p.y,doc.snapSize||50)},snapped:false,anchor:null};
+ };
+ const wallMagneticPoint=(p,origin)=>{
+  const endpoint=magneticPoint(p);
+  if(endpoint.snapped)return {...endpoint,label:"Hjørne"};
+  if(!origin)return endpoint;
+  const dx=p.x-origin.x,dy=p.y-origin.y,L=Math.hypot(dx,dy);
+  if(L<120)return endpoint;
+  const raw=Math.atan2(dy,dx)*180/Math.PI,nearest=Math.round(raw/45)*45;
+  const diff=Math.abs((((raw-nearest)+180)%360+360)%360-180);
+  if(diff>7)return endpoint;
+  const rad=nearest*Math.PI/180,point={x:clamp(origin.x+Math.cos(rad)*L,0,VIEW),y:clamp(origin.y+Math.sin(rad)*L,0,VIEW)};
+  return {point,snapped:true,label:(((nearest%360)+360)%360)+"°"};
+ };
+ const clampPanForZoom=(value,zoom)=>{const dims=viewDimsFor(zoom);return{x:clamp(value.x,0,Math.max(0,VIEW-dims.w)),y:clamp(value.y,0,Math.max(0,VIEW-dims.h))}};
+ const zoomBy=delta=>setDoc(d=>{const oldZoom=d.zoom||1,oldDims=viewDimsFor(oldZoom),zoom=clamp(oldZoom+delta,.5,5),nextDims=viewDimsFor(zoom);setPan(p=>clampPanForZoom({x:p.x+oldDims.w/2-nextDims.w/2,y:p.y+oldDims.h/2-nextDims.h/2},zoom));return {...d,zoom}});
+ const fitView=()=>{const b=drawingBounds(),aspect=clamp(canvasAspect||1,.35,2.8),base=aspect>=1?{w:VIEW,h:VIEW/aspect}:{w:VIEW*aspect,h:VIEW},zoom=clamp(Math.min(base.w/Math.max(500,b.w*1.12),base.h/Math.max(500,b.h*1.12)),.5,5),nextDims=viewDimsFor(zoom);setPan(clampPanForZoom({x:b.x+b.w/2-nextDims.w/2,y:b.y+b.h/2-nextDims.h/2},zoom));setDoc(d=>({...d,zoom}))};
+ const capturePointer=e=>{try{svg.current?.setPointerCapture?.(e.pointerId)}catch{}};
+ const releasePointer=e=>{try{if(svg.current?.hasPointerCapture?.(e.pointerId))svg.current.releasePointerCapture(e.pointerId)}catch{}};
+ const scrollPanel=ref=>ref.current?.scrollIntoView?.({behavior:"smooth",block:"start"});
+ const clearPendingCanvasTouch=()=>{if(pendingCanvasTouch.current){clearTimeout(pendingCanvasTouch.current);pendingCanvasTouch.current=null}};
+ const rollbackGestureDrag=()=>{const start=drag?.start||wallDrag?.start||zoneDrag?.start||measureDrag?.start;if(start){try{setDoc(JSON.parse(start))}catch{}}setDrag(null);setWallDrag(null);setZoneDrag(null);setMeasureDrag(null);setPanning(null)};
+ const beginPinch=()=>{
+  const points=[...touchPointers.current.values()];
+  if(points.length<2||!svg.current)return;
+  clearPendingCanvasTouch();rollbackGestureDrag();
+  const a=points[0],b=points[1],r=svg.current.getBoundingClientRect(),startZoom=doc.zoom||1,startDims=viewDimsFor(startZoom);
+  const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+  pinchGesture.current={
+   startDistance:Math.max(1,Math.hypot(b.x-a.x,b.y-a.y)),
+   startZoom,
+   worldX:pan.x+(mx-r.left)*startDims.w/r.width,
+   worldY:pan.y+(my-r.top)*startDims.h/r.height
+  };
+ };
+ const pointerDownCapture=e=>{
+  if(e.pointerType!=="touch")return;
+  capturePointer(e);
+  touchPointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(touchPointers.current.size>=2){
+   if(touchPointers.current.size===2)beginPinch();
+   e.preventDefault();e.stopPropagation();
+  }
+ };
+ const pointerMoveCapture=e=>{
+  if(e.pointerType!=="touch"||!touchPointers.current.has(e.pointerId))return;
+  touchPointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  const gesture=pinchGesture.current,points=[...touchPointers.current.values()];
+  if(!gesture||points.length<2||!svg.current)return;
+  e.preventDefault();e.stopPropagation();
+  const a=points[0],b=points[1],distance=Math.max(1,Math.hypot(b.x-a.x,b.y-a.y));
+  const zoom=clamp(gesture.startZoom*(distance/gesture.startDistance),.5,5);
+  const r=svg.current.getBoundingClientRect(),nextDims=viewDimsFor(zoom),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+  const nextPan=clampPanForZoom({
+   x:gesture.worldX-(mx-r.left)*nextDims.w/r.width,
+   y:gesture.worldY-(my-r.top)*nextDims.h/r.height
+  },zoom);
+  setPan(nextPan);setDoc(d=>Math.abs((d.zoom||1)-zoom)<.002?d:{...d,zoom});
+ };
+ const pointerUpCapture=e=>{
+  if(e.pointerType!=="touch")return;
+  const wasPinching=!!pinchGesture.current;
+  touchPointers.current.delete(e.pointerId);releasePointer(e);
+  if(touchPointers.current.size<2)pinchGesture.current=null;
+  if(wasPinching){e.preventDefault();e.stopPropagation()}
+ };
+ const startPan=e=>{if(tool!=="pan")return;capturePointer(e);setPanning({cx:e.clientX,cy:e.clientY,x:pan.x,y:pan.y})};
+ const movePan=e=>{if(!panning)return;const r=svg.current.getBoundingClientRect();setPan(clampPanForZoom({x:panning.x-(e.clientX-panning.cx)*viewWidth/r.width,y:panning.y-(e.clientY-panning.cy)*viewHeight/r.height},doc.zoom||1))};
+ const newDoc=()=>{const d=initial();try{localStorage.setItem(LAST_STORE,d.id)}catch{}setDoc(d);setSelected(null);setHistory([]);setFuture([])};
+ const openDoc=id=>{const d=docs.find(x=>x.id===id);if(d){try{localStorage.setItem(LAST_STORE,d.id)}catch{}setDoc(d);setSelected(null);setHistory([]);setFuture([])}};
+ const chooseLocalOrServer=(local,incoming)=>{
+  if(!local)return incoming;
+  const localTime=Number(local._localSavedAt)||0,serverTime=Date.parse(incoming._serverUpdatedAt||"")||0,same=serverSignature(local)===serverSignature(incoming);
+  return !same&&localTime>serverTime?local:incoming;
+ };
+ const mergeIncomingDrawings=incoming=>{if(!incoming.length)return;const merged=[...(docsRef.current||[])];let keptLocal=0;for(const drawing of incoming){const i=merged.findIndex(x=>x.serverId===drawing.serverId);if(i>=0){const chosen=chooseLocalOrServer(merged[i],drawing);if(chosen===merged[i])keptLocal++;merged[i]=chosen}else merged.push(drawing)}docsRef.current=merged;setDocs(merged);localStorage.setItem(STORE,JSON.stringify(merged));setMessage(keptLocal?"Nyere lokal tegning beholdt":incoming.length+" tegning(er) hentet");setTimeout(()=>setMessage(""),2200)};
+ const loadOrderDrawings=async orderId=>{if(!orderId)return;try{const r=await fetch("/api/admin/project-drawings?orderId="+encodeURIComponent(orderId)),x=await r.json();if(!r.ok||x.setupRequired)return;const incoming=(x.drawings||[]).map(row=>({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||orderId,projectId:row.projectId||"",name:row.name,customer:row.customer,address:row.address,notes:row.notes,_serverUpdatedAt:row.updatedAt||null}));mergeIncomingDrawings(incoming)}catch{}};
+ const loadProjectDrawings=async projectId=>{if(!projectId)return;try{const r=await fetch("/api/admin/project-drawings?projectId="+encodeURIComponent(projectId)),x=await r.json();if(!r.ok||x.setupRequired)return;const incoming=(x.drawings||[]).map(row=>({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||"",projectId:row.projectId,name:row.name,customer:row.customer,address:row.address,notes:row.notes,_serverUpdatedAt:row.updatedAt||null}));mergeIncomingDrawings(incoming)}catch{}};
+ const changeOrder=e=>{const orderId=e.target.value,order=orders.find(item=>item.id===orderId);setDoc(d=>({...d,orderId,projectId:orderId?"":d.projectId,customer:orderId?(order?.customerName||d.customer):d.customer,address:orderId?(order?.customer?.address||d.address):d.address,name:orderId&&d.name==="Ny tegning"?"Tegning – "+(order?.orderNumber||"oppdrag"):d.name}));if(orderId)loadOrderDrawings(orderId)};
+ const changeProject=e=>{const projectId=e.target.value;setDoc(d=>({...d,projectId,orderId:projectId?"":d.orderId}));if(projectId)loadProjectDrawings(projectId)};
+ useEffect(()=>{
+  if(!orders.length||linkedOrderHandled.current)return;
+  const orderId=new URLSearchParams(window.location.search).get("orderId")||"";
+  if(!orderId)return;
+  const order=orders.find(item=>item.id===orderId);
+  if(!order)return;
+  linkedOrderHandled.current=orderId;
+  let cancelled=false;
+  (async()=>{
+   const localList=docsRef.current||[],lastId=localStorage.getItem(LAST_STORE),activeLocal=localList.find(item=>item.id===lastId&&item.orderId===orderId)||null;
+   try{
+    const r=await fetch("/api/admin/project-drawings?orderId="+encodeURIComponent(orderId)),x=await r.json();
+    if(cancelled)return;
+    if(r.ok&&!x.setupRequired&&Array.isArray(x.drawings)&&x.drawings.length){
+     const incoming=x.drawings.map(row=>({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||orderId,projectId:row.projectId||"",name:row.name,customer:row.customer,address:row.address,notes:row.notes,_serverUpdatedAt:row.updatedAt||null}));
+     const latest=incoming[0],sameLocal=(docsRef.current||[]).find(item=>item.serverId===latest.serverId),serverChoice=chooseLocalOrServer(sameLocal,latest);
+     let chosen=serverChoice;
+     if(activeLocal&&!activeLocal.serverId){
+      const localTime=Number(activeLocal._localSavedAt)||0,serverTime=Date.parse(latest._serverUpdatedAt||"")||0;
+      if(localTime>serverTime)chosen=activeLocal;
+     }
+     mergeIncomingDrawings(incoming);
+     docRef.current=chosen;setDoc(chosen);try{localStorage.setItem(LAST_STORE,chosen.id)}catch{}
+     setSelected(null);setHistory([]);setFuture([]);
+     if(chosen===latest){serverSyncedSignature.current=serverSignature(latest);setSaveState("server")}
+     else setSaveState(typeof navigator!=="undefined"&&!navigator.onLine?"offline":"local");
+     setMessage(chosen===latest?"Tegning hentet fra "+(order.orderNumber||"oppdraget"):"Nyere lokal befaringstegning beholdt");
+     setTimeout(()=>setMessage(""),2400);
+     return;
+    }
+   }catch{}
+   if(cancelled)return;
+   if(activeLocal){
+    docRef.current=activeLocal;setDoc(activeLocal);setSelected(null);setHistory([]);setFuture([]);
+    setSaveState(typeof navigator!=="undefined"&&!navigator.onLine?"offline":"local");
+    setMessage("Lokal befaringstegning åpnet");
+    setTimeout(()=>setMessage(""),2200);
+    return;
+   }
+   const next={...initial(),orderId,customer:order.customerName||"",address:order.customer?.address||"",name:"Tegning – "+(order.orderNumber||"oppdrag")};
+   docRef.current=next;setDoc(next);setSelected(null);setHistory([]);setFuture([]);
+   setMessage("Ny tegning koblet til "+(order.orderNumber||"oppdraget"));
+   setTimeout(()=>setMessage(""),2200);
+  })();
+  return()=>{cancelled=true};
+ },[orders]);
+ const openRoomBuilder=type=>setRoomBuilder(type==="l"
+  ?{type:"l",name:"Rom "+((doc.zones||[]).length+1),w:"5000",h:"4000",rw:"1800",rh:"1500"}
+  :{type:"rect",name:"Rom "+((doc.zones||[]).length+1),w:"4000",h:"3000"});
+ const roomStart=(w,h)=>{const cx=pan.x+viewWidth/2,cy=pan.y+viewHeight/2;return{x:clamp(snapTo(cx-w/2,doc.snapSize||50),100,Math.max(100,VIEW-w-100)),y:clamp(snapTo(cy-h/2,doc.snapSize||50),100,Math.max(100,VIEW-h-100))}};
+ const createRoom=()=>{
+  if(!roomBuilder)return;
+  const w=Number(roomBuilder.w),h=Number(roomBuilder.h),name=String(roomBuilder.name||"").trim()||"Rom "+((doc.zones||[]).length+1);
+  if(!Number.isFinite(w)||!Number.isFinite(h)||w<300||h<300||w>7000||h>7000){setMessage("Sjekk rommålene");setTimeout(()=>setMessage(""),1800);return}
+  const t=Number(doc.defaultWallThickness)||98,H=Number(doc.defaultWallHeight)||2400,{x,y}=roomStart(w,h);
+  if(roomBuilder.type==="l"){
+   const rw=Number(roomBuilder.rw),rh=Number(roomBuilder.rh);
+   if(!Number.isFinite(rw)||!Number.isFinite(rh)||w<600||h<600||rw<300||rh<300||rw>=w-300||rh>=h-300){setMessage("Innhakket passer ikke i L-rommet");setTimeout(()=>setMessage(""),2200);return}
+   const pts=[[x,y],[x+w-rw,y],[x+w-rw,y+rh],[x+w,y+rh],[x+w,y+h],[x,y+h],[x,y]];
+   const walls=pts.slice(0,-1).map((p,i)=>({id:uid(),x1:p[0],y1:p[1],x2:pts[i+1][0],y2:pts[i+1][1],t,h:H}));
+   const points=walls.map(wall=>({x:wall.x1,y:wall.y1})),zone={id:uid(),name,points,wallIds:walls.map(wall=>wall.id),ceilingHeight:H,floorFinish:"",notes:""};
+   mutate(d=>({...d,walls:[...d.walls,...walls],zones:[...(d.zones||[]),zone]}));
+   setSelected({kind:"zone",id:zone.id});
+  }else{
+   const walls=[{id:uid(),x1:x,y1:y,x2:x+w,y2:y,t,h:H},{id:uid(),x1:x+w,y1:y,x2:x+w,y2:y+h,t,h:H},{id:uid(),x1:x+w,y1:y+h,x2:x,y2:y+h,t,h:H},{id:uid(),x1:x,y1:y+h,x2:x,y2:y,t,h:H}];
+   const points=walls.map(wall=>({x:wall.x1,y:wall.y1})),zone={id:uid(),name,points,wallIds:walls.map(wall=>wall.id),ceilingHeight:H,floorFinish:"",notes:""};
+   mutate(d=>({...d,walls:[...d.walls,...walls],zones:[...(d.zones||[]),zone]}));
+   setSelected({kind:"zone",id:zone.id});
+  }
+  const focusZoom=clamp(VIEW/Math.max(500,Math.max(w,h)*1.18),.5,5),focusView=VIEW/focusZoom;
+  setPan(clampPanForZoom({x:x+w/2-focusView/2,y:y+h/2-focusView/2},focusZoom));
+  setDoc(d=>({...d,zoom:focusZoom}));
+  setRoomBuilder(null);setTool("select");
+ };
+ const makeRoom=()=>openRoomBuilder("rect");
+ const makeLRoom=()=>openRoomBuilder("l");
+ const openWallBuilder=()=>{
+  const wall=selected?.kind==="wall"?doc.walls.find(item=>item.id===selected.id):null;
+  setWallBuilder({
+   length:"3000",angle:wall?String(Math.round(angle(wall))):"0",
+   thickness:String(doc.defaultWallThickness||98),height:String(doc.defaultWallHeight||2400),
+   connectToSelected:!!wall
+  });
+ };
+ const createExactWall=()=>{
+  if(!wallBuilder)return;
+  const L=Number(wallBuilder.length),A=Number(wallBuilder.angle),t=Number(wallBuilder.thickness),h=Number(wallBuilder.height);
+  if(!Number.isFinite(L)||L<100||L>12000||!Number.isFinite(A)||!Number.isFinite(t)||t<40||!Number.isFinite(h)||h<300){setMessage("Sjekk veggmålene");setTimeout(()=>setMessage(""),1800);return}
+  const selectedWall=wallBuilder.connectToSelected&&selected?.kind==="wall"?doc.walls.find(item=>item.id===selected.id):null;
+  const dims=viewDimsFor(),rad=A*Math.PI/180;
+  const x1=selectedWall?selectedWall.x2:snapTo(pan.x+dims.w/2-Math.cos(rad)*L/2,doc.snapSize||50);
+  const y1=selectedWall?selectedWall.y2:snapTo(pan.y+dims.h/2-Math.sin(rad)*L/2,doc.snapSize||50);
+  const id=uid(),wall={id,x1:clamp(x1,0,VIEW),y1:clamp(y1,0,VIEW),x2:clamp(x1+Math.cos(rad)*L,0,VIEW),y2:clamp(y1+Math.sin(rad)*L,0,VIEW),t,h};
+  mutate(d=>({...d,walls:[...d.walls,wall]}));
+  setSelected({kind:"wall",id});setTool("select");setWallBuilder(null);setQuickAddOpen(false);
+ };
+ const openingCollision=(wall,itemId,start,width,items=doc.items)=>{
+  const end=start+width;
+  return wallOpeningLayout(wall,items).rows.some(row=>row.item.id!==itemId&&start<row.gaps.start+Number(row.item.w||0)&&end>row.gaps.start);
+ };
+ const findOpeningStart=(wall,width,items=doc.items,excludeId=null,preferredValue=null)=>{
+  const W=Math.max(0,Number(width)||0),filtered=(items||[]).filter(item=>item.id!==excludeId),layout=wallOpeningLayout(wall,filtered),preferred=preferredValue==null?Math.max(0,(layout.L-W)/2):clamp(Number(preferredValue)||0,0,Math.max(0,layout.L-W));
+  const intervals=layout.rows.map(row=>({start:row.gaps.start,end:row.gaps.start+Number(row.item.w||0)}));
+  const candidates=[preferred,0,...intervals.flatMap(x=>[x.end,Math.max(0,x.start-W)])].filter(value=>value>=0&&value+W<=layout.L).sort((a,b)=>Math.abs(a-preferred)-Math.abs(b-preferred));
+  return candidates.find(start=>!intervals.some(x=>start<x.end&&start+W>x.start))??null;
+ };
+ const addItemToWall=(type,w,h,wallId=null,returnZoneId=null)=>{
+  const id=uid(),selectedWall=wallId?doc.walls.find(wall=>wall.id===wallId):selected?.kind==="wall"?doc.walls.find(wall=>wall.id===selected.id):null;
+  if(selectedWall&&wallTypes.has(type)){
+   const start=openingTypes.has(type)?findOpeningStart(selectedWall,w):Math.max(0,(len(selectedWall)-w)/2);
+   if(start==null){setMessage("Ikke nok ledig plass på veggen");setTimeout(()=>setMessage(""),2200);return}
+   const off=start+w/2,a=Math.atan2(selectedWall.y2-selectedWall.y1,selectedWall.x2-selectedWall.x1),cx=selectedWall.x1+Math.cos(a)*off,cy=selectedWall.y1+Math.sin(a)*off;
+   mutate(d=>({...d,items:[...d.items,{id,type,x:cx-w/2,y:cy-h/2,w,h,rot:a*180/Math.PI,wallId:selectedWall.id,wallOffset:off,...openingDefaults(type)}]}));
+  }else{
+   const cx=pan.x+viewWidth/2,cy=pan.y+viewHeight/2,x=snapTo(cx-w/2,doc.snapSize||50),y=snapTo(cy-h/2,doc.snapSize||50);
+   mutate(d=>({...d,items:[...d.items,{id,type,x:clamp(x,0,VIEW-w),y:clamp(y,0,VIEW-h),w,h,rot:0,...openingDefaults(type)}]}));
+  }
+  setFieldReturnZoneId(returnZoneId||null);setSelected({kind:"item",id});setTool("select");setQuickAddOpen(false);setTimeout(()=>setMobileEditOpen(true),0);
+ };
+ const addItem=(type,w,h)=>addItemToWall(type,w,h);
+ const sel=useMemo(()=>selected?.kind==="wall"?doc.walls.find(x=>x.id===selected.id):selected?.kind==="item"?doc.items.find(x=>x.id===selected.id):selected?.kind==="zone"?(doc.zones||[]).find(x=>x.id===selected.id):selected?.kind==="measurement"?(doc.measurements||[]).find(x=>x.id===selected.id):null,[selected,doc]);
+ const selectedZoneWalls=useMemo(()=>selected?.kind==="zone"&&Array.isArray(sel?.wallIds)?sel.wallIds.map(id=>doc.walls.find(w=>w.id===id)).filter(Boolean):[],[selected,sel,doc.walls]);
+ useEffect(()=>{setMobileEditOpen(false)},[selected?.kind,selected?.id]);
+ const applyWallValue=(d,wallId,key,n)=>{
+  const target=d.walls.find(w=>w.id===wallId);if(!target)return d;
+  let nextTarget={...target},moveStart=null,moveEnd=null;
+  if(key==="len"||key==="angle"){
+   const L=key==="len"?n:len(target),A=(key==="angle"?n:angle(target))*Math.PI/180;
+   moveEnd={from:{x:target.x2,y:target.y2},to:{x:target.x1+L*Math.cos(A),y:target.y1+L*Math.sin(A)}};
+   nextTarget={...target,x2:moveEnd.to.x,y2:moveEnd.to.y};
+  }else if(key==="x1"||key==="y1"){
+   const dx=key==="x1"?n-target.x1:0,dy=key==="y1"?n-target.y1:0;
+   moveStart={from:{x:target.x1,y:target.y1},to:{x:target.x1+dx,y:target.y1+dy}};
+   moveEnd={from:{x:target.x2,y:target.y2},to:{x:target.x2+dx,y:target.y2+dy}};
+   nextTarget={...target,x1:moveStart.to.x,y1:moveStart.to.y,x2:moveEnd.to.x,y2:moveEnd.to.y};
+  }else nextTarget={...target,[key]:n};
+  const walls=d.walls.map(w=>{if(w.id===target.id)return nextTarget;let out={...w};for(const change of [moveStart,moveEnd].filter(Boolean)){if(Math.hypot(w.x1-change.from.x,w.y1-change.from.y)<5){out.x1=change.to.x;out.y1=change.to.y}if(Math.hypot(w.x2-change.from.x,w.y2-change.from.y)<5){out.x2=change.to.x;out.y2=change.to.y}}return out});
+  return {...d,walls,zones:syncLinkedZones(walls,d.zones),measurements:syncAnchoredMeasurements(walls,d.measurements),items:syncMounted(walls,d.items)};
+ };
+ const updateWallById=(wallId,key,value)=>{const n=Number(value);if(!Number.isFinite(n))return;if(key==="len"&&(n<100||n>12000)){setMessage("Vegglengde må være 100–12000 mm");setTimeout(()=>setMessage(""),1800);return}mutate(d=>applyWallValue(d,wallId,key,n))};
+ const updateWallItemById=(itemId,key,value)=>{
+  const n=Number(value);if(!Number.isFinite(n))return;
+  const item=doc.items.find(o=>o.id===itemId),wall=item?.wallId?doc.walls.find(w=>w.id===item.wallId):null;
+  if(!item)return;
+  if(!wall){mutate(d=>({...d,items:d.items.map(o=>o.id===itemId?{...o,[key]:n}:o)}));return}
+  const current=wallEdgeOffsets(item,wall),width=key==="w"?n:Number(item.w)||0,maxGap=Math.max(0,current.L-width),startGap=key==="wallStartGap"?n:key==="wallEndGap"?current.L-n-width:current.start;
+  if(width<100||width>12000){setMessage("Bredde må være 100–12000 mm");setTimeout(()=>setMessage(""),1800);return}
+  if(width>current.L){setMessage("Åpningen kan ikke være bredere enn veggen");setTimeout(()=>setMessage(""),2000);return}
+  if(startGap<0||startGap>maxGap){setMessage("Plasseringen går utenfor veggen");setTimeout(()=>setMessage(""),1800);return}
+  if(openingTypes.has(item.type)&&openingCollision(wall,item.id,startGap,width)){setMessage("Åpningen overlapper en annen åpning");setTimeout(()=>setMessage(""),2200);return}
+  mutate(d=>{
+   const live=d.items.find(o=>o.id===itemId),liveWall=live?.wallId?d.walls.find(w=>w.id===live.wallId):null;if(!live||!liveWall)return d;
+   const a=Math.atan2(liveWall.y2-liveWall.y1,liveWall.x2-liveWall.x1),center=startGap+width/2,cx=liveWall.x1+Math.cos(a)*center,cy=liveWall.y1+Math.sin(a)*center;
+   const updated={...live,w:width,wallOffset:center,x:cx-width/2,y:cy-live.h/2,rot:a*180/Math.PI};
+   return {...d,items:d.items.map(o=>o.id===itemId?updated:o)};
+  });
+ };
+ const updateOpeningGapBefore=(itemId,value)=>{
+  const gap=Number(value);if(!Number.isFinite(gap)||gap<0){setMessage("Mellomrom må være 0 mm eller mer");setTimeout(()=>setMessage(""),1600);return}
+  const item=doc.items.find(o=>o.id===itemId),wall=item?.wallId?doc.walls.find(w=>w.id===item.wallId):null;if(!item||!wall)return;
+  const layout=wallOpeningLayout(wall,doc.items),index=layout.rows.findIndex(row=>row.item.id===itemId);if(index<0)return;
+  const previousEnd=index===0?0:layout.rows[index-1].gaps.start+Number(layout.rows[index-1].item.w||0);
+  updateWallItemById(itemId,"wallStartGap",previousEnd+gap);
+ };
+ const update=(key,value)=>{const n=Number(value);if(!Number.isFinite(n))return;if(selected?.kind==="item"&&sel?.wallId&&openingTypes.has(sel.type)&&["w","wallStartGap","wallEndGap"].includes(key)){updateWallItemById(sel.id,key,n);return}mutate(d=>{if(selected?.kind==="item"){return {...d,items:d.items.map(o=>{if(o.id!==selected.id)return o;if((key==="wallOffset"||key==="wallStartGap"||key==="wallEndGap")&&o.wallId){const w=d.walls.find(x=>x.id===o.wallId);if(!w)return o;const limits=mountedLimits(o,w),half=Math.max(0,Number(o.w)||0)/2;let desired=n;if(key==="wallStartGap")desired=n+half;if(key==="wallEndGap")desired=limits.L-n-half;const off=clamp(desired,limits.min,limits.max),a=Math.atan2(w.y2-w.y1,w.x2-w.x1),cx=w.x1+Math.cos(a)*off,cy=w.y1+Math.sin(a)*off;return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off}}return {...o,[key]:n}})}}return applyWallValue(d,selected?.id,key,n)})};
+ const remove=()=>{checkpoint();setFuture([]);setDoc(d=>selected?.kind==="wall"?(()=>{const walls=d.walls.filter(x=>x.id!==selected.id);return {...d,walls,zones:syncLinkedZones(walls,d.zones),measurements:syncAnchoredMeasurements(walls,d.measurements),items:d.items.map(o=>o.wallId===selected.id?{...o,wallId:null,wallOffset:null}:o)}})():selected?.kind==="zone"?{...d,zones:(d.zones||[]).filter(x=>x.id!==selected.id)}:selected?.kind==="measurement"?{...d,measurements:(d.measurements||[]).filter(x=>x.id!==selected.id)}:{...d,items:d.items.filter(x=>x.id!==selected.id)});setSelected(null)};
  const flipDoor=()=>{if(selected?.kind!=="item"||!sel||sel.type!=="door")return;mutate(d=>({...d,items:d.items.map(o=>o.id===sel.id?{...o,flip:!o.flip}:o)}))};
  const detach=()=>{if(selected?.kind!=="item"||!sel)return;mutate(d=>({...d,items:d.items.map(o=>o.id===sel.id?{...o,wallId:null}:o)}))};
- const duplicate=()=>{if(selected?.kind!=="item"||!sel)return;mutate(d=>({...d,items:[...d.items,{...sel,id:uid(),x:sel.x+200,y:sel.y+200}]}))};
- const applySizePreset=value=>{if(selected?.kind!=="item"||!sel||!value)return;const [w,h]=value.split("x").map(Number);if(!Number.isFinite(w)||!Number.isFinite(h)||w<=0||h<=0)return;mutate(d=>({...d,items:d.items.map(o=>o.id!==sel.id?o:{...o,x:o.x+(o.w-w)/2,y:o.y+(o.h-h)/2,w,h})}))};
+ const duplicate=()=>{if(selected?.kind!=="item"||!sel)return;
+  if(sel.wallId&&openingTypes.has(sel.type)){
+   const wall=doc.walls.find(w=>w.id===sel.wallId);if(!wall)return;
+   const current=wallEdgeOffsets(sel,wall),start=findOpeningStart(wall,Number(sel.w)||0,doc.items,null,current.start+Number(sel.w||0)+100);
+   if(start==null){setMessage("Ikke ledig plass til kopi på veggen");setTimeout(()=>setMessage(""),2000);return}
+   const id=uid(),a=Math.atan2(wall.y2-wall.y1,wall.x2-wall.x1),center=start+sel.w/2,cx=wall.x1+Math.cos(a)*center,cy=wall.y1+Math.sin(a)*center;
+   mutate(d=>({...d,items:[...d.items,{...sel,id,x:cx-sel.w/2,y:cy-sel.h/2,wallOffset:center,rot:a*180/Math.PI}]}));setSelected({kind:"item",id});return;
+  }
+  mutate(d=>({...d,items:[...d.items,{...sel,id:uid(),x:sel.x+200,y:sel.y+200}]}))
+ };
+ const applySizePreset=value=>{if(selected?.kind!=="item"||!sel||!value)return;const [w,h]=value.split("x").map(Number);if(!Number.isFinite(w)||!Number.isFinite(h)||w<=0||h<=0)return;
+  if(sel.wallId&&openingTypes.has(sel.type)){updateWallItemById(sel.id,"w",w);return}
+  mutate(d=>{const items=d.items.map(o=>o.id!==sel.id?o:{...o,x:o.x+(o.w-w)/2,y:o.y+(o.h-h)/2,w,h});return {...d,items:syncMounted(d.walls,items)}})
+ };
  const applyWallPreset=value=>{if(selected?.kind!=="wall"||!sel||!value)return;const [t,h]=value.split("x").map(Number);if(!Number.isFinite(t)||!Number.isFinite(h)||t<=0||h<=0)return;mutate(d=>({...d,walls:d.walls.map(w=>w.id!==sel.id?w:{...w,t,h})}))};
  const finishZone=()=>{if(zoneDraft.length<3){setMessage("Romsonen trenger minst 3 punkter");setTimeout(()=>setMessage(""),1800);return}const zone={id:uid(),name:"Rom "+((doc.zones||[]).length+1),points:zoneDraft,ceilingHeight:Number(doc.defaultWallHeight)||2400,floorFinish:"",notes:""};mutate(d=>({...d,zones:[...(d.zones||[]),zone]}));setZoneDraft([]);setTool("select");setSelected({kind:"zone",id:zone.id})};
  const cancelZone=()=>{setZoneDraft([]);setTool("select")};
  const updateZoneField=(key,value,numeric=false)=>{if(selected?.kind!=="zone"||!sel)return;const next=numeric?Number(value):String(value);if(numeric&&!Number.isFinite(next))return;mutate(d=>({...d,zones:(d.zones||[]).map(z=>z.id===sel.id?{...z,[key]:next}:z)}))};
+ const updateMeasurementField=(key,value)=>{if(selected?.kind!=="measurement"||!sel)return;mutate(d=>({...d,measurements:(d.measurements||[]).map(m=>m.id===sel.id?{...m,[key]:String(value)}:m)}))};
  useEffect(()=>{
   const onKey=e=>{
    const tag=String(e.target?.tagName||"").toLowerCase();
@@ -149,54 +536,267 @@ export default function DrawingClient(){
    if(mod&&e.key.toLowerCase()==="y"){e.preventDefault();redo();return}
    if(mod&&e.key.toLowerCase()==="d"&&selected?.kind==="item"){e.preventDefault();duplicate();return}
    if((e.key==="Delete"||e.key==="Backspace")&&selected){e.preventDefault();remove();return}
-   if(e.key==="Escape"){setDraft(null);setZoneDraft([]);setMeasureDraft(null);setTool("select");setSelected(null)}
+   if(e.key==="Escape"){setDraft(null);setWallChain(null);setSnapHint(null);setZoneDraft([]);setMeasureDraft(null);setTool("select");setSelected(null)}
   };
   window.addEventListener("keydown",onKey);
   return()=>window.removeEventListener("keydown",onKey);
  });
- const downWallEnd=(e,w,end)=>{e.stopPropagation();setTool("select");setSelected({kind:"wall",id:w.id});setWallDrag({id:w.id,end,start:JSON.stringify(doc)})};
- const moveWallEnd=e=>{if(!wallDrag)return;const p=point(e),q={x:snapTo(p.x,doc.snapSize||50),y:snapTo(p.y,doc.snapSize||50)};setDoc(d=>{const target=d.walls.find(w=>w.id===wallDrag.id);if(!target)return d;const ox=wallDrag.end===1?target.x1:target.x2,oy=wallDrag.end===1?target.y1:target.y2;const walls=d.walls.map(w=>{let n={...w};if(w.id===wallDrag.id){if(wallDrag.end===1){n.x1=q.x;n.y1=q.y}else{n.x2=q.x;n.y2=q.y}}else{if(Math.hypot(w.x1-ox,w.y1-oy)<5){n.x1=q.x;n.y1=q.y}if(Math.hypot(w.x2-ox,w.y2-oy)<5){n.x2=q.x;n.y2=q.y}}return n});return {...d,walls,items:syncMounted(walls,d.items)}})};
- const endWallDrag=()=>{if(!wallDrag)return;setHistory(h=>[...h.slice(-24),wallDrag.start]);setFuture([]);setWallDrag(null)};
- const downZonePoint=(e,z,index)=>{e.stopPropagation();setTool("select");setSelected({kind:"zone",id:z.id});setZoneDrag({id:z.id,index,start:JSON.stringify(doc)})};
- const moveZonePoint=e=>{if(!zoneDrag)return;const p=point(e),q={x:snapTo(p.x,doc.snapSize||50),y:snapTo(p.y,doc.snapSize||50)};setDoc(d=>({...d,zones:(d.zones||[]).map(z=>z.id!==zoneDrag.id?z:{...z,points:z.points.map((pt,i)=>i===zoneDrag.index?q:pt)})}))};
- const endZoneDrag=()=>{if(!zoneDrag)return;setHistory(h=>[...h.slice(-24),zoneDrag.start]);setFuture([]);setZoneDrag(null)};
- const downItem=(e,o)=>{e.stopPropagation();setTool("select");setSelected({kind:"item",id:o.id});const p=point(e);setDrag({id:o.id,dx:p.x-o.x,dy:p.y-o.y,start:JSON.stringify(doc)})};
- const move=e=>{if(panning){movePan(e);return}if(wallDrag){moveWallEnd(e);return}if(zoneDrag){moveZonePoint(e);return}if(!drag)return;const p=point(e);setDoc(d=>({...d,items:d.items.map(o=>o.id===drag.id?{...o,x:snapTo(p.x-drag.dx,d.snapSize||50),y:snapTo(p.y-drag.dy,d.snapSize||50)}:o)}))};
- const up=()=>{if(panning){setPanning(null);return}if(wallDrag){endWallDrag();return}if(zoneDrag){endZoneDrag();return}if(!drag)return;setHistory(h=>[...h.slice(-24),drag.start]);setFuture([]);setDoc(d=>{const o=d.items.find(x=>x.id===drag.id);if(!o||!wallTypes.has(o.type))return d;const n=nearestWall({x:o.x+o.w/2,y:o.y+o.h/2},d.walls);if(!n||n.dist>450)return {...d,items:d.items.map(x=>x.id!==o.id?x:{...x,wallId:null,wallOffset:null})};const a=Math.atan2(n.wall.y2-n.wall.y1,n.wall.x2-n.wall.x1)*180/Math.PI;return {...d,items:d.items.map(x=>x.id!==o.id?x:{...x,x:n.x-o.w/2,y:n.y-o.h/2,rot:a,wallId:n.wall.id,wallOffset:Math.round(n.t*len(n.wall))})}});setDrag(null)};
- const canvasDown=e=>{if(e.target.dataset?.canvas!=="yes")return;if(tool==="pan"){startPan(e);return}setSelected(null);const p=point(e),q={x:snapTo(p.x,doc.snapSize||50),y:snapTo(p.y,doc.snapSize||50)};if(tool==="zone"){setZoneDraft(points=>[...points,q]);return}if(tool==="measure"){if(!measureDraft)setMeasureDraft(q);else{mutate(d=>({...d,measurements:[...(d.measurements||[]),{id:uid(),x1:measureDraft.x,y1:measureDraft.y,x2:q.x,y2:q.y}]}));setMeasureDraft(null)}return}if(tool!=="wall")return;if(!draft)setDraft(q);else{mutate(d=>({...d,walls:[...d.walls,{id:uid(),x1:draft.x,y1:draft.y,x2:q.x,y2:q.y,t:Number(d.defaultWallThickness)||98,h:Number(d.defaultWallHeight)||2400}]}));setDraft(q)}};
+ const downWallEnd=(e,w,end)=>{e.stopPropagation();capturePointer(e);setTool("select");setSelected({kind:"wall",id:w.id});setWallDrag({id:w.id,end,start:JSON.stringify(doc)})};
+ const moveWallEnd=e=>{if(!wallDrag)return;const targetNow=doc.walls.find(w=>w.id===wallDrag.id);if(!targetNow)return;const origin=wallDrag.end===1?{x:targetNow.x1,y:targetNow.y1}:{x:targetNow.x2,y:targetNow.y2},p=point(e),magnet=magneticPoint(p,doc.walls,wallDrag.id,origin),q=magnet.point;setSnapHint(magnet.snapped?{...q,label:"Hjørne"}:null);setDoc(d=>{const target=d.walls.find(w=>w.id===wallDrag.id);if(!target)return d;const ox=wallDrag.end===1?target.x1:target.x2,oy=wallDrag.end===1?target.y1:target.y2;const walls=d.walls.map(w=>{let n={...w};if(w.id===wallDrag.id){if(wallDrag.end===1){n.x1=q.x;n.y1=q.y}else{n.x2=q.x;n.y2=q.y}}else{if(Math.hypot(w.x1-ox,w.y1-oy)<5){n.x1=q.x;n.y1=q.y}if(Math.hypot(w.x2-ox,w.y2-oy)<5){n.x2=q.x;n.y2=q.y}}return n});return {...d,walls,zones:syncLinkedZones(walls,d.zones),measurements:syncAnchoredMeasurements(walls,d.measurements),items:syncMounted(walls,d.items)}})};
+ const endWallDrag=()=>{if(!wallDrag)return;setSnapHint(null);setHistory(h=>[...h.slice(-24),wallDrag.start]);setFuture([]);setWallDrag(null)};
+ const downZonePoint=(e,z,index)=>{e.stopPropagation();capturePointer(e);setTool("select");setSelected({kind:"zone",id:z.id});setZoneDrag({id:z.id,index,wallIds:Array.isArray(z.wallIds)?z.wallIds:null,start:JSON.stringify(doc)})};
+ const moveZonePoint=e=>{if(!zoneDrag)return;const p=point(e),magnet=magneticPoint(p),q=magnet.point;setSnapHint(magnet.snapped?{...q,label:"Hjørne"}:null);setDoc(d=>{
+  if(Array.isArray(zoneDrag.wallIds)&&zoneDrag.wallIds.length>=3){
+   const ids=zoneDrag.wallIds,index=zoneDrag.index,currentId=ids[index],prevId=ids[(index-1+ids.length)%ids.length];
+   const walls=d.walls.map(w=>w.id===currentId?{...w,x1:q.x,y1:q.y}:w.id===prevId?{...w,x2:q.x,y2:q.y}:w);
+   return {...d,walls,zones:syncLinkedZones(walls,d.zones),measurements:syncAnchoredMeasurements(walls,d.measurements),items:syncMounted(walls,d.items)};
+  }
+  return {...d,zones:(d.zones||[]).map(z=>z.id!==zoneDrag.id?z:{...z,points:z.points.map((pt,i)=>i===zoneDrag.index?q:pt)})};
+ })};
+ const endZoneDrag=()=>{if(!zoneDrag)return;setSnapHint(null);setHistory(h=>[...h.slice(-24),zoneDrag.start]);setFuture([]);setZoneDrag(null)};
+ const downMeasurementEnd=(e,m,end)=>{e.stopPropagation();capturePointer(e);setTool("select");setSelected({kind:"measurement",id:m.id});setMeasureDrag({id:m.id,end,start:JSON.stringify(doc)})};
+ const moveMeasurementEnd=e=>{if(!measureDrag)return;const p=point(e),magnet=magneticPoint(p),q=magnet.point;setSnapHint(magnet.snapped?{...q,label:"Hjørne"}:null);setDoc(d=>({...d,measurements:(d.measurements||[]).map(m=>m.id!==measureDrag.id?m:measureDrag.end===1?{...m,x1:q.x,y1:q.y,anchor1:magnet.anchor||null}:{...m,x2:q.x,y2:q.y,anchor2:magnet.anchor||null})}))};
+ const endMeasurementDrag=()=>{if(!measureDrag)return;setSnapHint(null);setHistory(h=>[...h.slice(-24),measureDrag.start]);setFuture([]);setMeasureDrag(null)};
+ const downItem=(e,o)=>{if(["wall","measure","zone"].includes(tool)){e.stopPropagation();drawingPointDown(e);return}e.stopPropagation();capturePointer(e);setTool("select");setSelected({kind:"item",id:o.id});const p=point(e);setDrag({id:o.id,dx:p.x-o.x,dy:p.y-o.y,start:JSON.stringify(doc)})};
+ const move=e=>{if(panning){movePan(e);return}if(wallDrag){moveWallEnd(e);return}if(zoneDrag){moveZonePoint(e);return}if(measureDrag){moveMeasurementEnd(e);return}if(!drag)return;const p=point(e);setDoc(d=>({...d,items:d.items.map(o=>o.id===drag.id?{...o,x:snapTo(p.x-drag.dx,d.snapSize||50),y:snapTo(p.y-drag.dy,d.snapSize||50)}:o)}))};
+ const up=e=>{if(e)releasePointer(e);if(panning){setPanning(null);return}if(wallDrag){endWallDrag();return}if(zoneDrag){endZoneDrag();return}if(measureDrag){endMeasurementDrag();return}if(!drag)return;setHistory(h=>[...h.slice(-24),drag.start]);setFuture([]);setDoc(d=>{const o=d.items.find(x=>x.id===drag.id);if(!o||!wallTypes.has(o.type))return d;const n=nearestWall({x:o.x+o.w/2,y:o.y+o.h/2},d.walls);if(!n||n.dist>450)return {...d,items:d.items.map(x=>x.id!==o.id?x:{...x,wallId:null,wallOffset:null})};const a=Math.atan2(n.wall.y2-n.wall.y1,n.wall.x2-n.wall.x1)*180/Math.PI,limits=mountedLimits(o,n.wall),preferred=clamp(Math.round(n.t*limits.L)-o.w/2,0,Math.max(0,limits.L-o.w)),safeStart=openingTypes.has(o.type)?findOpeningStart(n.wall,o.w,d.items,o.id,preferred):preferred;if(safeStart==null)return JSON.parse(drag.start);const off=safeStart+o.w/2,cx=n.wall.x1+Math.cos(a*Math.PI/180)*off,cy=n.wall.y1+Math.sin(a*Math.PI/180)*off;return {...d,items:d.items.map(x=>x.id!==o.id?x:{...x,x:cx-o.w/2,y:cy-o.h/2,rot:a,wallId:n.wall.id,wallOffset:off})}});setDrag(null)};
+ const applyCanvasPoint=p=>{
+  setSelected(null);
+  const magnet=tool==="wall"&&draft?wallMagneticPoint(p,draft):magneticPoint(p),q=magnet.point;
+  setSnapHint(magnet.snapped?{...q,label:magnet.label||"Hjørne"}:null);
+  if(tool==="zone"){setZoneDraft(points=>[...points,q]);setTimeout(()=>setSnapHint(null),350);return}
+  if(tool==="measure"){if(!measureDraft)setMeasureDraft({...q,anchor:magnet.anchor||null});else{const id=uid();mutate(d=>({...d,measurements:[...(d.measurements||[]),{id,label:"",x1:measureDraft.x,y1:measureDraft.y,x2:q.x,y2:q.y,anchor1:measureDraft.anchor||null,anchor2:magnet.anchor||null}]}));setMeasureDraft(null);setTool("select");setSelected({kind:"measurement",id})}setTimeout(()=>setSnapHint(null),350);return}
+  if(tool!=="wall")return;
+  if(!draft){
+   setDraft(q);setWallChain({start:q,count:0,points:[q],wallIds:[]});setTimeout(()=>setSnapHint(null),350);return;
+  }
+  const nextCount=(wallChain?.count||0)+1,closing=wallChain?.start&&nextCount>=3&&Math.hypot(q.x-wallChain.start.x,q.y-wallChain.start.y)<2;
+  const chainPoints=[...(wallChain?.points||[draft]),q],zonePoints=closing?chainPoints.slice(0,-1):null,zoneId=closing?uid():null,wallId=uid();
+  mutate(d=>{
+   const wall={id:wallId,x1:draft.x,y1:draft.y,x2:q.x,y2:q.y,t:Number(d.defaultWallThickness)||98,h:Number(d.defaultWallHeight)||2400};
+   if(!closing)return {...d,walls:[...d.walls,wall]};
+   const wallIds=[...(wallChain?.wallIds||[]),wallId],zone={id:zoneId,name:"Rom "+((d.zones||[]).length+1),points:zonePoints,wallIds,ceilingHeight:Number(d.defaultWallHeight)||2400,floorFinish:"",notes:""};
+   return {...d,walls:[...d.walls,wall],zones:[...(d.zones||[]),zone]};
+  });
+  if(closing){setDraft(null);setWallChain(null);setTool("select");setSnapHint(null);setSelected({kind:"zone",id:zoneId});setMessage("Rom lukket · areal beregnet");setTimeout(()=>setMessage(""),1800)}
+  else{setDraft(q);setWallChain(chain=>({...chain,start:chain?.start||draft,count:nextCount,points:[...(chain?.points||[draft]),q],wallIds:[...(chain?.wallIds||[]),wallId]}));setTimeout(()=>setSnapHint(null),350)}
+ };
+ const drawingPointDown=e=>{
+  capturePointer(e);
+  const p=point(e);
+  if(e.pointerType==="touch"&&["wall","zone","measure"].includes(tool)){
+   clearPendingCanvasTouch();
+   const x=p.x,y=p.y;
+   pendingCanvasTouch.current=setTimeout(()=>{pendingCanvasTouch.current=null;if(!pinchGesture.current&&touchPointers.current.size<=1)applyCanvasPoint({x,y})},130);
+   return;
+  }
+  applyCanvasPoint(p);
+ };
+ const canvasDown=e=>{
+  if(e.target.dataset?.canvas!=="yes")return;
+  if(tool==="pan"){startPan(e);return}
+  if(tool==="select"){setSelected(null);return}
+  drawingPointDown(e);
+ };
  const summary=useMemo(()=>{const wallM=doc.walls.reduce((s,w)=>s+len(w),0)/1000,wallM2=doc.walls.reduce((s,w)=>s+len(w)*(w.h||2400),0)/1000000,deckM2=doc.items.filter(o=>o.type==="deck").reduce((s,o)=>s+o.w*o.h,0)/1000000,floorM2=closedWallAreaM2(doc.walls),openingM2=doc.items.filter(o=>o.wallId&&openingTypes.has(o.type)).reduce((s,o)=>s+(Number(o.w)||0)*(Number(o.openingHeight)||openingDefaults(o.type).openingHeight||0),0)/1000000,netWallM2=Math.max(0,wallM2-openingM2),zoneRows=(doc.zones||[]).map(z=>{const area=polygonAreaM2(z.points),perimeter=polygonPerimeterM(z.points),height=(Number(z.ceilingHeight)||Number(doc.defaultWallHeight)||2400)/1000;return {...z,area,perimeter,wallArea:perimeter*height}}),zonedFloorM2=zoneRows.reduce((s,z)=>s+z.area,0),zonePerimeterM=zoneRows.reduce((s,z)=>s+z.perimeter,0),zoneWallM2=zoneRows.reduce((s,z)=>s+z.wallArea,0);const count=t=>doc.items.filter(o=>o.type===t).length;return {wallM,wallM2,openingM2,netWallM2,deckM2,floorM2,zoneRows,zonedFloorM2,zonePerimeterM,zoneWallM2,objects:doc.items.length,doors:count("door")+count("sliding"),windows:count("window"),posts:count("post")}},[doc]);
+ const selectedOrder=orders.find(order=>order.id===doc.orderId);
  const selectedProject=projects.find(p=>p.id===doc.projectId);
- const projectLabel=selectedProject?.title||"Ikke koblet til oppdrag";
+ const projectLabel=selectedOrder
+  ?[selectedOrder.orderNumber,selectedOrder.customerName].filter(Boolean).join(" · ")
+  :selectedProject?.title
+   ?selectedProject.title+" (eldre prosjektkobling)"
+   :"Ikke koblet til oppdrag";
+ const saveStatusText=()=>!online?"Offline · lagret på telefonen":saveState==="syncing"?"Synkroniserer…":saveState==="server"?"Synkronisert med oppdrag":lastSavedAt?"Lokalt lagret":"Autolagres lokalt";
  const clearMeasures=()=>mutate(d=>({...d,measurements:[]}));
  const importJson=e=>{const file=e.target.files?.[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(String(r.result));if(!Array.isArray(x.walls)||!Array.isArray(x.items))throw new Error();const next={...initial(),...x,id:uid(),name:(x.name||"Importert tegning")+" – kopi"};setDoc(next);setSelected(null);setHistory([]);setMessage("Importert – trykk Lagre")}catch{alert("Filen ser ikke ut som en gyldig Aadland-tegning.")}};r.readAsText(file);e.target.value=""};
- const deleteDoc=async()=>{if(!confirm("Slette denne tegningen?"))return;if(doc.serverId){try{const r=await fetch("/api/admin/project-drawings",{method:"DELETE",headers:{"content-type":"application/json"},body:JSON.stringify({id:doc.serverId})});const x=await r.json();if(!r.ok&&!x.setupRequired){setMessage("Kunne ikke slette fra oppdraget");return}}catch{setMessage("Server utilgjengelig");return}}const list=docs.filter(x=>x.id!==doc.id);setDocs(list);localStorage.setItem(STORE,JSON.stringify(list));setDoc(list[0]||initial());setSelected(null);setHistory([]);setFuture([])};
+ const deleteDoc=async()=>{if(!confirm("Slette denne tegningen?"))return;if(doc.serverId){try{const r=await fetch("/api/admin/project-drawings",{method:"DELETE",headers:{"content-type":"application/json"},body:JSON.stringify({id:doc.serverId})});const x=await r.json();if(!r.ok&&!x.setupRequired){setMessage("Kunne ikke slette fra oppdraget");return}}catch{setMessage("Server utilgjengelig");return}}const list=docs.filter(x=>x.id!==doc.id),next=list[0]||initial();setDocs(list);docsRef.current=list;localStorage.setItem(STORE,JSON.stringify(list));localStorage.setItem(LAST_STORE,next.id);docRef.current=next;setDoc(next);setSelected(null);setHistory([]);setFuture([])};
  const exportJson=()=>{const blob=new Blob([JSON.stringify(doc,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=(doc.name||"tegning").replace(/[^a-z0-9æøå]+/gi,"-")+".json";a.click();URL.revokeObjectURL(a.href)};
  const quantityText=()=>{const lines=["Mengdegrunnlag fra tegning: "+(doc.name||"Tegning"),""];if(summary.zoneRows.length){for(const z of summary.zoneRows){lines.push((z.name||"Rom")+": "+z.area.toFixed(2)+" m² gulv/tak · "+z.perimeter.toFixed(2)+" lm brutto list · "+z.wallArea.toFixed(2)+" m² brutto vegg"+(z.floorFinish?" · "+z.floorFinish:""));}}else{lines.push("Gulvareal lukket rom: "+(summary.floorM2==null?"ikke beregnet":summary.floorM2.toFixed(2)+" m²"));lines.push("Netto veggflate: "+summary.netWallM2.toFixed(2)+" m²");}lines.push("Åpningsareal: "+summary.openingM2.toFixed(2)+" m²");lines.push("Dører/skyvedører: "+summary.doors+" · Vinduer: "+summary.windows);if(doc.notes)lines.push("","Tegningsnotat: "+doc.notes);return lines.join("\n")};
  const quoteLinesFromDrawing=()=>{const rows=[];if(summary.zoneRows.length){for(const z of summary.zoneRows){const name=z.name||"Rom",finish=z.floorFinish?" · "+z.floorFinish:"";rows.push({type:"other",description:"Gulvareal – "+name+finish,quantity:Number(z.area.toFixed(2)),unit:"m²",unitPriceOre:"",vatRate:25});rows.push({type:"other",description:"Takareal – "+name,quantity:Number(z.area.toFixed(2)),unit:"m²",unitPriceOre:"",vatRate:25});rows.push({type:"other",description:"Gulvlister, brutto – "+name,quantity:Number(z.perimeter.toFixed(2)),unit:"lm",unitPriceOre:"",vatRate:25});rows.push({type:"other",description:"Veggflate, brutto – "+name,quantity:Number(z.wallArea.toFixed(2)),unit:"m²",unitPriceOre:"",vatRate:25});}}else{if(summary.floorM2!=null&&summary.floorM2>0){rows.push({type:"other",description:"Gulvareal fra tegning",quantity:Number(summary.floorM2.toFixed(2)),unit:"m²",unitPriceOre:"",vatRate:25});rows.push({type:"other",description:"Takareal fra tegning",quantity:Number(summary.floorM2.toFixed(2)),unit:"m²",unitPriceOre:"",vatRate:25});}if(summary.netWallM2>0)rows.push({type:"other",description:"Netto veggflate fra tegning",quantity:Number(summary.netWallM2.toFixed(2)),unit:"m²",unitPriceOre:"",vatRate:25});}return rows};
- const newQuoteFromDrawing=()=>{try{const lines=quoteLinesFromDrawing();sessionStorage.setItem("aadlandQuoteDraftFromDrawing",JSON.stringify({title:"Tilbud – "+(doc.name||"tegning"),customer:{name:doc.customer||"",address:doc.address||""},notes:quantityText(),lineItems:lines}));window.location.href="/admin/tilbud/ny"}catch{setMessage("Kunne ikke åpne tilbudskladd");setTimeout(()=>setMessage(""),1800)}};
+ const newQuoteFromDrawing=()=>{try{const lines=quoteLinesFromDrawing();sessionStorage.setItem("aadlandQuoteDraftFromDrawing",JSON.stringify({title:"Tilbud – "+(doc.name||"tegning"),customer:{name:doc.customer||"",address:doc.address||""},notes:quantityText(),lineItems:lines}));window.location.href="/admin/tilbud/ny"+(doc.orderId?"?orderId="+encodeURIComponent(doc.orderId):"")}catch{setMessage("Kunne ikke åpne tilbudskladd");setTimeout(()=>setMessage(""),1800)}};
  const drawingBounds=()=>{const xs=[],ys=[];for(const w of doc.walls){xs.push(w.x1,w.x2);ys.push(w.y1,w.y2)}for(const o of doc.items){xs.push(o.x,o.x+o.w);ys.push(o.y,o.y+o.h)}for(const z of doc.zones||[]){for(const p of z.points||[]){xs.push(p.x);ys.push(p.y)}}if(!xs.length)return{x:0,y:0,w:VIEW,h:VIEW};const pad=350,minX=Math.max(0,Math.min(...xs)-pad),minY=Math.max(0,Math.min(...ys)-pad),maxX=Math.min(VIEW,Math.max(...xs)+pad),maxY=Math.min(VIEW,Math.max(...ys)+pad);return{x:minX,y:minY,w:Math.max(500,maxX-minX),h:Math.max(500,maxY-minY)}};
  const exportPng=()=>{try{const source=svg.current;if(!source)return;const clone=source.cloneNode(true),b=drawingBounds(),maxPx=1800,scale=Math.min(maxPx/b.w,maxPx/b.h),width=Math.max(600,Math.round(b.w*scale)),height=Math.max(600,Math.round(b.h*scale));clone.setAttribute("viewBox",b.x+" "+b.y+" "+b.w+" "+b.h);clone.setAttribute("width",String(width));clone.setAttribute("height",String(height));const data=new XMLSerializer().serializeToString(clone),blob=new Blob([data],{type:"image/svg+xml;charset=utf-8"}),url=URL.createObjectURL(blob),img=new Image();img.onload=()=>{const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;const ctx=canvas.getContext("2d");ctx.fillStyle="#ffffff";ctx.fillRect(0,0,width,height);ctx.drawImage(img,0,0,width,height);URL.revokeObjectURL(url);canvas.toBlob(png=>{if(!png)return;const a=document.createElement("a");a.href=URL.createObjectURL(png);a.download=(doc.name||"tegning").replace(/[^a-z0-9æøå]+/gi,"-")+"-grunnlag.png";a.click();URL.revokeObjectURL(a.href)},"image/png")};img.onerror=()=>{URL.revokeObjectURL(url);setMessage("Kunne ikke lage PNG");setTimeout(()=>setMessage(""),1800)};img.src=url}catch{setMessage("Kunne ikke lage PNG");setTimeout(()=>setMessage(""),1800)}};
- const aiBrief=()=>{const lines=["Lag en realistisk visualisering basert på vedlagte plantegning og eventuelt kundebilde.","","Prosjekt: "+(doc.name||"Tegning"),doc.customer?"Kunde: "+doc.customer:"",doc.address?"Adresse/arbeidssted: "+doc.address:"","Målgrunnlag:"];if(summary.zoneRows.length){for(const z of summary.zoneRows)lines.push("- "+(z.name||"Rom")+": "+z.area.toFixed(2)+" m², takhøyde "+(Number(z.ceilingHeight)||Number(doc.defaultWallHeight)||2400)+" mm"+(z.floorFinish?", gulv/overflate: "+z.floorFinish:""));}else{lines.push("- Vegger: "+summary.wallM.toFixed(2)+" lm","- Gulvareal: "+(summary.floorM2==null?"ikke beregnet":summary.floorM2.toFixed(2)+" m²"));}const counts=[["Dører/skyvedører",summary.doors],["Vinduer",summary.windows],["Stolper",summary.posts]].filter(x=>x[1]);for(const [label,count] of counts)lines.push("- "+label+": "+count);if(doc.notes)lines.push("","Notater fra befaring: "+doc.notes);lines.push("","Krav til visualiseringen: Behold romgeometri, åpninger og hovedplasseringer fra tegningen. Bruk målgrunnlaget som styrende. Ikke flytt vegger eller åpninger uten at det uttrykkelig bes om det. Resultatet skal være en realistisk illustrasjon, ikke en teknisk arbeidstegning.");return lines.filter(Boolean).join("\n")};
- const copyAiBrief=async()=>{try{await navigator.clipboard.writeText(aiBrief());setMessage("ChatGPT-brief kopiert");setTimeout(()=>setMessage(""),1800)}catch{setMessage("Kunne ikke kopiere brief");setTimeout(()=>setMessage(""),1800)}};
- return <main className={styles.shell}>
-  <header className={styles.top}><Link href="/admin">← Backoffice</Link><strong>Tegning & visualisering</strong><input className={styles.name} value={doc.name} onChange={e=>setDoc(d=>({...d,name:e.target.value}))}/><span className={styles.saved}>{message}</span><button className={styles.btn} onClick={()=>persist()}>Lagre</button><button className={styles.btn} onClick={undo} disabled={!history.length}>Angre</button><button className={styles.btn} onClick={redo} disabled={!future.length}>Gjør om</button><button className={styles.btn} onClick={()=>zoomBy(-.25)}>−</button><span className={styles.zoom}>{Math.round((doc.zoom||1)*100)}%</span><button className={styles.btn} onClick={()=>zoomBy(.25)}>+</button><button className={styles.btn} onClick={fitView}>Tilpass</button><button className={tool==="pan"?styles.activeBtn:styles.btn} onClick={()=>{setTool(tool==="pan"?"select":"pan");setDraft(null);setMeasureDraft(null)}}>Flytt visning</button><button className={styles.btn} onClick={()=>window.print()}>PDF</button><button className={styles.btn} onClick={newQuoteFromDrawing}>Nytt tilbud fra tegning</button></header>
+ const aiBrief=()=>{
+  const lines=[
+   "Lag en realistisk visualisering basert på vedlagte plantegning og eventuelt kundebilde.",
+   "",
+   "Prosjekt: "+(doc.name||"Tegning"),
+   doc.customer?"Kunde: "+doc.customer:"",
+   doc.address?"Adresse/arbeidssted: "+doc.address:"",
+   "",
+   "Rom og hovedmål:"
+  ];
+  if(summary.zoneRows.length){
+   for(const z of summary.zoneRows){
+    lines.push("- "+(z.name||"Rom")+": "+z.area.toFixed(2)+" m², omkrets "+z.perimeter.toFixed(2)+" m, takhøyde "+(Number(z.ceilingHeight)||Number(doc.defaultWallHeight)||2400)+" mm"+(z.floorFinish?", gulv/overflate: "+z.floorFinish:""));
+   }
+  }else{
+   lines.push("- Vegger totalt: "+summary.wallM.toFixed(2)+" lm","- Gulvareal: "+(summary.floorM2==null?"ikke beregnet":summary.floorM2.toFixed(2)+" m²"));
+  }
+  if(doc.walls.length){
+   lines.push("","Vegger:");
+   doc.walls.forEach((w,index)=>lines.push("- Vegg "+(index+1)+": "+len(w)+" mm lang, "+Math.round(Number(w.h)||2400)+" mm høy, "+Math.round(Number(w.t)||98)+" mm tykk, vinkel "+angle(w)+"°"));
+  }
+  if(doc.items.length){
+   lines.push("","Åpninger, innredning og objekter:");
+   doc.items.forEach((o,index)=>{
+    const extra=[];
+    if(openingTypes.has(o.type))extra.push((o.type==="window"?"vindushøyde ":"åpningshøyde ")+Math.round(Number(o.openingHeight)||openingDefaults(o.type).openingHeight||0)+" mm");
+    if(o.type==="window")extra.push("brystning "+Math.round(Number(o.sillHeight)||0)+" mm");
+    if(o.wallId&&Number.isFinite(o.wallOffset))extra.push("senter "+Math.round(o.wallOffset)+" mm fra veggens start");
+    lines.push("- "+(index+1)+". "+labelFor(o.type)+": "+Math.round(o.w)+" × "+Math.round(o.h)+" mm, rotasjon "+Math.round(Number(o.rot)||0)+"°"+(extra.length?" · "+extra.join(", "):""));
+   });
+  }
+  const counts=[["Dører/skyvedører",summary.doors],["Vinduer",summary.windows],["Stolper",summary.posts]].filter(x=>x[1]);
+  if(counts.length)lines.push("","Antall:",...counts.map(([label,count])=>"- "+label+": "+count));
+  if(doc.notes)lines.push("","Notater fra befaring: "+doc.notes);
+  if(doc.visualizationNotes)lines.push("","Ønsket uttrykk / endringer i visualiseringen: "+doc.visualizationNotes);
+  lines.push(
+   "",
+   "Krav til visualiseringen:",
+   "- Behold romgeometri, vegglengder, åpninger og hovedplasseringer fra tegningen.",
+   "- Bruk målgrunnlaget som styrende og ikke flytt vegger, dører eller vinduer uten at det uttrykkelig bes om det.",
+   "- Respekter oppgitte høyder, bredder og brystningshøyder.",
+   "- Resultatet skal være en realistisk illustrasjon av ferdig løsning, ikke en teknisk arbeidstegning.",
+   "- Dersom noe ikke kan avgjøres fra grunnlaget, behold eksisterende løsning fremfor å finne på nye bygningsmessige endringer."
+  );
+  return lines.filter(line=>line!==null&&line!==undefined).join("\n");
+ };
+ const copyAiBrief=async(showMessage=true)=>{try{await navigator.clipboard.writeText(aiBrief());if(showMessage){setMessage("ChatGPT-brief kopiert");setTimeout(()=>setMessage(""),1800)}return true}catch{if(showMessage){setMessage("Kunne ikke kopiere brief");setTimeout(()=>setMessage(""),1800)}return false}};
+ const prepareChatGptPackage=async()=>{const copied=await copyAiBrief(false);exportPng();setMessage(copied?"PNG eksporteres · ChatGPT-brief kopiert":"PNG eksporteres · brief kunne ikke kopieres");setTimeout(()=>setMessage(""),2600)};
+ return <main className={styles.shell+(fieldMode?" "+styles.fieldMode:"")}>
+  <header className={styles.top}><Link href="/admin">← Backoffice</Link><strong>Tegning & visualisering</strong><input className={styles.name} value={doc.name} onChange={e=>setDoc(d=>({...d,name:e.target.value}))}/><span className={styles.saved}>{message||saveStatusText()}</span><button className={styles.btn} onClick={()=>persist()}>Lagre på oppdrag</button><button className={styles.btn} onClick={undo} disabled={!history.length}>Angre</button><button className={styles.btn} onClick={redo} disabled={!future.length}>Gjør om</button><button className={styles.btn} onClick={()=>zoomBy(-.25)}>−</button><span className={styles.zoom}>{Math.round((doc.zoom||1)*100)}%</span><button className={styles.btn} onClick={()=>zoomBy(.25)}>+</button><button className={styles.btn} onClick={fitView}>Tilpass</button><button className={tool==="pan"?styles.activeBtn:styles.btn} onClick={()=>{setTool(tool==="pan"?"select":"pan");setDraft(null);setMeasureDraft(null)}}>Flytt visning</button><button className={styles.btn} onClick={()=>window.print()}>PDF</button><button className={styles.btn} onClick={newQuoteFromDrawing}>Nytt tilbud fra tegning</button></header>
+  <nav className={styles.mobileTools} aria-label="Tegneverktøy mobil">
+   <button type="button" className={tool==="select"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("select");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Velg</button>
+   <button type="button" className={tool==="wall"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("wall");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Vegg</button>
+   <button type="button" className={tool==="pan"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("pan");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Flytt</button>
+   <button type="button" className={tool==="measure"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("measure");setDraft(null);setWallChain(null);setSnapHint(null);setZoneDraft([]);setMeasureDraft(null)}}>Mål</button>
+   <button type="button" className={tool==="zone"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("zone");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Romsone</button>
+   <button type="button" className={quickAddOpen?styles.mobileActive:styles.mobileTool} onClick={()=>{setMobileEditOpen(false);setQuickAddOpen(value=>!value)}}>+ Legg til</button><button type="button" className={fieldMode?styles.mobileActive:styles.mobileTool} onClick={()=>{setFieldMode(value=>!value);setQuickAddOpen(false);setMobileEditOpen(false)}}>{fieldMode?"Avslutt befaring":"Befaring"}</button>
+   {(draft||measureDraft||zoneDraft.length>0)&&<button type="button" className={styles.mobileDone} onClick={()=>{if(tool==="zone"&&zoneDraft.length>=3)finishZone();else{setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([]);setTool("select")}}}>{tool==="zone"&&zoneDraft.length>=3?"Lukk sone":"Ferdig"}</button>}
+   <span className={styles.mobileDivider}/>
+   <button type="button" className={styles.mobileTool} onClick={undo} disabled={!history.length}>↶</button>
+   <button type="button" className={styles.mobileTool} onClick={redo} disabled={!future.length}>↷</button>
+   <button type="button" className={styles.mobileTool} onClick={()=>zoomBy(-.25)}>−</button>
+   <span className={styles.mobileZoom}>{Math.round((doc.zoom||1)*100)}%</span>
+   <button type="button" className={styles.mobileTool} onClick={()=>zoomBy(.25)}>+</button>
+   <button type="button" className={styles.mobileTool} onClick={fitView}>Tilpass</button>
+   <span className={styles.mobileDivider}/>
+   <button type="button" className={styles.mobileTool} onClick={()=>scrollPanel(leftPanel)}>Objekter</button>
+   <button type="button" className={styles.mobileTool} onClick={()=>scrollPanel(rightPanel)}>Egenskaper</button>
+   <span className={styles.mobileSyncStatus} data-state={online?saveState:"offline"}>{!online?"Offline":saveState==="syncing"?"Synk…":saveState==="server"?"Synket":"Lokalt"}</span>
+   <button type="button" className={styles.mobileSave} onClick={()=>persist()}>Lagre</button>
+  </nav>
+  {quickAddOpen&&<div className={styles.mobileQuickAdd}>
+   <button type="button" onClick={openWallBuilder}>↔ Vegg med mål</button>
+   <button type="button" onClick={makeRoom}>▭ Rektangulært rom</button>
+   <button type="button" onClick={makeLRoom}>⌞ L-rom</button>
+   <button type="button" onClick={()=>addItem("door",900,100)}>Dør 90</button>
+   <button type="button" onClick={()=>addItem("window",1200,100)}>Vindu 120</button>
+   <button type="button" onClick={()=>addItem("opening",1000,100)}>Åpning 100</button>
+   <button type="button" onClick={()=>addItem("shower",900,900)}>Dusj 90×90</button>
+   <button type="button" onClick={()=>addItem("toilet",400,700)}>Toalett</button>
+   <button type="button" onClick={()=>addItem("sink",600,500)}>Servant 60</button>
+   <button type="button" onClick={()=>addItem("base",600,600)}>Benkeskap 60</button>
+   <button type="button" onClick={()=>addItem("washer",600,600)}>Vaskemaskin</button>
+  </div>}
+  {sel&&!quickAddOpen&&<div className={styles.mobileSelection}>
+   <div><span>VALGT</span><strong>{selected.kind==="wall"?"Vegg · "+len(sel)+" mm · "+angle(sel)+"°":selected.kind==="zone"?(sel.name||"Romsone")+" · "+polygonAreaM2(sel.points).toFixed(2)+" m²":selected.kind==="measurement"?(sel.label?sel.label+" · ":"Mål · ")+Math.round(Math.hypot(sel.x2-sel.x1,sel.y2-sel.y1))+" mm":labelFor(sel.type)+" · "+Math.round(sel.w)+" × "+Math.round(sel.h)+" mm"}</strong></div>
+   <button type="button" onClick={()=>setMobileEditOpen(value=>!value)}>{mobileEditOpen?"Lukk":"Rediger mål"}</button>
+  </div>}
+  {sel&&!quickAddOpen&&mobileEditOpen&&<div className={styles.mobileInspector}>
+   {selected.kind==="wall"?<>
+    <label>Lengde (mm)<input key={"ml-"+sel.id+"-"+len(sel)} type="number" inputMode="numeric" defaultValue={len(sel)} onBlur={e=>update("len",e.target.value)}/></label>
+    <label>Vinkel (°)<input key={"ma-"+sel.id+"-"+angle(sel)} type="number" inputMode="decimal" defaultValue={angle(sel)} onBlur={e=>update("angle",e.target.value)}/></label>
+    <label>Høyde (mm)<input key={"mh-"+sel.id+"-"+sel.h} type="number" inputMode="numeric" defaultValue={Math.round(sel.h||2400)} onBlur={e=>update("h",e.target.value)}/></label>
+    <label>Tykkelse (mm)<input key={"mt-"+sel.id+"-"+sel.t} type="number" inputMode="numeric" defaultValue={Math.round(sel.t||98)} onBlur={e=>update("t",e.target.value)}/></label>
+    <div className={styles.mobileAngles}>{[0,90,180,270].map(value=><button type="button" key={value} onClick={()=>update("angle",value)}>{value}°</button>)}</div>
+   </>:selected.kind==="zone"?<>
+    <label>Romnavn<input key={"zn-"+sel.id+"-"+sel.name} defaultValue={sel.name||""} onBlur={e=>updateZoneField("name",e.target.value)}/></label>
+    <label>Takhøyde (mm)<input key={"zh-"+sel.id+"-"+sel.ceilingHeight} type="number" inputMode="numeric" defaultValue={Number(sel.ceilingHeight)||Number(doc.defaultWallHeight)||2400} onBlur={e=>updateZoneField("ceilingHeight",e.target.value,true)}/></label>
+    <div className={styles.mobileRoomMetrics}><span><small>Gulv/tak</small><strong>{polygonAreaM2(sel.points).toFixed(2)} m²</strong></span><span><small>Omkrets</small><strong>{polygonPerimeterM(sel.points).toFixed(2)} m</strong></span></div>
+    {selectedZoneWalls.length>0&&<div className={styles.mobileRoomWalls}>
+     <div className={styles.mobileRoomWallsHead}><div><strong>Veggmål</strong><small>Mål rundt rommet i rekkefølge</small></div><span>{selectedZoneWalls.length} vegger</span></div>
+     {selectedZoneWalls.map((wall,index)=><div className={styles.mobileRoomWallRow} key={wall.id}>
+      <button type="button" className={styles.mobileWallSelect} onClick={()=>{setSelected({kind:"wall",id:wall.id});setMobileEditOpen(false)}}><b>{index+1}</b><span>Vegg {index+1}<small>{angle(wall)}°</small></span></button>
+      <label><span>Lengde mm</span><input key={"zw-"+wall.id+"-"+len(wall)} type="number" inputMode="numeric" min="100" max="12000" defaultValue={len(wall)} onBlur={e=>updateWallById(wall.id,"len",e.target.value)}/></label>
+      <div className={styles.mobileWallOpenings}><button type="button" onClick={()=>addItemToWall("door",900,100,wall.id,sel.id)}>+ Dør</button><button type="button" onClick={()=>addItemToWall("window",1200,100,wall.id,sel.id)}>+ Vindu</button><button type="button" onClick={()=>addItemToWall("opening",1000,100,wall.id,sel.id)}>+ Åpning</button></div>
+      {(()=>{const layout=wallOpeningLayout(wall,doc.items);return layout.rows.length>0?<><div className={styles.mobileWallChain} data-overlap={layout.overlap?"true":"false"}><strong>Målkjede</strong><div>{layout.parts.map((part,i)=><span key={part.item.id}>{part.gap>0&&<em>{part.gap}</em>}<b>{labelFor(part.item.type)} {Math.round(part.item.w)}</b></span>)}{layout.endGap>0&&<em>{layout.endGap}</em>}</div>{layout.overlap&&<small>⚠ Åpninger overlapper – korriger plasseringen.</small>}</div><div className={styles.mobileExistingOpenings}>{layout.parts.map((part,index)=>{const {item,gaps}=part;return <div className={styles.mobileOpeningCard} key={item.id}><button type="button" className={styles.mobileOpeningTitle} onClick={()=>{setFieldReturnZoneId(sel.id);setSelected({kind:"item",id:item.id});setTimeout(()=>setMobileEditOpen(true),0)}}><span>{labelFor(item.type)}</span><b>Rediger</b></button><label><span>Bredde</span><input key={"ow-"+item.id+"-"+item.w} type="number" inputMode="numeric" min="100" max={gaps.L} defaultValue={Math.round(item.w)} onBlur={e=>updateWallItemById(item.id,"w",e.target.value)}/></label><label><span>{index===0?"Fra hjørne":"Fra forrige"}</span><input key={"og-"+item.id+"-"+part.gap} type="number" inputMode="numeric" min="0" defaultValue={part.gap} onBlur={e=>updateOpeningGapBefore(item.id,e.target.value)}/></label><small>Fra start: {gaps.start} mm · Til slutt: {gaps.end} mm</small></div>})}</div></>:null})()}
+     </div>)}
+     <p>Nummer og pil i tegningen viser måleretningen. «Fra start» måles fra hjørnet bak pilen. Endring av en vegg flytter neste hjørne; kontroller siste vegg når hele rommet er målt.</p>
+    </div>}
+   </>:selected.kind==="measurement"?<>
+    <label className={styles.mobileWide}>Navn på mål<input key={"mn-"+sel.id+"-"+sel.label} defaultValue={sel.label||""} placeholder="F.eks. vegg til vindu" onBlur={e=>updateMeasurementField("label",e.target.value)}/></label>
+    <div className={styles.mobileMeasureReadout}><span>Målt avstand</span><strong>{Math.round(Math.hypot(sel.x2-sel.x1,sel.y2-sel.y1))} mm</strong></div>
+   </>:<>
+    <label>Bredde (mm)<input key={"iw-"+sel.id+"-"+sel.w} type="number" inputMode="numeric" defaultValue={Math.round(sel.w)} onBlur={e=>update("w",e.target.value)}/></label>
+    <label>Dybde/lengde (mm)<input key={"ih-"+sel.id+"-"+sel.h} type="number" inputMode="numeric" defaultValue={Math.round(sel.h)} onBlur={e=>update("h",e.target.value)}/></label>
+    <label>Rotasjon (°)<input key={"ir-"+sel.id+"-"+sel.rot} type="number" inputMode="decimal" defaultValue={Math.round(Number(sel.rot)||0)} onBlur={e=>update("rot",e.target.value)}/></label>
+    {sel.wallId&&doc.walls.find(w=>w.id===sel.wallId)&&(()=>{const wall=doc.walls.find(w=>w.id===sel.wallId),gaps=wallEdgeOffsets(sel,wall);return <><label>Fra veggstart (mm)<input key={"igs-"+sel.id+"-"+gaps.start} type="number" inputMode="numeric" min="0" max={Math.max(0,gaps.L-sel.w)} defaultValue={gaps.start} onBlur={e=>update("wallStartGap",e.target.value)}/></label><label>Til veggslutt (mm)<input key={"ige-"+sel.id+"-"+gaps.end} type="number" inputMode="numeric" min="0" max={Math.max(0,gaps.L-sel.w)} defaultValue={gaps.end} onBlur={e=>update("wallEndGap",e.target.value)}/></label></>})()}
+    {openingTypes.has(sel.type)&&<label>{sel.type==="window"?"Vindushøyde (mm)":"Åpningshøyde (mm)"}<input key={"io-"+sel.id+"-"+sel.openingHeight} type="number" inputMode="numeric" defaultValue={Math.round(Number(sel.openingHeight)||openingDefaults(sel.type).openingHeight||2100)} onBlur={e=>update("openingHeight",e.target.value)}/></label>}
+    {sel.type==="window"&&<label>Brystning (mm)<input key={"is-"+sel.id+"-"+sel.sillHeight} type="number" inputMode="numeric" defaultValue={Math.round(Number(sel.sillHeight)||0)} onBlur={e=>update("sillHeight",e.target.value)}/></label>}
+   </>}
+   <div className={styles.mobileObjectActions}>
+    {selected.kind==="item"&&fieldReturnZoneId&&(doc.zones||[]).some(z=>z.id===fieldReturnZoneId)&&<button type="button" onClick={()=>{const id=fieldReturnZoneId;setFieldReturnZoneId(null);setSelected({kind:"zone",id});setTimeout(()=>setMobileEditOpen(true),0)}}>← Til rom</button>}
+    {selected.kind==="measurement"&&<button type="button" onClick={()=>{setSelected(null);setMobileEditOpen(false);setTool("measure");setMeasureDraft(null);setSnapHint(null)}}>+ Nytt mål</button>}
+    {selected.kind==="item"&&sel.type==="door"&&<button type="button" onClick={flipDoor}>Speil dør</button>}
+    {selected.kind==="item"&&sel.wallId&&<button type="button" onClick={detach}>Løsne</button>}
+    {selected.kind==="item"&&<button type="button" onClick={duplicate}>Dupliser</button>}
+    <button type="button" className={styles.mobileDanger} onClick={remove}>Slett valgt</button>
+   </div>
+   <button type="button" className={styles.mobileAllProps} onClick={()=>scrollPanel(rightPanel)}>Vis alle egenskaper</button>
+  </div>}
+  {wallBuilder&&<div className={styles.roomModalBackdrop} role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)setWallBuilder(null)}}>
+   <section className={styles.roomModal} role="dialog" aria-modal="true" aria-label="Lag vegg med mål">
+    <div className={styles.roomModalHead}><div><span>NY VEGG</span><h2>Vegg med eksakte mål</h2></div><button type="button" onClick={()=>setWallBuilder(null)} aria-label="Lukk">×</button></div>
+    <div className={styles.roomModalGrid}>
+     <label>Lengde (mm)<input autoFocus type="number" inputMode="numeric" min="100" max="12000" value={wallBuilder.length} onChange={e=>setWallBuilder(v=>({...v,length:e.target.value}))}/></label>
+     <label>Vinkel (°)<input type="number" inputMode="decimal" value={wallBuilder.angle} onChange={e=>setWallBuilder(v=>({...v,angle:e.target.value}))}/></label>
+     <label>Tykkelse (mm)<input type="number" inputMode="numeric" min="40" value={wallBuilder.thickness} onChange={e=>setWallBuilder(v=>({...v,thickness:e.target.value}))}/></label>
+     <label>Høyde (mm)<input type="number" inputMode="numeric" min="300" value={wallBuilder.height} onChange={e=>setWallBuilder(v=>({...v,height:e.target.value}))}/></label>
+    </div>
+    <div className={styles.wallAngleButtons}>{[0,45,90,135,180,225,270,315].map(value=><button type="button" key={value} onClick={()=>setWallBuilder(v=>({...v,angle:String(value)}))}>{value}°</button>)}</div>
+    {selected?.kind==="wall"&&<label className={styles.wallConnect}><input type="checkbox" checked={wallBuilder.connectToSelected} onChange={e=>setWallBuilder(v=>({...v,connectToSelected:e.target.checked}))}/> Start fra enden av valgt vegg</label>}
+    <p>{wallBuilder.connectToSelected&&selected?.kind==="wall"?"Den nye veggen starter nøyaktig i endepunktet på veggen du valgte.":"Veggen plasseres midt i området du ser på."}</p>
+    <div className={styles.roomModalActions}><button type="button" onClick={()=>setWallBuilder(null)}>Avbryt</button><button type="button" onClick={createExactWall}>Lag vegg</button></div>
+   </section>
+  </div>}
+  {roomBuilder&&<div className={styles.roomModalBackdrop} role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)setRoomBuilder(null)}}>
+   <section className={styles.roomModal} role="dialog" aria-modal="true" aria-label={roomBuilder.type==="l"?"Lag L-rom":"Lag rektangulært rom"}>
+    <div className={styles.roomModalHead}><div><span>NYTT ROM</span><h2>{roomBuilder.type==="l"?"L-formet rom":"Rektangulært rom"}</h2></div><button type="button" onClick={()=>setRoomBuilder(null)} aria-label="Lukk">×</button></div>
+    <label>Romnavn<input autoFocus value={roomBuilder.name} onChange={e=>setRoomBuilder(v=>({...v,name:e.target.value}))}/></label>
+    <div className={styles.roomModalGrid}>
+     <label>Lengde (mm)<input type="number" inputMode="numeric" min="300" max="7000" value={roomBuilder.w} onChange={e=>setRoomBuilder(v=>({...v,w:e.target.value}))}/></label>
+     <label>Bredde (mm)<input type="number" inputMode="numeric" min="300" max="7000" value={roomBuilder.h} onChange={e=>setRoomBuilder(v=>({...v,h:e.target.value}))}/></label>
+     {roomBuilder.type==="l"&&<>
+      <label>Innhakk bredde (mm)<input type="number" inputMode="numeric" min="300" value={roomBuilder.rw} onChange={e=>setRoomBuilder(v=>({...v,rw:e.target.value}))}/></label>
+      <label>Innhakk dybde (mm)<input type="number" inputMode="numeric" min="300" value={roomBuilder.rh} onChange={e=>setRoomBuilder(v=>({...v,rh:e.target.value}))}/></label>
+     </>}
+    </div>
+    <div className={styles.roomPreview} aria-hidden="true"><div className={roomBuilder.type==="l"?styles.roomLShape:styles.roomRectShape}/></div>
+    <p>Rommet plasseres midt i det du ser på tegneflaten. Vegger får standard tykkelse <b>{doc.defaultWallThickness||98} mm</b> og høyde <b>{doc.defaultWallHeight||2400} mm</b>.</p>
+    <div className={styles.roomModalActions}><button type="button" onClick={()=>setRoomBuilder(null)}>Avbryt</button><button type="button" onClick={createRoom}>Lag rom</button></div>
+   </section>
+  </div>}
   <div className={styles.layout}>
-   <aside className={styles.panel}>
-    <div className={styles.group}><h2>Tegninger</h2><div className={styles.row}><button className={styles.btn} onClick={newDoc}>+ Ny</button><button className={styles.btn} onClick={exportJson}>Eksporter</button><label className={styles.btn}>Importer<input className={styles.hiddenFile} type="file" accept="application/json,.json" onChange={importJson}/></label><button className={styles.btn+" "+styles.danger} onClick={deleteDoc}>Slett</button></div>{docs.length>0&&<select className={styles.select} value={doc.id} onChange={e=>openDoc(e.target.value)}>{docs.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select>}<div className={styles.field}><label>Koble til oppdrag</label><select className={styles.select} value={doc.projectId||""} onChange={changeProject}><option value="">Ikke koblet</option>{projects.map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</select></div><div className={styles.field}><label>Kunde</label><input value={doc.customer||""} onChange={e=>setDoc(d=>({...d,customer:e.target.value}))}/></div><div className={styles.field}><label>Adresse</label><input value={doc.address||""} onChange={e=>setDoc(d=>({...d,address:e.target.value}))}/></div><div className={styles.field}><label>Notater</label><textarea className={styles.textarea} value={doc.notes||""} onChange={e=>setDoc(d=>({...d,notes:e.target.value}))}/></div></div>
-    <div className={styles.group}><h2>Innstillinger</h2><div className={styles.field}><label>Snap/rutenett</label><select className={styles.select} value={doc.snapSize||50} onChange={e=>setDoc(d=>({...d,snapSize:Number(e.target.value)}))}><option value="10">10 mm</option><option value="25">25 mm</option><option value="50">50 mm</option><option value="100">100 mm</option></select></div><div className={styles.field}><label>Standard veggtykkelse</label><select className={styles.select} value={doc.defaultWallThickness||98} onChange={e=>setDoc(d=>({...d,defaultWallThickness:Number(e.target.value)}))}><option value="70">70 mm</option><option value="98">98 mm</option><option value="120">120 mm</option><option value="198">198 mm</option><option value="248">248 mm</option></select></div><div className={styles.field}><label>Standard vegghøyde</label><select className={styles.select} value={doc.defaultWallHeight||2400} onChange={e=>setDoc(d=>({...d,defaultWallHeight:Number(e.target.value)}))}><option value="2200">2200 mm</option><option value="2400">2400 mm</option><option value="2500">2500 mm</option><option value="2600">2600 mm</option><option value="2700">2700 mm</option></select></div><div className={styles.field}><label>PDF-målestokk</label><select className={styles.select} value={doc.scale||"1:50"} onChange={e=>setDoc(d=>({...d,scale:e.target.value}))}><option>1:20</option><option>1:25</option><option>1:50</option><option>1:100</option></select></div><label className={styles.check}><input type="checkbox" checked={doc.showGrid!==false} onChange={e=>setDoc(d=>({...d,showGrid:e.target.checked}))}/> Vis rutenett</label></div><div className={styles.group}><h2>Rom og vegger</h2><div className={styles.row}><button className={tool==="wall"?styles.activeBtn:styles.btn} onClick={()=>{setTool("wall");setDraft(null)}}>Tegn vegg</button><button className={styles.btn} onClick={makeRoom}>Rektangulært rom</button><button className={styles.btn} onClick={makeLRoom}>L-formet rom</button><button className={tool==="zone"?styles.activeBtn:styles.btn} onClick={()=>{setTool("zone");setDraft(null);setMeasureDraft(null);setZoneDraft([])}}>Tegn romsone</button>{tool==="zone"&&<><button className={styles.btn} onClick={finishZone} disabled={zoneDraft.length<3}>Lukk romsone</button><button className={styles.btn} onClick={cancelZone}>Avbryt sone</button></>}<button className={tool==="measure"?styles.activeBtn:styles.btn} onClick={()=>{setTool("measure");setDraft(null);setZoneDraft([]);setMeasureDraft(null)}}>Mål avstand</button><button className={styles.btn} onClick={clearMeasures}>Fjern mål</button></div><p className={styles.muted}>Nye vegger bruker standard tykkelse og høyde over. Med «Tegn romsone» klikker du rundt innsiden av et rom og avslutter med «Lukk romsone». Da beregnes gulv/tak, brutto listelengde og veggflate per rom.</p></div>
+   <aside ref={leftPanel} className={styles.panel+" "+styles.left}>
+    <div className={styles.group}><h2>Tegninger</h2><div className={styles.row}><button className={styles.btn} onClick={newDoc}>+ Ny</button><button className={styles.btn} onClick={exportJson}>Eksporter</button><label className={styles.btn}>Importer<input className={styles.hiddenFile} type="file" accept="application/json,.json" onChange={importJson}/></label><button className={styles.btn+" "+styles.danger} onClick={deleteDoc}>Slett</button></div>{docs.length>0&&<select className={styles.select} value={doc.id} onChange={e=>openDoc(e.target.value)}>{docs.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select>}<div className={styles.field}><label>Koble til oppdrag</label><select className={styles.select} value={doc.orderId||""} onChange={changeOrder}><option value="">Ikke koblet</option>{orders.map(order=><option key={order.id} value={order.id}>{order.orderNumber} · {order.customerName||"Uten kundenavn"}</option>)}</select><small className={styles.muted}>Velger du et oppdrag, hentes kunde og arbeidsadresse automatisk og tegningen lagres på oppdraget.</small></div>{doc.projectId&&<div className={styles.field}><label>Eldre prosjektkobling</label><select className={styles.select} value={doc.projectId||""} onChange={changeProject}><option value="">Fjern eldre kobling</option>{projects.map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</select></div>}<div className={styles.field}><label>Kunde</label><input value={doc.customer||""} onChange={e=>setDoc(d=>({...d,customer:e.target.value}))}/></div><div className={styles.field}><label>Adresse</label><input value={doc.address||""} onChange={e=>setDoc(d=>({...d,address:e.target.value}))}/></div><div className={styles.field}><label>Notater</label><textarea className={styles.textarea} value={doc.notes||""} onChange={e=>setDoc(d=>({...d,notes:e.target.value}))}/></div></div>
+    <div className={styles.group}><h2>Innstillinger</h2><div className={styles.field}><label>Snap/rutenett</label><select className={styles.select} value={doc.snapSize||50} onChange={e=>setDoc(d=>({...d,snapSize:Number(e.target.value)}))}><option value="10">10 mm</option><option value="25">25 mm</option><option value="50">50 mm</option><option value="100">100 mm</option></select></div><div className={styles.field}><label>Standard veggtykkelse</label><select className={styles.select} value={doc.defaultWallThickness||98} onChange={e=>setDoc(d=>({...d,defaultWallThickness:Number(e.target.value)}))}><option value="70">70 mm</option><option value="98">98 mm</option><option value="120">120 mm</option><option value="198">198 mm</option><option value="248">248 mm</option></select></div><div className={styles.field}><label>Standard vegghøyde</label><select className={styles.select} value={doc.defaultWallHeight||2400} onChange={e=>setDoc(d=>({...d,defaultWallHeight:Number(e.target.value)}))}><option value="2200">2200 mm</option><option value="2400">2400 mm</option><option value="2500">2500 mm</option><option value="2600">2600 mm</option><option value="2700">2700 mm</option></select></div><div className={styles.field}><label>PDF-målestokk</label><select className={styles.select} value={doc.scale||"1:50"} onChange={e=>setDoc(d=>({...d,scale:e.target.value}))}><option>1:20</option><option>1:25</option><option>1:50</option><option>1:100</option></select></div><label className={styles.check}><input type="checkbox" checked={doc.showGrid!==false} onChange={e=>setDoc(d=>({...d,showGrid:e.target.checked}))}/> Vis rutenett</label></div><div className={styles.group}><h2>Rom og vegger</h2><div className={styles.row}><button className={tool==="wall"?styles.activeBtn:styles.btn} onClick={()=>{setTool("wall");setDraft(null);setWallChain(null);setSnapHint(null)}}>Tegn vegg</button><button className={styles.btn} onClick={makeRoom}>Rektangulært rom</button><button className={styles.btn} onClick={makeLRoom}>L-formet rom</button><button className={tool==="zone"?styles.activeBtn:styles.btn} onClick={()=>{setTool("zone");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Tegn romsone</button>{tool==="zone"&&<><button className={styles.btn} onClick={finishZone} disabled={zoneDraft.length<3}>Lukk romsone</button><button className={styles.btn} onClick={cancelZone}>Avbryt sone</button></>}<button className={tool==="measure"?styles.activeBtn:styles.btn} onClick={()=>{setTool("measure");setDraft(null);setWallChain(null);setSnapHint(null);setZoneDraft([]);setMeasureDraft(null)}}>Mål avstand</button><button className={styles.btn} onClick={clearMeasures}>Fjern mål</button></div><p className={styles.muted}>Nye vegger bruker standard tykkelse og høyde over. Med «Tegn romsone» klikker du rundt innsiden av et rom og avslutter med «Lukk romsone». Da beregnes gulv/tak, brutto listelengde og veggflate per rom.</p></div>
     {catalog.map(g=><div className={styles.group} key={g.group}><h2>{g.group}</h2><div className={styles.library}>{g.items.map(([t,l,w,h])=><button key={t} onClick={()=>addItem(t,w,h)}>{l}<small>{w} × {h} mm</small></button>)}</div></div>)}
    </aside>
-   <section className={styles.workspace}><div className={styles.printHead}><h1>{doc.name}</h1><p>{[doc.customer,doc.address].filter(Boolean).join(" · ")}</p><p>Oppdrag: {projectLabel}</p><p>Målestokk: {doc.scale||"1:50"} · Alle mål i mm · Aadland Service</p></div><div className={styles.printSummary}><div><span>Vegger</span><b>{summary.wallM.toFixed(2)} lm</b></div><div><span>Gulvareal</span><b>{summary.floorM2==null?"—":summary.floorM2.toFixed(2)+" m²"}</b></div><div><span>Brutto veggflate</span><b>{summary.wallM2.toFixed(2)} m²</b></div><div><span>Åpningsareal</span><b>{summary.openingM2.toFixed(2)} m²</b></div><div><span>Netto veggflate</span><b>{summary.netWallM2.toFixed(2)} m²</b></div><div><span>Dører / vinduer</span><b>{summary.doors} / {summary.windows}</b></div>{summary.zoneRows.length>0&&<><div><span>Romsone gulv/tak</span><b>{summary.zonedFloorM2.toFixed(2)} m²</b></div><div><span>Brutto listelengde</span><b>{summary.zonePerimeterM.toFixed(2)} lm</b></div><div><span>Romsone veggflate</span><b>{summary.zoneWallM2.toFixed(2)} m²</b></div></>}{doc.notes&&<div className={styles.printNotes}><span>Notater</span><b>{doc.notes}</b></div>}</div><div className={styles.canvasWrap}><svg ref={svg} className={styles.canvas} viewBox={pan.x+" "+pan.y+" "+viewSize+" "+viewSize} onPointerDown={canvasDown} onPointerMove={move} onPointerUp={up} onPointerLeave={up} onWheel={e=>{e.preventDefault();zoomBy(e.deltaY<0?.15:-.15)}}>
+   <section className={styles.workspace}><div className={styles.printHead}><h1>{doc.name}</h1><p>{[doc.customer,doc.address].filter(Boolean).join(" · ")}</p><p>Oppdrag: {projectLabel}</p><p>Målestokk: {doc.scale||"1:50"} · Alle mål i mm · Aadland Service</p></div><div className={styles.printSummary}><div><span>Vegger</span><b>{summary.wallM.toFixed(2)} lm</b></div><div><span>Gulvareal</span><b>{summary.floorM2==null?"—":summary.floorM2.toFixed(2)+" m²"}</b></div><div><span>Brutto veggflate</span><b>{summary.wallM2.toFixed(2)} m²</b></div><div><span>Åpningsareal</span><b>{summary.openingM2.toFixed(2)} m²</b></div><div><span>Netto veggflate</span><b>{summary.netWallM2.toFixed(2)} m²</b></div><div><span>Dører / vinduer</span><b>{summary.doors} / {summary.windows}</b></div>{summary.zoneRows.length>0&&<><div><span>Romsone gulv/tak</span><b>{summary.zonedFloorM2.toFixed(2)} m²</b></div><div><span>Brutto listelengde</span><b>{summary.zonePerimeterM.toFixed(2)} lm</b></div><div><span>Romsone veggflate</span><b>{summary.zoneWallM2.toFixed(2)} m²</b></div></>}{doc.notes&&<div className={styles.printNotes}><span>Notater</span><b>{doc.notes}</b></div>}</div><div className={styles.canvasWrap}><div className={styles.mobileCanvasHint}>Én finger: tegn/velg · To fingre: zoom og flytt</div><svg ref={svg} className={styles.canvas} viewBox={pan.x+" "+pan.y+" "+viewWidth+" "+viewHeight} onPointerDownCapture={pointerDownCapture} onPointerMoveCapture={pointerMoveCapture} onPointerUpCapture={pointerUpCapture} onPointerCancelCapture={pointerUpCapture} onPointerDown={canvasDown} onPointerMove={move} onPointerUp={up} onPointerLeave={e=>{if(e.pointerType!=="touch")up(e)}} onWheel={e=>{e.preventDefault();zoomBy(e.deltaY<0?.15:-.15)}}>
     <defs><pattern id="minor" width={GRID} height={GRID} patternUnits="userSpaceOnUse"><path d={"M "+GRID+" 0 L 0 0 0 "+GRID} fill="none" stroke="#ece9e1" strokeWidth="6"/></pattern><pattern id="major" width="1000" height="1000" patternUnits="userSpaceOnUse"><rect width="1000" height="1000" fill="url(#minor)"/><path d="M1000 0L0 0 0 1000" fill="none" stroke="#d9d5ca" strokeWidth="12"/></pattern></defs>
     <rect data-canvas="yes" width={VIEW} height={VIEW} fill={doc.showGrid===false?"#fff":"url(#major)"}/>
-    {(doc.zones||[]).map(z=>{const c=polygonCentroid(z.points),active=selected?.kind==="zone"&&selected.id===z.id;return <g key={z.id} onPointerDown={e=>{if(tool==="zone")return;e.stopPropagation();setTool("select");setSelected({kind:"zone",id:z.id})}} style={{pointerEvents:tool==="zone"?"none":"auto",cursor:"pointer"}}><polygon points={z.points.map(p=>p.x+","+p.y).join(" ")} fill={active?"rgba(207,161,83,.28)":"rgba(50,106,118,.10)"} stroke={active?"#9b7a39":"#326a76"} strokeWidth={active?28:18} strokeDasharray="45 22"/><text x={c.x} y={c.y-35} textAnchor="middle" fontSize="120" fontWeight="700" fill="#274e57">{z.name||"Rom"}</text><text x={c.x} y={c.y+95} textAnchor="middle" fontSize="90" fill="#326a76">{polygonAreaM2(z.points).toFixed(2)} m²</text>{active&&z.points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="55" fill="#fff" stroke="#9b7a39" strokeWidth="20" onPointerDown={e=>downZonePoint(e,z,i)}/>)}</g>})}
+    {(doc.zones||[]).map(z=>{const c=polygonCentroid(z.points),active=selected?.kind==="zone"&&selected.id===z.id;return <g key={z.id} onPointerDown={e=>{if(["wall","measure","zone"].includes(tool)){e.stopPropagation();drawingPointDown(e);return}e.stopPropagation();setTool("select");setSelected({kind:"zone",id:z.id})}} style={{pointerEvents:tool==="zone"?"none":"auto",cursor:"pointer"}}><polygon points={z.points.map(p=>p.x+","+p.y).join(" ")} fill={active?"rgba(207,161,83,.28)":"rgba(50,106,118,.10)"} stroke={active?"#9b7a39":"#326a76"} strokeWidth={active?28:18} strokeDasharray="45 22"/><text x={c.x} y={c.y-35} textAnchor="middle" fontSize="120" fontWeight="700" fill="#274e57">{z.name||"Rom"}</text><text x={c.x} y={c.y+95} textAnchor="middle" fontSize="90" fill="#326a76">{polygonAreaM2(z.points).toFixed(2)} m²</text>{active&&z.points.map((p,i)=><g key={i}><circle cx={p.x} cy={p.y} r="190" fill="transparent" onPointerDown={e=>downZonePoint(e,z,i)}/><circle cx={p.x} cy={p.y} r="55" fill="#fff" stroke="#9b7a39" strokeWidth="20" pointerEvents="none"/></g>)}</g>})}
     {zoneDraft.length>0&&<g style={{pointerEvents:"none"}}><polyline points={zoneDraft.map(p=>p.x+","+p.y).join(" ")} fill="rgba(207,161,83,.12)" stroke="#9b7a39" strokeWidth="24" strokeDasharray="45 22"/>{zoneDraft.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="38" fill="#9b7a39"/>)}</g>}
-    {doc.walls.map(w=><g key={w.id} onPointerDown={e=>{e.stopPropagation();setTool("select");setSelected({kind:"wall",id:w.id})}} className={styles.pick}><line x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} stroke={selected?.id===w.id?"#9b7a39":"#222"} strokeWidth={Math.max(35,w.t)} strokeLinecap="square"/>{selected?.kind==="wall"&&selected.id===w.id&&<><circle cx={w.x1} cy={w.y1} r="70" fill="#fff" stroke="#9b7a39" strokeWidth="22" onPointerDown={e=>downWallEnd(e,w,1)}/><circle cx={w.x2} cy={w.y2} r="70" fill="#fff" stroke="#9b7a39" strokeWidth="22" onPointerDown={e=>downWallEnd(e,w,2)}/></>}{(()=>{const d=dim(w);return <><line x1={d.ax} y1={d.ay} x2={d.bx} y2={d.by} stroke="#777" strokeWidth="10"/><line x1={d.ax-d.nx*60} y1={d.ay-d.ny*60} x2={d.ax+d.nx*60} y2={d.ay+d.ny*60} stroke="#777" strokeWidth="10"/><line x1={d.bx-d.nx*60} y1={d.by-d.ny*60} x2={d.bx+d.nx*60} y2={d.by+d.ny*60} stroke="#777" strokeWidth="10"/><text x={d.mx} y={d.my} textAnchor="middle" fontSize="105">{len(w)} mm · {angle(w)}°</text></>})()}</g>)}
-    {doc.items.map(o=><g key={o.id} transform={"translate("+o.x+" "+o.y+") rotate("+o.rot+" "+o.w/2+" "+o.h/2+")"} onPointerDown={e=>downItem(e,o)} className={styles.pick}>{o.type==="door"?<g transform={o.flip?"translate("+o.w+" 0) scale(-1 1)":undefined}><line x1="0" y1={o.h/2} x2={o.w} y2={o.h/2} stroke="#51462f" strokeWidth="28"/><path d={"M0 "+o.h/2+" A "+o.w+" "+o.w+" 0 0 1 "+o.w+" "+(o.h/2-o.w)} fill="none" stroke="#8b806a" strokeWidth="18"/></g>:o.type==="sliding"?<><rect width={o.w} height={Math.max(o.h,100)} fill="#f7f7f7" stroke="#51462f" strokeWidth="18"/><line x1="60" y1="20" x2={o.w*.62} y2="20" stroke="#51462f" strokeWidth="22"/><line x1={o.w*.38} y1={o.h-20} x2={o.w-60} y2={o.h-20} stroke="#51462f" strokeWidth="22"/></>:o.type==="opening"?<><line x1="0" y1={o.h/2} x2={o.w} y2={o.h/2} stroke="#fff" strokeWidth="100"/><line x1="0" y1="0" x2="0" y2={o.h} stroke="#777" strokeWidth="16"/><line x1={o.w} y1="0" x2={o.w} y2={o.h} stroke="#777" strokeWidth="16"/></>:o.type==="window"?<><rect width={o.w} height={Math.max(o.h,100)} fill="#dfeef1" stroke="#51462f" strokeWidth="18"/><line x1="0" y1={o.h/2} x2={o.w} y2={o.h/2} stroke="#64828a" strokeWidth="18"/></>:<rect width={o.w} height={o.h} rx="30" fill={selected?.id===o.id?"#eadcbf":"#f5f1e7"} stroke="#51462f" strokeWidth="18"/>}<text x={o.w/2} y={o.h/2} textAnchor="middle" dominantBaseline="middle" fontSize="100">{labelFor(o.type)}</text><text x={o.w/2} y={o.h/2+125} textAnchor="middle" fontSize="75">{o.w} × {o.h}</text></g>)}
-    {(doc.measurements||[]).map(m=><g key={m.id}><line x1={m.x1} y1={m.y1} x2={m.x2} y2={m.y2} stroke="#326a76" strokeWidth="12" strokeDasharray="35 22"/><circle cx={m.x1} cy={m.y1} r="28" fill="#326a76"/><circle cx={m.x2} cy={m.y2} r="28" fill="#326a76"/><text x={(m.x1+m.x2)/2} y={(m.y1+m.y2)/2-70} textAnchor="middle" fontSize="90" fill="#326a76">{Math.round(Math.hypot(m.x2-m.x1,m.y2-m.y1))} mm</text></g>)}{draft&&<><circle cx={draft.x} cy={draft.y} r="55" fill="#9b7a39"/><text x={draft.x+90} y={draft.y-80} fontSize="90">Neste veggpunkt</text></>}{measureDraft&&<><circle cx={measureDraft.x} cy={measureDraft.y} r="45" fill="#326a76"/><text x={measureDraft.x+80} y={measureDraft.y-60} fontSize="85" fill="#326a76">Velg endepunkt</text></>}
+    {doc.walls.map(w=><g key={w.id} onPointerDown={e=>{if(["wall","measure","zone"].includes(tool)){e.stopPropagation();drawingPointDown(e);return}e.stopPropagation();setTool("select");setSelected({kind:"wall",id:w.id})}} className={styles.pick}><line x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} stroke="transparent" strokeWidth="260" strokeLinecap="round"/><line x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} stroke={selected?.id===w.id?"#9b7a39":"#222"} strokeWidth={Math.max(35,w.t)} strokeLinecap="square"/>{selected?.kind==="wall"&&selected.id===w.id&&<><circle cx={w.x1} cy={w.y1} r="190" fill="transparent" onPointerDown={e=>downWallEnd(e,w,1)}/><circle cx={w.x2} cy={w.y2} r="190" fill="transparent" onPointerDown={e=>downWallEnd(e,w,2)}/><circle cx={w.x1} cy={w.y1} r="70" fill="#fff" stroke="#9b7a39" strokeWidth="22" pointerEvents="none"/><circle cx={w.x2} cy={w.y2} r="70" fill="#fff" stroke="#9b7a39" strokeWidth="22" pointerEvents="none"/></>}{(()=>{const d=dim(w);return <><line x1={d.ax} y1={d.ay} x2={d.bx} y2={d.by} stroke="#777" strokeWidth="10"/><line x1={d.ax-d.nx*60} y1={d.ay-d.ny*60} x2={d.ax+d.nx*60} y2={d.ay+d.ny*60} stroke="#777" strokeWidth="10"/><line x1={d.bx-d.nx*60} y1={d.by-d.ny*60} x2={d.bx+d.nx*60} y2={d.by+d.ny*60} stroke="#777" strokeWidth="10"/><text x={d.mx} y={d.my} textAnchor="middle" fontSize="105">{len(w)} mm · {angle(w)}°</text></>})()}</g>)}
+    {selected?.kind==="zone"&&selectedZoneWalls.length>0&&selectedZoneWalls.map((wall,index)=>{const x=(wall.x1+wall.x2)/2,y=(wall.y1+wall.y2)/2,dx=wall.x2-wall.x1,dy=wall.y2-wall.y1,L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L,nx=-uy,ny=ux,tip={x:x+ux*205,y:y+uy*205},base={x:x+ux*118,y:y+uy*118};return <g key={"room-wall-"+wall.id} pointerEvents="none"><circle cx={x} cy={y} r="118" fill="#252622" stroke="#fff" strokeWidth="18"/><text x={x} y={y+34} textAnchor="middle" fontSize="105" fontWeight="800" fill="#fff">{index+1}</text><polygon points={tip.x+","+tip.y+" "+(base.x+nx*52)+","+(base.y+ny*52)+" "+(base.x-nx*52)+","+(base.y-ny*52)} fill="#d7a74e" stroke="#fff" strokeWidth="12"/></g>})}
+    {doc.items.map(o=><g key={o.id} transform={"translate("+o.x+" "+o.y+") rotate("+o.rot+" "+o.w/2+" "+o.h/2+")"} onPointerDown={e=>downItem(e,o)} className={styles.pick}><rect x="-140" y="-140" width={o.w+280} height={Math.max(o.h,100)+280} fill="transparent"/>{o.type==="door"?<g transform={o.flip?"translate("+o.w+" 0) scale(-1 1)":undefined}><line x1="0" y1={o.h/2} x2={o.w} y2={o.h/2} stroke="#51462f" strokeWidth="28"/><path d={"M0 "+o.h/2+" A "+o.w+" "+o.w+" 0 0 1 "+o.w+" "+(o.h/2-o.w)} fill="none" stroke="#8b806a" strokeWidth="18"/></g>:o.type==="sliding"?<><rect width={o.w} height={Math.max(o.h,100)} fill="#f7f7f7" stroke="#51462f" strokeWidth="18"/><line x1="60" y1="20" x2={o.w*.62} y2="20" stroke="#51462f" strokeWidth="22"/><line x1={o.w*.38} y1={o.h-20} x2={o.w-60} y2={o.h-20} stroke="#51462f" strokeWidth="22"/></>:o.type==="opening"?<><line x1="0" y1={o.h/2} x2={o.w} y2={o.h/2} stroke="#fff" strokeWidth="100"/><line x1="0" y1="0" x2="0" y2={o.h} stroke="#777" strokeWidth="16"/><line x1={o.w} y1="0" x2={o.w} y2={o.h} stroke="#777" strokeWidth="16"/></>:o.type==="window"?<><rect width={o.w} height={Math.max(o.h,100)} fill="#dfeef1" stroke="#51462f" strokeWidth="18"/><line x1="0" y1={o.h/2} x2={o.w} y2={o.h/2} stroke="#64828a" strokeWidth="18"/></>:<rect width={o.w} height={o.h} rx="30" fill={selected?.id===o.id?"#eadcbf":"#f5f1e7"} stroke="#51462f" strokeWidth="18"/>}<text x={o.w/2} y={o.h/2} textAnchor="middle" dominantBaseline="middle" fontSize="100">{labelFor(o.type)}</text><text x={o.w/2} y={o.h/2+125} textAnchor="middle" fontSize="75">{o.w} × {o.h}</text></g>)}
+    {selected?.kind==="item"&&sel?.wallId&&openingTypes.has(sel.type)&&doc.walls.find(w=>w.id===sel.wallId)&&(()=>{const wall=doc.walls.find(w=>w.id===sel.wallId),g=wallEdgeOffsets(sel,wall),dx=wall.x2-wall.x1,dy=wall.y2-wall.y1,L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L,nx=-uy,ny=ux,off=360,sx=wall.x1+ux*g.start,sy=wall.y1+uy*g.start,ex=sx+ux*sel.w,ey=sy+uy*sel.w,a1={x:wall.x1+nx*off,y:wall.y1+ny*off},a2={x:sx+nx*off,y:sy+ny*off},a3={x:ex+nx*off,y:ey+ny*off},a4={x:wall.x2+nx*off,y:wall.y2+ny*off};return <g pointerEvents="none"><line x1={a1.x} y1={a1.y} x2={a4.x} y2={a4.y} stroke="#315c64" strokeWidth="12"/>{[a1,a2,a3,a4].map((p,i)=><line key={i} x1={p.x-nx*58} y1={p.y-ny*58} x2={p.x+nx*58} y2={p.y+ny*58} stroke="#315c64" strokeWidth="12"/>)}<text x={(a1.x+a2.x)/2} y={(a1.y+a2.y)/2-55} textAnchor="middle" fontSize="76" fontWeight="700" fill="#315c64">{g.start} mm</text><text x={(a2.x+a3.x)/2} y={(a2.y+a3.y)/2-55} textAnchor="middle" fontSize="82" fontWeight="800" fill="#9b7a39">{Math.round(sel.w)} mm</text><text x={(a3.x+a4.x)/2} y={(a3.y+a4.y)/2-55} textAnchor="middle" fontSize="76" fontWeight="700" fill="#315c64">{g.end} mm</text></g>})()}
+    {(doc.measurements||[]).map(m=>{const active=selected?.kind==="measurement"&&selected.id===m.id,distance=Math.round(Math.hypot(m.x2-m.x1,m.y2-m.y1));return <g key={m.id} className={styles.pick} onPointerDown={e=>{if(["wall","measure","zone"].includes(tool)){e.stopPropagation();drawingPointDown(e);return}e.stopPropagation();setTool("select");setSelected({kind:"measurement",id:m.id})}}><line x1={m.x1} y1={m.y1} x2={m.x2} y2={m.y2} stroke="transparent" strokeWidth="180"/><line x1={m.x1} y1={m.y1} x2={m.x2} y2={m.y2} stroke={active?"#9b7a39":"#326a76"} strokeWidth={active?20:12} strokeDasharray="35 22"/>{active&&<><circle cx={m.x1} cy={m.y1} r="170" fill="transparent" onPointerDown={e=>downMeasurementEnd(e,m,1)}/><circle cx={m.x2} cy={m.y2} r="170" fill="transparent" onPointerDown={e=>downMeasurementEnd(e,m,2)}/></>}<circle cx={m.x1} cy={m.y1} r={active?40:28} fill={active?"#9b7a39":"#326a76"} pointerEvents="none"/><circle cx={m.x2} cy={m.y2} r={active?40:28} fill={active?"#9b7a39":"#326a76"} pointerEvents="none"/><text x={(m.x1+m.x2)/2} y={(m.y1+m.y2)/2-70} textAnchor="middle" fontSize="90" fontWeight={active?"700":"400"} fill={active?"#8a6729":"#326a76"}>{m.label?m.label+" · ":""}{distance} mm</text></g>})}{snapHint&&<g pointerEvents="none"><circle cx={snapHint.x} cy={snapHint.y} r="105" fill="rgba(215,167,78,.18)" stroke="#d7a74e" strokeWidth="26"/><circle cx={snapHint.x} cy={snapHint.y} r="24" fill="#d7a74e"/><text x={snapHint.x+130} y={snapHint.y-105} fontSize="82" fontWeight="700" fill="#8a6729">{snapHint.label||"Snap"}</text></g>}{draft&&<><circle cx={draft.x} cy={draft.y} r="55" fill="#9b7a39"/><text x={draft.x+90} y={draft.y-80} fontSize="90">Neste veggpunkt</text></>}{measureDraft&&<><circle cx={measureDraft.x} cy={measureDraft.y} r="45" fill="#326a76"/><text x={measureDraft.x+80} y={measureDraft.y-60} fontSize="85" fill="#326a76">Velg endepunkt</text></>}
    </svg></div></section>
-   <aside className={styles.panel+" "+styles.right}><h2>Egenskaper</h2>{!sel?<p className={styles.muted}>Velg et objekt, en vegg eller en romsone. Møbler og utstyr kan dras direkte i tegningen. Dører, vinduer, rekkverk og levegger fester seg automatisk til nærmeste vegg når du slipper dem.</p>:selected.kind==="zone"?<><h3>{sel.name||"Romsone"}</h3><div className={styles.field}><label>Romnavn</label><input value={sel.name||""} onChange={e=>updateZoneField("name",e.target.value)}/></div><div className={styles.field}><label>Takhøyde (mm)</label><input type="number" min="300" value={Number(sel.ceilingHeight)||Number(doc.defaultWallHeight)||2400} onChange={e=>updateZoneField("ceilingHeight",e.target.value,true)}/></div><div className={styles.field}><label>Gulv / overflate</label><input value={sel.floorFinish||""} onChange={e=>updateZoneField("floorFinish",e.target.value)} placeholder="F.eks. flis, parkett, vinyl"/></div><div className={styles.field}><label>Romnotat</label><textarea className={styles.textarea} value={sel.notes||""} onChange={e=>updateZoneField("notes",e.target.value)}/></div><p className={styles.muted}>Gulv/tak: <b>{polygonAreaM2(sel.points).toFixed(2)} m²</b><br/>Brutto listelengde: <b>{polygonPerimeterM(sel.points).toFixed(2)} lm</b><br/>Brutto veggflate: <b>{(polygonPerimeterM(sel.points)*((Number(sel.ceilingHeight)||Number(doc.defaultWallHeight)||2400)/1000)).toFixed(2)} m²</b></p><p className={styles.muted}>De markerte hjørnepunktene i tegningen kan dras for å finjustere sonen etter befaringen.</p></>:selected.kind==="wall"?<><h3>Vegg</h3><div className={styles.field}><label>Standard veggtype</label><select className={styles.select} value="" onChange={e=>applyWallPreset(e.target.value)}><option value="">Velg veggtype…</option>{wallPresets.map(([label,t,h])=><option key={label} value={t+"x"+h}>{label}</option>)}</select></div>{[["Lengde (mm)","len",len(sel)],["Vinkel (grader)","angle",angle(sel)],["Tykkelse (mm)","t",sel.t],["Høyde (mm)","h",sel.h]].map(([l,k,v])=><div className={styles.field} key={k}><label>{l}</label><input type="number" value={v} onChange={e=>update(k,e.target.value)}/></div>)}</>:<><h3>{labelFor(sel.type)}</h3>{sizePresets[sel.type]?.length>0&&<div className={styles.field}><label>Standardmål</label><select className={styles.select} value="" onChange={e=>applySizePreset(e.target.value)}><option value="">Velg standardmål…</option>{sizePresets[sel.type].map(([label,w,h])=><option key={label+"-"+w+"-"+h} value={w+"x"+h}>{label}</option>)}</select><small className={styles.muted}>Standardmålet beholder objektets senterpunkt. Du kan fortsatt finjustere målene under.</small></div>}{openingTypes.has(sel.type)&&<><div className={styles.field}><label>{sel.type==="window"?"Vindushøyde (mm)":"Åpningshøyde (mm)"}</label><input type="number" min="100" value={Math.round(Number(sel.openingHeight)||openingDefaults(sel.type).openingHeight||2100)} onChange={e=>update("openingHeight",e.target.value)}/></div>{sel.type==="window"&&<div className={styles.field}><label>Brystningshøyde (mm)</label><input type="number" min="0" value={Math.round(Number(sel.sillHeight)||0)} onChange={e=>update("sillHeight",e.target.value)}/><small className={styles.muted}>Avstand fra ferdig gulv til underkant vindu.</small></div>}</>}{[["Bredde (mm)","w"],["Dybde/lengde (mm)","h"],["X-posisjon (mm)","x"],["Y-posisjon (mm)","y"],["Rotasjon (grader)","rot"]].map(([l,k])=><div className={styles.field} key={k}><label>{l}</label><input type="number" value={Math.round(sel[k])} onChange={e=>update(k,e.target.value)}/></div>)}{sel.wallId&&doc.walls.find(w=>w.id===sel.wallId)&&<div className={styles.field}><label>Avstand fra veggens start/hjørne (mm)</label><input type="number" min="0" max={len(doc.walls.find(w=>w.id===sel.wallId))} value={Number.isFinite(sel.wallOffset)?Math.round(sel.wallOffset):wallOffset(sel,doc.walls.find(w=>w.id===sel.wallId))} onChange={e=>update("wallOffset",e.target.value)}/><small className={styles.muted}>Målet går fra veggens start/hjørne til senter av objektet.</small></div>}<div className={styles.row}>{sel.type==="door"&&<button className={styles.btn} onClick={flipDoor}>Speil slagretning</button>}{sel.wallId&&<button className={styles.btn} onClick={detach}>Løsne fra vegg</button>}<button className={styles.btn} onClick={duplicate}>Dupliser</button></div></>} {sel&&<button className={styles.btn+" "+styles.danger} onClick={remove}>Slett valgt</button>}
-    <div className={styles.group+" "+styles.ai}><h2>Tegningsinfo</h2><p className={styles.muted}>Oppdrag: <b>{projectLabel}</b><br/>Målestokk for utskrift: <b>{doc.scale||"1:50"}</b><br/>Alle oppgitte mål er i millimeter.</p></div><div className={styles.group+" "+styles.ai}><h2>Mengder fra tegning</h2><p className={styles.muted}>Vegger: <b>{summary.wallM.toFixed(2)} lm</b><br/>Brutto veggflate: <b>{summary.wallM2.toFixed(2)} m²</b><br/>Åpningsareal i vegg: <b>{summary.openingM2.toFixed(2)} m²</b><br/>Netto veggflate: <b>{summary.netWallM2.toFixed(2)} m²</b><br/>Gulvareal lukket rom: <b>{summary.floorM2==null?"—":summary.floorM2.toFixed(2)+" m²"}</b><br/>Terrassefelt: <b>{summary.deckM2.toFixed(2)} m²</b><br/>Dører/skyvedører: <b>{summary.doors}</b><br/>Vinduer: <b>{summary.windows}</b><br/>Stolper: <b>{summary.posts}</b><br/>Objekter totalt: <b>{summary.objects}</b>{summary.zoneRows.length>0&&<><br/><br/>Romsoner: <b>{summary.zoneRows.length}</b><br/>Samlet gulv/tak: <b>{summary.zonedFloorM2.toFixed(2)} m²</b><br/>Brutto listelengde: <b>{summary.zonePerimeterM.toFixed(2)} lm</b><br/>Brutto rom-veggflate: <b>{summary.zoneWallM2.toFixed(2)} m²</b></>}</p>{summary.zoneRows.length>0&&<div className={styles.zoneList}>{summary.zoneRows.map(z=><button type="button" key={z.id} onClick={()=>setSelected({kind:"zone",id:z.id})}><span>{z.name||"Rom"}</span><b>{z.area.toFixed(2)} m²</b></button>)}</div>}</div><div className={styles.group+" "+styles.ai}><h2>AI-visualisering</h2><p className={styles.muted}>Bruk plantegningen som målgrunnlag sammen med kundebilde i ChatGPT. PNG-en beskjæres automatisk rundt det som faktisk er tegnet.</p><div className={styles.row}><button type="button" className={styles.btn} onClick={exportPng}>Eksporter tegning som PNG</button><button type="button" className={styles.btn} onClick={copyAiBrief}>Kopier ChatGPT-brief</button></div><p className={styles.muted}>AI-bildet er en illustrasjon. Mål og plasseringer i denne tegningen er fortsatt det tekniske grunnlaget.</p></div>
+   <aside ref={rightPanel} className={styles.panel+" "+styles.right}><h2>Egenskaper</h2>{!sel?<p className={styles.muted}>Velg et objekt, en vegg eller en romsone. Møbler og utstyr kan dras direkte i tegningen. Dører, vinduer, rekkverk og levegger fester seg automatisk til nærmeste vegg når du slipper dem.</p>:selected.kind==="zone"?<><h3>{sel.name||"Romsone"}</h3><div className={styles.field}><label>Romnavn</label><input value={sel.name||""} onChange={e=>updateZoneField("name",e.target.value)}/></div><div className={styles.field}><label>Takhøyde (mm)</label><input type="number" min="300" value={Number(sel.ceilingHeight)||Number(doc.defaultWallHeight)||2400} onChange={e=>updateZoneField("ceilingHeight",e.target.value,true)}/></div><div className={styles.field}><label>Gulv / overflate</label><input value={sel.floorFinish||""} onChange={e=>updateZoneField("floorFinish",e.target.value)} placeholder="F.eks. flis, parkett, vinyl"/></div><div className={styles.field}><label>Romnotat</label><textarea className={styles.textarea} value={sel.notes||""} onChange={e=>updateZoneField("notes",e.target.value)}/></div><p className={styles.muted}>Gulv/tak: <b>{polygonAreaM2(sel.points).toFixed(2)} m²</b><br/>Brutto listelengde: <b>{polygonPerimeterM(sel.points).toFixed(2)} lm</b><br/>Brutto veggflate: <b>{(polygonPerimeterM(sel.points)*((Number(sel.ceilingHeight)||Number(doc.defaultWallHeight)||2400)/1000)).toFixed(2)} m²</b></p>{selectedZoneWalls.length>0&&<div className={styles.roomWallEditor}><h4>Veggmål i rommet</h4>{selectedZoneWalls.map((wall,index)=><div className={styles.roomWallEditorRow} key={wall.id}><button type="button" onClick={()=>setSelected({kind:"wall",id:wall.id})}>{index+1}</button><span>Vegg {index+1}<small>{angle(wall)}°</small></span><input key={"dw-"+wall.id+"-"+len(wall)} type="number" min="100" max="12000" defaultValue={len(wall)} onBlur={e=>updateWallById(wall.id,"len",e.target.value)}/>{(()=>{const layout=wallOpeningLayout(wall,doc.items);return layout.rows.length?<div className={styles.roomWallOpeningList} data-overlap={layout.overlap?"true":"false"}><div className={styles.roomWallChain}>{layout.parts.map(part=><span key={part.item.id}>{part.gap>0&&<em>{part.gap}</em>}<b>{labelFor(part.item.type)} {Math.round(part.item.w)}</b></span>)}{layout.endGap>0&&<em>{layout.endGap}</em>}</div>{layout.rows.map(({item,gaps})=><button type="button" key={item.id} onClick={()=>setSelected({kind:"item",id:item.id})}><span>{labelFor(item.type)} · {Math.round(item.w)} mm</span><b>{gaps.start} mm fra start</b></button>)}{layout.overlap&&<small>⚠ Overlapp må korrigeres</small>}</div>:null})()}</div>)}<small className={styles.muted}>Nummer + pil i tegningen viser måleretningen. Åpningsmål «fra start» følger denne retningen. Endring flytter neste hjørne; kontroller siste vegg til slutt.</small></div>}<p className={styles.muted}>De markerte hjørnepunktene i tegningen kan dras for å finjustere sonen etter befaringen.</p></>:selected.kind==="measurement"?<><h3>Mål</h3><div className={styles.field}><label>Navn / notat</label><input value={sel.label||""} onChange={e=>updateMeasurementField("label",e.target.value)} placeholder="F.eks. vegg til vindu"/></div><p className={styles.muted}>Avstand: <b>{Math.round(Math.hypot(sel.x2-sel.x1,sel.y2-sel.y1))} mm</b></p><p className={styles.muted}>Målelinjen kan slettes uten å fjerne de andre målene.</p></>:selected.kind==="wall"?<><h3>Vegg</h3><div className={styles.field}><label>Standard veggtype</label><select className={styles.select} value="" onChange={e=>applyWallPreset(e.target.value)}><option value="">Velg veggtype…</option>{wallPresets.map(([label,t,h])=><option key={label} value={t+"x"+h}>{label}</option>)}</select></div><div className={styles.field}><label>Startpunkt X (mm)</label><input type="number" value={Math.round(sel.x1)} onChange={e=>update("x1",e.target.value)}/></div><div className={styles.field}><label>Startpunkt Y (mm)</label><input type="number" value={Math.round(sel.y1)} onChange={e=>update("y1",e.target.value)}/></div>{[["Lengde (mm)","len",len(sel)],["Vinkel (grader)","angle",angle(sel)],["Tykkelse (mm)","t",sel.t],["Høyde (mm)","h",sel.h]].map(([l,k,v])=><div className={styles.field} key={k}><label>{l}</label><input type="number" value={v} onChange={e=>update(k,e.target.value)}/></div>)}<div className={styles.field}><label>Hurtigvinkel</label><div className={styles.row}>{[0,90,180,270].map(value=><button type="button" key={value} className={Math.abs(angle(sel)-value)<.1?styles.activeBtn:styles.btn} onClick={()=>update("angle",value)}>{value}°</button>)}</div><small className={styles.muted}>Startpunktet beholdes når lengde eller vinkel endres. Dører og vinduer som er festet til veggen følger med.</small></div></>:<><h3>{labelFor(sel.type)}</h3>{sizePresets[sel.type]?.length>0&&<div className={styles.field}><label>Standardmål</label><select className={styles.select} value="" onChange={e=>applySizePreset(e.target.value)}><option value="">Velg standardmål…</option>{sizePresets[sel.type].map(([label,w,h])=><option key={label+"-"+w+"-"+h} value={w+"x"+h}>{label}</option>)}</select><small className={styles.muted}>Standardmålet beholder objektets senterpunkt. Du kan fortsatt finjustere målene under.</small></div>}{openingTypes.has(sel.type)&&<><div className={styles.field}><label>{sel.type==="window"?"Vindushøyde (mm)":"Åpningshøyde (mm)"}</label><input type="number" min="100" value={Math.round(Number(sel.openingHeight)||openingDefaults(sel.type).openingHeight||2100)} onChange={e=>update("openingHeight",e.target.value)}/></div>{sel.type==="window"&&<div className={styles.field}><label>Brystningshøyde (mm)</label><input type="number" min="0" value={Math.round(Number(sel.sillHeight)||0)} onChange={e=>update("sillHeight",e.target.value)}/><small className={styles.muted}>Avstand fra ferdig gulv til underkant vindu.</small></div>}</>}{[["Bredde (mm)","w"],["Dybde/lengde (mm)","h"],["X-posisjon (mm)","x"],["Y-posisjon (mm)","y"],["Rotasjon (grader)","rot"]].map(([l,k])=><div className={styles.field} key={k}><label>{l}</label><input type="number" value={Math.round(sel[k])} onChange={e=>update(k,e.target.value)}/></div>)}{sel.wallId&&doc.walls.find(w=>w.id===sel.wallId)&&(()=>{const wall=doc.walls.find(w=>w.id===sel.wallId),gaps=wallEdgeOffsets(sel,wall),maxGap=Math.max(0,gaps.L-Math.max(0,Number(sel.w)||0));return <div className={styles.field}><label>Plassering på vegg</label>{gaps.tooWide&&<p className={styles.muted}><b>Obs:</b> Objektet er bredere enn veggen og kan ikke plasseres helt innenfor.</p>}<label>Fra start/hjørne til nærmeste objektkant (mm)</label><input type="number" min="0" max={maxGap} value={gaps.start} onChange={e=>update("wallStartGap",e.target.value)}/><label>Fra motsatt objektkant til veggslutt (mm)</label><input type="number" min="0" max={maxGap} value={gaps.end} onChange={e=>update("wallEndGap",e.target.value)}/><small className={styles.muted}>Begge målene går til objektets kant, ikke senter. Objektet holdes automatisk innenfor veggen når det er plass.</small></div>})()}<div className={styles.row}>{sel.type==="door"&&<button className={styles.btn} onClick={flipDoor}>Speil slagretning</button>}{sel.wallId&&<button className={styles.btn} onClick={detach}>Løsne fra vegg</button>}<button className={styles.btn} onClick={duplicate}>Dupliser</button></div></>} {sel&&<button className={styles.btn+" "+styles.danger} onClick={remove}>Slett valgt</button>}
+    <div className={styles.group+" "+styles.ai}><h2>Tegningsinfo</h2><p className={styles.muted}>Oppdrag: <b>{projectLabel}</b><br/>Målestokk for utskrift: <b>{doc.scale||"1:50"}</b><br/>Alle oppgitte mål er i millimeter.</p></div><div className={styles.group+" "+styles.ai}><h2>Mengder fra tegning</h2><p className={styles.muted}>Vegger: <b>{summary.wallM.toFixed(2)} lm</b><br/>Brutto veggflate: <b>{summary.wallM2.toFixed(2)} m²</b><br/>Åpningsareal i vegg: <b>{summary.openingM2.toFixed(2)} m²</b><br/>Netto veggflate: <b>{summary.netWallM2.toFixed(2)} m²</b><br/>Gulvareal lukket rom: <b>{summary.floorM2==null?"—":summary.floorM2.toFixed(2)+" m²"}</b><br/>Terrassefelt: <b>{summary.deckM2.toFixed(2)} m²</b><br/>Dører/skyvedører: <b>{summary.doors}</b><br/>Vinduer: <b>{summary.windows}</b><br/>Stolper: <b>{summary.posts}</b><br/>Objekter totalt: <b>{summary.objects}</b>{summary.zoneRows.length>0&&<><br/><br/>Romsoner: <b>{summary.zoneRows.length}</b><br/>Samlet gulv/tak: <b>{summary.zonedFloorM2.toFixed(2)} m²</b><br/>Brutto listelengde: <b>{summary.zonePerimeterM.toFixed(2)} lm</b><br/>Brutto rom-veggflate: <b>{summary.zoneWallM2.toFixed(2)} m²</b></>}</p>{summary.zoneRows.length>0&&<div className={styles.zoneList}>{summary.zoneRows.map(z=><button type="button" key={z.id} onClick={()=>setSelected({kind:"zone",id:z.id})}><span>{z.name||"Rom"}</span><b>{z.area.toFixed(2)} m²</b></button>)}</div>}</div><div className={styles.group+" "+styles.ai}><h2>AI-visualisering</h2><p className={styles.muted}>Bruk plantegningen som målgrunnlag sammen med kundebilde i ChatGPT. Briefen inkluderer vegger, åpninger, høyder, standardmål og plasseringer.</p><div className={styles.field}><label>Ønsket uttrykk / endringer</label><textarea className={styles.textarea} value={doc.visualizationNotes||""} onChange={e=>setDoc(d=>({...d,visualizationNotes:e.target.value}))} placeholder="F.eks. lyse eikefronter, beige fliser, behold vinduene, fjern overskap på høyre vegg…"/></div><div className={styles.row}><button type="button" className={styles.activeBtn} onClick={prepareChatGptPackage}>Klargjør for ChatGPT</button><button type="button" className={styles.btn} onClick={exportPng}>Bare PNG</button><button type="button" className={styles.btn} onClick={()=>copyAiBrief()}>Bare brief</button></div><p className={styles.muted}>«Klargjør for ChatGPT» eksporterer tegningen som PNG og kopierer den detaljerte briefen. Legg ved PNG-en og eventuelle kundebilder i ChatGPT, og lim inn briefen. AI-bildet er en illustrasjon; målene i tegningen er fortsatt teknisk grunnlag.</p></div>
    </aside>
   </div>
  </main>

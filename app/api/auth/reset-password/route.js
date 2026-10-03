@@ -3,6 +3,7 @@ import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {createAdminPasswordResetToken} from "../../../../lib/adminPasswordReset";
+import {serviceEmailFrom,serviceReplyTo} from "../../../../lib/serviceEmailConfig";
 
 const genericMessage="Hvis e-postadressen er registrert, sender vi en lenke for å velge nytt passord.";
 
@@ -71,9 +72,9 @@ export async function POST(req){
 </table></td></tr></table></body></html>`;
 
   const sent=await resend.emails.send({
-   from:"Aadland Service <noreply@aadland-service.no>",
+   from:serviceEmailFrom(),
    to:value,
-   replyTo:"post@aadland-service.no",
+   replyTo:serviceReplyTo(),
    subject:"Velg nytt passord – Aadland Service backoffice",
    html
   });

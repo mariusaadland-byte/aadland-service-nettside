@@ -5,6 +5,7 @@ import Link from "next/link";
 import {CatalogFooter,CatalogHeader,CatalogPlaceholder} from "../produkter/ProductChrome";
 
 const kr=o=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",maximumFractionDigits:0}).format((Number(o)||0)/100);
+const ALL_SELECTION_LIMIT=9;
 
 function mixRentalItems(items,categories){
  const categoryIds=categories.map(category=>category.id);
@@ -55,10 +56,10 @@ export default function Utleie(){
  const mixedItems=useMemo(()=>mixRentalItems(items,categories),[items,categories]);
  const filtered=useMemo(()=>{
   if(filter==="uncategorized")return items.filter(item=>!item.categoryId);
-  if(filter==="all")return mixedItems;
+  if(filter==="all")return mixedItems.slice(0,ALL_SELECTION_LIMIT);
   return items.filter(item=>item.categoryId===filter);
  },[items,mixedItems,filter]);
- const visible=filtered.slice(0,visibleCount);
+ const visible=filter==="all"?filtered:filtered.slice(0,visibleCount);
  const uncategorized=items.some(item=>!item.categoryId);
 
  function chooseFilter(value){
@@ -89,7 +90,9 @@ export default function Utleie(){
       <span className="catalogEyebrow">UTLEIEKATALOG</span>
       <h2>Hva trenger du?</h2>
      </div>
-     {!loading&&!setup&&<span>{Math.min(visible.length,filtered.length)} av {filtered.length} {filtered.length===1?"produkt":"produkter"}</span>}
+     {!loading&&!setup&&<span>{filter==="all"
+      ?(items.length>filtered.length?`Utvalgte ${filtered.length} av ${items.length} produkter`:`${filtered.length} ${filtered.length===1?"produkt":"produkter"}`)
+      :`${Math.min(visible.length,filtered.length)} av ${filtered.length} ${filtered.length===1?"produkt":"produkter"}`}</span>}
     </div>
 
     {categories.length>0&&<div className="rentalCategoryFilters" aria-label="Velg utleiekategori">
@@ -126,7 +129,7 @@ export default function Utleie(){
       })}
      </div>
     )}
-    {!loading&&!setup&&visible.length<filtered.length&&<div className="rentalLoadMore">
+    {!loading&&!setup&&filter!=="all"&&visible.length<filtered.length&&<div className="rentalLoadMore">
      <button type="button" className="catalogGoldButton" onClick={()=>setVisibleCount(count=>count+12)}>Vis flere produkter →</button>
      <span>{filtered.length-visible.length} igjen</span>
     </div>}

@@ -2,6 +2,7 @@ import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {cronGuard} from "../../../../lib/cronAuth";
 import {osloDateKey,shiftDateKey,osloDayStartIso,osloDayEndIso} from "../../../../lib/osloTime";
+import {serviceEmailFrom,serviceReplyTo} from "../../../../lib/serviceEmailConfig";
 
 const MAX_PER_RUN=25;
 function esc(value){
@@ -96,9 +97,9 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
 </table></td></tr></table></body></html>`;
 
    const result=await resend.emails.send({
-    from:"Aadland Service <noreply@aadland-service.no>",
+    from:serviceEmailFrom(),
     to:email,
-    replyTo:"post@aadland-service.no",
+    replyTo:serviceReplyTo(),
     subject:"Påminnelse om befaring i morgen – Aadland Service",
     html
    });
