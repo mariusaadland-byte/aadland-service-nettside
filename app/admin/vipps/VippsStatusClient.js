@@ -15,6 +15,7 @@ export default function VippsStatusClient(){
  const [error,setError]=useState("");
  const [message,setMessage]=useState("");
  const [savingUnit,setSavingUnit]=useState("");
+ const [diagnostics,setDiagnostics]=useState({});
 
  async function load(){
   const response=await fetch("/api/admin/vipps-status");
@@ -40,6 +41,28 @@ export default function VippsStatusClient(){
    await load();
   }catch(err){
    setError(err.message||"Webhooken kunne ikke registreres.");
+  }finally{
+   setSavingUnit("");
+  }
+ }
+
+ async function testSetup(unit){
+  setError("");setMessage("");
+  setSavingUnit(unit.unit);
+  try{
+   const response=await fetch("/api/admin/vipps-diagnostics",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({unit:unit.unit})
+   });
+   const body=await response.json().catch(()=>({}));
+   setDiagnostics(prev=>({...prev,[unit.unit]:body}));
+   if(!response.ok)throw new Error(body.error||"Vipps-oppsettet kunne ikke testes.");
+   setMessage(body.readyForEnable
+    ?unit.label+" er teknisk klar for aktivering."
+    :unit.label+" har kontakt med Vipps, men ett eller flere oppsettspunkter mangler.");
+  }catch(err){
+   setError(err.message||"Vipps-oppsettet kunne ikke testes.");
   }finally{
    setSavingUnit("");
   }
@@ -79,9 +102,25 @@ export default function VippsStatusClient(){
      </div>
      {!unit.configured&&<p className="muted">Mangler: {unit.missing.map(key=>labels[key]||key).join(", ")}.</p>}
      {unit.webhook&&<p className="muted">Webhook aktiv · sist oppdatert {unit.webhook.updatedAt?new Date(unit.webhook.updatedAt).toLocaleString("nb-NO"):"ukjent"}. Secret lagres privat og vises aldri.</p>}
-     {unit.configured&&data.enabled&&!unit.webhook&&<button className="btn" type="button" disabled={savingUnit===unit.unit} onClick={()=>registerWebhook(unit)}>{savingUnit===unit.unit?"Registrerer …":"Registrer webhook"}</button>}
-     {unit.configured&&data.enabled&&unit.webhook&&<button className="btn alt" type="button" disabled={savingUnit===unit.unit} onClick={()=>registerWebhook(unit,true)}>{savingUnit===unit.unit?"Registrerer …":"Registrer webhook på nytt"}</button>}
-     {unit.configured&&!data.enabled&&<p className="muted">Webhook kan registreres når <code>VIPPS_PAYMENTS_ENABLED=true</code> settes under kontrollert oppsett.</p>}
+     {unit.configured&&<div className="rentalBookingActions">
+      <button className="btn alt" type="button" disabled={savingUnit===unit.unit} onClick={()=>testSetup(unit)}>{savingUnit===unit.unit?"Tester …":"Test oppsett"}</button>
+      {!unit.webhook&&<button className="btn" type="button" disabled={savingUnit===unit.unit} onClick={()=>registerWebhook(unit)}>{savingUnit===unit.unit?"Registrerer …":"Registrer webhook"}</button>}
+      {unit.webhook&&<button className="btn alt" type="button" disabled={savingUnit===unit.unit} onClick={()=>registerWebhook(unit,true)}>{savingUnit===unit.unit?"Registrerer …":"Registrer webhook på nytt"}</button>}
+     </div>}
+     {unit.configured&&!data.enabled&&<p className="muted">Betalingsmotoren kan stå AV mens API-nøkler og webhook testes. Slå den først på når «Test oppsett» er grønn for begge salgssteder.</p>}
+     {diagnostics[unit.unit]&&<div className="customerPaymentConfirmation" style={{marginTop:14}}>
+      <b>{diagnostics[unit.unit].readyForEnable?"✓ Klar for aktivering":"Oppsett må fullføres"}</b>
+      <span>API-tilkobling: {diagnostics[unit.unit].apiConnection?"✓":"mangler"}</span>
+      {diagnostics[unit.unit].checks&&<>
+       <span>Webhook lagret lokalt: {diagnostics[unit.unit].checks.webhookStored?"✓":"mangler"}</span>
+       <span>Webhook funnet hos Vipps: {diagnostics[unit.unit].checks.webhookFoundAtVipps?"✓":"mangler"}</span>
+       <span>Webhook-ID samsvarer: {diagnostics[unit.unit].checks.webhookIdMatches?"✓":"mangler"}</span>
+       <span>Callback-URL samsvarer: {diagnostics[unit.unit].checks.callbackUrlMatches?"✓":"mangler"}</span>
+       <span>Nødvendige hendelser registrert: {diagnostics[unit.unit].checks.eventsComplete?"✓":"mangler"}</span>
+       <span>MSN samsvarer: {diagnostics[unit.unit].checks.msnMatches?"✓":"mangler"}</span>
+       <span>Ingen duplikat-webhook på samme URL: {diagnostics[unit.unit].checks.noDuplicateCallback?"✓":"må ryddes"}</span>
+      </>}
+     </div>}
     </section>)}
    </div>
 
