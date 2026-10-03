@@ -126,3 +126,9 @@
  .roomModalGrid{grid-template-columns:1fr 1fr;gap:8px}
  .roomPreview{height:90px}
 }
+
+@media(max-width:900px){
+ .mobileObjectActions{grid-column:1/-1;display:flex;gap:7px;flex-wrap:wrap}
+ .mobileObjectActions button{min-height:40px;padding:0 11px;border:1px solid #cfcfcf;border-radius:8px;background:#fafafa;font-weight:800}
+ .mobileObjectActions .mobileDanger{color:#8d2424;border-color:#d8aaaa;background:#fff6f6}
+}
