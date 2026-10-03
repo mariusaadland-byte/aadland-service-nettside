@@ -44,3 +44,35 @@
  .panel{padding:14px 12px}
  .library button{padding:10px 8px}
 }
+
+.mobileSelection,.mobileCanvasHint{display:none}
+@media(max-width:900px){
+ .mobileSelection{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  position:sticky;top:61px;z-index:34;padding:7px 10px;
+  background:#f4eee1;border-bottom:1px solid #d5c7a8;box-shadow:0 2px 8px #0001
+ }
+ .mobileSelection>div{min-width:0;display:grid;gap:2px}
+ .mobileSelection span{font-size:9px;letter-spacing:.1em;color:#8b7040;font-weight:800}
+ .mobileSelection strong{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .mobileSelection button{
+  flex:0 0 auto;min-height:38px;border:1px solid #b89959;border-radius:8px;
+  background:#fff7e7;color:#332715;padding:0 11px;font-weight:800
+ }
+ .mobileCanvasHint{
+  display:block;margin:0 0 7px;padding:7px 9px;border-radius:8px;
+  background:#e9f1f2;color:#315c64;font-size:11px;font-weight:700;text-align:center
+ }
+ .canvasWrap{position:relative}
+}
+@media(max-width:900px) and (orientation:landscape){
+ .top{padding:6px 10px;min-height:42px;flex-wrap:nowrap}
+ .top .name{display:none}
+ .top .saved{max-width:26vw}
+ .mobileTools{padding:5px 8px}
+ .mobileTool,.mobileActive,.mobileDone,.mobileSave{min-height:38px;padding:0 11px;font-size:12px}
+ .mobileSelection{top:49px;padding:5px 8px}
+ .workspace{padding-top:7px}
+ .canvasWrap{width:min(72vh,100%);min-width:330px;margin:0 auto}
+ .mobileCanvasHint{padding:5px 7px;margin-bottom:5px}
+}
