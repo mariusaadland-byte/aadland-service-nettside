@@ -8,6 +8,7 @@ import {productPrice} from "../../../lib/catalog";
 import {buildOrderConfirmationEmail} from "../../../lib/orderConfirmationEmail";
 import {createVippsPayment} from "../../../lib/vippsClient";
 import {vippsUnitReadiness} from "../../../lib/vippsReadiness";
+import {serviceEmailFrom,serviceReplyTo} from "../../../lib/serviceEmailConfig";
 const SALES_TERMS_VERSION="2026-10";
 function num(){return "AS-"+Date.now().toString().slice(-8)+"-"+crypto.randomBytes(2).toString("hex").toUpperCase()}
 export async function POST(req){
@@ -120,8 +121,8 @@ export async function POST(req){
   if(resendKey){
    const {Resend}=await import("resend");
    const resend=new Resend(resendKey);
-   const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
-   const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+   const from=serviceEmailFrom();
+   const replyTo=serviceReplyTo();
    const isCustom=body.orderType==="custom";
    const requestOrigin=new URL(req.url).origin;
    const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
