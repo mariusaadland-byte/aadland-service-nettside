@@ -269,3 +269,30 @@
  .mobileExistingOpenings span{font-weight:800}
  .mobileExistingOpenings b{font-weight:700}
 }
+
+@media(max-width:900px){
+ .mobileExistingOpenings{grid-column:1/-1;display:grid;gap:7px;padding:0 0 4px 41px}
+ .mobileOpeningCard{
+  display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:7px;
+  border:1px solid #b9cdd1;border-radius:9px;background:#f7fbfb
+ }
+ .mobileOpeningTitle{
+  grid-column:1/-1;display:flex!important;justify-content:space-between;align-items:center;
+  min-height:32px!important;padding:0 8px!important;border:0!important;border-radius:7px!important;
+  background:#e8f2f4!important;color:#315c64!important
+ }
+ .mobileOpeningCard label{display:grid;gap:3px}
+ .mobileOpeningCard label>span{font-size:9px;color:#5b7277;font-weight:800}
+ .mobileOpeningCard input{
+  width:100%;box-sizing:border-box;min-height:40px;border:1px solid #b8c8cb;
+  border-radius:7px;padding:0 7px;font-size:16px;background:#fff
+ }
+ .mobileOpeningCard>small{
+  grid-column:1/-1;font-size:9px;color:#5b7277;text-align:right;font-weight:700
+ }
+}
+.roomWallOpeningList{display:grid;gap:5px;grid-column:1/-1;padding-left:41px}
+.roomWallOpeningList button{
+ display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:32px;padding:0 8px;
+ border:1px solid #b9cdd1;border-radius:7px;background:#f3f8f9;color:#315c64;font-size:10px
+}
