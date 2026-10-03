@@ -11,6 +11,7 @@ import {
 } from "../../../../lib/vippsClient";
 import {syncVippsPaymentSnapshot} from "../../../../lib/vippsPaymentSync";
 import {sendVippsPaymentReceiptIfNeeded} from "../../../../lib/vippsPaymentReceipt";
+import {sendVippsRefundNoticeIfNeeded} from "../../../../lib/vippsRefundNotice";
 
 export const runtime="nodejs";
 
@@ -107,6 +108,8 @@ export async function POST(req){
   const snapshot=await syncVippsPaymentSnapshot(s,unit,reference,payment);
   let receipt=null;
   let receiptWarning="";
+  let refundNotice=null;
+  let refundNoticeWarning="";
   if(String(snapshot?.db?.status||"").toLowerCase()==="paid"){
    try{
     receipt=await sendVippsPaymentReceiptIfNeeded({s,unit,id:target.id,req});
@@ -115,7 +118,15 @@ export async function POST(req){
     console.error("VIPPS ADMIN RECEIPT ERROR",{unit,reference,message:error?.message});
    }
   }
-  return NextResponse.json({ok:true,action,unit,reference,snapshot,receipt,receiptWarning});
+  if(Number(snapshot?.refundedOre||0)>0){
+   try{
+    refundNotice=await sendVippsRefundNoticeIfNeeded({s,unit,id:target.id,req});
+   }catch(error){
+    refundNoticeWarning="Tilbakebetalingen er registrert, men kundebekreftelsen kunne ikke sendes med én gang. Systemet prøver automatisk igjen.";
+    console.error("VIPPS ADMIN REFUND NOTICE ERROR",{unit,reference,message:error?.message});
+   }
+  }
+  return NextResponse.json({ok:true,action,unit,reference,snapshot,receipt,receiptWarning,refundNotice,refundNoticeWarning});
  }catch(error){
   console.error("VIPPS ADMIN PAYMENT ACTION ERROR",{
    unit,action,reference,status:error?.status,code:error?.code
