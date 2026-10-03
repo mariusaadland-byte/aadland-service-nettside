@@ -5,6 +5,7 @@ import {getVippsPayment} from "../../../../lib/vippsClient";
 import {syncVippsPaymentSnapshot} from "../../../../lib/vippsPaymentSync";
 import {rateLimitRequest} from "../../../../lib/rateLimit";
 import {sendVippsPaymentReceiptIfNeeded} from "../../../../lib/vippsPaymentReceipt";
+import {sendVippsRefundNoticeIfNeeded} from "../../../../lib/vippsRefundNotice";
 
 export const runtime="nodejs";
 
@@ -86,6 +87,11 @@ export async function GET(req){
    }catch(error){
     console.error("VIPPS PUBLIC RECEIPT ERROR",{unit,reference,message:error?.message});
    }
+  }
+  try{
+   await sendVippsRefundNoticeIfNeeded({s,unit,id:target.id,req});
+  }catch(error){
+   console.error("VIPPS PUBLIC REFUND NOTICE ERROR",{unit,reference,message:error?.message});
   }
 
   return NextResponse.json({
