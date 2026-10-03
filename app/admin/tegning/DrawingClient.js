@@ -401,18 +401,18 @@ export default function DrawingClient(){
   if(tool==="measure"){if(!measureDraft)setMeasureDraft(q);else{const id=uid();mutate(d=>({...d,measurements:[...(d.measurements||[]),{id,label:"",x1:measureDraft.x,y1:measureDraft.y,x2:q.x,y2:q.y}]}));setMeasureDraft(null);setTool("select");setSelected({kind:"measurement",id})}setTimeout(()=>setSnapHint(null),350);return}
   if(tool!=="wall")return;
   if(!draft){
-   setDraft(q);setWallChain({start:q,count:0,points:[q]});setTimeout(()=>setSnapHint(null),350);return;
+   setDraft(q);setWallChain({start:q,count:0,points:[q],wallIds:[]});setTimeout(()=>setSnapHint(null),350);return;
   }
   const nextCount=(wallChain?.count||0)+1,closing=wallChain?.start&&nextCount>=3&&Math.hypot(q.x-wallChain.start.x,q.y-wallChain.start.y)<2;
-  const chainPoints=[...(wallChain?.points||[draft]),q],zonePoints=closing?chainPoints.slice(0,-1):null,zoneId=closing?uid():null;
+  const chainPoints=[...(wallChain?.points||[draft]),q],zonePoints=closing?chainPoints.slice(0,-1):null,zoneId=closing?uid():null,wallId=uid();
   mutate(d=>{
-   const wall={id:uid(),x1:draft.x,y1:draft.y,x2:q.x,y2:q.y,t:Number(d.defaultWallThickness)||98,h:Number(d.defaultWallHeight)||2400};
+   const wall={id:wallId,x1:draft.x,y1:draft.y,x2:q.x,y2:q.y,t:Number(d.defaultWallThickness)||98,h:Number(d.defaultWallHeight)||2400};
    if(!closing)return {...d,walls:[...d.walls,wall]};
-   const zone={id:zoneId,name:"Rom "+((d.zones||[]).length+1),points:zonePoints,ceilingHeight:Number(d.defaultWallHeight)||2400,floorFinish:"",notes:""};
+   const wallIds=[...(wallChain?.wallIds||[]),wallId],zone={id:zoneId,name:"Rom "+((d.zones||[]).length+1),points:zonePoints,wallIds,ceilingHeight:Number(d.defaultWallHeight)||2400,floorFinish:"",notes:""};
    return {...d,walls:[...d.walls,wall],zones:[...(d.zones||[]),zone]};
   });
   if(closing){setDraft(null);setWallChain(null);setTool("select");setSnapHint(null);setSelected({kind:"zone",id:zoneId});setMessage("Rom lukket · areal beregnet");setTimeout(()=>setMessage(""),1800)}
-  else{setDraft(q);setWallChain(chain=>({...chain,start:chain?.start||draft,count:nextCount,points:[...(chain?.points||[draft]),q]}));setTimeout(()=>setSnapHint(null),350)}
+  else{setDraft(q);setWallChain(chain=>({...chain,start:chain?.start||draft,count:nextCount,points:[...(chain?.points||[draft]),q],wallIds:[...(chain?.wallIds||[]),wallId]}));setTimeout(()=>setSnapHint(null),350)}
  };
  const drawingPointDown=e=>{
   capturePointer(e);
