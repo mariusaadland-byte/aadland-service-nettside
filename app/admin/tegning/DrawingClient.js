@@ -466,7 +466,9 @@ export default function DrawingClient(){
    if(key==="w")width=n;
    if(key==="wallStartGap")start=n;
    if(width<100||width>12000){setMessage("Bredde må være 100–12000 mm");setTimeout(()=>setMessage(""),1800);return d}
+   if(width>current.L){setMessage("Åpningen kan ikke være bredere enn veggen");setTimeout(()=>setMessage(""),2000);return d}
    const maxGap=Math.max(0,current.L-width);
+   if(start<0||start>maxGap){setMessage("Plasseringen går utenfor veggen");setTimeout(()=>setMessage(""),1800);return d}
    start=clamp(start,0,maxGap);
    const center=start+width/2,a=Math.atan2(wall.y2-wall.y1,wall.x2-wall.x1),cx=wall.x1+Math.cos(a)*center,cy=wall.y1+Math.sin(a)*center;
    const next={...item,w:width,wallOffset:center,x:cx-width/2,y:cy-item.h/2,rot:a*180/Math.PI};
