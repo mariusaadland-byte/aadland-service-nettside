@@ -269,8 +269,14 @@ export default function DrawingClient(){
  const makeRoom=()=>openRoomBuilder("rect");
  const makeLRoom=()=>openRoomBuilder("l");
  const addItem=(type,w,h)=>{
-  const id=uid(),cx=pan.x+viewSize/2,cy=pan.y+viewSize/2,x=snapTo(cx-w/2,doc.snapSize||50),y=snapTo(cy-h/2,doc.snapSize||50);
-  mutate(d=>({...d,items:[...d.items,{id,type,x:clamp(x,0,VIEW-w),y:clamp(y,0,VIEW-h),w,h,rot:0,...openingDefaults(type)}]}));
+  const id=uid(),selectedWall=selected?.kind==="wall"?doc.walls.find(wall=>wall.id===selected.id):null;
+  if(selectedWall&&wallTypes.has(type)){
+   const limits=mountedLimits({w},selectedWall),off=clamp(limits.L/2,limits.min,limits.max),a=Math.atan2(selectedWall.y2-selectedWall.y1,selectedWall.x2-selectedWall.x1),cx=selectedWall.x1+Math.cos(a)*off,cy=selectedWall.y1+Math.sin(a)*off;
+   mutate(d=>({...d,items:[...d.items,{id,type,x:cx-w/2,y:cy-h/2,w,h,rot:a*180/Math.PI,wallId:selectedWall.id,wallOffset:off,...openingDefaults(type)}]}));
+  }else{
+   const cx=pan.x+viewSize/2,cy=pan.y+viewSize/2,x=snapTo(cx-w/2,doc.snapSize||50),y=snapTo(cy-h/2,doc.snapSize||50);
+   mutate(d=>({...d,items:[...d.items,{id,type,x:clamp(x,0,VIEW-w),y:clamp(y,0,VIEW-h),w,h,rot:0,...openingDefaults(type)}]}));
+  }
   setSelected({kind:"item",id});setTool("select");setQuickAddOpen(false);
  };
  const sel=useMemo(()=>selected?.kind==="wall"?doc.walls.find(x=>x.id===selected.id):selected?.kind==="item"?doc.items.find(x=>x.id===selected.id):selected?.kind==="zone"?(doc.zones||[]).find(x=>x.id===selected.id):null,[selected,doc]);
