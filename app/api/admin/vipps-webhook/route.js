@@ -47,9 +47,10 @@ export async function POST(req){
 
  const {data:existing,error:statusError}=await s.rpc("get_vipps_webhook_status",{target_environment:env()});
  if(statusError)return NextResponse.json({error:"Webhook-status kunne ikke kontrolleres."},{status:500});
- const current=(Array.isArray(existing)?existing:[]).find(item=>item?.unit===unit);
+ const currentRegistrations=(Array.isArray(existing)?existing:[]).filter(item=>item?.unit===unit);
+ const current=currentRegistrations[0]||null;
  const replace=body.replace===true;
- if(current&&!replace){
+ if(currentRegistrations.length&&!replace){
   return NextResponse.json({error:"Dette salgsstedet har allerede en aktiv webhook.",alreadyRegistered:true},{status:409});
  }
 
@@ -83,17 +84,29 @@ export async function POST(req){
  }
 
  let replacementWarning="";
- if(current?.webhookId&&replace){
-  try{
-   await deleteVippsWebhook(unit,current.webhookId,{allowDisabled:true});
-   await s.rpc("deactivate_vipps_webhook_registration",{
-    target_webhook_id:current.webhookId,
+ if(currentRegistrations.length&&replace){
+  const warnings=[];
+  for(const oldRegistration of currentRegistrations){
+   const oldId=String(oldRegistration?.webhookId||"").trim();
+   if(!oldId||oldId===webhookId)continue;
+
+   try{
+    await deleteVippsWebhook(unit,oldId,{allowDisabled:true});
+   }catch(error){
+    warnings.push("En gammel webhook kunne ikke slettes hos Vipps.");
+    console.error("VIPPS OLD WEBHOOK DELETE ERROR",{unit,webhookId:oldId,status:error?.status});
+   }
+
+   const {error:deactivateError}=await s.rpc("deactivate_vipps_webhook_registration",{
+    target_webhook_id:oldId,
     target_environment:env()
    });
-  }catch(error){
-   replacementWarning="Ny webhook er aktiv, men gammel webhook kunne ikke slettes automatisk.";
-   console.error("VIPPS OLD WEBHOOK DELETE ERROR",{unit,webhookId:current.webhookId,status:error.status});
+   if(deactivateError){
+    warnings.push("En gammel lokal webhook kunne ikke deaktiveres.");
+    console.error("VIPPS OLD WEBHOOK DEACTIVATE ERROR",{unit,webhookId:oldId,error:deactivateError.message});
+   }
   }
+  replacementWarning=[...new Set(warnings)].join(" ");
  }
 
  return NextResponse.json({
