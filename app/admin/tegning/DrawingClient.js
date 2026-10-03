@@ -457,25 +457,20 @@ export default function DrawingClient(){
  const updateWallById=(wallId,key,value)=>{const n=Number(value);if(!Number.isFinite(n))return;if(key==="len"&&(n<100||n>12000)){setMessage("Vegglengde må være 100–12000 mm");setTimeout(()=>setMessage(""),1800);return}mutate(d=>applyWallValue(d,wallId,key,n))};
  const updateWallItemById=(itemId,key,value)=>{
   const n=Number(value);if(!Number.isFinite(n))return;
+  const item=doc.items.find(o=>o.id===itemId),wall=item?.wallId?doc.walls.find(w=>w.id===item.wallId):null;
+  if(!item)return;
+  if(!wall){mutate(d=>({...d,items:d.items.map(o=>o.id===itemId?{...o,[key]:n}:o)}));return}
+  const current=wallEdgeOffsets(item,wall),width=key==="w"?n:Number(item.w)||0,startGap=key==="wallStartGap"?n:current.start,maxGap=Math.max(0,current.L-width);
+  if(width<100||width>12000){setMessage("Bredde må være 100–12000 mm");setTimeout(()=>setMessage(""),1800);return}
+  if(width>current.L){setMessage("Åpningen kan ikke være bredere enn veggen");setTimeout(()=>setMessage(""),2000);return}
+  if(startGap<0||startGap>maxGap){setMessage("Plasseringen går utenfor veggen");setTimeout(()=>setMessage(""),1800);return}
   mutate(d=>{
-   const item=d.items.find(o=>o.id===itemId);if(!item)return d;
-   const wall=item.wallId?d.walls.find(w=>w.id===item.wallId):null;
-   if(!wall)return {...d,items:d.items.map(o=>o.id===itemId?{...o,[key]:n}:o)};
-   const current=wallEdgeOffsets(item,wall);
-   let width=Number(item.w)||0,start=current.start;
-   if(key==="w")width=n;
-   if(key==="wallStartGap")start=n;
-   if(width<100||width>12000){setMessage("Bredde må være 100–12000 mm");setTimeout(()=>setMessage(""),1800);return d}
-   if(width>current.L){setMessage("Åpningen kan ikke være bredere enn veggen");setTimeout(()=>setMessage(""),2000);return d}
-   const maxGap=Math.max(0,current.L-width);
-   if(start<0||start>maxGap){setMessage("Plasseringen går utenfor veggen");setTimeout(()=>setMessage(""),1800);return d}
-   start=clamp(start,0,maxGap);
-   const center=start+width/2,a=Math.atan2(wall.y2-wall.y1,wall.x2-wall.x1),cx=wall.x1+Math.cos(a)*center,cy=wall.y1+Math.sin(a)*center;
-   const next={...item,w:width,wallOffset:center,x:cx-width/2,y:cy-item.h/2,rot:a*180/Math.PI};
-   return {...d,items:d.items.map(o=>o.id===itemId?next:o)};
+   const live=d.items.find(o=>o.id===itemId),liveWall=live?.wallId?d.walls.find(w=>w.id===live.wallId):null;if(!live||!liveWall)return d;
+   const a=Math.atan2(liveWall.y2-liveWall.y1,liveWall.x2-liveWall.x1),center=startGap+width/2,cx=liveWall.x1+Math.cos(a)*center,cy=liveWall.y1+Math.sin(a)*center;
+   const updated={...live,w:width,wallOffset:center,x:cx-width/2,y:cy-live.h/2,rot:a*180/Math.PI};
+   return {...d,items:d.items.map(o=>o.id===itemId?updated:o)};
   });
  };
-
  const update=(key,value)=>{const n=Number(value);if(!Number.isFinite(n))return;mutate(d=>{if(selected?.kind==="item"){return {...d,items:d.items.map(o=>{if(o.id!==selected.id)return o;if((key==="wallOffset"||key==="wallStartGap"||key==="wallEndGap")&&o.wallId){const w=d.walls.find(x=>x.id===o.wallId);if(!w)return o;const limits=mountedLimits(o,w),half=Math.max(0,Number(o.w)||0)/2;let desired=n;if(key==="wallStartGap")desired=n+half;if(key==="wallEndGap")desired=limits.L-n-half;const off=clamp(desired,limits.min,limits.max),a=Math.atan2(w.y2-w.y1,w.x2-w.x1),cx=w.x1+Math.cos(a)*off,cy=w.y1+Math.sin(a)*off;return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off}}return {...o,[key]:n}})}}return applyWallValue(d,selected?.id,key,n)})};
  const remove=()=>{checkpoint();setFuture([]);setDoc(d=>selected?.kind==="wall"?(()=>{const walls=d.walls.filter(x=>x.id!==selected.id);return {...d,walls,zones:syncLinkedZones(walls,d.zones),measurements:syncAnchoredMeasurements(walls,d.measurements),items:d.items.map(o=>o.wallId===selected.id?{...o,wallId:null,wallOffset:null}:o)}})():selected?.kind==="zone"?{...d,zones:(d.zones||[]).filter(x=>x.id!==selected.id)}:selected?.kind==="measurement"?{...d,measurements:(d.measurements||[]).filter(x=>x.id!==selected.id)}:{...d,items:d.items.filter(x=>x.id!==selected.id)});setSelected(null)};
  const flipDoor=()=>{if(selected?.kind!=="item"||!sel||sel.type!=="door")return;mutate(d=>({...d,items:d.items.map(o=>o.id===sel.id?{...o,flip:!o.flip}:o)}))};
