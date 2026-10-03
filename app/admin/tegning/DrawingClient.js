@@ -171,7 +171,10 @@ export default function DrawingClient(){
   if(e.pointerType!=="touch")return;
   capturePointer(e);
   touchPointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(touchPointers.current.size===2)beginPinch();
+  if(touchPointers.current.size>=2){
+   if(touchPointers.current.size===2)beginPinch();
+   e.preventDefault();e.stopPropagation();
+  }
  };
  const pointerMoveCapture=e=>{
   if(e.pointerType!=="touch"||!touchPointers.current.has(e.pointerId))return;
