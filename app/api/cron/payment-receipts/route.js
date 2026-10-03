@@ -2,11 +2,12 @@ import {NextResponse} from "next/server";
 import {cronGuard} from "../../../../lib/cronAuth";
 import {db} from "../../../../lib/supabase";
 import {sendVippsPaymentReceiptIfNeeded} from "../../../../lib/vippsPaymentReceipt";
+import {sendVippsRefundNoticeIfNeeded} from "../../../../lib/vippsRefundNotice";
 
 export const runtime="nodejs";
 const LIMIT_PER_TYPE=25;
 
-async function pendingIds(s,table){
+async function pendingReceiptIds(s,table){
  const {data,error}=await s.from(table)
   .select("id")
   .eq("payment_provider","vipps")
@@ -19,23 +20,39 @@ async function pendingIds(s,table){
  return (data||[]).map(row=>row.id);
 }
 
+async function pendingRefundIds(s,table){
+ const {data,error}=await s.from(table)
+  .select("id,payment_refunded_ore,refund_notice_total_ore")
+  .eq("payment_provider","vipps")
+  .gt("payment_refunded_ore",0)
+  .order("updated_at",{ascending:true})
+  .limit(LIMIT_PER_TYPE*2);
+ if(error)throw error;
+ return (data||[])
+  .filter(row=>Math.max(0,Number(row.payment_refunded_ore)||0)>Math.max(0,Number(row.refund_notice_total_ore)||0))
+  .slice(0,LIMIT_PER_TYPE)
+  .map(row=>row.id);
+}
+
 export async function GET(req){
  const authError=cronGuard(req); if(authError)return authError;
  const s=db();
  if(!s)return NextResponse.json({ok:false,error:"Databasen er ikke tilgjengelig."},{status:503});
 
- let serviceIds=[],rentalIds=[];
+ let serviceIds=[],rentalIds=[],serviceRefundIds=[],rentalRefundIds=[];
  try{
-  [serviceIds,rentalIds]=await Promise.all([
-   pendingIds(s,"orders"),
-   pendingIds(s,"rental_bookings")
+  [serviceIds,rentalIds,serviceRefundIds,rentalRefundIds]=await Promise.all([
+   pendingReceiptIds(s,"orders"),
+   pendingReceiptIds(s,"rental_bookings"),
+   pendingRefundIds(s,"orders"),
+   pendingRefundIds(s,"rental_bookings")
   ]);
  }catch(error){
   console.error("VIPPS RECEIPT RETRY QUERY ERROR",error);
   return NextResponse.json({ok:false,error:"Ventende Vipps-kvitteringer kunne ikke hentes."},{status:500});
  }
 
- let sent=0,skipped=0;
+ let sent=0,skipped=0,refundSent=0,refundSkipped=0;
  const failures=[];
 
  for(const [unit,ids] of [["service",serviceIds],["rental",rentalIds]]){
@@ -45,17 +62,30 @@ export async function GET(req){
     if(result?.sent)sent+=1;
     else skipped+=1;
    }catch(error){
-    failures.push({unit,id,error:String(error?.message||error||"Ukjent feil").slice(0,180)});
+    failures.push({type:"receipt",unit,id,error:String(error?.message||error||"Ukjent feil").slice(0,180)});
     console.error("VIPPS RECEIPT RETRY ERROR",{unit,id,message:error?.message});
+   }
+  }
+ }
+
+ for(const [unit,ids] of [["service",serviceRefundIds],["rental",rentalRefundIds]]){
+  for(const id of ids){
+   try{
+    const result=await sendVippsRefundNoticeIfNeeded({s,unit,id,req});
+    if(result?.sent)refundSent+=1;
+    else refundSkipped+=1;
+   }catch(error){
+    failures.push({type:"refund",unit,id,error:String(error?.message||error||"Ukjent feil").slice(0,180)});
+    console.error("VIPPS REFUND NOTICE RETRY ERROR",{unit,id,message:error?.message});
    }
   }
  }
 
  return NextResponse.json({
   ok:true,
-  checked:serviceIds.length+rentalIds.length,
-  sent,
-  skipped,
+  checked:serviceIds.length+rentalIds.length+serviceRefundIds.length+rentalRefundIds.length,
+  receipt:{checked:serviceIds.length+rentalIds.length,sent,skipped},
+  refund:{checked:serviceRefundIds.length+rentalRefundIds.length,sent:refundSent,skipped:refundSkipped},
   failed:failures.length,
   failures
  });
