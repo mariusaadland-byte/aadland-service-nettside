@@ -336,25 +336,38 @@ export default function DrawingClient(){
   linkedOrderHandled.current=orderId;
   let cancelled=false;
   (async()=>{
+   const localList=docsRef.current||[],lastId=localStorage.getItem(LAST_STORE),activeLocal=localList.find(item=>item.id===lastId&&item.orderId===orderId)||null;
    try{
     const r=await fetch("/api/admin/project-drawings?orderId="+encodeURIComponent(orderId)),x=await r.json();
     if(cancelled)return;
     if(r.ok&&!x.setupRequired&&Array.isArray(x.drawings)&&x.drawings.length){
      const incoming=x.drawings.map(row=>({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||orderId,projectId:row.projectId||"",name:row.name,customer:row.customer,address:row.address,notes:row.notes,_serverUpdatedAt:row.updatedAt||null}));
-     const latest=incoming[0];
-     setDoc(latest);
-     setSelected(null);
-     setHistory([]);
-     setFuture([]);
-     setDocs(current=>{const merged=[...current];for(const drawing of incoming){const i=merged.findIndex(item=>item.serverId===drawing.serverId);if(i>=0)merged[i]=drawing;else merged.push(drawing)}localStorage.setItem(STORE,JSON.stringify(merged));return merged});
-     setMessage("Tegning hentet fra "+(order.orderNumber||"oppdraget"));
-     setTimeout(()=>setMessage(""),2200);
+     const latest=incoming[0],sameLocal=(docsRef.current||[]).find(item=>item.serverId===latest.serverId),serverChoice=chooseLocalOrServer(sameLocal,latest);
+     let chosen=serverChoice;
+     if(activeLocal&&!activeLocal.serverId){
+      const localTime=Number(activeLocal._localSavedAt)||0,serverTime=Date.parse(latest._serverUpdatedAt||"")||0;
+      if(localTime>serverTime)chosen=activeLocal;
+     }
+     mergeIncomingDrawings(incoming);
+     docRef.current=chosen;setDoc(chosen);try{localStorage.setItem(LAST_STORE,chosen.id)}catch{}
+     setSelected(null);setHistory([]);setFuture([]);
+     if(chosen===latest){serverSyncedSignature.current=serverSignature(latest);setSaveState("server")}
+     else setSaveState(typeof navigator!=="undefined"&&!navigator.onLine?"offline":"local");
+     setMessage(chosen===latest?"Tegning hentet fra "+(order.orderNumber||"oppdraget"):"Nyere lokal befaringstegning beholdt");
+     setTimeout(()=>setMessage(""),2400);
      return;
     }
    }catch{}
    if(cancelled)return;
+   if(activeLocal){
+    docRef.current=activeLocal;setDoc(activeLocal);setSelected(null);setHistory([]);setFuture([]);
+    setSaveState(typeof navigator!=="undefined"&&!navigator.onLine?"offline":"local");
+    setMessage("Lokal befaringstegning åpnet");
+    setTimeout(()=>setMessage(""),2200);
+    return;
+   }
    const next={...initial(),orderId,customer:order.customerName||"",address:order.customer?.address||"",name:"Tegning – "+(order.orderNumber||"oppdrag")};
-   setDoc(next);setSelected(null);setHistory([]);setFuture([]);
+   docRef.current=next;setDoc(next);setSelected(null);setHistory([]);setFuture([]);
    setMessage("Ny tegning koblet til "+(order.orderNumber||"oppdraget"));
    setTimeout(()=>setMessage(""),2200);
   })();
