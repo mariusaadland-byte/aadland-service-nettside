@@ -12,6 +12,7 @@ import {buildOrderConfirmationEmail} from "../../../../lib/orderConfirmationEmai
 import {sendOrderStatusNotice} from "../../../../lib/orderStatusNotice";
 import {sendProductOrderProgressNotice} from "../../../../lib/orderProgressNotice";
 import {sendManualOrderRefundNotice} from "../../../../lib/orderRefundNotice";
+import {serviceEmailFrom,serviceReplyTo} from "../../../../lib/serviceEmailConfig";
 
 function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 
@@ -280,8 +281,8 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     try{
       const {Resend}=await import("resend");
       const resend=new Resend(resendKey);
-      const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
-      const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+      const from=serviceEmailFrom();
+      const replyTo=serviceReplyTo();
       const requestOrigin=new URL(req.url).origin;
       const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
       const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
@@ -449,8 +450,8 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     try{
       const {Resend}=await import("resend");
       const resend=new Resend(resendKey);
-      const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
-      const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+      const from=serviceEmailFrom();
+      const replyTo=serviceReplyTo();
       const requestOrigin=new URL(req.url).origin;
       const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
       const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
@@ -570,8 +571,8 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     try{
       const {Resend}=await import("resend");
       const resend=new Resend(resendKey);
-      const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
-      const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+      const from=serviceEmailFrom();
+      const replyTo=serviceReplyTo();
       const requestOrigin=new URL(req.url).origin;
       const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
       const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
@@ -680,8 +681,8 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     try{
       const {Resend}=await import("resend");
       const resend=new Resend(resendKey);
-      const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
-      const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+      const from=serviceEmailFrom();
+      const replyTo=serviceReplyTo();
       const requestOrigin=new URL(req.url).origin;
       const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
       const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
@@ -862,8 +863,8 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     try{
       const {Resend}=await import("resend");
       const resend=new Resend(resendKey);
-      const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
-      const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+      const from=serviceEmailFrom();
+      const replyTo=serviceReplyTo();
       const customerEmail=String(surveyOrder.customer?.email||"").trim().toLowerCase();
       const customerName=String(surveyOrder.customer?.name||"kunde").trim();
       const surveyText=new Date(normalizedSurveyDate).toLocaleString("nb-NO",{dateStyle:"long",timeStyle:"short",timeZone:"Europe/Oslo"});
