@@ -470,7 +470,7 @@ export default function AdminClient({ user }) {
   if (canManageProducts) tabs.push(["rental", "Utleieutstyr"]);
   if (canViewOrders) tabs.push(["rentalCalendar", "Utleiekalender"]);
   if (canViewOrders) tabs.push(["rentalBookings", "Utleiebookinger"]);
-  if (canUpdateOrders) tabs.push(["calculator", "Kalkulator"],["reminders", "Purring"],["vipps", "Vipps"]);
+  if (canUpdateOrders) tabs.push(["workClock", "Arbeidsklokke"],["calculator", "Kalkulator"],["reminders", "Purring"],["vipps", "Vipps"]);
   if (canManageProducts) tabs.push(["projects", "Tidligere oppdrag"]);
   if (canManageProducts) tabs.push(["homepage", "Forside"]);
   if (canManageProducts) tabs.push(["drawing", "Tegning & visualisering"]);
@@ -478,6 +478,7 @@ export default function AdminClient({ user }) {
 
   function chooseTab(id) {
     if (id === "drawing") { setMenuOpen(false); router.push("/admin/tegning"); return; }
+    if (id === "workClock") { setMenuOpen(false); router.push("/admin/arbeidsklokke"); return; }
     if (id === "calculator") { setMenuOpen(false); router.push("/admin/kalkulator"); return; }
     if (id === "reminders") { setMenuOpen(false); router.push("/admin/purring"); return; }
     if (id === "vipps") { setMenuOpen(false); router.push("/admin/vipps"); return; }

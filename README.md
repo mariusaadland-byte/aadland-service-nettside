@@ -11,6 +11,7 @@ Nettsted og backoffice for Aadland Service.
 - Backoffice på `/admin` med ordre, kunder, produkter, tjenester, utleie, prosjekter og forsideinnhold
 - Tegning og visualisering på `/admin/tegning`
 - Pris- og fastpriskalkulator på `/admin/kalkulator` med arbeid, materialpåslag, reise, bom og MVA-visning
+- Arbeidsklokke på `/admin/arbeidsklokke` med start/stopp, manuelle timer, flytting/redigering, km, bom og Excel-eksport
 - Supabase som database og Resend for e-post
 - Betalingsstatus er separat fra ordrestatus. Betalingsleverandør er ikke koblet til ennå.
 
