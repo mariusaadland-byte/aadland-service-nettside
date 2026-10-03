@@ -455,6 +455,25 @@ export default function DrawingClient(){
   return {...d,walls,zones:syncLinkedZones(walls,d.zones),measurements:syncAnchoredMeasurements(walls,d.measurements),items:syncMounted(walls,d.items)};
  };
  const updateWallById=(wallId,key,value)=>{const n=Number(value);if(!Number.isFinite(n))return;if(key==="len"&&(n<100||n>12000)){setMessage("Vegglengde må være 100–12000 mm");setTimeout(()=>setMessage(""),1800);return}mutate(d=>applyWallValue(d,wallId,key,n))};
+ const updateWallItemById=(itemId,key,value)=>{
+  const n=Number(value);if(!Number.isFinite(n))return;
+  mutate(d=>{
+   const item=d.items.find(o=>o.id===itemId);if(!item)return d;
+   const wall=item.wallId?d.walls.find(w=>w.id===item.wallId):null;
+   if(!wall)return {...d,items:d.items.map(o=>o.id===itemId?{...o,[key]:n}:o)};
+   const current=wallEdgeOffsets(item,wall);
+   let width=Number(item.w)||0,start=current.start;
+   if(key==="w")width=n;
+   if(key==="wallStartGap")start=n;
+   if(width<100||width>12000){setMessage("Bredde må være 100–12000 mm");setTimeout(()=>setMessage(""),1800);return d}
+   const maxGap=Math.max(0,current.L-width);
+   start=clamp(start,0,maxGap);
+   const center=start+width/2,a=Math.atan2(wall.y2-wall.y1,wall.x2-wall.x1),cx=wall.x1+Math.cos(a)*center,cy=wall.y1+Math.sin(a)*center;
+   const next={...item,w:width,wallOffset:center,x:cx-width/2,y:cy-item.h/2,rot:a*180/Math.PI};
+   return {...d,items:d.items.map(o=>o.id===itemId?next:o)};
+  });
+ };
+
  const update=(key,value)=>{const n=Number(value);if(!Number.isFinite(n))return;mutate(d=>{if(selected?.kind==="item"){return {...d,items:d.items.map(o=>{if(o.id!==selected.id)return o;if((key==="wallOffset"||key==="wallStartGap"||key==="wallEndGap")&&o.wallId){const w=d.walls.find(x=>x.id===o.wallId);if(!w)return o;const limits=mountedLimits(o,w),half=Math.max(0,Number(o.w)||0)/2;let desired=n;if(key==="wallStartGap")desired=n+half;if(key==="wallEndGap")desired=limits.L-n-half;const off=clamp(desired,limits.min,limits.max),a=Math.atan2(w.y2-w.y1,w.x2-w.x1),cx=w.x1+Math.cos(a)*off,cy=w.y1+Math.sin(a)*off;return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off}}return {...o,[key]:n}})}}return applyWallValue(d,selected?.id,key,n)})};
  const remove=()=>{checkpoint();setFuture([]);setDoc(d=>selected?.kind==="wall"?(()=>{const walls=d.walls.filter(x=>x.id!==selected.id);return {...d,walls,zones:syncLinkedZones(walls,d.zones),measurements:syncAnchoredMeasurements(walls,d.measurements),items:d.items.map(o=>o.wallId===selected.id?{...o,wallId:null,wallOffset:null}:o)}})():selected?.kind==="zone"?{...d,zones:(d.zones||[]).filter(x=>x.id!==selected.id)}:selected?.kind==="measurement"?{...d,measurements:(d.measurements||[]).filter(x=>x.id!==selected.id)}:{...d,items:d.items.filter(x=>x.id!==selected.id)});setSelected(null)};
  const flipDoor=()=>{if(selected?.kind!=="item"||!sel||sel.type!=="door")return;mutate(d=>({...d,items:d.items.map(o=>o.id===sel.id?{...o,flip:!o.flip}:o)}))};
@@ -662,7 +681,7 @@ export default function DrawingClient(){
       <button type="button" className={styles.mobileWallSelect} onClick={()=>{setSelected({kind:"wall",id:wall.id});setMobileEditOpen(false)}}><b>{index+1}</b><span>Vegg {index+1}<small>{angle(wall)}°</small></span></button>
       <label><span>Lengde mm</span><input key={"zw-"+wall.id+"-"+len(wall)} type="number" inputMode="numeric" min="100" max="12000" defaultValue={len(wall)} onBlur={e=>updateWallById(wall.id,"len",e.target.value)}/></label>
       <div className={styles.mobileWallOpenings}><button type="button" onClick={()=>addItemToWall("door",900,100,wall.id,sel.id)}>+ Dør</button><button type="button" onClick={()=>addItemToWall("window",1200,100,wall.id,sel.id)}>+ Vindu</button><button type="button" onClick={()=>addItemToWall("opening",1000,100,wall.id,sel.id)}>+ Åpning</button></div>
-      {doc.items.filter(item=>item.wallId===wall.id&&openingTypes.has(item.type)).length>0&&<div className={styles.mobileExistingOpenings}>{doc.items.filter(item=>item.wallId===wall.id&&openingTypes.has(item.type)).map(item=><button type="button" key={item.id} onClick={()=>{setFieldReturnZoneId(sel.id);setSelected({kind:"item",id:item.id});setTimeout(()=>setMobileEditOpen(true),0)}}><span>{labelFor(item.type)}</span><b>{Math.round(item.w)} mm</b></button>)}</div>}
+      {doc.items.filter(item=>item.wallId===wall.id&&openingTypes.has(item.type)).length>0&&<div className={styles.mobileExistingOpenings}>{doc.items.filter(item=>item.wallId===wall.id&&openingTypes.has(item.type)).map(item=>{const gaps=wallEdgeOffsets(item,wall),maxGap=Math.max(0,gaps.L-item.w);return <div className={styles.mobileOpeningCard} key={item.id}><button type="button" className={styles.mobileOpeningTitle} onClick={()=>{setFieldReturnZoneId(sel.id);setSelected({kind:"item",id:item.id});setTimeout(()=>setMobileEditOpen(true),0)}}><span>{labelFor(item.type)}</span><b>Rediger</b></button><label><span>Bredde</span><input key={"ow-"+item.id+"-"+item.w} type="number" inputMode="numeric" min="100" max={gaps.L} defaultValue={Math.round(item.w)} onBlur={e=>updateWallItemById(item.id,"w",e.target.value)}/></label><label><span>Fra start</span><input key={"os-"+item.id+"-"+gaps.start} type="number" inputMode="numeric" min="0" max={maxGap} defaultValue={gaps.start} onBlur={e=>updateWallItemById(item.id,"wallStartGap",e.target.value)}/></label><small>Til slutt: {gaps.end} mm</small></div>})}</div>}
      </div>)}
      <p>Endring av en vegg flytter neste hjørne. Gå rundt rommet i samme rekkefølge og kontroller siste vegg når alle mål er lagt inn.</p>
     </div>}
@@ -673,6 +692,7 @@ export default function DrawingClient(){
     <label>Bredde (mm)<input key={"iw-"+sel.id+"-"+sel.w} type="number" inputMode="numeric" defaultValue={Math.round(sel.w)} onBlur={e=>update("w",e.target.value)}/></label>
     <label>Dybde/lengde (mm)<input key={"ih-"+sel.id+"-"+sel.h} type="number" inputMode="numeric" defaultValue={Math.round(sel.h)} onBlur={e=>update("h",e.target.value)}/></label>
     <label>Rotasjon (°)<input key={"ir-"+sel.id+"-"+sel.rot} type="number" inputMode="decimal" defaultValue={Math.round(Number(sel.rot)||0)} onBlur={e=>update("rot",e.target.value)}/></label>
+    {sel.wallId&&doc.walls.find(w=>w.id===sel.wallId)&&(()=>{const wall=doc.walls.find(w=>w.id===sel.wallId),gaps=wallEdgeOffsets(sel,wall);return <><label>Fra veggstart (mm)<input key={"igs-"+sel.id+"-"+gaps.start} type="number" inputMode="numeric" min="0" max={Math.max(0,gaps.L-sel.w)} defaultValue={gaps.start} onBlur={e=>update("wallStartGap",e.target.value)}/></label><label>Til veggslutt (mm)<input key={"ige-"+sel.id+"-"+gaps.end} type="number" inputMode="numeric" min="0" max={Math.max(0,gaps.L-sel.w)} defaultValue={gaps.end} onBlur={e=>update("wallEndGap",e.target.value)}/></label></>})()}
     {openingTypes.has(sel.type)&&<label>{sel.type==="window"?"Vindushøyde (mm)":"Åpningshøyde (mm)"}<input key={"io-"+sel.id+"-"+sel.openingHeight} type="number" inputMode="numeric" defaultValue={Math.round(Number(sel.openingHeight)||openingDefaults(sel.type).openingHeight||2100)} onBlur={e=>update("openingHeight",e.target.value)}/></label>}
     {sel.type==="window"&&<label>Brystning (mm)<input key={"is-"+sel.id+"-"+sel.sillHeight} type="number" inputMode="numeric" defaultValue={Math.round(Number(sel.sillHeight)||0)} onBlur={e=>update("sillHeight",e.target.value)}/></label>}
    </>}
