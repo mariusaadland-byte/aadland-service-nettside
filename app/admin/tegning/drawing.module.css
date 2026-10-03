@@ -180,3 +180,12 @@
  .fieldMode .canvasWrap{width:100%;min-width:0;height:100%;margin:0}
  .fieldMode .mobileSelection,.fieldMode .mobileQuickAdd{top:calc(54px + env(safe-area-inset-top))}
 }
+
+.wallAngleButtons{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:12px}
+.wallAngleButtons button{min-height:40px;border:1px solid #c9b37d;border-radius:8px;background:#faf5e9;font-weight:800}
+.wallConnect{display:flex!important;grid-template-columns:none!important;align-items:center;gap:9px;margin-top:12px;color:#444!important}
+.wallConnect input{width:auto!important;min-height:0!important;transform:scale(1.2)}
+@media(max-width:480px){
+ .wallAngleButtons{grid-template-columns:repeat(4,1fr);gap:6px}
+ .wallAngleButtons button{min-height:38px;font-size:12px}
+}
