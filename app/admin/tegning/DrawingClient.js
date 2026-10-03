@@ -192,7 +192,7 @@ export default function DrawingClient(){
  const releasePointer=e=>{try{if(svg.current?.hasPointerCapture?.(e.pointerId))svg.current.releasePointerCapture(e.pointerId)}catch{}};
  const scrollPanel=ref=>ref.current?.scrollIntoView?.({behavior:"smooth",block:"start"});
  const clearPendingCanvasTouch=()=>{if(pendingCanvasTouch.current){clearTimeout(pendingCanvasTouch.current);pendingCanvasTouch.current=null}};
- const rollbackGestureDrag=()=>{const start=drag?.start||wallDrag?.start||zoneDrag?.start;if(start){try{setDoc(JSON.parse(start))}catch{}}setDrag(null);setWallDrag(null);setZoneDrag(null);setPanning(null)};
+ const rollbackGestureDrag=()=>{const start=drag?.start||wallDrag?.start||zoneDrag?.start||measureDrag?.start;if(start){try{setDoc(JSON.parse(start))}catch{}}setDrag(null);setWallDrag(null);setZoneDrag(null);setMeasureDrag(null);setPanning(null)};
  const beginPinch=()=>{
   const points=[...touchPointers.current.values()];
   if(points.length<2||!svg.current)return;
@@ -387,8 +387,15 @@ export default function DrawingClient(){
  const downWallEnd=(e,w,end)=>{e.stopPropagation();capturePointer(e);setTool("select");setSelected({kind:"wall",id:w.id});setWallDrag({id:w.id,end,start:JSON.stringify(doc)})};
  const moveWallEnd=e=>{if(!wallDrag)return;const targetNow=doc.walls.find(w=>w.id===wallDrag.id);if(!targetNow)return;const origin=wallDrag.end===1?{x:targetNow.x1,y:targetNow.y1}:{x:targetNow.x2,y:targetNow.y2},p=point(e),magnet=magneticPoint(p,doc.walls,wallDrag.id,origin),q=magnet.point;setSnapHint(magnet.snapped?{...q,label:"Hjørne"}:null);setDoc(d=>{const target=d.walls.find(w=>w.id===wallDrag.id);if(!target)return d;const ox=wallDrag.end===1?target.x1:target.x2,oy=wallDrag.end===1?target.y1:target.y2;const walls=d.walls.map(w=>{let n={...w};if(w.id===wallDrag.id){if(wallDrag.end===1){n.x1=q.x;n.y1=q.y}else{n.x2=q.x;n.y2=q.y}}else{if(Math.hypot(w.x1-ox,w.y1-oy)<5){n.x1=q.x;n.y1=q.y}if(Math.hypot(w.x2-ox,w.y2-oy)<5){n.x2=q.x;n.y2=q.y}}return n});return {...d,walls,items:syncMounted(walls,d.items)}})};
  const endWallDrag=()=>{if(!wallDrag)return;setSnapHint(null);setHistory(h=>[...h.slice(-24),wallDrag.start]);setFuture([]);setWallDrag(null)};
- const downZonePoint=(e,z,index)=>{e.stopPropagation();capturePointer(e);setTool("select");setSelected({kind:"zone",id:z.id});setZoneDrag({id:z.id,index,start:JSON.stringify(doc)})};
- const moveZonePoint=e=>{if(!zoneDrag)return;const p=point(e),magnet=magneticPoint(p),q=magnet.point;setSnapHint(magnet.snapped?{...q,label:"Hjørne"}:null);setDoc(d=>({...d,zones:(d.zones||[]).map(z=>z.id!==zoneDrag.id?z:{...z,points:z.points.map((pt,i)=>i===zoneDrag.index?q:pt)})}))};
+ const downZonePoint=(e,z,index)=>{e.stopPropagation();capturePointer(e);setTool("select");setSelected({kind:"zone",id:z.id});setZoneDrag({id:z.id,index,wallIds:Array.isArray(z.wallIds)?z.wallIds:null,start:JSON.stringify(doc)})};
+ const moveZonePoint=e=>{if(!zoneDrag)return;const p=point(e),magnet=magneticPoint(p),q=magnet.point;setSnapHint(magnet.snapped?{...q,label:"Hjørne"}:null);setDoc(d=>{
+  if(Array.isArray(zoneDrag.wallIds)&&zoneDrag.wallIds.length>=3){
+   const ids=zoneDrag.wallIds,index=zoneDrag.index,currentId=ids[index],prevId=ids[(index-1+ids.length)%ids.length];
+   const walls=d.walls.map(w=>w.id===currentId?{...w,x1:q.x,y1:q.y}:w.id===prevId?{...w,x2:q.x,y2:q.y}:w);
+   return {...d,walls,zones:syncLinkedZones(walls,d.zones),items:syncMounted(walls,d.items)};
+  }
+  return {...d,zones:(d.zones||[]).map(z=>z.id!==zoneDrag.id?z:{...z,points:z.points.map((pt,i)=>i===zoneDrag.index?q:pt)})};
+ })};
  const endZoneDrag=()=>{if(!zoneDrag)return;setSnapHint(null);setHistory(h=>[...h.slice(-24),zoneDrag.start]);setFuture([]);setZoneDrag(null)};
  const downMeasurementEnd=(e,m,end)=>{e.stopPropagation();capturePointer(e);setTool("select");setSelected({kind:"measurement",id:m.id});setMeasureDrag({id:m.id,end,start:JSON.stringify(doc)})};
  const moveMeasurementEnd=e=>{if(!measureDrag)return;const p=point(e),magnet=magneticPoint(p),q=magnet.point;setSnapHint(magnet.snapped?{...q,label:"Hjørne"}:null);setDoc(d=>({...d,measurements:(d.measurements||[]).map(m=>m.id!==measureDrag.id?m:measureDrag.end===1?{...m,x1:q.x,y1:q.y}:{...m,x2:q.x,y2:q.y})}))};
