@@ -10,6 +10,7 @@ import {
  vippsPaymentsEnabled
 } from "../../../../lib/vippsClient";
 import {syncVippsPaymentSnapshot} from "../../../../lib/vippsPaymentSync";
+import {sendVippsPaymentReceiptIfNeeded} from "../../../../lib/vippsPaymentReceipt";
 
 export const runtime="nodejs";
 
@@ -39,39 +40,18 @@ async function findTarget(s,unit,reference){
  return data||null;
 }
 
-async function syncSnapshot(s,unit,reference,payment){
- const aggregate=payment?.aggregate||{};
- for(const key of ["authorizedAmount","cancelledAmount","capturedAmount","refundedAmount"]){
-  if(aggregate[key])ensureNok(aggregate[key]);
- }
- const authorizedOre=amountValue(aggregate.authorizedAmount);
- const cancelledOre=amountValue(aggregate.cancelledAmount);
- const capturedOre=amountValue(aggregate.capturedAmount);
- const refundedOre=amountValue(aggregate.refundedAmount);
+function amountValue(obj){
+ const value=Number(obj?.value);
+ return Number.isInteger(value)&&value>=0?value:0;
+}
 
- const {data,error}=await s.rpc("sync_vipps_payment_snapshot",{
-  target_unit:unit,
-  target_reference:reference,
-  payment_state_value:String(payment?.state||""),
-  psp_reference_value:String(payment?.pspReference||""),
-  authorized_ore_value:authorizedOre,
-  cancelled_ore_value:cancelledOre,
-  captured_ore_value:capturedOre,
-  refunded_ore_value:refundedOre,
-  capture_guaranteed_until_value:payment?.captureGuaranteedUntil||null
- });
- if(error)throw error;
- return {
-  db:data,
-  state:String(payment?.state||""),
-  authorizedOre,
-  cancelledOre,
-  capturedOre,
-  refundedOre,
-  remainingCaptureOre:Math.max(0,authorizedOre-cancelledOre-capturedOre),
-  remainingRefundOre:Math.max(0,capturedOre-refundedOre),
-  captureGuaranteedUntil:payment?.captureGuaranteedUntil||null
- };
+function ensureNok(obj){
+ const currency=String(obj?.currency||"NOK").toUpperCase();
+ if(currency!=="NOK"){
+  const error=new Error("VIPPS_UNEXPECTED_CURRENCY");
+  error.code="VIPPS_UNEXPECTED_CURRENCY";
+  throw error;
+ }
 }
 
 export async function POST(req){
@@ -125,7 +105,17 @@ export async function POST(req){
   }
 
   const snapshot=await syncVippsPaymentSnapshot(s,unit,reference,payment);
-  return NextResponse.json({ok:true,action,unit,reference,snapshot});
+  let receipt=null;
+  let receiptWarning="";
+  if(String(snapshot?.db?.status||"").toLowerCase()==="paid"){
+   try{
+    receipt=await sendVippsPaymentReceiptIfNeeded({s,unit,id:target.id,req});
+   }catch(error){
+    receiptWarning="Betalingen er oppdatert, men kvitteringen kunne ikke sendes med én gang. Systemet prøver automatisk igjen.";
+    console.error("VIPPS ADMIN RECEIPT ERROR",{unit,reference,message:error?.message});
+   }
+  }
+  return NextResponse.json({ok:true,action,unit,reference,snapshot,receipt,receiptWarning});
  }catch(error){
   console.error("VIPPS ADMIN PAYMENT ACTION ERROR",{
    unit,action,reference,status:error?.status,code:error?.code
