@@ -157,14 +157,14 @@ export default function DrawingClient(){
  },[]);
  const writeLocalSnapshot=(next=docRef.current,{silent=false}={})=>{
   try{
-   const current=docsRef.current||[],list=[next,...current.filter(x=>x.id!==next.id)];
+   const savedAt=Date.now(),storedNext={...next,_localSavedAt:savedAt},current=docsRef.current||[],list=[storedNext,...current.filter(x=>x.id!==next.id)];
    localStorage.setItem(STORE,JSON.stringify(list));localStorage.setItem(LAST_STORE,next.id);
    docsRef.current=list;
    if(!silent){
     setDocs(list);
     const synced=!!serverSyncedSignature.current&&(next.orderId||next.projectId)&&serverSignature(next)===serverSyncedSignature.current;
     setSaveState(typeof navigator!=="undefined"&&!navigator.onLine?"offline":synced?"server":"local");
-    setLastSavedAt(Date.now());
+    setLastSavedAt(savedAt);
    }
    return list;
   }catch{return null}
@@ -182,7 +182,7 @@ export default function DrawingClient(){
   return()=>{window.removeEventListener("pagehide",flush);document.removeEventListener("visibilitychange",onVisibility)};
  },[]);
  const persistLocal=next=>writeLocalSnapshot(next);
- const serverPayload=next=>({id:next.serverId,orderId:next.orderId||null,projectId:next.projectId||null,name:next.name,customer:next.customer,address:next.address,notes:next.notes,drawingData:{...next,serverId:undefined}});
+ const serverPayload=next=>{const {_localSavedAt,_serverUpdatedAt,serverId,...drawingData}=next;return {id:serverId,orderId:next.orderId||null,projectId:next.projectId||null,name:next.name,customer:next.customer,address:next.address,notes:next.notes,drawingData}};
  const serverSignature=next=>JSON.stringify(serverPayload(next));
  const syncServer=async(next=docRef.current,{quiet=false}={})=>{
   if(!next?.orderId&&!next?.projectId)return false;
@@ -317,9 +317,14 @@ export default function DrawingClient(){
  const movePan=e=>{if(!panning)return;const r=svg.current.getBoundingClientRect();setPan(clampPanForZoom({x:panning.x-(e.clientX-panning.cx)*viewWidth/r.width,y:panning.y-(e.clientY-panning.cy)*viewHeight/r.height},doc.zoom||1))};
  const newDoc=()=>{const d=initial();try{localStorage.setItem(LAST_STORE,d.id)}catch{}setDoc(d);setSelected(null);setHistory([]);setFuture([])};
  const openDoc=id=>{const d=docs.find(x=>x.id===id);if(d){try{localStorage.setItem(LAST_STORE,d.id)}catch{}setDoc(d);setSelected(null);setHistory([]);setFuture([])}};
- const mergeIncomingDrawings=incoming=>{if(!incoming.length)return;const merged=[...docs];for(const drawing of incoming){const i=merged.findIndex(x=>x.serverId===drawing.serverId);if(i>=0)merged[i]=drawing;else merged.push(drawing)}setDocs(merged);localStorage.setItem(STORE,JSON.stringify(merged));setMessage(incoming.length+" tegning(er) hentet");setTimeout(()=>setMessage(""),2200)};
- const loadOrderDrawings=async orderId=>{if(!orderId)return;try{const r=await fetch("/api/admin/project-drawings?orderId="+encodeURIComponent(orderId)),x=await r.json();if(!r.ok||x.setupRequired)return;const incoming=(x.drawings||[]).map(row=>({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||orderId,projectId:row.projectId||"",name:row.name,customer:row.customer,address:row.address,notes:row.notes}));mergeIncomingDrawings(incoming)}catch{}};
- const loadProjectDrawings=async projectId=>{if(!projectId)return;try{const r=await fetch("/api/admin/project-drawings?projectId="+encodeURIComponent(projectId)),x=await r.json();if(!r.ok||x.setupRequired)return;const incoming=(x.drawings||[]).map(row=>({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||"",projectId:row.projectId,name:row.name,customer:row.customer,address:row.address,notes:row.notes}));mergeIncomingDrawings(incoming)}catch{}};
+ const chooseLocalOrServer=(local,incoming)=>{
+  if(!local)return incoming;
+  const localTime=Number(local._localSavedAt)||0,serverTime=Date.parse(incoming._serverUpdatedAt||"")||0,same=serverSignature(local)===serverSignature(incoming);
+  return !same&&localTime>serverTime?local:incoming;
+ };
+ const mergeIncomingDrawings=incoming=>{if(!incoming.length)return;const merged=[...(docsRef.current||[])];let keptLocal=0;for(const drawing of incoming){const i=merged.findIndex(x=>x.serverId===drawing.serverId);if(i>=0){const chosen=chooseLocalOrServer(merged[i],drawing);if(chosen===merged[i])keptLocal++;merged[i]=chosen}else merged.push(drawing)}docsRef.current=merged;setDocs(merged);localStorage.setItem(STORE,JSON.stringify(merged));setMessage(keptLocal?"Nyere lokal tegning beholdt":incoming.length+" tegning(er) hentet");setTimeout(()=>setMessage(""),2200)};
+ const loadOrderDrawings=async orderId=>{if(!orderId)return;try{const r=await fetch("/api/admin/project-drawings?orderId="+encodeURIComponent(orderId)),x=await r.json();if(!r.ok||x.setupRequired)return;const incoming=(x.drawings||[]).map(row=>({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||orderId,projectId:row.projectId||"",name:row.name,customer:row.customer,address:row.address,notes:row.notes,_serverUpdatedAt:row.updatedAt||null}));mergeIncomingDrawings(incoming)}catch{}};
+ const loadProjectDrawings=async projectId=>{if(!projectId)return;try{const r=await fetch("/api/admin/project-drawings?projectId="+encodeURIComponent(projectId)),x=await r.json();if(!r.ok||x.setupRequired)return;const incoming=(x.drawings||[]).map(row=>({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||"",projectId:row.projectId,name:row.name,customer:row.customer,address:row.address,notes:row.notes,_serverUpdatedAt:row.updatedAt||null}));mergeIncomingDrawings(incoming)}catch{}};
  const changeOrder=e=>{const orderId=e.target.value,order=orders.find(item=>item.id===orderId);setDoc(d=>({...d,orderId,projectId:orderId?"":d.projectId,customer:orderId?(order?.customerName||d.customer):d.customer,address:orderId?(order?.customer?.address||d.address):d.address,name:orderId&&d.name==="Ny tegning"?"Tegning – "+(order?.orderNumber||"oppdrag"):d.name}));if(orderId)loadOrderDrawings(orderId)};
  const changeProject=e=>{const projectId=e.target.value;setDoc(d=>({...d,projectId,orderId:projectId?"":d.orderId}));if(projectId)loadProjectDrawings(projectId)};
  useEffect(()=>{
@@ -335,7 +340,7 @@ export default function DrawingClient(){
     const r=await fetch("/api/admin/project-drawings?orderId="+encodeURIComponent(orderId)),x=await r.json();
     if(cancelled)return;
     if(r.ok&&!x.setupRequired&&Array.isArray(x.drawings)&&x.drawings.length){
-     const incoming=x.drawings.map(row=>({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||orderId,projectId:row.projectId||"",name:row.name,customer:row.customer,address:row.address,notes:row.notes}));
+     const incoming=x.drawings.map(row=>({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||orderId,projectId:row.projectId||"",name:row.name,customer:row.customer,address:row.address,notes:row.notes,_serverUpdatedAt:row.updatedAt||null}));
      const latest=incoming[0];
      setDoc(latest);
      setSelected(null);
