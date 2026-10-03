@@ -103,6 +103,21 @@ function syncLinkedZones(walls,zones){
   return {...zone,points:linked.map(w=>({x:w.x1,y:w.y1}))};
  });
 }
+function syncAnchoredMeasurements(walls,measurements){
+ const byId=new Map((walls||[]).map(w=>[w.id,w]));
+ return (measurements||[]).map(m=>{
+  let next={...m};
+  for(const i of [1,2]){
+   const anchor=m["anchor"+i];
+   if(!anchor?.wallId)continue;
+   const wall=byId.get(anchor.wallId);
+   if(!wall){delete next["anchor"+i];continue}
+   next["x"+i]=anchor.end===1?wall.x1:wall.x2;
+   next["y"+i]=anchor.end===1?wall.y1:wall.y2;
+  }
+  return next;
+ });
+}
 
 const initial=()=>({id:uid(),name:"Ny tegning",orderId:"",projectId:"",customer:"",address:"",notes:"",visualizationNotes:"",walls:[],items:[],zones:[],measurements:[],snapSize:50,showGrid:true,scale:"1:50",zoom:1,defaultWallThickness:98,defaultWallHeight:2400});
 const wallTypes=new Set(["door","sliding","window","opening","railing","screen"]);
@@ -165,13 +180,13 @@ export default function DrawingClient(){
   let best=null;
   for(const wall of walls){
    if(wall.id===excludeWallId)continue;
-   for(const endpoint of [{x:wall.x1,y:wall.y1},{x:wall.x2,y:wall.y2}]){
+   for(const [end,endpoint] of [[1,{x:wall.x1,y:wall.y1}],[2,{x:wall.x2,y:wall.y2}]]){
     if(ignoreNear&&Math.hypot(endpoint.x-ignoreNear.x,endpoint.y-ignoreNear.y)<8)continue;
     const dist=Math.hypot(p.x-endpoint.x,p.y-endpoint.y);
-    if(dist<=threshold&&(!best||dist<best.dist))best={...endpoint,dist};
+    if(dist<=threshold&&(!best||dist<best.dist))best={...endpoint,dist,wallId:wall.id,end};
    }
   }
-  return best?{point:{x:best.x,y:best.y},snapped:true}:{point:{x:snapTo(p.x,doc.snapSize||50),y:snapTo(p.y,doc.snapSize||50)},snapped:false};
+  return best?{point:{x:best.x,y:best.y},snapped:true,anchor:{wallId:best.wallId,end:best.end}}:{point:{x:snapTo(p.x,doc.snapSize||50),y:snapTo(p.y,doc.snapSize||50)},snapped:false,anchor:null};
  };
  const wallMagneticPoint=(p,origin)=>{
   const endpoint=magneticPoint(p);
@@ -398,7 +413,7 @@ export default function DrawingClient(){
  })};
  const endZoneDrag=()=>{if(!zoneDrag)return;setSnapHint(null);setHistory(h=>[...h.slice(-24),zoneDrag.start]);setFuture([]);setZoneDrag(null)};
  const downMeasurementEnd=(e,m,end)=>{e.stopPropagation();capturePointer(e);setTool("select");setSelected({kind:"measurement",id:m.id});setMeasureDrag({id:m.id,end,start:JSON.stringify(doc)})};
- const moveMeasurementEnd=e=>{if(!measureDrag)return;const p=point(e),magnet=magneticPoint(p),q=magnet.point;setSnapHint(magnet.snapped?{...q,label:"Hjørne"}:null);setDoc(d=>({...d,measurements:(d.measurements||[]).map(m=>m.id!==measureDrag.id?m:measureDrag.end===1?{...m,x1:q.x,y1:q.y}:{...m,x2:q.x,y2:q.y})}))};
+ const moveMeasurementEnd=e=>{if(!measureDrag)return;const p=point(e),magnet=magneticPoint(p),q=magnet.point;setSnapHint(magnet.snapped?{...q,label:"Hjørne"}:null);setDoc(d=>({...d,measurements:(d.measurements||[]).map(m=>m.id!==measureDrag.id?m:measureDrag.end===1?{...m,x1:q.x,y1:q.y,anchor1:magnet.anchor||null}:{...m,x2:q.x,y2:q.y,anchor2:magnet.anchor||null})}))};
  const endMeasurementDrag=()=>{if(!measureDrag)return;setSnapHint(null);setHistory(h=>[...h.slice(-24),measureDrag.start]);setFuture([]);setMeasureDrag(null)};
  const downItem=(e,o)=>{if(["wall","measure","zone"].includes(tool)){e.stopPropagation();drawingPointDown(e);return}e.stopPropagation();capturePointer(e);setTool("select");setSelected({kind:"item",id:o.id});const p=point(e);setDrag({id:o.id,dx:p.x-o.x,dy:p.y-o.y,start:JSON.stringify(doc)})};
  const move=e=>{if(panning){movePan(e);return}if(wallDrag){moveWallEnd(e);return}if(zoneDrag){moveZonePoint(e);return}if(measureDrag){moveMeasurementEnd(e);return}if(!drag)return;const p=point(e);setDoc(d=>({...d,items:d.items.map(o=>o.id===drag.id?{...o,x:snapTo(p.x-drag.dx,d.snapSize||50),y:snapTo(p.y-drag.dy,d.snapSize||50)}:o)}))};
@@ -408,7 +423,7 @@ export default function DrawingClient(){
   const magnet=tool==="wall"&&draft?wallMagneticPoint(p,draft):magneticPoint(p),q=magnet.point;
   setSnapHint(magnet.snapped?{...q,label:magnet.label||"Hjørne"}:null);
   if(tool==="zone"){setZoneDraft(points=>[...points,q]);setTimeout(()=>setSnapHint(null),350);return}
-  if(tool==="measure"){if(!measureDraft)setMeasureDraft(q);else{const id=uid();mutate(d=>({...d,measurements:[...(d.measurements||[]),{id,label:"",x1:measureDraft.x,y1:measureDraft.y,x2:q.x,y2:q.y}]}));setMeasureDraft(null);setTool("select");setSelected({kind:"measurement",id})}setTimeout(()=>setSnapHint(null),350);return}
+  if(tool==="measure"){if(!measureDraft)setMeasureDraft({...q,anchor:magnet.anchor||null});else{const id=uid();mutate(d=>({...d,measurements:[...(d.measurements||[]),{id,label:"",x1:measureDraft.x,y1:measureDraft.y,x2:q.x,y2:q.y,anchor1:measureDraft.anchor||null,anchor2:magnet.anchor||null}]}));setMeasureDraft(null);setTool("select");setSelected({kind:"measurement",id})}setTimeout(()=>setSnapHint(null),350);return}
   if(tool!=="wall")return;
   if(!draft){
    setDraft(q);setWallChain({start:q,count:0,points:[q],wallIds:[]});setTimeout(()=>setSnapHint(null),350);return;
