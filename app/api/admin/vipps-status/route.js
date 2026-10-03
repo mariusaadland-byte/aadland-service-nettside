@@ -85,7 +85,7 @@ export async function GET(){
    webhook:webhooks.find(item=>item?.unit===unit.unit)||null
   })),
   paymentIntegrationFoundation:true,
-  paymentIntegrationImplemented:false,
+  paymentIntegrationImplemented:true,
   captureAlerts,
   note:"API-nøkler og webhook-secrets vises aldri her. Webhook-secrets lagres i privat database."
  });
