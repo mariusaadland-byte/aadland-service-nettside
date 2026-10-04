@@ -407,3 +407,51 @@
 .roomCornerList b{
  display:grid;place-items:center;width:17px;height:17px;border-radius:50%;background:#2c2d2a;color:#fff;font-size:8px
 }
+
+@media (pointer:coarse) and (min-width:901px) and (max-width:1200px){
+ .mobileTools{
+  display:flex;align-items:center;gap:7px;position:sticky;top:0;z-index:35;
+  overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;
+  padding:8px max(12px,env(safe-area-inset-right)) 8px max(12px,env(safe-area-inset-left));
+  background:#171816;border-top:1px solid #2e302d;border-bottom:1px solid #343633;box-shadow:0 4px 12px #0002;scrollbar-width:none
+ }
+ .mobileTools::-webkit-scrollbar{display:none}
+ .mobileTool,.mobileActive,.mobileDone,.mobileSave{
+  flex:0 0 auto;min-height:44px;border-radius:9px;padding:0 13px;border:1px solid #454843;
+  background:#252724;color:#fff;font-size:13px;font-weight:700;white-space:nowrap
+ }
+ .mobileActive{background:#eadcbf;border-color:#c9a85e;color:#241d10}
+ .mobileDone{background:#315e51;border-color:#4a8d79}
+ .mobileSave{background:#d7a74e;border-color:#d7a74e;color:#17120a}
+ .mobileDivider{width:1px;height:28px;background:#4a4c48;flex:0 0 1px}
+ .mobileZoom{flex:0 0 auto;min-width:40px;text-align:center;color:#ddd;font-size:12px}
+ .mobileSyncStatus{
+  display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+  min-height:34px;padding:0 9px;border-radius:999px;border:1px solid #777;
+  font-size:10px;font-weight:800;white-space:nowrap;background:#2d2f2b;color:#f5f5f2
+ }
+ .mobileSyncStatus[data-state="server"]{border-color:#6f9e84;background:#233d30}
+ .mobileSyncStatus[data-state="syncing"]{border-color:#c9a85e;background:#4b3d20}
+ .mobileSyncStatus[data-state="offline"]{border-color:#b56f6f;background:#4a2929}
+ .mobileSelection{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 12px;background:#f4eee1;border-bottom:1px solid #d5c7a8}
+ .mobileSelection>div{min-width:0;display:grid;gap:2px}
+ .mobileSelection span{font-size:9px;letter-spacing:.1em;color:#8b7040;font-weight:800}
+ .mobileSelection strong{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .mobileSelection button{min-height:38px;border:1px solid #b89959;border-radius:8px;background:#fff7e7;color:#332715;padding:0 11px;font-weight:800}
+ .mobileInspector{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px;background:#fff;border-bottom:1px solid #ddd}
+ .mobileQuickAdd{display:flex;gap:7px;overflow-x:auto;padding:8px 12px;background:#f7f3e9;border-bottom:1px solid #ddcfaf}
+ .mobileQuickAdd button{flex:0 0 auto;min-height:40px;padding:0 11px;border-radius:9px;border:1px solid #cdb77e;background:#fffaf0;color:#342817;font-size:12px;font-weight:800;white-space:nowrap}
+ .mobileCanvasHint{display:block;margin:0 0 7px;padding:7px 9px;border-radius:8px;background:#e9f1f2;color:#315c64;font-size:11px;font-weight:700;text-align:center}
+ .fieldMode{height:100dvh;overflow:hidden;background:#e8e6df}
+ .fieldMode .top{display:none}
+ .fieldMode .mobileTools{position:fixed;top:0;left:0;right:0;z-index:60;padding-top:max(7px,env(safe-area-inset-top));min-height:calc(52px + env(safe-area-inset-top))}
+ .fieldMode .layout{display:flex;flex-direction:column;height:100dvh;overflow:hidden;padding-top:calc(52px + env(safe-area-inset-top));box-sizing:border-box;background:#e8e6df}
+ .fieldMode .left,.fieldMode .right{display:none!important}
+ .fieldMode .workspace{display:block;order:1;height:100%;min-height:0;padding:0;overflow:hidden}
+ .fieldMode .canvasWrap{width:100%;height:100%;padding:0;margin:0;display:block;position:relative;background:#fff}
+ .fieldMode .canvas{width:100%;height:100%;max-width:none;aspect-ratio:auto;border:0;border-radius:0;box-shadow:none}
+ .fieldMode .mobileCanvasHint{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:8;width:max-content;max-width:calc(100% - 20px);margin:0;opacity:.88;pointer-events:none}
+ .fieldMode .mobileSelection{position:fixed;top:calc(60px + env(safe-area-inset-top));left:8px;right:8px;z-index:55;border:1px solid #d5c7a8;border-radius:10px;box-shadow:0 4px 14px #0002}
+ .fieldMode .mobileInspector{position:fixed;left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));z-index:58;max-height:54dvh;overflow:auto;border:1px solid #d6d6d6;border-radius:12px;box-shadow:0 12px 34px #0004;padding-bottom:max(10px,env(safe-area-inset-bottom))}
+ .fieldMode .mobileQuickAdd{position:fixed;top:calc(60px + env(safe-area-inset-top));left:0;right:0;z-index:56;box-shadow:0 4px 12px #0002}
+}
