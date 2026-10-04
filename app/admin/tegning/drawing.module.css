@@ -363,3 +363,47 @@
 
 .diagOk{color:#2e7148!important;font-weight:800}
 .diagWarn{color:#9b3535!important;font-weight:800}
+
+@media(max-width:900px){
+ .mobileRoomConstruction{
+  grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:8px;
+  padding:9px;border:1px solid #d7cab0;border-radius:10px;background:#fffdf8
+ }
+ .mobileRoomConstruction label{display:grid;gap:4px}
+ .mobileRoomConstruction label>span{font-size:9px;color:#736b5d;font-weight:800}
+ .mobileRoomConstruction input{
+  width:100%;box-sizing:border-box;min-height:42px;border:1px solid #d0c6ae;
+  border-radius:8px;padding:0 8px;font-size:16px;background:#fff
+ }
+ .mobileCornerAngles{grid-column:1/-1;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+ .mobileCornerAngles>strong{font-size:10px;color:#5d5138;margin-right:3px}
+ .mobileCornerAngles span{
+  display:inline-flex;align-items:center;gap:4px;min-height:28px;padding:0 7px;
+  border:1px solid #d0b97d;border-radius:999px;background:#faf5e9;color:#4b3a1f;font-size:10px;font-weight:800
+ }
+ .mobileCornerAngles b{
+  display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#2c2d2a;color:#fff;font-size:9px
+ }
+ .mobileWallMeta{
+  grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;padding-left:41px
+ }
+ .mobileWallMeta span{
+  min-height:27px;display:inline-flex;align-items:center;padding:0 7px;
+  border-radius:999px;background:#f0eee8;color:#686052;font-size:9px;font-weight:800
+ }
+}
+.roomConstructionEditor{
+ display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0;padding:9px;
+ border:1px solid #d8cdb5;border-radius:9px;background:#fffdf8
+}
+.roomConstructionEditor h4{grid-column:1/-1;margin:0;font-size:12px}
+.roomConstructionEditor label{display:grid;gap:4px;font-size:10px;color:#6b6254;font-weight:700}
+.roomConstructionEditor input{width:100%;box-sizing:border-box;min-height:38px;border:1px solid #cec3ab;border-radius:7px;padding:0 8px}
+.roomCornerList{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap}
+.roomCornerList span{
+ display:inline-flex;align-items:center;gap:4px;padding:4px 7px;border-radius:999px;
+ border:1px solid #d0b97d;background:#faf5e9;color:#4b3a1f;font-size:9px;font-weight:800
+}
+.roomCornerList b{
+ display:grid;place-items:center;width:17px;height:17px;border-radius:50%;background:#2c2d2a;color:#fff;font-size:8px
+}
