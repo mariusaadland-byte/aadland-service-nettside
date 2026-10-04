@@ -171,7 +171,7 @@ function nearestWall(o,walls){
 }
 
 export default function DrawingClient(){
- const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[measureDrag,setMeasureDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null),[mobileEditOpen,setMobileEditOpen]=useState(false),[roomBuilder,setRoomBuilder]=useState(null),[quickAddOpen,setQuickAddOpen]=useState(false),[fieldMode,setFieldMode]=useState(false),[canvasAspect,setCanvasAspect]=useState(1),[wallBuilder,setWallBuilder]=useState(null),[snapHint,setSnapHint]=useState(null),[wallChain,setWallChain]=useState(null),[online,setOnline]=useState(true),[saveState,setSaveState]=useState("local"),[lastSavedAt,setLastSavedAt]=useState(null),[fieldReturnZoneId,setFieldReturnZoneId]=useState(null);
+ const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[measureDrag,setMeasureDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null),[mobileEditOpen,setMobileEditOpen]=useState(false),[roomBuilder,setRoomBuilder]=useState(null),[quickAddOpen,setQuickAddOpen]=useState(false),[fieldMode,setFieldMode]=useState(false),[canvasAspect,setCanvasAspect]=useState(1),[wallBuilder,setWallBuilder]=useState(null),[snapHint,setSnapHint]=useState(null),[wallChain,setWallChain]=useState(null),[online,setOnline]=useState(true),[saveState,setSaveState]=useState("local"),[lastSavedAt,setLastSavedAt]=useState(null),[fieldReturnZoneId,setFieldReturnZoneId]=useState(null),[roomPickerOpen,setRoomPickerOpen]=useState(false);
  const svg=useRef(null);
  const leftPanel=useRef(null),rightPanel=useRef(null);
  const touchPointers=useRef(new Map()),pinchGesture=useRef(null),pendingCanvasTouch=useRef(null);
@@ -317,6 +317,13 @@ export default function DrawingClient(){
  const clampPanForZoom=(value,zoom)=>{const dims=viewDimsFor(zoom);return{x:clamp(value.x,0,Math.max(0,VIEW-dims.w)),y:clamp(value.y,0,Math.max(0,VIEW-dims.h))}};
  const zoomBy=delta=>setDoc(d=>{const oldZoom=d.zoom||1,oldDims=viewDimsFor(oldZoom),zoom=clamp(oldZoom+delta,.5,5),nextDims=viewDimsFor(zoom);setPan(p=>clampPanForZoom({x:p.x+oldDims.w/2-nextDims.w/2,y:p.y+oldDims.h/2-nextDims.h/2},zoom));return {...d,zoom}});
  const fitView=()=>{const b=drawingBounds(),aspect=clamp(canvasAspect||1,.35,2.8),base=aspect>=1?{w:VIEW,h:VIEW/aspect}:{w:VIEW*aspect,h:VIEW},zoom=clamp(Math.min(base.w/Math.max(500,b.w*1.12),base.h/Math.max(500,b.h*1.12)),.5,5),nextDims=viewDimsFor(zoom);setPan(clampPanForZoom({x:b.x+b.w/2-nextDims.w/2,y:b.y+b.h/2-nextDims.h/2},zoom));setDoc(d=>({...d,zoom}))};
+ const focusPoints=points=>{
+  if(!Array.isArray(points)||!points.length)return;
+  const xs=points.map(p=>Number(p.x)||0),ys=points.map(p=>Number(p.y)||0),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys),w=Math.max(500,maxX-minX),h=Math.max(500,maxY-minY);
+  const aspect=clamp(canvasAspect||1,.35,2.8),base=aspect>=1?{w:VIEW,h:VIEW/aspect}:{w:VIEW*aspect,h:VIEW},zoom=clamp(Math.min(base.w/(w*1.25),base.h/(h*1.25)),.5,5),dims=viewDimsFor(zoom);
+  setPan(clampPanForZoom({x:(minX+maxX)/2-dims.w/2,y:(minY+maxY)/2-dims.h/2},zoom));setDoc(d=>({...d,zoom}));
+ };
+ const openRoomFromPicker=zone=>{setRoomPickerOpen(false);setQuickAddOpen(false);setSelected({kind:"zone",id:zone.id});setTool("select");setTimeout(()=>{setMobileEditOpen(true);focusPoints(zone.points)},0)};
  const capturePointer=e=>{try{svg.current?.setPointerCapture?.(e.pointerId)}catch{}};
  const releasePointer=e=>{try{if(svg.current?.hasPointerCapture?.(e.pointerId))svg.current.releasePointerCapture(e.pointerId)}catch{}};
  const scrollPanel=ref=>ref.current?.scrollIntoView?.({behavior:"smooth",block:"start"});
@@ -734,7 +741,7 @@ export default function DrawingClient(){
    <button type="button" className={tool==="pan"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("pan");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Flytt</button>
    <button type="button" className={tool==="measure"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("measure");setDraft(null);setWallChain(null);setSnapHint(null);setZoneDraft([]);setMeasureDraft(null)}}>Mål</button>
    <button type="button" className={tool==="zone"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("zone");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Romsone</button>
-   <button type="button" className={quickAddOpen?styles.mobileActive:styles.mobileTool} onClick={()=>{setMobileEditOpen(false);setQuickAddOpen(value=>!value)}}>+ Legg til</button><button type="button" className={fieldMode?styles.mobileActive:styles.mobileTool} onClick={()=>{setFieldMode(value=>!value);setQuickAddOpen(false);setMobileEditOpen(false)}}>{fieldMode?"Avslutt befaring":"Befaring"}</button>
+   <button type="button" className={quickAddOpen?styles.mobileActive:styles.mobileTool} onClick={()=>{setMobileEditOpen(false);setRoomPickerOpen(false);setQuickAddOpen(value=>!value)}}>+ Legg til</button><button type="button" className={roomPickerOpen?styles.mobileActive:styles.mobileTool} onClick={()=>{setMobileEditOpen(false);setQuickAddOpen(false);setRoomPickerOpen(value=>!value)}}>Rom</button><button type="button" className={fieldMode?styles.mobileActive:styles.mobileTool} onClick={()=>{setFieldMode(value=>!value);setQuickAddOpen(false);setRoomPickerOpen(false);setMobileEditOpen(false)}}>{fieldMode?"Avslutt befaring":"Befaring"}</button>
    {(draft||measureDraft||zoneDraft.length>0)&&<button type="button" className={styles.mobileDone} onClick={()=>{if(tool==="zone"&&zoneDraft.length>=3)finishZone();else{setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([]);setTool("select")}}}>{tool==="zone"&&zoneDraft.length>=3?"Lukk sone":"Ferdig"}</button>}
    <span className={styles.mobileDivider}/>
    <button type="button" className={styles.mobileTool} onClick={undo} disabled={!history.length}>↶</button>
@@ -762,11 +769,15 @@ export default function DrawingClient(){
    <button type="button" onClick={()=>addItem("base",600,600)}>Benkeskap 60</button>
    <button type="button" onClick={()=>addItem("washer",600,600)}>Vaskemaskin</button>
   </div>}
-  {sel&&!quickAddOpen&&<div className={styles.mobileSelection}>
+  {roomPickerOpen&&<div className={styles.mobileRoomPicker}>
+   <div className={styles.mobileRoomPickerHead}><div><strong>Rom i tegningen</strong><small>{(doc.zones||[]).length} registrert</small></div><div><button type="button" onClick={()=>{setRoomPickerOpen(false);makeRoom()}}>+ Rom</button><button type="button" onClick={()=>{setRoomPickerOpen(false);makeLRoom()}}>+ L-rom</button></div></div>
+   {(doc.zones||[]).length? <div className={styles.mobileRoomPickerList}>{(doc.zones||[]).map(zone=>{const linked=Array.isArray(zone.wallIds)?zone.wallIds.length:0,active=selected?.kind==="zone"&&selected.id===zone.id;return <button type="button" key={zone.id} className={active?styles.mobileRoomPickerActive:styles.mobileRoomPickerItem} onClick={()=>openRoomFromPicker(zone)}><span><b>{zone.name||"Rom"}</b><small>{polygonAreaM2(zone.points).toFixed(2)} m² · {linked?linked+" vegger":"fri sone"}</small></span><strong>Åpne</strong></button>})}</div>:<p className={styles.mobileRoomPickerEmpty}>Ingen rom ennå. Opprett et rektangulært rom, L-rom eller tegn en lukket veggkontur.</p>}
+  </div>}
+  {sel&&!quickAddOpen&&!roomPickerOpen&&<div className={styles.mobileSelection}>
    <div><span>VALGT</span><strong>{selected.kind==="wall"?"Vegg · "+len(sel)+" mm · "+angle(sel)+"°":selected.kind==="zone"?(sel.name||"Romsone")+" · "+polygonAreaM2(sel.points).toFixed(2)+" m²":selected.kind==="measurement"?(sel.label?sel.label+" · ":"Mål · ")+Math.round(Math.hypot(sel.x2-sel.x1,sel.y2-sel.y1))+" mm":labelFor(sel.type)+" · "+Math.round(sel.w)+" × "+Math.round(sel.h)+" mm"}</strong></div>
    <button type="button" onClick={()=>setMobileEditOpen(value=>!value)}>{mobileEditOpen?"Lukk":"Rediger mål"}</button>
   </div>}
-  {sel&&!quickAddOpen&&mobileEditOpen&&<div className={styles.mobileInspector}>
+  {sel&&!quickAddOpen&&!roomPickerOpen&&mobileEditOpen&&<div className={styles.mobileInspector}>
    {selected.kind==="wall"?<>
     <label>Lengde (mm)<input key={"ml-"+sel.id+"-"+len(sel)} type="number" inputMode="numeric" defaultValue={len(sel)} onBlur={e=>update("len",e.target.value)}/></label>
     <label>Vinkel (°)<input key={"ma-"+sel.id+"-"+angle(sel)} type="number" inputMode="decimal" defaultValue={angle(sel)} onBlur={e=>update("angle",e.target.value)}/></label>
