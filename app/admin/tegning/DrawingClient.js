@@ -162,7 +162,7 @@ function normalizeAngle(value){
 
 function zoneSurveyState(zone,walls,items){
  const ids=Array.isArray(zone?.wallIds)?zone.wallIds:[],byId=new Map((walls||[]).map(w=>[w.id,w])),linked=ids.map(id=>byId.get(id)).filter(Boolean);
- if(linked.length<3)return{linked:false,done:0,total:linked.length,closed:false,overlap:false,ready:false};
+ if(linked.length<3){const validZone=Array.isArray(zone?.points)&&zone.points.length>=3;return{linked:false,done:0,total:0,closed:validZone,overlap:false,ready:validZone}};
  const diagnostics=linkedRoomDiagnostics(linked),valid=new Set(linked.map(w=>w.id)),done=(zone.surveyedWallIds||[]).filter(id=>valid.has(id)).length;
  const overlap=linked.some(w=>wallOpeningLayout(w,items||[]).overlap),ready=diagnostics.closed&&done===linked.length&&!overlap;
  return{linked:true,done,total:linked.length,closed:diagnostics.closed,overlap,ready};
@@ -520,6 +520,7 @@ export default function DrawingClient(){
  const selectedRoomDiagnostics=useMemo(()=>linkedRoomDiagnostics(selectedZoneWalls),[selectedZoneWalls]);
  const selectedSurveyProgress=useMemo(()=>{const valid=new Set(selectedZoneWalls.map(w=>w.id)),done=(sel?.surveyedWallIds||[]).filter(id=>valid.has(id));return {done:done.length,total:selectedZoneWalls.length,complete:selectedZoneWalls.length>0&&done.length===selectedZoneWalls.length}},[sel?.surveyedWallIds,selectedZoneWalls]);
  const selectedSurveyState=useMemo(()=>selected?.kind==="zone"?zoneSurveyState(sel,doc.walls,doc.items):{ready:false,overlap:false,closed:false,done:0,total:0},[selected,sel,doc.walls,doc.items]);
+ const overallSurveyProgress=useMemo(()=>{const zones=doc.zones||[],done=zones.filter(zone=>zone.surveyCompletedAt&&zoneSurveyState(zone,doc.walls,doc.items).ready).length;return {done,total:zones.length,complete:zones.length>0&&done===zones.length}},[doc.zones,doc.walls,doc.items]);
  useEffect(()=>{setMobileEditOpen(false)},[selected?.kind,selected?.id]);
  const applyWallValue=(d,wallId,key,n)=>{
   const target=d.walls.find(w=>w.id===wallId);if(!target)return d;
@@ -799,7 +800,7 @@ export default function DrawingClient(){
    <button type="button" onClick={()=>addItem("washer",600,600)}>Vaskemaskin</button>
   </div>}
   {roomPickerOpen&&<div className={styles.mobileRoomPicker}>
-   <div className={styles.mobileRoomPickerHead}><div><strong>Rom i tegningen</strong><small>{(doc.zones||[]).length} registrert</small></div><div><button type="button" onClick={()=>{setRoomPickerOpen(false);makeRoom()}}>+ Rom</button><button type="button" onClick={()=>{setRoomPickerOpen(false);makeLRoom()}}>+ L-rom</button></div></div>
+   <div className={styles.mobileRoomPickerHead}><div><strong>Rom i tegningen</strong><small>{overallSurveyProgress.done}/{overallSurveyProgress.total} rom ferdig</small></div><div><button type="button" onClick={()=>{setRoomPickerOpen(false);makeRoom()}}>+ Rom</button><button type="button" onClick={()=>{setRoomPickerOpen(false);makeLRoom()}}>+ L-rom</button></div></div>
    {(doc.zones||[]).length? <div className={styles.mobileRoomPickerList}>{(doc.zones||[]).map(zone=>{const state=zoneSurveyState(zone,doc.walls,doc.items),active=selected?.kind==="zone"&&selected.id===zone.id,finished=!!zone.surveyCompletedAt&&state.ready;return <button type="button" key={zone.id} className={active?styles.mobileRoomPickerActive:styles.mobileRoomPickerItem} onClick={()=>openRoomFromPicker(zone)}><span><b>{zone.name||"Rom"}</b><small>{polygonAreaM2(zone.points).toFixed(2)} m² · {state.linked?state.done+"/"+state.total+" målt":"fri sone"}</small></span><strong className={finished?styles.mobileRoomDone:styles.mobileRoomPending}>{finished?"✓ Ferdig":"Gjenstår"}</strong></button>})}</div>:<p className={styles.mobileRoomPickerEmpty}>Ingen rom ennå. Opprett et rektangulært rom, L-rom eller tegn en lukket veggkontur.</p>}
   </div>}
   {sel&&!quickAddOpen&&!roomPickerOpen&&<div className={styles.mobileSelection}>
@@ -829,7 +830,7 @@ export default function DrawingClient(){
      <div className={styles.mobileCornerAngles}><strong>Hjørnevinkler</strong>{selectedRoomDiagnostics.corners.map((value,index)=><span key={index}><b>{index+1}</b>{value}°</span>)}</div>
     </div>}
     <div className={styles.mobileRoomSurveyCard} data-ready={selectedSurveyState.ready?"true":"false"}>
-     <div><strong>{sel.surveyCompletedAt&&selectedSurveyState.ready?"✓ Rom ferdig":selectedSurveyState.ready?"Klar for fullføring":"Befaring pågår"}</strong><small>{selectedSurveyState.ready?"Alle vegger er målt, geometrien er lukket og åpningene er gyldige.":(!selectedSurveyState.closed?"Kontroller romkonturen. ":"")+(selectedSurveyState.done<selectedSurveyState.total?(selectedSurveyState.total-selectedSurveyState.done)+" vegg(er) gjenstår. ":"")+(selectedSurveyState.overlap?"Åpnings-overlapp må rettes.":"")}</small></div>
+     <div><strong>{sel.surveyCompletedAt&&selectedSurveyState.ready?"✓ Rom ferdig":selectedSurveyState.ready?"Klar for fullføring":"Befaring pågår"}</strong><small>{selectedSurveyState.ready?(selectedSurveyState.total?"Alle vegger er målt, geometrien er lukket og åpningene er gyldige.":"Romsonen er klar for fullføring.") :(!selectedSurveyState.closed?"Kontroller romkonturen. ":"")+(selectedSurveyState.done<selectedSurveyState.total?(selectedSurveyState.total-selectedSurveyState.done)+" vegg(er) gjenstår. ":"")+(selectedSurveyState.overlap?"Åpnings-overlapp må rettes.":"")}</small></div>
      <label>Romnotat<textarea key={"rn-"+sel.id+"-"+(sel.roomSurveyNotes||"")} defaultValue={sel.roomSurveyNotes||""} placeholder="F.eks. skjev vegg, fuktmerke, kundeønske, rivearbeid…" onBlur={e=>updateZoneField("roomSurveyNotes",e.target.value)}/></label>
      <div className={styles.mobileRoomSurveyActions}>{sel.surveyCompletedAt&&selectedSurveyState.ready?<button type="button" onClick={reopenRoomSurvey}>Åpne rom igjen</button>:<button type="button" className={styles.mobileRoomComplete} disabled={!selectedSurveyState.ready} onClick={completeRoomSurvey}>✓ Fullfør rom</button>}<button type="button" onClick={nextSurveyRoom}>Neste rom →</button></div>
     </div>
