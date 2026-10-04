@@ -360,3 +360,6 @@
 .diagonalEditor label{display:grid;gap:4px;font-size:10px;color:#5d7479;font-weight:700}
 .diagonalEditor input{width:100%;box-sizing:border-box;min-height:38px;border:1px solid #bdc9cc;border-radius:7px;padding:0 8px}
 .diagonalEditor small{font-size:9px}
+
+.diagOk{color:#2e7148!important;font-weight:800}
+.diagWarn{color:#9b3535!important;font-weight:800}
