@@ -543,3 +543,19 @@
  min-height:36px;padding:0 10px;border:1px solid #c7b68f;border-radius:7px;background:#fff;font-weight:800
 }
 .roomSurveyEditor button:disabled{opacity:.45}
+
+@media(max-width:900px), (pointer:coarse) and (min-width:901px) and (max-width:1200px){
+ .mobileRoomSurveyCard[data-stale="true"]{border-color:#d5ad66;background:#fff7e8}
+ .mobileRoomSurveyCard[data-stale="true"]>div:first-child strong{color:#7a551b}
+ .mobileRoomStale{color:#9a651d!important}
+ .mobileSurveySummary,.mobileSurveyAllDone{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:8px 10px;border-radius:9px;font-size:10px;font-weight:800
+ }
+ .mobileSurveySummary{border:1px solid #d9c69e;background:#fff9ec;color:#6d5527}
+ .mobileSurveyAllDone{border:1px solid #8fbea0;background:#edf8f1;color:#2c6d43}
+ .mobileSurveySummary strong,.mobileSurveyAllDone strong{font-size:9px;font-weight:700}
+}
+.roomSurveyEditor[data-stale="true"]{border-color:#d5ad66;background:#fff7e8}
+.roomSurveyEditor[data-stale="true"] h4{color:#7a551b}
+.roomSurveyEditor>small{font-size:10px;line-height:1.4;color:#756a58}
