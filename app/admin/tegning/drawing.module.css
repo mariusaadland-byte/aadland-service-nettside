@@ -559,3 +559,16 @@
 .roomSurveyEditor[data-stale="true"]{border-color:#d5ad66;background:#fff7e8}
 .roomSurveyEditor[data-stale="true"] h4{color:#7a551b}
 .roomSurveyEditor>small{font-size:10px;line-height:1.4;color:#756a58}
+
+.surveyBadge,.surveyBadgeDone,.surveyBadgeStale{
+ min-height:34px;padding:0 10px;border-radius:999px;font-size:10px;font-weight:800;white-space:nowrap
+}
+.surveyBadge{border:1px solid #bca97f;background:#fff9eb;color:#705824}
+.surveyBadgeDone{border:1px solid #84b497;background:#edf8f1;color:#2b6a42}
+.surveyBadgeStale{border:1px solid #d1a259;background:#fff4df;color:#855b18}
+@media(max-width:900px), (pointer:coarse) and (min-width:901px) and (max-width:1200px){
+ .mobileSurveyDone{
+  flex:0 0 auto;min-height:44px;border-radius:9px;padding:0 13px;
+  border:1px solid #6ea181;background:#244735;color:#fff;font-size:13px;font-weight:800;white-space:nowrap
+ }
+}
