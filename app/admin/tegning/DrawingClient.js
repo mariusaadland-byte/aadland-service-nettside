@@ -165,10 +165,22 @@ export default function DrawingClient(){
  const svg=useRef(null);
  const leftPanel=useRef(null),rightPanel=useRef(null);
  const touchPointers=useRef(new Map()),pinchGesture=useRef(null),pendingCanvasTouch=useRef(null);
- const linkedOrderHandled=useRef("");
+ const linkedOrderHandled=useRef(""),linkedLocalOrderHandled=useRef("");
  const autosaveReady=useRef(false),docRef=useRef(doc),docsRef=useRef(docs),serverSyncInFlight=useRef(false),serverSyncQueued=useRef(false),serverSyncedSignature=useRef("");
  useEffect(()=>{docRef.current=doc},[doc]);
  useEffect(()=>{docsRef.current=docs},[docs]);
+ useEffect(()=>{
+  if(typeof window==="undefined"||!docs.length)return;
+  const orderId=new URLSearchParams(window.location.search).get("orderId")||"";
+  if(!orderId||linkedLocalOrderHandled.current===orderId)return;
+  const candidates=docs.filter(item=>item.orderId===orderId).sort((a,b)=>(Number(b._localSavedAt)||0)-(Number(a._localSavedAt)||0));
+  if(!candidates.length)return;
+  const lastId=localStorage.getItem(LAST_STORE),chosen=candidates.find(item=>item.id===lastId)||candidates[0];
+  linkedLocalOrderHandled.current=orderId;docRef.current=chosen;setDoc(chosen);setSelected(null);setHistory([]);setFuture([]);
+  setSaveState(typeof navigator!=="undefined"&&!navigator.onLine?"offline":"local");
+  setMessage(typeof navigator!=="undefined"&&!navigator.onLine?"Lokal oppdragstegning åpnet offline":"Lokal oppdragstegning åpnet");
+  setTimeout(()=>setMessage(""),1800);
+ },[docs]);
  useEffect(()=>{
   const update=()=>setOnline(navigator.onLine);
   update();window.addEventListener("online",update);window.addEventListener("offline",update);
