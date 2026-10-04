@@ -490,3 +490,17 @@
 @media(max-width:520px){
  .mobileRoomPickerList{grid-template-columns:1fr}
 }
+
+@media(max-width:900px), (pointer:coarse) and (min-width:901px) and (max-width:1200px){
+ .mobileWallCheck,.mobileWallChecked{
+  min-height:28px;padding:0 8px;border-radius:999px;font-size:9px;font-weight:800
+ }
+ .mobileWallCheck{border:1px solid #c9c4b8;background:#f5f3ee;color:#6d665a}
+ .mobileWallChecked{border:1px solid #8fbea0;background:#eef8f1;color:#2c6d43}
+}
+.roomWallEditorRow{grid-template-columns:34px minmax(72px,1fr) 94px 76px 34px}
+.roomWallCheck,.roomWallChecked{
+ width:32px;height:32px;border-radius:50%;font-weight:900
+}
+.roomWallCheck{border:1px solid #c8c3b8;background:#f7f5f0;color:#6d665a}
+.roomWallChecked{border:1px solid #87b89a;background:#edf7f0;color:#2c6d43}
