@@ -572,3 +572,22 @@
   border:1px solid #6ea181;background:#244735;color:#fff;font-size:13px;font-weight:800;white-space:nowrap
  }
 }
+
+.deleteModal{
+ width:min(460px,100%);max-height:min(720px,90vh);overflow:auto;
+ background:#fff;color:#1d1d1b;border-radius:16px;box-shadow:0 24px 70px #0005;padding:18px
+}
+.deleteModal p{font-size:13px;line-height:1.55;color:#655d50}
+.deleteModalActions{display:grid;grid-template-columns:1fr 1.2fr;gap:9px;margin-top:16px}
+.deleteModalActions button{
+ min-height:46px;border-radius:9px;border:1px solid #ccc;background:#fafafa;font-weight:800
+}
+.deleteModalActions button:last-child{background:#8d2d2d;border-color:#8d2d2d;color:#fff}
+.deleteModalActions button:disabled{opacity:.5}
+@media(max-width:900px), (pointer:coarse) and (min-width:901px) and (max-width:1200px){
+ .deleteModal{
+  width:100%;max-height:70dvh;border-radius:18px 18px 0 0;
+  padding:16px 14px max(20px,env(safe-area-inset-bottom))
+ }
+ .deleteModalActions button{min-height:50px;font-size:14px}
+}
