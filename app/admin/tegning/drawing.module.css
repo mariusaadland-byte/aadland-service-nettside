@@ -591,3 +591,13 @@
  }
  .deleteModalActions button{min-height:50px;font-size:14px}
 }
+
+@media(max-width:900px), (pointer:coarse) and (min-width:901px) and (max-width:1200px){
+ .mobileSurveySummary>div,.mobileSurveyAllDone>div{display:grid;gap:2px}
+ .mobileSurveySummary>div strong,.mobileSurveyAllDone>div strong{font-size:9px;font-weight:700}
+ .mobileSurveyFinish,.mobileSurveyNext{
+  flex:0 0 auto;min-height:38px;padding:0 10px;border-radius:8px;font-size:10px;font-weight:800
+ }
+ .mobileSurveyFinish{border:1px solid #315e51;background:#315e51;color:#fff}
+ .mobileSurveyNext{border:1px solid #c9ae70;background:#fff;color:#6d5527}
+}
