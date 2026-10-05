@@ -548,7 +548,7 @@ export default function DrawingClient(){
  };
  const finishSurveySession=async()=>{
   if(!overallSurveyProgress.complete){openNextSurveyIssue();return}
-  writeLocalSnapshot(docRef.current);await persist(docRef.current);setRoomPickerOpen(false);setQuickAddOpen(false);setMobileEditOpen(false);setFieldMode(false);
+  await persist(docRef.current);setRoomPickerOpen(false);setQuickAddOpen(false);setMobileEditOpen(false);setFieldMode(false);
  };
 
  useEffect(()=>{setMobileEditOpen(false)},[selected?.kind,selected?.id]);
@@ -808,7 +808,7 @@ export default function DrawingClient(){
    <button type="button" className={tool==="pan"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("pan");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Flytt</button>
    <button type="button" className={tool==="measure"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("measure");setDraft(null);setWallChain(null);setSnapHint(null);setZoneDraft([]);setMeasureDraft(null)}}>Mål</button>
    <button type="button" className={tool==="zone"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("zone");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Romsone</button>
-   <button type="button" className={quickAddOpen?styles.mobileActive:styles.mobileTool} onClick={()=>{setMobileEditOpen(false);setRoomPickerOpen(false);setQuickAddOpen(value=>!value)}}>+ Legg til</button><button type="button" className={roomPickerOpen?styles.mobileActive:overallSurveyProgress.complete?styles.mobileSurveyDone:styles.mobileTool} onClick={()=>{setMobileEditOpen(false);setQuickAddOpen(false);setRoomPickerOpen(value=>!value)}}>{overallSurveyProgress.total?overallSurveyProgress.complete?"✓ Rom":"Rom "+overallSurveyProgress.done+"/"+overallSurveyProgress.total:"Rom"}</button><button type="button" className={fieldMode?styles.mobileActive:styles.mobileTool} onClick={()=>{if(fieldMode){writeLocalSnapshot(docRef.current);persist(docRef.current)}setFieldMode(value=>!value);setQuickAddOpen(false);setRoomPickerOpen(false);setMobileEditOpen(false)}}>{fieldMode?"Avslutt befaring":"Befaring"}</button>
+   <button type="button" className={quickAddOpen?styles.mobileActive:styles.mobileTool} onClick={()=>{setMobileEditOpen(false);setRoomPickerOpen(false);setQuickAddOpen(value=>!value)}}>+ Legg til</button><button type="button" className={roomPickerOpen?styles.mobileActive:overallSurveyProgress.complete?styles.mobileSurveyDone:styles.mobileTool} onClick={()=>{setMobileEditOpen(false);setQuickAddOpen(false);setRoomPickerOpen(value=>!value)}}>{overallSurveyProgress.total?overallSurveyProgress.complete?"✓ Rom":"Rom "+overallSurveyProgress.done+"/"+overallSurveyProgress.total:"Rom"}</button><button type="button" className={fieldMode?styles.mobileActive:styles.mobileTool} onClick={()=>{if(fieldMode)persist(docRef.current);setFieldMode(value=>!value);setQuickAddOpen(false);setRoomPickerOpen(false);setMobileEditOpen(false)}}>{fieldMode?"Avslutt befaring":"Befaring"}</button>
    {(draft||measureDraft||zoneDraft.length>0)&&<button type="button" className={styles.mobileDone} onClick={()=>{if(tool==="zone"&&zoneDraft.length>=3)finishZone();else{setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([]);setTool("select")}}}>{tool==="zone"&&zoneDraft.length>=3?"Lukk sone":"Ferdig"}</button>}
    <span className={styles.mobileDivider}/>
    <button type="button" className={styles.mobileTool} onClick={undo} disabled={!history.length}>↶</button>
