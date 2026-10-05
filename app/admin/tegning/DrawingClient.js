@@ -227,8 +227,10 @@ export default function DrawingClient(){
  },[]);
  useEffect(()=>{
   const finish=()=>{setPrintMode(false);if(printSelectionRef.current){setSelected(printSelectionRef.current);printSelectionRef.current=null}};
+  const media=window.matchMedia?.("print"),onMedia=e=>{if(!e.matches)finish()};
   window.addEventListener("afterprint",finish);
-  return()=>window.removeEventListener("afterprint",finish);
+  media?.addEventListener?.("change",onMedia);
+  return()=>{window.removeEventListener("afterprint",finish);media?.removeEventListener?.("change",onMedia)};
  },[]);
 
  useEffect(()=>{const el=svg.current;if(!el||typeof ResizeObserver==="undefined")return;const update=()=>{const r=el.getBoundingClientRect();if(r.width>0&&r.height>0)setCanvasAspect(clamp(r.width/r.height,.35,2.8))};update();const observer=new ResizeObserver(update);observer.observe(el);window.addEventListener("orientationchange",update);return()=>{observer.disconnect();window.removeEventListener("orientationchange",update)}},[]);
@@ -768,7 +770,6 @@ export default function DrawingClient(){
  const runPrint=()=>{
   printSelectionRef.current=selected;setSelected(null);setPrintMode(true);
   requestAnimationFrame(()=>requestAnimationFrame(()=>window.print()));
-  setTimeout(()=>{setPrintMode(false);if(printSelectionRef.current){setSelected(printSelectionRef.current);printSelectionRef.current=null}},3000);
  };
  const printBounds=printMode?drawingBounds():null;
 
