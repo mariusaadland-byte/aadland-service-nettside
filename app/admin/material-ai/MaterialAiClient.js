@@ -74,6 +74,8 @@ export default function MaterialAiClient(){
  const [result,setResult]=useState(null);
  const [prices,setPrices]=useState({});
  const [catalog,setCatalog]=useState([]);
+ const [supplierStatuses,setSupplierStatuses]=useState([]);
+ const [directBusy,setDirectBusy]=useState("");
  const [loading,setLoading]=useState(false);
  const [error,setError]=useState("");
  const [message,setMessage]=useState("");
@@ -90,6 +92,12 @@ export default function MaterialAiClient(){
    }
   }catch{}
  },[]);
+ useEffect(()=>{
+  let cancelled=false;
+  fetch("/api/admin/material-suppliers").then(async r=>{const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error();return data.suppliers||[]}).then(items=>{if(!cancelled)setSupplierStatuses(items)}).catch(()=>{});
+  return()=>{cancelled=true};
+ },[]);
+
 
  const totals=useMemo(()=>{
   if(!result?.lines?.length)return {cost:0,sales:0};
@@ -120,6 +128,18 @@ export default function MaterialAiClient(){
   const current=prices[line.id]||{},match=matchCatalog(line,catalog,current.supplier||"");
   if(!match){setMessage("Fant ingen god prisfil-match for "+line.material);setTimeout(()=>setMessage(""),1800);return}
   setPrices(value=>({...value,[line.id]:{...value[line.id],supplier:match.supplier||value[line.id]?.supplier||"",sku:match.sku||"",productName:match.name||"",costExVat:String(match.costExVat||""),priceBasis:match.priceBasis||value[line.id]?.priceBasis||"unit",matched:true}}));
+ }
+ async function directLookup(line){
+  const current=prices[line.id]||{},supplier=current.supplier;if(!supplier){setMessage("Velg leverandør først.");setTimeout(()=>setMessage(""),1600);return}
+  setDirectBusy(line.id);setError("");
+  try{
+   const r=await fetch("/api/admin/material-suppliers?supplier="+encodeURIComponent(supplier)+"&q="+encodeURIComponent(line.supplierSearch||line.material)),data=await r.json().catch(()=>({}));
+   if(!r.ok)throw new Error(data.error||"Kunne ikke hente leverandørpris.");
+   if(!data.connected)throw new Error("Denne leverandøren er ikke direkte koblet ennå.");
+   const match=data.products?.[0];if(!match)throw new Error("Fant ingen kundepris på dette søket.");
+   setPrices(value=>({...value,[line.id]:{...value[line.id],supplier:match.supplier||supplier,sku:match.sku||"",productName:match.name||"",costExVat:String(match.costExVat||""),priceBasis:match.priceBasis||value[line.id]?.priceBasis||"unit",matched:true,direct:true}}));
+  }catch(err){setError(err.message||"Kunne ikke hente leverandørpris.")}
+  finally{setDirectBusy("")}
  }
  function importPriceFile(event){
   const file=event.target.files?.[0];event.target.value="";if(!file)return;
@@ -171,7 +191,7 @@ export default function MaterialAiClient(){
 
    <section className={styles.supplierCard}>
     <div className={styles.sectionHead}><div><span className={styles.kicker}>3 · LEVERANDØRPRISER</span><h2>Dine innkjøpspriser</h2><p>Prisimport er tilgjengelig nå. Direkte koblinger bygges mot leverandørens godkjente API/PunchOut/EDI når tilgangene er på plass.</p></div><label className={styles.importBtn}>Importer prisfil<input type="file" accept=".csv,text/csv,.txt" onChange={importPriceFile}/></label></div>
-    <div className={styles.supplierGrid}>{SUPPLIERS.map(s=><div key={s.id}><strong>{s.name}</strong><span>{s.mode}</span><small>{s.note}</small><b>Ikke direkte koblet</b></div>)}</div>
+    <div className={styles.supplierGrid}>{SUPPLIERS.map(s=>{const status=supplierStatuses.find(item=>item.id===s.id);return <div key={s.id}><strong>{s.name}</strong><span>{status?.mode||s.mode}</span><small>{s.note}</small><b className={status?.connected?styles.connected:undefined}>{status?.connected?"Direkte koblet ✓":"Ikke direkte koblet"}</b></div>})}</div>
     <div className={styles.catalogStatus}><span>{catalog.length?catalog.length+" varer i lokal prisbase":"Ingen prisfil importert"}</span>{catalog.length>0&&<button type="button" onClick={clearCatalog}>Tøm prisbase</button>}</div>
     <p className={styles.fileHelp}>CSV kan bruke kolonner som leverandør, varenr/SKU, produkt/navn, enhet, pris eks. mva eller pris inkl. mva, pakningsstørrelse og prisbasis. Pris inkl. mva konverteres til eks. mva før påslag.</p>
    </section>
@@ -189,9 +209,9 @@ export default function MaterialAiClient(){
        <label>Varenr.<input value={p.sku||""} onChange={e=>updatePrice(line.id,"sku",e.target.value)} placeholder="Valgfritt"/></label>
        <label>Innkjøpspris eks. mva<input inputMode="decimal" value={p.costExVat||""} onChange={e=>updatePrice(line.id,"costExVat",e.target.value)} placeholder="0,00"/></label>
        <label>Pris gjelder<select value={basis} onChange={e=>updatePrice(line.id,"priceBasis",e.target.value)}><option value="unit">Per {line.unit}</option><option value="package">Per pakke</option></select></label>
-       <button type="button" className={styles.matchBtn} onClick={()=>autoMatch(line)} disabled={!catalog.length}>Match prisfil</button>
+       <div className={styles.priceActions}><button type="button" className={styles.matchBtn} onClick={()=>autoMatch(line)} disabled={!catalog.length}>Match prisfil</button><button type="button" className={styles.directBtn} onClick={()=>directLookup(line)} disabled={!p.supplier||directBusy===line.id||!supplierStatuses.find(s=>s.name===p.supplier)?.connected}>{directBusy===line.id?"Henter…":"Hent min pris"}</button></div>
       </div>
-      {p.productName&&<p className={styles.matchInfo}>Matchet: <b>{p.productName}</b>{p.sku?" · "+p.sku:""}</p>}
+      {p.productName&&<p className={styles.matchInfo}>{p.direct?"Direkte pris":"Matchet"}: <b>{p.productName}</b>{p.sku?" · "+p.sku:""}</p>}
       <div className={styles.priceSummary}><span>Kost: <b>{money(qty*cost)}</b></span><span>+ {decimal(number(markup),2)} %: <b>{money(sales)} / {basis==="package"?"pk":line.unit}</b></span><strong>Tilbudslinje {money(total)} eks. mva</strong></div>
       <details><summary>Se grunnlag</summary><p><b>Grunnlag:</b> {line.basis}</p><p><b>Søk hos leverandør:</b> {line.supplierSearch}</p></details>
      </article>;
