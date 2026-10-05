@@ -119,7 +119,7 @@ export default function MaterialAiClient(){
  function autoMatch(line){
   const current=prices[line.id]||{},match=matchCatalog(line,catalog,current.supplier||"");
   if(!match){setMessage("Fant ingen god prisfil-match for "+line.material);setTimeout(()=>setMessage(""),1800);return}
-  setPrices(value=>({...value,[line.id], [line.id]:{...value[line.id],supplier:match.supplier||value[line.id]?.supplier||"",sku:match.sku||"",productName:match.name||"",costExVat:String(match.costExVat||""),priceBasis:match.priceBasis||value[line.id]?.priceBasis||"unit",matched:true}}));
+  setPrices(value=>({...value,[line.id]:{...value[line.id],supplier:match.supplier||value[line.id]?.supplier||"",sku:match.sku||"",productName:match.name||"",costExVat:String(match.costExVat||""),priceBasis:match.priceBasis||value[line.id]?.priceBasis||"unit",matched:true}}));
  }
  function importPriceFile(event){
   const file=event.target.files?.[0];event.target.value="";if(!file)return;
