@@ -650,3 +650,25 @@
  .printLooseMeasures span{display:flex;justify-content:space-between;gap:4mm;border:1px solid #ccc;padding:2mm;font-size:7.5pt}
  .printLooseMeasures strong{white-space:nowrap}
 }
+
+.quoteWarningModal{
+ width:min(500px,100%);max-height:min(760px,90vh);overflow:auto;
+ background:#fff;color:#1d1d1b;border-radius:16px;box-shadow:0 24px 70px #0005;padding:18px
+}
+.quoteWarningModal>p{font-size:13px;line-height:1.55;color:#655d50}
+.quoteWarningModal>small{display:block;margin-top:10px;font-size:10px;line-height:1.45;color:#786b56}
+.quoteWarningStats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+.quoteWarningStats span{display:grid;gap:2px;padding:9px;border:1px solid #d8ccb0;border-radius:9px;background:#fffaf0}
+.quoteWarningStats small{font-size:9px;color:#75694f;font-weight:800}
+.quoteWarningStats b{font-size:16px}
+.quoteWarningActions{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.quoteWarningActions button{min-height:46px;border-radius:9px;border:1px solid #c9b27a;background:#fffaf0;color:#4c3a1f;font-weight:800}
+.quoteWarningActions button:last-child{background:#6f5a32;border-color:#6f5a32;color:#fff}
+@media(max-width:900px), (pointer:coarse) and (min-width:901px) and (max-width:1200px){
+ .quoteWarningModal{
+  width:100%;max-height:76dvh;border-radius:18px 18px 0 0;
+  padding:16px 14px max(20px,env(safe-area-inset-bottom))
+ }
+ .quoteWarningActions{grid-template-columns:1fr}
+ .quoteWarningActions button{min-height:50px;font-size:14px}
+}
