@@ -94,3 +94,10 @@
  .totalBar button{grid-column:auto}
 }
 @media print{.topActions,.supplierCard,.inputGrid,.back,.matchBtn{display:none!important}.page{background:#fff;padding:0}.card,.result,.line{border-color:#bbb}.totalBar{position:static;box-shadow:none}}
+
+.connected{color:#2f6a43!important}
+.priceActions{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:stretch}
+.directBtn{min-height:41px;border:1px solid #7fa48b;border-radius:8px;background:#eef7f1;color:#2f6641;font-size:10px;font-weight:900;padding:0 10px}
+.directBtn:disabled{opacity:.42}
+@media(max-width:980px){.priceActions{grid-column:1/-1}}
+@media(max-width:560px){.priceActions{grid-column:auto;grid-template-columns:1fr}}
