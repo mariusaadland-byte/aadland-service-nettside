@@ -165,7 +165,7 @@ export default function MaterialAiClient(){
  const [basis,setBasis]=useState(emptyBasis);
  const [rooms,setRooms]=useState([]);
  const [rows,setRows]=useState([]);
- const [markup,setMarkup]=useState("10");
+ const [markup,setMarkup]=useState("20");
  const [prices,setPrices]=useState({});
  const [catalog,setCatalog]=useState([]);
  const [favorites,setFavorites]=useState([]);
@@ -178,7 +178,7 @@ export default function MaterialAiClient(){
   try{
    const saved=JSON.parse(localStorage.getItem(STORE)||"[]");if(Array.isArray(saved))setCatalog(saved);const savedFavorites=JSON.parse(localStorage.getItem(FAVORITES_STORE)||"[]");if(Array.isArray(savedFavorites))setFavorites(savedFavorites);
    const draft=JSON.parse(localStorage.getItem(DRAFT_STORE)||"null");
-   if(draft){setProject(draft.project||"");setFacts(draft.facts||"");setBasis({...emptyBasis(),...(draft.basis||{})});setRooms(Array.isArray(draft.rooms)?draft.rooms:[]);setRows(Array.isArray(draft.rows)?draft.rows:[]);setMarkup(String(draft.markup??"10"));setPrices(draft.prices||{})}
+   if(draft){setProject(draft.project||"");setFacts(draft.facts||"");setBasis({...emptyBasis(),...(draft.basis||{})});setRooms(Array.isArray(draft.rooms)?draft.rooms:[]);setRows(Array.isArray(draft.rows)?draft.rows:[]);setMarkup(String(draft.markup??"").trim()==="10"?"20":String(draft.markup??"20"));setPrices(draft.prices||{})}
    const drawing=JSON.parse(sessionStorage.getItem("aadlandMaterialCalcFromDrawing")||sessionStorage.getItem("aadlandMaterialAiFromDrawing")||"null");
    if(drawing){
     sessionStorage.removeItem("aadlandMaterialCalcFromDrawing");sessionStorage.removeItem("aadlandMaterialAiFromDrawing");
