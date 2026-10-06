@@ -6,6 +6,7 @@ import styles from "./material-ai.module.css";
 
 const STORE="aadland-material-price-catalog-v1";
 const SUPPLIERS=[
+ {id:"byggern",name:"Bygger’n",mode:"Proffpris / prisliste",note:"Primær leverandør. Bygger’n Proff viser egne priser og kan levere prislister; direkte adapter aktiveres når godkjent tilgang er på plass."},
  {id:"ahlsell",name:"Ahlsell",mode:"PunchOut / prisfil",note:"Kan kobles mot bedriftsavtale og kundepris."},
  {id:"optimera",name:"Optimera / MinOptimera",mode:"Avtalepris / prisfil",note:"Adapter klar for leverandørens godkjente integrasjonsmetode."},
  {id:"byggmakker",name:"Byggmakker Proff",mode:"Proff / prisfil",note:"Adapter klar for bedriftspris når tilgangsmetode er avklart."},
@@ -117,7 +118,7 @@ export default function MaterialAiClient(){
    const next={};
    for(const line of data.result?.lines||[]){
     const match=matchCatalog(line,catalog,"");
-    next[line.id]=match?{supplier:match.supplier||"",sku:match.sku||"",productName:match.name||"",costExVat:String(match.costExVat||""),priceBasis:match.priceBasis||((line.packages||0)>0?"package":"unit"),matched:true}:{supplier:"",sku:"",productName:"",costExVat:"",priceBasis:(line.packages||0)>0?"package":"unit",matched:false};
+    next[line.id]=match?{supplier:match.supplier||"",sku:match.sku||"",productName:match.name||"",costExVat:String(match.costExVat||""),priceBasis:match.priceBasis||((line.packages||0)>0?"package":"unit"),matched:true}:{supplier:"Bygger’n",sku:"",productName:"",costExVat:"",priceBasis:(line.packages||0)>0?"package":"unit",matched:false};
    }
    setPrices(next);
   }catch(err){setError(err.message||"Kunne ikke beregne materialene.")}
