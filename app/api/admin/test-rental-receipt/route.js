@@ -3,7 +3,7 @@ import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {buildReceiptEmail} from "../../../../lib/receiptEmail";
 import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
-import {rentalEmailFrom,rentalReplyTo} from "../../../../lib/rentalEmailConfig";
+import {rentalEmailFrom,rentalReplyTo,rentalResendApiKey} from "../../../../lib/rentalEmailConfig";
 
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;
@@ -21,7 +21,7 @@ export async function POST(req){
  const depositReference=String(body.depositReference||"TEST-DEP-2026").trim().slice(0,120)||"TEST-DEP-2026";
  if(!email||email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return NextResponse.json({error:"Skriv inn en gyldig e-postadresse."},{status:400});
 
- const resendKey=process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY;
+ const resendKey=rentalResendApiKey();
  if(!resendKey)return NextResponse.json({error:"Preview-e-post er ikke konfigurert."},{status:503});
 
  const bookingNumber="TEST-U-2026-1001";
