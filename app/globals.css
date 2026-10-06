@@ -1669,6 +1669,9 @@ html{scroll-behavior:smooth}
 .rentalNewItemHeader h1{margin:22px 0 8px}
 .rentalNewItemForm{display:grid;gap:18px}
 .rentalNewItemGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.rentalQuantityField input{min-width:8rem;font-variant-numeric:tabular-nums}
+.rentalQuantityField small{display:block;margin-top:6px}
+
 .rentalNewItemImages{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:8px 0 14px}
 .rentalNewItemImages>div{display:grid;gap:8px}
 .rentalNewItemImages img{width:100%;height:150px;object-fit:cover;border-radius:12px}
@@ -3084,3 +3087,15 @@ body:has(.customerPage) .customerPage{
  .quotePaperAcceptanceFields{grid-template-columns:1fr}
  .quotePaperSignature{grid-column:1}
 }
+
+.rentalTermsNotice{
+ display:grid;
+ gap:4px;
+ margin:4px 0 12px;
+ padding:12px 14px;
+ border:1px solid rgba(215,167,78,.35);
+ background:rgba(215,167,78,.07);
+ border-radius:10px;
+}
+.rentalTermsNotice b{font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.rentalTermsNotice span{font-size:13px;line-height:1.5;color:var(--muted,#aaa)}

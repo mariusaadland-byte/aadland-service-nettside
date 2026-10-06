@@ -470,6 +470,7 @@ export default function AdminClient({ user }) {
   if (canManageProducts) tabs.push(["rental", "Utleieutstyr"]);
   if (canViewOrders) tabs.push(["rentalCalendar", "Utleiekalender"]);
   if (canViewOrders) tabs.push(["rentalBookings", "Utleiebookinger"]);
+  if (canUpdateOrders) tabs.push(["workClock", "Arbeidsklokke"],["calculator", "Kalkulator"],["materialAi", "Materialkalkulator"],["reminders", "Purring"],["vipps", "Vipps"]);
   if (canManageProducts) tabs.push(["projects", "Tidligere oppdrag"]);
   if (canManageProducts) tabs.push(["homepage", "Forside"]);
   if (canManageProducts) tabs.push(["drawing", "Tegning & visualisering"]);
@@ -477,6 +478,11 @@ export default function AdminClient({ user }) {
 
   function chooseTab(id) {
     if (id === "drawing") { setMenuOpen(false); router.push("/admin/tegning"); return; }
+    if (id === "workClock") { setMenuOpen(false); router.push("/admin/arbeidsklokke"); return; }
+    if (id === "calculator") { setMenuOpen(false); router.push("/admin/kalkulator"); return; }
+    if (id === "materialAi") { setMenuOpen(false); router.push("/admin/material-ai"); return; }
+    if (id === "reminders") { setMenuOpen(false); router.push("/admin/purring"); return; }
+    if (id === "vipps") { setMenuOpen(false); router.push("/admin/vipps"); return; }
     setTab(id);
     setMenuOpen(false);
   }
@@ -1150,6 +1156,42 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
   setMessage((alreadyPaid?"Betalingsbekreftelsen er sendt på nytt til ":"Betalingen er registrert og betalingsbekreftelsen er sendt til ")+(data.sentTo||order.customerEmail)+".");
   if(typeof reload==="function")await reload();
  }
+
+ async function vippsOrderAction(order,action){
+  const reference=String(order.paymentReference||order.orderNumber||"").trim();
+  if(!reference){setMessage("Vipps-referansen mangler.");return;}
+  let amountOre=0;
+  if(action==="capture"){
+   const suggested=Math.max(0,Number(order.paymentReservedOre||order.totalOre||0)-Number(order.paymentCapturedOre||0));
+   const value=window.prompt("Beløp som skal captures i Vipps (kr):",(suggested/100).toFixed(2));
+   if(value===null)return;
+   amountOre=kronerToOre(value);
+   if(!Number.isInteger(amountOre)||amountOre<=0){setMessage("Skriv inn et gyldig capture-beløp.");return;}
+   if(!window.confirm("Capture "+nok(amountOre)+" fra Vipps-reservasjonen? Gjør dette først når varen/tjenesten kan leveres."))return;
+  }else if(action==="refund"){
+   const suggested=Math.max(0,Number(order.paymentCapturedOre||0)-Number(order.paymentRefundedOre||0));
+   const value=window.prompt("Beløp som skal refunderes i Vipps (kr):",(suggested/100).toFixed(2));
+   if(value===null)return;
+   amountOre=kronerToOre(value);
+   if(!Number.isInteger(amountOre)||amountOre<=0){setMessage("Skriv inn et gyldig refusjonsbeløp.");return;}
+   if(!window.confirm("Refundere "+nok(amountOre)+" gjennom Vipps?"))return;
+  }else if(action==="cancel"&&!window.confirm("Kansellere gjenværende Vipps-reservasjon? Beløpet som ikke er captured frigis til kunden."))return;
+
+  setSavingId(order.id);setMessage("");
+  const response=await fetch("/api/admin/vipps-payment",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({unit:"service",reference,action,amountOre})
+  });
+  const data=await response.json().catch(()=>({}));
+  setSavingId(null);
+  if(!response.ok){setMessage(data.error||"Vipps-handlingen kunne ikke utføres.");return;}
+  const labels={sync:"Vipps-status er synkronisert.",capture:"Vipps-beløpet er trukket.",cancel:"Gjenværende Vipps-reservasjon er kansellert.",refund:"Vipps-refusjonen er registrert."};
+  const receiptText=data?.receipt?.sent?" Kvittering er sendt automatisk til kunden.":data?.receiptWarning?" "+data.receiptWarning:"";
+  const refundText=data?.refundNotice?.sent?" Tilbakebetalingsbekreftelse er sendt automatisk til kunden.":data?.refundNoticeWarning?" "+data.refundNoticeWarning:"";
+  setMessage((labels[action]||"Vipps-betalingen er oppdatert.")+receiptText+refundText);
+  if(typeof reload==="function")await reload();
+ }
  return <><>{message&&<p className="notice">{message}</p>}</><div className="orderCards">{orders.length?orders.map(order=><article className="card orderCard" key={order.id}>
   <div className="orderCardTop"><div><div className="kicker">{order.orderNumber}</div><h3>{order.customerName||"Ukjent kunde"}</h3><small className="muted">{new Date(order.createdAt).toLocaleString("nb-NO")}</small></div><b>{nok(order.totalOre||0)}</b></div>
   <p>{order.customerPhone&&<>{order.customerPhone}<br/></>}{order.customerEmail}</p>
@@ -1213,15 +1255,24 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
    {order.orderType!=="custom"&&<div className="orderPaymentPanel">
     <h4>Betaling og kvittering</h4>
     <div className="orderPaymentFacts">
-     <span><small>Status</small><b>{order.paymentStatus==="paid"?"Betalt":order.paymentStatus==="authorized"?"Reservert":order.paymentStatus==="refunded"?"Refundert":order.paymentStatus==="partial"?"Delvis betalt":"Ikke betalt"}</b></span>
+     <span><small>Status</small><b>{order.paymentStatus==="paid"?"Betalt":order.paymentStatus==="authorized"?"Reservert":order.paymentStatus==="refunded"?"Refundert":order.paymentStatus==="partial"?"Delvis betalt":order.paymentStatus==="cancelled"?"Kansellert":"Ikke betalt"}</b></span>
+     {String(order.paymentProvider||"").toLowerCase()==="vipps"&&<span><small>Betalingsmåte</small><b>Vipps</b></span>}
+     {String(order.paymentProvider||"").toLowerCase()==="vipps"&&Number(order.paymentReservedOre)>0&&<span><small>Reservert</small><b>{nok(order.paymentReservedOre)}</b></span>}
      <span><small>Registrert betalt</small><b>{nok(order.paymentCapturedOre||0)}</b></span>
      {Number(order.paymentRefundedOre)>0&&<span><small>Tilbakebetalt</small><b>{nok(order.paymentRefundedOre)}</b></span>}
+     {String(order.paymentProvider||"").toLowerCase()==="vipps"&&order.paymentCaptureGuaranteedUntil&&<span><small>Capture garantert til</small><b>{new Date(order.paymentCaptureGuaranteedUntil).toLocaleString("nb-NO")}</b></span>}
      {order.paymentRefundedAt&&<span><small>Sist tilbakebetalt</small><b>{new Date(order.paymentRefundedAt).toLocaleString("nb-NO")}</b></span>}
      {order.receiptSentAt&&<span><small>Betalingsbekreftelse</small><b>Sendt {new Date(order.receiptSentAt).toLocaleString("nb-NO")}</b></span>}
      {order.refundNoticeSentAt&&<span><small>Tilbakebetalingsbekreftelse</small><b>Sendt {new Date(order.refundNoticeSentAt).toLocaleString("nb-NO")}</b></span>}
     </div>
-    <div className="field"><label>Betalingsreferanse <span className="muted">(f.eks. Vipps-ref., kontant eller bank)</span></label><input id={"payment-reference-"+order.id} defaultValue={order.paymentReference||""} maxLength={120} placeholder="Valgfri referanse"/></div>
-    {canUpdateOrders&&order.paymentStatus!=="refunded"&&Number(order.paymentRefundedOre||0)===0&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>registerPayment(order)}>{savingId===order.id?"Sender …":order.paymentStatus==="paid"?"Send betalingsbekreftelse på nytt":"Registrer betalt + send bekreftelse"}</button>}
+    {String(order.paymentProvider||"").toLowerCase()==="vipps"&&canUpdateOrders&&<div className="rentalBookingActions">
+     <button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>vippsOrderAction(order,"sync")}>{savingId===order.id?"Synker …":"Synk Vipps-status"}</button>
+     {order.paymentStatus==="authorized"&&Number(order.paymentReservedOre||0)>Number(order.paymentCapturedOre||0)&&<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>vippsOrderAction(order,"capture")}>Capture Vipps</button>}
+     {order.paymentStatus==="authorized"&&Number(order.paymentReservedOre||0)>Number(order.paymentCapturedOre||0)&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>vippsOrderAction(order,"cancel")}>Kanseller reservasjon</button>}
+     {Number(order.paymentCapturedOre||0)>Number(order.paymentRefundedOre||0)&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>vippsOrderAction(order,"refund")}>Refunder via Vipps</button>}
+    </div>}
+    {String(order.paymentProvider||"").toLowerCase()!=="vipps"&&<div className="field"><label>Betalingsreferanse <span className="muted">(f.eks. bank, kontant eller annen manuell betaling)</span></label><input id={"payment-reference-"+order.id} defaultValue={order.paymentReference||""} maxLength={120} placeholder="Valgfri referanse"/></div>}
+    {String(order.paymentProvider||"").toLowerCase()!=="vipps"&&canUpdateOrders&&order.paymentStatus!=="refunded"&&Number(order.paymentRefundedOre||0)===0&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>registerPayment(order)}>{savingId===order.id?"Sender …":order.paymentStatus==="paid"?"Send betalingsbekreftelse på nytt":"Registrer betalt + send bekreftelse"}</button>}
     {Number(order.paymentCapturedOre)>Number(order.paymentRefundedOre||0)&&String(order.paymentProvider||"").toLowerCase()!=="vipps"&&<div className="orderRefundPanel">
      <h4>Tilbakebetaling</h4>
      <p className="muted">Gjenstår å kunne tilbakebetale: <b>{nok(Math.max(0,Number(order.paymentCapturedOre||0)-Number(order.paymentRefundedOre||0)))}</b></p>
@@ -1230,7 +1281,7 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
      <div className="field"><label>Merknad til kunden</label><textarea id={"refund-note-"+order.id} defaultValue={order.refundNote||""} maxLength={1000} rows="3" placeholder="Valgfritt"/></div>
      {canUpdateOrders&&<button className="btn alt" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>recordRefund(order,false)}>{savingId===order.id?"Behandler …":"Registrer tilbakebetaling + send bekreftelse"}</button>}
     </div>}
-    {String(order.paymentProvider||"").toLowerCase()==="vipps"&&Number(order.paymentCapturedOre)>Number(order.paymentRefundedOre||0)&&<p className="muted">Vipps-refusjon håndteres gjennom Vipps-betalingsflyten når den aktiveres.</p>}
+    {String(order.paymentProvider||"").toLowerCase()==="vipps"&&<p className="muted">Vipps-beløp synkroniseres mot Vipps. Capture skal først gjøres når varen eller tjenesten kan leveres.</p>}
     {Number(order.refundLastOre)>0&&canUpdateOrders&&<button className="btn alt" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>recordRefund(order,true)}>{savingId===order.id?"Sender …":"Send tilbakebetalingsbekreftelse på nytt"}</button>}
    </div>}
    {order.status==="cancelled"&&<div className="orderPaymentPanel">
@@ -1324,6 +1375,7 @@ function Jobs({orders,status,canUpdateOrders,reload,onCreateProject=null}){
      </div>
      <div className="jobQuoteActions">
       <a className="btn alt" href={"/admin/tilbud/"+order.sourceQuoteId}>Åpne tilbud</a>
+      <a className="btn alt" href={"/admin/tegning?orderId="+encodeURIComponent(order.id)}>Tegning</a>
       <a className="btn" href={"/admin/oppdrag/"+order.id+"/planlegg"}>{order.jobStartAt?"Rediger plan":"Planlegg oppdrag"}</a>
      </div>
     </div>
@@ -1434,6 +1486,7 @@ function Surveys({ orders, status, canUpdateOrders }) {
         <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:18}}>
           {order.customerPhone && <a className="btn" href={"tel:"+order.customerPhone}>Ring kunde</a>}
           {order.customerEmail && <a className="btn alt" href={"mailto:"+order.customerEmail}>Send e-post</a>}
+          <a className="btn alt" href={"/admin/tegning?orderId="+encodeURIComponent(order.id)}>Åpne tegning</a>
           {canUpdateOrders && <a className="btn alt" href={"/admin/tilbud/ny?orderId="+order.id}>Lag tilbud</a>}
         </div>
       </article>;
@@ -4164,7 +4217,7 @@ function RentalEditor({item,categories=[],reload,setError,close}){
  <div className="field"><label>Beskrivelse</label><textarea rows="3" value={v.description} onChange={e=>set("description",e.target.value)}/></div>
  <div className="field"><label>Bilder</label>{v.imageUrls.map((url,i)=><div key={url+i} style={{marginBottom:8}}><img src={url} alt="" style={{width:180,height:110,objectFit:"cover",borderRadius:10}}/><button type="button" className="btn alt" onClick={()=>set("imageUrls",v.imageUrls.filter((_,x)=>x!==i))}>Fjern</button></div>)}<input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={e=>{upload(e.target.files);e.target.value=""}}/>{uploading&&<small>Laster opp …</small>}</div>
  <div className="field"><label>Status</label><select value={v.status} onChange={e=>set("status",e.target.value)}><option value="available">Tilgjengelig</option><option value="unavailable">Midlertidig utilgjengelig</option><option value="maintenance">Service/vedlikehold</option><option value="hidden">Skjult</option></select></div>
- <div className="field"><label>Antall</label><input type="number" min="1" value={v.quantity} onChange={e=>set("quantity",e.target.value)}/></div>
+ <div className="field rentalQuantityField"><label>Antall</label><input type="number" min="1" max="100000" inputMode="numeric" value={v.quantity} onChange={e=>set("quantity",e.target.value)}/><small className="muted">Antall like eksemplarer som kan være ute samtidig.</small></div>
  <div className="field"><label>Døgnpris (kr)</label><input type="number" min="0" value={(Number(v.dailyPriceOre)||0)/100} onChange={e=>set("dailyPriceOre",Math.round(Number(e.target.value||0)*100))}/></div>
  <div className="field"><label>Helgepris (kr)</label><input type="number" min="0" value={v.weekendPriceOre===""?"":Number(v.weekendPriceOre)/100} onChange={e=>set("weekendPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))}/></div>
  <div className="field"><label>Ukepris (kr)</label><input type="number" min="0" value={v.weeklyPriceOre===""?"":Number(v.weeklyPriceOre)/100} onChange={e=>set("weeklyPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))}/></div>
@@ -4195,7 +4248,7 @@ alter table public.rental_bookings add column if not exists deposit_charged_ore 
 
 function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired=false}){
  const statuses={new:"Ny",confirmed:"Bekreftet",active:"Utlevert",returned:"Returnert",completed:"Ferdig",cancelled:"Avbrutt"};
- const paymentLabels={unpaid:"Ikke betalt",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert"};
+ const paymentLabels={unpaid:"Ikke betalt",pending:"Venter",authorized:"Reservert",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert",cancelled:"Kansellert"};
  const depositLabels={not_paid:"Ikke mottatt",held:"Holdes",released:"Frigitt",partially_charged:"Delvis brukt",charged:"Brukt"};
  const settlementIssue=booking=>{
   const total=Math.max(0,Number(booking.totalOre)||0);
@@ -4286,6 +4339,42 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
   const d=await runAction(booking,"record-paid-and-send-receipt",{paymentReference:reference},text);
   if(!d)return;
   setMessage((alreadyPaid?"Kvitteringen er sendt på nytt til ":"Leiebetalingen er registrert og kvitteringen er sendt til ")+(d.sentTo||booking.customer?.email)+".");
+ }
+
+ async function vippsRentalAction(booking,action){
+  const reference=String(booking.paymentReference||booking.bookingNumber||"").trim();
+  if(!reference){setError("Vipps-referansen mangler.");return;}
+  let amountOre=0;
+  if(action==="capture"){
+   const suggested=Math.max(0,Number(booking.paymentReservedOre||booking.totalOre||0)-Number(booking.paymentCapturedOre||0));
+   const value=window.prompt("Beløp som skal captures i Vipps (kr):",(suggested/100).toFixed(2));
+   if(value===null)return;
+   amountOre=kronerToOre(value);
+   if(!Number.isInteger(amountOre)||amountOre<=0){setError("Skriv inn et gyldig capture-beløp.");return;}
+   if(!window.confirm("Capture "+nok(amountOre)+" fra Vipps-reservasjonen? Gjør dette først når leien kan leveres/utleveres."))return;
+  }else if(action==="refund"){
+   const suggested=Math.max(0,Number(booking.paymentCapturedOre||0)-Number(booking.paymentRefundedOre||0));
+   const value=window.prompt("Beløp som skal refunderes i Vipps (kr):",(suggested/100).toFixed(2));
+   if(value===null)return;
+   amountOre=kronerToOre(value);
+   if(!Number.isInteger(amountOre)||amountOre<=0){setError("Skriv inn et gyldig refusjonsbeløp.");return;}
+   if(!window.confirm("Refundere "+nok(amountOre)+" gjennom Vipps?"))return;
+  }else if(action==="cancel"&&!window.confirm("Kansellere gjenværende Vipps-reservasjon? Beløpet som ikke er captured frigis til kunden."))return;
+
+  setError("");setMessage("");setSavingId(booking.id);
+  const response=await fetch("/api/admin/vipps-payment",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({unit:"rental",reference,action,amountOre})
+  });
+  const data=await response.json().catch(()=>({}));
+  setSavingId("");
+  if(!response.ok){setError(data.error||"Vipps-handlingen kunne ikke utføres.");return;}
+  const labels={sync:"Vipps-status er synkronisert.",capture:"Vipps-beløpet er trukket.",cancel:"Gjenværende Vipps-reservasjon er kansellert.",refund:"Vipps-refusjonen er registrert."};
+  const receiptText=data?.receipt?.sent?" Kvittering er sendt automatisk til kunden.":data?.receiptWarning?" "+data.receiptWarning:"";
+  const refundText=data?.refundNotice?.sent?" Tilbakebetalingsbekreftelse er sendt automatisk til kunden.":data?.refundNoticeWarning?" "+data.refundNoticeWarning:"";
+  setMessage((labels[action]||"Vipps-betalingen er oppdatert.")+receiptText+refundText);
+  await reload();
  }
 
  async function refundRentalPayment(booking){
@@ -4394,15 +4483,24 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
     <h4>Leiebetaling</h4>
     <div className="orderPaymentFacts">
      <span><small>Status</small><b>{paymentLabels[b.paymentStatus]||b.paymentStatus}</b></span>
+     {String(b.paymentProvider||"").toLowerCase()==="vipps"&&<span><small>Betalingsmåte</small><b>Vipps</b></span>}
+     {String(b.paymentProvider||"").toLowerCase()==="vipps"&&Number(b.paymentReservedOre)>0&&<span><small>Reservert</small><b>{nok(b.paymentReservedOre)}</b></span>}
      <span><small>Registrert betalt</small><b>{nok(b.paymentCapturedOre||0)}</b></span>
      {Number(b.paymentRefundedOre)>0&&<span><small>Tilbakebetalt</small><b>{nok(b.paymentRefundedOre)}</b></span>}
+     {String(b.paymentProvider||"").toLowerCase()==="vipps"&&b.paymentCaptureGuaranteedUntil&&<span><small>Capture garantert til</small><b>{new Date(b.paymentCaptureGuaranteedUntil).toLocaleString("nb-NO")}</b></span>}
      {Number(b.paymentCapturedOre)>Number(b.paymentRefundedOre||0)&&<span><small>Netto registrert</small><b>{nok(Number(b.paymentCapturedOre)-Number(b.paymentRefundedOre||0))}</b></span>}
      {b.receiptSentAt&&<span><small>Kvittering</small><b>Sendt {new Date(b.receiptSentAt).toLocaleString("nb-NO")}</b></span>}
     </div>
-    <div className="field"><label>Betalingsreferanse <span className="muted">(Vipps, bank, kontant osv.)</span></label><input id={"rental-payment-reference-"+b.id} defaultValue={b.paymentReference||""} maxLength={120} placeholder="Valgfri referanse"/></div>
-    {canUpdate&&<button className="btn" type="button" disabled={savingId===b.id||paymentSetupRequired||!b.customer?.email||Number(b.paymentRefundedOre)>0} onClick={()=>registerPayment(b)}>{savingId===b.id?"Sender …":Number(b.paymentRefundedOre)>0?"Tilbakebetaling registrert":b.paymentStatus==="paid"?"Send kvittering på nytt":"Registrer leie betalt + send kvittering/PDF"}</button>}
-    <p className="muted">Betalingsstatus oppdateres automatisk når leien registreres som betalt. Dette hindrer at «Betalt» settes uten registrert beløp.</p>
-    {Number(b.paymentCapturedOre)>Number(b.paymentRefundedOre||0)&&canUpdate&&<div className="rentalRefundPanel">
+    {String(b.paymentProvider||"").toLowerCase()==="vipps"&&canUpdate&&<div className="rentalBookingActions">
+     <button className="btn alt" type="button" disabled={savingId===b.id} onClick={()=>vippsRentalAction(b,"sync")}>{savingId===b.id?"Synker …":"Synk Vipps-status"}</button>
+     {b.paymentStatus==="authorized"&&Number(b.paymentReservedOre||0)>Number(b.paymentCapturedOre||0)&&<button className="btn" type="button" disabled={savingId===b.id} onClick={()=>vippsRentalAction(b,"capture")}>Capture Vipps</button>}
+     {b.paymentStatus==="authorized"&&Number(b.paymentReservedOre||0)>Number(b.paymentCapturedOre||0)&&<button className="btn alt" type="button" disabled={savingId===b.id} onClick={()=>vippsRentalAction(b,"cancel")}>Kanseller reservasjon</button>}
+     {Number(b.paymentCapturedOre||0)>Number(b.paymentRefundedOre||0)&&<button className="btn alt" type="button" disabled={savingId===b.id} onClick={()=>vippsRentalAction(b,"refund")}>Refunder via Vipps</button>}
+    </div>}
+    {String(b.paymentProvider||"").toLowerCase()!=="vipps"&&<div className="field"><label>Betalingsreferanse <span className="muted">(bank, kontant eller annen manuell betaling)</span></label><input id={"rental-payment-reference-"+b.id} defaultValue={b.paymentReference||""} maxLength={120} placeholder="Valgfri referanse"/></div>}
+    {String(b.paymentProvider||"").toLowerCase()!=="vipps"&&canUpdate&&<button className="btn" type="button" disabled={savingId===b.id||paymentSetupRequired||!b.customer?.email||Number(b.paymentRefundedOre)>0} onClick={()=>registerPayment(b)}>{savingId===b.id?"Sender …":Number(b.paymentRefundedOre)>0?"Tilbakebetaling registrert":b.paymentStatus==="paid"?"Send kvittering på nytt":"Registrer leie betalt + send kvittering/PDF"}</button>}
+    <p className="muted">{String(b.paymentProvider||"").toLowerCase()==="vipps"?"Vipps-betalingen synkroniseres mot Vipps. Capture gjøres først når leien kan leveres/utleveres.":"Betalingsstatus oppdateres automatisk når leien registreres som betalt. Dette hindrer at «Betalt» settes uten registrert beløp."}</p>
+    {String(b.paymentProvider||"").toLowerCase()!=="vipps"&&Number(b.paymentCapturedOre)>Number(b.paymentRefundedOre||0)&&canUpdate&&<div className="rentalRefundPanel">
      <h5>Registrer tilbakebetaling</h5>
      <p className="muted">Registrer bare penger som faktisk er tilbakebetalt i bank, Vipps eller kontant. Systemet utfører ikke selve overføringen.</p>
      <div className="field"><label>Tilbakebetalt beløp (kr)</label><input id={"rental-refund-amount-"+b.id} type="number" min="0.01" step="0.01" max={(Number(b.paymentCapturedOre)-Number(b.paymentRefundedOre||0))/100} defaultValue={((Number(b.paymentCapturedOre)-Number(b.paymentRefundedOre||0))/100).toFixed(2)}/></div>

@@ -88,7 +88,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  },[isDirty]);
 
  useEffect(()=>{
-  if(quoteId||sourceOrderId)return;
+  if(quoteId)return;
   try{
    const raw=sessionStorage.getItem("aadlandQuoteDraftFromDrawing");
    if(!raw)return;
@@ -100,7 +100,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     description:String(line?.description||"").trim().slice(0,500),
     quantity:Math.max(0.01,Number(line?.quantity)||1),
     unit:String(line?.unit||"stk").trim().slice(0,20),
-    unitPriceOre:"",
+    unitPriceOre:Number.isFinite(Number(line?.unitPriceOre))&&Number(line.unitPriceOre)>=0?Math.round(Number(line.unitPriceOre)):"",
     vatRate:Number(line?.vatRate)===0?0:25
    })).filter(line=>line.description);
    setV(current=>({
@@ -114,9 +114,9 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     lineItems:importedLines.length?importedLines:current.lineItems,
     notes:String(draft?.notes||current.notes||"").slice(0,8000)
    }));
-   if(importedLines.length)setSavedMessage(importedLines.length+" mengdelinjer er hentet fra tegningen. Fyll inn pris på hver linje før tilbudet lagres.");
+   if(importedLines.length){const priced=importedLines.filter(line=>line.unitPriceOre!=="").length;setSavedMessage(importedLines.length+" linjer er hentet inn"+(priced?" · "+priced+" med ferdig pris.":"."));}
   }catch{}
- },[quoteId,sourceOrderId]);
+ },[quoteId]);
 
  useEffect(()=>{
   if(quoteId||sourceOrderId||!initialCustomer)return;
