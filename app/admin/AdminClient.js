@@ -4236,6 +4236,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
  };
  const [savingId,setSavingId]=useState("");
  const [message,setMessage]=useState("");
+ const [openId,setOpenId]=useState(null);
  const [migrationCopied,setMigrationCopied]=useState(false);
 
  async function patch(id,changes){
@@ -4265,6 +4266,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
    return null;
   }
   await reload();
+  setOpenId(null);
   return d;
  }
 
@@ -4369,12 +4371,24 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
   </div>}
   {message&&<p className="success">{message}</p>}
   {!bookings.length?<div className="card"><h3>Ingen utleiebookinger ennå</h3><p className="muted">Nye bookinger fra utleiesiden vises her.</p></div>:
-  <div className="grid rentalBookingGrid">{bookings.map(b=><article className="card rentalBookingCard" key={b.id}>
-   <div className="rentalBookingTop">
-    <div><div className="kicker">{b.bookingNumber}</div><h3>{b.itemName}</h3></div>
-    <span className={"rentalBookingStatus rentalBookingStatus-"+b.status}>{statuses[b.status]||b.status}</span>
-   </div>
-   {attentionIssue(b)&&<div className="notice"><b>Krever oppmerksomhet</b><br/><span>{attentionIssue(b)}</span></div>}
+  <div className="grid rentalBookingGrid">{bookings.map(b=>{
+   const isOpen=openId===b.id;
+   const issue=attentionIssue(b);
+   return <article className={"card rentalBookingCard "+(isOpen?"isOpen":"isCompact")} key={b.id}>
+   <button className="rentalBookingCompactHead" type="button" aria-expanded={isOpen} onClick={()=>setOpenId(isOpen?null:b.id)}>
+    <span className="rentalBookingCompactMain">
+     <b>{b.customer?.name||"Ukjent kunde"}</b>
+     <small>{b.itemName} · {b.startDate} – {b.endDate}</small>
+     <em>{b.bookingNumber}</em>
+    </span>
+    <span className="rentalBookingCompactSide">
+     {issue&&<i className="rentalBookingAttentionDot" title="Krever oppmerksomhet">!</i>}
+     <span className={"rentalBookingStatus rentalBookingStatus-"+b.status}>{statuses[b.status]||b.status}</span>
+     <span className="rentalBookingChevron" aria-hidden="true">{isOpen?"⌃":"⌄"}</span>
+    </span>
+   </button>
+   {isOpen&&<div className="rentalBookingExpanded">
+   {issue&&<div className="notice"><b>Krever oppmerksomhet</b><br/><span>{issue}</span></div>}
    <p><b>{b.customer?.name}</b><br/>{b.customer?.phone} · {b.customer?.email}<br/>{b.customer?.fulfillment==="delivery"?"Levering":"Henting"}{b.customer?.address?" · "+b.customer.address:""}</p>
    <div className="rentalBookingSummary">
     <span><small>Periode</small><b>{b.startDate} – {b.endDate}</b></span>
@@ -4448,7 +4462,9 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
     {["new","confirmed"].includes(b.status)&&<button className="btn" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>notify(b,"confirm-and-send")}>{savingId===b.id?"Sender …":b.status==="confirmed"?"Send bekreftelse på nytt":"Bekreft og send e-post"}</button>}
     {["new","confirmed"].includes(b.status)&&<button className="btn alt rentalCancelButton" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>notify(b,"cancel-and-send")}>{savingId===b.id?"Sender …":"Avbryt og varsle kunde"}</button>}
    </div>}
-  </article>)}</div>}
+   </div>}
+  </article>
+  })}</div>}
  </>;
 }
 
