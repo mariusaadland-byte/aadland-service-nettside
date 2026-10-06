@@ -2,7 +2,7 @@ import {redirect} from "next/navigation";
 import {getAdminUser,hasPermission} from "../../../lib/auth";
 import MaterialAiClient from "./MaterialAiClient";
 
-export const metadata={title:"Material-AI"};
+export const metadata={title:"Materialkalkulator"};
 
 export default async function MaterialAiPage(){
  const user=await getAdminUser();
