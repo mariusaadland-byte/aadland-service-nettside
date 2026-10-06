@@ -829,8 +829,17 @@ export default function DrawingClient(){
    wallCount:doc.walls.length,
    roomCount:(doc.zones||[]).length
   };
+  const rooms=summary.zoneRows.map(z=>{
+   const ids=new Set(z.wallIds||[]),roomWalls=doc.walls.filter(w=>ids.has(w.id)),wallLengthM=roomWalls.reduce((sum,w)=>sum+len(w),0)/1000;
+   return {id:z.id,name:z.name||"Rom",basis:{
+    wallNetM2:Number(z.netWallM2.toFixed(3)),wallGrossM2:Number(z.wallArea.toFixed(3)),
+    floorM2:Number(z.area.toFixed(3)),ceilingM2:Number(z.area.toFixed(3)),
+    skirtingNetM:Number(z.netSkirtingM.toFixed(3)),perimeterM:Number(z.perimeter.toFixed(3)),
+    wallLengthM:Number(wallLengthM.toFixed(3)),wallCount:roomWalls.length,roomCount:1
+   }}
+  });
   try{
-   sessionStorage.setItem("aadlandMaterialCalcFromDrawing",JSON.stringify({project:doc.name||"",facts:lines.filter(Boolean).join("\n"),basis}));
+   sessionStorage.setItem("aadlandMaterialCalcFromDrawing",JSON.stringify({project:doc.name||"",facts:lines.filter(Boolean).join("\n"),basis,rooms}));
    window.location.href="/admin/material-ai"
   }catch{setMessage("Kunne ikke åpne materialkalkulator");setTimeout(()=>setMessage(""),1800)}
  };
