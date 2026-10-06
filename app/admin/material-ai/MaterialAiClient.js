@@ -50,7 +50,7 @@ const emptyBasis=()=>({wallNetM2:"",wallGrossM2:"",floorM2:"",ceilingM2:"",skirt
 
 function materialRow(preset={}){
  return {
-  id:uid(),material:"",specification:"",rule:"sheet",source:"wallNetM2",unit:"stk",
+  id:uid(),material:"",specification:"",rule:"sheet",source:"wallNetM2",scope:"all",unit:"stk",
   layers:"1",sheetW:"1200",sheetH:"2400",coverage:"",factor:"",pieceLength:"",cc:"600",
   manualQty:"",waste:"10",packageSize:"1",packageUnit:"stk",...preset
  };
@@ -100,8 +100,8 @@ function matchCatalog(line,catalog,supplier){
 }
 function sourceInfo(id){return SOURCE_FIELDS.find(item=>item.id===id)||SOURCE_FIELDS[0]}
 
-function calculateLine(row,basis){
- const source=number(basis[row.source]),sourceMeta=sourceInfo(row.source),layers=Math.max(1,number(row.layers)||1);
+function calculateLine(row,basis,rooms){
+ const scoped=row.scope&&row.scope!=="all"?rooms.find(room=>room.id===row.scope)?.basis:null,effective=scoped||basis,source=number(effective[row.source]),sourceMeta=sourceInfo(row.source),layers=Math.max(1,number(row.layers)||1);
  let required=0,unit=row.unit||"stk",calculation="",missing="";
  if(row.rule==="sheet"){
   const w=number(row.sheetW)/1000,h=number(row.sheetH)/1000,area=w*h;
@@ -150,6 +150,7 @@ export default function MaterialAiClient(){
  const [project,setProject]=useState("");
  const [facts,setFacts]=useState("");
  const [basis,setBasis]=useState(emptyBasis);
+ const [rooms,setRooms]=useState([]);
  const [rows,setRows]=useState([]);
  const [markup,setMarkup]=useState("10");
  const [prices,setPrices]=useState({});
@@ -163,12 +164,12 @@ export default function MaterialAiClient(){
   try{
    const saved=JSON.parse(localStorage.getItem(STORE)||"[]");if(Array.isArray(saved))setCatalog(saved);
    const draft=JSON.parse(localStorage.getItem(DRAFT_STORE)||"null");
-   if(draft){setProject(draft.project||"");setFacts(draft.facts||"");setBasis({...emptyBasis(),...(draft.basis||{})});setRows(Array.isArray(draft.rows)?draft.rows:[]);setMarkup(String(draft.markup??"10"));setPrices(draft.prices||{})}
+   if(draft){setProject(draft.project||"");setFacts(draft.facts||"");setBasis({...emptyBasis(),...(draft.basis||{})});setRooms(Array.isArray(draft.rooms)?draft.rooms:[]);setRows(Array.isArray(draft.rows)?draft.rows:[]);setMarkup(String(draft.markup??"10"));setPrices(draft.prices||{})}
    const drawing=JSON.parse(sessionStorage.getItem("aadlandMaterialCalcFromDrawing")||sessionStorage.getItem("aadlandMaterialAiFromDrawing")||"null");
    if(drawing){
     sessionStorage.removeItem("aadlandMaterialCalcFromDrawing");sessionStorage.removeItem("aadlandMaterialAiFromDrawing");
     setProject(drawing.project||"");setFacts(drawing.facts||"");
-    if(drawing.basis)setBasis(current=>({...current,...drawing.basis}));
+    if(drawing.basis)setBasis(current=>({...current,...drawing.basis}));if(Array.isArray(drawing.rooms))setRooms(drawing.rooms);
    }
   }catch{}
  },[]);
@@ -180,11 +181,11 @@ export default function MaterialAiClient(){
  },[]);
 
  useEffect(()=>{
-  const timer=setTimeout(()=>{try{localStorage.setItem(DRAFT_STORE,JSON.stringify({project,facts,basis,rows,markup,prices}))}catch{}},220);
+  const timer=setTimeout(()=>{try{localStorage.setItem(DRAFT_STORE,JSON.stringify({project,facts,basis,rooms,rows,markup,prices}))}catch{}},220);
   return()=>clearTimeout(timer);
- },[project,facts,basis,rows,markup,prices]);
+ },[project,facts,basis,rooms,rows,markup,prices]);
 
- const calculated=useMemo(()=>rows.map(row=>calculateLine(row,basis)),[rows,basis]);
+ const calculated=useMemo(()=>rows.map(row=>calculateLine(row,basis,rooms)),[rows,basis,rooms]);
  const totals=useMemo(()=>calculated.reduce((sum,line)=>{
   const p=prices[line.id]||{},cost=number(p.costExVat),priceBasis=p.priceBasis||((line.packages||0)>0?"package":"unit"),qty=priceBasis==="package"?number(line.packages):number(line.purchaseQuantity),salesUnit=cost*(1+number(markup)/100);
   sum.cost+=qty*cost;sum.sales+=qty*salesUnit;return sum;
@@ -238,7 +239,7 @@ export default function MaterialAiClient(){
   window.location.href="/admin/tilbud/ny";
  }
  function resetDraft(){
-  localStorage.removeItem(DRAFT_STORE);setProject("");setFacts("");setBasis(emptyBasis());setRows([]);setPrices({});setError("");setMessage("Materialgrunnlag tømt");setTimeout(()=>setMessage(""),1500)
+  localStorage.removeItem(DRAFT_STORE);setProject("");setFacts("");setBasis(emptyBasis());setRooms([]);setRows([]);setPrices({});setError("");setMessage("Materialgrunnlag tømt");setTimeout(()=>setMessage(""),1500)
  }
 
  return <main className={styles.page}><div className={styles.shell}>
@@ -287,6 +288,7 @@ export default function MaterialAiClient(){
       <label>Materiale<input value={line.material} onChange={e=>updateRow(line.id,"material",e.target.value)} placeholder="F.eks. 13 mm gips"/></label>
       <label>Spesifikasjon<input value={line.specification} onChange={e=>updateRow(line.id,"specification",e.target.value)} placeholder="Dimensjon / produkt"/></label>
       <label>Beregningsregel<select value={line.rule} onChange={e=>updateRow(line.id,"rule",e.target.value)}>{RULES.map(rule=><option key={rule.id} value={rule.id}>{rule.label}</option>)}</select></label>
+      {rooms.length>0&&<label>Område<select value={line.scope||"all"} onChange={e=>updateRow(line.id,"scope",e.target.value)}><option value="all">Hele prosjektet</option>{rooms.map(room=><option key={room.id} value={room.id}>{room.name}</option>)}</select></label>}
       {line.rule!=="manual"&&<label>Grunnlag<select value={line.source} onChange={e=>updateRow(line.id,"source",e.target.value)}>{SOURCE_FIELDS.map(source=><option key={source.id} value={source.id}>{source.label}</option>)}</select></label>}
      </div>
 
