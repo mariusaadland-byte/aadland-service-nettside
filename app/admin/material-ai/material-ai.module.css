@@ -122,3 +122,35 @@
 @media(max-width:560px){
  .totalBar{grid-template-columns:1fr}
 }
+
+.basisGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.basisGrid label{display:grid;gap:4px;margin:0;font-size:10px;font-weight:800;color:#6d6456}
+.basisGrid label>span,.ruleFields label>span{display:flex;align-items:center;gap:6px;border:1px solid #cec6b7;border-radius:8px;background:#fff;padding:0 8px}
+.basisGrid input,.ruleFields input{min-width:0;width:100%;height:40px;border:0;background:transparent;font-size:15px}
+.basisGrid input:focus,.ruleFields input:focus{outline:none}
+.basisGrid b,.ruleFields b{font-size:9px;color:#726a5e;white-space:nowrap}
+.templateBar{display:flex;gap:7px;overflow-x:auto;padding:2px 0 4px}
+.templateBar button{flex:0 0 auto;min-height:38px;border:1px solid #c9b47d;border-radius:9px;background:#fff9eb;color:#5e4820;font-size:10px;font-weight:900;padding:0 10px}
+.emptyState{padding:18px;border:1px dashed #cfc6b5;border-radius:10px;background:#faf8f3;color:#746c60;font-size:12px;text-align:center}
+.line[data-invalid="true"]{border-color:#d7a9a9;background:#fffafa}
+.materialIdentity{display:grid;grid-template-columns:1.1fr 1.4fr 1fr 1fr;gap:8px;margin-top:12px}
+.materialIdentity label,.ruleFields label{display:grid;gap:4px;font-size:9px;font-weight:900;color:#6d6456}
+.materialIdentity input,.materialIdentity select{width:100%;box-sizing:border-box;min-height:40px;border:1px solid #cbc5b8;border-radius:8px;background:#fff;padding:8px;font-size:13px}
+.ruleFields{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin:9px 0}
+.formulaBox{display:grid;gap:4px;padding:9px 10px;border-radius:9px;background:#f4f2ec;border:1px solid #ddd6c7;margin-bottom:10px}
+.formulaBox small{font-size:8px;letter-spacing:.09em;color:#8a7852;font-weight:900}
+.formulaBox b{font-size:11px;line-height:1.4}
+.formulaBox span{font-size:10px;color:#6d665a}
+.priceSummary button{margin-left:auto;border:0;background:transparent;color:#963c34;text-decoration:underline;font-size:10px;font-weight:800}
+@media(max-width:980px){
+ .basisGrid{grid-template-columns:1fr 1fr}
+ .materialIdentity{grid-template-columns:1fr 1fr}
+ .ruleFields{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:560px){
+ .basisGrid{grid-template-columns:1fr}
+ .materialIdentity{grid-template-columns:1fr}
+ .ruleFields{grid-template-columns:1fr 1fr}
+ .priceSummary strong{margin-left:0;width:100%}
+ .priceSummary button{margin-left:0}
+}
