@@ -154,3 +154,21 @@
  .priceSummary strong{margin-left:0;width:100%}
  .priceSummary button{margin-left:0}
 }
+
+.favoriteShelf{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;padding:10px;border:1px solid #c7d3c9;border-radius:10px;background:#f3f8f4}
+.favoriteShelf>div:first-child{display:grid;gap:2px;min-width:120px}
+.favoriteShelf>div:first-child strong{font-size:11px;color:#315b3d}
+.favoriteShelf>div:first-child small{font-size:9px;color:#6c786e}
+.favoriteShelf>div:last-child{display:flex;gap:6px;overflow-x:auto}
+.favoriteShelf span{display:flex;flex:0 0 auto}
+.favoriteShelf span button:first-child{min-height:36px;border:1px solid #90b19a;border-radius:8px 0 0 8px;background:#fff;color:#315b3d;padding:0 9px;font-size:10px;font-weight:800}
+.favoriteShelf span button:last-child{min-width:30px;border:1px solid #c9c4b8;border-left:0;border-radius:0 8px 8px 0;background:#fff;color:#8a4a43;font-size:16px}
+.materialIdentity{grid-template-columns:repeat(auto-fit,minmax(155px,1fr))}
+.priceSummary button:first-of-type{color:#3d6b49}
+@media(max-width:700px){
+ .favoriteShelf{grid-template-columns:1fr}
+ .materialIdentity{grid-template-columns:1fr 1fr}
+}
+@media(max-width:480px){
+ .materialIdentity{grid-template-columns:1fr}
+}
