@@ -108,6 +108,47 @@
  color:#b8b9b8;
 }
 .calculationLine b{color:#fff}
+.catalogToolbar{display:grid;grid-template-columns:minmax(170px,.7fr) minmax(0,1.3fr);gap:12px}
+.searchResults{margin-top:10px;border:1px solid #343943;border-radius:13px;overflow:hidden;background:#0f1217;max-height:360px;overflow-y:auto}
+.catalogEmpty{padding:16px;color:#969a9f;font-size:14px}
+.catalogError{margin-top:12px;padding:11px 13px;border:1px solid #78433d;background:#2a1918;color:#ffb8ad;border-radius:11px;font-size:13px;line-height:1.4}
+.productResult{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:center;text-align:left;background:#0f1217;color:#f5f1e8;border:0;border-bottom:1px solid #292e36;padding:13px 14px;cursor:pointer;font:inherit}
+.productResult:last-child{border-bottom:0}
+.productResult:hover{background:#181c23}
+.productResult>span{display:flex;flex-direction:column;gap:3px;min-width:0}
+.productResult>span:first-child b{white-space:normal}
+.productResult small{color:#8f9499;font-size:12px;line-height:1.35}
+.productResult strong{white-space:nowrap;color:#f5d98f}
+.productResult em{font-style:normal;color:#d7b76d;font-weight:800;font-size:13px;white-space:nowrap}
+.selectedMaterials{margin-top:14px;border:1px solid #343943;border-radius:13px;background:#101318;overflow:hidden}
+.materialListHead{display:flex;justify-content:space-between;gap:12px;padding:11px 13px;border-bottom:1px solid #292e36}
+.materialListHead span{color:#8f9499;font-size:12px}
+.materialLine{display:grid;grid-template-columns:minmax(0,1fr) 88px auto 34px;gap:10px;align-items:end;padding:12px 13px;border-bottom:1px solid #292e36}
+.materialName{display:flex;flex-direction:column;gap:3px;min-width:0}
+.materialName b{font-size:14px}
+.materialName small{color:#8f9499;font-size:12px;line-height:1.35}
+.materialLine label{display:flex;flex-direction:column;gap:4px;color:#8f9499;font-size:11px}
+.materialLine input{width:100%;box-sizing:border-box;min-height:38px;border:1px solid #343943;border-radius:9px;background:#0b0e12;color:#fff;padding:0 9px;font:inherit}
+.materialLineTotal{display:flex;flex-direction:column;gap:3px;align-items:flex-end;white-space:nowrap}
+.materialLineTotal span{font-size:11px;color:#8f9499}
+.materialLineTotal b{font-size:14px}
+.removeMaterial{width:34px;height:38px;border:1px solid #493431;border-radius:9px;background:#241615;color:#ff9c90;font-size:20px;cursor:pointer}
+.materialTotals{display:flex;justify-content:flex-end;gap:18px;flex-wrap:wrap;padding:11px 13px;color:#aeb0b1;font-size:12px}
+.materialTotals span{display:flex;gap:6px}
+.materialTotals b{color:#fff}
+.importPanel{margin-top:16px;border:1px solid #343943;border-radius:13px;overflow:hidden;background:#101318}
+.importToggle{width:100%;display:flex;justify-content:space-between;gap:16px;align-items:center;text-align:left;border:0;background:#15191f;color:#fff;padding:13px 14px;font:inherit;cursor:pointer}
+.importToggle>span{display:flex;flex-direction:column;gap:3px}
+.importToggle small{color:#8f9499;font-size:12px}
+.importToggle strong{color:#d7b76d;font-size:13px;white-space:nowrap}
+.importForm{padding:14px;border-top:1px solid #292e36}
+.importGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.importCheck{display:flex;gap:10px;align-items:flex-start;margin-top:14px;padding:11px 12px;border:1px solid #2b3038;border-radius:10px;background:#0e1116;cursor:pointer}
+.importCheck input{width:18px;height:18px;accent-color:#d7b76d;margin-top:1px}
+.importCheck span{display:flex;flex-direction:column;gap:3px}
+.importCheck small{color:#8f9499;font-weight:400;line-height:1.35}
+.importActions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px}
+.importActions span{font-size:13px;color:#a9d6ad}
 .breakdown{margin-top:16px}
 .breakdownHead{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:16px}
 .toggle{
@@ -143,6 +184,13 @@
  .summaryGrid{grid-template-columns:1fr}
  .totalCard{grid-column:auto}
  .two{grid-template-columns:1fr}
+ .catalogToolbar,.importGrid{grid-template-columns:1fr}
+ .productResult{grid-template-columns:minmax(0,1fr) auto}
+ .productResult em{grid-column:1/-1}
+ .materialLine{grid-template-columns:minmax(0,1fr) 74px 34px;align-items:end}
+ .materialLineTotal{grid-column:1/3;align-items:flex-start}
+ .removeMaterial{grid-column:3;grid-row:1}
+ .materialTotals{justify-content:flex-start;flex-direction:column;gap:6px}
  .breakdownHead{align-items:flex-start;flex-direction:column}
  .toggle{width:100%;box-sizing:border-box}
  .topActions{display:grid;grid-template-columns:1fr 1fr;width:100%}
