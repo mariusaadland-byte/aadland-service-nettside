@@ -1026,6 +1026,7 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
    ?(confirmed?"Bekreftet-varselet":"Under arbeid-varselet")+" er sendt på nytt."
    :"Bestillingen er satt som "+label+" og kunden er varslet.");
   if(typeof reload==="function")await reload();
+  setOpenId(null);
  }
  async function cancelOrder(order){
   const reason=window.prompt("Kanseller bestillingen og varsle kunden. Skriv valgfri årsak her, eller la feltet stå tomt. Trykk Avbryt for å stoppe.","");
@@ -1084,6 +1085,7 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
   if(!response.ok){setMessage(data.error||"Ordrebekreftelsen kunne ikke sendes.");return}
   setMessage("Ordrebekreftelsen er sendt til "+(data.sentTo||order.customerEmail)+".");
   if(typeof reload==="function")await reload();
+  setOpenId(null);
  }
  async function recordRefund(order,resend=false){
   if(order.orderType==="custom")return;
@@ -1150,7 +1152,9 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
   setMessage((alreadyPaid?"Betalingsbekreftelsen er sendt på nytt til ":"Betalingen er registrert og betalingsbekreftelsen er sendt til ")+(data.sentTo||order.customerEmail)+".");
   if(typeof reload==="function")await reload();
  }
- return <><>{message&&<p className="notice">{message}</p>}</><div className="orderCards">{orders.length?orders.map(order=><article className="card orderCard" key={order.id}>
+ return <><>{message&&<p className="notice">{message}</p>}</><div className="orderCards">{orders.length?orders.map(order=>{const isOpen=openId===order.id;return <article className={"card orderCard "+(isOpen?"isOpen":"isCompact")} key={order.id}>
+  <button className="orderCompactHead" type="button" aria-expanded={isOpen} onClick={()=>setOpenId(isOpen?null:order.id)}><span><b>{order.customerName||"Ukjent kunde"}</b><small>{order.orderNumber} · {new Date(order.createdAt).toLocaleDateString("nb-NO")}</small></span><span><strong>{nok(order.totalOre||0)}</strong><em>{labels[order.status]||order.status}</em><i aria-hidden="true">{isOpen?"⌃":"⌄"}</i></span></button>
+  {isOpen&&<div className="orderExpanded">
   <div className="orderCardTop"><div><div className="kicker">{order.orderNumber}</div><h3>{order.customerName||"Ukjent kunde"}</h3><small className="muted">{new Date(order.createdAt).toLocaleString("nb-NO")}</small></div><b>{nok(order.totalOre||0)}</b></div>
   <p>{order.customerPhone&&<>{order.customerPhone}<br/></>}{order.customerEmail}</p>
   <div className="orderBadges"><span>{order.fulfillmentType==="delivery"?"Levering":order.fulfillmentType==="shipping"?"Sending":"Henting"}</span><span>Betaling: {order.paymentStatus==="pending"?"Venter":order.paymentStatus==="authorized"?"Reservert":order.paymentStatus==="paid"?"Betalt":order.paymentStatus==="refunded"?"Refundert":order.paymentStatus}</span></div>
@@ -1270,7 +1274,8 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
   {order.orderType!=="custom"&&order.fulfillmentType==="shipping"&&order.dispatchedAt&&order.customerEmail&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>resendStatusNotice(order,"dispatched")}>{savingId===order.id?"Sender …":order.trackingSentAt?"Send sendt-varsel på nytt":"Send sendt-varsel"}</button>}
   {order.orderType!=="custom"&&order.fulfillmentType!=="shipping"&&order.deliveredAt&&order.customerEmail&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>resendStatusNotice(order,"delivered")}>{savingId===order.id?"Sender …":order.deliveryNoticeSentAt?"Send levert-varsel på nytt":"Send levert-varsel"}</button>}
  </div>}
- </article>):<div className="card"><p>Ingen bestillinger ennå.</p></div>}</div></>;
+  </div>}
+ </article>}):<div className="card"><p>Ingen bestillinger ennå.</p></div>}</div></>;
 }
 
 function Jobs({orders,status,canUpdateOrders,reload,onCreateProject=null}){
