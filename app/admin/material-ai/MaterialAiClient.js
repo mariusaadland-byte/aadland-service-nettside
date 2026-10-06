@@ -4,7 +4,7 @@ import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import styles from "./material-ai.module.css";
 
-const STORE="aadland-material-price-catalog-v1";
+const STORE="aadland-material-price-catalog-v1", DRAFT_STORE="aadland-material-ai-draft-v1";
 const SUPPLIERS=[
  {id:"byggern",name:"Bygger’n",mode:"Proffpris / prisliste",note:"Primær leverandør. Bygger’n Proff viser egne priser og kan levere prislister; direkte adapter aktiveres når godkjent tilgang er på plass."},
  {id:"ahlsell",name:"Ahlsell",mode:"PunchOut / prisfil",note:"Kan kobles mot bedriftsavtale og kundepris."},
@@ -76,6 +76,7 @@ export default function MaterialAiClient(){
  const [prices,setPrices]=useState({});
  const [catalog,setCatalog]=useState([]);
  const [supplierStatuses,setSupplierStatuses]=useState([]);
+ const [setupStatus,setSetupStatus]=useState({aiConfigured:null,model:""});
  const [directBusy,setDirectBusy]=useState("");
  const [loading,setLoading]=useState(false);
  const [error,setError]=useState("");
@@ -85,6 +86,10 @@ export default function MaterialAiClient(){
  useEffect(()=>{
   try{
    const saved=JSON.parse(localStorage.getItem(STORE)||"[]");if(Array.isArray(saved))setCatalog(saved);
+   const draft=JSON.parse(localStorage.getItem(DRAFT_STORE)||"null");
+   if(draft){
+    setProject(draft.project||"");setFacts(draft.facts||"");setMaterials(draft.materials||"");setMarkup(String(draft.markup??"10"));setResult(draft.result||null);setPrices(draft.prices||{});
+   }
    const drawing=JSON.parse(sessionStorage.getItem("aadlandMaterialAiFromDrawing")||"null");
    if(drawing){
     sessionStorage.removeItem("aadlandMaterialAiFromDrawing");
@@ -95,11 +100,35 @@ export default function MaterialAiClient(){
  },[]);
  useEffect(()=>{
   let cancelled=false;
-  fetch("/api/admin/material-suppliers").then(async r=>{const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error();return data.suppliers||[]}).then(items=>{if(!cancelled)setSupplierStatuses(items)}).catch(()=>{});
+  Promise.all([
+   fetch("/api/admin/material-suppliers").then(async r=>{const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error();return data.suppliers||[]}),
+   fetch("/api/admin/material-ai/status").then(async r=>{const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error();return data})
+  ]).then(([suppliers,status])=>{if(cancelled)return;setSupplierStatuses(suppliers);setSetupStatus({aiConfigured:Boolean(status.aiConfigured),model:status.model||""})}).catch(()=>{});
   return()=>{cancelled=true};
  },[]);
 
 
+ useEffect(()=>{
+  const timer=setTimeout(()=>{try{localStorage.setItem(DRAFT_STORE,JSON.stringify({project,facts,materials,markup,result,prices}))}catch{}},250);
+  return()=>clearTimeout(timer);
+ },[project,facts,materials,markup,result,prices]);
+
+ function updateMaterialLine(id,key,value){
+  setResult(current=>{
+   if(!current)return current;
+   const lines=current.lines.map(line=>{
+    if(line.id!==id)return line;
+    const next={...line};
+    if(["requiredQuantity","wastePercent","packageSize"].includes(key))next[key]=number(value);
+    else next[key]=value;
+    const raw=number(next.requiredQuantity)*(1+number(next.wastePercent)/100),pack=number(next.packageSize);
+    next.packages=pack>0?Math.ceil(raw/pack):0;
+    next.purchaseQuantity=Number((pack>0?next.packages*pack:raw).toFixed(3));
+    return next;
+   });
+   return {...current,lines};
+  });
+ }
  const totals=useMemo(()=>{
   if(!result?.lines?.length)return {cost:0,sales:0};
   return result.lines.reduce((sum,line)=>{
@@ -176,6 +205,8 @@ export default function MaterialAiClient(){
    </header>
 
    {(error||message)&&<div className={error?styles.error:styles.message}>{error||message}</div>}
+   {setupStatus.aiConfigured===false&&<div className={styles.setupWarning}><strong>AI er klar i koden, men ikke aktivert ennå.</strong><span>OPENAI_API_KEY mangler på serveren. Materialmengder kan ikke beregnes før nøkkelen er lagt inn.</span></div>}
+   {setupStatus.aiConfigured===true&&<div className={styles.setupReady}><strong>AI aktivert</strong><span>{setupStatus.model||"gpt-5.6-terra"}</span></div>}
 
    <section className={styles.inputGrid}>
     <div className={styles.card}>
@@ -204,7 +235,12 @@ export default function MaterialAiClient(){
      const p=prices[line.id]||{},cost=number(p.costExVat),basis=p.priceBasis||((line.packages||0)>0?"package":"unit"),qty=basis==="package"?number(line.packages):number(line.purchaseQuantity),sales=cost*(1+number(markup)/100),total=qty*sales;
      return <article key={line.id} className={styles.line}>
       <div className={styles.lineTop}><div><span className={styles.confidence} data-level={line.confidence}>{line.confidence==="high"?"Høy sikkerhet":line.confidence==="medium"?"Middels sikkerhet":"Lav sikkerhet"}</span><h3>{line.material}</h3><p>{line.specification}</p></div><div className={styles.qty}><small>Innkjøpsbehov</small><strong>{line.packages>0?line.packages+" pk · ":""}{decimal(line.purchaseQuantity)} {line.unit}</strong></div></div>
-      <div className={styles.calcGrid}><span><small>Teoretisk</small><b>{decimal(line.requiredQuantity)} {line.unit}</b></span><span><small>Svinn</small><b>{decimal(line.wastePercent,2)} %</b></span><span><small>Pakning</small><b>{line.packageSize>0?decimal(line.packageSize)+" "+line.packageUnit:"Ikke oppgitt"}</b></span><span><small>Beregning</small><b>{line.calculation||line.basis}</b></span></div>
+      <div className={styles.calcGrid}>
+       <label><small>Teoretisk behov</small><span><input inputMode="decimal" value={line.requiredQuantity} onChange={e=>updateMaterialLine(line.id,"requiredQuantity",e.target.value)}/><b>{line.unit}</b></span></label>
+       <label><small>Svinn</small><span><input inputMode="decimal" value={line.wastePercent} onChange={e=>updateMaterialLine(line.id,"wastePercent",e.target.value)}/><b>%</b></span></label>
+       <label><small>Pakningsstørrelse</small><span><input inputMode="decimal" value={line.packageSize||""} onChange={e=>updateMaterialLine(line.id,"packageSize",e.target.value)} placeholder="0"/><b>{line.packageUnit||line.unit}</b></span></label>
+       <span><small>Beregning</small><b>{line.calculation||line.basis}</b></span>
+      </div>
       <div className={styles.priceGrid}>
        <label>Leverandør<select value={p.supplier||""} onChange={e=>updatePrice(line.id,"supplier",e.target.value)}><option value="">Velg / alle</option>{SUPPLIERS.map(s=><option key={s.id} value={s.name}>{s.name}</option>)}</select></label>
        <label>Varenr.<input value={p.sku||""} onChange={e=>updatePrice(line.id,"sku",e.target.value)} placeholder="Valgfritt"/></label>
@@ -217,7 +253,7 @@ export default function MaterialAiClient(){
       <details><summary>Se grunnlag</summary><p><b>Grunnlag:</b> {line.basis}</p><p><b>Søk hos leverandør:</b> {line.supplierSearch}</p></details>
      </article>;
     })}</div>
-    <div className={styles.totalBar}><div><span>Innkjøpskost eks. mva</span><b>{money(totals.cost)}</b></div><div><span>Materialer til kunde eks. mva</span><strong>{money(totals.sales)}</strong></div><button type="button" onClick={createQuote}>Opprett tilbudskladd →</button></div>
+    <div className={styles.totalBar}><div><span>Innkjøpskost eks. mva</span><b>{money(totals.cost)}</b></div><div><span>Materialer til kunde eks. mva</span><strong>{money(totals.sales)}</strong></div><button type="button" className={styles.secondaryAction} onClick={()=>{localStorage.removeItem(DRAFT_STORE);setProject("");setFacts("");setMaterials("");setResult(null);setPrices({});setError("");setMessage("Materialutkast tømt");setTimeout(()=>setMessage(""),1500)}}>Nytt grunnlag</button><button type="button" onClick={createQuote}>Opprett tilbudskladd →</button></div>
    </section>}
   </div>
  </main>;
