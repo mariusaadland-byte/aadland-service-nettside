@@ -3084,3 +3084,35 @@ body:has(.customerPage) .customerPage{
  .quotePaperAcceptanceFields{grid-template-columns:1fr}
  .quotePaperSignature{grid-column:1}
 }
+
+
+/* Mobile rental calendars: keep the full 7-day calendar inside the phone viewport */
+@media(max-width:760px){
+ .rentalPage{overflow-x:hidden}
+ .rentalDetailCalendar,.rentalProductCalendar{width:100%;max-width:100%;min-width:0;box-sizing:border-box;overflow:hidden}
+ .rentalCalendarTitle{width:100%;max-width:100%;min-width:0;gap:10px}
+ .rentalCalendarTitle>div:first-child{min-width:0}
+ .rentalCalendarTitle h2,.rentalCalendarTitle h4,.rentalCalendarTitle p{overflow-wrap:anywhere}
+ .rentalMonthNav{flex:0 0 auto}
+ .rentalCalendarWeekdays,.rentalCustomerCalendar{width:100%;max-width:100%;min-width:0;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;overflow:hidden}
+ .rentalCalendarWeekdays span{min-width:0;padding:4px 0;font-size:8px}
+ .rentalCalendarDay,.rentalCalendarBlank{width:100%;max-width:100%;min-width:0;min-height:40px;box-sizing:border-box}
+
+ /* Backoffice utleiekalender skal også passe på én mobilskjerm. */
+ .rentalCalendar{width:100%;max-width:100%;overflow-x:hidden}
+ .rentalCalendar .calendarHead,.rentalCalendar .calendarGrid{width:100%;max-width:100%;min-width:0}
+ .rentalCalendar .calendarHead{gap:8px;flex-wrap:wrap}
+ .rentalCalendar .calendarGrid{grid-template-columns:repeat(7,minmax(0,1fr))}
+ .rentalCalendar .calendarWeekday{min-width:0;padding:5px 1px;font-size:9px;overflow:hidden}
+ .rentalCalendar .calendarDay{min-width:0;min-height:64px;padding:3px;font-size:10px;overflow:hidden}
+ .rentalCalendar .calendarEvent{max-width:100%;margin-top:3px;padding:3px;font-size:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
+@media(max-width:420px){
+ .rentalDetailCalendar{padding:18px 10px}
+ .rentalProductCalendar{padding-left:10px;padding-right:10px}
+ .rentalCalendarTitle{align-items:center;flex-wrap:wrap}
+ .rentalCalendarTitle h2{font-size:28px!important}
+ .rentalMonthNav button{width:40px;height:40px}
+ .rentalCalendarWeekdays,.rentalCustomerCalendar{gap:2px}
+ .rentalCalendarDay,.rentalCalendarBlank{min-height:38px}
+}
