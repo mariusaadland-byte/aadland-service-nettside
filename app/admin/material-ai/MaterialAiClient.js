@@ -6,6 +6,7 @@ import styles from "./material-ai.module.css";
 
 const STORE="aadland-material-price-catalog-v1";
 const DRAFT_STORE="aadland-material-calculator-v2";
+const FAVORITES_STORE="aadland-material-favorites-v1";
 
 const SUPPLIERS=[
  {id:"byggern",name:"Bygger’n",mode:"Proffpris / prisliste",note:"Primær leverandør. Prisfil brukes nå; direkte kundepris kan kobles på senere."},
@@ -99,6 +100,18 @@ function matchCatalog(line,catalog,supplier){
  return best?.score>0?best.row:null;
 }
 function sourceInfo(id){return SOURCE_FIELDS.find(item=>item.id===id)||SOURCE_FIELDS[0]}
+function sourceOptions(rule){
+ if(["sheet","coverage","per_area","battens_area"].includes(rule))return SOURCE_FIELDS.filter(item=>item.kind==="area");
+ if(["linear_piece","per_linear","studs"].includes(rule))return SOURCE_FIELDS.filter(item=>item.kind==="length");
+ return SOURCE_FIELDS;
+}
+function favoriteRow(line){
+ return {
+  material:line.material,specification:line.specification,rule:line.rule,source:line.source,scope:"all",unit:line.unit,
+  layers:line.layers,sheetW:line.sheetW,sheetH:line.sheetH,coverage:line.coverage,factor:line.factor,pieceLength:line.pieceLength,
+  cc:line.cc,manualQty:line.manualQty,waste:line.waste,packageSize:line.packageSize,packageUnit:line.packageUnit
+ };
+}
 
 function calculateLine(row,basis,rooms){
  const scoped=row.scope&&row.scope!=="all"?rooms.find(room=>room.id===row.scope)?.basis:null,effective=scoped||basis,source=number(effective[row.source]),sourceMeta=sourceInfo(row.source),layers=Math.max(1,number(row.layers)||1);
@@ -129,7 +142,7 @@ function calculateLine(row,basis,rooms){
   else if(!factor)missing="Forbruk per løpemeter mangler";
   else{required=source*factor*layers;calculation=decimal(source)+" lm × "+decimal(factor)+" "+unit+"/lm × "+decimal(layers,1)}
  }else if(row.rule==="studs"){
-  const cc=number(row.cc),wallCount=Math.max(1,Math.round(number(basis.wallCount)||1));
+  const cc=number(row.cc),wallCount=Math.max(1,Math.round(number(effective.wallCount)||1));
   if(!source)missing="Samlet vegglengde mangler";
   else if(!cc)missing="c/c-avstand mangler";
   else{required=Math.ceil(source*1000/cc)+wallCount;unit="stk";calculation="ceil("+decimal(source)+" m ÷ "+cc+" mm c/c) + "+wallCount+" endestendere"}
@@ -155,6 +168,7 @@ export default function MaterialAiClient(){
  const [markup,setMarkup]=useState("10");
  const [prices,setPrices]=useState({});
  const [catalog,setCatalog]=useState([]);
+ const [favorites,setFavorites]=useState([]);
  const [supplierStatuses,setSupplierStatuses]=useState([]);
  const [directBusy,setDirectBusy]=useState("");
  const [error,setError]=useState("");
@@ -162,7 +176,7 @@ export default function MaterialAiClient(){
 
  useEffect(()=>{
   try{
-   const saved=JSON.parse(localStorage.getItem(STORE)||"[]");if(Array.isArray(saved))setCatalog(saved);
+   const saved=JSON.parse(localStorage.getItem(STORE)||"[]");if(Array.isArray(saved))setCatalog(saved);const savedFavorites=JSON.parse(localStorage.getItem(FAVORITES_STORE)||"[]");if(Array.isArray(savedFavorites))setFavorites(savedFavorites);
    const draft=JSON.parse(localStorage.getItem(DRAFT_STORE)||"null");
    if(draft){setProject(draft.project||"");setFacts(draft.facts||"");setBasis({...emptyBasis(),...(draft.basis||{})});setRooms(Array.isArray(draft.rooms)?draft.rooms:[]);setRows(Array.isArray(draft.rows)?draft.rows:[]);setMarkup(String(draft.markup??"10"));setPrices(draft.prices||{})}
    const drawing=JSON.parse(sessionStorage.getItem("aadlandMaterialCalcFromDrawing")||sessionStorage.getItem("aadlandMaterialAiFromDrawing")||"null");
@@ -192,9 +206,23 @@ export default function MaterialAiClient(){
  },{cost:0,sales:0}),[calculated,prices,markup]);
 
  function updateBasis(key,value){setBasis(current=>({...current,[key]:value}))}
- function updateRow(id,key,value){setRows(current=>current.map(row=>row.id===id?{...row,[key]:value}:row))}
+ function updateRow(id,key,value){setRows(current=>current.map(row=>{
+  if(row.id!==id)return row;
+  if(key==="rule"){
+   const options=sourceOptions(value),source=options.some(item=>item.id===row.source)?row.source:(options[0]?.id||row.source);
+   return {...row,rule:value,source};
+  }
+  return {...row,[key]:value};
+ }))}
  function removeRow(id){setRows(current=>current.filter(row=>row.id!==id));setPrices(current=>{const next={...current};delete next[id];return next})}
- function addRow(preset={}){const row=materialRow(preset);setRows(current=>[...current,row]);setPrices(current=>({...current,[row.id]:{supplier:"Bygger’n",sku:"",productName:"",costExVat:"",priceBasis:"unit",matched:false}}))}
+ function addRow(preset={},presetPrice=null){const row=materialRow(preset);setRows(current=>[...current,row]);setPrices(current=>({...current,[row.id]:presetPrice?{...presetPrice}:{supplier:"Bygger’n",sku:"",productName:"",costExVat:"",priceBasis:number(row.packageSize)>1?"package":"unit",matched:false}}))}
+ function saveFavorite(line){
+  if(!line.material.trim()){setMessage("Skriv materialnavn før du lagrer favoritten.");setTimeout(()=>setMessage(""),1600);return}
+  const key=normalizeText(line.material+" "+line.specification),entry={id:uid(),key,name:[line.material,line.specification].filter(Boolean).join(" – "),row:favoriteRow(line),price:{...(prices[line.id]||{supplier:"Bygger’n"})}};
+  setFavorites(current=>{const next=[entry,...current.filter(item=>item.key!==key)].slice(0,40);localStorage.setItem(FAVORITES_STORE,JSON.stringify(next));return next});
+  setMessage("Materialfavoritt lagret");setTimeout(()=>setMessage(""),1500);
+ }
+ function removeFavorite(id){setFavorites(current=>{const next=current.filter(item=>item.id!==id);localStorage.setItem(FAVORITES_STORE,JSON.stringify(next));return next})}
  function updatePrice(id,key,value){setPrices(current=>({...current,[id]:{...(current[id]||{}),[key]:value}}))}
  function autoMatch(line){
   const current=prices[line.id]||{},preferred=current.supplier||"Bygger’n",match=matchCatalog(line,catalog,preferred)||matchCatalog(line,catalog,"Bygger’n")||matchCatalog(line,catalog,"");
@@ -278,6 +306,7 @@ export default function MaterialAiClient(){
   <section className={styles.result} id="materials">
    <div className={styles.sectionHead}><div><span className={styles.kicker}>4 · MATERIALER</span><h2>Materialbehov</h2><p>Velg en mal eller legg til en tom linje. Alle regnestykker vises, slik at du kan kontrollere hva kalkulatoren har gjort.</p></div><button type="button" onClick={()=>addRow()}>+ Tom materiallinje</button></div>
    <div className={styles.templateBar}>{TEMPLATES.map(template=><button type="button" key={template.label} onClick={()=>addRow(template.row)}>+ {template.label}</button>)}</div>
+   {favorites.length>0&&<div className={styles.favoriteShelf}><div><strong>Mine materialer</strong><small>Lagrede regler, varenummer og pris</small></div><div>{favorites.map(favorite=><span key={favorite.id}><button type="button" onClick={()=>addRow(favorite.row,favorite.price)}>+ {favorite.name}</button><button type="button" aria-label={"Slett "+favorite.name} onClick={()=>removeFavorite(favorite.id)}>×</button></span>)}</div></div>}
    {!rows.length&&<div className={styles.emptyState}>Ingen materialer lagt inn. Velg en hurtigmal over.</div>}
    <div className={styles.lines}>{calculated.map(line=>{
     const p=prices[line.id]||{supplier:"Bygger’n"},cost=number(p.costExVat),priceBasis=p.priceBasis||((line.packages||0)>0?"package":"unit"),qty=priceBasis==="package"?number(line.packages):number(line.purchaseQuantity),sales=cost*(1+number(markup)/100),total=qty*sales,meta=sourceInfo(line.source);
@@ -289,7 +318,7 @@ export default function MaterialAiClient(){
       <label>Spesifikasjon<input value={line.specification} onChange={e=>updateRow(line.id,"specification",e.target.value)} placeholder="Dimensjon / produkt"/></label>
       <label>Beregningsregel<select value={line.rule} onChange={e=>updateRow(line.id,"rule",e.target.value)}>{RULES.map(rule=><option key={rule.id} value={rule.id}>{rule.label}</option>)}</select></label>
       {rooms.length>0&&<label>Område<select value={line.scope||"all"} onChange={e=>updateRow(line.id,"scope",e.target.value)}><option value="all">Hele prosjektet</option>{rooms.map(room=><option key={room.id} value={room.id}>{room.name}</option>)}</select></label>}
-      {line.rule!=="manual"&&<label>Grunnlag<select value={line.source} onChange={e=>updateRow(line.id,"source",e.target.value)}>{SOURCE_FIELDS.map(source=><option key={source.id} value={source.id}>{source.label}</option>)}</select></label>}
+      {line.rule!=="manual"&&<label>Grunnlag<select value={line.source} onChange={e=>updateRow(line.id,"source",e.target.value)}>{sourceOptions(line.rule).map(source=><option key={source.id} value={source.id}>{source.label}</option>)}</select></label>}
      </div>
 
      <div className={styles.ruleFields}>
@@ -315,7 +344,7 @@ export default function MaterialAiClient(){
       <div className={styles.priceActions}><button type="button" className={styles.matchBtn} onClick={()=>autoMatch(line)} disabled={!catalog.length}>Match prisfil</button><button type="button" className={styles.directBtn} onClick={()=>directLookup(line)} disabled={!p.supplier||directBusy===line.id||!supplierStatuses.find(s=>s.name===p.supplier)?.connected}>{directBusy===line.id?"Henter…":"Hent min pris"}</button></div>
      </div>
      {p.productName&&<p className={styles.matchInfo}>{p.direct?"Direkte pris":"Matchet"}: <b>{p.productName}</b>{p.sku?" · "+p.sku:""}</p>}
-     <div className={styles.priceSummary}><span>Kost: <b>{money(qty*cost)}</b></span><span>+ {decimal(number(markup),2)} %: <b>{money(sales)} / {priceBasis==="package"?"pk":line.unit}</b></span><strong>Tilbudslinje {money(total)} eks. mva</strong><button type="button" onClick={()=>removeRow(line.id)}>Slett linje</button></div>
+     <div className={styles.priceSummary}><span>Kost: <b>{money(qty*cost)}</b></span><span>+ {decimal(number(markup),2)} %: <b>{money(sales)} / {priceBasis==="package"?"pk":line.unit}</b></span><strong>Tilbudslinje {money(total)} eks. mva</strong><button type="button" onClick={()=>saveFavorite(line)}>Lagre materiale</button><button type="button" onClick={()=>removeRow(line.id)}>Slett linje</button></div>
     </article>
    })}</div>
 
