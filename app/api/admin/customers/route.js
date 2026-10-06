@@ -1,18 +1,21 @@
 import {NextResponse} from "next/server";
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
+import {rentalBillingDecision} from "../../../../lib/rentalBilling";
+import {sendRentalConfirmation} from "../../../../lib/rentalConfirmationEmail";
+
+async function canView(){
+ return Boolean(await getAdminUser())&&Boolean(await hasPermission("canViewOrders"));
+}
 
 export async function GET(){
- const currentUser=await getAdminUser();
- if(!currentUser)return NextResponse.json({error:"Ikke innlogget."},{status:401});
- if(!(await hasPermission("canViewOrders"))){
-  return NextResponse.json({error:"Du har ikke tilgang til kunderegisteret."},{status:403});
- }
+ if(!(await canView()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
 
  const s=db();
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
 
- const [profilesResult,quotesResult]=await Promise.all([
+ const [profilesResult,quotesResult,billingResult]=await Promise.all([
   s.from("customer_profiles")
    .select("id,email,name,phone,address,created_at,updated_at")
    .order("created_at",{ascending:false})
@@ -20,7 +23,10 @@ export async function GET(){
   s.from("quotes")
    .select("id,quote_number,title,status,total_inc_vat_ore,customer,valid_until,created_at,sent_at,accepted_at,declined_at")
    .order("created_at",{ascending:false})
-   .limit(1000)
+   .limit(1000),
+  s.from("customer_billing_profiles")
+   .select("email,invoice_customer,credit_limit_ore,note,updated_at")
+   .limit(5000)
  ]);
 
  if(profilesResult.error){
@@ -28,6 +34,12 @@ export async function GET(){
   console.error("ADMIN CUSTOMERS GET",profilesResult.error);
   return NextResponse.json({error:"Kundekontoene kunne ikke hentes."},{status:500});
  }
+
+ if(billingResult.error&&!["42P01","42703"].includes(String(billingResult.error.code||""))){
+  console.error("ADMIN CUSTOMER BILLING GET",billingResult.error);
+ }
+
+ const billingMap=new Map((billingResult.data||[]).map(row=>[String(row.email||"").toLowerCase(),row]));
 
  let quotes=[];
  if(quotesResult.error){
@@ -51,16 +63,118 @@ export async function GET(){
  }
 
  return NextResponse.json({
-  customers:(profilesResult.data||[]).map(row=>({
-   id:row.id,
+  customers:(profilesResult.data||[]).map(row=>{
+   const billing=billingMap.get(String(row.email||"").toLowerCase())||{};
+   return {
+    id:row.id,
+    email:row.email||"",
+    name:row.name||"",
+    phone:row.phone||"",
+    address:row.address||"",
+    createdAt:row.created_at||null,
+    updatedAt:row.updated_at||null,
+    hasAccount:true,
+    invoiceCustomer:billing.invoice_customer===true,
+    creditLimitOre:billing.credit_limit_ore==null?null:Number(billing.credit_limit_ore)||0,
+    billingNote:billing.note||"",
+    billingUpdatedAt:billing.updated_at||null
+   };
+  }),
+  billingProfiles:(billingResult.data||[]).map(row=>({
    email:row.email||"",
-   name:row.name||"",
-   phone:row.phone||"",
-   address:row.address||"",
-   createdAt:row.created_at||null,
-   updatedAt:row.updated_at||null,
-   hasAccount:true
+   invoiceCustomer:row.invoice_customer===true,
+   creditLimitOre:row.credit_limit_ore==null?null:Number(row.credit_limit_ore)||0,
+   billingNote:row.note||"",
+   billingUpdatedAt:row.updated_at||null
   })),
   quotes
+ });
+}
+
+export async function PATCH(req){
+ const originError=sameOriginGuard(req);
+ if(originError)return originError;
+ if(!(await getAdminUser())||!(await hasPermission("canUpdateOrders"))){
+  return NextResponse.json({error:"Ingen tilgang."},{status:403});
+ }
+
+ const b=await req.json().catch(()=>({}));
+ const email=String(b.email||"").trim().toLowerCase();
+ if(!email||email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+  return NextResponse.json({error:"Gyldig e-postadresse mangler."},{status:400});
+ }
+
+ const invoiceCustomer=b.invoiceCustomer===true;
+ const creditLimitOre=b.creditLimitOre==null||b.creditLimitOre===""
+  ?null
+  :Math.max(0,Math.round(Number(b.creditLimitOre)||0));
+ const note=String(b.billingNote||"").trim().slice(0,1000);
+
+ const s=db();
+ if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+
+ const now=new Date().toISOString();
+ const {error}=await s.from("customer_billing_profiles").upsert({
+  email,
+  invoice_customer:invoiceCustomer,
+  credit_limit_ore:creditLimitOre,
+  note:note||null,
+  updated_at:now
+ },{onConflict:"email"});
+ if(error){
+  console.error("ADMIN CUSTOMER BILLING PATCH",error);
+  return NextResponse.json({error:"Faktura-/kredittinnstillingene kunne ikke lagres."},{status:500});
+ }
+
+ const decision=await rentalBillingDecision(s,email,0);
+ let confirmationsSent=0;
+ const confirmationErrors=[];
+
+ if(decision.eligible){
+  const {data:waiting,error:waitingError}=await s.from("rental_bookings")
+   .select("*,rental_items(name)")
+   .contains("customer",{email})
+   .in("status",["new","confirmed"])
+   .is("confirmation_sent_at",null)
+   .order("created_at",{ascending:true});
+
+  if(waitingError){
+   console.error("ADMIN CUSTOMER BILLING WAITING",waitingError);
+  }else{
+   for(const booking of waiting||[]){
+    try{
+     if(booking.status==="new"){
+      const {error:statusError}=await s.from("rental_bookings")
+       .update({status:"confirmed",updated_at:new Date().toISOString()})
+       .eq("id",booking.id);
+      if(statusError)throw statusError;
+      booking.status="confirmed";
+     }
+     await sendRentalConfirmation({
+      booking,
+      itemName:booking.rental_items?.name||"utstyret",
+      req
+     });
+     const sentAt=new Date().toISOString();
+     const {error:stampError}=await s.from("rental_bookings")
+      .update({confirmation_sent_at:sentAt,updated_at:sentAt})
+      .eq("id",booking.id);
+     if(stampError)throw stampError;
+     confirmationsSent+=1;
+    }catch(e){
+     console.error("ADMIN CUSTOMER AUTO CONFIRM",booking.id,e);
+     confirmationErrors.push(booking.booking_number||booking.id);
+    }
+   }
+  }
+ }
+
+ return NextResponse.json({
+  ok:true,
+  invoiceCustomer,
+  creditLimitOre,
+  billingDecision:decision,
+  confirmationsSent,
+  confirmationErrors
  });
 }
