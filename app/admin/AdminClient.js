@@ -470,7 +470,7 @@ export default function AdminClient({ user }) {
   if (canManageProducts) tabs.push(["rental", "Utleieutstyr"]);
   if (canViewOrders) tabs.push(["rentalCalendar", "Utleiekalender"]);
   if (canViewOrders) tabs.push(["rentalBookings", "Utleiebookinger"]);
-  if (canUpdateOrders) tabs.push(["workClock", "Arbeidsklokke"],["calculator", "Kalkulator"],["materialAi", "Material-AI"],["reminders", "Purring"],["vipps", "Vipps"]);
+  if (canUpdateOrders) tabs.push(["workClock", "Arbeidsklokke"],["calculator", "Kalkulator"],["materialAi", "Materialkalkulator"],["reminders", "Purring"],["vipps", "Vipps"]);
   if (canManageProducts) tabs.push(["projects", "Tidligere oppdrag"]);
   if (canManageProducts) tabs.push(["homepage", "Forside"]);
   if (canManageProducts) tabs.push(["drawing", "Tegning & visualisering"]);
