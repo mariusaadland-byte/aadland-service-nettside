@@ -224,6 +224,16 @@ export default function MaterialAiClient(){
  }
  function removeFavorite(id){setFavorites(current=>{const next=current.filter(item=>item.id!==id);localStorage.setItem(FAVORITES_STORE,JSON.stringify(next));return next})}
  function updatePrice(id,key,value){setPrices(current=>({...current,[id]:{...(current[id]||{}),[key]:value}}))}
+ function matchAllPrices(priceCatalog=catalog){
+  if(!priceCatalog.length||!rows.length)return 0;
+  let matched=0;const updates={};
+  for(const row of rows){
+   const preferred=prices[row.id]?.supplier||"Bygger’n",match=matchCatalog(row,priceCatalog,preferred)||matchCatalog(row,priceCatalog,"Bygger’n")||matchCatalog(row,priceCatalog,"");
+   if(match){matched++;updates[row.id]={supplier:match.supplier||preferred,sku:match.sku||"",productName:match.name||"",costExVat:String(match.costExVat||""),priceBasis:match.priceBasis||prices[row.id]?.priceBasis||"unit",matched:true}}
+  }
+  if(matched)setPrices(current=>{const next={...current};for(const [id,value] of Object.entries(updates))next[id]={...(next[id]||{}),...value};return next});
+  return matched;
+ }
  function autoMatch(line){
   const current=prices[line.id]||{},preferred=current.supplier||"Bygger’n",match=matchCatalog(line,catalog,preferred)||matchCatalog(line,catalog,"Bygger’n")||matchCatalog(line,catalog,"");
   if(!match){setMessage("Fant ingen god prisfil-match for "+line.material);setTimeout(()=>setMessage(""),1800);return}
@@ -244,7 +254,7 @@ export default function MaterialAiClient(){
  function importPriceFile(event){
   const file=event.target.files?.[0];event.target.value="";if(!file)return;
   const reader=new FileReader();
-  reader.onload=()=>{const next=parseCsv(reader.result);if(!next.length){setError("Prisfilen kunne ikke leses. Bruk CSV med minst produktnavn og pris.");return}setCatalog(next);localStorage.setItem(STORE,JSON.stringify(next));setMessage(next.length+" prislinjer importert.");setTimeout(()=>setMessage(""),1800)};
+  reader.onload=()=>{const next=parseCsv(reader.result);if(!next.length){setError("Prisfilen kunne ikke leses. Bruk CSV med minst produktnavn og pris.");return}setCatalog(next);localStorage.setItem(STORE,JSON.stringify(next));const matched=matchAllPrices(next);setMessage(next.length+" prislinjer importert"+(matched?" · "+matched+" materialer matchet automatisk":""));setTimeout(()=>setMessage(""),2200)};
   reader.readAsText(file);
  }
  function clearCatalog(){setCatalog([]);localStorage.removeItem(STORE)}
@@ -299,7 +309,7 @@ export default function MaterialAiClient(){
   <section className={styles.supplierCard}>
    <div className={styles.sectionHead}><div><span className={styles.kicker}>3 · LEVERANDØRPRISER</span><h2>Dine innkjøpspriser</h2><p>Bygger’n er primær. Importer prislisten som CSV; kalkulatoren prøver Bygger’n først og legger deretter på {decimal(number(markup),2)} %.</p></div><label className={styles.importBtn}>Importer prisfil<input type="file" accept=".csv,text/csv,.txt" onChange={importPriceFile}/></label></div>
    <div className={styles.supplierGrid}>{SUPPLIERS.map(s=>{const status=supplierStatuses.find(item=>item.id===s.id);return <div key={s.id}><strong>{s.name}</strong><span>{status?.mode||s.mode}</span><small>{s.note}</small><b className={status?.connected?styles.connected:undefined}>{status?.connected?"Direkte koblet ✓":"Prisfil / manuell pris"}</b></div>})}</div>
-   <div className={styles.catalogStatus}><span>{catalog.length?catalog.length+" varer i lokal prisbase":"Ingen prisfil importert ennå"}</span>{catalog.length>0&&<button type="button" onClick={clearCatalog}>Tøm prisbase</button>}</div>
+   <div className={styles.catalogStatus}><span>{catalog.length?catalog.length+" varer i lokal prisbase":"Ingen prisfil importert ennå"}</span><div>{catalog.length>0&&rows.length>0&&<button type="button" onClick={()=>{const count=matchAllPrices();setMessage(count?count+" materialer matchet mot prisbasen":"Fant ingen sikre treff");setTimeout(()=>setMessage(""),1800)}}>Match alle materialer</button>}{catalog.length>0&&<button type="button" onClick={clearCatalog}>Tøm prisbase</button>}</div></div>
    <p className={styles.fileHelp}>CSV kan ha kolonner som leverandør, varenr, produkt/navn, enhet, pris eks. mva eller pris inkl. mva, pakningsstørrelse og prisbasis.</p>
   </section>
 
