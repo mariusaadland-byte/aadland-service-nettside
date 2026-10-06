@@ -12,7 +12,7 @@ const DEFAULTS={
  hourlyRate:"500",
  fixedLabor:"",
  materialCost:"",
- materialMarkup:"15",
+ materialMarkup:"20",
  materialItems:[],
  distanceOneWay:"",
  oneWayTrips:"2",
@@ -72,7 +72,7 @@ export default function CalculatorClient(){
  useEffect(()=>{
   try{
    const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||"null");
-   if(saved&&typeof saved==="object")setForm({...DEFAULTS,...saved});
+   if(saved&&typeof saved==="object")setForm({...DEFAULTS,...saved,materialMarkup:String(saved.materialMarkup??"").trim()==="15"?"20":String(saved.materialMarkup??"20")});
   }catch{}
  },[]);
 
