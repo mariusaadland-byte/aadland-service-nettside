@@ -2,7 +2,7 @@ import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {cronGuard} from "../../../../lib/cronAuth";
 import {osloDateKey,shiftDateKey} from "../../../../lib/osloTime";
-import {rentalBookingSiteUrl,rentalEmailFrom,rentalReplyTo} from "../../../../lib/rentalEmailConfig";
+import {rentalBookingSiteUrl,rentalEmailFrom,rentalReplyTo,rentalResendApiKey} from "../../../../lib/rentalEmailConfig";
 
 const MAX_PER_RUN=50;
 
@@ -18,8 +18,8 @@ function displayDate(value){
 export async function GET(req){
  const authError=cronGuard(req); if(authError)return authError;
 
- const resendKey=process.env.RESEND_API_KEY;
- if(!resendKey)return NextResponse.json({ok:false,error:"RESEND_API_KEY mangler."},{status:503});
+ const resendKey=rentalResendApiKey();
+ if(!resendKey)return NextResponse.json({ok:false,error:"Utleie-e-post er ikke konfigurert."},{status:503});
 
  const s=db();
  if(!s)return NextResponse.json({ok:false,error:"Databasen er ikke tilgjengelig."},{status:503});
