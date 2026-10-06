@@ -13,6 +13,7 @@ const DEFAULTS={
  fixedLabor:"",
  materialCost:"",
  materialMarkup:"15",
+ materialItems:[],
  distanceOneWay:"",
  oneWayTrips:"2",
  kmRate:"5.30",
@@ -54,6 +55,19 @@ function Field({label,help,children}){
 export default function CalculatorClient(){
  const [form,setForm]=useState(DEFAULTS);
  const [copied,setCopied]=useState(false);
+ const [catalogSuppliers,setCatalogSuppliers]=useState([]);
+ const [catalogSupplier,setCatalogSupplier]=useState("byggern");
+ const [materialQuery,setMaterialQuery]=useState("");
+ const [materialResults,setMaterialResults]=useState([]);
+ const [catalogBusy,setCatalogBusy]=useState(false);
+ const [catalogError,setCatalogError]=useState("");
+ const [importOpen,setImportOpen]=useState(false);
+ const [importSupplier,setImportSupplier]=useState("byggern");
+ const [newSupplierName,setNewSupplierName]=useState("");
+ const [importPriceIncludesVat,setImportPriceIncludesVat]=useState(false);
+ const [importFile,setImportFile]=useState(null);
+ const [importBusy,setImportBusy]=useState(false);
+ const [importMessage,setImportMessage]=useState("");
 
  useEffect(()=>{
   try{
@@ -66,6 +80,47 @@ export default function CalculatorClient(){
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify(form));}catch{}
  },[form]);
 
+ useEffect(()=>{loadSuppliers()},[]);
+
+ useEffect(()=>{
+  const query=materialQuery.trim();
+  if(query.length<2){setMaterialResults([]);setCatalogError("");setCatalogBusy(false);return}
+  const controller=new AbortController();
+  const timer=setTimeout(async()=>{
+   setCatalogBusy(true);setCatalogError("");
+   try{
+    const params=new URLSearchParams({q:query,limit:"20"});
+    if(catalogSupplier)params.set("supplier",catalogSupplier);
+    const response=await fetch("/api/admin/material-catalog?"+params.toString(),{signal:controller.signal,cache:"no-store"});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||"Kunne ikke søke i materialkatalogen.");
+    setMaterialResults(Array.isArray(data.products)?data.products:[]);
+    if(Array.isArray(data.suppliers)&&data.suppliers.length)setCatalogSuppliers(data.suppliers);
+   }catch(error){
+    if(error?.name!=="AbortError")setCatalogError(error?.message||"Kunne ikke søke i materialkatalogen.");
+   }finally{
+    if(!controller.signal.aborted)setCatalogBusy(false);
+   }
+  },250);
+  return()=>{clearTimeout(timer);controller.abort()};
+ },[materialQuery,catalogSupplier]);
+
+ async function loadSuppliers(preferred){
+  try{
+   const response=await fetch("/api/admin/material-catalog",{cache:"no-store"});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Kunne ikke hente leverandører.");
+   const suppliers=Array.isArray(data.suppliers)?data.suppliers:[];
+   setCatalogSuppliers(suppliers);
+   const primary=suppliers.find(item=>item.isPrimary)?.id||suppliers[0]?.id||"byggern";
+   const next=preferred||catalogSupplier||primary;
+   if(!suppliers.some(item=>item.id===next))setCatalogSupplier(primary);
+   if(!suppliers.some(item=>item.id===importSupplier))setImportSupplier(primary);
+  }catch(error){
+   setCatalogError(error?.message||"Kunne ikke hente leverandører.");
+  }
+ }
+
  function set(name,value){
   setForm(current=>({...current,[name]:value}));
  }
@@ -74,13 +129,81 @@ export default function CalculatorClient(){
   setCopied(false);
  }
 
+ function addMaterial(product){
+  if(!product?.supplierId||!product?.sku)return;
+  const key=product.supplierId+"::"+product.sku;
+  setForm(current=>{
+   const items=Array.isArray(current.materialItems)?current.materialItems:[];
+   const existing=items.find(item=>item.key===key);
+   const next=existing
+    ?items.map(item=>item.key===key?{...item,qty:String(number(item.qty)+1)}:item)
+    :[...items,{
+      key,
+      supplierId:product.supplierId,
+      supplierName:product.supplierName||product.supplierId,
+      sku:product.sku,
+      name:product.name||"",
+      unit:product.unit||"STK",
+      costExVat:number(product.costExVat),
+      qty:"1"
+     }];
+   return {...current,materialItems:next};
+  });
+ }
+
+ function updateMaterial(key,field,value){
+  setForm(current=>({...current,materialItems:(Array.isArray(current.materialItems)?current.materialItems:[]).map(item=>item.key===key?{...item,[field]:value}:item)}));
+ }
+
+ function removeMaterial(key){
+  setForm(current=>({...current,materialItems:(Array.isArray(current.materialItems)?current.materialItems:[]).filter(item=>item.key!==key)}));
+ }
+
+ async function importPriceList(event){
+  event?.preventDefault?.();
+  setImportMessage("");setCatalogError("");
+  if(!importFile){setCatalogError("Velg en prisfil først.");return}
+  if(importSupplier==="new"&&!newSupplierName.trim()){setCatalogError("Skriv inn leverandørnavn.");return}
+  setImportBusy(true);
+  try{
+   const body=new FormData();
+   body.append("file",importFile);
+   body.append("supplierId",importSupplier);
+   body.append("newSupplierName",newSupplierName.trim());
+   body.append("priceIncludesVat",importPriceIncludesVat?"true":"false");
+   const response=await fetch("/api/admin/material-catalog/import",{method:"POST",body});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Kunne ikke importere prislisten.");
+   setImportMessage((data.imported||0)+" varer importert fra "+(data.supplier?.name||"leverandøren")+(data.skipped?" · "+data.skipped+" rader hoppet over":"")+".");
+   const supplierId=data.supplier?.id||"";
+   if(supplierId){
+    setCatalogSupplier(supplierId);
+    setImportSupplier(supplierId);
+   }
+   setNewSupplierName("");
+   setImportFile(null);
+   const input=document.getElementById("material-price-file");
+   if(input)input.value="";
+   await loadSuppliers(supplierId);
+   if(materialQuery.trim().length>=2)setMaterialQuery(q=>q+" ");
+  }catch(error){
+   setCatalogError(error?.message||"Kunne ikke importere prislisten.");
+  }finally{
+   setImportBusy(false);
+  }
+ }
+
  const calc=useMemo(()=>{
   const hours=number(form.hours);
   const hourlyRate=number(form.hourlyRate);
   const fixedLabor=number(form.fixedLabor);
   const labor=fixedLabor>0?fixedLabor:hours*hourlyRate;
 
-  const materialCost=number(form.materialCost);
+  const manualMaterialCost=number(form.materialCost);
+  const materialItems=Array.isArray(form.materialItems)?form.materialItems:[];
+  const catalogMaterialCostExVat=materialItems.reduce((sum,item)=>sum+number(item.qty)*number(item.costExVat),0);
+  const catalogMaterialCostIncVat=catalogMaterialCostExVat*(1+VAT_RATE);
+  const materialCost=manualMaterialCost+catalogMaterialCostIncVat;
   const markup=number(form.materialMarkup);
   const materials=materialCost*(1+markup/100);
 
@@ -97,7 +220,7 @@ export default function CalculatorClient(){
   const exVat=withoutVat(total);
   const vat=total-exVat;
 
-  return {hours,hourlyRate,fixedLabor,labor,materialCost,markup,materials,oneWayDistance,trips,totalKm,travel,tollPerWay,toll,total,exVat,vat,preset};
+  return {hours,hourlyRate,fixedLabor,labor,manualMaterialCost,catalogMaterialCostExVat,catalogMaterialCostIncVat,materialCost,markup,materials,oneWayDistance,trips,totalKm,travel,tollPerWay,toll,total,exVat,vat,preset};
  },[form]);
 
  const primaryTotal=form.businessExVat?calc.exVat:calc.total;
@@ -107,7 +230,8 @@ export default function CalculatorClient(){
   const lines=[
    form.project?form.project:"Prisberegning",
    "Arbeid: "+money(calc.labor),
-   "Materialer inkl. påslag: "+money(calc.materials),
+   "Materialer innkjøp: "+money(calc.materialCost)+" inkl. mva",
+   "Materialer inkl. "+decimal(calc.markup)+" % påslag: "+money(calc.materials),
    "Reise: "+decimal(calc.totalKm)+" km × "+money(number(form.kmRate))+" = "+money(calc.travel),
    "Bom: "+calc.trips+" vei(er) × "+money(calc.tollPerWay)+" = "+money(calc.toll),
    "Sum eks. mva: "+money(calc.exVat),
@@ -170,13 +294,77 @@ export default function CalculatorClient(){
     </section>
 
     <section className={styles.card}>
-     <div className={styles.cardHead}><span className={styles.step}>2</span><div><h2>Materialer</h2><p>Materialer holdes som egen linje i sammendraget.</p></div></div>
-     <Field label="Materialkost inkl. mva">
+     <div className={styles.cardHead}><span className={styles.step}>2</span><div><h2>Materialer</h2><p>Søk i leverandørprisene, legg inn antall og få materialpåslag automatisk.</p></div></div>
+
+     <div className={styles.catalogToolbar}>
+      <Field label="Leverandør">
+       <select value={catalogSupplier} onChange={e=>setCatalogSupplier(e.target.value)}>
+        <option value="">Alle leverandører</option>
+        {catalogSuppliers.map(item=><option key={item.id} value={item.id}>{item.name}{item.isPrimary?" · primær":""}</option>)}
+       </select>
+      </Field>
+      <Field label="Søk produkt" help="Søk på navn, varenummer, EAN, modulnummer eller varegruppe.">
+       <input value={materialQuery} onChange={e=>setMaterialQuery(e.target.value)} placeholder="F.eks. 28x120 terrasse, 48982916…"/>
+      </Field>
+     </div>
+
+     {catalogError&&<div className={styles.catalogError}>{catalogError}</div>}
+     {materialQuery.trim().length>=2&&<div className={styles.searchResults}>
+      {catalogBusy&&<div className={styles.catalogEmpty}>Søker…</div>}
+      {!catalogBusy&&!catalogError&&materialResults.length===0&&<div className={styles.catalogEmpty}>Ingen treff i prisbasen.</div>}
+      {!catalogBusy&&materialResults.map(product=><button type="button" key={product.supplierId+"::"+product.sku} className={styles.productResult} onClick={()=>addMaterial(product)}>
+       <span><b>{product.name}</b><small>{product.supplierName} · varenr. {product.sku}{product.categoryName?" · "+product.categoryName:""}</small></span>
+       <span><strong>{money(product.costExVat)}</strong><small>eks. mva / {product.unit||"stk"}</small></span>
+       <em>+ Legg til</em>
+      </button>)}
+     </div>}
+
+     {(Array.isArray(form.materialItems)?form.materialItems:[]).length>0&&<div className={styles.selectedMaterials}>
+      <div className={styles.materialListHead}><b>Valgte varer</b><span>{(form.materialItems||[]).length} varelinje(r)</span></div>
+      {(form.materialItems||[]).map(item=><div key={item.key} className={styles.materialLine}>
+       <div className={styles.materialName}><b>{item.name}</b><small>{item.supplierName} · {item.sku} · {money(number(item.costExVat))} eks. mva / {item.unit||"stk"}</small></div>
+       <label><span>Antall</span><input inputMode="decimal" value={item.qty} onChange={e=>updateMaterial(item.key,"qty",e.target.value)}/></label>
+       <div className={styles.materialLineTotal}><span>Innkjøp eks. mva</span><b>{money(number(item.qty)*number(item.costExVat))}</b></div>
+       <button type="button" className={styles.removeMaterial} onClick={()=>removeMaterial(item.key)} aria-label={"Fjern "+item.name}>×</button>
+      </div>)}
+      <div className={styles.materialTotals}>
+       <span>Leverandørvarer eks. mva <b>{money(calc.catalogMaterialCostExVat)}</b></span>
+       <span>Leverandørvarer inkl. mva <b>{money(calc.catalogMaterialCostIncVat)}</b></span>
+      </div>
+     </div>}
+
+     <Field label="Andre materialkostnader inkl. mva" help="Valgfritt. Bruk dette til materialer som ikke ligger i prisbasen.">
       <div className={styles.moneyInput}><span>kr</span><input inputMode="decimal" value={form.materialCost} onChange={e=>set("materialCost",e.target.value)} placeholder="0"/></div>
      </Field>
-     <Field label="Materialpåslag" help={"Kalkulert salgspris: "+money(calc.materials)}>
+     <Field label="Materialpåslag" help={"Kalkulert salgspris til kunde: "+money(calc.materials)}>
       <div className={styles.suffixInput}><input inputMode="decimal" value={form.materialMarkup} onChange={e=>set("materialMarkup",e.target.value)}/><span>%</span></div>
      </Field>
+     <div className={styles.calculationLine}><span>Samlet innkjøp inkl. mva</span><b>{money(calc.materialCost)}</b></div>
+
+     <div className={styles.importPanel}>
+      <button type="button" className={styles.importToggle} onClick={()=>{setImportOpen(value=>!value);setCatalogError("");setImportMessage("")}}>
+       <span><b>Leverandørprislister</b><small>Importer eller oppdater Bygger’n og andre leverandører</small></span>
+       <strong>{importOpen?"Lukk":"Åpne"} →</strong>
+      </button>
+      {importOpen&&<form className={styles.importForm} onSubmit={importPriceList}>
+       <div className={styles.importGrid}>
+        <Field label="Leverandør">
+         <select value={importSupplier} onChange={e=>setImportSupplier(e.target.value)}>
+          {catalogSuppliers.map(item=><option key={item.id} value={item.id}>{item.name}{item.isPrimary?" · primær":""}</option>)}
+          <option value="new">+ Ny leverandør</option>
+         </select>
+        </Field>
+        {importSupplier==="new"&&<Field label="Ny leverandør">
+         <input value={newSupplierName} onChange={e=>setNewSupplierName(e.target.value)} placeholder="F.eks. Montér"/>
+        </Field>}
+       </div>
+       <Field label="Prisfil" help="XLSX, CSV, TSV eller TXT. Nye filer oppdaterer samme varenummer og varer som forsvinner fra filen deaktiveres.">
+        <input id="material-price-file" type="file" accept=".xlsx,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain" onChange={e=>setImportFile(e.target.files?.[0]||null)}/>
+       </Field>
+       <label className={styles.importCheck}><input type="checkbox" checked={importPriceIncludesVat} onChange={e=>setImportPriceIncludesVat(e.target.checked)}/><span><b>Prisene i filen er inkl. mva</b><small>La denne være av for Bygger’n-filen du har nå – den er eks. mva.</small></span></label>
+       <div className={styles.importActions}><button type="submit" className={styles.primary} disabled={importBusy}>{importBusy?"Importerer…":"Importer / oppdater prisliste"}</button>{importMessage&&<span>{importMessage}</span>}</div>
+      </form>}
+     </div>
     </section>
 
     <section className={styles.card}>
