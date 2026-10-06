@@ -34,6 +34,7 @@ export default function AdminClient({ user }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [customerProfiles, setCustomerProfiles] = useState([]);
+  const [customerBillingProfiles, setCustomerBillingProfiles] = useState([]);
   const [customerQuotes, setCustomerQuotes] = useState([]);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -100,13 +101,16 @@ export default function AdminClient({ user }) {
       if (response.ok) {
         const data = await response.json();
         setCustomerProfiles(data.customers || []);
+        setCustomerBillingProfiles(data.billingProfiles || []);
         setCustomerQuotes(data.quotes || []);
       } else {
         setCustomerProfiles([]);
+        setCustomerBillingProfiles([]);
         setCustomerQuotes([]);
       }
     } else {
       setCustomerProfiles([]);
+      setCustomerBillingProfiles([]);
       setCustomerQuotes([]);
     }
 
@@ -753,7 +757,7 @@ export default function AdminClient({ user }) {
         )}
 
         {tab === "customers" && canViewOrders && (
-          <Customers orders={orders} bookings={rentalBookings} profiles={customerProfiles} quotes={customerQuotes} />
+          <Customers orders={orders} bookings={rentalBookings} profiles={customerProfiles} billingProfiles={customerBillingProfiles} quotes={customerQuotes} canUpdate={canUpdateOrders} reload={load} />
         )}
 
         {tab === "products" && canManageProducts && (
@@ -828,15 +832,19 @@ function customerQuoteHref(customer){
  return "/admin/tilbud/ny"+(query?"?"+query:"");
 }
 
-function Customers({orders,bookings,profiles,quotes}) {
+function Customers({orders,bookings,profiles,billingProfiles,quotes,canUpdate,reload}) {
   const [query,setQuery]=useState("");
   const [accountFilter,setAccountFilter]=useState("all");
+  const [savingEmail,setSavingEmail]=useState("");
+  const [billingMessage,setBillingMessage]=useState("");
   const customers=new Map();
+
   function keyFor(customer){
     const email=String(customer?.email||"").trim().toLowerCase();
     const phone=String(customer?.phone||"").replace(/\s/g,"");
     return email||phone||String(customer?.name||"").trim().toLowerCase();
   }
+
   function ensure(customer){
     const key=keyFor(customer);
     if(!key)return null;
@@ -846,15 +854,20 @@ function Customers({orders,bookings,profiles,quotes}) {
       phone:customer?.phone||"",
       address:customer?.address||"",
       orders:0,rentals:0,quotes:0,totalOre:0,lastDate:null,history:[],
-      hasAccount:false,accountCreatedAt:null
+      hasAccount:false,accountCreatedAt:null,
+      invoiceCustomer:false,creditLimitOre:null,billingNote:""
     };
     if(customer?.name)current.name=customer.name;
     if(customer?.email)current.email=customer.email;
     if(customer?.phone)current.phone=customer.phone;
     if(customer?.address)current.address=customer.address;
+    if(customer?.invoiceCustomer!==undefined)current.invoiceCustomer=customer.invoiceCustomer===true;
+    if(customer?.creditLimitOre!==undefined)current.creditLimitOre=customer.creditLimitOre==null?null:Number(customer.creditLimitOre)||0;
+    if(customer?.billingNote!==undefined)current.billingNote=customer.billingNote||"";
     customers.set(key,current);
     return current;
   }
+
   function add(customer,entry){
     const current=ensure(customer);
     if(!current)return;
@@ -863,6 +876,7 @@ function Customers({orders,bookings,profiles,quotes}) {
     current.history.push(entry);
     if(!current.lastDate||String(entry.date)>String(current.lastDate))current.lastDate=entry.date;
   }
+
   (profiles||[]).forEach(profile=>{
     const current=ensure(profile);
     if(!current)return;
@@ -872,6 +886,15 @@ function Customers({orders,bookings,profiles,quotes}) {
     if(profile.phone)current.phone=profile.phone;
     if(profile.address)current.address=profile.address;
   });
+
+  (billingProfiles||[]).forEach(profile=>{
+    const current=ensure(profile);
+    if(!current)return;
+    current.invoiceCustomer=profile.invoiceCustomer===true;
+    current.creditLimitOre=profile.creditLimitOre==null?null:Number(profile.creditLimitOre)||0;
+    current.billingNote=profile.billingNote||"";
+  });
+
   (quotes||[]).forEach(q=>{
     const current=ensure(q.customer);
     if(!current)return;
@@ -880,14 +903,100 @@ function Customers({orders,bookings,profiles,quotes}) {
     current.history.push({type:"quote",number:q.quoteNumber,date,totalOre:q.totalOre||0,label:"Tilbud · "+(q.title||"Tilbud"),href:"/admin/tilbud/"+q.id});
     if(!current.lastDate||String(date)>String(current.lastDate))current.lastDate=date;
   });
-  (orders||[]).forEach(o=>add(o.customer||{name:o.customerName,email:o.customerEmail,phone:o.customerPhone},{type:"order",number:o.orderNumber,date:o.createdAt,totalOre:o.totalOre||0,label:o.orderType==="custom"?(o.sourceQuoteId?"Oppdrag":"Befaring/forespørsel"):"Bestilling"}));
+
+  (orders||[]).forEach(o=>add(
+    o.customer||{name:o.customerName,email:o.customerEmail,phone:o.customerPhone},
+    {type:"order",number:o.orderNumber,date:o.createdAt,totalOre:o.totalOre||0,label:o.orderType==="custom"?(o.sourceQuoteId?"Oppdrag":"Befaring/forespørsel"):"Bestilling"}
+  ));
   (bookings||[]).forEach(b=>add(b.customer,{type:"rental",number:b.bookingNumber,date:b.createdAt,totalOre:b.totalOre||0,label:"Utleie"}));
-  const q=query.trim().toLowerCase(),list=[...customers.values()]
+
+  async function saveBilling(customer,index){
+    if(!canUpdate||!customer.email)return;
+    const invoiceCustomer=Boolean(document.getElementById("billing-invoice-"+index)?.checked);
+    const creditRaw=String(document.getElementById("billing-credit-"+index)?.value||"").trim();
+    const creditLimitOre=creditRaw===""?null:kronerToOre(creditRaw);
+    const billingNote=String(document.getElementById("billing-note-"+index)?.value||"").trim();
+    if(creditLimitOre!==null&&(!Number.isFinite(creditLimitOre)||creditLimitOre<0)){
+      setBillingMessage("Skriv inn en gyldig kredittgrense.");
+      return;
+    }
+
+    setSavingEmail(customer.email);
+    setBillingMessage("");
+    const response=await fetch("/api/admin/customers",{
+      method:"PATCH",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({email:customer.email,invoiceCustomer,creditLimitOre,billingNote})
+    });
+    const data=await response.json().catch(()=>({}));
+    setSavingEmail("");
+    if(!response.ok){
+      setBillingMessage(data.error||"Faktura-/kredittinnstillingene kunne ikke lagres.");
+      return;
+    }
+    const sent=Number(data.confirmationsSent)||0;
+    setBillingMessage(sent>0
+      ?"Kundeinnstillingene er lagret. "+sent+" ventende leiebekreftelse"+(sent===1?" er":"r er")+" sendt automatisk."
+      :"Kundeinnstillingene er lagret.");
+    if(typeof reload==="function")await reload();
+  }
+
+  const q=query.trim().toLowerCase();
+  const list=[...customers.values()]
    .filter(c=>!q||[c.name,c.email,c.phone,c.address].some(v=>String(v||"").toLowerCase().includes(q)))
    .filter(c=>accountFilter==="all"||(accountFilter==="account"?c.hasAccount:!c.hasAccount))
    .sort((x,y)=>String(y.lastDate||"").localeCompare(String(x.lastDate||"")));
-  return <><div className="card customerSearch"><div className="kicker">KUNDEREGISTER</div><h3>{customers.size} kunder fra kundekonto, tilbud, bestillinger, befaringer og utleie</h3><div className="customerSearchControls"><div className="field"><label>Søk</label><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Navn, e-post, telefon eller adresse"/></div><div className="field"><label>Kundekonto</label><select value={accountFilter} onChange={e=>setAccountFilter(e.target.value)}><option value="all">Alle kunder</option><option value="account">Har kundekonto</option><option value="guest">Uten kundekonto</option></select></div></div></div>
-  <div className="grid customerGrid">{list.map((c,i)=><article className="card" key={(c.email||c.phone||c.name)+i}><div className="customerAdminCardTop"><h3>{c.name}</h3>{c.hasAccount&&<span className="customerAccountBadge">Kundekonto</span>}</div><p>{c.phone&&<><a href={"tel:"+c.phone}>{c.phone}</a><br/></>}{c.email&&<><a href={"mailto:"+c.email}>{c.email}</a><br/></>}{c.address}</p><p><b>{c.quotes}</b> tilbud · <b>{c.orders}</b> bestilling/befaring · <b>{c.rentals}</b> utleie<br/>Registrert verdi: <b>{nok(c.totalOre)}</b>{c.accountCreatedAt&&<><br/><small className="muted">Kundekonto opprettet {new Date(c.accountCreatedAt).toLocaleDateString("nb-NO")}</small></>}</p><div className="customerAdminActions"><a className="btn alt" href={customerQuoteHref(c)}>Nytt tilbud</a>{c.email&&<a className="btn alt" href={"mailto:"+c.email}>Send e-post</a>}</div><details><summary>Vis historikk ({c.history.length})</summary>{c.history.sort((x,y)=>String(y.date||"").localeCompare(String(x.date||""))).map((h,j)=><div key={h.number+j} className="customerHistory">{h.href?<a href={h.href}><b>{h.label}</b> · {h.number}</a>:<><b>{h.label}</b> · {h.number}</>}<br/><small>{h.date?new Date(h.date).toLocaleString("nb-NO"):""} · {nok(h.totalOre||0)}</small></div>)}</details></article>)}</div>{!list.length&&<div className="card"><p>Ingen kunder funnet.</p></div>}</>;
+
+  return <>
+   {billingMessage&&<p className="notice">{billingMessage}</p>}
+   <div className="card customerSearch">
+    <div className="kicker">KUNDEREGISTER</div>
+    <h3>{customers.size} kunder fra kundekonto, tilbud, bestillinger, befaringer og utleie</h3>
+    <div className="customerSearchControls">
+     <div className="field"><label>Søk</label><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Navn, e-post, telefon eller adresse"/></div>
+     <div className="field"><label>Kundekonto</label><select value={accountFilter} onChange={e=>setAccountFilter(e.target.value)}><option value="all">Alle kunder</option><option value="account">Har kundekonto</option><option value="guest">Uten kundekonto</option></select></div>
+    </div>
+   </div>
+
+   <div className="grid customerGrid">
+    {list.map((customer,index)=><article className="card" key={(customer.email||customer.phone||customer.name)+index}>
+     <div className="customerAdminCardTop">
+      <h3>{customer.name}</h3>
+      <div className="customerAdminBadges">
+       {customer.hasAccount&&<span className="customerAccountBadge">Kundekonto</span>}
+       {customer.invoiceCustomer&&<span className="customerBillingBadge">Fakturakunde</span>}
+       {Number(customer.creditLimitOre)>0&&<span className="customerBillingBadge">Kreditt {nok(customer.creditLimitOre)}</span>}
+      </div>
+     </div>
+     <p>{customer.phone&&<><a href={"tel:"+customer.phone}>{customer.phone}</a><br/></>}{customer.email&&<><a href={"mailto:"+customer.email}>{customer.email}</a><br/></>}{customer.address}</p>
+     <p><b>{customer.quotes}</b> tilbud · <b>{customer.orders}</b> bestilling/befaring · <b>{customer.rentals}</b> utleie<br/>Registrert verdi: <b>{nok(customer.totalOre)}</b>{customer.accountCreatedAt&&<><br/><small className="muted">Kundekonto opprettet {new Date(customer.accountCreatedAt).toLocaleDateString("nb-NO")}</small></>}</p>
+
+     {customer.email&&<details className="customerBillingPanel">
+      <summary>Faktura / kreditt</summary>
+      <div className="customerBillingFields">
+       <label className="customerBillingCheck">
+        <input id={"billing-invoice-"+index} type="checkbox" defaultChecked={customer.invoiceCustomer}/>
+        <span><b>Fakturakunde</b><small>Leiebekreftelse kan sendes uten registrert forskuddsbetaling.</small></span>
+       </label>
+       <div className="field">
+        <label>Kredittgrense (kr)</label>
+        <input id={"billing-credit-"+index} inputMode="decimal" defaultValue={customer.creditLimitOre==null||Number(customer.creditLimitOre)===0?"":(Number(customer.creditLimitOre)/100).toFixed(0)} placeholder="Tomt felt = ingen beløpsgrense"/>
+        <small className="muted">Har kunden kredittgrense, kontrolleres åpne ubetalte utleier mot grensen automatisk.</small>
+       </div>
+       <div className="field">
+        <label>Internt notat</label>
+        <textarea id={"billing-note-"+index} rows="2" defaultValue={customer.billingNote||""} placeholder="Valgfritt"/>
+       </div>
+       {canUpdate&&<button className="btn" type="button" disabled={savingEmail===customer.email} onClick={()=>saveBilling(customer,index)}>{savingEmail===customer.email?"Lagrer …":"Lagre faktura/kreditt"}</button>}
+      </div>
+     </details>}
+
+     <div className="customerAdminActions"><a className="btn alt" href={customerQuoteHref(customer)}>Nytt tilbud</a>{customer.email&&<a className="btn alt" href={"mailto:"+customer.email}>Send e-post</a>}</div>
+     <details><summary>Vis historikk ({customer.history.length})</summary>{customer.history.sort((x,y)=>String(y.date||"").localeCompare(String(x.date||""))).map((h,j)=><div key={h.number+j} className="customerHistory">{h.href?<a href={h.href}><b>{h.label}</b> · {h.number}</a>:<><b>{h.label}</b> · {h.number}</>}<br/><small>{h.date?new Date(h.date).toLocaleString("nb-NO"):""} · {nok(h.totalOre||0)}</small></div>)}</details>
+    </article>)}
+   </div>
+   {!list.length&&<div className="card"><p>Ingen kunder funnet.</p></div>}
+  </>;
 }
 
 function Orders({ orders, status, canUpdateOrders, reload }) {
