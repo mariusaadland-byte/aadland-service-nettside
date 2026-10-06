@@ -6,6 +6,7 @@ import {buildReceiptEmail} from "../../../../lib/receiptEmail";
 import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
 import {rentalBookingSiteUrl,rentalEmailFrom,rentalReplyTo,rentalResendApiKey} from "../../../../lib/rentalEmailConfig";
 import {sendManualRentalRefundNotice} from "../../../../lib/rentalRefundNotice";
+import {sendRentalConfirmation} from "../../../../lib/rentalConfirmationEmail";
 
 async function canView(){
  return Boolean(await getAdminUser())&&Boolean(await hasPermission("canViewOrders"));
@@ -105,6 +106,19 @@ async function checkAvailability(s,booking){
 async function sendCustomerMessage(req,s,booking,item,kind){
  const email=String(booking.customer?.email||"").trim().toLowerCase();
  if(!email)return {error:"Kunden mangler e-postadresse."};
+
+ if(kind==="confirmation"){
+  try{
+   const sent=await sendRentalConfirmation({
+    booking,
+    itemName:item?.name||booking.rental_items?.name||"utstyret",
+    req
+   });
+   return {ok:true,email:sent.sentTo};
+  }catch(error){
+   return {error:String(error?.message||"E-posten kunne ikke sendes.")};
+  }
+ }
 
  const resendKey=rentalResendApiKey();
  if(!resendKey)return {error:"E-post er ikke konfigurert."};
@@ -336,7 +350,40 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
    const receiptSentAt=new Date().toISOString();
    const {error:stampError}=await s.from("rental_bookings").update({receipt_sent_at:receiptSentAt,updated_at:receiptSentAt}).eq("id",b.id);
    if(stampError)console.error("RENTAL RECEIPT STAMP",stampError);
-   return NextResponse.json({ok:true,sentTo:email,receiptSentAt,paymentStatus:"paid",paymentReference:reference});
+
+   let confirmationSentAt=current.confirmation_sent_at||null;
+   if(!confirmationSentAt&&["new","confirmed"].includes(current.status)){
+    const confirmation=await sendCustomerMessage(
+     req,
+     s,
+     {...current,status:"confirmed",payment_status:"paid",payment_reference:reference,payment_captured_ore:total},
+     current.rental_items||null,
+     "confirmation"
+    );
+    if(confirmation.error){
+     return NextResponse.json({
+      error:"Leiebetalingen er registrert og kvitteringen er sendt, men leiebekreftelsen kunne ikke sendes: "+confirmation.error,
+      statusSaved:true,
+      receiptSentAt
+     },{status:500});
+    }
+    confirmationSentAt=new Date().toISOString();
+    const {error:confirmationStampError}=await s.from("rental_bookings").update({
+     status:"confirmed",
+     confirmation_sent_at:confirmationSentAt,
+     updated_at:confirmationSentAt
+    }).eq("id",b.id);
+    if(confirmationStampError)console.error("RENTAL CONFIRMATION STAMP AFTER PAYMENT",confirmationStampError);
+   }
+
+   return NextResponse.json({
+    ok:true,
+    sentTo:email,
+    receiptSentAt,
+    confirmationSentAt,
+    paymentStatus:"paid",
+    paymentReference:reference
+   });
   }catch(e){
    console.error("RENTAL RECEIPT EMAIL ERROR",e);
    return NextResponse.json({error:"Leiebetalingen er registrert, men kvitteringen kunne ikke sendes.",statusSaved:true},{status:500});
