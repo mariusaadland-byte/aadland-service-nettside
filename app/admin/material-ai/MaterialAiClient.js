@@ -117,7 +117,7 @@ export default function MaterialAiClient(){
    setResult(data.result);setModel(data.model||"");
    const next={};
    for(const line of data.result?.lines||[]){
-    const match=matchCatalog(line,catalog,"");
+    const match=matchCatalog(line,catalog,"Bygger’n")||matchCatalog(line,catalog,"");
     next[line.id]=match?{supplier:match.supplier||"",sku:match.sku||"",productName:match.name||"",costExVat:String(match.costExVat||""),priceBasis:match.priceBasis||((line.packages||0)>0?"package":"unit"),matched:true}:{supplier:"Bygger’n",sku:"",productName:"",costExVat:"",priceBasis:(line.packages||0)>0?"package":"unit",matched:false};
    }
    setPrices(next);
