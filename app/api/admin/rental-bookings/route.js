@@ -4,7 +4,7 @@ import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
 import {buildReceiptEmail} from "../../../../lib/receiptEmail";
 import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
-import {rentalBookingSiteUrl,rentalEmailFrom,rentalReplyTo} from "../../../../lib/rentalEmailConfig";
+import {rentalBookingSiteUrl,rentalEmailFrom,rentalReplyTo,rentalResendApiKey} from "../../../../lib/rentalEmailConfig";
 import {sendManualRentalRefundNotice} from "../../../../lib/rentalRefundNotice";
 
 async function canView(){
@@ -106,9 +106,7 @@ async function sendCustomerMessage(req,s,booking,item,kind){
  const email=String(booking.customer?.email||"").trim().toLowerCase();
  if(!email)return {error:"Kunden mangler e-postadresse."};
 
- const resendKey=process.env.VERCEL_ENV==="preview"
-  ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)
-  :process.env.RESEND_API_KEY;
+ const resendKey=rentalResendApiKey();
  if(!resendKey)return {error:"E-post er ikke konfigurert."};
 
  const {Resend}=await import("resend");
@@ -276,7 +274,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
    return NextResponse.json({error:"Leiebetalingen kunne ikke registreres."},{status:500});
   }
 
-  const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
+  const resendKey=rentalResendApiKey();
   if(!resendKey)return NextResponse.json({error:"Leiebetalingen er registrert, men e-post er ikke konfigurert.",statusSaved:true},{status:503});
   try{
    const {Resend}=await import("resend");
@@ -424,9 +422,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
 
  if(action==="confirm-and-send"||action==="cancel-and-send"){
   if(!String(current.customer?.email||"").trim())return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
-  const resendKey=process.env.VERCEL_ENV==="preview"
-   ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)
-   :process.env.RESEND_API_KEY;
+  const resendKey=rentalResendApiKey();
   if(!resendKey)return NextResponse.json({error:"E-post er ikke konfigurert."},{status:503});
  }
 
