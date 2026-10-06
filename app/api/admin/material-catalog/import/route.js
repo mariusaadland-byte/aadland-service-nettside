@@ -53,7 +53,7 @@ export async function POST(req){
    name:newSupplierName,
    active:true,
    is_primary:false,
-   default_markup_percent:15,
+   default_markup_percent:20,
    updated_at:new Date().toISOString()
   },{onConflict:"id"}).select("id,name,is_primary,default_markup_percent").single();
   if(error)return NextResponse.json({error:"Kunne ikke opprette leverandøren."},{status:500});
