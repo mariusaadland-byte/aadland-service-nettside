@@ -1171,3 +1171,28 @@
  .wallInlineEditor>label,.wallInlineEditor>div{grid-column:1/-1}
  .wallFurnitureDimensions{grid-template-columns:1fr}
 }
+
+
+/* Quick wall placement for beds and other room furniture */
+.furnitureQuickPlacement{
+ display:grid!important;gap:8px!important;padding:10px!important;border:1px solid #d9ccb4!important;
+ border-radius:10px!important;background:#f6f1e7!important
+}
+.furnitureQuickPlacement>div:first-child{display:grid;gap:2px}
+.furnitureQuickPlacement>div:first-child b{font-size:10px;color:#5c503e}
+.furnitureQuickPlacement>div:first-child small{font-size:9px;color:#7d7468}
+.furnitureQuickPlacement select{
+ width:100%;min-height:40px;border:1px solid #c8bda9;border-radius:8px;background:#fff;color:#2d2922;padding:0 9px
+}
+.furnitureQuickPlacement>div:last-of-type{
+ display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:6px
+}
+.furnitureQuickPlacement button{
+ min-height:40px;border:1px solid #b99b5d;border-radius:8px;background:#fffaf0;color:#4f4026;
+ padding:0 7px;font:800 9px/1.1 inherit;cursor:pointer
+}
+.furnitureQuickPlacement button:nth-child(2){background:#d7a74e;color:#1b1408;border-color:#d7a74e}
+@media(max-width:520px){
+ .furnitureQuickPlacement>div:last-of-type{grid-template-columns:1fr}
+ .furnitureQuickPlacement button{min-height:44px;font-size:10px}
+}
