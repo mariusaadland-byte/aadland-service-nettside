@@ -1068,3 +1068,32 @@
  .furnitureSectionSizes{grid-template-columns:1fr}
  .furnitureSectionSizes input{min-height:42px}
 }
+
+
+/* Reusable custom furniture templates */
+.savedFurnitureTemplates{
+ display:grid;gap:8px;margin:0 0 14px;padding:10px;border:1px solid #d7ccb9;border-radius:10px;background:#f2ede3
+}
+.savedFurnitureTemplates>div:first-child{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.savedFurnitureTemplates>div:first-child b{font-size:10px;letter-spacing:.1em;color:#675842}
+.savedFurnitureTemplates>div:first-child small{font-size:8px;color:#8a8174}
+.savedFurnitureTemplates>div:last-child{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.savedFurnitureTemplates span{
+ display:grid;grid-template-columns:minmax(0,1fr) 32px;border:1px solid #d2c5ae;border-radius:9px;background:#fff;overflow:hidden
+}
+.savedFurnitureTemplates span>button:first-child{
+ display:grid;gap:3px;min-height:58px;padding:8px 9px;border:0;background:transparent;text-align:left;color:#332d24
+}
+.savedFurnitureTemplates span>button:first-child b{font-size:11px}
+.savedFurnitureTemplates span>button:first-child small{font-size:8px;color:#776e60}
+.savedFurnitureTemplates span>button:last-child{
+ border:0;border-left:1px solid #e2d9ca;background:#faf7f1;color:#8a6a58;font-size:18px;cursor:pointer
+}
+.savedFurnitureTemplates .savedFurnitureTemplateActive{border-color:#b28d43;box-shadow:inset 0 0 0 1px #cba75d;background:#f6ead1}
+@media(max-width:700px){
+ .savedFurnitureTemplates>div:last-child{grid-template-columns:1fr 1fr}
+ .savedFurnitureTemplates span>button:first-child{min-height:64px}
+}
+@media(max-width:430px){
+ .savedFurnitureTemplates>div:last-child{grid-template-columns:1fr}
+}
