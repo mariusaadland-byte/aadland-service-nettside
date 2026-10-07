@@ -4177,3 +4177,32 @@ body:has(.customerPage) .customerPage{
  .adminOverviewStats .adminStatLink{min-height:96px;padding:15px}
  .adminOverviewStats .adminStatLink>b{font-size:26px}
 }
+
+
+/* Customer-shared technical drawings */
+.customerDrawingsPanel .customerSectionHead p{max-width:720px;margin:7px 0 0;color:#777;line-height:1.5}
+.customerDrawingList{display:grid;gap:18px}
+.customerDrawingCard{padding:18px;overflow:hidden}
+.customerDrawingCard>header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:12px}
+.customerDrawingCard>header small{font-size:10px;letter-spacing:.12em;color:#987535;font-weight:900}
+.customerDrawingCard>header h3{margin:4px 0 3px;font-size:20px}
+.customerDrawingCard>header p{margin:0;color:#777;font-size:13px}
+.customerDrawingCard>header>span{font-size:11px;color:#888;white-space:nowrap}
+.customerDrawingNote{margin:0 0 12px;padding:10px 12px;border-left:3px solid #c49a45;background:#f7f3ea;color:#62594b;white-space:pre-wrap;line-height:1.5}
+.customerDrawingViewer{border:1px solid #ded8cd;border-radius:12px;overflow:hidden;background:#f5f2ec}
+.customerDrawingControls{display:flex;flex-wrap:wrap;gap:7px;padding:9px;background:#171816;border-bottom:1px solid #343532}
+.customerDrawingControls button{min-height:38px;border:1px solid #4a4c48;border-radius:8px;background:#272925;color:#fff;padding:0 11px;font:700 12px/1 inherit;cursor:pointer}
+.customerDrawingControls button.isActive{background:#d7a74e;border-color:#d7a74e;color:#17120a}
+.customerDrawingStage{display:grid;place-items:center;min-height:280px;aspect-ratio:16/10;background:#fff;overflow:hidden;touch-action:pan-y}
+.customerDrawingStage.is3D{touch-action:none;cursor:grab;background:linear-gradient(#f8f6f1,#eeebe4)}
+.customerDrawingStage.is3D:active{cursor:grabbing}
+.customerDrawingStage svg{display:block;width:100%;height:100%;max-height:620px}
+.customerDrawingHint{margin:0;padding:8px 11px;background:#f1ece2;color:#6c6458;font-size:11px;line-height:1.4}
+@media(max-width:700px){
+ .customerDrawingCard{padding:12px}
+ .customerDrawingCard>header{display:grid;gap:5px}
+ .customerDrawingCard>header>span{white-space:normal}
+ .customerDrawingStage{min-height:220px;aspect-ratio:4/3}
+ .customerDrawingControls{overflow-x:auto;flex-wrap:nowrap}
+ .customerDrawingControls button{flex:0 0 auto;min-height:44px}
+}
