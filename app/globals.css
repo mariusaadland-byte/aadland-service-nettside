@@ -2755,6 +2755,7 @@ body:has(.customerPage) .customerPage{
 .rentalBookingTop h3{margin-top:5px}
 .rentalBookingStatus{display:inline-flex;padding:7px 10px;border-radius:999px;background:#f1eee8;border:1px solid #ddd4c7;font-size:10px;font-weight:900;white-space:nowrap}
 .rentalBookingStatus-confirmed,.rentalBookingStatus-active{background:rgba(47,103,55,.10);border-color:rgba(47,103,55,.22);color:#2f6737}
+.rentalBookingStatus-waiting{background:rgba(207,161,83,.14);border-color:rgba(183,134,54,.32);color:#7b5a22}
 .rentalBookingStatus-cancelled{background:rgba(150,45,45,.08);border-color:rgba(150,45,45,.20);color:#7f2929}
 .rentalBookingSummary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0}
 .rentalBookingSummary span{display:grid;gap:4px;padding:10px 12px;background:#faf8f4;border:1px solid #e7e0d5;border-radius:10px}
@@ -3216,3 +3217,5 @@ body:has(.customerPage) .customerPage{
 .adminmain .rentalBookingExpanded h4,
 .adminmain .rentalBookingExpanded h5{color:#181613}
 .adminmain .rentalBookingExpanded .muted{color:#756f66}
+
+.rentalAutoConfirmNote{flex:1 1 100%;margin:4px 0 0;line-height:1.45}
