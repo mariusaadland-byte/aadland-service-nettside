@@ -355,7 +355,7 @@ function wallInwardNormal(wall,zones){
 function mountedItemCenter(item,wall,zones=[]){
  const limits=mountedLimits(item,wall),off=clamp(Number.isFinite(item?.wallOffset)?item.wallOffset:wallOffset(item,wall),limits.min,limits.max),a=Math.atan2(wall.y2-wall.y1,wall.x2-wall.x1);
  let cx=wall.x1+Math.cos(a)*off,cy=wall.y1+Math.sin(a)*off;
- if(item?.type==="customwall"){
+ if(item?.type==="customwall"||wallPlaceableFurnitureTypes.has(item?.type)){
   const inward=wallInwardNormal(wall,zones),shift=Math.max(0,(Number(wall.t)||98)/2)+Math.max(0,Number(item.h)||0)/2;
   cx+=inward.x*shift;cy+=inward.y*shift;
  }
@@ -526,9 +526,33 @@ function FurnitureGapPlanPreview({doc,wall,onSelectGap}){
  </svg>;
 }
 
-function WallElevationPreview({wall,items,zones=[],onSelectItem,selectedItemId,gapPickMode=false,onSelectGap}){
+function WallElevationPreview({wall,items,zones=[],onSelectItem,onMoveItem,onMoveStart,onMoveEnd,selectedItemId,gapPickMode=false,onSelectGap}){
  if(!wall)return null;
+ const svgRef=useRef(null),dragRef=useRef(null);
  const L=Math.max(1,len(wall)),H=Math.max(300,Number(wall.h)||2400),padX=Math.max(140,L*.035),padY=Math.max(140,H*.07);
+ const pointerWorldDelta=(e,start)=>{
+  const rect=svgRef.current?.getBoundingClientRect?.();if(!rect)return{dx:0,dy:0};
+  return {dx:(e.clientX-start.clientX)*(L+padX*2)/Math.max(1,rect.width),dy:(e.clientY-start.clientY)*(H+padY*2)/Math.max(1,rect.height)};
+ };
+ const beginItemDrag=(e,item)=>{
+  if(gapPickMode||!onMoveItem)return;
+  e.stopPropagation();e.currentTarget.setPointerCapture?.(e.pointerId);
+  const gaps=wallEdgeOffsets(item,wall),elev=Math.max(0,Number(item.elevation)||0);
+  dragRef.current={pointerId:e.pointerId,itemId:item.id,clientX:e.clientX,clientY:e.clientY,start:gaps.start,elevation:elev};
+  onSelectItem?.(item);onMoveStart?.(item);
+ };
+ const moveItemDrag=e=>{
+  const drag=dragRef.current;if(!drag||drag.pointerId!==e.pointerId)return;
+  e.preventDefault();const item=(items||[]).find(o=>o.id===drag.itemId);if(!item)return;
+  const delta=pointerWorldDelta(e,drag),width=Math.max(1,Number(item.w)||1),height=Math.max(80,modelHeight(item)),start=clamp(Math.round(drag.start+delta.dx),0,Math.max(0,L-width));
+  const canLift=["wallcab","customwall","tv","headboard","walllight","outlet","doubleoutlet","switch","dimmer","thermostat"].includes(item.type);
+  const elevation=canLift?clamp(Math.round(drag.elevation-delta.dy),0,Math.max(0,H-height)):Math.max(0,Number(item.elevation)||0);
+  onMoveItem?.(item,{start,elevation});
+ };
+ const endItemDrag=e=>{
+  const drag=dragRef.current;if(!drag||drag.pointerId!==e.pointerId)return;
+  dragRef.current=null;try{e.currentTarget.releasePointerCapture?.(e.pointerId)}catch{}onMoveEnd?.();
+ };
  const wallItems=(items||[]).filter(item=>item.wallId===wall.id).sort((a,b)=>(Number(a.wallOffset)||0)-(Number(b.wallOffset)||0));
  const projectedFurniture=wallProjectedFurniture(wall,items,zones);
  const blockingFurniture=projectedFurniture.filter(row=>row.blocksGap);
@@ -547,7 +571,7 @@ function WallElevationPreview({wall,items,zones=[],onSelectItem,selectedItemId,g
   const height=Math.max(80,modelHeight(item)),z0=Math.max(0,Number(item.elevation)||0);
   return{x:start,y:H-(z0+height),w:width,h:height,z0};
  };
- return <svg viewBox={[-padX,-padY,L+padX*2,H+padY*2].join(" ")} role="img" aria-label={"Veggvisning "+L+" millimeter"}>
+ return <svg ref={svgRef} viewBox={[-padX,-padY,L+padX*2,H+padY*2].join(" ")} role="img" aria-label={"Veggvisning "+L+" millimeter"} onPointerMove={moveItemDrag} onPointerUp={endItemDrag} onPointerCancel={endItemDrag}>
   <defs><pattern id={"wallgrid-"+wall.id} width="100" height="100" patternUnits="userSpaceOnUse"><path d="M100 0H0V100" fill="none" stroke="#e7e2d8" strokeWidth="4"/></pattern></defs>
   <rect x="0" y="0" width={L} height={H} fill={"url(#wallgrid-"+wall.id+")"} stroke="#5e5b55" strokeWidth="18"/>
   <line x1="0" y1={H} x2={L} y2={H} stroke="#2b2a27" strokeWidth="22"/>
@@ -557,7 +581,7 @@ function WallElevationPreview({wall,items,zones=[],onSelectItem,selectedItemId,g
    const height=Math.max(80,Math.min(H,modelHeight(item))),z0=Math.max(0,Number(item.elevation)||0),y=H-Math.min(H,z0+height),w=Math.max(60,end-start);
    const opacity=gapPickMode?(blocksGap?.96:.58):.82;
    const fill=gapPickMode?(blocksGap?"#cdb489":"#e8e1d6"):"#ddd0b7",stroke=gapPickMode?(blocksGap?"#5f482c":"#9d9589"):"#756044";
-   return <g key={"context-"+item.id} opacity={opacity} pointerEvents="none">
+   return <g key={"context-"+item.id} opacity={opacity} onPointerDown={e=>{if(!gapPickMode){e.stopPropagation();onSelectItem?.(item)}}} style={{cursor:gapPickMode?"default":"pointer"}}>
     <rect x={start} y={y} width={w} height={Math.min(height,H-y)} rx="18" fill={fill} stroke={stroke} strokeWidth={gapPickMode?(blocksGap?20:12):14} strokeDasharray={gapPickMode&&!blocksGap?"28 20":undefined}/>
     <text x={start+w/2} y={Math.max(70,y+75)} textAnchor="middle" fontSize="58" fontWeight="900" fill="#493d2d">{item.customName||labelFor(item.type)}</text>
     <text x={start+w/2} y={Math.min(H-35,y+145)} textAnchor="middle" fontSize="48" fontWeight="700" fill="#665846">{Math.round(w)} mm · sett forfra</text>
@@ -576,7 +600,7 @@ function WallElevationPreview({wall,items,zones=[],onSelectItem,selectedItemId,g
   </g>}
   {wallItems.map(item=>{
    const b=itemBox(item),active=selectedItemId===item.id,custom=item.type==="customwall";
-   return <g key={"elev-"+item.id} onClick={()=>onSelectItem?.(item)} style={{cursor:"pointer"}}>
+   return <g key={"elev-"+item.id} onPointerDown={e=>beginItemDrag(e,item)} onClick={()=>onSelectItem?.(item)} style={{cursor:gapPickMode?"pointer":"grab"}}>
     {openingTypes.has(item.type)?<rect x={b.x} y={b.y} width={b.w} height={b.h} fill={item.type==="window"?"#dceef2":"#faf8f2"} stroke={active?"#c39235":"#6c6961"} strokeWidth={active?22:15}/>:wallElectricalTypes.has(item.type)?<g><circle cx={b.x+b.w/2} cy={b.y+b.h/2} r={b.w*.42} fill="#fff4b8" stroke={active?"#c39235":"#8b6e25"} strokeWidth={active?20:13}/><text x={b.x+b.w/2} y={b.y+b.h/2+25} textAnchor="middle" fontSize={Math.max(55,b.w*.42)} fontWeight="900" fill="#72571d">{electricalSymbol(item.type)}</text></g>:<g>
      <rect x={b.x} y={b.y} width={b.w} height={b.h} fill={custom?"#e8d6b6":"#d8c39d"} stroke={active?"#c39235":"#6e5633"} strokeWidth={active?22:15}/>
      {custom&&(()=>{const grid=furnitureGridMetrics(item);return <>{grid.colEdges.slice(1,-1).map((edge,i)=><line key={"vx"+i} x1={b.x+b.w*edge} y1={b.y} x2={b.x+b.w*edge} y2={b.y+b.h} stroke="#9a815a" strokeWidth="9"/>)}{grid.rowEdges.slice(1,-1).map((edge,i)=><line key={"hy"+i} x1={b.x} y1={b.y+b.h*edge} x2={b.x+b.w} y2={b.y+b.h*edge} stroke="#9a815a" strokeWidth="9"/>)}{furnitureCellArray(grid.cols,grid.rows,item.cellTypes,"open").map((type,i)=>{const col=i%grid.cols,row=Math.floor(i/grid.cols),x=b.x+b.w*grid.colEdges[col],y=b.y+b.h*grid.rowEdges[row],cw=b.w*(grid.colEdges[col+1]-grid.colEdges[col]),ch=b.h*(grid.rowEdges[row+1]-grid.rowEdges[row]),cx=x+cw/2;return <g key={"cell-"+i} pointerEvents="none">
@@ -691,7 +715,8 @@ function normalizeDrawingDocument(raw){
  });
  return {...base,walls,zones,measurements,items};
 }
-const wallTypes=new Set(["door","sliding","window","opening","railing","screen","walllight","outlet","doubleoutlet","switch","dimmer","thermostat","customwall"]);
+const wallPlaceableFurnitureTypes=new Set(["base","wallcab","tallcab","fridge","oven","dishwasher","bed","wardrobe","nightstand","dresser","desk","bookshelf","vanity","headboard","tv","sofa","bench"]);
+const wallTypes=new Set(["door","sliding","window","opening","railing","screen","walllight","outlet","doubleoutlet","switch","dimmer","thermostat","customwall",...wallPlaceableFurnitureTypes]);
 const openingTypes=new Set(["door","sliding","window","opening"]);
 const openingDefaults=type=>type==="window"?{openingHeight:1200,sillHeight:900}:openingTypes.has(type)?{openingHeight:2100,sillHeight:0}:{};
 function nearestWall(o,walls){
@@ -1008,6 +1033,15 @@ export default function DrawingClient(){
  const makeLRoom=()=>openRoomBuilder("l");
  const wallForView=wallViewId?doc.walls.find(w=>w.id===wallViewId)||null:null;
  const wallSelectedItem=wallForView&&selected?.kind==="item"?doc.items.find(item=>item.id===selected.id&&item.wallId===wallForView.id)||null:null;
+ const wallProjectedSelected=wallForView&&selected?.kind==="item"&&!wallSelectedItem?wallProjectedFurniture(wallForView,doc.items,doc.zones||[]).find(row=>row.item.id===selected.id)?.item||null:null;
+ const moveWallItem2D=(itemId,{start,elevation})=>{
+  setDoc(d=>{
+   const item=d.items.find(o=>o.id===itemId),wall=item?.wallId?d.walls.find(w=>w.id===item.wallId):null;if(!item||!wall)return d;
+   const width=Math.max(1,Number(item.w)||1),off=clamp(Number(start)+width/2,width/2,Math.max(width/2,len(wall)-width/2)),nextBase={...item,wallOffset:off,elevation:Number.isFinite(Number(elevation))?Number(elevation):(Number(item.elevation)||0)},placed=mountedItemCenter(nextBase,wall,d.zones||[]);
+   return {...d,items:d.items.map(o=>o.id===itemId?{...nextBase,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}:o)};
+  });
+ };
+ const beginWallItem2DMove=()=>{checkpoint();setFuture([])};
  const updateWallVerticalItem=(itemId,key,value)=>{
   const n=Number(value);if(!Number.isFinite(n))return;
   const item=doc.items.find(o=>o.id===itemId),wall=item?.wallId?doc.walls.find(w=>w.id===item.wallId):null;if(!item||!wall)return;
@@ -1146,8 +1180,11 @@ export default function DrawingClient(){
   if(selectedWall&&wallTypes.has(type)){
    const start=openingTypes.has(type)?findOpeningStart(selectedWall,w):Math.max(0,(len(selectedWall)-w)/2);
    if(start==null){setMessage("Ikke nok ledig plass på veggen");setTimeout(()=>setMessage(""),2200);return}
-   const off=start+w/2,a=Math.atan2(selectedWall.y2-selectedWall.y1,selectedWall.x2-selectedWall.x1),cx=selectedWall.x1+Math.cos(a)*off,cy=selectedWall.y1+Math.sin(a)*off;
-   mutate(d=>({...d,items:[...d.items,{id,type,x:cx-w/2,y:cy-h/2,w,h,rot:a*180/Math.PI,wallId:selectedWall.id,wallOffset:off,...openingDefaults(type),...itemDefaults(type,d)}]}));
+   const off=start+w/2;
+   mutate(d=>{
+    const liveWall=d.walls.find(wall=>wall.id===selectedWall.id)||selectedWall,base={id,type,x:0,y:0,w,h,rot:0,wallId:liveWall.id,wallOffset:off,...openingDefaults(type),...itemDefaults(type,d)},placed=mountedItemCenter(base,liveWall,d.zones||[]);
+    return {...d,items:[...d.items,{...base,x:placed.cx-w/2,y:placed.cy-h/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}]};
+   });
   }else{
    const cx=pan.x+viewWidth/2,cy=pan.y+viewHeight/2,x=snapTo(cx-w/2,doc.snapSize||50),y=snapTo(cy-h/2,doc.snapSize||50);
    mutate(d=>{
@@ -1184,7 +1221,7 @@ export default function DrawingClient(){
   const dx=b.x-a.x,dy=b.y-a.y,ux=dx/L,uy=dy/L,inward=wallInwardNormal(wall,[context.zone]),baseAngle=Math.atan2(dy,dx),localY={x:-Math.sin(baseAngle),y:Math.cos(baseAngle)},rot=localY.x*inward.x+localY.y*inward.y>=0?baseAngle:baseAngle+Math.PI;
   let off=mode==="start"?W/2:mode==="end"?L-W/2:L/2;
   off=clamp(off,W/2,Math.max(W/2,L-W/2));
-  const cx=a.x+ux*off+inward.x*D/2,cy=a.y+uy*off+inward.y*D/2,next={...item,x:cx-W/2,y:cy-D/2,rot:rot*180/Math.PI,roomId:context.zone.id};
+  const base={...item,wallId:wall.id,wallOffset:off,roomId:context.zone.id,rot:rot*180/Math.PI},placed=mountedItemCenter(base,wall,doc.zones||[]),next={...base,x:placed.cx-W/2,y:placed.cy-D/2,rot:placed.a*180/Math.PI,wallOffset:placed.off};
   if(!itemFitsZone(next,context.inset)){setMessage("Møbelet får ikke plass helt der i dette rommet");setTimeout(()=>setMessage(""),2000);return}
   mutate(d=>({...d,items:d.items.map(o=>o.id===itemId?next:o)}));
   setFurnitureSnapWallId(wall.id);
@@ -1743,6 +1780,14 @@ export default function DrawingClient(){
     <div className={styles.wallViewToolbar}><button type="button" onClick={()=>cycleWallView(-1)}>← Forrige</button><button type="button" className={styles.wallViewBuild} onClick={()=>openFurnitureBuilder(wallForView.id)}>+ Bygg eget møbel</button>{furnitureGapPick&&<button type="button" className={styles.wallGapCancel} onClick={()=>{setFurnitureBuilder(furnitureGapPick);setFurnitureGapPick(null)}}>Avbryt mellomrom</button>}<button type="button" onClick={()=>cycleWallView(1)}>Neste →</button></div>
     <div className={styles.wallWorkspaceTools}>
      <button type="button" onClick={()=>openFurnitureBuilder(wallForView.id)}>+ Eget møbel</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("base",600,600)}>+ Benkeskap</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("wallcab",600,350)}>+ Overskap</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("tallcab",600,600)}>+ Høyskap</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("fridge",600,600)}>+ Kjøleskap</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("oven",600,600)}>+ Komfyr</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("dishwasher",600,600)}>+ Oppvaskmaskin</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("bed",1800,2000)}>+ Seng</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("wardrobe",1200,600)}>+ Garderobe</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("door",900,100)}>+ Dør</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("sliding",1800,100)}>+ Skyvedør</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("window",1200,100)}>+ Vindu</button>
@@ -1754,7 +1799,8 @@ export default function DrawingClient(){
      <button type="button" onClick={()=>addWallWorkspaceItem("thermostat",140,100)}>+ Termostat</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("walllight",180,100)}>+ Vegglampe</button>
     </div>
-    <div className={styles.wallViewCanvas+(furnitureGapPick?" "+styles.wallGapPickCanvas:"")}><WallElevationPreview wall={wallForView} items={doc.items} zones={doc.zones||[]} selectedItemId={selected?.kind==="item"?selected.id:null} gapPickMode={!!furnitureGapPick} onSelectGap={chooseFurnitureGap} onSelectItem={item=>{if(!furnitureGapPick)setSelected({kind:"item",id:item.id})}}/></div>
+    <div className={styles.wallViewCanvas+(furnitureGapPick?" "+styles.wallGapPickCanvas:"")}><WallElevationPreview wall={wallForView} items={doc.items} zones={doc.zones||[]} selectedItemId={selected?.kind==="item"?selected.id:null} gapPickMode={!!furnitureGapPick} onSelectGap={chooseFurnitureGap} onMoveStart={beginWallItem2DMove} onMoveItem={moveWallItem2D} onMoveEnd={()=>{}} onSelectItem={item=>{if(!furnitureGapPick)setSelected({kind:"item",id:item.id})}}/></div>
+    {wallProjectedSelected&&<div className={styles.wallProjectedEditor}><div><strong>{wallProjectedSelected.customName||labelFor(wallProjectedSelected.type)}</strong><small>Dette møbelet står i rommet. Fest det til denne veggen for eksakt 2D-plassering.</small></div><button type="button" onClick={()=>snapRoomFurniture(wallProjectedSelected.id,"start",wallForView.id)}>← Helt i hjørne</button><button type="button" onClick={()=>snapRoomFurniture(wallProjectedSelected.id,"center",wallForView.id)}>Sentrer på vegg</button><button type="button" onClick={()=>snapRoomFurniture(wallProjectedSelected.id,"end",wallForView.id)}>Helt i hjørne →</button></div>
     {wallSelectedItem&&(()=>{const gaps=wallEdgeOffsets(wallSelectedItem,wallForView),isOpening=openingTypes.has(wallSelectedItem.type),isElectrical=wallElectricalTypes.has(wallSelectedItem.type),isCustom=wallSelectedItem.type==="customwall";return <div className={styles.wallInlineEditor}>
      <div><strong>{wallSelectedItem.customName||labelFor(wallSelectedItem.type)}</strong><small>Valgt på vegg {Math.max(1,doc.walls.findIndex(w=>w.id===wallForView.id)+1)}</small></div>
      <label>Fra venstre (mm)<CommitNumberInput min="0" max={Math.max(0,gaps.L-Number(wallSelectedItem.w||0))} value={gaps.start} onCommit={value=>updateWallItemById(wallSelectedItem.id,"wallStartGap",value)}/></label>
@@ -1765,7 +1811,7 @@ export default function DrawingClient(){
      {isCustom&&<><label>Møbelhøyde (mm)<CommitNumberInput min="50" value={Math.round(modelHeight(wallSelectedItem))} onCommit={value=>updateWallVerticalItem(wallSelectedItem.id,"modelHeight",value)}/></label><label>Fra gulv (mm)<CommitNumberInput min="0" value={Math.round(Number(wallSelectedItem.elevation)||0)} onCommit={value=>updateWallVerticalItem(wallSelectedItem.id,"elevation",value)}/></label><div className={styles.wallFurnitureDimensions}><b>Feltbredder</b>{furnitureGridMetrics(wallSelectedItem).colWidths.map((value,i)=><label key={"wcw-"+i+"-"+value}>F{i+1}<CommitNumberInput min="50" value={value} onCommit={next=>updateCustomFurnitureColumn(wallSelectedItem.id,i,next)}/><span>mm</span></label>)}</div><div className={styles.wallFurnitureDimensions}><b>Radhøyder</b>{furnitureGridMetrics(wallSelectedItem).rowHeights.map((value,i)=><label key={"wrh-"+i+"-"+value}>R{i+1}<CommitNumberInput min="50" value={value} onCommit={next=>updateCustomFurnitureRow(wallSelectedItem.id,i,next)}/><span>mm</span></label>)}</div><div className={styles.wallFurnitureFronts}><b>Fronter</b>{furnitureCellArray(wallSelectedItem.sectionsX,wallSelectedItem.sectionsY,wallSelectedItem.cellTypes,"open").map((type,i)=><button type="button" key={"wfront-"+i} onClick={()=>{const cells=furnitureCellArray(wallSelectedItem.sectionsX,wallSelectedItem.sectionsY,wallSelectedItem.cellTypes,"open");cells[i]=nextFurnitureCellType(cells[i]);mutate(d=>({...d,items:d.items.map(o=>o.id===wallSelectedItem.id?{...o,cellTypes:cells}:o)}))}}>F{i+1}: {furnitureCellLabel(type)}</button>)}</div></>}
      <div className={styles.wallInlineActions}><button type="button" onClick={duplicate}>Dupliser</button><button type="button" onClick={remove}>Slett</button></div>
     </div>})()}
-    <div className={styles.wallViewHint}>{furnitureGapPick?<><b>Velg mellomrom rett forfra:</b> du ser den valgte veggen frontalt. Seng, garderobe, kommode, skap og andre møbler i rommet projiseres inn på veggen med riktig plassering langs veggen og riktig høyde. De grønne feltene er de ledige breddene mellom møblene. Trykk på feltet du vil fylle, så får møbelet automatisk akkurat den bredden og plasseres på veggen der.</>:<><b>Frontvisning av rommet:</b> møbler som står i rommet vises projisert rett mot valgt vegg, sammen med dører, vinduer, EL-punkter og veggmonterte møbler. Klikk et objekt som er festet til veggen for å redigere det.</>}</div>
+    <div className={styles.wallViewHint}>{furnitureGapPick?<><b>Velg mellomrom rett forfra:</b> du ser den valgte veggen frontalt. Seng, garderobe, kommode, skap og andre møbler i rommet projiseres inn på veggen med riktig plassering langs veggen og riktig høyde. De grønne feltene er de ledige breddene mellom møblene. Trykk på feltet du vil fylle, så får møbelet automatisk akkurat den bredden og plasseres på veggen der.</>:<><b>2D veggbygger:</b> møbler vises rett forfra. Du kan legge inn kjøkkenskap, hvitevarer, seng og garderobe direkte her, dra dem sidelengs på veggen og dra overskap/veggmøbler opp og ned. Klikk et eksisterende rommøbel for å feste/sentrere det på denne veggen.</>}</div>
     <footer><span>Vegg: <b>{len(wallForView)} × {Math.round(Number(wallForView.h)||2400)} × {Math.round(Number(wallForView.t)||98)} mm</b></span><span>På veggen: <b>{doc.items.filter(item=>item.wallId===wallForView.id).length}</b></span><span>Rom-møbler forfra: <b>{wallProjectedFurniture(wallForView,doc.items,doc.zones||[]).length}</b></span><button type="button" onClick={()=>setWallViewId(null)}>Tilbake til plantegning →</button></footer>
    </section>
   </div>}
