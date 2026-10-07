@@ -34,6 +34,7 @@ export default function MinSide(){
  const [profileForm,setProfileForm]=useState({name:"",phone:"",address:""});
  const [rentalContext,setRentalContext]=useState(false);
  const [activePanel,setActivePanel]=useState("overview");
+ const [portalMenuOpen,setPortalMenuOpen]=useState(false);
 
  async function load(){
   try{
@@ -185,6 +186,7 @@ export default function MinSide(){
 
  function selectPanel(id){
   setActivePanel(id);
+  setPortalMenuOpen(false);
   window.setTimeout(()=>{
    document.querySelector(".customerPortalContent")?.scrollIntoView({behavior:"smooth",block:"start"});
   },40);
@@ -289,16 +291,27 @@ export default function MinSide(){
 
   <div className="customerPortalLayout">
    <aside className="customerPortalSidebar">
-    <div className="customerPortalIdentity">
-     <span className="customerPortalAvatar">{String(data.customer.name||"K").trim().charAt(0).toUpperCase()}</span>
-     <div>
-      <small>{rentalContext?"AADLAND UTLEIE · MIN SIDE":"MIN SIDE"}</small>
-      <b>{data.customer.name||"Kunde"}</b>
-      <span>{data.customer.email}</span>
+    <div className="customerPortalIdentityRow">
+     <div className="customerPortalIdentity">
+      <span className="customerPortalAvatar">{String(data.customer.name||"K").trim().charAt(0).toUpperCase()}</span>
+      <div>
+       <small>{rentalContext?"AADLAND UTLEIE · MIN SIDE":"MIN SIDE"}</small>
+       <b>{data.customer.name||"Kunde"}</b>
+       <span>{data.customer.email}</span>
+      </div>
      </div>
+     <button
+      type="button"
+      className={"customerPortalMenuButton "+(portalMenuOpen?"isOpen":"")}
+      aria-label={portalMenuOpen?"Lukk meny":"Åpne meny"}
+      aria-expanded={portalMenuOpen}
+      onClick={()=>setPortalMenuOpen(v=>!v)}
+     >
+      <span></span><span></span><span></span>
+     </button>
     </div>
 
-    <nav className="customerPortalNav" aria-label="Min side">
+    <nav className={"customerPortalNav "+(portalMenuOpen?"isOpen":"")} aria-label="Min side">
      <button type="button" className={activePanel==="overview"?"isActive":""} onClick={()=>selectPanel("overview")}><span>Oversikt</span></button>
      <button type="button" className={activePanel==="foresporsler"?"isActive":""} onClick={()=>selectPanel("foresporsler")}><span>Forespørsler</span><b>{openEnquiries}</b></button>
      <button type="button" className={activePanel==="tilbud"?"isActive":""} onClick={()=>selectPanel("tilbud")}><span>Tilbud</span><b>{openQuotes}</b></button>
