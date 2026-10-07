@@ -392,11 +392,11 @@ export default function AdminClient({ user }) {
         tab:"surveys"
       })),
     ...rentalBookings
-      .filter(booking=>booking.status==="new")
+      .filter(booking=>booking.status==="new"||(booking.status==="confirmed"&&!booking.confirmationSentAt))
       .map(booking=>({
         key:"rental-"+booking.id,
         sort:2,
-        eyebrow:"NY UTLEIEBOOKING",
+        eyebrow:booking.status==="new"?"NY UTLEIEBOOKING":"UTLEIE VENTER BETALING/KREDITT",
         title:booking.customer?.name||booking.bookingNumber||"Utleie",
         meta:booking.bookingNumber||"",
         tab:"rentalBookings"
@@ -668,9 +668,9 @@ export default function AdminClient({ user }) {
                     <b>{rentalBookings.filter((booking) => ["confirmed", "active"].includes(booking.status)).length}</b>
                   </div>
                   <div className="stat">
-                    <span className="muted">Nye utleiebookinger</span>
+                    <span className="muted">Utleie venter betaling/kreditt</span>
                     <br />
-                    <b>{rentalBookings.filter((booking) => booking.status === "new").length}</b>
+                    <b>{rentalBookings.filter((booking) => booking.status === "new" || (booking.status === "confirmed" && !booking.confirmationSentAt)).length}</b>
                   </div>
                 </>
               )}
