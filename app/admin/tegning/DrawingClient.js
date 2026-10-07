@@ -337,50 +337,59 @@ function wallPrismCorners(w){
   {x:w.x2-nx*half,y:w.y2-ny*half},{x:w.x1-nx*half,y:w.y1-ny*half}
  ];
 }
-function Drawing3DPreview({doc,onWallSelect}){
- const zones=doc.zones||[],walls=doc.walls||[],items=doc.items||[];
- const projected=[];
- const addPoint=(x,y,z=0)=>projected.push(isoPoint(x,y,z));
+function camera3DPoint(x,y,z,camera,origin){
+ const yaw=(Number(camera?.yaw)||42)*Math.PI/180,pitch=clamp(Number(camera?.pitch)||34,8,78)*Math.PI/180,zoom=clamp(Number(camera?.zoom)||1,.55,2.5);
+ const dx=(Number(x)||0)-origin.x,dy=(Number(y)||0)-origin.y,rx=dx*Math.cos(yaw)-dy*Math.sin(yaw),ry=dx*Math.sin(yaw)+dy*Math.cos(yaw);
+ return{x:rx*zoom,y:(ry*Math.sin(pitch)-(Number(z)||0)*Math.cos(pitch))*zoom,depth:ry*Math.cos(pitch)+(Number(z)||0)*Math.sin(pitch)};
+}
+function Drawing3DPreview({doc,onWallSelect,onItemSelect,camera}){
+ const zones=doc.zones||[],walls=doc.walls||[],items=doc.items||[],planPoints=[];
+ for(const z of zones)for(const p of z.points||[])planPoints.push({x:Number(p.x)||0,y:Number(p.y)||0});
+ for(const w of walls)planPoints.push({x:Number(w.x1)||0,y:Number(w.y1)||0},{x:Number(w.x2)||0,y:Number(w.y2)||0});
+ for(const item of items){const c=itemCenter(item);planPoints.push(c)}
+ const origin=planPoints.length?{x:(Math.min(...planPoints.map(p=>p.x))+Math.max(...planPoints.map(p=>p.x)))/2,y:(Math.min(...planPoints.map(p=>p.y))+Math.max(...planPoints.map(p=>p.y)))/2}:{x:0,y:0};
+ const project=(x,y,z=0)=>camera3DPoint(x,y,z,camera,origin),projected=[];
+ const addPoint=(x,y,z=0)=>projected.push(project(x,y,z));
  for(const z of zones)for(const p of z.points||[]){addPoint(p.x,p.y,0);addPoint(p.x,p.y,Number(z.ceilingHeight)||Number(doc.defaultWallHeight)||2400)}
  for(const w of walls){const h=Number(w.h)||2400;for(const p of wallPrismCorners(w)){addPoint(p.x,p.y,0);addPoint(p.x,p.y,h)}}
  for(const item of items){
   const height=ceilingElectricalTypes.has(item.type)?itemCeilingHeight(item,doc):wallElectricalTypes.has(item.type)?Number(item.mountHeight)||1200:modelHeight(item);
-  for(const p of rotatedItemCorners(item)){addPoint(p.x,p.y,0);addPoint(p.x,p.y,height)}
+  const z0=electricalTypes.has(item.type)?height:Math.max(0,Number(item.elevation)||0);
+  for(const p of rotatedItemCorners(item)){addPoint(p.x,p.y,z0);if(!electricalTypes.has(item.type))addPoint(p.x,p.y,z0+modelHeight(item))}
  }
- if(!projected.length)projected.push({x:0,y:0},{x:1000,y:700});
- const minX=Math.min(...projected.map(p=>p.x)),maxX=Math.max(...projected.map(p=>p.x)),minY=Math.min(...projected.map(p=>p.y)),maxY=Math.max(...projected.map(p=>p.y)),pad=Math.max(400,(maxX-minX+maxY-minY)*.04);
+ if(!projected.length)projected.push({x:-500,y:-350},{x:500,y:350});
+ const minX=Math.min(...projected.map(p=>p.x)),maxX=Math.max(...projected.map(p=>p.x)),minY=Math.min(...projected.map(p=>p.y)),maxY=Math.max(...projected.map(p=>p.y)),pad=Math.max(300,(maxX-minX+maxY-minY)*.05);
  const viewBox=[minX-pad,minY-pad,Math.max(1000,maxX-minX+pad*2),Math.max(800,maxY-minY+pad*2)].join(" ");
- const wallRows=[...walls].sort((a,b)=>isoPoint((a.x1+a.x2)/2,(a.y1+a.y2)/2,0).y-isoPoint((b.x1+b.x2)/2,(b.y1+b.y2)/2,0).y);
- const itemRows=[...items].sort((a,b)=>isoPoint(itemCenter(a).x,itemCenter(a).y,0).y-isoPoint(itemCenter(b).x,itemCenter(b).y,0).y);
- return <svg viewBox={viewBox} role="img" aria-label="Isometrisk 3D-visning av tegningen">
+ const wallRows=[...walls].sort((a,b)=>project((a.x1+a.x2)/2,(a.y1+a.y2)/2,0).depth-project((b.x1+b.x2)/2,(b.y1+b.y2)/2,0).depth);
+ const itemRows=[...items].sort((a,b)=>project(itemCenter(a).x,itemCenter(a).y,0).depth-project(itemCenter(b).x,itemCenter(b).y,0).depth);
+ return <svg viewBox={viewBox} role="img" aria-label="Dreibar 3D-visning av tegningen">
   <defs>
    <linearGradient id="floor3d" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#faf7ef"/><stop offset="1" stopColor="#e9e1d4"/></linearGradient>
    <linearGradient id="wall3d" x1="0" x2="1"><stop offset="0" stopColor="#d9d2c6"/><stop offset="1" stopColor="#b9b1a5"/></linearGradient>
    <linearGradient id="item3d" x1="0" x2="1"><stop offset="0" stopColor="#d8b979"/><stop offset="1" stopColor="#9d7b42"/></linearGradient>
   </defs>
-  {zones.map(zone=><polygon key={"floor-"+zone.id} points={pointsAttr((zone.points||[]).map(p=>isoPoint(p.x,p.y,0)))} fill="url(#floor3d)" stroke="#b8ad9b" strokeWidth="18"/>)}
-  {wallRows.map((w,index)=>{const h=Number(w.h)||2400,fp=wallPrismCorners(w),base=fp.map(p=>isoPoint(p.x,p.y,0)),top=fp.map(p=>isoPoint(p.x,p.y,h)),mid=isoPoint((w.x1+w.x2)/2,(w.y1+w.y2)/2,h+90);return <g key={"wall3d-"+w.id} role={onWallSelect?"button":undefined} tabIndex={onWallSelect?0:undefined} style={{cursor:onWallSelect?"pointer":"default"}} onClick={()=>onWallSelect?.(w)} onKeyDown={e=>{if(onWallSelect&&(e.key==="Enter"||e.key===" ")){e.preventDefault();onWallSelect(w)}}}>
+  {zones.map(zone=><polygon key={"floor-"+zone.id} points={pointsAttr((zone.points||[]).map(p=>project(p.x,p.y,0)))} fill="url(#floor3d)" stroke="#b8ad9b" strokeWidth="18"/>)}
+  {wallRows.map(w=>{const h=Number(w.h)||2400,fp=wallPrismCorners(w),base=fp.map(p=>project(p.x,p.y,0)),top=fp.map(p=>project(p.x,p.y,h));return <g key={"wall3d-"+w.id} role={onWallSelect?"button":undefined} tabIndex={onWallSelect?0:undefined} style={{cursor:onWallSelect?"pointer":"default"}} onClick={e=>{e.stopPropagation();onWallSelect?.(w)}} onKeyDown={e=>{if(onWallSelect&&(e.key==="Enter"||e.key===" ")){e.preventDefault();onWallSelect(w)}}}>
    <polygon points={pointsAttr([base[0],base[1],top[1],top[0]])} fill="url(#wall3d)" stroke="#81796d" strokeWidth="12" opacity=".9"/>
    <polygon points={pointsAttr([base[1],base[2],top[2],top[1]])} fill="#aaa295" stroke="#81796d" strokeWidth="11" opacity=".92"/>
    <polygon points={pointsAttr([base[2],base[3],top[3],top[2]])} fill="#c9c1b5" stroke="#81796d" strokeWidth="11" opacity=".92"/>
    <polygon points={pointsAttr([base[3],base[0],top[0],top[3]])} fill="#b8b0a4" stroke="#81796d" strokeWidth="11" opacity=".92"/>
    <polygon points={pointsAttr(top)} fill="#e6e0d6" stroke="#81796d" strokeWidth="11" opacity=".96"/>
-   <text x={mid.x} y={mid.y} textAnchor="middle" fontSize="72" fontWeight="900" fill="#5e5548">V{index+1}</text>
   </g>})}
   {itemRows.map(item=>{
-   const center=itemCenter(item);
+   const center=itemCenter(item),select=()=>onItemSelect?.(item);
    if(openingTypes.has(item.type)){
     const a=(Number(item.rot)||0)*Math.PI/180,ux=Math.cos(a),uy=Math.sin(a),half=(Number(item.w)||0)/2,z0=item.type==="window"?Number(item.sillHeight)||0:0,z1=z0+(Number(item.openingHeight)||openingDefaults(item.type).openingHeight||2100);
-    const a0=isoPoint(center.x-ux*half,center.y-uy*half,z0),b0=isoPoint(center.x+ux*half,center.y+uy*half,z0),b1=isoPoint(center.x+ux*half,center.y+uy*half,z1),a1=isoPoint(center.x-ux*half,center.y-uy*half,z1);
-    return <polygon key={"opening3d-"+item.id} points={pointsAttr([a0,b0,b1,a1])} fill={item.type==="window"?"rgba(147,205,221,.78)":"rgba(250,248,242,.9)"} stroke="#5d5b56" strokeWidth="15"/>;
+    const pts=[project(center.x-ux*half,center.y-uy*half,z0),project(center.x+ux*half,center.y+uy*half,z0),project(center.x+ux*half,center.y+uy*half,z1),project(center.x-ux*half,center.y-uy*half,z1)];
+    return <polygon key={"opening3d-"+item.id} points={pointsAttr(pts)} fill={item.type==="window"?"rgba(147,205,221,.78)":"rgba(250,248,242,.9)"} stroke="#5d5b56" strokeWidth="15" onClick={e=>{e.stopPropagation();select()}} style={{cursor:onItemSelect?"pointer":"default"}}/>;
    }
    if(electricalTypes.has(item.type)){
-    const z=ceilingElectricalTypes.has(item.type)?itemCeilingHeight(item,doc):Number(item.mountHeight)||1200,p=isoPoint(center.x,center.y,z),size=Math.max(90,Math.min(Number(item.w)||140,240));
-    return <g key={"el3d-"+item.id}><polygon points={pointsAttr([{x:p.x,y:p.y-size},{x:p.x+size,y:p.y},{x:p.x,y:p.y+size},{x:p.x-size,y:p.y}])} fill="#ffe773" stroke="#89691e" strokeWidth="14"/><text x={p.x} y={p.y+28} textAnchor="middle" fontSize="80" fontWeight="900" fill="#5f4715">{electricalSymbol(item.type)}</text></g>;
+    const z=ceilingElectricalTypes.has(item.type)?itemCeilingHeight(item,doc):Number(item.mountHeight)||1200,p=project(center.x,center.y,z),size=Math.max(90,Math.min(Number(item.w)||140,240));
+    return <g key={"el3d-"+item.id} onClick={e=>{e.stopPropagation();select()}} style={{cursor:onItemSelect?"pointer":"default"}}><polygon points={pointsAttr([{x:p.x,y:p.y-size},{x:p.x+size,y:p.y},{x:p.x,y:p.y+size},{x:p.x-size,y:p.y}])} fill="#ffe773" stroke="#89691e" strokeWidth="14"/><text x={p.x} y={p.y+28} textAnchor="middle" fontSize="80" fontWeight="900" fill="#5f4715">{electricalSymbol(item.type)}</text></g>;
    }
    if(["railing","screen"].includes(item.type))return null;
-   const corners=rotatedItemCorners(item),h=modelHeight(item),z0=Math.max(0,Number(item.elevation)||0),base=corners.map(p=>isoPoint(p.x,p.y,z0)),top=corners.map(p=>isoPoint(p.x,p.y,z0+h));
-   return <g key={"obj3d-"+item.id}>
+   const corners=rotatedItemCorners(item),h=modelHeight(item),z0=Math.max(0,Number(item.elevation)||0),base=corners.map(p=>project(p.x,p.y,z0)),top=corners.map(p=>project(p.x,p.y,z0+h));
+   return <g key={"obj3d-"+item.id} onClick={e=>{e.stopPropagation();select()}} style={{cursor:onItemSelect?"pointer":"default"}}>
     <polygon points={pointsAttr([base[1],base[2],top[2],top[1]])} fill="#9c7b48" stroke="#675236" strokeWidth="11"/>
     <polygon points={pointsAttr([base[2],base[3],top[3],top[2]])} fill="#80643d" stroke="#675236" strokeWidth="11"/>
     <polygon points={pointsAttr(top)} fill="url(#item3d)" stroke="#675236" strokeWidth="12"/>
