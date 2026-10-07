@@ -161,11 +161,33 @@ export async function GET(){
   }:null
  }));
 
+ let drawings=[];
+ const {data:drawingRows,error:drawingError}=await s.from("project_drawings")
+  .select("id,order_id,name,address,notes,drawing_data,updated_at")
+  .eq("customer_user_id",customer.id)
+  .eq("customer_visible",true)
+  .order("updated_at",{ascending:false})
+  .limit(50);
+ if(drawingError){
+  if(!["42P01","42703"].includes(String(drawingError.code||"")))console.error("CUSTOMER DRAWINGS",drawingError);
+ }else{
+  drawings=(drawingRows||[]).map(row=>({
+   id:row.id,
+   orderId:row.order_id||"",
+   name:row.name||"Tegning",
+   address:row.address||"",
+   notes:row.notes||"",
+   updatedAt:row.updated_at||null,
+   drawingData:row.drawing_data&&typeof row.drawing_data==="object"?row.drawing_data:{}
+  }));
+ }
+
  return NextResponse.json({
   customer,
   orders,
   rentals,
   quotes,
+  drawings,
   quoteSetupRequired
  });
 }
