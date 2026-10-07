@@ -1000,10 +1000,16 @@ export default function DrawingClient(){
   if(!furnitureBuilder)return;
   const wallId=furnitureBuilder.wallId||wallForView?.id||(selected?.kind==="wall"?selected.id:"")||doc.walls[0]?.id||"";
   if(!wallId){setMessage("Tegn en vegg først");setTimeout(()=>setMessage(""),1800);return}
-  const wall=doc.walls.find(w=>w.id===wallId),gaps=wallFurnitureGaps(wall,doc.items);
-  if(!gaps.length){setMessage("Fant ikke et ledig mellomrom på denne veggen");setTimeout(()=>setMessage(""),2200);return}
-  setFurnitureGapPick({...furnitureBuilder,mount:"wall",wallId});setFurnitureBuilder(null);setWallViewId(wallId);setSelected({kind:"wall",id:wallId});setShow3D(false);
-  setMessage("Trykk på mellomrommet der møbelet skal stå");setTimeout(()=>setMessage(""),3200);
+  const wall=doc.walls.find(w=>w.id===wallId);
+  if(!wall){setMessage("Fant ikke valgt vegg");setTimeout(()=>setMessage(""),1800);return}
+  const gaps=wallFurnitureGaps(wall,doc.items);
+  setFurnitureGapPick({...furnitureBuilder,mount:"wall",wallId});
+  setFurnitureBuilder(null);
+  setWallViewId(wallId);
+  setSelected({kind:"wall",id:wallId});
+  setShow3D(false);
+  setMessage(gaps.length?"Trykk på mellomrommet der møbelet skal stå":"Frontvisning åpnet · ingen automatisk ledige felt funnet ennå");
+  setTimeout(()=>setMessage(""),3200);
  };
  const chooseFurnitureGap=gap=>{if(furnitureGapPick)placeCustomFurniture(furnitureGapPick,gap)};
  const openWallBuilder=()=>{
@@ -1631,7 +1637,7 @@ export default function DrawingClient(){
      <div style={{aspectRatio:Math.max(.35,Math.min(3,Number(furnitureBuilder.width||1)/Math.max(1,Number(furnitureBuilder.height)||1)))}}>{Array.from({length:Math.max(1,Math.min(8,Math.round(Number(furnitureBuilder.sectionsX)||1)))*Math.max(1,Math.min(6,Math.round(Number(furnitureBuilder.sectionsY)||1)))},(_,i)=><span key={i}/>)}</div>
      <p>{furnitureBuilder.name||"Eget møbel"} · {furnitureBuilder.width||0} × {furnitureBuilder.depth||0} × {furnitureBuilder.height||0} mm</p>
     </div>
-    <div className={styles.furnitureSmartActions}>{furnitureBuilder.mount==="wall"&&<><button type="button" onClick={()=>setFurnitureBuilder(v=>{const wall=doc.walls.find(w=>w.id===v?.wallId)||wallForView;if(!v||!wall)return v;const width=Math.min(Math.max(100,Number(v.width)||100),len(wall));return {...v,width:String(Math.round(width)),start:String(Math.round((len(wall)-width)/2))}})}>Sentrer på veggen</button><button type="button" className={styles.smartGapButton} onClick={startFurnitureGapPick}>↔ Velg mellomrom – tilpass automatisk</button></>}</div>
+    <div className={styles.furnitureSmartActions}>{furnitureBuilder.mount==="wall"&&<><button type="button" onClick={()=>setFurnitureBuilder(v=>{const wall=doc.walls.find(w=>w.id===v?.wallId)||wallForView;if(!v||!wall)return v;const width=Math.min(Math.max(100,Number(v.width)||100),len(wall));return {...v,width:String(Math.round(width)),start:String(Math.round((len(wall)-width)/2))}})}>Sentrer på veggen</button><button type="button" className={styles.smartGapButton} onClick={e=>{e.preventDefault();e.stopPropagation();startFurnitureGapPick()}}>↔ Velg mellomrom – tilpass automatisk</button></>}</div>
     <div className={styles.roomModalActions}><button type="button" onClick={()=>setFurnitureBuilder(null)}>Avbryt</button><button type="button" onClick={createCustomFurniture}>Legg inn møbel</button></div>
    </section>
   </div>}
