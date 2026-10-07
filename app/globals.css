@@ -3606,3 +3606,89 @@ body:has(.customerPage) .customerPage{
  .customerPortalContent .customerJobCard,
  .customerPortalContent .customerAccountCard{padding:16px!important}
 }
+
+
+/* Compact customer rental list */
+.customerRentalGroup{display:grid;gap:10px;margin-top:4px}
+.customerRentalGroup+.customerRentalGroup{margin-top:26px}
+.customerRentalGroupHead{
+ display:flex;align-items:center;justify-content:space-between;gap:12px;
+ padding:0 2px
+}
+.customerRentalGroupHead h3{margin:0!important;font-size:16px!important}
+.customerRentalGroupHead>span{
+ display:grid;place-items:center;min-width:28px;height:28px;padding:0 7px;border-radius:999px;
+ background:rgba(215,167,78,.10);border:1px solid rgba(215,167,78,.24);
+ color:#d7a74e;font-size:10px;font-weight:900
+}
+.customerRentalList{
+ display:grid;gap:8px
+}
+.customerRentalRow{
+ overflow:hidden;
+ border:1px solid rgba(255,255,255,.09);
+ border-radius:14px;
+ background:#181818;
+}
+.customerRentalRow[open]{
+ border-color:rgba(215,167,78,.28);
+ background:#1a1a1a
+}
+.customerRentalRow summary{
+ list-style:none;
+ display:grid;
+ grid-template-columns:130px minmax(0,1fr) auto auto 24px;
+ gap:14px;
+ align-items:center;
+ min-height:76px;
+ padding:12px 14px;
+ cursor:pointer;
+ user-select:none
+}
+.customerRentalRow summary::-webkit-details-marker{display:none}
+.customerRentalRow summary:hover{background:rgba(255,255,255,.025)}
+.customerRentalDate,.customerRentalMain{display:grid;gap:3px;min-width:0}
+.customerRentalDate b{font-size:13px}
+.customerRentalDate small,
+.customerRentalMain small{color:rgba(255,255,255,.45);font-size:9px}
+.customerRentalMain b{
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px
+}
+.customerRentalPrice{font-size:12px;font-weight:900;white-space:nowrap}
+.customerRentalChevron{
+ display:grid;place-items:center;width:24px;height:24px;border-radius:50%;
+ background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);
+ font-size:13px;transition:transform .16s ease
+}
+.customerRentalRow[open] .customerRentalChevron{transform:rotate(180deg)}
+.customerRentalDetails{
+ display:grid;gap:12px;padding:14px;border-top:1px solid rgba(255,255,255,.07)
+}
+.customerRentalDetails .customerCardMeta{margin:0}
+.customerRentalDetails>.btn{justify-self:start}
+.customerRentalPast .customerRentalRow{opacity:.92}
+
+@media(max-width:760px){
+ .customerRentalRow summary{
+  grid-template-columns:92px minmax(0,1fr) auto 20px;
+  gap:9px;
+  min-height:68px;
+  padding:10px 11px
+ }
+ .customerRentalRow summary .customerStatus{
+  grid-column:3;
+  font-size:8px!important;
+  padding:5px 7px!important
+ }
+ .customerRentalPrice{display:none}
+ .customerRentalChevron{grid-column:4}
+ .customerRentalDate b{font-size:11px}
+ .customerRentalDate small,.customerRentalMain small{font-size:8px}
+ .customerRentalMain b{font-size:12px}
+ .customerRentalDetails{padding:12px}
+}
+@media(max-width:430px){
+ .customerRentalRow summary{grid-template-columns:82px minmax(0,1fr) auto 18px;gap:7px}
+ .customerRentalDate b{font-size:10px}
+ .customerRentalGroupHead h3{font-size:14px!important}
+}
