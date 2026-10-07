@@ -238,11 +238,19 @@ function wallProjectedFurniture(wall,items,zones=[],walls=[],defaultThickness=98
   return {item,start,end,width:Math.max(0,end-start),distance,blockDistance,blocksGap,sameRoom};
  }).filter(row=>row.visible).sort((a,b)=>a.distance-b.distance);
 }
+function wallItemVerticalBounds(item){
+ if(openingTypes.has(item?.type)){const z0=item.type==="window"?Math.max(0,Number(item.sillHeight)||0):0;return{z0,z1:z0+Math.max(100,Number(item.openingHeight)||openingDefaults(item.type).openingHeight||2100)}}
+ if(wallElectricalTypes.has(item?.type)){const z=Math.max(0,Number(item.mountHeight)||0);return{z0:z-75,z1:z+75}}
+ const z0=Math.max(0,Number(item?.elevation)||0);return{z0,z1:z0+Math.max(50,modelHeight(item))};
+}
+function wallItemsVerticalOverlap(a,b,pad=2){
+ const A=wallItemVerticalBounds(a),B=wallItemVerticalBounds(b);return A.z0<B.z1-pad&&A.z1>B.z0+pad;
+}
 function wallFurnitureGaps(wall,items,zones=[],walls=[],defaultThickness=98,excludeId=null,verticalRange=null){
  const face=wallFaceMetrics(wall,zones,walls,defaultThickness),L=Math.max(1,face.L),overlapsHeight=item=>{
   if(!verticalRange)return true;
-  const z0=openingTypes.has(item.type)?(item.type==="window"?Math.max(0,Number(item.sillHeight)||0):0):Math.max(0,Number(item.elevation)||0),z1=openingTypes.has(item.type)?z0+Math.max(100,Number(item.openingHeight)||openingDefaults(item.type).openingHeight||2100):z0+Math.max(50,modelHeight(item));
-  return z0<Number(verticalRange.z1)-2&&z1>Number(verticalRange.z0)+2;
+  const range=wallItemVerticalBounds(item);
+  return range.z0<Number(verticalRange.z1)-2&&range.z1>Number(verticalRange.z0)+2;
  };
  const mounted=(items||[])
   .filter(item=>item.wallId===wall.id&&item.id!==excludeId&&!wallElectricalTypes.has(item.type)&&!["railing","screen"].includes(item.type)&&overlapsHeight(item))
@@ -686,7 +694,7 @@ function WallElevationPreview({wall,items,zones=[],walls=[],defaultWallThickness
   const delta=pointerWorldDelta(e,drag),width=Math.max(1,Number(item.w)||1),height=Math.max(80,modelHeight(item)),rawStart=clamp(Math.round(drag.start+delta.dx),0,Math.max(0,L-width)),threshold=Math.max(18,Math.min(55,L*.012));
   const candidates=[{start:0,label:"0 mm · venstre hjørne"},{start:Math.max(0,L-width),label:"0 mm · høyre hjørne"},{start:Math.max(0,(L-width)/2),label:"Sentrert på vegg"}];
   for(const other of wallItems){
-   if(other.id===item.id||wallElectricalTypes.has(other.type))continue;
+   if(other.id===item.id||wallElectricalTypes.has(other.type)||!wallItemsVerticalOverlap(item,other))continue;
    const g=wallFaceOffsets(other,wall,zones,walls,defaultWallThickness),ow=Math.max(1,Number(other.w)||1);
    candidates.push({start:g.start-width,label:"Inntil "+(other.customName||labelFor(other.type))},{start:g.start+ow,label:"Inntil "+(other.customName||labelFor(other.type))},{start:g.start+(ow-width)/2,label:"Sentrert med "+(other.customName||labelFor(other.type))});
   }
@@ -1039,7 +1047,7 @@ export default function DrawingClient(){
  const multiItems=useMemo(()=>multiSelectedIds.map(id=>doc.items.find(o=>o.id===id)).filter(Boolean),[multiSelectedIds,doc.items]);
  const placeWallItem=(itemId,mode)=>{
   const item=doc.items.find(o=>o.id===itemId),wall=item?.wallId?doc.walls.find(w=>w.id===item.wallId):null;if(!item||!wall)return;if(item.locked){setMessage("Lås opp objektet før du flytter det");setTimeout(()=>setMessage(""),1400);return}
-  const width=Math.max(1,Number(item.w)||1),face=wallFaceMetrics(wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),L=face.L,rows=doc.items.filter(o=>o.wallId===wall.id&&o.id!==itemId&&!wallElectricalTypes.has(o.type)).map(o=>({item:o,...wallFaceOffsets(o,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98)})).sort((a,b)=>a.start-b.start),current=wallFaceOffsets(item,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
+  const width=Math.max(1,Number(item.w)||1),face=wallFaceMetrics(wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),L=face.L,rows=doc.items.filter(o=>o.wallId===wall.id&&o.id!==itemId&&!wallElectricalTypes.has(o.type)&&wallItemsVerticalOverlap(item,o)).map(o=>({item:o,...wallFaceOffsets(o,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98)})).sort((a,b)=>a.start-b.start),current=wallFaceOffsets(item,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
   let start=current.start;
   if(mode==="start")start=0;
   else if(mode==="center")start=(L-width)/2;
@@ -1051,14 +1059,14 @@ export default function DrawingClient(){
   const item=doc.items.find(o=>o.id===itemId),wall=item?.wallId?doc.walls.find(w=>w.id===item.wallId):null;if(!item||!wall)return;
   const width=Math.max(1,Number(item.w)||1),face=wallFaceMetrics(wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),start=wallFaceOffsets(item,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98).start+width;
   if(start+width>face.L+1){setMessage("Ikke plass til en kopi til høyre");setTimeout(()=>setMessage(""),1800);return}
-  const occupied=doc.items.filter(o=>o.wallId===wall.id&&o.id!==item.id&&!wallElectricalTypes.has(o.type)).some(o=>{const g=wallFaceOffsets(o,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);return start<g.start+Number(o.w||0)-3&&start+width>g.start+3});
+  const occupied=doc.items.filter(o=>o.wallId===wall.id&&o.id!==item.id&&!wallElectricalTypes.has(o.type)&&wallItemsVerticalOverlap(item,o)).some(o=>{const g=wallFaceOffsets(o,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);return start<g.start+Number(o.w||0)-3&&start+width>g.start+3});
   if(occupied){setMessage("Neste plass på veggen er opptatt");setTimeout(()=>setMessage(""),1800);return}
   const id=uid(),base={...item,id,wallOffset:wallOffsetFromFaceStart(wall,start,width,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98)},placed=mountedItemCenter(base,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
   mutate(d=>({...d,items:[...d.items,{...base,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}]}));setSelected({kind:"item",id});
  };
  const fillWallRight=itemId=>{
   const item=doc.items.find(o=>o.id===itemId),wall=item?.wallId?doc.walls.find(w=>w.id===item.wallId):null;if(!item||!wall)return;
-  const width=Math.max(1,Number(item.w)||1),face=wallFaceMetrics(wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),current=wallFaceOffsets(item,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),blockers=doc.items.filter(o=>o.wallId===wall.id&&o.id!==item.id&&!wallElectricalTypes.has(o.type)).map(o=>wallFaceOffsets(o,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98)).filter(g=>g.start>=current.start+width-2).sort((a,b)=>a.start-b.start),limit=blockers[0]?.start??face.L,space=Math.max(0,limit-(current.start+width)),count=Math.floor(space/width);
+  const width=Math.max(1,Number(item.w)||1),face=wallFaceMetrics(wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),current=wallFaceOffsets(item,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),blockers=doc.items.filter(o=>o.wallId===wall.id&&o.id!==item.id&&!wallElectricalTypes.has(o.type)&&wallItemsVerticalOverlap(item,o)).map(o=>wallFaceOffsets(o,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98)).filter(g=>g.start>=current.start+width-2).sort((a,b)=>a.start-b.start),limit=blockers[0]?.start??face.L,space=Math.max(0,limit-(current.start+width)),count=Math.floor(space/width);
   if(count<1&&space<30){setMessage("Ingen ledig plass å fylle");setTimeout(()=>setMessage(""),1800);return}
   mutate(d=>{
    const liveWall=d.walls.find(w=>w.id===wall.id)||wall,added=[];
@@ -1090,7 +1098,7 @@ export default function DrawingClient(){
  const wallNeighborDistances=item=>{
   const wall=item?.wallId?doc.walls.find(w=>w.id===item.wallId):null;if(!item||!wall)return null;
   const current=wallFaceOffsets(item,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),width=Math.max(1,Number(item.w)||1);
-  const rows=doc.items.filter(o=>o.wallId===wall.id&&o.id!==item.id&&!wallElectricalTypes.has(o.type)).map(o=>({item:o,g:wallFaceOffsets(o,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98)})).sort((a,b)=>a.g.start-b.g.start);
+  const rows=doc.items.filter(o=>o.wallId===wall.id&&o.id!==item.id&&!wallElectricalTypes.has(o.type)&&wallItemsVerticalOverlap(item,o)).map(o=>({item:o,g:wallFaceOffsets(o,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98)})).sort((a,b)=>a.g.start-b.g.start);
   const prev=rows.filter(row=>row.g.start+Number(row.item.w||0)<=current.start+2).at(-1)||null,next=rows.find(row=>row.g.start>=current.start+width-2)||null;
   const prevEdge=prev?prev.g.start+Number(prev.item.w||0):0,nextEdge=next?next.g.start:current.L;
   return {wall,current,width,prev,next,prevGap:Math.max(0,Math.round(current.start-prevEdge)),nextGap:Math.max(0,Math.round(nextEdge-(current.start+width))),prevEdge,nextEdge};
