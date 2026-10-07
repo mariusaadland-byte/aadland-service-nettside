@@ -474,7 +474,7 @@ export default function AdminClient({ user }) {
   if (canManageProducts) tabs.push(["rental", "Utleieutstyr"]);
   if (canViewOrders) tabs.push(["rentalCalendar", "Utleiekalender"]);
   if (canViewOrders) tabs.push(["rentalBookings", "Utleiebookinger"]);
-  if (canUpdateOrders) tabs.push(["workClock", "Arbeidsklokke"],["calculator", "Kalkulator"],["materialAi", "Materialkalkulator"],["reminders", "Purring"]);
+  if (canUpdateOrders) tabs.push(["workClock", "Arbeidsklokke"],["calculator", "Kalkulator"],["materialAi", "Materialkalkulator"],["reminders", "Purring"],["vipps", "Vipps"]);
   if (canManageProducts) tabs.push(["projects", "Tidligere oppdrag"]);
   if (canManageProducts) tabs.push(["homepage", "Forside"]);
   if (canManageProducts) tabs.push(["drawing", "Tegning & visualisering"]);
@@ -486,6 +486,7 @@ export default function AdminClient({ user }) {
     if (id === "calculator") { setMenuOpen(false); router.push("/admin/kalkulator"); return; }
     if (id === "materialAi") { setMenuOpen(false); router.push("/admin/material-ai"); return; }
     if (id === "reminders") { setMenuOpen(false); router.push("/admin/purring"); return; }
+    if (id === "vipps") { setMenuOpen(false); router.push("/admin/vipps"); return; }
     setTab(id);
     setMenuOpen(false);
   }
