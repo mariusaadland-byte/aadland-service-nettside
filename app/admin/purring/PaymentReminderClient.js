@@ -102,7 +102,7 @@ export default function PaymentReminderClient(){
   await load();
  }
 
- return <main className="admin">
+ return <main className="admin adminStandalonePage">
   <div className="adminPageTop">
    <div>
     <div className="kicker">AADLAND SERVICE</div>
