@@ -189,7 +189,7 @@ const furnitureTypes=new Set(["sofa","table","chair","bed","wardrobe","tv","nigh
 const itemLayer=type=>electricalTypes.has(type)?"electrical":openingTypes.has(type)?"openings":kitchenTypes.has(type)?"kitchen":furnitureTypes.has(type)?"furniture":"construction";
 const itemAabb=item=>{const c=rotatedItemCorners(item),xs=c.map(p=>p.x),ys=c.map(p=>p.y);return{left:Math.min(...xs),right:Math.max(...xs),top:Math.min(...ys),bottom:Math.max(...ys)}};
 const boxesOverlap=(a,b,pad=0)=>a.left<b.right-pad&&a.right>b.left+pad&&a.top<b.bottom-pad&&a.bottom>b.top+pad;
-function drawingCollisions(items=[],walls=[],zones=[]){
+function drawingCollisions(items=[],walls=[],zones=[],defaultThickness=98){
  const result=new Map(),byWall=new Map((walls||[]).map(w=>[w.id,w]));
  const mark=(a,b,reason)=>{if(!result.has(a))result.set(a,[]);if(!result.get(a).some(row=>row.id===b&&row.reason===reason))result.get(a).push({id:b,reason})};
  const doorSwingBox=door=>{
@@ -212,7 +212,7 @@ function drawingCollisions(items=[],walls=[],zones=[]){
   if(aSwing&&!b.wallId&&!electricalTypes.has(b.type)&&boxesOverlap(aSwing,itemAabb(b),5)){mark(a.id,b.id,"dørslag er blokkert");mark(b.id,a.id,"blokkerer dørslag")}
   if(bSwing&&!a.wallId&&!electricalTypes.has(a.type)&&boxesOverlap(bSwing,itemAabb(a),5)){mark(b.id,a.id,"dørslag er blokkert");mark(a.id,b.id,"blokkerer dørslag")}
  }
- const innerZones=roomPlacementZones(zones,walls,98);
+ const innerZones=roomPlacementZones(zones,walls,defaultThickness);
  if(innerZones.length)for(const item of items){
   if(electricalTypes.has(item.type)||openingTypes.has(item.type))continue;
   if(!roomBoundedTypes.has(item.type)&&!wallPlaceableFurnitureTypes.has(item.type)&&item.type!=="customwall")continue;
@@ -1008,7 +1008,7 @@ export default function DrawingClient(){
  const toggleLock=itemId=>mutate(d=>({...d,items:d.items.map(o=>o.id===itemId?{...o,locked:!o.locked}:o)}));
  const toggleMulti=itemId=>setMultiSelectedIds(ids=>ids.includes(itemId)?ids.filter(id=>id!==itemId):[...ids,itemId]);
  const clearMulti=()=>setMultiSelectedIds([]);
- const collisionMap=useMemo(()=>drawingCollisions(doc.items,doc.walls,doc.zones||[]),[doc.items,doc.walls,doc.zones]);
+ const collisionMap=useMemo(()=>drawingCollisions(doc.items,doc.walls,doc.zones||[],doc.defaultWallThickness||98),[doc.items,doc.walls,doc.zones,doc.defaultWallThickness]);
  const selectedCollisions=selected?.kind==="item"?(collisionMap.get(selected.id)||[]):[];
  const multiItems=useMemo(()=>multiSelectedIds.map(id=>doc.items.find(o=>o.id===id)).filter(Boolean),[multiSelectedIds,doc.items]);
  const placeWallItem=(itemId,mode)=>{
@@ -1399,11 +1399,10 @@ export default function DrawingClient(){
    if(fitGap){setMessage("Møbelet ble tilpasset mellomrommet automatisk · "+Math.round(width)+" mm");setTimeout(()=>setMessage(""),2600)}
   }else{
    const zone=selected?.kind==="zone"?(doc.zones||[]).find(z=>z.id===selected.id):null,center=zone?polygonCentroid(zone.points):{x:pan.x+viewWidth/2,y:pan.y+viewHeight/2};
-   mutate(d=>{
-    const proposed={id,type:"customfloor",customName:name,x:center.x-width/2,y:center.y-depth/2,w:width,h:depth,rot:0,modelHeight:height,elevation,sectionsX,sectionsY,cellTypes,colWidths,rowHeights};
-    const placed=constrainFreeItemStrict(proposed,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackItem:proposed,fallbackCenter:center,snapDistance:0});
-    return {...d,items:[...d.items,placed]};
-   });
+   const proposed={id,type:"customfloor",customName:name,x:center.x-width/2,y:center.y-depth/2,w:width,h:depth,rot:0,modelHeight:height,elevation,sectionsX,sectionsY,cellTypes,colWidths,rowHeights};
+   const zones=roomPlacementZones(doc.zones,doc.walls,doc.defaultWallThickness||98),placed=constrainFreeItemStrict(proposed,zones,{fallbackItem:proposed,fallbackCenter:center,snapDistance:0});
+   if(zones.length&&!itemFitsSomePlacementZone(placed,zones)){setMessage("Møbelet får ikke plass innenfor rommets innervegger");setTimeout(()=>setMessage(""),2200);return}
+   mutate(d=>({...d,items:[...d.items,placed]}));
    setSelected({kind:"item",id});
   }
   setFurnitureBuilder(null);setFurnitureGapPick(null);setTool("select");
@@ -1464,7 +1463,9 @@ export default function DrawingClient(){
    selectedWall=nearestWall(viewCenter,doc.walls)?.wall||doc.walls[0];
   }
   if(selectedWall&&wallTypes.has(type)){
-   const face=wallFaceMetrics(selectedWall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),preferred=Math.max(0,(face.L-w)/2),start=openingTypes.has(type)?findOpeningStart(selectedWall,w,doc.items,null,preferred,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98):preferred;
+   const face=wallFaceMetrics(selectedWall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
+   if(w>face.L+1){setMessage("Møbelet er bredere enn ferdig innvendig vegg");setTimeout(()=>setMessage(""),2200);return}
+   const preferred=Math.max(0,(face.L-w)/2),start=openingTypes.has(type)?findOpeningStart(selectedWall,w,doc.items,null,preferred,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98):preferred;
    if(start==null){setMessage("Ikke nok ledig plass på veggen");setTimeout(()=>setMessage(""),2200);return}
    const faceStart=start,off=wallOffsetFromFaceStart(selectedWall,faceStart,w,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
    mutate(d=>{
@@ -1473,12 +1474,11 @@ export default function DrawingClient(){
    });
   }else{
    const cx=pan.x+viewWidth/2,cy=pan.y+viewHeight/2,x=snapTo(cx-w/2,doc.snapSize||50),y=snapTo(cy-h/2,doc.snapSize||50);
-   mutate(d=>{
-    const proposed={id,type,x:clamp(x,0,VIEW-w),y:clamp(y,0,VIEW-h),w,h,rot:0,...openingDefaults(type),...itemDefaults(type,d)};
-    const placementZones=roomPlacementZones(d.zones,d.walls,d.defaultWallThickness);
-    const placed=constrainFreeItemStrict(proposed,placementZones,{fallbackItem:proposed,fallbackCenter:{x:cx,y:cy},snapDistance:0});
-    return {...d,items:[...d.items,placed]};
-   });
+   const candidate={id,type,x:clamp(x,0,VIEW-w),y:clamp(y,0,VIEW-h),w,h,rot:0,...openingDefaults(type),...itemDefaults(type,doc)};
+   const placementZones=roomPlacementZones(doc.zones,doc.walls,doc.defaultWallThickness||98);
+   const placed=constrainFreeItemStrict(candidate,placementZones,{fallbackItem:candidate,fallbackCenter:{x:cx,y:cy},snapDistance:0});
+   if(placementZones.length&&roomBoundedTypes.has(type)&&!itemFitsSomePlacementZone(placed,placementZones)){setMessage("Møbelet får ikke plass innenfor rommets innervegger");setTimeout(()=>setMessage(""),2200);return}
+   mutate(d=>({...d,items:[...d.items,placed]}));
   }
   setFieldReturnZoneId(returnZoneId||null);setSelected({kind:"item",id});setTool("select");setQuickAddOpen(false);setTimeout(()=>setMobileEditOpen(true),0);
  };
