@@ -409,6 +409,13 @@ function roomPlacementZones(zones,walls,defaultThickness=98){
 function roomInnerZone(zone,walls,defaultThickness=98){
  return Array.isArray(zone?.wallIds)&&zone.wallIds.length===(zone?.points||[]).length?insetLinkedZone(zone,walls,defaultThickness):zone;
 }
+function roomInnerDiagnostics(zone,walls,defaultThickness=98){
+ const points=roomInnerZone(zone,walls,defaultThickness)?.points||[];if(points.length<3)return{closed:false,maxGap:0,diagonals:[],corners:[]};
+ let signedArea=0;for(let i=0;i<points.length;i++){const a=points[i],b=points[(i+1)%points.length];signedArea+=a.x*b.y-b.x*a.y}
+ const orientation=signedArea>=0?1:-1,corners=points.map((point,index)=>{const prev=points[(index-1+points.length)%points.length],next=points[(index+1)%points.length],inX=point.x-prev.x,inY=point.y-prev.y,outX=next.x-point.x,outY=next.y-point.y,turn=Math.atan2(inX*outY-inY*outX,inX*outX+inY*outY)*180/Math.PI;let interior=180-orientation*turn;while(interior<=0)interior+=360;while(interior>360)interior-=360;return Math.round(interior*10)/10}),diagonals=[];
+ if(points.length===4){diagonals.push(Math.round(Math.hypot(points[2].x-points[0].x,points[2].y-points[0].y)));diagonals.push(Math.round(Math.hypot(points[3].x-points[1].x,points[3].y-points[1].y)))}
+ return{closed:true,maxGap:0,diagonals,corners};
+}
 function itemFitsSomePlacementZone(item,zones){
  return (zones||[]).some(zone=>itemFitsZone(item,zone));
 }
@@ -1410,21 +1417,21 @@ export default function DrawingClient(){
   setTimeout(()=>setMessage(""),1800);
  };
  const selectedZoneWalls=useMemo(()=>selected?.kind==="zone"&&Array.isArray(sel?.wallIds)?sel.wallIds.map(id=>doc.walls.find(w=>w.id===id)).filter(Boolean):[],[selected,sel,doc.walls]);
- const selectedRoomDiagnostics=useMemo(()=>linkedRoomDiagnostics(selectedZoneWalls),[selectedZoneWalls]);
+ const selectedRoomDiagnostics=useMemo(()=>selected?.kind==="zone"&&sel?roomInnerDiagnostics(sel,doc.walls,doc.defaultWallThickness):linkedRoomDiagnostics(selectedZoneWalls),[selected,sel,selectedZoneWalls,doc.walls,doc.defaultWallThickness]);
  const selectedSurveyProgress=useMemo(()=>{const valid=new Set(selectedZoneWalls.map(w=>w.id)),done=(sel?.surveyedWallIds||[]).filter(id=>valid.has(id));return {done:done.length,total:selectedZoneWalls.length,complete:selectedZoneWalls.length>0&&done.length===selectedZoneWalls.length}},[sel?.surveyedWallIds,selectedZoneWalls]);
  const selectedSurveyState=useMemo(()=>selected?.kind==="zone"?zoneSurveyState(sel,doc.walls,doc.items):{ready:false,overlap:false,closed:false,done:0,total:0},[selected,sel,doc.walls,doc.items]);
  const selectedRoomQuantity=useMemo(()=>{
   if(selected?.kind!=="zone"||!sel)return null;
   const ids=new Set(selectedZoneWalls.map(w=>w.id)),inner=roomInnerZone(sel,doc.walls,doc.defaultWallThickness),perimeter=polygonPerimeterM(inner.points),height=(Number(sel.ceilingHeight)||Number(doc.defaultWallHeight)||2400)/1000;
   const openings=doc.items.filter(o=>ids.has(o.wallId)&&openingTypes.has(o.type));
-  const grossWallM2=selectedZoneWalls.length?selectedZoneWalls.reduce((sum,w)=>sum+len(w)*(Number(w.h)||Number(sel.ceilingHeight)||Number(doc.defaultWallHeight)||2400),0)/1000000:perimeter*height;
+  const grossWallM2=selectedZoneWalls.length?selectedZoneWalls.reduce((sum,w)=>sum+wallFaceMetrics(w,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98).L*(Number(w.h)||Number(sel.ceilingHeight)||Number(doc.defaultWallHeight)||2400),0)/1000000:perimeter*height;
   const openingM2=openings.reduce((sum,o)=>{const wall=doc.walls.find(w=>w.id===o.wallId),wallHeight=Number(wall?.h)||Number(sel.ceilingHeight)||Number(doc.defaultWallHeight)||2400,openingHeight=Math.min(wallHeight,Number(o.openingHeight)||openingDefaults(o.type).openingHeight||0);return sum+(Number(o.w)||0)*openingHeight/1000000},0);
   const floorBreakM=openings.filter(o=>["door","sliding","opening"].includes(o.type)).reduce((sum,o)=>sum+(Number(o.w)||0)/1000,0);
   return {grossWallM2,openingM2,netWallM2:Math.max(0,grossWallM2-openingM2),grossSkirtingM:perimeter,netSkirtingM:Math.max(0,perimeter-floorBreakM)};
  },[selected,sel,selectedZoneWalls,doc.items,doc.walls,doc.defaultWallHeight]);
  const overallSurveyProgress=useMemo(()=>{const zones=doc.zones||[],states=zones.map(zone=>zoneSurveyState(zone,doc.walls,doc.items)),done=states.filter(state=>state.finished).length,stale=states.filter(state=>state.stale).length;return {done,stale,total:zones.length,remaining:Math.max(0,zones.length-done),complete:zones.length>0&&done===zones.length}},[doc.zones,doc.walls,doc.items]);
  const surveyReportRooms=useMemo(()=>{const byId=new Map(doc.walls.map(w=>[w.id,w]));return (doc.zones||[]).map((zone,zoneIndex)=>{
-  const walls=(zone.wallIds||[]).map(id=>byId.get(id)).filter(Boolean),state=zoneSurveyState(zone,doc.walls,doc.items),diagnostics=linkedRoomDiagnostics(walls);
+  const walls=(zone.wallIds||[]).map(id=>byId.get(id)).filter(Boolean),state=zoneSurveyState(zone,doc.walls,doc.items),diagnostics=roomInnerDiagnostics(zone,doc.walls,doc.defaultWallThickness);
   const wallRows=walls.map((wall,index)=>{const layout=wallOpeningLayout(wall,doc.items),openings=layout.rows.map(({item,gaps})=>({id:item.id,label:labelFor(item.type),width:Math.round(Number(item.w)||0),start:gaps.start,end:gaps.end,openingHeight:Math.round(Number(item.openingHeight)||openingDefaults(item.type).openingHeight||0),sillHeight:item.type==="window"?Math.round(Number(item.sillHeight)||0):null,flip:!!item.flip}));return {id:wall.id,index:index+1,length:Math.round(wallFaceMetrics(wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98).L),angle:angle(wall),height:Math.round(Number(wall.h)||0),thickness:Math.round(Number(wall.t)||0),corner:diagnostics.corners[index],surveyed:(zone.surveyedWallIds||[]).includes(wall.id),openings}}); 
   const d1=Number(zone.diagonal1Measured),d2=Number(zone.diagonal2Measured);
   const inner=roomInnerZone(zone,doc.walls,doc.defaultWallThickness),perimeter=polygonPerimeterM(inner.points),roomOpenings=doc.items.filter(item=>walls.some(w=>w.id===item.wallId)&&openingTypes.has(item.type)),grossWallM2=walls.length?walls.reduce((sum,w)=>sum+wallFaceMetrics(w,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98).L*(Number(w.h)||Number(zone.ceilingHeight)||Number(doc.defaultWallHeight)||2400),0)/1000000:perimeter*((Number(zone.ceilingHeight)||Number(doc.defaultWallHeight)||2400)/1000),openingM2=roomOpenings.reduce((sum,item)=>{const wall=walls.find(w=>w.id===item.wallId),wallHeight=Number(wall?.h)||Number(zone.ceilingHeight)||Number(doc.defaultWallHeight)||2400,openingHeight=Math.min(wallHeight,Number(item.openingHeight)||openingDefaults(item.type).openingHeight||0);return sum+(Number(item.w)||0)*openingHeight/1000000},0),floorBreakM=roomOpenings.filter(item=>["door","sliding","opening"].includes(item.type)).reduce((sum,item)=>sum+(Number(item.w)||0)/1000,0);
@@ -1714,7 +1721,7 @@ export default function DrawingClient(){
   const zoneRows=(doc.zones||[]).map(z=>{
    const inner=roomInnerZone(z,doc.walls,doc.defaultWallThickness),area=polygonAreaM2(inner.points),perimeter=polygonPerimeterM(inner.points),height=(Number(z.ceilingHeight)||Number(doc.defaultWallHeight)||2400)/1000,linkedWalls=(z.wallIds||[]).map(id=>wallsById.get(id)).filter(Boolean),linkedIds=new Set(linkedWalls.map(w=>w.id));
    const roomOpenings=linkedWalls.length?doc.items.filter(o=>linkedIds.has(o.wallId)&&openingTypes.has(o.type)):[];
-   const grossWallArea=linkedWalls.length?linkedWalls.reduce((s,w)=>s+len(w)*(Number(w.h)||Number(z.ceilingHeight)||Number(doc.defaultWallHeight)||2400),0)/1000000:perimeter*height;
+   const grossWallArea=linkedWalls.length?linkedWalls.reduce((s,w)=>s+wallFaceMetrics(w,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98).L*(Number(w.h)||Number(z.ceilingHeight)||Number(doc.defaultWallHeight)||2400),0)/1000000:perimeter*height;
    const roomOpeningM2=roomOpenings.reduce((s,o)=>s+openingArea(o),0),netRoomWallM2=Math.max(0,grossWallArea-roomOpeningM2);
    const floorBreakM=roomOpenings.filter(o=>["door","sliding","opening"].includes(o.type)).reduce((s,o)=>s+(Number(o.w)||0)/1000,0),netSkirtingM=Math.max(0,perimeter-floorBreakM);
    return {...z,area,perimeter,wallArea:grossWallArea,openingM2:roomOpeningM2,netWallM2:netRoomWallM2,netSkirtingM,openingCount:roomOpenings.length};
@@ -1784,7 +1791,7 @@ export default function DrawingClient(){
    roomCount:(doc.zones||[]).length
   };
   const rooms=summary.zoneRows.map(z=>{
-   const ids=new Set(z.wallIds||[]),roomWalls=doc.walls.filter(w=>ids.has(w.id)),wallLengthM=roomWalls.reduce((sum,w)=>sum+len(w),0)/1000;
+   const ids=new Set(z.wallIds||[]),roomWalls=doc.walls.filter(w=>ids.has(w.id)),wallLengthM=roomWalls.reduce((sum,w)=>sum+wallFaceMetrics(w,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98).L,0)/1000;
    return {id:z.id,name:z.name||"Rom",basis:{
     wallNetM2:Number(z.netWallM2.toFixed(3)),wallGrossM2:Number(z.wallArea.toFixed(3)),
     floorM2:Number(z.area.toFixed(3)),ceilingM2:Number(z.area.toFixed(3)),
@@ -1824,7 +1831,7 @@ export default function DrawingClient(){
   }
   if(doc.walls.length){
    lines.push("","Vegger:");
-   doc.walls.forEach((w,index)=>lines.push("- Vegg "+(index+1)+": "+len(w)+" mm lang, "+Math.round(Number(w.h)||2400)+" mm høy, "+Math.round(Number(w.t)||98)+" mm tykk, vinkel "+angle(w)+"°"));
+   doc.walls.forEach((w,index)=>lines.push("- Vegg "+(index+1)+": "+Math.round(wallFaceMetrics(w,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98).L)+" mm innvendig lengde, "+Math.round(Number(w.h)||2400)+" mm høy, "+Math.round(Number(w.t)||98)+" mm tykk, vinkel "+angle(w)+"°"));
   }
   if(doc.items.length){
    lines.push("","Åpninger, innredning og objekter:");
