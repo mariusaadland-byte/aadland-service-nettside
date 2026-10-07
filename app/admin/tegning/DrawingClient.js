@@ -574,7 +574,7 @@ function Drawing3DPreview({doc,onWallSelect,onItemSelect,camera}){
     <polygon points={pointsAttr(top)} fill="url(#item3d)" stroke="#675236" strokeWidth="12"/>
     {custom&&<FurnitureFront3D item={item} a={frontA} b={frontB} z0={z0} height={h} project={project} prefix={"front-"+item.id}/>}
    </g>
-  })}</g>
+  })}
  </svg>;
 }
 function FurnitureGapPlanPreview({doc,wall,onSelectGap}){
@@ -706,7 +706,7 @@ function WallElevationPreview({wall,items,zones=[],walls=[],defaultWallThickness
     <text x={b.x+b.w/2} y={Math.max(65,b.y-28)} textAnchor="middle" fontSize="60" fontWeight="800" fill="#4d4230">{item.customName||labelFor(item.type)}</text>
     {!wallElectricalTypes.has(item.type)&&<text x={b.x+b.w/2} y={Math.min(H+90,b.y+b.h+72)} textAnchor="middle" fontSize="52" fill="#6d6250">{Math.round(b.w)} × {Math.round(b.h)} mm{b.z0>0?" · +"+Math.round(b.z0):""}</text>}
    </g>
-  })}
+  })}</g>
  </svg>;
 }
 function syncLinkedZones(walls,zones){
