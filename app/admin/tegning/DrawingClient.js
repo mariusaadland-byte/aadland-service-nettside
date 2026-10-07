@@ -220,6 +220,38 @@ function constrainFreeItem(item,zones,{fallbackCenter=null,snapDistance=140}={})
  }
  return {...item,x:best.x-item.w/2,y:best.y-item.h/2,roomId:zone.id};
 }
+function polygonSignedArea(points){
+ let area=0;
+ for(let i=0;i<(points||[]).length;i++){const a=points[i],b=points[(i+1)%points.length];area+=a.x*b.y-b.x*a.y}
+ return area/2;
+}
+function infiniteLineIntersection(a,b,c,d){
+ const r={x:b.x-a.x,y:b.y-a.y},s={x:d.x-c.x,y:d.y-c.y},den=r.x*s.y-r.y*s.x;
+ if(Math.abs(den)<1e-7)return null;
+ const t=((c.x-a.x)*s.y-(c.y-a.y)*s.x)/den;
+ return{x:a.x+t*r.x,y:a.y+t*r.y};
+}
+function insetLinkedZone(zone,walls,defaultThickness=98){
+ const points=zone?.points||[],ids=Array.isArray(zone?.wallIds)?zone.wallIds:[];
+ if(points.length<3||ids.length!==points.length)return zone;
+ const byId=new Map((walls||[]).map(w=>[w.id,w])),orientation=polygonSignedArea(points)>=0?1:-1,shifted=[];
+ for(let i=0;i<points.length;i++){
+  const a=points[i],b=points[(i+1)%points.length],dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1;
+  const wall=byId.get(ids[i]),distance=Math.max(0,(Number(wall?.t)||Number(defaultThickness)||98)/2);
+  const nx=orientation>0?-dy/L:dy/L,ny=orientation>0?dx/L:-dx/L;
+  shifted.push({a:{x:a.x+nx*distance,y:a.y+ny*distance},b:{x:b.x+nx*distance,y:b.y+ny*distance},nx,ny,distance});
+ }
+ const inset=points.map((point,i)=>{
+  const prev=shifted[(i-1+shifted.length)%shifted.length],next=shifted[i],hit=infiniteLineIntersection(prev.a,prev.b,next.a,next.b);
+  if(hit&&Number.isFinite(hit.x)&&Number.isFinite(hit.y)&&Math.hypot(hit.x-point.x,hit.y-point.y)<2000)return hit;
+  const nx=prev.nx*prev.distance+next.nx*next.distance,ny=prev.ny*prev.distance+next.ny*next.distance;
+  return{x:point.x+nx/2,y:point.y+ny/2};
+ });
+ return {...zone,points:inset,_sourcePoints:points};
+}
+function roomPlacementZones(zones,walls,defaultThickness=98){
+ return (zones||[]).map(zone=>insetLinkedZone(zone,walls,defaultThickness));
+}
 function electricalSymbol(type){
  return ({ceilinglight:"⊗",downlight:"⊙",walllight:"◐",outlet:"◫",doubleoutlet:"▣",switch:"S",dimmer:"D",thermostat:"T",junction:"●"})[type]||"";
 }
@@ -736,7 +768,7 @@ export default function DrawingClient(){
    const cx=pan.x+viewWidth/2,cy=pan.y+viewHeight/2,x=snapTo(cx-w/2,doc.snapSize||50),y=snapTo(cy-h/2,doc.snapSize||50);
    mutate(d=>{
     const proposed={id,type,x:clamp(x,0,VIEW-w),y:clamp(y,0,VIEW-h),w,h,rot:0,...openingDefaults(type),...itemDefaults(type,d)};
-    const placed=constrainFreeItem(proposed,d.zones||[],{fallbackCenter:{x:cx,y:cy},snapDistance:0});
+    const placed=constrainFreeItem(proposed,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackCenter:{x:cx,y:cy},snapDistance:0});
     return {...d,items:[...d.items,placed]};
    });
   }
@@ -851,7 +883,7 @@ export default function DrawingClient(){
       return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off};
      }
      const changed={...o,[key]:n};
-     return wallTypes.has(o.type)?changed:constrainFreeItem(changed,d.zones||[],{fallbackCenter:itemCenter(o),snapDistance:0});
+     return wallTypes.has(o.type)?changed:constrainFreeItem(changed,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackCenter:itemCenter(o),snapDistance:0});
     })};
    }
    return applyWallValue(d,selected?.id,key,n);
@@ -869,11 +901,11 @@ export default function DrawingClient(){
    const id=uid(),a=Math.atan2(wall.y2-wall.y1,wall.x2-wall.x1),center=start+sel.w/2,cx=wall.x1+Math.cos(a)*center,cy=wall.y1+Math.sin(a)*center;
    mutate(d=>({...d,items:[...d.items,{...sel,id,x:cx-sel.w/2,y:cy-sel.h/2,wallOffset:center,rot:a*180/Math.PI}]}));setSelected({kind:"item",id});return;
   }
-  mutate(d=>{const copy={...sel,id:uid(),x:sel.x+200,y:sel.y+200};return {...d,items:[...d.items,constrainFreeItem(copy,d.zones||[],{fallbackCenter:itemCenter(sel),snapDistance:0})]}})
+  mutate(d=>{const copy={...sel,id:uid(),x:sel.x+200,y:sel.y+200};return {...d,items:[...d.items,constrainFreeItem(copy,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackCenter:itemCenter(sel),snapDistance:0})]}})
  };
  const applySizePreset=value=>{if(selected?.kind!=="item"||!sel||!value)return;const [w,h]=value.split("x").map(Number);if(!Number.isFinite(w)||!Number.isFinite(h)||w<=0||h<=0)return;
   if(sel.wallId&&openingTypes.has(sel.type)){updateWallItemById(sel.id,"w",w);return}
-  mutate(d=>{const items=d.items.map(o=>{if(o.id!==sel.id)return o;const changed={...o,x:o.x+(o.w-w)/2,y:o.y+(o.h-h)/2,w,h};return o.wallId?changed:constrainFreeItem(changed,d.zones||[],{fallbackCenter:itemCenter(o),snapDistance:0})});return {...d,items:syncMounted(d.walls,items)}})
+  mutate(d=>{const items=d.items.map(o=>{if(o.id!==sel.id)return o;const changed={...o,x:o.x+(o.w-w)/2,y:o.y+(o.h-h)/2,w,h};return o.wallId?changed:constrainFreeItem(changed,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackCenter:itemCenter(o),snapDistance:0})});return {...d,items:syncMounted(d.walls,items)}})
  };
  const applyWallPreset=value=>{if(selected?.kind!=="wall"||!sel||!value)return;const [t,h]=value.split("x").map(Number);if(!Number.isFinite(t)||!Number.isFinite(h)||t<=0||h<=0)return;mutate(d=>({...d,walls:d.walls.map(w=>w.id!==sel.id?w:{...w,t,h})}))};
  const finishZone=()=>{if(zoneDraft.length<3){setMessage("Romsonen trenger minst 3 punkter");setTimeout(()=>setMessage(""),1800);return}const zone={id:uid(),name:"Rom "+((doc.zones||[]).length+1),points:zoneDraft,ceilingHeight:Number(doc.defaultWallHeight)||2400,floorFinish:"",notes:""};mutate(d=>({...d,zones:[...(d.zones||[]),zone]}));setZoneDraft([]);setTool("select");setSelected({kind:"zone",id:zone.id})};
@@ -940,7 +972,7 @@ export default function DrawingClient(){
  const moveMeasurementEnd=e=>{if(!measureDrag)return;const p=point(e),magnet=magneticPoint(p),q=magnet.point;setSnapHint(magnet.snapped?{...q,label:"Hjørne"}:null);setDoc(d=>({...d,measurements:(d.measurements||[]).map(m=>m.id!==measureDrag.id?m:measureDrag.end===1?{...m,x1:q.x,y1:q.y,anchor1:magnet.anchor||null}:{...m,x2:q.x,y2:q.y,anchor2:magnet.anchor||null})}))};
  const endMeasurementDrag=()=>{if(!measureDrag)return;setSnapHint(null);setHistory(h=>[...h.slice(-24),measureDrag.start]);setFuture([]);setMeasureDrag(null)};
  const downItem=(e,o)=>{if(["wall","measure","zone"].includes(tool)){e.stopPropagation();drawingPointDown(e);return}e.stopPropagation();capturePointer(e);setTool("select");setSelected({kind:"item",id:o.id});const p=point(e);setDrag({id:o.id,dx:p.x-o.x,dy:p.y-o.y,start:JSON.stringify(doc),startCenter:itemCenter(o)})};
- const move=e=>{if(panning){movePan(e);return}if(wallDrag){moveWallEnd(e);return}if(zoneDrag){moveZonePoint(e);return}if(measureDrag){moveMeasurementEnd(e);return}if(!drag)return;const p=point(e);setDoc(d=>({...d,items:d.items.map(o=>{if(o.id!==drag.id)return o;const proposed={...o,x:snapTo(p.x-drag.dx,d.snapSize||50),y:snapTo(p.y-drag.dy,d.snapSize||50)};return wallTypes.has(o.type)?proposed:constrainFreeItem(proposed,d.zones||[],{fallbackCenter:drag.startCenter,snapDistance:150})})}))};
+ const move=e=>{if(panning){movePan(e);return}if(wallDrag){moveWallEnd(e);return}if(zoneDrag){moveZonePoint(e);return}if(measureDrag){moveMeasurementEnd(e);return}if(!drag)return;const p=point(e);setDoc(d=>({...d,items:d.items.map(o=>{if(o.id!==drag.id)return o;const proposed={...o,x:snapTo(p.x-drag.dx,d.snapSize||50),y:snapTo(p.y-drag.dy,d.snapSize||50)};return wallTypes.has(o.type)?proposed:constrainFreeItem(proposed,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackCenter:drag.startCenter,snapDistance:150})})}))};
  const up=e=>{if(e)releasePointer(e);if(panning){setPanning(null);return}if(wallDrag){endWallDrag();return}if(zoneDrag){endZoneDrag();return}if(measureDrag){endMeasurementDrag();return}if(!drag)return;setHistory(h=>[...h.slice(-24),drag.start]);setFuture([]);setDoc(d=>{const o=d.items.find(x=>x.id===drag.id);if(!o||!wallTypes.has(o.type))return d;const n=nearestWall({x:o.x+o.w/2,y:o.y+o.h/2},d.walls);if(!n||n.dist>450)return wallElectricalTypes.has(o.type)?JSON.parse(drag.start):{...d,items:d.items.map(x=>x.id!==o.id?x:{...x,wallId:null,wallOffset:null})};const a=Math.atan2(n.wall.y2-n.wall.y1,n.wall.x2-n.wall.x1)*180/Math.PI,limits=mountedLimits(o,n.wall),preferred=clamp(Math.round(n.t*limits.L)-o.w/2,0,Math.max(0,limits.L-o.w)),safeStart=openingTypes.has(o.type)?findOpeningStart(n.wall,o.w,d.items,o.id,preferred):preferred;if(safeStart==null)return JSON.parse(drag.start);const off=safeStart+o.w/2,cx=n.wall.x1+Math.cos(a*Math.PI/180)*off,cy=n.wall.y1+Math.sin(a*Math.PI/180)*off;return {...d,items:d.items.map(x=>x.id!==o.id?x:{...x,x:cx-o.w/2,y:cy-o.h/2,rot:a,wallId:n.wall.id,wallOffset:off})}});setDrag(null)};
  const applyCanvasPoint=p=>{
   setSelected(null);
