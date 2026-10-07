@@ -935,9 +935,13 @@ function Customers({orders,bookings,profiles,billingProfiles,quotes,canUpdate,re
       return;
     }
     const sent=Number(data.confirmationsSent)||0;
-    setBillingMessage(sent>0
-      ?"Kundeinnstillingene er lagret. "+sent+" ventende leiebekreftelse"+(sent===1?" er":"r er")+" sendt automatisk."
-      :"Kundeinnstillingene er lagret.");
+    if(data.billingDecision?.reason==="credit-limit"){
+      setBillingMessage("Kundeinnstillingene er lagret, men åpne utleier overstiger tilgjengelig kreditt. Leiebekreftelse er derfor ikke sendt ennå.");
+    }else{
+      setBillingMessage(sent>0
+        ?"Kundeinnstillingene er lagret. "+sent+" ventende leiebekreftelse"+(sent===1?" er":"r er")+" sendt automatisk."
+        :"Kundeinnstillingene er lagret.");
+    }
     if(typeof reload==="function")await reload();
   }
 
@@ -4488,6 +4492,8 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
   <div className="grid rentalBookingGrid">{bookings.map(b=>{
    const isOpen=openId===b.id;
    const issue=attentionIssue(b);
+   const waitingForFinalConfirmation=b.status==="confirmed"&&!b.confirmationSentAt;
+   const visibleStatus=waitingForFinalConfirmation?"Reservert":(statuses[b.status]||b.status);
    return <article className={"card rentalBookingCard "+(isOpen?"isOpen":"isCompact")} key={b.id}>
    <button className="rentalBookingCompactHead" type="button" aria-expanded={isOpen} onClick={()=>setOpenId(isOpen?null:b.id)}>
     <span className="rentalBookingCompactMain">
@@ -4497,7 +4503,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
     </span>
     <span className="rentalBookingCompactSide">
      {issue&&<i className="rentalBookingAttentionDot" title="Krever oppmerksomhet">!</i>}
-     <span className={"rentalBookingStatus rentalBookingStatus-"+b.status}>{statuses[b.status]||b.status}</span>
+     <span className={"rentalBookingStatus "+(waitingForFinalConfirmation?"rentalBookingStatus-waiting":"rentalBookingStatus-"+b.status)}>{visibleStatus}</span>
      <span className="rentalBookingChevron" aria-hidden="true">{isOpen?"⌃":"⌄"}</span>
     </span>
    </button>
@@ -4573,7 +4579,9 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
    <div className="field"><label>Internt notat</label><textarea defaultValue={b.adminNote} id={"rental-note-"+b.id}/></div>
    {canUpdate&&<div className="rentalBookingActions">
     <button className="btn alt" type="button" disabled={savingId===b.id} onClick={()=>patch(b.id,{adminNote:document.getElementById("rental-note-"+b.id).value})}>{savingId===b.id?"Lagrer …":"Lagre notat"}</button>
-    {["new","confirmed"].includes(b.status)&&<button className="btn" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>notify(b,"confirm-and-send")}>{savingId===b.id?"Sender …":b.status==="confirmed"?"Send bekreftelse på nytt":"Bekreft og send e-post"}</button>}
+    {b.status==="new"&&<button className="btn" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>notify(b,"confirm-and-send")}>{savingId===b.id?"Sender …":"Bekreft og send e-post"}</button>}
+    {b.status==="confirmed"&&b.confirmationSentAt&&<button className="btn" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>notify(b,"confirm-and-send")}>{savingId===b.id?"Sender …":"Send bekreftelse på nytt"}</button>}
+    {b.status==="confirmed"&&!b.confirmationSentAt&&<p className="muted rentalAutoConfirmNote">Leiebekreftelsen sendes automatisk når betaling registreres, eller når kunden godkjennes for faktura/kreditt.</p>}
     {["new","confirmed"].includes(b.status)&&<button className="btn alt rentalCancelButton" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>notify(b,"cancel-and-send")}>{savingId===b.id?"Sender …":"Avbryt og varsle kunde"}</button>}
    </div>}
    </div>}
