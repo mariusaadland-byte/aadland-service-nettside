@@ -3692,3 +3692,71 @@ body:has(.customerPage) .customerPage{
  .customerRentalDate b{font-size:10px}
  .customerRentalGroupHead h3{font-size:14px!important}
 }
+
+
+/* Mobile hamburger for customer portal */
+.customerPortalIdentityRow{display:block}
+.customerPortalMenuButton{display:none}
+@media(max-width:780px){
+ .customerPortalIdentityRow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+ }
+ .customerPortalIdentity{flex:1 1 auto;min-width:0}
+ .customerPortalMenuButton{
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:4px;
+  flex:0 0 auto;
+  width:40px;
+  height:40px;
+  padding:0;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.12);
+  background:#181818;
+  cursor:pointer;
+ }
+ .customerPortalMenuButton span{
+  display:block;
+  width:17px;
+  height:2px;
+  border-radius:999px;
+  background:#f5f2ec;
+  transition:transform .16s ease,opacity .16s ease;
+ }
+ .customerPortalMenuButton.isOpen span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+ .customerPortalMenuButton.isOpen span:nth-child(2){opacity:0}
+ .customerPortalMenuButton.isOpen span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+
+ .customerPortalNav{
+  display:none;
+  overflow:visible;
+  padding:8px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;
+  background:#161616;
+ }
+ .customerPortalNav.isOpen{
+  display:grid;
+  gap:5px;
+ }
+ .customerPortalNav button{
+  width:100%;
+  min-height:42px;
+  padding:0 12px;
+  border:1px solid transparent;
+  border-radius:10px;
+  background:transparent;
+  font-size:11px;
+ }
+ .customerPortalNav button:hover{
+  background:rgba(255,255,255,.04);
+ }
+ .customerPortalNav button.isActive{
+  background:rgba(215,167,78,.12);
+  border-color:rgba(215,167,78,.26);
+ }
+}
