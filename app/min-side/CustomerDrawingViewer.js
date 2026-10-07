@@ -7,7 +7,7 @@ const pointsAttr=points=>points.map(p=>p.x+","+p.y).join(" ");
 const wallLength=w=>Math.max(1,Math.hypot((Number(w.x2)||0)-(Number(w.x1)||0),(Number(w.y2)||0)-(Number(w.y1)||0)));
 const itemHeight=item=>Math.max(80,Number(item?.modelHeight)||({
  bed:550,nightstand:550,dresser:900,desk:750,bookshelf:1900,vanity:780,armchair:900,ottoman:450,headboard:1200,
- wardrobe:2100,sofa:850,table:750,chair:900,tv:750,base:900,wallcab:700,tallcab:2200,fridge:2000,oven:900,dishwasher:850,island:900
+ wardrobe:2100,sofa:850,table:750,chair:900,tv:750,base:900,sinkcab:900,cornerbase:900,wallcab:700,tallcab:2200,fridge:2000,integratedfridge:2200,oven:900,dishwasher:850,cooktop:40,hood:500,kitchensink:150,countertop:30,plinth:100,filler:900,coverpanel:900,island:900
 })[item?.type]||600);
 const electrical=new Set(["ceilinglight","downlight","ledstrip","walllight","outlet","doubleoutlet","switch","dimmer","thermostat","junction"]);
 const wallElectrical=new Set(["walllight","outlet","doubleoutlet","switch","dimmer","thermostat"]);
