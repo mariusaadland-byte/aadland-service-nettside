@@ -35,6 +35,9 @@ export default function MinSide(){
  const [rentalContext,setRentalContext]=useState(false);
  const [activePanel,setActivePanel]=useState("overview");
  const [portalMenuOpen,setPortalMenuOpen]=useState(false);
+ const [serviceVippsAvailable,setServiceVippsAvailable]=useState(false);
+ const [rentalVippsAvailable,setRentalVippsAvailable]=useState(false);
+ const [paymentBusyId,setPaymentBusyId]=useState("");
 
  async function load(){
   try{
@@ -59,6 +62,15 @@ export default function MinSide(){
   if(verification==="success")setInfo("E-postadressen er bekreftet. Velkommen til Min side.");
   if(verification==="invalid")setError("Bekreftelseslenken er ugyldig eller utløpt.");
   if(verification==="error")setError("E-postadressen kunne ikke bekreftes akkurat nå. Prøv igjen.");
+  fetch("/api/payment-options")
+   .then(async response=>{
+    const options=await response.json().catch(()=>({}));
+    if(response.ok){
+     setServiceVippsAvailable(options?.vipps?.service===true);
+     setRentalVippsAvailable(options?.vipps?.rental===true);
+    }
+   })
+   .catch(()=>{});
   load();
  },[]);
 
@@ -170,6 +182,54 @@ export default function MinSide(){
    }));
   }catch{}
   window.location.href="/produkter/"+encodeURIComponent(item.productSlug);
+ }
+
+ async function resumeOrderVipps(order){
+  setError("");setInfo("");
+  setPaymentBusyId(order.id);
+  try{
+   const response=await fetch("/api/customer/order-vipps",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({orderId:order.id})
+   });
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok){
+    setError(result.error||"Vipps-betalingen kunne ikke åpnes.");
+    await load();
+    return;
+   }
+   if(!result.redirectUrl){setError("Vipps svarte uten betalingslenke. Prøv igjen.");return;}
+   window.location.assign(result.redirectUrl);
+  }catch{
+   setError("Vipps-betalingen kunne ikke åpnes akkurat nå.");
+  }finally{
+   setPaymentBusyId("");
+  }
+ }
+
+ async function startRentalVipps(rental){
+  setError("");setInfo("");
+  setPaymentBusyId(rental.id);
+  try{
+   const response=await fetch("/api/customer/rental-vipps",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({bookingId:rental.id})
+   });
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok){
+    setError(result.error||"Vipps-betalingen kunne ikke startes.");
+    await load();
+    return;
+   }
+   if(!result.redirectUrl){setError("Vipps svarte uten betalingslenke. Prøv igjen.");return;}
+   window.location.assign(result.redirectUrl);
+  }catch{
+   setError("Vipps-betalingen kunne ikke startes akkurat nå.");
+  }finally{
+   setPaymentBusyId("");
+  }
  }
 
  function repeatRental(rental){
