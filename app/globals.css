@@ -3219,3 +3219,390 @@ body:has(.customerPage) .customerPage{
 .adminmain .rentalBookingExpanded .muted{color:#756f66}
 
 .rentalAutoConfirmNote{flex:1 1 100%;margin:4px 0 0;line-height:1.45}
+
+
+/* Streamlined customer portal */
+.customerPortalPage{
+ max-width:1240px!important;
+ padding:28px 22px 90px!important;
+}
+.customerPortalTopbar{
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ gap:18px;
+ min-height:50px;
+ margin-bottom:24px;
+}
+.customerPortalBack{
+ display:inline-flex;
+ align-items:center;
+ gap:8px;
+ color:#d7a74e!important;
+ font-weight:800;
+ text-decoration:none;
+}
+.customerPortalLogout{
+ border:1px solid rgba(255,255,255,.16);
+ background:transparent;
+ color:rgba(255,255,255,.72);
+ min-height:38px;
+ padding:0 14px;
+ border-radius:999px;
+ font:inherit;
+ font-size:12px;
+ font-weight:800;
+ cursor:pointer;
+}
+.customerPortalLogout:hover{
+ color:#fff;
+ border-color:rgba(215,167,78,.55);
+}
+.customerPortalLayout{
+ display:grid;
+ grid-template-columns:248px minmax(0,1fr);
+ gap:28px;
+ align-items:start;
+}
+.customerPortalSidebar{
+ position:sticky;
+ top:22px;
+ display:grid;
+ gap:16px;
+}
+.customerPortalIdentity{
+ display:grid;
+ grid-template-columns:46px minmax(0,1fr);
+ gap:12px;
+ align-items:center;
+ padding:16px;
+ border:1px solid rgba(255,255,255,.09);
+ background:#181818;
+ border-radius:16px;
+ box-shadow:0 14px 34px rgba(0,0,0,.18);
+}
+.customerPortalAvatar{
+ display:grid;
+ place-items:center;
+ width:46px;
+ height:46px;
+ border-radius:14px;
+ background:linear-gradient(145deg,#d7a74e,#b78334);
+ color:#111;
+ font-size:20px;
+ font-weight:950;
+}
+.customerPortalIdentity>div{
+ display:grid;
+ gap:2px;
+ min-width:0;
+}
+.customerPortalIdentity small{
+ color:#d7a74e;
+ font-size:8px;
+ font-weight:900;
+ letter-spacing:.11em;
+}
+.customerPortalIdentity b{
+ overflow:hidden;
+ text-overflow:ellipsis;
+ white-space:nowrap;
+ font-size:14px;
+}
+.customerPortalIdentity span{
+ overflow:hidden;
+ text-overflow:ellipsis;
+ white-space:nowrap;
+ color:rgba(255,255,255,.48);
+ font-size:10px;
+}
+.customerPortalNav{
+ display:grid;
+ gap:5px;
+ padding:7px;
+ border:1px solid rgba(255,255,255,.08);
+ background:#161616;
+ border-radius:16px;
+}
+.customerPortalNav button{
+ width:100%;
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ gap:12px;
+ min-height:44px;
+ padding:0 12px;
+ border:1px solid transparent;
+ border-radius:10px;
+ background:transparent;
+ color:rgba(255,255,255,.65);
+ font:inherit;
+ font-size:12px;
+ font-weight:800;
+ text-align:left;
+ cursor:pointer;
+ transition:background .16s ease,color .16s ease,border-color .16s ease;
+}
+.customerPortalNav button:hover{
+ background:rgba(255,255,255,.04);
+ color:#fff;
+}
+.customerPortalNav button.isActive{
+ background:rgba(215,167,78,.12);
+ border-color:rgba(215,167,78,.26);
+ color:#f1cc7c;
+}
+.customerPortalNav button b{
+ display:grid;
+ place-items:center;
+ min-width:24px;
+ height:24px;
+ padding:0 6px;
+ border-radius:999px;
+ background:rgba(255,255,255,.07);
+ color:rgba(255,255,255,.72);
+ font-size:10px;
+}
+.customerPortalNav button.isActive b{
+ background:rgba(215,167,78,.16);
+ color:#f3cf82;
+}
+.customerPortalContent{
+ min-width:0;
+}
+.customerPortalOverview{
+ display:grid;
+ gap:26px;
+}
+.customerPortalWelcome{
+ padding:6px 0 2px;
+}
+.customerPortalWelcome h1{
+ margin:6px 0 8px!important;
+ font-size:clamp(34px,5vw,56px)!important;
+ line-height:.98!important;
+ letter-spacing:-.035em;
+}
+.customerPortalWelcome p{
+ margin:0;
+ max-width:620px;
+ color:rgba(255,255,255,.58);
+ font-size:14px;
+ line-height:1.6;
+}
+.customerPortalStats{
+ display:grid;
+ grid-template-columns:repeat(5,minmax(0,1fr));
+ gap:10px;
+}
+.customerPortalStats button{
+ min-width:0;
+ display:grid;
+ gap:4px;
+ padding:16px;
+ border:1px solid rgba(255,255,255,.09);
+ border-radius:14px;
+ background:#181818;
+ color:#fff;
+ text-align:left;
+ cursor:pointer;
+ transition:transform .16s ease,border-color .16s ease,background .16s ease;
+}
+.customerPortalStats button:hover{
+ transform:translateY(-2px);
+ border-color:rgba(215,167,78,.36);
+ background:#1c1c1c;
+}
+.customerPortalStats small{
+ color:#d7a74e;
+ font-size:8px;
+ font-weight:900;
+ letter-spacing:.1em;
+}
+.customerPortalStats b{
+ font-size:28px;
+ line-height:1;
+}
+.customerPortalStats span{
+ color:rgba(255,255,255,.44);
+ font-size:10px;
+}
+.customerPortalRecent{
+ display:grid;
+ gap:12px;
+}
+.customerPortalBlockHead{
+ display:flex;
+ align-items:end;
+ justify-content:space-between;
+ gap:12px;
+}
+.customerPortalBlockHead h2{
+ margin:3px 0 0!important;
+ font-size:22px!important;
+}
+.customerPortalQuickActions{
+ display:flex;
+ flex-wrap:wrap;
+ gap:10px;
+ padding-top:2px;
+}
+.customerPortalQuickActions .btn{
+ min-height:42px;
+ display:inline-flex;
+ align-items:center;
+ justify-content:center;
+ padding:0 16px!important;
+}
+.customerPortalPanel{
+ margin-top:0!important;
+ animation:customerPanelIn .18s ease-out;
+}
+@keyframes customerPanelIn{
+ from{opacity:.25;transform:translateY(5px)}
+ to{opacity:1;transform:translateY(0)}
+}
+.customerPortalPanel>.customerSectionHead{
+ margin-bottom:18px;
+ padding-bottom:14px;
+ border-bottom:1px solid rgba(255,255,255,.08);
+}
+.customerPortalPanel .customerSectionHead h2{
+ font-size:clamp(28px,4vw,38px);
+ letter-spacing:-.02em;
+}
+.customerPortalContent .customerGrid{
+ grid-template-columns:1fr;
+ gap:12px;
+}
+.customerPortalContent .customerJobGrid{
+ gap:12px;
+}
+.customerPortalContent .customerQuoteCard,
+.customerPortalContent .customerHistoryCard,
+.customerPortalContent .customerJobCard,
+.customerPortalContent .customerAccountCard{
+ border-radius:16px!important;
+ box-shadow:none!important;
+}
+.customerPortalContent .customerHistoryCard,
+.customerPortalContent .customerQuoteCard{
+ padding:20px!important;
+}
+.customerPortalContent .customerCardMeta{
+ grid-template-columns:repeat(3,minmax(0,1fr));
+ gap:8px;
+}
+.customerPortalContent .customerCardMeta span{
+ min-width:0;
+ padding:11px 12px;
+ border-radius:10px;
+}
+.customerPortalContent .customerCardMeta b{
+ overflow-wrap:anywhere;
+}
+.customerPortalContent .customerEmpty{
+ border-style:dashed!important;
+ box-shadow:none!important;
+}
+.customerPortalContent .customerActivityItem{
+ appearance:none;
+ width:100%;
+ border-top:0;
+ border-left:0;
+ border-right:0;
+ background:transparent;
+ font:inherit;
+ text-align:left;
+ cursor:pointer;
+}
+.customerPortalContent .customerActivityItem:last-child{border-bottom:0}
+.customerPortalContent .customerActivityItem:focus-visible,
+.customerPortalNav button:focus-visible,
+.customerPortalStats button:focus-visible{
+ outline:2px solid #d7a74e;
+ outline-offset:2px;
+}
+.customerPortalContent .customerDashboardNotice{
+ margin:0 0 18px!important;
+}
+
+@media(max-width:1020px){
+ .customerPortalLayout{grid-template-columns:210px minmax(0,1fr);gap:18px}
+ .customerPortalStats{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .customerPortalContent .customerCardMeta{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:780px){
+ .customerPortalPage{padding:18px 14px 76px!important}
+ .customerPortalTopbar{margin-bottom:14px}
+ .customerPortalLayout{grid-template-columns:1fr;gap:16px}
+ .customerPortalSidebar{
+  position:sticky;
+  top:0;
+  z-index:20;
+  gap:8px;
+  margin:0 -14px;
+  padding:8px 14px 10px;
+  background:rgba(17,17,17,.96);
+  backdrop-filter:blur(16px);
+  border-bottom:1px solid rgba(255,255,255,.07);
+ }
+ .customerPortalIdentity{
+  grid-template-columns:34px minmax(0,1fr);
+  padding:8px 2px;
+  border:0;
+  background:transparent;
+  border-radius:0;
+  box-shadow:none;
+ }
+ .customerPortalAvatar{width:34px;height:34px;border-radius:10px;font-size:15px}
+ .customerPortalIdentity small{display:none}
+ .customerPortalIdentity b{font-size:12px}
+ .customerPortalIdentity span{font-size:9px}
+ .customerPortalNav{
+  display:flex;
+  gap:7px;
+  overflow-x:auto;
+  padding:0 0 2px;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  scrollbar-width:none;
+ }
+ .customerPortalNav::-webkit-scrollbar{display:none}
+ .customerPortalNav button{
+  width:auto;
+  flex:0 0 auto;
+  min-height:36px;
+  padding:0 11px;
+  border-color:rgba(255,255,255,.09);
+  border-radius:999px;
+  background:#181818;
+  font-size:10px;
+ }
+ .customerPortalNav button b{min-width:20px;height:20px;font-size:8px}
+ .customerPortalWelcome{padding-top:8px}
+ .customerPortalWelcome h1{font-size:40px!important}
+ .customerPortalStats{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .customerPortalStats button{padding:13px}
+ .customerPortalStats b{font-size:24px}
+ .customerPortalPanel>.customerSectionHead{align-items:flex-start}
+ .customerPortalContent .customerCardMeta{grid-template-columns:1fr 1fr}
+}
+@media(max-width:520px){
+ .customerPortalTopbar{min-height:42px}
+ .customerPortalBack{font-size:13px}
+ .customerPortalLogout{min-height:34px;padding:0 12px;font-size:10px}
+ .customerPortalOverview{gap:20px}
+ .customerPortalStats{gap:8px}
+ .customerPortalStats button{padding:12px;border-radius:12px}
+ .customerPortalStats small{font-size:7px}
+ .customerPortalStats span{font-size:9px}
+ .customerPortalQuickActions{display:grid;grid-template-columns:1fr}
+ .customerPortalQuickActions .btn{width:100%}
+ .customerPortalContent .customerCardMeta{grid-template-columns:1fr}
+ .customerPortalContent .customerHistoryCard,
+ .customerPortalContent .customerQuoteCard,
+ .customerPortalContent .customerJobCard,
+ .customerPortalContent .customerAccountCard{padding:16px!important}
+}
