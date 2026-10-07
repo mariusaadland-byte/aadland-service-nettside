@@ -2,6 +2,7 @@ import {rateLimitRequest} from "../../../../lib/rateLimit";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {createClient} from "@supabase/supabase-js";
+import {db} from "../../../../lib/supabase";
 import {setCustomerCookie} from "../../../../lib/customer-auth";
 
 export async function POST(req){
@@ -15,15 +16,22 @@ export async function POST(req){
   if(value.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)||secret.length>128)return NextResponse.json({error:"Feil e-post eller passord."},{status:401});
 
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if(!url||!key||!process.env.SESSION_SECRET)return NextResponse.json({error:"Kundeinnlogging er ikke konfigurert."},{status:503});
+  const anonKey=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if(!url||!anonKey||!process.env.SUPABASE_SERVICE_ROLE_KEY||!process.env.SESSION_SECRET){
+   return NextResponse.json({error:"Kundeinnlogging er ikke konfigurert."},{status:503});
+  }
 
-  const authClient=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
-  const serviceClient=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
+  // Password verification must use the public auth role. Keep all database
+  // reads/writes on a completely separate service-role client so a user JWT
+  // can never downgrade the privileged server-side queries.
+  const authClient=createClient(url,anonKey,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+  const serviceClient=db();
+  if(!serviceClient)return NextResponse.json({error:"Kundeinnlogging er ikke konfigurert."},{status:503});
   const {data,error}=await authClient.auth.signInWithPassword({email:value,password:secret});
   if(error||!data.user)return NextResponse.json({error:"Feil e-post eller passord, eller e-postadressen er ikke bekreftet."},{status:401});
   if(!data.user.email_confirmed_at)return NextResponse.json({error:"Bekreft e-postadressen din før du logger inn."},{status:403});
 
+  let profileRepaired=false;
   let {data:profile,error:profileError}=await serviceClient.from("customer_profiles").select("*").eq("id",data.user.id).maybeSingle();
   if(profileError){
    if(String(profileError.code||"")==="42P01")return NextResponse.json({error:"Kundekonto er ikke aktivert i databasen ennå.",setupRequired:true},{status:409});
@@ -60,6 +68,7 @@ export async function POST(req){
     return NextResponse.json({error:"Kundeprofilen manglet og kunne ikke opprettes automatisk."},{status:500});
    }
    profile=created;
+   profileRepaired=true;
   }
 
   const [ordersLink,rentalsLink]=await Promise.all([
@@ -70,7 +79,7 @@ export async function POST(req){
   if(rentalsLink.error)console.error("CUSTOMER RENTAL HISTORY LINK",rentalsLink.error);
 
   await setCustomerCookie(data.user.id);
-  return NextResponse.json({ok:true,profileRepaired:Boolean(profile)});
+  return NextResponse.json({ok:true,profileRepaired});
  }catch(e){
   console.error("CUSTOMER LOGIN",e);
   return NextResponse.json({error:"Kunne ikke logge inn."},{status:500});

@@ -3208,6 +3208,13 @@ body:has(.customerPage) .customerPage{
 .customerBillingCheck input{width:18px;height:18px;margin-top:2px}
 .customerBillingCheck span{display:grid;gap:3px}
 .customerBillingCheck small{color:#756f66;line-height:1.35}
+.customerCreditUsage{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:10px;border:1px solid #e0d9ce;border-radius:10px;background:#fff}
+.customerCreditUsage span{display:grid;gap:3px;min-width:0}
+.customerCreditUsage small{color:#756f66;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+.customerCreditUsage b{font-size:12px}
+.customerCreditUsage.isOverLimit{border-color:#c75d52;background:#fff7f5}
+.customerBillingBadge.isOverLimit{border-color:rgba(177,61,48,.5);background:rgba(177,61,48,.12);color:#8d2d24}
+@media(max-width:640px){.customerCreditUsage{grid-template-columns:1fr}}
 
 /* Admin utleiebookinger skal alltid være lesbare i lys backoffice. */
 .adminmain .rentalBookingCard{background:#fff;color:#181613;border-color:#e2d9cc}
@@ -3846,3 +3853,327 @@ body:has(.customerPage) .customerPage{
 .customerPortalAttentionList button b{font-size:12px}
 .customerPortalAttentionList button small{color:rgba(255,255,255,.48);line-height:1.4}
 .customerPortalAttentionList button strong{color:#d7a74e;font-size:18px}
+
+
+/* Rental terms notice */
+.rentalTermsNotice{display:grid;gap:4px;margin:4px 0 12px;padding:12px 14px;border:1px solid rgba(215,167,78,.35);background:rgba(215,167,78,.07);border-radius:10px}
+.rentalTermsNotice b{font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.rentalTermsNotice span{font-size:13px;line-height:1.5;color:var(--muted,#aaa)}
+
+
+/* Backoffice readability + compact interactive calendars */
+.adminmain{
+ background:#f3efe8;
+ color:#181613;
+}
+.adminmain>.kicker{color:#9a6d25}
+.adminmain>h1,
+.adminmain .card,
+.adminmain .stat,
+.adminmain .table,
+.adminmain .jobCard,
+.adminmain .orderCard,
+.adminmain .rentalBookingCard,
+.adminmain .rentalCalendar,
+.adminmain .jobCalendar,
+.adminmain details{
+ color:#181613;
+}
+.adminmain .card h1,
+.adminmain .card h2,
+.adminmain .card h3,
+.adminmain .card h4,
+.adminmain .card h5,
+.adminmain .card h6,
+.adminmain .card p,
+.adminmain .card label,
+.adminmain .card legend,
+.adminmain .card summary,
+.adminmain .table th,
+.adminmain .table td{
+ color:#181613;
+}
+.adminmain .muted,
+.adminmain small.muted{color:#756f66!important}
+.adminmain input:not([type="checkbox"]):not([type="radio"]),
+.adminmain select,
+.adminmain textarea{
+ background:#fff!important;
+ color:#181613!important;
+ -webkit-text-fill-color:#181613!important;
+ caret-color:#181613!important;
+ color-scheme:light;
+ border-color:#d9d0c5;
+}
+.adminmain input::placeholder,
+.adminmain textarea::placeholder{
+ color:#9b968e!important;
+ -webkit-text-fill-color:#9b968e!important;
+ opacity:1;
+}
+.adminmain .btn{
+ color:#fff;
+}
+.adminmain .btn.alt{
+ background:#fff;
+ color:#181613;
+ border:1px solid #d9d0c5;
+}
+.adminmain .btn.alt:hover{
+ border-color:#b98a3e;
+ background:#fffaf0;
+}
+.adminmain .notice{color:#7b321e}
+.adminmain .success{color:#285b30}
+.adminmain .orderCompactHead,
+.adminmain .rentalBookingCompactHead{
+ color:#181613;
+}
+
+.adminCompactCalendar{
+ width:min(100%,1040px);
+ padding:16px;
+}
+.adminCompactCalendar .calendarHead{
+ margin-bottom:10px;
+}
+.adminCompactCalendar .calendarHead h3{
+ margin:4px 0 0;
+ font-size:20px;
+}
+.adminCompactCalendar .calendarHead .btn{
+ min-width:38px;
+ padding:8px 11px;
+}
+.adminCompactCalendar .calendarWeekday{
+ padding:6px 4px;
+ font-size:10px;
+ color:#6c655b;
+ background:#f8f5ef;
+}
+.adminCompactCalendar .calendarDay{
+ min-height:78px;
+ padding:5px;
+ background:#fff;
+}
+.adminCompactCalendar .calendarDay>strong{
+ display:block;
+ font-size:11px;
+ color:#504a42;
+}
+.adminCompactCalendar .calendarDay.empty{
+ background:#f5f2ec;
+}
+.adminCompactCalendar .calendarEvent{
+ width:100%;
+ display:block;
+ margin-top:4px;
+ padding:5px 6px;
+ border:1px solid #ded7cb;
+ border-radius:7px;
+ background:#f0ede7;
+ color:#181613;
+ font:inherit;
+ font-size:10px;
+ font-weight:700;
+ line-height:1.2;
+ text-align:left;
+ overflow:hidden;
+ text-overflow:ellipsis;
+ white-space:nowrap;
+ cursor:pointer;
+}
+.adminCompactCalendar .calendarEvent:hover{
+ border-color:#c79a45;
+ background:#fff8e8;
+}
+.adminCompactCalendar .calendarEvent.booking{border-left:3px solid #b98a3e}
+.adminCompactCalendar .calendarEvent.block{border-style:dashed;border-left:3px solid #8a8175}
+.adminCompactCalendar .calendarEvent.job{border-left:3px solid #537a5b}
+.adminCalendarTarget>.card{
+ outline:3px solid rgba(207,161,83,.4);
+ box-shadow:0 0 0 5px rgba(207,161,83,.10);
+}
+
+@media(min-width:901px){
+ .admin{
+  background:#f3efe8;
+  color:#181613;
+ }
+ .admin .side{
+  color:#181613;
+ }
+ .admin .side button:not(.active){
+  color:#181613;
+ }
+}
+
+@media(max-width:760px){
+ .adminCompactCalendar{
+  padding:10px;
+ }
+ .adminCompactCalendar .calendarHead,
+ .adminCompactCalendar .calendarGrid{
+  min-width:0!important;
+ }
+ .adminCompactCalendar .calendarDay{
+  min-height:62px;
+  padding:3px;
+ }
+ .adminCompactCalendar .calendarEvent{
+  padding:3px;
+  font-size:8px;
+ }
+}
+
+.adminCalendarBlockTarget{
+ margin-left:-8px;
+ margin-right:-8px;
+ padding-left:8px!important;
+ padding-right:8px!important;
+ background:#fff8e8;
+ outline:2px solid rgba(207,161,83,.35);
+ border-radius:8px;
+}
+
+
+/* Final PC backoffice contrast audit */
+.adminStandalonePage{
+ display:block!important;
+ min-height:100vh;
+ padding:34px;
+ background:#f3efe8!important;
+ color:#181613!important;
+}
+.adminStandalonePage>h1,
+.adminStandalonePage h2,
+.adminStandalonePage h3,
+.adminStandalonePage h4,
+.adminStandalonePage h5,
+.adminStandalonePage p,
+.adminStandalonePage label,
+.adminStandalonePage th,
+.adminStandalonePage td,
+.adminStandalonePage code{
+ color:#181613;
+}
+.adminStandalonePage .card,
+.adminStandalonePage .stat,
+.adminStandalonePage .table{
+ background:#fff;
+ color:#181613;
+}
+.adminStandalonePage input:not([type="checkbox"]):not([type="radio"]),
+.adminStandalonePage select,
+.adminStandalonePage textarea{
+ background:#fff!important;
+ color:#181613!important;
+ -webkit-text-fill-color:#181613!important;
+ caret-color:#181613!important;
+ color-scheme:light;
+ border-color:#d9d0c5;
+}
+.adminStandalonePage .muted,
+.adminStandalonePage small.muted{color:#756f66!important}
+.adminStandalonePage .btn{background:#181613;color:#fff}
+.adminStandalonePage .btn.alt{background:#fff;color:#181613;border:1px solid #d9d0c5}
+
+/* Customer-portal styles share a few class names with backoffice. Keep admin light/readable. */
+.adminmain .customerCardMeta span,
+.adminStandalonePage .customerCardMeta span{
+ background:#fff!important;
+ border-color:#e0d9ce!important;
+ color:#181613!important;
+}
+.adminmain .customerCardMeta small,
+.adminStandalonePage .customerCardMeta small{
+ color:#756f66!important;
+}
+.adminmain .customerCardMeta b,
+.adminStandalonePage .customerCardMeta b{
+ color:#181613!important;
+}
+.adminmain .customerPaymentConfirmation,
+.adminStandalonePage .customerPaymentConfirmation{
+ background:#edf7ef!important;
+ border-color:#b9d7c0!important;
+ color:#285b30!important;
+}
+.adminmain .customerPaymentConfirmation span,
+.adminStandalonePage .customerPaymentConfirmation span{
+ color:#4c6c53!important;
+}
+
+/* Keep intentionally dark/gold status pills and primary buttons readable. */
+.adminmain .quoteSummaryTotal,
+.adminmain .quoteDocLineHead,
+.adminmain .quoteDocGrandTotal,
+.adminmain .quoteLineNumber,
+.adminmain .quoteFilters button.active{
+ color:#fff!important;
+}
+.adminmain .quoteRevisionButton{color:#fff!important}
+.adminmain .jobPlanningSend,
+.adminmain .quoteSendButton,
+.adminmain .quoteCreateJobButton{
+ color:#17130c!important;
+}
+
+/* Calendar jumps land clearly on the exact record. */
+.adminCalendarRecordTarget{
+ outline:3px solid rgba(207,161,83,.42);
+ box-shadow:0 0 0 5px rgba(207,161,83,.10),0 14px 34px rgba(0,0,0,.08)!important;
+}
+
+@media(max-width:900px){
+ .adminStandalonePage{padding:20px}
+}
+@media(max-width:600px){
+ .adminStandalonePage{padding:16px}
+}
+
+
+/* Clickable overview stat cards */
+.adminOverviewStats .adminStatLink{
+ appearance:none;
+ width:100%;
+ display:grid;
+ gap:5px;
+ align-content:start;
+ min-height:112px;
+ padding:18px 20px;
+ border:1px solid #d9d0c5;
+ border-radius:18px;
+ background:#fff;
+ color:#181613;
+ font:inherit;
+ text-align:left;
+ cursor:pointer;
+ box-shadow:none;
+ transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease,background .16s ease;
+}
+.adminOverviewStats .adminStatLink:hover{
+ transform:translateY(-2px);
+ border-color:#c69a4f;
+ background:#fffaf1;
+ box-shadow:0 10px 24px rgba(61,48,29,.09);
+}
+.adminOverviewStats .adminStatLink:focus-visible{
+ outline:3px solid rgba(207,161,83,.35);
+ outline-offset:2px;
+}
+.adminOverviewStats .adminStatLink>b{
+ margin-top:1px;
+ font-size:30px;
+ line-height:1;
+}
+.adminOverviewStats .adminStatLink>small{
+ margin-top:auto;
+ color:#8a672d;
+ font-size:10px;
+ font-weight:800;
+}
+@media(max-width:600px){
+ .adminOverviewStats .adminStatLink{min-height:96px;padding:15px}
+ .adminOverviewStats .adminStatLink>b{font-size:26px}
+}

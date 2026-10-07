@@ -2,6 +2,7 @@
 
 import {useEffect,useState} from "react";
 import {useParams} from "next/navigation";
+import {RENTAL_CHANGE_DEADLINE_HOURS} from "../../../lib/companyInfo";
 import Link from "next/link";
 import {CatalogFooter,CatalogHeader,CatalogPlaceholder} from "../../produkter/ProductChrome";
 
@@ -346,7 +347,8 @@ export default function RentalDetailPage(){
       <label><span>E-post *</span><input autoComplete="email" required type="email" value={customer.email} onChange={e=>setCustomer({...customer,email:e.target.value})}/></label>
       <label><span>Adresse{fulfillment==="delivery"?" *":""}</span><input autoComplete="street-address" required={fulfillment==="delivery"} value={customer.address} onChange={e=>setCustomer({...customer,address:e.target.value})}/></label>
       <label><span>Henting / levering</span><select value={fulfillment} onChange={e=>setFulfillment(e.target.value)}>{item.pickupAvailable&&<option value="pickup">Jeg henter selv</option>}{item.deliveryAvailable&&<option value="delivery">Jeg ønsker levering</option>}</select></label>
-      <label className="rentalTerms"><input type="checkbox" required checked={accepted} onChange={e=>setAccepted(e.target.checked)}/><span>Jeg godtar <a href="/vilkar/utleie" target="_blank" rel="noreferrer">utleiebetingelsene</a>.</span></label>
+      <div className="rentalTermsNotice"><b>Endring og avbestilling</b><span>Gratis frem til {RENTAL_CHANGE_DEADLINE_HOURS} timer før avtalt leiestart. Se vilkårene for detaljer.</span></div>
+      <label className="rentalTerms"><input type="checkbox" required checked={accepted} onChange={e=>setAccepted(e.target.checked)}/><span>Jeg har lest og godtar <a href="/vilkar/utleie" target="_blank" rel="noreferrer">utleiebetingelsene</a>, inkludert fristene for endring og avbestilling.</span></label>
       <div className="rentalBookingActions">
        <button className="catalogGoldButton" disabled={booking}>{booking?"Sender …":"Send booking →"}</button>
        <button type="button" className="rentalCancelButton" disabled={booking} onClick={()=>setChosen(null)}>Endre periode</button>

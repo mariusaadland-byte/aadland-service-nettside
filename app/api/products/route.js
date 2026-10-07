@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, fromDbProduct } from "../../../lib/supabase";
+import {withSupabaseRetry} from "../../../lib/supabaseRetry";
 
 export async function GET() {
   try {
@@ -12,11 +13,11 @@ export async function GET() {
       );
     }
 
-    const { data, error } = await s
+    const { data, error } = await withSupabaseRetry(()=>s
       .from("products")
       .select("*")
       .eq("active", true)
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true }));
 
     if (error) {
       console.error("PRODUCTS GET ERROR:", error);

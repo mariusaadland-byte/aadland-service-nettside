@@ -7,8 +7,10 @@ import {db,fromDbRentalItem} from "../../../lib/supabase";
 import {rentalEmailFrom,rentalReplyTo,rentalRequestSiteUrl,rentalSiteUrl,rentalResendApiKey} from "../../../lib/rentalEmailConfig";
 import {sendRentalConfirmation} from "../../../lib/rentalConfirmationEmail";
 import {rentalBillingDecision} from "../../../lib/rentalBilling";
+import {vippsUnitReadiness} from "../../../lib/vippsReadiness";
+import {createRentalPaymentLinkToken} from "../../../lib/rentalPaymentLink";
 
-const RENTAL_TERMS_VERSION="2026-09";
+const RENTAL_TERMS_VERSION="2026-10";
 
 function valid(a,b){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(a||"")||!/^\d{4}-\d{2}-\d{2}$/.test(b||"")||b<a)return false;
@@ -59,7 +61,7 @@ function money(ore){
  return (Number(ore||0)/100).toLocaleString("nb-NO",{minimumFractionDigits:0,maximumFractionDigits:2})+" kr";
 }
 
-function acknowledgementHtml({bookingNumber,name,item,startDate,endDate,totalOre,depositOre,minSideUrl,accountUrl,billing}){
+function acknowledgementHtml({bookingNumber,name,item,startDate,endDate,totalOre,depositOre,minSideUrl,accountUrl,billing,guestPaymentUrl}){
  const creditText=billing?.reason==="credit-limit"&&billing?.creditLimitOre
   ?`<p style="margin:12px 0 0;color:#d9b365;font-size:12px;line-height:1.55">Bookingen er reservert, men tilgjengelig kreditt må avklares før endelig leiebekreftelse sendes.</p>`
   :"";
@@ -79,6 +81,7 @@ ${depositOre?`<tr><td style="padding:12px 14px;color:#8e887f;font-size:11px;bord
 <p style="color:#c9c3b8;line-height:1.65;margin:20px 0 0">Endelig leiebekreftelse sendes automatisk når betalingen er registrert, eller med en gang dersom kunden er godkjent for faktura/kreditt.</p>
 ${creditText}
 ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:`<a href="${esc(minSideUrl)}" style="display:inline-block;margin-top:20px;border:1px solid #d7a74e;color:#d7a74e;text-decoration:none;font-weight:900;padding:12px 18px">Opprett Min side →</a><p style="margin:10px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Opprett konto med samme e-postadresse, så kobles utleien automatisk til kontoen din.</p>`}
+${guestPaymentUrl?`<a href="${esc(guestPaymentUrl)}" style="display:inline-block;margin-top:12px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Betal leien med Vipps →</a><p style="margin:10px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Vipps gjelder bare leiebeløpet. Eventuelt depositum håndteres separat.</p>`:""}
 <p style="margin:22px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Finner du ikke e-posten, sjekk søppelpost/spam.</p>
 </td></tr>
 <tr><td style="padding:18px 30px;border-top:1px solid #34312b;color:#8e887f;font-size:11px">Aadland Utleie · 471 54 898 · post@aadland-service.no</td></tr>
@@ -200,13 +203,26 @@ export async function POST(req){
    const replyTo=rentalReplyTo();
    const minSideUrl=siteOrigin+"/min-side";
    const accountUrl=customerUserId?minSideUrl:"";
+   let guestPaymentUrl="";
+   if(!billing.eligible&&!customerUserId){
+    try{
+     const readiness=await vippsUnitReadiness(s,"rental");
+     if(readiness.ready===true){
+      const paymentLink=createRentalPaymentLinkToken({...bookingRecord,id:newBookingId,status:"confirmed"});
+      guestPaymentUrl=siteOrigin+"/betaling/utleie?booking="+encodeURIComponent(newBookingId)+"#token="+encodeURIComponent(paymentLink.token);
+     }
+    }catch(error){
+     console.error("RENTAL BOOKING PAYMENT LINK",error);
+    }
+   }
 
    if(billing.eligible){
     try{
      await sendRentalConfirmation({
       booking:{...bookingRecord,id:newBookingId,status:"confirmed"},
       itemName:item.name,
-      req
+      req,
+      idempotencyKey:"rental-confirmation/billing/"+newBookingId
      });
      confirmationSent=true;
      await s.from("rental_bookings").update({
@@ -222,7 +238,7 @@ export async function POST(req){
     try{
      const customerHtml=acknowledgementHtml({
       bookingNumber,name,item,startDate:b.startDate,endDate:b.endDate,
-      totalOre:p.totalOre,depositOre:p.depositOre,minSideUrl,accountUrl,billing
+      totalOre:p.totalOre,depositOre:p.depositOre,minSideUrl,accountUrl,billing,guestPaymentUrl
      });
      const result=await resend.emails.send({
       from:sender,

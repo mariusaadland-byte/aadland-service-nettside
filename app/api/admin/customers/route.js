@@ -15,7 +15,7 @@ export async function GET(){
  const s=db();
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
 
- const [profilesResult,quotesResult,billingResult]=await Promise.all([
+ const [profilesResult,quotesResult,billingResult,creditBookingsResult]=await Promise.all([
   s.from("customer_profiles")
    .select("id,email,name,phone,address,created_at,updated_at")
    .order("created_at",{ascending:false})
@@ -26,6 +26,10 @@ export async function GET(){
    .limit(1000),
   s.from("customer_billing_profiles")
    .select("email,invoice_customer,credit_limit_ore,note,updated_at")
+   .limit(5000),
+  s.from("rental_bookings")
+   .select("customer,total_ore,payment_captured_ore,payment_refunded_ore,status")
+   .in("status",["new","confirmed","active","returned","completed"])
    .limit(5000)
  ]);
 
@@ -38,8 +42,32 @@ export async function GET(){
  if(billingResult.error&&!["42P01","42703"].includes(String(billingResult.error.code||""))){
   console.error("ADMIN CUSTOMER BILLING GET",billingResult.error);
  }
+ if(creditBookingsResult.error&&!["42P01","42703"].includes(String(creditBookingsResult.error.code||""))){
+  console.error("ADMIN CUSTOMER CREDIT EXPOSURE GET",creditBookingsResult.error);
+ }
 
- const billingMap=new Map((billingResult.data||[]).map(row=>[String(row.email||"").toLowerCase(),row]));
+ const exposureMap=new Map();
+ for(const booking of creditBookingsResult.data||[]){
+  const email=String(booking.customer?.email||"").trim().toLowerCase();
+  if(!email)continue;
+  const total=Math.max(0,Number(booking.total_ore)||0);
+  const captured=Math.max(0,Number(booking.payment_captured_ore)||0);
+  const refunded=Math.max(0,Number(booking.payment_refunded_ore)||0);
+  const netPaid=Math.max(0,captured-refunded);
+  exposureMap.set(email,(exposureMap.get(email)||0)+Math.max(0,total-netPaid));
+ }
+
+ const billingMap=new Map((billingResult.data||[]).map(row=>{
+  const email=String(row.email||"").toLowerCase();
+  const limit=row.credit_limit_ore==null?null:Math.max(0,Number(row.credit_limit_ore)||0);
+  const exposure=Math.max(0,Number(exposureMap.get(email))||0);
+  return [email,{
+   ...row,
+   credit_exposure_ore:exposure,
+   remaining_credit_ore:limit&&limit>0?Math.max(0,limit-exposure):null,
+   credit_over_limit:Boolean(limit&&limit>0&&exposure>limit)
+  }];
+ }));
 
  let quotes=[];
  if(quotesResult.error){
@@ -77,7 +105,10 @@ export async function GET(){
     invoiceCustomer:billing.invoice_customer===true,
     creditLimitOre:billing.credit_limit_ore==null?null:Number(billing.credit_limit_ore)||0,
     billingNote:billing.note||"",
-    billingUpdatedAt:billing.updated_at||null
+    billingUpdatedAt:billing.updated_at||null,
+    creditExposureOre:Number(billing.credit_exposure_ore)||0,
+    remainingCreditOre:billing.remaining_credit_ore==null?null:Number(billing.remaining_credit_ore)||0,
+    creditOverLimit:billing.credit_over_limit===true
    };
   }),
   billingProfiles:(billingResult.data||[]).map(row=>({
@@ -85,7 +116,10 @@ export async function GET(){
    invoiceCustomer:row.invoice_customer===true,
    creditLimitOre:row.credit_limit_ore==null?null:Number(row.credit_limit_ore)||0,
    billingNote:row.note||"",
-   billingUpdatedAt:row.updated_at||null
+   billingUpdatedAt:row.updated_at||null,
+   creditExposureOre:Number(exposureMap.get(String(row.email||"").toLowerCase()))||0,
+   remainingCreditOre:row.credit_limit_ore==null||Number(row.credit_limit_ore)<=0?null:Math.max(0,(Number(row.credit_limit_ore)||0)-(Number(exposureMap.get(String(row.email||"").toLowerCase()))||0)),
+   creditOverLimit:row.credit_limit_ore!=null&&Number(row.credit_limit_ore)>0&&(Number(exposureMap.get(String(row.email||"").toLowerCase()))||0)>Number(row.credit_limit_ore)
   })),
   quotes
  });
@@ -153,7 +187,8 @@ export async function PATCH(req){
      await sendRentalConfirmation({
       booking,
       itemName:booking.rental_items?.name||"utstyret",
-      req
+      req,
+      idempotencyKey:"rental-confirmation/billing/"+booking.id
      });
      const sentAt=new Date().toISOString();
      const {error:stampError}=await s.from("rental_bookings")

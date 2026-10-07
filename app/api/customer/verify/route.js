@@ -1,6 +1,6 @@
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
-import {createClient} from "@supabase/supabase-js";
+import {db} from "../../../../lib/supabase";
 import {setCustomerCookie} from "../../../../lib/customer-auth";
 import {verifyCustomerVerificationToken} from "../../../../lib/customerVerification";
 
@@ -23,11 +23,10 @@ export async function POST(req){
   const verified=verifyCustomerVerificationToken(token);
   if(!verified)return NextResponse.json({error:"Bekreftelseslenken er ugyldig eller utløpt.",code:"invalid_or_expired"},{status:410});
 
-  const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if(!url||!key||!process.env.SESSION_SECRET)return NextResponse.json({error:"Bekreftelse er ikke konfigurert akkurat nå."},{status:503});
+  if(!process.env.SESSION_SECRET)return NextResponse.json({error:"Bekreftelse er ikke konfigurert akkurat nå."},{status:503});
 
-  const s=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
+  const s=db();
+  if(!s)return NextResponse.json({error:"Bekreftelse er ikke konfigurert akkurat nå."},{status:503});
   const {data:userData,error:userError}=await s.auth.admin.getUserById(verified.id);
   const user=userData?.user;
   if(userError||!user||String(user.email||"").trim().toLowerCase()!==verified.email){

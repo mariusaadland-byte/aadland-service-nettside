@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import {COMPANY_ADDRESS,COMPANY_INFO} from "../../lib/companyInfo";
 
 export function CatalogHeader({ rental = false }) {
   const [open, setOpen] = useState(false);
@@ -90,7 +91,7 @@ export function CatalogFooter({ rental = false }) {
       </div>
       <div className="catalogWrap catalogFooterBottom">
         <span>{rental?"© Aadland Utleie · Aadland Service":"© Aadland Service"}</span>
-        <span>Org.nr. 937 781 873 MVA</span>
+        <span>Org.nr. {COMPANY_INFO.orgNumber} · {COMPANY_ADDRESS}</span>
       </div>
     </footer>
   );

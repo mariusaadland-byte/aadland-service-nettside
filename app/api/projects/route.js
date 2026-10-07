@@ -1,5 +1,6 @@
 import {NextResponse} from "next/server";
 import {db} from "../../../lib/supabase";
+import {withSupabaseRetry} from "../../../lib/supabaseRetry";
 
 const map=p=>({
  id:p.id,
@@ -23,7 +24,7 @@ export async function GET(request){
  const all=searchParams.get("all")==="1";
 
  if(slug){
-  const {data,error}=await s.from("projects").select("*").eq("active",true).eq("slug",slug).maybeSingle();
+  const {data,error}=await withSupabaseRetry(()=>s.from("projects").select("*").eq("active",true).eq("slug",slug).maybeSingle());
   if(error){
    console.error("PROJECT GET ERROR:",error);
    if(error.code==="42P01")return NextResponse.json({project:null,setupRequired:true},{status:503});
@@ -31,12 +32,12 @@ export async function GET(request){
   }
   if(!data)return NextResponse.json({project:null});
 
-  const {data:listData,error:listError}=await s
+  const {data:listData,error:listError}=await withSupabaseRetry(()=>s
    .from("projects")
    .select("id,title,slug,category,image_urls,sort_order,created_at")
    .eq("active",true)
    .order("sort_order")
-   .order("created_at",{ascending:false});
+   .order("created_at",{ascending:false}));
 
   let previousProject=null;
   let nextProject=null;
@@ -61,10 +62,13 @@ export async function GET(request){
   return NextResponse.json({project:map(data),previousProject,nextProject});
  }
 
- let query=s.from("projects").select("*").eq("active",true).order("sort_order").order("created_at",{ascending:false});
- if(!all) query=query.eq("featured",true).limit(4);
+ const makeQuery=()=>{
+  let query=s.from("projects").select("*").eq("active",true).order("sort_order").order("created_at",{ascending:false});
+  if(!all)query=query.eq("featured",true).limit(4);
+  return query;
+ };
 
- const {data,error}=await query;
+ const {data,error}=await withSupabaseRetry(makeQuery);
  if(error){
   console.error("PROJECTS GET ERROR:",error);
   if(error.code==="42P01")return NextResponse.json({projects:[],setupRequired:true},{status:503});

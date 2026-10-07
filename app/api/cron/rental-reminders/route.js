@@ -3,6 +3,8 @@ import {db} from "../../../../lib/supabase";
 import {cronGuard} from "../../../../lib/cronAuth";
 import {osloDateKey,shiftDateKey} from "../../../../lib/osloTime";
 import {rentalBookingSiteUrl,rentalEmailFrom,rentalReplyTo,rentalResendApiKey} from "../../../../lib/rentalEmailConfig";
+import {vippsUnitReadiness} from "../../../../lib/vippsReadiness";
+import {createRentalPaymentLinkToken} from "../../../../lib/rentalPaymentLink";
 
 const MAX_PER_RUN=50;
 
@@ -26,7 +28,7 @@ export async function GET(req){
 
  const targetDate=shiftDateKey(osloDateKey(new Date()),1);
  const {data,error}=await s.from("rental_bookings")
-  .select("id,booking_number,status,customer,customer_user_id,start_date,end_date,total_ore,deposit_ore,confirmation_sent_at,reminder_sent_at,rental_items(name)")
+  .select("id,booking_number,status,customer,customer_user_id,start_date,end_date,total_ore,deposit_ore,payment_status,payment_captured_ore,payment_refunded_ore,confirmation_sent_at,reminder_sent_at,rental_items(name)")
   .eq("status","confirmed")
   .eq("start_date",targetDate)
   .not("confirmation_sent_at","is",null)
@@ -40,6 +42,13 @@ export async function GET(req){
   }
   console.error("RENTAL REMINDER QUERY",error);
   return NextResponse.json({ok:false,error:"Utleiebookingene kunne ikke hentes."},{status:500});
+ }
+
+ let rentalVippsReady=false;
+ try{
+  rentalVippsReady=(await vippsUnitReadiness(s,"rental")).ready===true;
+ }catch(error){
+  console.error("RENTAL REMINDER VIPPS READINESS",error);
  }
 
  const {Resend}=await import("resend");
@@ -72,6 +81,18 @@ export async function GET(req){
    const address=String(booking.customer?.address||"").trim();
    const base=rentalBookingSiteUrl(booking,req);
    const accountUrl=booking.customer_user_id?base+"/min-side":"";
+   let guestPaymentUrl="";
+   const paymentStatus=String(booking.payment_status||"unpaid").toLowerCase();
+   const paymentOpen=!["authorized","paid","refunded"].includes(paymentStatus)
+    &&Math.max(0,Number(booking.payment_captured_ore)||0)<=Math.max(0,Number(booking.payment_refunded_ore)||0);
+   if(rentalVippsReady&&!booking.customer_user_id&&paymentOpen){
+    try{
+     const link=createRentalPaymentLinkToken(booking);
+     guestPaymentUrl=base+"/betaling/utleie?booking="+encodeURIComponent(booking.id)+"#token="+encodeURIComponent(link.token);
+    }catch(error){
+     console.error("RENTAL REMINDER PAYMENT LINK",booking.id,error);
+    }
+   }
    const html=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111;padding:28px 12px"><tr><td align="center">
 <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#181818;border:1px solid #34312b">
@@ -87,6 +108,7 @@ export async function GET(req){
 ${address?`<div style="margin-top:12px;color:#8e887f;font-size:11px">ADRESSE</div><div style="margin-top:4px;color:#fff;font-weight:700">${esc(address)}</div>`:""}
 </div>
 ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:""}
+${guestPaymentUrl?`<a href="${esc(guestPaymentUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Betal leien med Vipps →</a><p style="margin:10px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Vipps gjelder bare leiebeløpet. Eventuelt depositum håndteres separat.</p>`:""}
 <p style="margin:24px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Hvis noe har endret seg, svar på denne e-posten eller ring 471 54 898.</p>
 </td></tr>
 <tr><td style="padding:18px 30px;border-top:1px solid #34312b;color:#8e887f;font-size:11px">Aadland Utleie · 471 54 898 · post@aadland-service.no</td></tr>

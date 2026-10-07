@@ -1,5 +1,6 @@
 import {NextResponse} from "next/server";
 import {db,fromDbRentalItem} from "../../../lib/supabase";
+import {withSupabaseRetry} from "../../../lib/supabaseRetry";
 
 function valid(a,b){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(a||"")||!/^\d{4}-\d{2}-\d{2}$/.test(b||"")||b<a)return false;
@@ -52,13 +53,16 @@ export async function GET(req){
 
  if((start||end)&&!valid(start,end))return NextResponse.json({error:"Ugyldig datoperiode."},{status:400});
 
- let itemQuery=s.from("rental_items").select("*").eq("active",true).neq("status","hidden").order("sort_order");
- if(itemId)itemQuery=itemQuery.eq("id",itemId);
- if(slug)itemQuery=itemQuery.eq("slug",slug);
+ const makeItemQuery=()=>{
+  let query=s.from("rental_items").select("*").eq("active",true).neq("status","hidden").order("sort_order");
+  if(itemId)query=query.eq("id",itemId);
+  if(slug)query=query.eq("slug",slug);
+  return query;
+ };
 
  const [itemsResult,categoriesResult]=await Promise.all([
-  itemQuery,
-  s.from("rental_categories").select("*").eq("active",true).order("sort_order").order("created_at")
+  withSupabaseRetry(makeItemQuery),
+  withSupabaseRetry(()=>s.from("rental_categories").select("*").eq("active",true).order("sort_order").order("created_at"))
  ]);
 
  if(itemsResult.error){

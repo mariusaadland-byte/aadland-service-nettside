@@ -3,6 +3,7 @@ import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {buildReceiptEmail} from "../../../../lib/receiptEmail";
 import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
+import {serviceEmailFrom,serviceReplyTo} from "../../../../lib/serviceEmailConfig";
 
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;
@@ -82,8 +83,8 @@ export async function POST(req){
  try{
   const {Resend}=await import("resend");
   const resend=new Resend(resendKey);
-  const from=process.env.ORDER_EMAIL_FROM||"Aadland Service <noreply@aadland-service.no>";
-  const replyTo=process.env.ORDER_REPLY_TO||"post@aadland-service.no";
+  const from=serviceEmailFrom();
+  const replyTo=serviceReplyTo();
   const result=await resend.emails.send({
    from,to:email,replyTo,
    subject:"[TEST] Betalingsbekreftelse – "+orderNumber,
