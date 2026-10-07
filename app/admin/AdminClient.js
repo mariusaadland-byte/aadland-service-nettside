@@ -1447,6 +1447,7 @@ function Jobs({orders,status,canUpdateOrders,reload,onCreateProject=null}){
      </div>
      <div className="jobQuoteActions">
       <a className="btn alt" href={"/admin/tilbud/"+order.sourceQuoteId}>Åpne tilbud</a>
+      <a className="btn alt" href={"/admin/tegning?orderId="+encodeURIComponent(order.id)}>Tegning</a>
       <a className="btn" href={"/admin/oppdrag/"+order.id+"/planlegg"}>{order.jobStartAt?"Rediger plan":"Planlegg oppdrag"}</a>
      </div>
     </div>
@@ -1557,6 +1558,7 @@ function Surveys({ orders, status, canUpdateOrders }) {
         <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:18}}>
           {order.customerPhone && <a className="btn" href={"tel:"+order.customerPhone}>Ring kunde</a>}
           {order.customerEmail && <a className="btn alt" href={"mailto:"+order.customerEmail}>Send e-post</a>}
+          <a className="btn alt" href={"/admin/tegning?orderId="+encodeURIComponent(order.id)}>Åpne tegning</a>
           {canUpdateOrders && <a className="btn alt" href={"/admin/tilbud/ny?orderId="+order.id}>Lag tilbud</a>}
         </div>
       </article>;
