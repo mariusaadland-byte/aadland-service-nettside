@@ -150,7 +150,6 @@ export async function POST(req){
   const p=calculate(item,b.startDate,b.endDate);
   if(p.days>365)return NextResponse.json({error:"Utleieperioden kan ikke være lengre enn 365 dager."},{status:400});
 
-  const billing=await rentalBillingDecision(s,email,p.totalOre);
   const customerUserId=await getCustomerUserId();
   const siteOrigin=rentalRequestSiteUrl(req)||rentalSiteUrl(req);
   const bookingNumber=num();
@@ -189,6 +188,7 @@ export async function POST(req){
    throw insertError;
   }
 
+  const billing=await rentalBillingDecision(s,email,0);
   const resendKey=rentalResendApiKey();
   let confirmationSent=false;
   let acknowledgementSent=false;
