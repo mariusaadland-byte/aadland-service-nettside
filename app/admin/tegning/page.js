@@ -7,6 +7,7 @@ export const metadata = { title: "Tegning & visualisering" };
 export default async function DrawingPage() {
   const admin = await getAdminUser();
   if (!admin) redirect("/admin/login");
-  if (!(await hasPermission("canManageProducts"))) redirect("/admin");
+  const canUseDrawing=(await hasPermission("canManageProducts"))||(await hasPermission("canViewOrders"));
+  if (!canUseDrawing) redirect("/admin");
   return <DrawingClient />;
 }
