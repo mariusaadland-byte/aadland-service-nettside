@@ -221,7 +221,8 @@ export async function POST(req){
      await sendRentalConfirmation({
       booking:{...bookingRecord,id:newBookingId,status:"confirmed"},
       itemName:item.name,
-      req
+      req,
+      idempotencyKey:"rental-confirmation/billing/"+newBookingId
      });
      confirmationSent=true;
      await s.from("rental_bookings").update({
