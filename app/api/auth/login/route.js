@@ -25,7 +25,17 @@ export async function POST(req){
 
     const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.SUPABASE_SERVICE_ROLE_KEY;
     if(!url||!key||!process.env.SESSION_SECRET)return NextResponse.json({error:"Innlogging er ikke konfigurert."},{status:503});
-    const supabase = createClient(
+    const authClient = createClient(
+      url,
+      key,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      }
+    );
+    const serviceClient = createClient(
       url,
       key,
       {
@@ -37,7 +47,7 @@ export async function POST(req){
     );
 
     const { data, error } =
-      await supabase.auth.signInWithPassword({
+      await authClient.auth.signInWithPassword({
         email: normalizedEmail,
         password: normalizedPassword,
       });
@@ -52,7 +62,7 @@ export async function POST(req){
     const {
       data: adminUser,
       error: adminError,
-    } = await supabase
+    } = await serviceClient
       .from("admin_users")
       .select(
         "id,email,name,role,can_view_orders,can_update_orders,can_manage_products,can_manage_users,active"
