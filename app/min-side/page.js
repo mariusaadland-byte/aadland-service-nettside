@@ -226,6 +226,17 @@ export default function MinSide(){
  const enquiries=customOrders.filter(order=>!order.source_quote);
  const purchases=(data.orders||[]).filter(order=>order.order_type!=="custom");
  const rentals=data.rentals||[];
+ const activeEnquiries=[...enquiries].filter(o=>!["completed","cancelled"].includes(o.status)).sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")));
+ const pastEnquiries=[...enquiries].filter(o=>["completed","cancelled"].includes(o.status)).sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")));
+ const activeQuotes=[...quotes].filter(q=>effectiveQuoteStatus(q)==="sent").sort((a,b)=>String(b.sentAt||b.createdAt||"").localeCompare(String(a.sentAt||a.createdAt||"")));
+ const pastQuotes=[...quotes].filter(q=>effectiveQuoteStatus(q)!=="sent").sort((a,b)=>String(b.acceptedAt||b.declinedAt||b.sentAt||b.createdAt||"").localeCompare(String(a.acceptedAt||a.declinedAt||a.sentAt||a.createdAt||"")));
+ const activeJobRows=[...jobs].filter(o=>!["completed","cancelled"].includes(o.status)).sort((a,b)=>{
+  const ax=String(a.job_start_at||"9999-12-31"),bx=String(b.job_start_at||"9999-12-31");
+  return ax===bx?String(b.created_at||"").localeCompare(String(a.created_at||"")):ax.localeCompare(bx);
+ });
+ const pastJobRows=[...jobs].filter(o=>["completed","cancelled"].includes(o.status)).sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")));
+ const activePurchaseRows=[...purchases].filter(o=>!["completed","cancelled"].includes(o.status)).sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")));
+ const pastPurchaseRows=[...purchases].filter(o=>["completed","cancelled"].includes(o.status)).sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")));
  const rentalToday=osloDateKey(new Date());
  const rentalIsPast=r=>["completed","cancelled","returned"].includes(r.status)||String(r.end_date||"")<rentalToday;
  const upcomingRentals=[...rentals].filter(r=>!rentalIsPast(r)).sort((a,b)=>String(a.start_date||"").localeCompare(String(b.start_date||"")));
@@ -396,20 +407,52 @@ export default function MinSide(){
     <div><div className="kicker">KONTAKT</div><h2>Forespørsler og befaring</h2></div>
     <div className="customerSectionActions"><span>{enquiries.length}</span><a className="btn alt" href={rentalContext?"https://www.aadland-service.no/#befaring":"/#befaring"}>Ny forespørsel</a></div>
    </div>
-   {!enquiries.length?<div className="card customerEmpty"><p>Ingen forespørsler knyttet til kontoen ennå.</p></div>:
-   <div className="customerGrid">{enquiries.map(o=><article className="card customerHistoryCard" key={o.id}>
-    <div className="customerCardTop">
-     <div><small>{o.order_number}</small><h3>Befaring / forespørsel</h3><p className="customerHistoryDate">Sendt {dateTime(o.created_at)}</p></div>
-     <span className={"customerStatus customerStatus-"+o.status}>{enquiryStatus[o.status]||o.status}</span>
-    </div>
-    {o.custom_request&&<p className="customerEnquiryText">{String(o.custom_request).split("\nBilder:\n")[0]}</p>}
-    <div className="customerCardMeta">
-     <span><small>Status</small><b>{enquiryStatus[o.status]||o.status}</b></span>
-     {o.survey_date&&<span><small>Befaring</small><b>{dateTimeFull(o.survey_date)}</b></span>}
-     {o.survey_confirmation_sent_at&&<span><small>Bekreftelse</small><b>Sendt {dateTime(o.survey_confirmation_sent_at)}</b></span>}
-     {o.survey_reminder_sent_at&&<span><small>Påminnelse</small><b>Sendt {dateTime(o.survey_reminder_sent_at)}</b></span>}
-    </div>
-   </article>)}</div>}
+   {!enquiries.length?<div className="card customerEmpty"><p>Ingen forespørsler knyttet til kontoen ennå.</p></div>:<>
+    {activeEnquiries.length>0&&<div className="customerCompactGroup">
+     <div className="customerCompactGroupHead"><h3>Aktive</h3><span>{activeEnquiries.length}</span></div>
+     <div className="customerCompactList">
+      {activeEnquiries.map(o=><details className="customerCompactRow" key={o.id}>
+       <summary>
+        <span className="customerCompactDate"><b>{dateTime(o.created_at)}</b><small>Sendt</small></span>
+        <span className="customerCompactMain"><b>Befaring / forespørsel</b><small>{o.order_number}</small></span>
+        <span className={"customerStatus customerStatus-"+o.status}>{enquiryStatus[o.status]||o.status}</span>
+        <span className="customerCompactMeta">{o.survey_date?"Befaring "+dateTime(o.survey_date):"Åpne"}</span>
+        <span className="customerCompactChevron">⌄</span>
+       </summary>
+       <div className="customerCompactDetails">
+        {o.custom_request&&<p className="customerEnquiryText">{String(o.custom_request).split("\nBilder:\n")[0]}</p>}
+        <div className="customerCardMeta">
+         <span><small>Status</small><b>{enquiryStatus[o.status]||o.status}</b></span>
+         {o.survey_date&&<span><small>Befaring</small><b>{dateTimeFull(o.survey_date)}</b></span>}
+         {o.survey_confirmation_sent_at&&<span><small>Bekreftelse</small><b>Sendt {dateTime(o.survey_confirmation_sent_at)}</b></span>}
+         {o.survey_reminder_sent_at&&<span><small>Påminnelse</small><b>Sendt {dateTime(o.survey_reminder_sent_at)}</b></span>}
+        </div>
+       </div>
+      </details>)}
+     </div>
+    </div>}
+    {pastEnquiries.length>0&&<div className="customerCompactGroup customerCompactHistory">
+     <div className="customerCompactGroupHead"><h3>Historikk</h3><span>{pastEnquiries.length}</span></div>
+     <div className="customerCompactList">
+      {pastEnquiries.map(o=><details className="customerCompactRow" key={o.id}>
+       <summary>
+        <span className="customerCompactDate"><b>{dateTime(o.created_at)}</b><small>Sendt</small></span>
+        <span className="customerCompactMain"><b>Befaring / forespørsel</b><small>{o.order_number}</small></span>
+        <span className={"customerStatus customerStatus-"+o.status}>{enquiryStatus[o.status]||o.status}</span>
+        <span className="customerCompactMeta">Historikk</span>
+        <span className="customerCompactChevron">⌄</span>
+       </summary>
+       <div className="customerCompactDetails">
+        {o.custom_request&&<p className="customerEnquiryText">{String(o.custom_request).split("\nBilder:\n")[0]}</p>}
+        <div className="customerCardMeta">
+         <span><small>Status</small><b>{enquiryStatus[o.status]||o.status}</b></span>
+         {o.survey_date&&<span><small>Befaring</small><b>{dateTimeFull(o.survey_date)}</b></span>}
+        </div>
+       </div>
+      </details>)}
+     </div>
+    </div>}
+   </>}
   </section>}
 
   {activePanel==="tilbud"&&<section id="tilbud" className="customerDashboardSection customerPortalPanel">
@@ -417,28 +460,62 @@ export default function MinSide(){
     <div><div className="kicker">DOKUMENTER</div><h2>Tilbud</h2></div>
     <span>{quotes.length}</span>
    </div>
-   {!quotes.length?<div className="card customerEmpty"><p>Ingen tilbud knyttet til kontoen ennå.</p></div>:
-   <div className="customerGrid">
-    {quotes.map(q=>{
-     const status=effectiveQuoteStatus(q);
-     return <article className="card customerQuoteCard" key={q.id}>
-      <div className="customerCardTop">
-       <div><small>{q.quoteNumber}{q.revisionNumber>1?" · Revisjon "+q.revisionNumber:""}</small><h3>{q.title}</h3></div>
-       <span className={"customerStatus customerStatus-"+status}>{quoteStatus[status]||status}</span>
-      </div>
-      <div className="customerCardMeta">
-       <span><small>Total inkl. MVA</small><b>{kr(q.totalIncVatOre)}</b></span>
-       <span><small>{q.validUntil?"Gyldig til":"Sendt"}</small><b>{q.validUntil?date(q.validUntil):dateTime(q.sentAt||q.createdAt)}</b></span>
-       {q.plannedStartDate&&<span><small>Tidligst oppstart</small><b>{date(q.plannedStartDate)}</b></span>}
-      </div>
-      {status==="accepted"&&<p className="customerQuoteMessage">{q.acceptanceMethod==="paper"?"Tilbudet er godkjent på papir"+(q.paperSignedDate?" · signert "+date(q.paperSignedDate):"")+".":"Tilbudet er godkjent."}</p>}
-      {status==="declined"&&<p className="customerQuoteMessage">Tilbudet er avslått.</p>}
-      {status==="expired"&&<p className="customerQuoteMessage">Tilbudets gyldighetsdato er passert.</p>}
-      {status==="superseded"&&<p className="customerQuoteMessage">Denne versjonen er erstattet av en nyere revisjon og beholdes som dokumentasjon.</p>}
-      <Link className="btn" href={q.href}>Åpne tilbud</Link>
-     </article>
-    })}
-   </div>}
+   {!quotes.length?<div className="card customerEmpty"><p>Ingen tilbud knyttet til kontoen ennå.</p></div>:<>
+    {activeQuotes.length>0&&<div className="customerCompactGroup">
+     <div className="customerCompactGroupHead"><h3>Venter på svar</h3><span>{activeQuotes.length}</span></div>
+     <div className="customerCompactList">
+      {activeQuotes.map(q=>{
+       const status=effectiveQuoteStatus(q);
+       return <details className="customerCompactRow customerCompactRowAction" key={q.id}>
+        <summary>
+         <span className="customerCompactDate"><b>{dateTime(q.sentAt||q.createdAt)}</b><small>Sendt</small></span>
+         <span className="customerCompactMain"><b>{q.title}</b><small>{q.quoteNumber}{q.revisionNumber>1?" · Revisjon "+q.revisionNumber:""}</small></span>
+         <span className={"customerStatus customerStatus-"+status}>{quoteStatus[status]||status}</span>
+         <span className="customerCompactMeta">{kr(q.totalIncVatOre)}</span>
+         <span className="customerCompactChevron">⌄</span>
+        </summary>
+        <div className="customerCompactDetails">
+         <div className="customerCardMeta">
+          <span><small>Total inkl. MVA</small><b>{kr(q.totalIncVatOre)}</b></span>
+          <span><small>{q.validUntil?"Gyldig til":"Sendt"}</small><b>{q.validUntil?date(q.validUntil):dateTime(q.sentAt||q.createdAt)}</b></span>
+          {q.plannedStartDate&&<span><small>Tidligst oppstart</small><b>{date(q.plannedStartDate)}</b></span>}
+         </div>
+         <Link className="btn" href={q.href}>Åpne og svar på tilbud</Link>
+        </div>
+       </details>
+      })}
+     </div>
+    </div>}
+    {pastQuotes.length>0&&<div className="customerCompactGroup customerCompactHistory">
+     <div className="customerCompactGroupHead"><h3>Historikk</h3><span>{pastQuotes.length}</span></div>
+     <div className="customerCompactList">
+      {pastQuotes.map(q=>{
+       const status=effectiveQuoteStatus(q);
+       return <details className="customerCompactRow" key={q.id}>
+        <summary>
+         <span className="customerCompactDate"><b>{dateTime(q.acceptedAt||q.declinedAt||q.sentAt||q.createdAt)}</b><small>Sist endret</small></span>
+         <span className="customerCompactMain"><b>{q.title}</b><small>{q.quoteNumber}{q.revisionNumber>1?" · Revisjon "+q.revisionNumber:""}</small></span>
+         <span className={"customerStatus customerStatus-"+status}>{quoteStatus[status]||status}</span>
+         <span className="customerCompactMeta">{kr(q.totalIncVatOre)}</span>
+         <span className="customerCompactChevron">⌄</span>
+        </summary>
+        <div className="customerCompactDetails">
+         <div className="customerCardMeta">
+          <span><small>Total inkl. MVA</small><b>{kr(q.totalIncVatOre)}</b></span>
+          {q.validUntil&&<span><small>Gyldig til</small><b>{date(q.validUntil)}</b></span>}
+          {q.plannedStartDate&&<span><small>Tidligst oppstart</small><b>{date(q.plannedStartDate)}</b></span>}
+         </div>
+         {status==="accepted"&&<p className="customerQuoteMessage">{q.acceptanceMethod==="paper"?"Tilbudet er godkjent på papir"+(q.paperSignedDate?" · signert "+date(q.paperSignedDate):"")+".":"Tilbudet er godkjent."}</p>}
+         {status==="declined"&&<p className="customerQuoteMessage">Tilbudet er avslått.</p>}
+         {status==="expired"&&<p className="customerQuoteMessage">Tilbudets gyldighetsdato er passert.</p>}
+         {status==="superseded"&&<p className="customerQuoteMessage">Denne versjonen er erstattet av en nyere revisjon.</p>}
+         <Link className="btn alt" href={q.href}>Åpne tilbud</Link>
+        </div>
+       </details>
+      })}
+     </div>
+    </div>}
+   </>}
   </section>}
 
   {activePanel==="oppdrag"&&<section id="oppdrag" className="customerDashboardSection customerJobsSection customerPortalPanel">
@@ -446,128 +523,134 @@ export default function MinSide(){
     <div><div className="kicker">MINE OPPDRAG</div><h2>Oppdrag</h2></div>
     <span>{jobs.length}</span>
    </div>
-   {!jobs.length?<div className="card customerEmpty"><p>Ingen aktive eller tidligere oppdrag knyttet til kontoen ennå.</p></div>:
-   <div className="customerJobGrid">{jobs.map(o=>{
-    const q=o.source_quote;
-    return <article className="card customerJobCard" key={o.id}>
-     <div className="customerCardTop">
-      <div><small>{o.order_number}{q?.quoteNumber?" · "+q.quoteNumber:""}</small><h3>{q?.title||"Oppdrag"}</h3></div>
-      <span className={"customerStatus customerStatus-"+o.status}>{orderStatus[o.status]||o.status}</span>
+   {!jobs.length?<div className="card customerEmpty"><p>Ingen aktive eller tidligere oppdrag knyttet til kontoen ennå.</p></div>:<>
+    {activeJobRows.length>0&&<div className="customerCompactGroup">
+     <div className="customerCompactGroupHead"><h3>Aktive oppdrag</h3><span>{activeJobRows.length}</span></div>
+     <div className="customerCompactList">
+      {activeJobRows.map(o=>{
+       const q=o.source_quote;
+       return <details className="customerCompactRow" key={o.id}>
+        <summary>
+         <span className="customerCompactDate"><b>{o.job_start_at?dateTime(o.job_start_at):"Ikke avtalt"}</b><small>Oppstart</small></span>
+         <span className="customerCompactMain"><b>{q?.title||"Oppdrag"}</b><small>{o.order_number}{q?.quoteNumber?" · "+q.quoteNumber:""}</small></span>
+         <span className={"customerStatus customerStatus-"+o.status}>{orderStatus[o.status]||o.status}</span>
+         <span className="customerCompactMeta">{kr(q?.totalIncVatOre||o.total_ore)}</span>
+         <span className="customerCompactChevron">⌄</span>
+        </summary>
+        <div className="customerCompactDetails">
+         {o.job_start_at?<div className="customerJobStart">
+          <small>AVTALT OPPSTART</small><b>{dateTimeFull(o.job_start_at)}</b>
+          {o.job_confirmation_sent_at&&<span>Bekreftet på e-post {dateTime(o.job_confirmation_sent_at)}</span>}
+          {o.job_reminder_sent_at&&<span>Påminnelse sendt {dateTime(o.job_reminder_sent_at)}</span>}
+         </div>:q?.earliestStartDate?<div className="customerJobStart customerJobStartPending">
+          <small>TIDLIGST OPPSTART I TILBUDET</small><b>{date(q.earliestStartDate)}</b><span>Endelig oppstart er ikke avtalt ennå.</span>
+         </div>:<div className="customerJobStart customerJobStartPending"><small>OPPSTART</small><b>Ikke avtalt ennå</b><span>Vi tar kontakt når oppstart skal avtales.</span></div>}
+         {o.job_customer_agreement&&<div className="customerJobAgreement"><small>DETTE ER AVTALT VIDERE</small><p>{o.job_customer_agreement}</p>{o.job_planning_updated_at&&<span>Sist oppdatert {dateTimeFull(o.job_planning_updated_at)}</span>}</div>}
+         <div className="customerCardMeta">
+          <span><small>Avtalt total</small><b>{kr(q?.totalIncVatOre||o.total_ore)}</b></span>
+          <span><small>Betaling</small><b>{paymentStatus[o.payment_status]||o.payment_status||"Ikke registrert"}</b></span>
+         </div>
+         {Array.isArray(q?.paymentPlan)&&q.paymentPlan.length>0&&<div className="customerJobPaymentPlan">
+          <h4>Betalingsplan</h4>
+          {q.paymentPlan.map((row,index)=><div key={row.id||index}><span><b>{row.label||("Delbetaling "+(index+1))}</b><small>{row.trigger||""}</small></span><strong>{row.percent}% · {kr((q.totalIncVatOre||o.total_ore)*(Number(row.percent)||0)/100)}</strong></div>)}
+         </div>}
+         {q?.href&&<Link className="btn alt" href={q.href}>Åpne godkjent tilbud</Link>}
+        </div>
+       </details>
+      })}
      </div>
-
-     {o.job_start_at?<div className="customerJobStart">
-      <small>AVTALT OPPSTART</small>
-      <b>{dateTimeFull(o.job_start_at)}</b>
-      {o.job_confirmation_sent_at&&<span>Bekreftet på e-post {dateTime(o.job_confirmation_sent_at)}</span>}
-      {o.job_reminder_sent_at&&<span>Påminnelse sendt {dateTime(o.job_reminder_sent_at)}</span>}
-     </div>:q?.earliestStartDate?<div className="customerJobStart customerJobStartPending">
-      <small>TIDLIGST OPPSTART I TILBUDET</small>
-      <b>{date(q.earliestStartDate)}</b>
-      <span>Endelig oppstart er ikke avtalt ennå.</span>
-     </div>:<div className="customerJobStart customerJobStartPending">
-      <small>OPPSTART</small>
-      <b>Ikke avtalt ennå</b>
-      <span>Vi tar kontakt når oppstart skal avtales.</span>
-     </div>}
-
-     {o.job_customer_agreement&&<div className="customerJobAgreement">
-      <small>DETTE ER AVTALT VIDERE</small>
-      <p>{o.job_customer_agreement}</p>
-      {o.job_planning_updated_at&&<span>Sist oppdatert {dateTimeFull(o.job_planning_updated_at)}</span>}
-     </div>}
-
-     <div className="customerCardMeta">
-      <span><small>Avtalt total</small><b>{kr(q?.totalIncVatOre||o.total_ore)}</b></span>
-      <span><small>Betaling</small><b>{paymentStatus[o.payment_status]||o.payment_status||"Ikke registrert"}</b></span>
+    </div>}
+    {pastJobRows.length>0&&<div className="customerCompactGroup customerCompactHistory">
+     <div className="customerCompactGroupHead"><h3>Historikk</h3><span>{pastJobRows.length}</span></div>
+     <div className="customerCompactList">
+      {pastJobRows.map(o=>{
+       const q=o.source_quote;
+       return <details className="customerCompactRow" key={o.id}>
+        <summary>
+         <span className="customerCompactDate"><b>{dateTime(o.created_at)}</b><small>Opprettet</small></span>
+         <span className="customerCompactMain"><b>{q?.title||"Oppdrag"}</b><small>{o.order_number}</small></span>
+         <span className={"customerStatus customerStatus-"+o.status}>{orderStatus[o.status]||o.status}</span>
+         <span className="customerCompactMeta">{kr(q?.totalIncVatOre||o.total_ore)}</span>
+         <span className="customerCompactChevron">⌄</span>
+        </summary>
+        <div className="customerCompactDetails">
+         <div className="customerCardMeta">
+          <span><small>Avtalt total</small><b>{kr(q?.totalIncVatOre||o.total_ore)}</b></span>
+          <span><small>Betaling</small><b>{paymentStatus[o.payment_status]||o.payment_status||"Ikke registrert"}</b></span>
+         </div>
+         {q?.href&&<Link className="btn alt" href={q.href}>Åpne tilbud</Link>}
+        </div>
+       </details>
+      })}
      </div>
-
-     {Array.isArray(q?.paymentPlan)&&q.paymentPlan.length>0&&<div className="customerJobPaymentPlan">
-      <h4>Betalingsplan</h4>
-      {q.paymentPlan.map((row,index)=><div key={row.id||index}>
-       <span><b>{row.label||("Delbetaling "+(index+1))}</b><small>{row.trigger||""}</small></span>
-       <strong>{row.percent}% · {kr((q.totalIncVatOre||o.total_ore)*(Number(row.percent)||0)/100)}</strong>
-      </div>)}
-     </div>}
-
-     {q?.href&&<Link className="btn alt" href={q.href}>Åpne godkjent tilbud</Link>}
-    </article>;
-   })}</div>}
+    </div>}
+   </>}
   </section>}
 
   {activePanel==="bestillinger"&&<section id="bestillinger" className="customerDashboardSection customerPortalPanel">
    <div className="customerSectionHead"><div><div className="kicker">HANDEL</div><h2>Bestillinger</h2></div><div className="customerSectionActions"><span>{purchases.length}</span><a className="btn alt" href={rentalContext?"https://www.aadland-service.no/produkter":"/produkter"}>Se produkter</a></div></div>
-   {!purchases.length?<div className="card customerEmpty"><p>Ingen produktbestillinger knyttet til kontoen ennå.</p></div>:
-   <div className="customerGrid">{purchases.map(o=><article className="card customerHistoryCard" key={o.id}>
-    <div className="customerCardTop"><div><small>{o.order_number}</small><h3>Bestilling</h3><p className="customerHistoryDate">Bestilt {dateTime(o.created_at)}</p></div><span className={"customerStatus customerStatus-"+o.status}>{orderStatus[o.status]||o.status}</span></div>
-    {Array.isArray(o.items)&&o.items.length>0&&<div className="customerItemList">
-     {o.items.slice(0,6).map((item,index)=><div key={(item.productId||item.name||"item")+"-"+index}><span><b>{item.name||"Produkt"}</b><small>Antall {item.quantity||1}</small></span><span className="customerItemRepeat"><strong>{kr((Number(item.unitPriceOre)||0)*(Number(item.quantity)||1))}</strong>{item.productSlug&&<button type="button" className="btn alt" onClick={()=>repeatPurchase(item)}>Kjøp igjen</button>}</span></div>)}
-     {o.items.length>6&&<small>+ {o.items.length-6} flere varelinjer</small>}
+   {!purchases.length?<div className="card customerEmpty"><p>Ingen produktbestillinger knyttet til kontoen ennå.</p></div>:<>
+    {activePurchaseRows.length>0&&<div className="customerCompactGroup">
+     <div className="customerCompactGroupHead"><h3>Aktive bestillinger</h3><span>{activePurchaseRows.length}</span></div>
+     <div className="customerCompactList">
+      {activePurchaseRows.map(o=><details className="customerCompactRow" key={o.id}>
+       <summary>
+        <span className="customerCompactDate"><b>{dateTime(o.created_at)}</b><small>Bestilt</small></span>
+        <span className="customerCompactMain"><b>{(Array.isArray(o.items)&&o.items[0]?.name)||"Bestilling"}{Array.isArray(o.items)&&o.items.length>1?" + "+(o.items.length-1)+" til":""}</b><small>{o.order_number}</small></span>
+        <span className={"customerStatus customerStatus-"+o.status}>{orderStatus[o.status]||o.status}</span>
+        <span className="customerCompactMeta">{kr(o.total_ore)}</span>
+        <span className="customerCompactChevron">⌄</span>
+       </summary>
+       <div className="customerCompactDetails">
+        {Array.isArray(o.items)&&o.items.length>0&&<div className="customerItemList">
+         {o.items.slice(0,6).map((item,index)=><div key={(item.productId||item.name||"item")+"-"+index}><span><b>{item.name||"Produkt"}</b><small>Antall {item.quantity||1}</small></span><span className="customerItemRepeat"><strong>{kr((Number(item.unitPriceOre)||0)*(Number(item.quantity)||1))}</strong>{item.productSlug&&<button type="button" className="btn alt" onClick={()=>repeatPurchase(item)}>Kjøp igjen</button>}</span></div>)}
+         {o.items.length>6&&<small>+ {o.items.length-6} flere varelinjer</small>}
+        </div>}
+        <div className="customerCardMeta">
+         <span><small>Sum</small><b>{kr(o.total_ore)}</b></span>
+         <span><small>Betaling</small><b>{paymentStatus[o.payment_status]||o.payment_status||"Ikke registrert"}</b></span>
+         {Number(o.payment_captured_ore)>0&&<span><small>Registrert betalt</small><b>{kr(o.payment_captured_ore)}</b></span>}
+         <span><small>Levering</small><b>{fulfillmentStatus[o.fulfillment_type]||o.fulfillment_type||"Ikke registrert"}</b></span>
+         {Number(o.shipping_ore)>0&&<span><small>Frakt</small><b>{kr(o.shipping_ore)}</b></span>}
+        </div>
+        {o.fulfillment_type==="delivery"&&<div className="customerPaymentConfirmation"><b>{o.delivery_within_radius===true?"✓ Leveringsområdet er godkjent":o.delivery_within_radius===false?"Leveringsadressen er utenfor 15 km":"Leveringsområdet kontrolleres"}</b><span>{o.delivery_within_radius===true?"Adressen er godkjent for lokal levering innen 15 km.":o.delivery_within_radius===false?"Vi tar kontakt for å avtale henting eller en annen løsning.":"Vi kontrollerer adressen før bestillingen bekreftes."}</span></div>}
+        {o.confirmation_sent_at&&<div className="customerPaymentConfirmation"><b>✓ Ordrebekreftelse sendt</b><span>Sendt {dateTimeFull(o.confirmation_sent_at)}</span></div>}
+        {(o.confirmed_at||o.in_progress_at)&&<div className="customerPaymentConfirmation"><b>Ordrefremdrift</b>{o.confirmed_at&&<span>✓ Bekreftet {dateTimeFull(o.confirmed_at)}</span>}{o.in_progress_at&&<span>✓ Under arbeid {dateTimeFull(o.in_progress_at)}</span>}</div>}
+        {o.status==="ready"&&["pickup","delivery"].includes(o.fulfillment_type)&&<div className="customerPaymentConfirmation"><b>{o.fulfillment_type==="pickup"?"✓ Klar for henting":"✓ Klar for levering"}</b>{o.ready_notice_sent_at&&<span>Varsel sendt {dateTimeFull(o.ready_notice_sent_at)}</span>}</div>}
+        {o.fulfillment_type==="shipping"&&(o.tracking_number||o.tracking_url)&&<div className="customerPaymentConfirmation"><b>✓ Bestillingen er sendt</b>{o.tracking_number&&<span>Sporingsnummer: {o.tracking_number}</span>}{o.tracking_url&&<a className="btn alt" href={o.tracking_url} target="_blank" rel="noopener noreferrer">Spor pakken</a>}</div>}
+        {o.payment_status==="paid"&&(o.payment_reference||o.receipt_sent_at)&&<div className="customerPaymentConfirmation"><b>✓ Betaling registrert</b>{o.payment_reference&&<span>Referanse: {o.payment_reference}</span>}{o.receipt_sent_at&&<span>Betalingsbekreftelse sendt {dateTimeFull(o.receipt_sent_at)}</span>}</div>}
+       </div>
+      </details>)}
+     </div>
     </div>}
-    <div className="customerCardMeta">
-     <span><small>Sum</small><b>{kr(o.total_ore)}</b></span>
-     <span><small>Betaling</small><b>{paymentStatus[o.payment_status]||o.payment_status||"Ikke registrert"}</b></span>
-     {Number(o.payment_captured_ore)>0&&<span><small>Registrert betalt</small><b>{kr(o.payment_captured_ore)}</b></span>}
-     <span><small>Levering</small><b>{fulfillmentStatus[o.fulfillment_type]||o.fulfillment_type||"Ikke registrert"}</b></span>
-     {Number(o.shipping_ore)>0&&<span><small>Frakt</small><b>{kr(o.shipping_ore)}</b></span>}
-    </div>
-    {o.fulfillment_type==="delivery"&&<div className="customerPaymentConfirmation">
-     <b>{o.delivery_within_radius===true?"✓ Leveringsområdet er godkjent":o.delivery_within_radius===false?"Leveringsadressen er utenfor 15 km":"Leveringsområdet kontrolleres"}</b>
-     <span>{o.delivery_within_radius===true
-      ?"Adressen er godkjent for lokal levering innen 15 km."
-      :o.delivery_within_radius===false
-       ?"Vi tar kontakt for å avtale henting eller en annen løsning."
-       :"Vi kontrollerer adressen før bestillingen bekreftes."}</span>
+    {pastPurchaseRows.length>0&&<div className="customerCompactGroup customerCompactHistory">
+     <div className="customerCompactGroupHead"><h3>Historikk</h3><span>{pastPurchaseRows.length}</span></div>
+     <div className="customerCompactList">
+      {pastPurchaseRows.map(o=><details className="customerCompactRow" key={o.id}>
+       <summary>
+        <span className="customerCompactDate"><b>{dateTime(o.created_at)}</b><small>Bestilt</small></span>
+        <span className="customerCompactMain"><b>{(Array.isArray(o.items)&&o.items[0]?.name)||"Bestilling"}{Array.isArray(o.items)&&o.items.length>1?" + "+(o.items.length-1)+" til":""}</b><small>{o.order_number}</small></span>
+        <span className={"customerStatus customerStatus-"+o.status}>{orderStatus[o.status]||o.status}</span>
+        <span className="customerCompactMeta">{kr(o.total_ore)}</span>
+        <span className="customerCompactChevron">⌄</span>
+       </summary>
+       <div className="customerCompactDetails">
+        {Array.isArray(o.items)&&o.items.length>0&&<div className="customerItemList">
+         {o.items.slice(0,6).map((item,index)=><div key={(item.productId||item.name||"item")+"-"+index}><span><b>{item.name||"Produkt"}</b><small>Antall {item.quantity||1}</small></span><span className="customerItemRepeat"><strong>{kr((Number(item.unitPriceOre)||0)*(Number(item.quantity)||1))}</strong>{item.productSlug&&<button type="button" className="btn alt" onClick={()=>repeatPurchase(item)}>Kjøp igjen</button>}</span></div>)}
+        </div>}
+        <div className="customerCardMeta">
+         <span><small>Sum</small><b>{kr(o.total_ore)}</b></span>
+         <span><small>Betaling</small><b>{paymentStatus[o.payment_status]||o.payment_status||"Ikke registrert"}</b></span>
+         <span><small>Levering</small><b>{fulfillmentStatus[o.fulfillment_type]||o.fulfillment_type||"Ikke registrert"}</b></span>
+        </div>
+        {o.status==="cancelled"&&<div className="customerPaymentConfirmation"><b>Bestillingen er kansellert</b>{o.cancellation_reason&&<span>Årsak: {o.cancellation_reason}</span>}{o.cancelled_at&&<span>Kansellert {dateTimeFull(o.cancelled_at)}</span>}</div>}
+        {o.delivered_at&&<div className="customerPaymentConfirmation"><b>✓ Bestillingen er levert</b><span>Registrert levert {dateTimeFull(o.delivered_at)}</span></div>}
+        {Number(o.payment_refunded_ore)>0&&<div className="customerPaymentConfirmation"><b>{Number(o.payment_refunded_ore)>=Number(o.payment_captured_ore||0)?"✓ Betalingen er tilbakebetalt":"✓ Delvis tilbakebetaling registrert"}</b><span>Totalt tilbakebetalt: {kr(o.payment_refunded_ore)}</span></div>}
+       </div>
+      </details>)}
+     </div>
     </div>}
-    {o.confirmation_sent_at&&<div className="customerPaymentConfirmation">
-     <b>✓ Ordrebekreftelse sendt</b>
-     <span>Sendt {dateTimeFull(o.confirmation_sent_at)}</span>
-    </div>}
-    {(o.confirmed_at||o.in_progress_at)&&<div className="customerPaymentConfirmation">
-     <b>Ordrefremdrift</b>
-     {o.confirmed_at&&<span>✓ Bekreftet {dateTimeFull(o.confirmed_at)}{o.confirmed_notice_sent_at?" · kunde varslet "+dateTimeFull(o.confirmed_notice_sent_at):""}</span>}
-     {o.in_progress_at&&<span>✓ Under arbeid {dateTimeFull(o.in_progress_at)}{o.in_progress_notice_sent_at?" · kunde varslet "+dateTimeFull(o.in_progress_notice_sent_at):""}</span>}
-    </div>}
-
-    {o.status==="cancelled"&&<div className="customerPaymentConfirmation">
-     <b>Bestillingen er kansellert</b>
-     {o.cancellation_reason&&<span>Årsak: {o.cancellation_reason}</span>}
-     {o.cancelled_at&&<span>Kansellert {dateTimeFull(o.cancelled_at)}</span>}
-     {o.cancellation_sent_at&&<span>Bekreftelse sendt {dateTimeFull(o.cancellation_sent_at)}</span>}
-     {["paid","partial","authorized"].includes(o.payment_status)&&<span>Eventuell registrert betaling/refusjon håndteres separat.</span>}
-    </div>}
-    {o.status==="ready"&&["pickup","delivery"].includes(o.fulfillment_type)&&<div className="customerPaymentConfirmation">
-     <b>{o.fulfillment_type==="pickup"?"✓ Klar for henting":"✓ Klar for levering"}</b>
-     <span>{o.fulfillment_type==="pickup"?"Bestillingen er ferdig og klar for henting.":"Bestillingen er ferdig og klar for levering."}</span>
-     {o.ready_notice_sent_at&&<span>Varsel sendt {dateTimeFull(o.ready_notice_sent_at)}</span>}
-    </div>}
-    {o.fulfillment_type==="shipping"&&(o.tracking_number||o.tracking_url)&&<div className="customerPaymentConfirmation">
-     <b>✓ Bestillingen er sendt</b>
-     {o.tracking_number&&<span>Sporingsnummer: {o.tracking_number}</span>}
-     {o.tracking_url&&<a className="btn alt" href={o.tracking_url} target="_blank" rel="noopener noreferrer">Spor pakken</a>}
-     {o.dispatched_at&&<span>Sendt {dateTimeFull(o.dispatched_at)}</span>}
-     {o.tracking_sent_at&&<span>Sendt-varsel sendt {dateTimeFull(o.tracking_sent_at)}</span>}
-    </div>}
-    {o.delivered_at&&<div className="customerPaymentConfirmation">
-     <b>✓ Bestillingen er levert</b>
-     <span>Registrert levert {dateTimeFull(o.delivered_at)}</span>
-     {o.delivery_notice_sent_at&&<span>Levert-varsel sendt {dateTimeFull(o.delivery_notice_sent_at)}</span>}
-    </div>}
-    {Number(o.payment_refunded_ore)>0&&<div className="customerPaymentConfirmation">
-     <b>{Number(o.payment_refunded_ore)>=Number(o.payment_captured_ore||0)?"✓ Betalingen er tilbakebetalt":"✓ Delvis tilbakebetaling registrert"}</b>
-     {Number(o.refund_last_ore)>0&&<span>Sist tilbakebetalt: {kr(o.refund_last_ore)}</span>}
-     <span>Totalt tilbakebetalt: {kr(o.payment_refunded_ore)}</span>
-     {Number(o.payment_captured_ore)>Number(o.payment_refunded_ore)&&<span>Netto registrert betaling etter tilbakebetaling: {kr(Number(o.payment_captured_ore)-Number(o.payment_refunded_ore))}</span>}
-     {o.refund_reference&&<span>Referanse: {o.refund_reference}</span>}
-     {o.refund_note&&<span>Merknad: {o.refund_note}</span>}
-     {o.payment_refunded_at&&<span>Registrert {dateTimeFull(o.payment_refunded_at)}</span>}
-     {o.refund_notice_sent_at&&<span>Tilbakebetalingsbekreftelse sendt {dateTimeFull(o.refund_notice_sent_at)}</span>}
-    </div>}
-    {o.payment_status==="paid"&&(o.payment_reference||o.receipt_sent_at)&&<div className="customerPaymentConfirmation">
-     <b>✓ Betaling registrert</b>
-     {o.payment_reference&&<span>Referanse: {o.payment_reference}</span>}
-     {o.receipt_sent_at&&<span>Betalingsbekreftelse sendt {dateTimeFull(o.receipt_sent_at)}</span>}
-    </div>}
-   </article>)}</div>}
+   </>}
   </section>}
 
   {activePanel==="utleie"&&<section id="utleie" className="customerDashboardSection customerPortalPanel">
