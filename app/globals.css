@@ -1403,7 +1403,7 @@ html{scroll-behavior:smooth}
 .rentalHint{display:block;margin-top:15px;color:rgba(255,255,255,.45);line-height:1.5}
 
 .rentalBookingSection{padding:0 0 84px;background:#101010}
-.rentalBookingCard{display:grid;grid-template-columns:minmax(280px,.72fr) minmax(0,1.28fr);gap:0;background:#171717;border:1px solid rgba(215,167,78,.2);box-shadow:0 30px 70px rgba(0,0,0,.28)}
+.rentalBookingSection .rentalBookingCard{display:grid;grid-template-columns:minmax(280px,.72fr) minmax(0,1.28fr);gap:0;background:#171717;border:1px solid rgba(215,167,78,.2);box-shadow:0 30px 70px rgba(0,0,0,.28)}
 .rentalBookingIntro{padding:38px;background:linear-gradient(145deg,#1e1b17,#121212);border-right:1px solid rgba(255,255,255,.09)}
 .rentalBookingIntro h2{margin:8px 0 10px;font-size:40px;line-height:.96}
 .rentalBookingIntro>p{color:rgba(255,255,255,.6)}
@@ -1427,7 +1427,7 @@ html{scroll-behavior:smooth}
 @media(max-width:950px){
  .rentalGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
  .rentalDatePanel{grid-template-columns:1fr;gap:26px}
- .rentalBookingCard{grid-template-columns:1fr}
+ .rentalBookingSection .rentalBookingCard{grid-template-columns:1fr}
  .rentalBookingIntro{border-right:0;border-bottom:1px solid rgba(255,255,255,.09)}
 }
 @media(max-width:700px){
@@ -3189,3 +3189,30 @@ body:has(.customerPage) .customerPage{
  .orderCompactHead i{width:25px;height:25px}
  .orderExpanded{padding:0 12px 14px}
 }
+
+
+/* Customer billing controls */
+.customerAdminBadges{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.customerBillingBadge{
+ display:inline-flex;align-items:center;padding:5px 8px;border-radius:999px;
+ border:1px solid rgba(183,134,54,.35);background:rgba(215,167,78,.12);
+ color:#725018;font-size:9px;font-weight:900
+}
+.customerBillingPanel{
+ margin:14px 0;padding:12px 14px;border:1px solid #e3ddd2;border-radius:12px;background:#faf8f4
+}
+.customerBillingPanel summary{cursor:pointer;font-weight:900}
+.customerBillingFields{display:grid;gap:12px;margin-top:14px}
+.customerBillingCheck{display:flex;align-items:flex-start;gap:10px}
+.customerBillingCheck input{width:18px;height:18px;margin-top:2px}
+.customerBillingCheck span{display:grid;gap:3px}
+.customerBillingCheck small{color:#756f66;line-height:1.35}
+
+/* Admin utleiebookinger skal alltid være lesbare i lys backoffice. */
+.adminmain .rentalBookingCard{background:#fff;color:#181613;border-color:#e2d9cc}
+.adminmain .rentalBookingExpanded{background:#fff;color:#181613}
+.adminmain .rentalBookingExpanded p,
+.adminmain .rentalBookingExpanded label,
+.adminmain .rentalBookingExpanded h4,
+.adminmain .rentalBookingExpanded h5{color:#181613}
+.adminmain .rentalBookingExpanded .muted{color:#756f66}
