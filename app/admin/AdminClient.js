@@ -1271,6 +1271,42 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
   setMessage((alreadyPaid?"Betalingsbekreftelsen er sendt på nytt til ":"Betalingen er registrert og betalingsbekreftelsen er sendt til ")+(data.sentTo||order.customerEmail)+".");
   if(typeof reload==="function")await reload();
  }
+ async function vippsOrderAction(order,action){
+  const reference=String(order.paymentReference||order.orderNumber||"").trim();
+  if(!reference){setMessage("Vipps-referansen mangler.");return;}
+  let amountOre=0;
+  if(action==="capture"){
+   const suggested=Math.max(0,Number(order.paymentReservedOre||order.totalOre||0)-Number(order.paymentCapturedOre||0));
+   const value=window.prompt("Beløp som skal captures i Vipps (kr):",(suggested/100).toFixed(2));
+   if(value===null)return;
+   amountOre=kronerToOre(value);
+   if(!Number.isInteger(amountOre)||amountOre<=0){setMessage("Skriv inn et gyldig capture-beløp.");return;}
+   if(!window.confirm("Capture "+nok(amountOre)+" fra Vipps-reservasjonen? Gjør dette først når varen/tjenesten kan leveres."))return;
+  }else if(action==="refund"){
+   const suggested=Math.max(0,Number(order.paymentCapturedOre||0)-Number(order.paymentRefundedOre||0));
+   const value=window.prompt("Beløp som skal refunderes i Vipps (kr):",(suggested/100).toFixed(2));
+   if(value===null)return;
+   amountOre=kronerToOre(value);
+   if(!Number.isInteger(amountOre)||amountOre<=0){setMessage("Skriv inn et gyldig refusjonsbeløp.");return;}
+   if(!window.confirm("Refundere "+nok(amountOre)+" gjennom Vipps?"))return;
+  }else if(action==="cancel"&&!window.confirm("Kansellere gjenværende Vipps-reservasjon? Beløpet som ikke er captured frigis til kunden."))return;
+
+  setSavingId(order.id);setMessage("");
+  const response=await fetch("/api/admin/vipps-payment",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({unit:"service",reference,action,amountOre})
+  });
+  const data=await response.json().catch(()=>({}));
+  setSavingId(null);
+  if(!response.ok){setMessage(data.error||"Vipps-handlingen kunne ikke utføres.");return;}
+  const labels={sync:"Vipps-status er synkronisert.",capture:"Vipps-beløpet er trukket.",cancel:"Gjenværende Vipps-reservasjon er kansellert.",refund:"Vipps-refusjonen er registrert."};
+  const receiptText=data?.receipt?.sent?" Kvittering er sendt automatisk til kunden.":data?.receiptWarning?" "+data.receiptWarning:"";
+  const refundText=data?.refundNotice?.sent?" Tilbakebetalingsbekreftelse er sendt automatisk til kunden.":data?.refundNoticeWarning?" "+data.refundNoticeWarning:"";
+  setMessage((labels[action]||"Vipps-betalingen er oppdatert.")+receiptText+refundText);
+  if(typeof reload==="function")await reload();
+ }
+
  return <><>{message&&<p className="notice">{message}</p>}</><div className="orderCards">{orders.length?orders.map(order=>{const isOpen=openId===order.id;return <article className={"card orderCard "+(isOpen?"isOpen":"isCompact")} key={order.id}>
   <button className="orderCompactHead" type="button" aria-expanded={isOpen} onClick={()=>setOpenId(isOpen?null:order.id)}><span><b>{order.customerName||"Ukjent kunde"}</b><small>{order.orderNumber} · {new Date(order.createdAt).toLocaleDateString("nb-NO")}</small></span><span><strong>{nok(order.totalOre||0)}</strong><em>{labels[order.status]||order.status}</em><i aria-hidden="true">{isOpen?"⌃":"⌄"}</i></span></button>
   {isOpen&&<div className="orderExpanded">
@@ -4414,6 +4450,42 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
   const d=await runAction(booking,"record-paid-and-send-receipt",{paymentReference:reference},text);
   if(!d)return;
   setMessage((alreadyPaid?"Kvitteringen er sendt på nytt til ":"Leiebetalingen er registrert og kvitteringen er sendt til ")+(d.sentTo||booking.customer?.email)+".");
+ }
+
+ async function vippsRentalAction(booking,action){
+  const reference=String(booking.paymentReference||booking.bookingNumber||"").trim();
+  if(!reference){setError("Vipps-referansen mangler.");return;}
+  let amountOre=0;
+  if(action==="capture"){
+   const suggested=Math.max(0,Number(booking.paymentReservedOre||booking.totalOre||0)-Number(booking.paymentCapturedOre||0));
+   const value=window.prompt("Beløp som skal captures i Vipps (kr):",(suggested/100).toFixed(2));
+   if(value===null)return;
+   amountOre=kronerToOre(value);
+   if(!Number.isInteger(amountOre)||amountOre<=0){setError("Skriv inn et gyldig capture-beløp.");return;}
+   if(!window.confirm("Capture "+nok(amountOre)+" fra Vipps-reservasjonen? Gjør dette først når leien kan leveres/utleveres."))return;
+  }else if(action==="refund"){
+   const suggested=Math.max(0,Number(booking.paymentCapturedOre||0)-Number(booking.paymentRefundedOre||0));
+   const value=window.prompt("Beløp som skal refunderes i Vipps (kr):",(suggested/100).toFixed(2));
+   if(value===null)return;
+   amountOre=kronerToOre(value);
+   if(!Number.isInteger(amountOre)||amountOre<=0){setError("Skriv inn et gyldig refusjonsbeløp.");return;}
+   if(!window.confirm("Refundere "+nok(amountOre)+" gjennom Vipps?"))return;
+  }else if(action==="cancel"&&!window.confirm("Kansellere gjenværende Vipps-reservasjon? Beløpet som ikke er captured frigis til kunden."))return;
+
+  setError("");setMessage("");setSavingId(booking.id);
+  const response=await fetch("/api/admin/vipps-payment",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({unit:"rental",reference,action,amountOre})
+  });
+  const data=await response.json().catch(()=>({}));
+  setSavingId("");
+  if(!response.ok){setError(data.error||"Vipps-handlingen kunne ikke utføres.");return;}
+  const labels={sync:"Vipps-status er synkronisert.",capture:"Vipps-beløpet er trukket.",cancel:"Gjenværende Vipps-reservasjon er kansellert.",refund:"Vipps-refusjonen er registrert."};
+  const receiptText=data?.receipt?.sent?" Kvittering er sendt automatisk til kunden.":data?.receiptWarning?" "+data.receiptWarning:"";
+  const refundText=data?.refundNotice?.sent?" Tilbakebetalingsbekreftelse er sendt automatisk til kunden.":data?.refundNoticeWarning?" "+data.refundNoticeWarning:"";
+  setMessage((labels[action]||"Vipps-betalingen er oppdatert.")+receiptText+refundText);
+  await reload();
  }
 
  async function refundRentalPayment(booking){
