@@ -1,7 +1,7 @@
 import {rateLimitRequest,rateLimitValue} from "../../../../lib/rateLimit";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
-import {createClient} from "@supabase/supabase-js";
+import {db} from "../../../../lib/supabase";
 import {createCustomerVerificationToken} from "../../../../lib/customerVerification";
 import {customerEmailContext,customerResendApiKey} from "../../../../lib/rentalEmailConfig";
 
@@ -21,12 +21,11 @@ export async function POST(req){
   if(value.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))return NextResponse.json({error:"Skriv inn en gyldig e-postadresse."},{status:400});
   const emailRateError=await rateLimitValue(value,{"scope":"customer-resend-verification-email","max":3,"windowSeconds":3600,"message":"For mange forespørsler om bekreftelsesmail for denne e-postadressen. Prøv igjen senere."}); if(emailRateError)return emailRateError;
 
-  const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
   const resendKey=customerResendApiKey(req);
-  if(!url||!key||!process.env.SESSION_SECRET||!resendKey)return NextResponse.json({error:"Bekreftelsesmail er ikke konfigurert akkurat nå."},{status:503});
+  if(!process.env.SESSION_SECRET||!resendKey)return NextResponse.json({error:"Bekreftelsesmail er ikke konfigurert akkurat nå."},{status:503});
 
-  const s=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
+  const s=db();
+  if(!s)return NextResponse.json({error:"Bekreftelsesmail er ikke konfigurert akkurat nå."},{status:503});
   const {data:profile,error:profileError}=await s.from("customer_profiles")
    .select("id,email,name")
    .eq("email",value)
