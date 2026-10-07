@@ -13,6 +13,18 @@ const electrical=new Set(["ceilinglight","downlight","ledstrip","walllight","out
 const wallElectrical=new Set(["walllight","outlet","doubleoutlet","switch","dimmer","thermostat"]);
 const ceilingElectrical=new Set(["ceilinglight","downlight","ledstrip","junction"]);
 const openingTypes=new Set(["door","sliding","window","opening"]);
+const customCellTypes=["open","door","drawer","shelf"];
+const customCells=item=>{
+ const cols=Math.max(1,Math.min(8,Math.round(Number(item?.sectionsX)||1))),rows=Math.max(1,Math.min(6,Math.round(Number(item?.sectionsY)||1))),count=cols*rows,source=Array.isArray(item?.cellTypes)?item.cellTypes:[];
+ return {cols,rows,cells:Array.from({length:count},(_,i)=>customCellTypes.includes(source[i])?source[i]:"open")};
+};
+const polygonSignedArea=points=>{let area=0;for(let i=0;i<(points||[]).length;i++){const a=points[i],b=points[(i+1)%points.length];area+=(Number(a.x)||0)*(Number(b.y)||0)-(Number(b.x)||0)*(Number(a.y)||0)}return area/2};
+function wallInwardNormal(wall,zones=[]){
+ const zone=(zones||[]).find(z=>Array.isArray(z.wallIds)&&z.wallIds.includes(wall?.id));
+ if(!zone)return{x:0,y:0};
+ const dx=wall.x2-wall.x1,dy=wall.y2-wall.y1,L=Math.hypot(dx,dy)||1,ccw=polygonSignedArea(zone.points||[])>=0;
+ return ccw?{x:-dy/L,y:dx/L}:{x:dy/L,y:-dx/L};
+}
 
 function rotatedCorners(item){
  const w=Math.max(1,Number(item.w)||1),h=Math.max(1,Number(item.h)||1),cx=(Number(item.x)||0)+w/2,cy=(Number(item.y)||0)+h/2,a=(Number(item.rot)||0)*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
@@ -44,6 +56,20 @@ function cameraProject(x,y,z,camera,origin){
 function ceilingHeight(item,doc){
  const fallback=Number(doc.defaultWallHeight)||2400;
  return wallElectrical.has(item.type)?Number(item.mountHeight)||1200:ceilingElectrical.has(item.type)?fallback:itemHeight(item);
+}
+function FurnitureFront({item,a,b,z0,height,project,prefix}){
+ const {cols,rows,cells}=customCells(item),point=(t,z)=>project(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,z);
+ return <g>{cells.map((type,i)=>{
+  const col=i%cols,row=Math.floor(i/cols),t0=col/cols,t1=(col+1)/cols,zTop=z0+height*(1-row/rows),zBottom=z0+height*(1-(row+1)/rows);
+  const p0=point(t0,zBottom),p1=point(t1,zBottom),p2=point(t1,zTop),p3=point(t0,zTop),mid=point((t0+t1)/2,(zTop+zBottom)/2);
+  return <g key={prefix+"-"+i}>
+   <polygon points={pointsAttr([p0,p1,p2,p3])} fill={type==="open"?"rgba(88,69,45,.18)":type==="drawer"?"rgba(222,193,143,.92)":"rgba(235,216,180,.94)"} stroke="#665136" strokeWidth="6"/>
+   {type==="door"&&<><line x1={p3.x+(p2.x-p3.x)*.08} y1={p3.y+(p2.y-p3.y)*.08} x2={p0.x+(p1.x-p0.x)*.08} y2={p0.y+(p1.y-p0.y)*.08} stroke="#8c7047" strokeWidth="5"/><circle cx={mid.x+(p2.x-p3.x)*.35} cy={mid.y+(p2.y-p3.y)*.35} r="8" fill="#4b3923"/></>}
+   {type==="drawer"&&[.25,.5,.75].map((q,n)=>{const l=point(t0,zBottom+(zTop-zBottom)*q),rr=point(t1,zBottom+(zTop-zBottom)*q);return <line key={n} x1={l.x} y1={l.y} x2={rr.x} y2={rr.y} stroke="#80633f" strokeWidth="5"/>})}
+   {type==="shelf"&&[1/3,2/3].map((q,n)=>{const l=point(t0,zBottom+(zTop-zBottom)*q),rr=point(t1,zBottom+(zTop-zBottom)*q);return <line key={n} x1={l.x} y1={l.y} x2={rr.x} y2={rr.y} stroke="#725736" strokeWidth="7"/>})}
+   {type==="open"&&<text x={mid.x} y={mid.y+12} textAnchor="middle" fontSize="32" fontWeight="900" fill="#6d593c">ÅPEN</text>}
+  </g>
+ })}</g>;
 }
 
 function PlanView({doc}){
@@ -98,8 +124,16 @@ function ThreeDView({doc,camera}){
     const a=(Number(item.rot)||0)*Math.PI/180,ux=Math.cos(a),uy=Math.sin(a),half=(Number(item.w)||0)/2,z0=item.type==="window"?Number(item.sillHeight)||0:0,z1=z0+(Number(item.openingHeight)||2100);
     return <polygon key={item.id} points={pointsAttr([project(center.x-ux*half,center.y-uy*half,z0),project(center.x+ux*half,center.y+uy*half,z0),project(center.x+ux*half,center.y+uy*half,z1),project(center.x-ux*half,center.y-uy*half,z1)])} fill={item.type==="window"?"#b9d9df":"#f2efe8"} stroke="#66615a" strokeWidth="10"/>;
    }
-   const corners=rotatedCorners(item),z0=Math.max(0,Number(item.elevation)||0),h=itemHeight(item),base=corners.map(p=>project(p.x,p.y,z0)),top=corners.map(p=>project(p.x,p.y,z0+h));
-   return <g key={item.id}><polygon points={pointsAttr([base[1],base[2],top[2],top[1]])} fill="#9f7e4d" stroke="#675337" strokeWidth="9"/><polygon points={pointsAttr([base[2],base[3],top[3],top[2]])} fill="#806440" stroke="#675337" strokeWidth="9"/><polygon points={pointsAttr(top)} fill="#d4b57d" stroke="#675337" strokeWidth="10"/></g>;
+   const corners=rotatedCorners(item),z0=Math.max(0,Number(item.elevation)||0),h=itemHeight(item),base=corners.map(p=>project(p.x,p.y,z0)),top=corners.map(p=>project(p.x,p.y,z0+h)),custom=["customfloor","customwall"].includes(item.type);
+   let frontA=corners[3],frontB=corners[2];
+   if(item.type==="customwall"&&item.wallId){
+    const wall=(doc.walls||[]).find(w=>w.id===item.wallId);
+    if(wall){
+     const inward=wallInwardNormal(wall,doc.zones||[]),a=(Number(item.rot)||0)*Math.PI/180,localY={x:-Math.sin(a),y:Math.cos(a)};
+     if(localY.x*inward.x+localY.y*inward.y<0){frontA=corners[0];frontB=corners[1]}
+    }
+   }
+   return <g key={item.id}><polygon points={pointsAttr([base[1],base[2],top[2],top[1]])} fill="#9f7e4d" stroke="#675337" strokeWidth="9"/><polygon points={pointsAttr([base[2],base[3],top[3],top[2]])} fill="#806440" stroke="#675337" strokeWidth="9"/><polygon points={pointsAttr(top)} fill="#d4b57d" stroke="#675337" strokeWidth="10"/>{custom&&<FurnitureFront item={item} a={frontA} b={frontB} z0={z0} height={h} project={project} prefix={"customer-front-"+item.id}/>}</g>;
   })}
  </svg>;
 }
