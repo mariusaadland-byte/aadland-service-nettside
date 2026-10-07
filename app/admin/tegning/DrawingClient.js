@@ -527,8 +527,8 @@ function FurnitureGapPlanPreview({doc,wall,onSelectGap}){
 }
 
 function WallElevationPreview({wall,items,zones=[],onSelectItem,onMoveItem,onMoveStart,onMoveEnd,selectedItemId,gapPickMode=false,onSelectGap}){
- if(!wall)return null;
  const svgRef=useRef(null),dragRef=useRef(null);
+ if(!wall)return null;
  const L=Math.max(1,len(wall)),H=Math.max(300,Number(wall.h)||2400),padX=Math.max(140,L*.035),padY=Math.max(140,H*.07);
  const pointerWorldDelta=(e,start)=>{
   const rect=svgRef.current?.getBoundingClientRect?.();if(!rect)return{dx:0,dy:0};
@@ -1297,7 +1297,7 @@ export default function DrawingClient(){
   if(!wall){mutate(d=>({...d,items:d.items.map(o=>o.id===itemId?{...o,[key]:n}:o)}));return}
   const current=wallEdgeOffsets(item,wall),width=key==="w"?n:Number(item.w)||0,maxGap=Math.max(0,current.L-width),startGap=key==="wallStartGap"?n:key==="wallEndGap"?current.L-n-width:current.start;
   if(width<100||width>12000){setMessage("Bredde må være 100–12000 mm");setTimeout(()=>setMessage(""),1800);return}
-  if(width>current.L){setMessage("Åpningen kan ikke være bredere enn veggen");setTimeout(()=>setMessage(""),2000);return}
+  if(width>current.L){setMessage("Objektet kan ikke være bredere enn veggen");setTimeout(()=>setMessage(""),2000);return}
   if(startGap<0||startGap>maxGap){setMessage("Plasseringen går utenfor veggen");setTimeout(()=>setMessage(""),1800);return}
   if(openingTypes.has(item.type)&&openingCollision(wall,item.id,startGap,width)){setMessage("Åpningen overlapper en annen åpning");setTimeout(()=>setMessage(""),2200);return}
   mutate(d=>{
@@ -1317,7 +1317,7 @@ export default function DrawingClient(){
  const update=(key,value)=>{
   const n=Number(value);
   if(!Number.isFinite(n))return;
-  if(selected?.kind==="item"&&sel?.wallId&&(openingTypes.has(sel.type)||sel.type==="customwall")&&["w","wallStartGap","wallEndGap"].includes(key)){
+  if(selected?.kind==="item"&&sel?.wallId&&wallTypes.has(sel.type)&&["w","wallStartGap","wallEndGap"].includes(key)){
    updateWallItemById(sel.id,key,n);
    return;
   }
@@ -1331,8 +1331,8 @@ export default function DrawingClient(){
       let desired=n;
       if(key==="wallStartGap")desired=n+half;
       if(key==="wallEndGap")desired=limits.L-n-half;
-      const off=clamp(desired,limits.min,limits.max),a=Math.atan2(w.y2-w.y1,w.x2-w.x1),cx=w.x1+Math.cos(a)*off,cy=w.y1+Math.sin(a)*off;
-      return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off};
+      const off=clamp(desired,limits.min,limits.max),base={...o,wallOffset:off},placed=mountedItemCenter(base,w,d.zones||[]);
+      return {...base,x:placed.cx-o.w/2,y:placed.cy-o.h/2,rot:placed.a*180/Math.PI,wallOffset:placed.off};
      }
      let changed={...o,[key]:n};
      if(["customwall","customfloor"].includes(o.type)&&key==="w")changed={...changed,colWidths:furnitureDimArray(o.sectionsX,n,o.colWidths)};
@@ -1374,12 +1374,14 @@ export default function DrawingClient(){
  const flipDoor=()=>{if(selected?.kind!=="item"||!sel||sel.type!=="door")return;mutate(d=>({...d,items:d.items.map(o=>o.id===sel.id?{...o,flip:!o.flip}:o)}))};
  const detach=()=>{if(selected?.kind!=="item"||!sel)return;mutate(d=>({...d,items:d.items.map(o=>o.id===sel.id?{...o,type:o.type==="customwall"?"customfloor":o.type,wallId:null,wallOffset:null}:o)}))};
  const duplicate=()=>{if(selected?.kind!=="item"||!sel)return;
-  if(sel.wallId&&openingTypes.has(sel.type)){
+  if(sel.wallId){
    const wall=doc.walls.find(w=>w.id===sel.wallId);if(!wall)return;
-   const current=wallEdgeOffsets(sel,wall),start=findOpeningStart(wall,Number(sel.w)||0,doc.items,null,current.start+Number(sel.w||0)+100);
-   if(start==null){setMessage("Ikke ledig plass til kopi på veggen");setTimeout(()=>setMessage(""),2000);return}
-   const id=uid(),a=Math.atan2(wall.y2-wall.y1,wall.x2-wall.x1),center=start+sel.w/2,cx=wall.x1+Math.cos(a)*center,cy=wall.y1+Math.sin(a)*center;
-   mutate(d=>({...d,items:[...d.items,{...sel,id,x:cx-sel.w/2,y:cy-sel.h/2,wallOffset:center,rot:a*180/Math.PI}]}));setSelected({kind:"item",id});return;
+   const current=wallEdgeOffsets(sel,wall),width=Math.max(1,Number(sel.w)||1),preferred=current.start+width+100,maxStart=Math.max(0,len(wall)-width);
+   let start=openingTypes.has(sel.type)?findOpeningStart(wall,width,doc.items,null,preferred):clamp(preferred,0,maxStart);
+   if(openingTypes.has(sel.type)&&start==null){setMessage("Ikke ledig plass til kopi på veggen");setTimeout(()=>setMessage(""),2000);return}
+   if(start==null)start=current.start;
+   const id=uid(),center=start+width/2,base={...sel,id,wallOffset:center};
+   mutate(d=>{const liveWall=d.walls.find(w=>w.id===wall.id)||wall,placed=mountedItemCenter(base,liveWall,d.zones||[]);return {...d,items:[...d.items,{...base,x:placed.cx-width/2,y:placed.cy-(Number(sel.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}]}});setSelected({kind:"item",id});return;
   }
   mutate(d=>{const copy={...sel,id:uid(),x:sel.x+200,y:sel.y+200};return {...d,items:[...d.items,constrainFreeItemStrict(copy,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackItem:{...sel,id:copy.id},fallbackCenter:itemCenter(sel),snapDistance:0})]}})
  };
