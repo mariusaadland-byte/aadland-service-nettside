@@ -12,6 +12,7 @@ import {
 import {syncVippsPaymentSnapshot} from "../../../../lib/vippsPaymentSync";
 import {sendVippsPaymentReceiptIfNeeded} from "../../../../lib/vippsPaymentReceipt";
 import {sendVippsRefundNoticeIfNeeded} from "../../../../lib/vippsRefundNotice";
+import {sendPaidRentalConfirmationIfNeeded} from "../../../../lib/rentalConfirmationEmail";
 
 export const runtime="nodejs";
 
@@ -108,6 +109,8 @@ export async function POST(req){
   const snapshot=await syncVippsPaymentSnapshot(s,unit,reference,payment);
   let receipt=null;
   let receiptWarning="";
+  let rentalConfirmation=null;
+  let rentalConfirmationWarning="";
   let refundNotice=null;
   let refundNoticeWarning="";
   if(String(snapshot?.db?.status||"").toLowerCase()==="paid"){
@@ -116,6 +119,14 @@ export async function POST(req){
    }catch(error){
     receiptWarning="Betalingen er oppdatert, men kvitteringen kunne ikke sendes med én gang. Systemet prøver automatisk igjen.";
     console.error("VIPPS ADMIN RECEIPT ERROR",{unit,reference,message:error?.message});
+   }
+   if(unit==="rental"){
+    try{
+     rentalConfirmation=await sendPaidRentalConfirmationIfNeeded({s,id:target.id,req});
+    }catch(error){
+     rentalConfirmationWarning="Leiebetalingen er registrert, men den endelige leiebekreftelsen kunne ikke sendes med én gang. Systemet prøver automatisk igjen.";
+     console.error("VIPPS ADMIN RENTAL CONFIRMATION ERROR",{reference,message:error?.message});
+    }
    }
   }
   if(Number(snapshot?.refundedOre||0)>0){
@@ -126,7 +137,7 @@ export async function POST(req){
     console.error("VIPPS ADMIN REFUND NOTICE ERROR",{unit,reference,message:error?.message});
    }
   }
-  return NextResponse.json({ok:true,action,unit,reference,snapshot,receipt,receiptWarning,refundNotice,refundNoticeWarning});
+  return NextResponse.json({ok:true,action,unit,reference,snapshot,receipt,receiptWarning,rentalConfirmation,rentalConfirmationWarning,refundNotice,refundNoticeWarning});
  }catch(error){
   console.error("VIPPS ADMIN PAYMENT ACTION ERROR",{
    unit,action,reference,status:error?.status,code:error?.code
