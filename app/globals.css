@@ -3823,3 +3823,26 @@ body:has(.customerPage) .customerPage{
  .customerCompactRow summary{grid-template-columns:82px minmax(0,1fr) auto 18px;gap:7px}
  .customerCompactGroupHead h3{font-size:14px!important}
 }
+
+
+/* Customer portal follow-up */
+.customerPortalAttention{
+ display:grid;gap:12px;padding:16px;border:1px solid rgba(215,167,78,.22);
+ border-radius:16px;background:linear-gradient(180deg,rgba(215,167,78,.07),rgba(255,255,255,.015))
+}
+.customerPortalAttention .customerPortalBlockHead>span{
+ display:grid;place-items:center;min-width:30px;height:30px;padding:0 8px;border-radius:999px;
+ background:rgba(215,167,78,.12);border:1px solid rgba(215,167,78,.28);
+ color:#e9c574;font-size:11px;font-weight:900
+}
+.customerPortalAttentionList{display:grid;gap:7px}
+.customerPortalAttentionList button{
+ width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;
+ padding:13px 14px;border:1px solid rgba(255,255,255,.08);border-radius:12px;
+ background:#181818;color:#fff;text-align:left;font:inherit;cursor:pointer
+}
+.customerPortalAttentionList button:hover{border-color:rgba(215,167,78,.34);background:#1d1d1d}
+.customerPortalAttentionList button span{display:grid;gap:3px;min-width:0}
+.customerPortalAttentionList button b{font-size:12px}
+.customerPortalAttentionList button small{color:rgba(255,255,255,.48);line-height:1.4}
+.customerPortalAttentionList button strong{color:#d7a74e;font-size:18px}
