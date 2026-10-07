@@ -586,7 +586,7 @@ export default function DrawingClient(){
    docsRef.current=list;
    if(!silent){
     setDocs(list);
-    const synced=!!serverSyncedSignature.current&&(next.orderId||next.projectId)&&serverSignature(next)===serverSyncedSignature.current;
+    const synced=!!serverSyncedSignature.current&&(next.orderId||next.projectId||next.customerUserId)&&serverSignature(next)===serverSyncedSignature.current;
     setSaveState(typeof navigator!=="undefined"&&!navigator.onLine?"offline":synced?"server":"local");
     setLastSavedAt(savedAt);
    }
@@ -609,7 +609,7 @@ export default function DrawingClient(){
  const serverPayload=next=>{const {_localSavedAt,_serverUpdatedAt,serverId,...drawingData}=next;return {id:serverId,orderId:next.orderId||null,projectId:next.projectId||null,customerUserId:next.customerUserId||null,customerVisible:next.customerVisible===true,name:next.name,customer:next.customer,address:next.address,notes:next.notes,drawingData}};
  const serverSignature=next=>JSON.stringify(serverPayload(next));
  const syncServer=async(next=docRef.current,{quiet=false}={})=>{
-  if(!next?.orderId&&!next?.projectId)return false;
+  if(!next?.orderId&&!next?.projectId&&!next?.customerUserId)return false;
   if(typeof navigator!=="undefined"&&!navigator.onLine){setSaveState("offline");return false}
   const signature=serverSignature(next);
   if(quiet&&signature===serverSyncedSignature.current)return true;
@@ -638,16 +638,16 @@ export default function DrawingClient(){
   return false;
  };
  useEffect(()=>{
-  if(!autosaveReady.current||(!doc.orderId&&!doc.projectId))return;
+  if(!autosaveReady.current||(!doc.orderId&&!doc.projectId&&!doc.customerUserId))return;
   const timer=setTimeout(()=>syncServer(docRef.current,{quiet:true}),8000);
   return()=>clearTimeout(timer);
  },[doc]);
  useEffect(()=>{
   if(!online)return;
   const current=docRef.current;
-  if(current?.orderId||current?.projectId){const timer=setTimeout(()=>syncServer(current,{quiet:true}),500);return()=>clearTimeout(timer)}
+  if(current?.orderId||current?.projectId||current?.customerUserId){const timer=setTimeout(()=>syncServer(current,{quiet:true}),500);return()=>clearTimeout(timer)}
  },[online]);
- const persist=async(next=docRef.current)=>{writeLocalSnapshot(next);if(!next.orderId&&!next.projectId){setMessage("Lagret på enheten");setTimeout(()=>setMessage(""),1800);return}await syncServer(next,{quiet:false})};
+ const persist=async(next=docRef.current)=>{writeLocalSnapshot(next);if(!next.orderId&&!next.projectId&&!next.customerUserId){setMessage("Lagret på enheten");setTimeout(()=>setMessage(""),1800);return}await syncServer(next,{quiet:false})};
  const checkpoint=()=>setHistory(h=>[...h.slice(-24),JSON.stringify(doc)]);
  const syncMounted=(walls,items,zones=[])=>items.map(o=>{if(!o.wallId)return o;const w=walls.find(x=>x.id===o.wallId);if(!w)return {...o,wallId:null,wallOffset:null};const {off,a,cx,cy}=mountedItemCenter(o,w,zones);return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off}});
  const mutate=fn=>{checkpoint();setFuture([]);setDoc(d=>fn(d))};
