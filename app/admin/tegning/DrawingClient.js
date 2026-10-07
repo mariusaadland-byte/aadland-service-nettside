@@ -831,7 +831,7 @@ export default function DrawingClient(){
   if(furnitureBuilder.mount==="wall"){
    const wall=doc.walls.find(w=>w.id===furnitureBuilder.wallId)||wallForView||(selected?.kind==="wall"?doc.walls.find(w=>w.id===selected.id):null);
    if(!wall){setMessage("Velg en vegg for veggmontert møbel");setTimeout(()=>setMessage(""),2000);return}
-   const L=len(wall);if(width>L){setMessage("Møbelet er bredere enn veggen");setTimeout(()=>setMessage(""),2000);return}
+   const L=len(wall),wallHeight=Math.max(300,Number(wall.h)||Number(doc.defaultWallHeight)||2400);if(width>L){setMessage("Møbelet er bredere enn veggen");setTimeout(()=>setMessage(""),2000);return}if(elevation+height>wallHeight){setMessage("Møbelet går over veggens høyde");setTimeout(()=>setMessage(""),2200);return}
    const rawStart=String(furnitureBuilder.start||"").trim()===""?(L-width)/2:Number(furnitureBuilder.start);
    const start=clamp(Number.isFinite(rawStart)?rawStart:(L-width)/2,0,Math.max(0,L-width)),off=start+width/2,base={id,type:"customwall",customName:name,x:0,y:0,w:width,h:depth,rot:0,wallId:wall.id,wallOffset:off,modelHeight:height,elevation,sectionsX,sectionsY},placed=mountedItemCenter(base,wall,doc.zones||[]);
    mutate(d=>({...d,items:[...d.items,{...base,x:placed.cx-width/2,y:placed.cy-depth/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}]}));
