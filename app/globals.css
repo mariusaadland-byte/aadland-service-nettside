@@ -4025,3 +4025,13 @@ body:has(.customerPage) .customerPage{
   font-size:8px;
  }
 }
+
+.adminCalendarBlockTarget{
+ margin-left:-8px;
+ margin-right:-8px;
+ padding-left:8px!important;
+ padding-right:8px!important;
+ background:#fff8e8;
+ outline:2px solid rgba(207,161,83,.35);
+ border-radius:8px;
+}
