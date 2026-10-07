@@ -1,5 +1,6 @@
 import {NextResponse} from "next/server";
 import {db,fromDbRentalItem} from "../../../lib/supabase";
+import {withSupabaseRetry} from "../../../lib/supabaseRetry";
 
 function valid(a,b){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(a||"")||!/^\d{4}-\d{2}-\d{2}$/.test(b||"")||b<a)return false;
@@ -57,8 +58,8 @@ export async function GET(req){
  if(slug)itemQuery=itemQuery.eq("slug",slug);
 
  const [itemsResult,categoriesResult]=await Promise.all([
-  itemQuery,
-  s.from("rental_categories").select("*").eq("active",true).order("sort_order").order("created_at")
+  withSupabaseRetry(()=>itemQuery),
+  withSupabaseRetry(()=>s.from("rental_categories").select("*").eq("active",true).order("sort_order").order("created_at"))
  ]);
 
  if(itemsResult.error){
