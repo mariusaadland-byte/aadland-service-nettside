@@ -23,28 +23,23 @@ export async function POST(req){
       return NextResponse.json({error:"Feil e-post eller passord."},{status:401});
     }
 
-    const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if(!url||!key||!process.env.SESSION_SECRET)return NextResponse.json({error:"Innlogging er ikke konfigurert."},{status:503});
+    const url=process.env.NEXT_PUBLIC_SUPABASE_URL,anonKey=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if(!url||!anonKey||!process.env.SUPABASE_SERVICE_ROLE_KEY||!process.env.SESSION_SECRET){
+      return NextResponse.json({error:"Innlogging er ikke konfigurert."},{status:503});
+    }
     const authClient = createClient(
       url,
-      key,
+      anonKey,
       {
         auth: {
           persistSession: false,
           autoRefreshToken: false,
+          detectSessionInUrl: false,
         },
       }
     );
-    const serviceClient = createClient(
-      url,
-      key,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-        },
-      }
-    );
+    const serviceClient=db();
+    if(!serviceClient)return NextResponse.json({error:"Innlogging er ikke konfigurert."},{status:503});
 
     const { data, error } =
       await authClient.auth.signInWithPassword({
