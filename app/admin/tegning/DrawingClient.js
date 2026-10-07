@@ -829,7 +829,33 @@ export default function DrawingClient(){
   const previousEnd=index===0?0:layout.rows[index-1].gaps.start+Number(layout.rows[index-1].item.w||0);
   updateWallItemById(itemId,"wallStartGap",previousEnd+gap);
  };
- const update=(key,value)=>{const n=Number(value);if(!Number.isFinite(n))return;if(selected?.kind==="item"&&sel?.wallId&&openingTypes.has(sel.type)&&["w","wallStartGap","wallEndGap"].includes(key)){updateWallItemById(sel.id,key,n);return}mutate(d=>{if(selected?.kind==="item"){return {...d,items:d.items.map(o=>{if(o.id!==selected.id)return o;if((key==="wallOffset"||key==="wallStartGap"||key==="wallEndGap")&&o.wallId){const w=d.walls.find(x=>x.id===o.wallId);if(!w)return o;const limits=mountedLimits(o,w),half=Math.max(0,Number(o.w)||0)/2;let desired=n;if(key==="wallStartGap")desired=n+half;if(key==="wallEndGap")desired=limits.L-n-half;const off=clamp(desired,limits.min,limits.max),a=Math.atan2(w.y2-w.y1,w.x2-w.x1),cx=w.x1+Math.cos(a)*off,cy=w.y1+Math.sin(a)*off;return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off}}const changed={...o,[key]:n};return wallTypes.has(o.type)?changed:constrainFreeItem(changed,d.zones||[],{fallbackCenter:itemCenter(o),snapDistance:0})}})}}return applyWallValue(d,selected?.id,key,n)})};
+ const update=(key,value)=>{
+  const n=Number(value);
+  if(!Number.isFinite(n))return;
+  if(selected?.kind==="item"&&sel?.wallId&&openingTypes.has(sel.type)&&["w","wallStartGap","wallEndGap"].includes(key)){
+   updateWallItemById(sel.id,key,n);
+   return;
+  }
+  mutate(d=>{
+   if(selected?.kind==="item"){
+    return {...d,items:d.items.map(o=>{
+     if(o.id!==selected.id)return o;
+     if((key==="wallOffset"||key==="wallStartGap"||key==="wallEndGap")&&o.wallId){
+      const w=d.walls.find(x=>x.id===o.wallId);if(!w)return o;
+      const limits=mountedLimits(o,w),half=Math.max(0,Number(o.w)||0)/2;
+      let desired=n;
+      if(key==="wallStartGap")desired=n+half;
+      if(key==="wallEndGap")desired=limits.L-n-half;
+      const off=clamp(desired,limits.min,limits.max),a=Math.atan2(w.y2-w.y1,w.x2-w.x1),cx=w.x1+Math.cos(a)*off,cy=w.y1+Math.sin(a)*off;
+      return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off};
+     }
+     const changed={...o,[key]:n};
+     return wallTypes.has(o.type)?changed:constrainFreeItem(changed,d.zones||[],{fallbackCenter:itemCenter(o),snapDistance:0});
+    })};
+   }
+   return applyWallValue(d,selected?.id,key,n);
+  });
+ };
  const updateItemText=(key,value)=>{if(selected?.kind!=="item"||!sel)return;mutate(d=>({...d,items:d.items.map(o=>o.id===sel.id?{...o,[key]:String(value)}:o)}))};
  const remove=()=>{checkpoint();setFuture([]);setDoc(d=>selected?.kind==="wall"?(()=>{const walls=d.walls.filter(x=>x.id!==selected.id);return {...d,walls,zones:syncLinkedZones(walls,d.zones),measurements:syncAnchoredMeasurements(walls,d.measurements),items:d.items.map(o=>o.wallId===selected.id?{...o,wallId:null,wallOffset:null}:o)}})():selected?.kind==="zone"?{...d,zones:(d.zones||[]).filter(x=>x.id!==selected.id)}:selected?.kind==="measurement"?{...d,measurements:(d.measurements||[]).filter(x=>x.id!==selected.id)}:{...d,items:d.items.filter(x=>x.id!==selected.id)});setSelected(null)};
  const flipDoor=()=>{if(selected?.kind!=="item"||!sel||sel.type!=="door")return;mutate(d=>({...d,items:d.items.map(o=>o.id===sel.id?{...o,flip:!o.flip}:o)}))};
