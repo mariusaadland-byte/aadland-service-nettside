@@ -224,6 +224,10 @@ export default function MinSide(){
  const enquiries=customOrders.filter(order=>!order.source_quote);
  const purchases=(data.orders||[]).filter(order=>order.order_type!=="custom");
  const rentals=data.rentals||[];
+ const rentalToday=osloDateKey(new Date());
+ const rentalIsPast=r=>["completed","cancelled","returned"].includes(r.status)||String(r.end_date||"")<rentalToday;
+ const upcomingRentals=[...rentals].filter(r=>!rentalIsPast(r)).sort((a,b)=>String(a.start_date||"").localeCompare(String(b.start_date||"")));
+ const pastRentals=[...rentals].filter(r=>rentalIsPast(r)).sort((a,b)=>String(b.start_date||"").localeCompare(String(a.start_date||"")));
  const openQuotes=quotes.filter(q=>effectiveQuoteStatus(q)==="sent").length;
  const openEnquiries=enquiries.filter(o=>!["completed","cancelled"].includes(o.status)).length;
  const activeJobs=jobs.filter(o=>!["completed","cancelled"].includes(o.status)).length;
@@ -554,49 +558,97 @@ export default function MinSide(){
   </section>}
 
   {activePanel==="utleie"&&<section id="utleie" className="customerDashboardSection customerPortalPanel">
-   <div className="customerSectionHead"><div><div className="kicker">UTLEIE</div><h2>Utleie</h2></div><div className="customerSectionActions"><span>{rentals.length}</span><Link className="btn alt" href="/utleie">Se utleie</Link></div></div>
-   {!rentals.length?<div className="card customerEmpty"><p>Ingen utleier knyttet til kontoen ennå.</p></div>:
-   <div className="customerGrid">{rentals.map(r=><article className="card customerHistoryCard" key={r.id}>
-    <div className="customerCardTop"><div><small>{r.booking_number}</small><h3>{r.rental_items?.name||"Utleie"}</h3><p className="customerHistoryDate">Booket {dateTime(r.created_at)}</p></div><span className={"customerStatus customerStatus-"+r.status}>{rentalDisplayStatus(r)}</span></div>
-    <div className="customerCardMeta">
-     <span><small>Periode</small><b>{date(r.start_date)} – {date(r.end_date)}</b></span>
-     <span><small>Leiepris</small><b>{kr(r.total_ore)}</b></span>
-     <span><small>Betaling</small><b>{paymentStatus[r.payment_status]||r.payment_status||"Ikke registrert"}</b></span>
-     {Number(r.payment_captured_ore)>0&&<span><small>Registrert betalt</small><b>{kr(r.payment_captured_ore)}</b></span>}
-     <span><small>Utlevering</small><b>{fulfillmentStatus[r.customer?.fulfillment]||"Ikke registrert"}</b></span>
-     {Number(r.deposit_ore)>0&&<span><small>Depositum</small><b>{kr(r.deposit_ore)} · {depositStatus[r.deposit_status]||r.deposit_status||"Ikke registrert"}</b></span>}
-    </div>
-    {(r.confirmation_sent_at||r.reminder_sent_at||r.cancellation_sent_at)&&<div className="customerPaymentConfirmation">
-     <b>Varsler</b>
-     {r.confirmation_sent_at&&<span>✓ Bookingbekreftelse sendt {dateTimeFull(r.confirmation_sent_at)}</span>}
-     {r.reminder_sent_at&&<span>✓ Påminnelse sendt {dateTimeFull(r.reminder_sent_at)}</span>}
-     {r.cancellation_sent_at&&<span>✓ Avbestillingsbekreftelse sendt {dateTimeFull(r.cancellation_sent_at)}</span>}
+   <div className="customerSectionHead">
+    <div><div className="kicker">UTLEIE</div><h2>Utleie</h2></div>
+    <div className="customerSectionActions"><span>{rentals.length}</span><Link className="btn alt" href="/utleie">Ny utleie</Link></div>
+   </div>
+
+   {!rentals.length?<div className="card customerEmpty"><p>Ingen utleier knyttet til kontoen ennå.</p></div>:<>
+    {upcomingRentals.length>0&&<div className="customerRentalGroup">
+     <div className="customerRentalGroupHead"><h3>Aktive og kommende</h3><span>{upcomingRentals.length}</span></div>
+     <div className="customerRentalList">
+      {upcomingRentals.map(r=><details className="customerRentalRow" key={r.id}>
+       <summary>
+        <span className="customerRentalDate">
+         <b>{date(r.start_date)}</b>
+         <small>{date(r.end_date)!==date(r.start_date)?"til "+date(r.end_date):"Én dag"}</small>
+        </span>
+        <span className="customerRentalMain">
+         <b>{r.rental_items?.name||"Utleie"}</b>
+         <small>{r.booking_number}</small>
+        </span>
+        <span className={"customerStatus customerStatus-"+r.status}>{rentalDisplayStatus(r)}</span>
+        <span className="customerRentalPrice">{kr(r.total_ore)}</span>
+        <span className="customerRentalChevron" aria-hidden="true">⌄</span>
+       </summary>
+       <div className="customerRentalDetails">
+        <div className="customerCardMeta">
+         <span><small>Periode</small><b>{date(r.start_date)} – {date(r.end_date)}</b></span>
+         <span><small>Leiepris</small><b>{kr(r.total_ore)}</b></span>
+         <span><small>Betaling</small><b>{paymentStatus[r.payment_status]||r.payment_status||"Ikke registrert"}</b></span>
+         {Number(r.payment_captured_ore)>0&&<span><small>Registrert betalt</small><b>{kr(r.payment_captured_ore)}</b></span>}
+         <span><small>Utlevering</small><b>{fulfillmentStatus[r.customer?.fulfillment]||"Ikke registrert"}</b></span>
+         {Number(r.deposit_ore)>0&&<span><small>Depositum</small><b>{kr(r.deposit_ore)} · {depositStatus[r.deposit_status]||r.deposit_status||"Ikke registrert"}</b></span>}
+        </div>
+        {(r.confirmation_sent_at||r.reminder_sent_at||r.cancellation_sent_at)&&<div className="customerPaymentConfirmation">
+         <b>Varsler</b>
+         {r.confirmation_sent_at&&<span>✓ Bookingbekreftelse sendt {dateTimeFull(r.confirmation_sent_at)}</span>}
+         {r.reminder_sent_at&&<span>✓ Påminnelse sendt {dateTimeFull(r.reminder_sent_at)}</span>}
+         {r.cancellation_sent_at&&<span>✓ Avbestillingsbekreftelse sendt {dateTimeFull(r.cancellation_sent_at)}</span>}
+        </div>}
+        {r.status==="active"&&<div className="customerPaymentConfirmation"><b>Utstyret er utlevert</b><span>Bookingen er registrert som aktiv.</span></div>}
+        {["paid","refunded"].includes(r.payment_status)&&r.receipt_sent_at&&<div className="customerPaymentConfirmation"><b>✓ Leiebetaling registrert</b><span>Betalingsbekreftelse sendt {dateTimeFull(r.receipt_sent_at)}</span></div>}
+        {Number(r.deposit_ore)>0&&["held","released","partially_charged","charged"].includes(r.deposit_status)&&<div className="customerPaymentConfirmation">
+         <b>{r.deposit_status==="released"?"✓ Depositum frigitt":r.deposit_status==="held"?"✓ Depositum mottatt":"Depositum oppgjort"}</b>
+         {Number(r.deposit_held_ore)>0&&<span>Registrert holdt: {kr(r.deposit_held_ore)}</span>}
+         {Number(r.deposit_charged_ore)>0&&<span>Registrert brukt: {kr(r.deposit_charged_ore)}</span>}
+         {r.deposit_released_at&&<span>Frigitt {dateTimeFull(r.deposit_released_at)}</span>}
+        </div>}
+        {r.rental_items?.slug&&<button type="button" className="btn alt" onClick={()=>repeatRental(r)}>Lei igjen</button>}
+       </div>
+      </details>)}
+     </div>
     </div>}
-    {r.status==="active"&&<div className="customerPaymentConfirmation"><b>Utstyret er utlevert</b><span>Bookingen er registrert som aktiv.</span></div>}
-    {r.status==="returned"&&<div className="customerPaymentConfirmation"><b>✓ Utstyret er returnert</b><span>{r.payment_status==="paid"?"Leiebetalingen er registrert.":"Oppgjøret er ikke ferdig registrert ennå."}</span></div>}
-    {r.status==="completed"&&<div className="customerPaymentConfirmation"><b>✓ Utleien er ferdigbehandlet</b><span>Betaling og eventuelt depositum er avklart.</span></div>}
-    {r.status==="cancelled"&&<div className="customerPaymentConfirmation"><b>Bookingen er avbrutt</b><span>Ta kontakt dersom noe rundt betaling eller depositum ikke stemmer.</span></div>}
-    {["paid","refunded"].includes(r.payment_status)&&r.receipt_sent_at&&<div className="customerPaymentConfirmation">
-     <b>✓ Leiebetaling registrert</b>
-     <span>Betalingsbekreftelse sendt {dateTimeFull(r.receipt_sent_at)}</span>
+
+    {pastRentals.length>0&&<div className="customerRentalGroup customerRentalPast">
+     <div className="customerRentalGroupHead"><h3>Tidligere utleie</h3><span>{pastRentals.length}</span></div>
+     <div className="customerRentalList">
+      {pastRentals.map(r=><details className="customerRentalRow" key={r.id}>
+       <summary>
+        <span className="customerRentalDate">
+         <b>{date(r.start_date)}</b>
+         <small>{date(r.end_date)!==date(r.start_date)?"til "+date(r.end_date):"Én dag"}</small>
+        </span>
+        <span className="customerRentalMain">
+         <b>{r.rental_items?.name||"Utleie"}</b>
+         <small>{r.booking_number}</small>
+        </span>
+        <span className={"customerStatus customerStatus-"+r.status}>{rentalDisplayStatus(r)}</span>
+        <span className="customerRentalPrice">{kr(r.total_ore)}</span>
+        <span className="customerRentalChevron" aria-hidden="true">⌄</span>
+       </summary>
+       <div className="customerRentalDetails">
+        <div className="customerCardMeta">
+         <span><small>Periode</small><b>{date(r.start_date)} – {date(r.end_date)}</b></span>
+         <span><small>Leiepris</small><b>{kr(r.total_ore)}</b></span>
+         <span><small>Betaling</small><b>{paymentStatus[r.payment_status]||r.payment_status||"Ikke registrert"}</b></span>
+         <span><small>Utlevering</small><b>{fulfillmentStatus[r.customer?.fulfillment]||"Ikke registrert"}</b></span>
+         {Number(r.deposit_ore)>0&&<span><small>Depositum</small><b>{kr(r.deposit_ore)} · {depositStatus[r.deposit_status]||r.deposit_status||"Ikke registrert"}</b></span>}
+        </div>
+        {r.status==="returned"&&<div className="customerPaymentConfirmation"><b>✓ Utstyret er returnert</b><span>{r.payment_status==="paid"?"Leiebetalingen er registrert.":"Oppgjøret er ikke ferdig registrert ennå."}</span></div>}
+        {r.status==="completed"&&<div className="customerPaymentConfirmation"><b>✓ Utleien er ferdigbehandlet</b><span>Betaling og eventuelt depositum er avklart.</span></div>}
+        {r.status==="cancelled"&&<div className="customerPaymentConfirmation"><b>Bookingen er avbrutt</b><span>Ta kontakt dersom noe rundt betaling eller depositum ikke stemmer.</span></div>}
+        {Number(r.payment_refunded_ore)>0&&<div className="customerPaymentConfirmation">
+         <b>{Number(r.payment_refunded_ore)>=Number(r.payment_captured_ore||0)?"✓ Leiebetalingen er tilbakebetalt":"✓ Delvis tilbakebetaling registrert"}</b>
+         <span>Totalt tilbakebetalt: {kr(r.payment_refunded_ore)}</span>
+         {r.refund_notice_sent_at&&<span>Bekreftelse sendt {dateTimeFull(r.refund_notice_sent_at)}</span>}
+        </div>}
+        {r.rental_items?.slug&&<button type="button" className="btn alt" onClick={()=>repeatRental(r)}>Lei igjen</button>}
+       </div>
+      </details>)}
+     </div>
     </div>}
-    {Number(r.payment_refunded_ore)>0&&<div className="customerPaymentConfirmation">
-     <b>{Number(r.payment_refunded_ore)>=Number(r.payment_captured_ore||0)?"✓ Leiebetalingen er tilbakebetalt":"✓ Delvis tilbakebetaling registrert"}</b>
-     {Number(r.refund_last_ore)>0&&<span>Sist tilbakebetalt: {kr(r.refund_last_ore)}</span>}
-     <span>Totalt tilbakebetalt: {kr(r.payment_refunded_ore)}</span>
-     {Number(r.payment_captured_ore)>Number(r.payment_refunded_ore)&&<span>Gjenstående registrert betaling: {kr(Number(r.payment_captured_ore)-Number(r.payment_refunded_ore))}</span>}
-     {r.refund_reference&&<span>Referanse: {r.refund_reference}</span>}
-     {r.refund_note&&<span>Merknad: {r.refund_note}</span>}
-     {r.refund_notice_sent_at&&<span>Tilbakebetalingsbekreftelse sendt {dateTimeFull(r.refund_notice_sent_at)}</span>}
-    </div>}
-    {Number(r.deposit_ore)>0&&["held","released","partially_charged","charged"].includes(r.deposit_status)&&<div className="customerPaymentConfirmation">
-     <b>{r.deposit_status==="released"?"✓ Depositum frigitt":r.deposit_status==="held"?"✓ Depositum mottatt":"Depositum oppgjort"}</b>
-     {Number(r.deposit_held_ore)>0&&<span>Registrert holdt: {kr(r.deposit_held_ore)}</span>}
-     {Number(r.deposit_charged_ore)>0&&<span>Registrert brukt: {kr(r.deposit_charged_ore)}</span>}
-     {r.deposit_released_at&&<span>Frigitt {dateTimeFull(r.deposit_released_at)}</span>}
-    </div>}
-    {r.rental_items?.slug&&<button type="button" className="btn alt" onClick={()=>repeatRental(r)}>Lei igjen</button>}
-   </article>)}</div>}
+   </>}
   </section>}
    </div>
   </div>
