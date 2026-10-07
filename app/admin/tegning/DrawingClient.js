@@ -192,7 +192,7 @@ function constrainFreeItem(item,zones,{fallbackCenter=null,snapDistance=140}={})
  if(!zone&&zones?.length){
   zone=[...zones].sort((a,b)=>{const ac=polygonCentroid(a.points||[]),bc=polygonCentroid(b.points||[]);return Math.hypot(ac.x-center.x,ac.y-center.y)-Math.hypot(bc.x-center.x,bc.y-center.y)})[0];
  }
- if(!zone)return constrainFreeItem({...item,type:"__canvas__"},[],{});
+ if(!zone){const clamped=constrainFreeItem({...item,type:"__canvas__"},[],{});return {...clamped,type:item.type}}
  if(itemFitsZone(item,zone)) {
   const safe=safeCenterInZone(item,zone,fallback);
   if(safe&&snapDistance>0){
