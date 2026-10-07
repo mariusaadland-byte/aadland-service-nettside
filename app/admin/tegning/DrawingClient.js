@@ -706,7 +706,7 @@ export default function DrawingClient(){
   const candidates=docs.filter(item=>item.orderId===orderId).sort((a,b)=>(Number(b._localSavedAt)||0)-(Number(a._localSavedAt)||0));
   if(!candidates.length)return;
   const lastId=localStorage.getItem(LAST_STORE),chosen=candidates.find(item=>item.id===lastId)||candidates[0];
-  linkedLocalOrderHandled.current=orderId;docRef.current=chosen;setDoc(chosen);setSelected(null);setHistory([]);setFuture([]);
+  const normalizedChosen=normalizeDrawingDocument(chosen);linkedLocalOrderHandled.current=orderId;docRef.current=normalizedChosen;setDoc(normalizedChosen);setSelected(null);setHistory([]);setFuture([]);
   setSaveState(typeof navigator!=="undefined"&&!navigator.onLine?"offline":"local");
   setMessage(typeof navigator!=="undefined"&&!navigator.onLine?"Lokal oppdragstegning åpnet offline":"Lokal oppdragstegning åpnet");
   setTimeout(()=>setMessage(""),1800);
@@ -939,7 +939,7 @@ export default function DrawingClient(){
       if(localTime>serverTime)chosen=activeLocal;
      }
      mergeIncomingDrawings(incoming);
-     docRef.current=chosen;setDoc(chosen);try{localStorage.setItem(LAST_STORE,chosen.id)}catch{}
+     const normalizedChosen=normalizeDrawingDocument(chosen);docRef.current=normalizedChosen;setDoc(normalizedChosen);try{localStorage.setItem(LAST_STORE,normalizedChosen.id)}catch{}
      setSelected(null);setHistory([]);setFuture([]);
      if(chosen===latest){serverSyncedSignature.current=serverSignature(latest);setSaveState("server")}
      else setSaveState(typeof navigator!=="undefined"&&!navigator.onLine?"offline":"local");
@@ -950,7 +950,7 @@ export default function DrawingClient(){
    }catch{}
    if(cancelled)return;
    if(activeLocal){
-    docRef.current=activeLocal;setDoc(activeLocal);setSelected(null);setHistory([]);setFuture([]);
+    const normalizedActive=normalizeDrawingDocument(activeLocal);docRef.current=normalizedActive;setDoc(normalizedActive);setSelected(null);setHistory([]);setFuture([]);
     setSaveState(typeof navigator!=="undefined"&&!navigator.onLine?"offline":"local");
     setMessage("Lokal befaringstegning åpnet");
     setTimeout(()=>setMessage(""),2200);
