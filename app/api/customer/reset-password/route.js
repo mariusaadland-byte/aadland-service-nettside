@@ -3,7 +3,7 @@ import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {createClient} from "@supabase/supabase-js";
 import {createCustomerPasswordResetToken} from "../../../../lib/customerPasswordReset";
-import {customerEmailContext} from "../../../../lib/rentalEmailConfig";
+import {customerEmailContext,customerResendApiKey} from "../../../../lib/rentalEmailConfig";
 
 function esc(value){
  return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
@@ -24,9 +24,7 @@ export async function POST(req){
 
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const resendKey=process.env.VERCEL_ENV==="preview"
-   ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)
-   :process.env.RESEND_API_KEY;
+  const resendKey=customerResendApiKey(req);
 
   if(!url||!key||!process.env.SESSION_SECRET||!resendKey){
    return NextResponse.json({error:"Passordgjenoppretting er ikke konfigurert akkurat nå."},{status:503});
