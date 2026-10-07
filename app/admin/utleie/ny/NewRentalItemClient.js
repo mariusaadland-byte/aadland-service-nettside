@@ -112,7 +112,7 @@ export default function NewRentalItemClient(){
 
     <div className="rentalNewItemGrid">
      <div className="field"><label>Status</label><select value={v.status} onChange={e=>set("status",e.target.value)}><option value="available">Tilgjengelig</option><option value="unavailable">Midlertidig utilgjengelig</option><option value="maintenance">Service/vedlikehold</option><option value="hidden">Skjult</option></select></div>
-     <div className="field"><label>Antall</label><input type="number" min="1" value={v.quantity} onChange={e=>set("quantity",e.target.value)}/></div>
+     <div className="field rentalQuantityField"><label>Antall</label><input type="number" min="1" max="100000" inputMode="numeric" value={v.quantity} onChange={e=>set("quantity",e.target.value)}/><small className="muted">Hvor mange like eksemplarer som kan leies ut samtidig.</small></div>
      <div className="field"><label>Døgnpris (kr) *</label><input required type="number" min="0" step="1" value={v.dailyPriceOre===""?"":Number(v.dailyPriceOre)/100} onChange={e=>set("dailyPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="F.eks. 450"/></div>
      <div className="field"><label>Helgepris (kr)</label><input type="number" min="0" value={v.weekendPriceOre===""?"":Number(v.weekendPriceOre)/100} onChange={e=>set("weekendPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))}/></div>
      <div className="field"><label>Ukepris (kr)</label><input type="number" min="0" value={v.weeklyPriceOre===""?"":Number(v.weeklyPriceOre)/100} onChange={e=>set("weeklyPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))}/></div>
