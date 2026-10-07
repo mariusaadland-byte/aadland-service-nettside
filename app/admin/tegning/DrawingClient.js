@@ -53,7 +53,7 @@ const sizePresets={
  walllight:[["Vegglampe",180,100]],outlet:[["Stikk",180,100]],doubleoutlet:[["Dobbel stikk",220,100]],
  switch:[["Bryter",120,100]],dimmer:[["Dimmer",120,100]],thermostat:[["Termostat",140,100]],junction:[["Koblingspunkt",140,140]]
 };
-const flat=catalog.flatMap(g=>g.items), labelFor=t=>flat.find(x=>x[0]===t)?.[1]||t;
+const flat=catalog.flatMap(g=>g.items), labelFor=t=>t==="customwall"||t==="customfloor"?"Eget møbel":flat.find(x=>x[0]===t)?.[1]||t;
 const uid=()=>globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2);
 const snapTo=(n,size=GRID)=>Math.round(n/size)*size;
 const len=w=>Math.round(Math.hypot(w.x2-w.x1,w.y2-w.y1));
@@ -123,11 +123,11 @@ function polygonCentroid(points){
 const electricalTypes=new Set(["ceilinglight","downlight","walllight","outlet","doubleoutlet","switch","dimmer","thermostat","junction"]);
 const wallElectricalTypes=new Set(["walllight","outlet","doubleoutlet","switch","dimmer","thermostat"]);
 const ceilingElectricalTypes=new Set(["ceilinglight","downlight","junction"]);
-const roomBoundedTypes=new Set(["toilet","walltoilet","shower","bath","sink","washer","base","wallcab","tallcab","fridge","oven","dishwasher","island","sofa","table","chair","bed","wardrobe","tv","ceilinglight","downlight","junction"]);
+const roomBoundedTypes=new Set(["toilet","walltoilet","shower","bath","sink","washer","base","wallcab","tallcab","fridge","oven","dishwasher","island","sofa","table","chair","bed","wardrobe","tv","ceilinglight","downlight","junction","customfloor"]);
 const item3DHeight={
  toilet:780,walltoilet:450,shower:2100,bath:600,sink:850,washer:850,
  base:900,wallcab:700,tallcab:2200,fridge:2000,oven:900,dishwasher:850,island:900,
- sofa:850,table:750,chair:900,bed:550,wardrobe:2100,tv:750,bench:500,planter:550,post:2400
+ sofa:850,table:750,chair:900,bed:550,wardrobe:2100,tv:750,bench:500,planter:550,post:2400,customfloor:900,customwall:700
 };
 const itemDefaults=(type,doc)=>({
  ...(electricalTypes.has(type)?{circuit:"",itemNote:""}:{}),
@@ -271,6 +271,14 @@ function PlanItemGlyph({item,active}){
  if(o.type==="sliding")return <><rect width={o.w} height={Math.max(o.h,100)} fill="#f7f7f7" stroke="#51462f" strokeWidth="18"/><line x1="60" y1="20" x2={o.w*.62} y2="20" stroke="#51462f" strokeWidth="22"/><line x1={o.w*.38} y1={o.h-20} x2={o.w-60} y2={o.h-20} stroke="#51462f" strokeWidth="22"/></>;
  if(o.type==="opening")return <><line x1="0" y1={o.h/2} x2={o.w} y2={o.h/2} stroke="#fff" strokeWidth="100"/><line x1="0" y1="0" x2="0" y2={o.h} stroke="#777" strokeWidth="16"/><line x1={o.w} y1="0" x2={o.w} y2={o.h} stroke="#777" strokeWidth="16"/></>;
  if(o.type==="window")return <><rect width={o.w} height={Math.max(o.h,100)} fill="#dfeef1" stroke="#51462f" strokeWidth="18"/><line x1="0" y1={o.h/2} x2={o.w} y2={o.h/2} stroke="#64828a" strokeWidth="18"/></>;
+ if(o.type==="customwall"||o.type==="customfloor"){
+  const cols=Math.max(1,Math.min(8,Math.round(Number(o.sectionsX)||1))),rows=Math.max(1,Math.min(6,Math.round(Number(o.sectionsY)||1)));
+  return <g>
+   <rect width={o.w} height={o.h} rx="18" fill={active?"#f0dfbd":"#efe7d8"} stroke="#6e5633" strokeWidth="18"/>
+   {Array.from({length:cols-1},(_,i)=><line key={"c"+i} x1={o.w*(i+1)/cols} y1="0" x2={o.w*(i+1)/cols} y2={o.h} stroke="#9a815a" strokeWidth="10"/>)}
+   {Array.from({length:rows-1},(_,i)=><line key={"r"+i} x1="0" y1={o.h*(i+1)/rows} x2={o.w} y2={o.h*(i+1)/rows} stroke="#9a815a" strokeWidth="10"/>)}
+  </g>;
+ }
  if(electricalTypes.has(o.type)){
   const cx=o.w/2,cy=o.h/2,r=Math.max(52,Math.min(o.w,o.h)*.34);
   return <g>
@@ -290,7 +298,7 @@ function itemCeilingHeight(item,doc){
  const center=itemCenter(item),zone=zoneContainingPoint(center,doc.zones||[]);
  return Number(zone?.ceilingHeight)||Number(doc.defaultWallHeight)||2400;
 }
-function Drawing3DPreview({doc}){
+function Drawing3DPreview({doc,onWallSelect}){
  const zones=doc.zones||[],walls=doc.walls||[],items=doc.items||[];
  const projected=[];
  const addPoint=(x,y,z=0)=>projected.push(isoPoint(x,y,z));
@@ -312,7 +320,7 @@ function Drawing3DPreview({doc}){
    <linearGradient id="item3d" x1="0" x2="1"><stop offset="0" stopColor="#d8b979"/><stop offset="1" stopColor="#9d7b42"/></linearGradient>
   </defs>
   {zones.map(zone=><polygon key={"floor-"+zone.id} points={pointsAttr((zone.points||[]).map(p=>isoPoint(p.x,p.y,0)))} fill="url(#floor3d)" stroke="#b8ad9b" strokeWidth="18"/>)}
-  {wallRows.map(w=>{const h=Number(w.h)||2400,p1=isoPoint(w.x1,w.y1,0),p2=isoPoint(w.x2,w.y2,0),p3=isoPoint(w.x2,w.y2,h),p4=isoPoint(w.x1,w.y1,h);return <polygon key={"wall3d-"+w.id} points={pointsAttr([p1,p2,p3,p4])} fill="url(#wall3d)" stroke="#81796d" strokeWidth="16" opacity=".88"/>})}
+  {wallRows.map(w=>{const h=Number(w.h)||2400,p1=isoPoint(w.x1,w.y1,0),p2=isoPoint(w.x2,w.y2,0),p3=isoPoint(w.x2,w.y2,h),p4=isoPoint(w.x1,w.y1,h);return <polygon key={"wall3d-"+w.id} points={pointsAttr([p1,p2,p3,p4])} fill="url(#wall3d)" stroke="#81796d" strokeWidth="16" opacity=".88" role={onWallSelect?"button":undefined} tabIndex={onWallSelect?0:undefined} style={{cursor:onWallSelect?"pointer":"default"}} onClick={()=>onWallSelect?.(w)} onKeyDown={e=>{if(onWallSelect&&(e.key==="Enter"||e.key===" ")){e.preventDefault();onWallSelect(w)}}}/>})}
   {itemRows.map(item=>{
    const center=itemCenter(item);
    if(openingTypes.has(item.type)){
@@ -330,6 +338,44 @@ function Drawing3DPreview({doc}){
     <polygon points={pointsAttr([base[1],base[2],top[2],top[1]])} fill="#9c7b48" stroke="#675236" strokeWidth="11"/>
     <polygon points={pointsAttr([base[2],base[3],top[3],top[2]])} fill="#80643d" stroke="#675236" strokeWidth="11"/>
     <polygon points={pointsAttr(top)} fill="url(#item3d)" stroke="#675236" strokeWidth="12"/>
+   </g>
+  })}
+ </svg>;
+}
+function WallElevationPreview({wall,items,onSelectItem,selectedItemId}){
+ if(!wall)return null;
+ const L=Math.max(1,len(wall)),H=Math.max(300,Number(wall.h)||2400),padX=Math.max(140,L*.035),padY=Math.max(140,H*.07);
+ const wallItems=(items||[]).filter(item=>item.wallId===wall.id).sort((a,b)=>(Number(a.wallOffset)||0)-(Number(b.wallOffset)||0));
+ const itemBox=item=>{
+  const gaps=wallEdgeOffsets(item,wall),width=Math.max(60,Number(item.w)||120),start=gaps.start;
+  if(openingTypes.has(item.type)){
+   const z0=item.type==="window"?Math.max(0,Number(item.sillHeight)||0):0;
+   const height=Math.max(100,Number(item.openingHeight)||openingDefaults(item.type).openingHeight||2100);
+   return{x:start,y:H-(z0+height),w:width,h:height,z0};
+  }
+  if(wallElectricalTypes.has(item.type)){
+   const size=Math.max(110,Math.min(220,Number(item.w)||150)),centerZ=Math.max(size/2,Number(item.mountHeight)||1000);
+   return{x:gaps.center-size/2,y:H-centerZ-size/2,w:size,h:size,z0:centerZ-size/2};
+  }
+  const height=Math.max(80,modelHeight(item)),z0=Math.max(0,Number(item.elevation)||0);
+  return{x:start,y:H-(z0+height),w:width,h:height,z0};
+ };
+ return <svg viewBox={[-padX,-padY,L+padX*2,H+padY*2].join(" ")} role="img" aria-label={"Veggvisning "+L+" millimeter"}>
+  <defs><pattern id={"wallgrid-"+wall.id} width="100" height="100" patternUnits="userSpaceOnUse"><path d="M100 0H0V100" fill="none" stroke="#e7e2d8" strokeWidth="4"/></pattern></defs>
+  <rect x="0" y="0" width={L} height={H} fill={"url(#wallgrid-"+wall.id+")"} stroke="#5e5b55" strokeWidth="18"/>
+  <line x1="0" y1={H} x2={L} y2={H} stroke="#2b2a27" strokeWidth="22"/>
+  <text x={L/2} y={-55} textAnchor="middle" fontSize="80" fontWeight="800" fill="#554a37">{L} mm</text>
+  <text x={-70} y={H/2} textAnchor="middle" transform={"rotate(-90 -70 "+H/2+")"} fontSize="74" fontWeight="700" fill="#554a37">{Math.round(H)} mm</text>
+  {wallItems.map(item=>{
+   const b=itemBox(item),active=selectedItemId===item.id,custom=item.type==="customwall";
+   return <g key={"elev-"+item.id} onClick={()=>onSelectItem?.(item)} style={{cursor:"pointer"}}>
+    {openingTypes.has(item.type)?<rect x={b.x} y={b.y} width={b.w} height={b.h} fill={item.type==="window"?"#dceef2":"#faf8f2"} stroke={active?"#c39235":"#6c6961"} strokeWidth={active?22:15}/>:wallElectricalTypes.has(item.type)?<g><circle cx={b.x+b.w/2} cy={b.y+b.h/2} r={b.w*.42} fill="#fff4b8" stroke={active?"#c39235":"#8b6e25"} strokeWidth={active?20:13}/><text x={b.x+b.w/2} y={b.y+b.h/2+25} textAnchor="middle" fontSize={Math.max(55,b.w*.42)} fontWeight="900" fill="#72571d">{electricalSymbol(item.type)}</text></g>:<g>
+     <rect x={b.x} y={b.y} width={b.w} height={b.h} fill={custom?"#e8d6b6":"#d8c39d"} stroke={active?"#c39235":"#6e5633"} strokeWidth={active?22:15}/>
+     {custom&&Array.from({length:Math.max(1,Math.min(8,Math.round(Number(item.sectionsX)||1)))-1},(_,i)=><line key={"vx"+i} x1={b.x+b.w*(i+1)/Math.max(1,Math.round(Number(item.sectionsX)||1))} y1={b.y} x2={b.x+b.w*(i+1)/Math.max(1,Math.round(Number(item.sectionsX)||1))} y2={b.y+b.h} stroke="#9a815a" strokeWidth="9"/>)}
+     {custom&&Array.from({length:Math.max(1,Math.min(6,Math.round(Number(item.sectionsY)||1)))-1},(_,i)=><line key={"hy"+i} x1={b.x} y1={b.y+b.h*(i+1)/Math.max(1,Math.round(Number(item.sectionsY)||1))} x2={b.x+b.w} y2={b.y+b.h*(i+1)/Math.max(1,Math.round(Number(item.sectionsY)||1))} stroke="#9a815a" strokeWidth="9"/>)}
+    </g>}
+    <text x={b.x+b.w/2} y={Math.max(65,b.y-28)} textAnchor="middle" fontSize="60" fontWeight="800" fill="#4d4230">{item.customName||labelFor(item.type)}</text>
+    {!wallElectricalTypes.has(item.type)&&<text x={b.x+b.w/2} y={Math.min(H+90,b.y+b.h+72)} textAnchor="middle" fontSize="52" fill="#6d6250">{Math.round(b.w)} × {Math.round(b.h)} mm{b.z0>0?" · +"+Math.round(b.z0):""}</text>}
    </g>
   })}
  </svg>;
@@ -419,7 +465,7 @@ function zoneSurveyStatusText(state){
 }
 
 const initial=()=>({id:uid(),name:"Ny tegning",orderId:"",projectId:"",customer:"",address:"",notes:"",visualizationNotes:"",walls:[],items:[],zones:[],measurements:[],snapSize:50,showGrid:true,scale:"1:50",zoom:1,defaultWallThickness:98,defaultWallHeight:2400});
-const wallTypes=new Set(["door","sliding","window","opening","railing","screen","walllight","outlet","doubleoutlet","switch","dimmer","thermostat"]);
+const wallTypes=new Set(["door","sliding","window","opening","railing","screen","walllight","outlet","doubleoutlet","switch","dimmer","thermostat","customwall"]);
 const openingTypes=new Set(["door","sliding","window","opening"]);
 const openingDefaults=type=>type==="window"?{openingHeight:1200,sillHeight:900}:openingTypes.has(type)?{openingHeight:2100,sillHeight:0}:{};
 function nearestWall(o,walls){
