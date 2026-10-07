@@ -282,7 +282,7 @@ export default function MaterialAiClient(){
 
  return <main className={styles.page}><div className={styles.shell}>
   <header className={styles.top}>
-   <div><Link href="/admin" className={styles.back}>← Tilbake til backoffice</Link><span>AADLAND SERVICE · INTERNVERKTØY</span><h1>Materialkalkulator</h1><p>Ingen AI-kostnad. Du legger inn mål og materialvalg; faste formler regner ut behov, svinn, pakker, Bygger’n-pris og 10 % påslag.</p></div>
+   <div><Link href="/admin" className={styles.back}>← Tilbake til backoffice</Link><span>AADLAND SERVICE · INTERNVERKTØY</span><h1>Materialkalkulator</h1><p>Ingen AI-kostnad. Du legger inn mål og materialvalg; faste formler regner ut behov, svinn, pakker, Bygger’n-pris og valgt materialpåslag.</p></div>
    <div className={styles.topActions}><label>Standard påslag <span><input inputMode="decimal" value={markup} onChange={e=>setMarkup(e.target.value)}/><b>%</b></span></label><button type="button" onClick={()=>document.getElementById("materials")?.scrollIntoView({behavior:"smooth"})}>Legg til materialer</button></div>
   </header>
 
