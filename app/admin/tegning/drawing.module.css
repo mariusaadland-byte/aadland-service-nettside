@@ -1037,3 +1037,15 @@
  .customCellEditor>div{grid-template-columns:1fr 1fr}
  .customCellEditor button{min-height:42px}
 }
+
+
+/* Edit custom furniture fronts without leaving 3D */
+.preview3DSelection>div:first-child{display:grid;gap:7px;min-width:0;flex:1}
+.preview3DCellEditor{display:flex;flex-wrap:wrap;gap:5px}
+.preview3DCellEditor button{
+ min-height:31px!important;border-color:#70613f!important;background:#31291b!important;color:#f6dda7!important;padding:0 8px!important;font-size:8px!important
+}
+@media(max-width:900px){
+ .preview3DCellEditor{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
+ .preview3DCellEditor button{flex:0 0 auto;min-height:38px!important}
+}
