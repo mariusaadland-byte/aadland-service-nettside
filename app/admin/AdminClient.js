@@ -861,7 +861,7 @@ function Customers({orders,bookings,profiles,billingProfiles,quotes,canUpdate,re
       address:customer?.address||"",
       orders:0,rentals:0,quotes:0,totalOre:0,lastDate:null,history:[],
       hasAccount:false,accountCreatedAt:null,
-      invoiceCustomer:false,creditLimitOre:null,billingNote:""
+      invoiceCustomer:false,creditLimitOre:null,billingNote:"",creditExposureOre:0,remainingCreditOre:null,creditOverLimit:false
     };
     if(customer?.name)current.name=customer.name;
     if(customer?.email)current.email=customer.email;
@@ -870,6 +870,9 @@ function Customers({orders,bookings,profiles,billingProfiles,quotes,canUpdate,re
     if(customer?.invoiceCustomer!==undefined)current.invoiceCustomer=customer.invoiceCustomer===true;
     if(customer?.creditLimitOre!==undefined)current.creditLimitOre=customer.creditLimitOre==null?null:Number(customer.creditLimitOre)||0;
     if(customer?.billingNote!==undefined)current.billingNote=customer.billingNote||"";
+    if(customer?.creditExposureOre!==undefined)current.creditExposureOre=Math.max(0,Number(customer.creditExposureOre)||0);
+    if(customer?.remainingCreditOre!==undefined)current.remainingCreditOre=customer.remainingCreditOre==null?null:Math.max(0,Number(customer.remainingCreditOre)||0);
+    if(customer?.creditOverLimit!==undefined)current.creditOverLimit=customer.creditOverLimit===true;
     customers.set(key,current);
     return current;
   }
@@ -899,6 +902,9 @@ function Customers({orders,bookings,profiles,billingProfiles,quotes,canUpdate,re
     current.invoiceCustomer=profile.invoiceCustomer===true;
     current.creditLimitOre=profile.creditLimitOre==null?null:Number(profile.creditLimitOre)||0;
     current.billingNote=profile.billingNote||"";
+    current.creditExposureOre=Math.max(0,Number(profile.creditExposureOre)||0);
+    current.remainingCreditOre=profile.remainingCreditOre==null?null:Math.max(0,Number(profile.remainingCreditOre)||0);
+    current.creditOverLimit=profile.creditOverLimit===true;
   });
 
   (quotes||[]).forEach(q=>{
@@ -975,7 +981,7 @@ function Customers({orders,bookings,profiles,billingProfiles,quotes,canUpdate,re
       <div className="customerAdminBadges">
        {customer.hasAccount&&<span className="customerAccountBadge">Kundekonto</span>}
        {customer.invoiceCustomer&&<span className="customerBillingBadge">Fakturakunde</span>}
-       {Number(customer.creditLimitOre)>0&&<span className="customerBillingBadge">Kreditt {nok(customer.creditLimitOre)}</span>}
+       {Number(customer.creditLimitOre)>0&&<span className={"customerBillingBadge "+(customer.creditOverLimit?"isOverLimit":"")}>Kreditt {nok(customer.creditLimitOre)}</span>}
       </div>
      </div>
      <p>{customer.phone&&<><a href={"tel:"+customer.phone}>{customer.phone}</a><br/></>}{customer.email&&<><a href={"mailto:"+customer.email}>{customer.email}</a><br/></>}{customer.address}</p>
@@ -993,6 +999,11 @@ function Customers({orders,bookings,profiles,billingProfiles,quotes,canUpdate,re
         <input id={"billing-credit-"+index} inputMode="decimal" defaultValue={customer.creditLimitOre==null||Number(customer.creditLimitOre)===0?"":(Number(customer.creditLimitOre)/100).toFixed(0)} placeholder="Tomt felt = ingen beløpsgrense"/>
         <small className="muted">Har kunden kredittgrense, kontrolleres åpne ubetalte utleier mot grensen automatisk.</small>
        </div>
+       {Number(customer.creditLimitOre)>0&&<div className={"customerCreditUsage "+(customer.creditOverLimit?"isOverLimit":"")}>
+        <span><small>Brukt kreditt</small><b>{nok(customer.creditExposureOre||0)}</b></span>
+        <span><small>Ledig kreditt</small><b>{nok(customer.remainingCreditOre||0)}</b></span>
+        <span><small>Status</small><b>{customer.creditOverLimit?"Over kredittgrensen":"Innenfor grensen"}</b></span>
+       </div>}
        <div className="field">
         <label>Internt notat</label>
         <textarea id={"billing-note-"+index} rows="2" defaultValue={customer.billingNote||""} placeholder="Valgfritt"/>
