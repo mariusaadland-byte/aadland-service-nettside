@@ -605,7 +605,7 @@ function FurnitureGapPlanPreview({doc,wall,onSelectGap}){
 }
 
 function WallElevationPreview({wall,items,zones=[],walls=[],defaultWallThickness=98,onSelectItem,onMoveItem,onMoveStart,onMoveEnd,selectedItemId,gapPickMode=false,onSelectGap}){
- const svgRef=useRef(null),dragRef=useRef(null);
+ const svgRef=useRef(null),dragRef=useRef(null),[wallSnapGuide,setWallSnapGuide]=useState(null);
  if(!wall)return null;
  const face=wallFaceMetrics(wall,zones,walls,defaultWallThickness),L=Math.max(1,face.L),H=Math.max(300,Number(wall.h)||2400),padX=Math.max(140,L*.035),padY=Math.max(140,H*.07);
  const pointerWorldDelta=(e,start)=>{
@@ -623,14 +623,24 @@ function WallElevationPreview({wall,items,zones=[],walls=[],defaultWallThickness
  const moveItemDrag=e=>{
   const drag=dragRef.current;if(!drag||drag.pointerId!==e.pointerId)return;
   e.preventDefault();const item=(items||[]).find(o=>o.id===drag.itemId);if(!item)return;
-  const delta=pointerWorldDelta(e,drag),width=Math.max(1,Number(item.w)||1),height=Math.max(80,modelHeight(item)),start=clamp(Math.round(drag.start+delta.dx),0,Math.max(0,L-width));
-  const canLift=["wallcab","customwall","tv","headboard","walllight","outlet","doubleoutlet","switch","dimmer","thermostat"].includes(item.type);
-  const elevation=canLift?clamp(Math.round(drag.elevation-delta.dy),0,Math.max(0,H-height)):Math.max(0,Number(item.elevation)||0);
+  const delta=pointerWorldDelta(e,drag),width=Math.max(1,Number(item.w)||1),height=Math.max(80,modelHeight(item)),rawStart=clamp(Math.round(drag.start+delta.dx),0,Math.max(0,L-width)),threshold=Math.max(18,Math.min(55,L*.012));
+  const candidates=[{start:0,label:"0 mm · venstre hjørne"},{start:Math.max(0,L-width),label:"0 mm · høyre hjørne"},{start:Math.max(0,(L-width)/2),label:"Sentrert på vegg"}];
+  for(const other of wallItems){
+   if(other.id===item.id||wallElectricalTypes.has(other.type))continue;
+   const g=wallFaceOffsets(other,wall,zones,walls,defaultWallThickness),ow=Math.max(1,Number(other.w)||1);
+   candidates.push({start:g.start-width,label:"Inntil "+(other.customName||labelFor(other.type))},{start:g.start+ow,label:"Inntil "+(other.customName||labelFor(other.type))},{start:g.start+(ow-width)/2,label:"Sentrert med "+(other.customName||labelFor(other.type))});
+  }
+  let best=null;for(const candidate of candidates){if(candidate.start<0||candidate.start>L-width)continue;const d=Math.abs(candidate.start-rawStart);if(d<=threshold&&(!best||d<best.d))best={...candidate,d}}
+  const start=best?Math.round(best.start):rawStart;
+  const canLift=["wallcab","customwall","tv","headboard","hood","countertop","cooktop","walllight","outlet","doubleoutlet","switch","dimmer","thermostat"].includes(item.type);
+  let elevation=canLift?clamp(Math.round(drag.elevation-delta.dy),0,Math.max(0,H-height)):Math.max(0,Number(item.elevation)||0),verticalLabel="";
+  if(canLift){const vCandidates=[{v:0,label:"Gulv"},{v:Math.max(0,H-height),label:"Topp vegg"}];for(const other of wallItems){if(other.id===item.id)continue;const oz=Math.max(0,Number(other.elevation)||0),oh=Math.max(80,modelHeight(other));vCandidates.push({v:oz,label:"Samme underkant"},{v:oz+oh-height,label:"Samme overkant"})}let vb=null;for(const c of vCandidates){if(c.v<0||c.v>H-height)continue;const d=Math.abs(c.v-elevation);if(d<=threshold&&(!vb||d<vb.d))vb={...c,d}}if(vb){elevation=Math.round(vb.v);verticalLabel=vb.label}}
+  setWallSnapGuide(best||verticalLabel?{x:best?start+(best.label.includes("høyre hjørne")?width:best.label.includes("venstre hjørne")?0:width/2):null,y:verticalLabel?H-elevation:null,label:[best?.label,verticalLabel].filter(Boolean).join(" · ")}:null);
   onMoveItem?.(item,{start,elevation});
  };
  const endItemDrag=e=>{
   const drag=dragRef.current;if(!drag||drag.pointerId!==e.pointerId)return;
-  dragRef.current=null;try{e.currentTarget.releasePointerCapture?.(e.pointerId)}catch{}onMoveEnd?.();
+  dragRef.current=null;setWallSnapGuide(null);try{e.currentTarget.releasePointerCapture?.(e.pointerId)}catch{}onMoveEnd?.();
  };
  const wallItems=(items||[]).filter(item=>item.wallId===wall.id).sort((a,b)=>(Number(a.wallOffset)||0)-(Number(b.wallOffset)||0));
  const projectedFurniture=wallProjectedFurniture(wall,items,zones,walls,defaultWallThickness);
@@ -654,6 +664,7 @@ function WallElevationPreview({wall,items,zones=[],walls=[],defaultWallThickness
   <defs><pattern id={"wallgrid-"+wall.id} width="100" height="100" patternUnits="userSpaceOnUse"><path d="M100 0H0V100" fill="none" stroke="#e7e2d8" strokeWidth="4"/></pattern></defs>
   <rect x="0" y="0" width={L} height={H} fill={"url(#wallgrid-"+wall.id+")"} stroke="#5e5b55" strokeWidth="18"/>
   <line x1="0" y1={H} x2={L} y2={H} stroke="#2b2a27" strokeWidth="22"/>
+  {wallSnapGuide&&<g pointerEvents="none">{wallSnapGuide.x!=null&&<line x1={wallSnapGuide.x} y1="0" x2={wallSnapGuide.x} y2={H} stroke="#2c7bb6" strokeWidth="12" strokeDasharray="38 22"/>}{wallSnapGuide.y!=null&&<line x1="0" y1={wallSnapGuide.y} x2={L} y2={wallSnapGuide.y} stroke="#2c7bb6" strokeWidth="12" strokeDasharray="38 22"/>}<rect x={Math.max(20,Math.min(L-760,(wallSnapGuide.x??L/2)-350))} y="28" width="700" height="110" rx="22" fill="rgba(255,255,255,.94)" stroke="#2c7bb6" strokeWidth="9"/><text x={Math.max(20,Math.min(L-760,(wallSnapGuide.x??L/2)-350))+350} y="101" textAnchor="middle" fontSize="54" fontWeight="900" fill="#245f8b">{wallSnapGuide.label}</text></g>}
   <text x={L/2} y={-55} textAnchor="middle" fontSize="80" fontWeight="800" fill="#554a37">{L} mm</text>
   <text x={-70} y={H/2} textAnchor="middle" transform={"rotate(-90 -70 "+H/2+")"} fontSize="74" fontWeight="700" fill="#554a37">{Math.round(H)} mm</text>
   {projectedFurniture.slice().reverse().map(({item,start,end,distance,blocksGap})=>{
