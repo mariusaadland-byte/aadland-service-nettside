@@ -575,116 +575,93 @@ export default function AdminClient({ user }) {
 
         {tab === "overview" && (
           <>
-            <div className="stats">
+            <div className="stats adminOverviewStats">
               {canViewOrders && (
                 <>
-                  <div className="stat">
+                  <button type="button" className="stat adminStatLink" onClick={()=>setTab("orders")}>
                     <span className="muted">Nye bestillinger</span>
-                    <br />
                     <b>{fresh}</b>
-                  </div>
+                    <small>Åpne bestillinger →</small>
+                  </button>
 
-                  <div className="stat">
+                  <button type="button" className="stat adminStatLink" onClick={()=>setTab("surveys")}>
                     <span className="muted">Nye forespørsler</span>
-                    <br />
                     <b>{freshEnquiries}</b>
-                  </div>
+                    <small>Åpne forespørsler →</small>
+                  </button>
 
-                  <div className="stat">
-                    <span className="muted">
-                      Under behandling
-                    </span>
-                    <br />
+                  <button type="button" className="stat adminStatLink" onClick={()=>setTab("orders")}>
+                    <span className="muted">Under behandling</span>
                     <b>{working}</b>
-                  </div>
+                    <small>Se aktive saker →</small>
+                  </button>
                 </>
               )}
 
               {canManageProducts && (
                 <>
-                  <div className="stat">
-                    <span className="muted">
-                      Aktive produkter
-                    </span>
-                    <br />
-                    <b>
-                      {
-                        products.filter(
-                          (product) => product.active !== false
-                        ).length
-                      }
-                    </b>
-                  </div>
+                  <button type="button" className="stat adminStatLink" onClick={()=>setTab("products")}>
+                    <span className="muted">Aktive produkter</span>
+                    <b>{products.filter((product) => product.active !== false).length}</b>
+                    <small>Åpne produkter →</small>
+                  </button>
 
-                  <div className="stat">
-                    <span className="muted">
-                      Aktive kategorier
-                    </span>
-                    <br />
-                    <b>
-                      {
-                        categories.filter(
-                          (category) => category.active !== false
-                        ).length
-                      }
-                    </b>
-                  </div>
+                  <button type="button" className="stat adminStatLink" onClick={()=>setTab("categories")}>
+                    <span className="muted">Aktive kategorier</span>
+                    <b>{categories.filter((category) => category.active !== false).length}</b>
+                    <small>Åpne kategorier →</small>
+                  </button>
                 </>
               )}
 
               {canViewOrders && (
                 <>
-                  <div className="stat">
-                    <span className="muted">
-                      Betaling må avklares
-                    </span>
-                    <br />
+                  <button type="button" className="stat adminStatLink" onClick={()=>setTab("orders")}>
+                    <span className="muted">Betaling må avklares</span>
                     <b>{paymentAttentionCount}</b>
-                    {paymentAttentionOre>0&&<><br/><small className="muted">{nok(paymentAttentionOre)}</small></>}
-                  </div>
-                  <div className="stat">
-                    <span className="muted">
-                      Leveringsområde må sjekkes
-                    </span>
-                    <br />
+                    {paymentAttentionOre>0&&<small>{nok(paymentAttentionOre)} · åpne →</small>}
+                    {paymentAttentionOre<=0&&<small>Åpne bestillinger →</small>}
+                  </button>
+
+                  <button type="button" className="stat adminStatLink" onClick={()=>setTab("orders")}>
+                    <span className="muted">Leveringsområde må sjekkes</span>
                     <b>{deliveryAreaCount}</b>
-                  </div>
-                  <div className="stat">
-                    <span className="muted">
-                      Tilbud venter svar
-                    </span>
-                    <br />
+                    <small>Åpne bestillinger →</small>
+                  </button>
+
+                  <button type="button" className="stat adminStatLink" onClick={()=>router.push("/admin/tilbud")}>
+                    <span className="muted">Tilbud venter svar</span>
                     <b>{waitingQuotes}</b>
-                  </div>
-                  <div className="stat">
-                    <span className="muted">
-                      Godkjent tilbudsverdi
-                    </span>
-                    <br />
+                    <small>Åpne tilbud →</small>
+                  </button>
+
+                  <button type="button" className="stat adminStatLink" onClick={()=>router.push("/admin/tilbud")}>
+                    <span className="muted">Godkjent tilbudsverdi</span>
                     <b>{nok(acceptedQuoteValue)}</b>
-                  </div>
-                  <div className="stat">
-                    <span className="muted">
-                      Ordreverdi
-                    </span>
-                    <br />
+                    <small>Åpne tilbud →</small>
+                  </button>
+
+                  <button type="button" className="stat adminStatLink" onClick={()=>setTab("orders")}>
+                    <span className="muted">Ordreverdi</span>
                     <b>{nok(total)}</b>
-                  </div>
+                    <small>Åpne bestillinger →</small>
+                  </button>
                 </>
               )}
 
               {canViewOrders && (
                 <>
-                  <div className="stat">
+                  <button type="button" className="stat adminStatLink" onClick={()=>setTab("rentalBookings")}>
                     <span className="muted">Aktive utleier</span>
-                    <br />
                     <b>{rentalBookings.filter((booking) => ["confirmed", "active"].includes(booking.status)).length}</b>
-                  </div>
-                  <div className="stat">
+                    <small>Åpne utleiebookinger →</small>
+                  </button>
+
+                  <button type="button" className="stat adminStatLink" onClick={()=>setTab("rentalBookings")}>
                     <span className="muted">Utleie venter betaling/kreditt</span>
-                    <br />
                     <b>{rentalBookings.filter((booking) => booking.status === "new" || (booking.status === "confirmed" && !booking.confirmationSentAt)).length}</b>
-                  </div>
+                    <small>Åpne utleiebookinger →</small>
+                  </button>
                 </>
               )}
             </div>
