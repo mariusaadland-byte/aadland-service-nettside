@@ -571,7 +571,7 @@ function Drawing3DPreview({doc,onWallSelect,onItemSelect,camera}){
     <polygon points={pointsAttr(top)} fill="url(#item3d)" stroke="#675236" strokeWidth="12"/>
     {custom&&<FurnitureFront3D item={item} a={frontA} b={frontB} z0={z0} height={h} project={project} prefix={"front-"+item.id}/>}
    </g>
-  })}
+  })}</g>
  </svg>;
 }
 function FurnitureGapPlanPreview({doc,wall,onSelectGap}){
@@ -647,7 +647,7 @@ function WallElevationPreview({wall,items,zones=[],walls=[],defaultWallThickness
  const blockingFurniture=projectedFurniture.filter(row=>row.blocksGap);
  const freeGaps=gapPickMode?wallFurnitureGaps(wall,items,zones,walls,defaultWallThickness):[];
  const itemBox=item=>{
-  const gaps=wallFaceOffsets(item,wall,zones,walls,defaultWallThickness),width=Math.max(60,Number(item.w)||120),start=gaps.start;
+  const gaps=wallFaceOffsets(item,wall,zones,walls,defaultWallThickness),width=Math.min(L,Math.max(60,Number(item.w)||120)),start=clamp(gaps.start,0,Math.max(0,L-width));
   if(openingTypes.has(item.type)){
    const z0=item.type==="window"?Math.max(0,Number(item.sillHeight)||0):0;
    const height=Math.max(100,Number(item.openingHeight)||openingDefaults(item.type).openingHeight||2100);
@@ -661,13 +661,13 @@ function WallElevationPreview({wall,items,zones=[],walls=[],defaultWallThickness
   return{x:start,y:H-(z0+height),w:width,h:height,z0};
  };
  return <svg ref={svgRef} viewBox={[-padX,-padY,L+padX*2,H+padY*2].join(" ")} role="img" aria-label={"Veggvisning "+L+" millimeter"} onPointerMove={moveItemDrag} onPointerUp={endItemDrag} onPointerCancel={endItemDrag}>
-  <defs><pattern id={"wallgrid-"+wall.id} width="100" height="100" patternUnits="userSpaceOnUse"><path d="M100 0H0V100" fill="none" stroke="#e7e2d8" strokeWidth="4"/></pattern></defs>
+  <defs><pattern id={"wallgrid-"+wall.id} width="100" height="100" patternUnits="userSpaceOnUse"><path d="M100 0H0V100" fill="none" stroke="#e7e2d8" strokeWidth="4"/></pattern><clipPath id={"wall-xclip-"+wall.id}><rect x="0" y={-padY} width={L} height={H+padY*2}/></clipPath></defs>
   <rect x="0" y="0" width={L} height={H} fill={"url(#wallgrid-"+wall.id+")"} stroke="#5e5b55" strokeWidth="18"/>
   <line x1="0" y1={H} x2={L} y2={H} stroke="#2b2a27" strokeWidth="22"/>
   {wallSnapGuide&&<g pointerEvents="none">{wallSnapGuide.x!=null&&<line x1={wallSnapGuide.x} y1="0" x2={wallSnapGuide.x} y2={H} stroke="#2c7bb6" strokeWidth="12" strokeDasharray="38 22"/>}{wallSnapGuide.y!=null&&<line x1="0" y1={wallSnapGuide.y} x2={L} y2={wallSnapGuide.y} stroke="#2c7bb6" strokeWidth="12" strokeDasharray="38 22"/>}<rect x={Math.max(20,Math.min(L-760,(wallSnapGuide.x??L/2)-350))} y="28" width="700" height="110" rx="22" fill="rgba(255,255,255,.94)" stroke="#2c7bb6" strokeWidth="9"/><text x={Math.max(20,Math.min(L-760,(wallSnapGuide.x??L/2)-350))+350} y="101" textAnchor="middle" fontSize="54" fontWeight="900" fill="#245f8b">{wallSnapGuide.label}</text></g>}
   <text x={L/2} y={-55} textAnchor="middle" fontSize="80" fontWeight="800" fill="#554a37">{L} mm</text>
   <text x={-70} y={H/2} textAnchor="middle" transform={"rotate(-90 -70 "+H/2+")"} fontSize="74" fontWeight="700" fill="#554a37">{Math.round(H)} mm</text>
-  {projectedFurniture.slice().reverse().map(({item,start,end,distance,blocksGap})=>{
+  <g clipPath={"url(#wall-xclip-"+wall.id+")"}>{projectedFurniture.slice().reverse().map(({item,start,end,distance,blocksGap})=>{
    const height=Math.max(80,Math.min(H,modelHeight(item))),z0=Math.max(0,Number(item.elevation)||0),y=H-Math.min(H,z0+height),w=Math.max(60,end-start);
    const opacity=gapPickMode?(blocksGap?.96:.58):.82;
    const fill=gapPickMode?(blocksGap?"#cdb489":"#e8e1d6"):"#ddd0b7",stroke=gapPickMode?(blocksGap?"#5f482c":"#9d9589"):"#756044";
@@ -676,7 +676,7 @@ function WallElevationPreview({wall,items,zones=[],walls=[],defaultWallThickness
     <text x={start+w/2} y={Math.max(70,y+75)} textAnchor="middle" fontSize="58" fontWeight="900" fill="#493d2d">{item.customName||labelFor(item.type)}</text>
     <text x={start+w/2} y={Math.min(H-35,y+145)} textAnchor="middle" fontSize="48" fontWeight="700" fill="#665846">{Math.round(w)} mm · sett forfra</text>
    </g>
-  })}
+  })}</g>
   {gapPickMode&&freeGaps.map((gap,index)=><g key={"gap-"+index} onClick={()=>onSelectGap?.(gap)} style={{cursor:"pointer"}}>
    <rect x={gap.start+10} y="10" width={Math.max(20,gap.width-20)} height={Math.max(20,H-20)} rx="24" fill="rgba(47,132,108,.04)" stroke="#2f846c" strokeWidth="14" strokeDasharray="35 24"/>
    <rect x={gap.start+gap.width/2-Math.min(360,gap.width*.42)} y={H*.43} width={Math.min(720,gap.width*.84)} height="190" rx="30" fill="rgba(255,255,255,.94)" stroke="#2f846c" strokeWidth="10"/>
@@ -688,7 +688,7 @@ function WallElevationPreview({wall,items,zones=[],walls=[],defaultWallThickness
    <text x="55" y="82" fontSize="54" fontWeight="900" fill="#236853">FRONTVISNING · møbler funnet: {projectedFurniture.length}</text>
    <text x="55" y="137" fontSize="43" fontWeight="700" fill="#665f54">Møblene vises projisert rett mot veggen. Grønne felt er ledig bredde mellom dem.</text>
   </g>}
-  {wallItems.map(item=>{
+  <g clipPath={"url(#wall-xclip-"+wall.id+")"}>{wallItems.map(item=>{
    const b=itemBox(item),active=selectedItemId===item.id,custom=item.type==="customwall";
    return <g key={"elev-"+item.id} onPointerDown={e=>beginItemDrag(e,item)} onClick={()=>onSelectItem?.(item)} style={{cursor:gapPickMode?"pointer":"grab"}}>
     {openingTypes.has(item.type)?<rect x={b.x} y={b.y} width={b.w} height={b.h} fill={item.type==="window"?"#dceef2":"#faf8f2"} stroke={active?"#c39235":"#6c6961"} strokeWidth={active?22:15}/>:wallElectricalTypes.has(item.type)?<g><circle cx={b.x+b.w/2} cy={b.y+b.h/2} r={b.w*.42} fill="#fff4b8" stroke={active?"#c39235":"#8b6e25"} strokeWidth={active?20:13}/><text x={b.x+b.w/2} y={b.y+b.h/2+25} textAnchor="middle" fontSize={Math.max(55,b.w*.42)} fontWeight="900" fill="#72571d">{electricalSymbol(item.type)}</text></g>:<g>
@@ -793,7 +793,7 @@ function zoneSurveyStatusText(state){
 const initial=()=>({id:uid(),name:"Ny tegning",orderId:"",projectId:"",customerUserId:"",customerVisible:false,customer:"",address:"",notes:"",visualizationNotes:"",walls:[],items:[],zones:[],measurements:[],snapSize:50,showGrid:true,scale:"1:50",zoom:1,defaultWallThickness:98,defaultWallHeight:2400});
 function normalizeDrawingDocument(raw){
  const base={...initial(),...(raw&&typeof raw==="object"?raw:{})},walls=Array.isArray(base.walls)?base.walls:[],zones=Array.isArray(base.zones)?base.zones:[],measurements=Array.isArray(base.measurements)?base.measurements:[],wallIds=new Set(walls.map(w=>w.id));
- const items=(Array.isArray(base.items)?base.items:[]).map(item=>{
+ let items=(Array.isArray(base.items)?base.items:[]).map(item=>{
   let next={...item};
   if(next.wallId&&!wallIds.has(next.wallId))next={...next,wallId:null,wallOffset:null};
   if(["customwall","customfloor"].includes(next.type)){
@@ -802,6 +802,16 @@ function normalizeDrawingDocument(raw){
   }
   if(electricalTypes.has(next.type))next={...next,circuit:String(next.circuit||""),itemNote:String(next.itemNote||"")};
   return next;
+ });
+ items=items.map(item=>{
+  if(!item.wallId||wallElectricalTypes.has(item.type))return item;
+  const wall=walls.find(w=>w.id===item.wallId);if(!wall)return item;
+  const face=wallFaceMetrics(wall,zones,walls,base.defaultWallThickness||98),width=Math.max(1,Number(item.w)||1);
+  if(width>face.L+1)return item;
+  const gaps=wallFaceOffsets(item,wall,zones,walls,base.defaultWallThickness||98),safeStart=clamp(gaps.start,0,Math.max(0,face.L-width));
+  if(Math.abs(safeStart-gaps.start)<.5)return item;
+  const wallOffset=wallOffsetFromFaceStart(wall,safeStart,width,zones,walls,base.defaultWallThickness||98),baseItem={...item,wallOffset},placed=mountedItemCenter(baseItem,wall,zones);
+  return {...baseItem,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off};
  });
  return {...base,walls,zones,measurements,items};
 }
