@@ -806,6 +806,10 @@ export default function DrawingClient(){
   const readyTimer=setTimeout(()=>{autosaveReady.current=true},700);
   return()=>clearTimeout(readyTimer);
  },[]);
+ useEffect(()=>{
+  if(typeof window==="undefined"||!doc?.id)return;
+  try{const rows=JSON.parse(localStorage.getItem(VERSION_STORE+":"+doc.id)||"[]");setVersions(Array.isArray(rows)?rows.slice(0,20):[])}catch{setVersions([])}
+ },[doc?.id]);
  const writeLocalSnapshot=(next=docRef.current,{silent=false}={})=>{
   try{
    const savedAt=Date.now(),storedNext={...next,_localSavedAt:savedAt},current=docsRef.current||[],list=[storedNext,...current.filter(x=>x.id!==next.id)];
@@ -880,6 +884,77 @@ export default function DrawingClient(){
  const mutate=fn=>{checkpoint();setFuture([]);setDoc(d=>fn(d))};
  const undo=()=>{const last=history.at(-1);if(!last)return;setFuture(f=>[JSON.stringify(doc),...f].slice(0,25));setDoc(normalizeDrawingDocument(JSON.parse(last)));setHistory(h=>h.slice(0,-1));setSelected(null)};
  const redo=()=>{const next=future[0];if(!next)return;setHistory(h=>[...h.slice(-24),JSON.stringify(doc)]);setDoc(normalizeDrawingDocument(JSON.parse(next)));setFuture(f=>f.slice(1));setSelected(null)};
+ const saveVersion=()=>{
+  if(!doc?.id)return;
+  const row={id:uid(),label:String(versionLabel||"").trim()||"Versjon "+new Date().toLocaleString("nb-NO",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}),createdAt:new Date().toISOString(),drawing:doc};
+  setVersions(current=>{const next=[row,...current].slice(0,20);try{localStorage.setItem(VERSION_STORE+":"+doc.id,JSON.stringify(next))}catch{}return next});
+  setVersionLabel("");setMessage("Versjon lagret");setTimeout(()=>setMessage(""),1600);
+ };
+ const restoreVersion=row=>{
+  if(!row?.drawing)return;checkpoint();setFuture([]);const next=normalizeDrawingDocument({...row.drawing,id:doc.id,serverId:doc.serverId,orderId:doc.orderId,projectId:doc.projectId,customerUserId:doc.customerUserId});setDoc(next);setSelected(null);setMultiSelectedIds([]);setMessage("Versjon gjenopprettet");setTimeout(()=>setMessage(""),1800);
+ };
+ const deleteVersion=id=>setVersions(current=>{const next=current.filter(v=>v.id!==id);try{localStorage.setItem(VERSION_STORE+":"+doc.id,JSON.stringify(next))}catch{}return next});
+ const toggleLayer=key=>setLayerVisibility(v=>({...v,[key]:!v[key]}));
+ const isItemVisible=item=>layerVisibility[itemLayer(item.type)]!==false;
+ const toggleLock=itemId=>mutate(d=>({...d,items:d.items.map(o=>o.id===itemId?{...o,locked:!o.locked}:o)}));
+ const toggleMulti=itemId=>setMultiSelectedIds(ids=>ids.includes(itemId)?ids.filter(id=>id!==itemId):[...ids,itemId]);
+ const clearMulti=()=>setMultiSelectedIds([]);
+ const collisionMap=useMemo(()=>drawingCollisions(doc.items),[doc.items]);
+ const selectedCollisions=selected?.kind==="item"?(collisionMap.get(selected.id)||[]):[];
+ const multiItems=useMemo(()=>multiSelectedIds.map(id=>doc.items.find(o=>o.id===id)).filter(Boolean),[multiSelectedIds,doc.items]);
+ const placeWallItem=(itemId,mode)=>{
+  const item=doc.items.find(o=>o.id===itemId),wall=item?.wallId?doc.walls.find(w=>w.id===item.wallId):null;if(!item||!wall)return;
+  const width=Math.max(1,Number(item.w)||1),L=len(wall),rows=doc.items.filter(o=>o.wallId===wall.id&&o.id!==itemId&&!wallElectricalTypes.has(o.type)).map(o=>({item:o,...wallEdgeOffsets(o,wall)})).sort((a,b)=>a.start-b.start),current=wallEdgeOffsets(item,wall);
+  let start=current.start;
+  if(mode==="start")start=0;
+  else if(mode==="center")start=(L-width)/2;
+  else if(mode==="end")start=L-width;
+  else if(mode==="previous"){const prev=rows.filter(row=>row.end<=current.start+5).at(-1);start=prev?prev.start+Number(prev.item.w||0):0}
+  start=clamp(start,0,Math.max(0,L-width));updateWallItemById(itemId,"wallStartGap",start);
+ };
+ const duplicateWallRight=itemId=>{
+  const item=doc.items.find(o=>o.id===itemId),wall=item?.wallId?doc.walls.find(w=>w.id===item.wallId):null;if(!item||!wall)return;
+  const width=Math.max(1,Number(item.w)||1),start=wallEdgeOffsets(item,wall).start+width;
+  if(start+width>len(wall)+1){setMessage("Ikke plass til en kopi til høyre");setTimeout(()=>setMessage(""),1800);return}
+  const occupied=doc.items.filter(o=>o.wallId===wall.id&&o.id!==item.id&&!wallElectricalTypes.has(o.type)).some(o=>{const g=wallEdgeOffsets(o,wall);return start<g.start+Number(o.w||0)-3&&start+width>g.start+3});
+  if(occupied){setMessage("Neste plass på veggen er opptatt");setTimeout(()=>setMessage(""),1800);return}
+  const id=uid(),base={...item,id,wallOffset:start+width/2},placed=mountedItemCenter(base,wall,doc.zones||[]);
+  mutate(d=>({...d,items:[...d.items,{...base,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}]}));setSelected({kind:"item",id});
+ };
+ const fillWallRight=itemId=>{
+  const item=doc.items.find(o=>o.id===itemId),wall=item?.wallId?doc.walls.find(w=>w.id===item.wallId):null;if(!item||!wall)return;
+  const width=Math.max(1,Number(item.w)||1),current=wallEdgeOffsets(item,wall),blockers=doc.items.filter(o=>o.wallId===wall.id&&o.id!==item.id&&!wallElectricalTypes.has(o.type)).map(o=>wallEdgeOffsets(o,wall)).filter(g=>g.start>=current.start+width-2).sort((a,b)=>a.start-b.start),limit=blockers[0]?.start??len(wall),space=Math.max(0,limit-(current.start+width)),count=Math.floor(space/width);
+  if(count<1&&space<30){setMessage("Ingen ledig plass å fylle");setTimeout(()=>setMessage(""),1800);return}
+  mutate(d=>{
+   const liveWall=d.walls.find(w=>w.id===wall.id)||wall,added=[];
+   for(let i=0;i<count;i++){const start=current.start+width*(i+1),id=uid(),base={...item,id,wallOffset:start+width/2},placed=mountedItemCenter(base,liveWall,d.zones||[]);added.push({...base,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off})}
+   const used=count*width,remainder=Math.round(space-used);
+   if(kitchenTypes.has(item.type)&&remainder>=30){const start=current.start+width*(count+1),id=uid(),base={id,type:"filler",x:0,y:0,w:remainder,h:Number(item.h)||600,rot:0,wallId:liveWall.id,wallOffset:start+remainder/2,modelHeight:modelHeight(item),elevation:Number(item.elevation)||0},placed=mountedItemCenter(base,liveWall,d.zones||[]);added.push({...base,x:placed.cx-remainder/2,y:placed.cy-(Number(base.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off})}
+   return {...d,items:[...d.items,...added]};
+  });setMessage("Veggrekken er fylt mot høyre");setTimeout(()=>setMessage(""),1800);
+ };
+ const alignMulti=mode=>{
+  const chosen=multiItems.filter(o=>!o.locked);if(chosen.length<2){setMessage("Velg minst to ulåste objekter");setTimeout(()=>setMessage(""),1600);return}
+  const wallId=chosen[0].wallId,sameWall=!!wallId&&chosen.every(o=>o.wallId===wallId);
+  mutate(d=>{
+   let items=[...d.items];
+   if(sameWall){
+    const wall=d.walls.find(w=>w.id===wallId);if(!wall)return d;
+    const sorted=[...chosen].sort((a,b)=>wallEdgeOffsets(a,wall).start-wallEdgeOffsets(b,wall).start);
+    if(mode==="pack"){let cursor=wallEdgeOffsets(sorted[0],wall).start;for(const item of sorted){const width=Number(item.w)||1,base={...item,wallOffset:cursor+width/2},placed=mountedItemCenter(base,wall,d.zones||[]);items=items.map(o=>o.id===item.id?{...base,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}:o);cursor+=width}}
+    else if(mode==="distribute"){const total=sorted.reduce((sum,o)=>sum+(Number(o.w)||0),0),gap=Math.max(0,(len(wall)-total)/(sorted.length+1));let cursor=gap;for(const item of sorted){const width=Number(item.w)||1,base={...item,wallOffset:cursor+width/2},placed=mountedItemCenter(base,wall,d.zones||[]);items=items.map(o=>o.id===item.id?{...base,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}:o);cursor+=width+gap}}
+    else if(mode==="sameHeight"){const elevation=Number(sorted[0].elevation)||0;items=items.map(o=>multiSelectedIds.includes(o.id)?{...o,elevation}:o)}
+    else if(mode==="sameWidth"){const width=Number(sorted[0].w)||1;items=items.map(o=>{if(!multiSelectedIds.includes(o.id))return o;const live=wallEdgeOffsets(o,wall),start=clamp(live.start,0,Math.max(0,len(wall)-width)),base={...o,w:width,wallOffset:start+width/2},placed=mountedItemCenter(base,wall,d.zones||[]);return {...base,x:placed.cx-width/2,y:placed.cy-(Number(o.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}})}
+   }else{
+    const boxes=chosen.map(item=>({item,box:itemAabb(item)})),left=Math.min(...boxes.map(x=>x.box.left)),right=Math.max(...boxes.map(x=>x.box.right)),top=Math.min(...boxes.map(x=>x.box.top)),bottom=Math.max(...boxes.map(x=>x.box.bottom)),cx=(left+right)/2;
+    items=items.map(o=>{if(!multiSelectedIds.includes(o.id)||o.wallId)return o;let next={...o};if(mode==="left")next.x+=left-itemAabb(o).left;if(mode==="right")next.x+=right-itemAabb(o).right;if(mode==="center")next.x+=cx-(itemAabb(o).left+itemAabb(o).right)/2;if(mode==="top")next.y+=top-itemAabb(o).top;if(mode==="bottom")next.y+=bottom-itemAabb(o).bottom;if(mode==="sameWidth")next.w=Number(chosen[0].w)||next.w;return constrainFreeItemStrict(next,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackItem:o,fallbackCenter:itemCenter(o),snapDistance:0})});
+   }
+   return {...d,items};
+  });
+ };
+ const deleteMulti=()=>{if(!multiSelectedIds.length)return;mutate(d=>({...d,items:d.items.filter(o=>!multiSelectedIds.includes(o.id)||o.locked)}));setMultiSelectedIds([]);setSelected(null)};
+ const duplicateMulti=()=>{const chosen=multiItems.filter(o=>!o.locked);if(!chosen.length)return;mutate(d=>{const added=chosen.map(o=>({...o,id:uid(),x:o.wallId?o.x:o.x+200,y:o.wallId?o.y:o.y+200}));return {...d,items:[...d.items,...added]}})};
+
  const viewDimsFor=(zoom=doc.zoom||1)=>{
   const aspect=clamp(canvasAspect||1,.35,2.8),base=VIEW/zoom;
   return aspect>=1?{w:base,h:base/aspect}:{w:base*aspect,h:base};
