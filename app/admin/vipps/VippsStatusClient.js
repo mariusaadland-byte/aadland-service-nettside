@@ -68,7 +68,7 @@ export default function VippsStatusClient(){
   }
  }
 
- return <main className="admin">
+ return <main className="admin adminStandalonePage">
   <div className="adminPageTop">
    <div>
     <div className="kicker">BETALING</div>
