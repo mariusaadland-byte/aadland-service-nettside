@@ -31,6 +31,7 @@ export async function POST(req){
   if(error||!data.user)return NextResponse.json({error:"Feil e-post eller passord, eller e-postadressen er ikke bekreftet."},{status:401});
   if(!data.user.email_confirmed_at)return NextResponse.json({error:"Bekreft e-postadressen din før du logger inn."},{status:403});
 
+  let profileRepaired=false;
   let {data:profile,error:profileError}=await serviceClient.from("customer_profiles").select("*").eq("id",data.user.id).maybeSingle();
   if(profileError){
    if(String(profileError.code||"")==="42P01")return NextResponse.json({error:"Kundekonto er ikke aktivert i databasen ennå.",setupRequired:true},{status:409});
@@ -67,6 +68,7 @@ export async function POST(req){
     return NextResponse.json({error:"Kundeprofilen manglet og kunne ikke opprettes automatisk."},{status:500});
    }
    profile=created;
+   profileRepaired=true;
   }
 
   const [ordersLink,rentalsLink]=await Promise.all([
@@ -77,7 +79,7 @@ export async function POST(req){
   if(rentalsLink.error)console.error("CUSTOMER RENTAL HISTORY LINK",rentalsLink.error);
 
   await setCustomerCookie(data.user.id);
-  return NextResponse.json({ok:true,profileRepaired:Boolean(profile)});
+  return NextResponse.json({ok:true,profileRepaired});
  }catch(e){
   console.error("CUSTOMER LOGIN",e);
   return NextResponse.json({error:"Kunne ikke logge inn."},{status:500});
