@@ -1292,3 +1292,79 @@
  .layerGrid{grid-template-columns:1fr}
  .wallPlacementButtons{grid-template-columns:1fr}
 }
+
+
+/* Professional drawing controls */
+.proTools{display:grid;gap:10px}
+.proTools>button{width:100%}
+.layerGrid{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:8px;border:1px solid #d7cfbf;border-radius:9px;background:#f5f1e9}
+.layerGrid>b{grid-column:1/-1;font-size:10px;color:#5f5548}
+.layerGrid button{
+ min-height:34px;border:1px solid #cfc5b4;border-radius:7px;background:#fff;color:#665f55;padding:0 7px;font:800 9px/1 inherit;cursor:pointer;text-align:left
+}
+.layerGrid button[data-active="true"]{border-color:#5c8b78;background:#e9f3ee;color:#244e3f}
+.versionTools{display:grid;gap:7px;padding:8px;border:1px solid #d7cfbf;border-radius:9px;background:#f5f1e9}
+.versionTools>b{font-size:10px;color:#5f5548}
+.versionTools>div:first-of-type{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px}
+.versionTools input{min-width:0;min-height:36px;border:1px solid #c8bead;border-radius:7px;background:#fff;padding:0 8px}
+.versionTools>div:first-of-type button{
+ min-height:36px;border:1px solid #a98544;border-radius:7px;background:#d7a74e;color:#201708;padding:0 8px;font:800 9px/1 inherit;cursor:pointer
+}
+.versionList{display:grid;gap:4px}
+.versionList span{display:grid;grid-template-columns:minmax(0,1fr) 32px;border:1px solid #d9d0c2;border-radius:7px;background:#fff;overflow:hidden}
+.versionList span>button:first-child{display:grid;gap:2px;border:0;background:#fff;text-align:left;padding:7px;cursor:pointer}
+.versionList span>button:first-child b{font-size:9px}.versionList span>button:first-child small{font-size:8px;color:#7d756b}
+.versionList span>button:last-child{border:0;border-left:1px solid #e3dbcf;background:#faf7f1;color:#8b6157;font-size:16px;cursor:pointer}
+.collisionSummary{margin:0;padding:8px;border:1px solid #d7a09b;border-radius:8px;background:#fff0ee;color:#7c2d27;font-size:9px;font-weight:800}
+
+.multiToolbar{
+ display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid #c7bdac;background:#f4efe4;position:relative;z-index:8
+}
+.multiToolbar>div{display:flex;align-items:center;gap:6px;margin-right:4px}
+.multiToolbar b{font-size:10px;color:#4c4336}
+.multiToolbar button{
+ min-height:34px;border:1px solid #baad98;border-radius:7px;background:#fff;color:#4f493f;padding:0 8px;font:800 9px/1 inherit;cursor:pointer
+}
+.multiToolbar>div button{min-height:30px;background:#eee7da}
+.multiToolbar .multiDanger{border-color:#c98983;background:#fff0ee;color:#802e29}
+
+.objectStatusPanel{display:grid;gap:7px;margin:0 0 10px}
+.objectStatusPanel>button{width:100%}
+.objectLocked{min-height:38px;border:1px solid #8c7448;border-radius:8px;background:#30291e;color:#f6ddaa;font:800 10px/1 inherit;cursor:pointer}
+.collisionWarning{display:grid;gap:3px;padding:8px;border:1px solid #d5928c;border-radius:8px;background:#fff0ee;color:#7d2c27}
+.collisionWarning b{font-size:10px}.collisionWarning small{font-size:8px}
+
+.wallPlacementPanel{display:grid!important;gap:6px!important;padding:9px!important;border:1px solid #d3c8b7!important;border-radius:9px!important;background:#f7f3eb!important}
+.wallPlacementButtons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.wallPlacementButtons button{
+ min-height:35px;border:1px solid #bda979;border-radius:7px;background:#fff9ed;color:#4d4028;padding:0 6px;font:800 8px/1.1 inherit;cursor:pointer
+}
+.wallPlacementButtons button:nth-child(2){background:#ead7ad}
+.wallInlineActions{flex-wrap:wrap;grid-column:1/-1!important}
+.wallInlineActions button{min-height:34px;height:auto}
+.wallAutoFitButton{background:#17493e!important;border-color:#3a8b74!important;color:#eafff7!important}
+
+.furnitureAutoWidth{
+ display:grid!important;align-content:center;gap:4px;padding:8px;border:1px solid #5c927d!important;border-radius:9px;background:#edf7f2;color:#285745!important
+}
+.furnitureAutoWidth strong{font-size:13px;letter-spacing:.06em}.furnitureAutoWidth small{font-size:8px;line-height:1.3;color:#527266}
+.furnitureAutoSections{align-content:center;padding:8px!important;border:1px dashed #73a38f;border-radius:8px;background:#edf7f2!important}
+.furnitureAutoSections small{font-size:9px;line-height:1.4;color:#47695b}
+
+.mobileObjectStatus{display:grid!important;gap:6px!important;padding:8px!important;border:1px solid #d2c7b5!important;border-radius:9px!important;background:#f6f1e8!important}
+.mobileObjectStatus>button{min-height:42px;border:1px solid #a9946a;border-radius:8px;background:#fffaf0;font:800 10px/1 inherit}
+.mobileObjectStatus>div{display:grid;gap:3px;padding:7px;border:1px solid #d5928c;border-radius:7px;background:#fff0ee;color:#7d2c27}
+.mobileObjectStatus b{font-size:10px}.mobileObjectStatus small{font-size:8px}
+
+@media(max-width:900px){
+ .multiToolbar{flex-wrap:nowrap;overflow-x:auto;padding:7px}
+ .multiToolbar>div,.multiToolbar>button{flex:0 0 auto}
+ .multiToolbar button{min-height:42px}
+ .wallInlineEditor{max-height:38dvh}
+}
+@media(max-width:520px){
+ .layerGrid{grid-template-columns:1fr 1fr}
+ .wallPlacementButtons{grid-template-columns:1fr}
+ .wallInlineActions{display:grid;grid-template-columns:1fr 1fr;width:100%}
+ .wallInlineActions button{min-height:42px}
+}
