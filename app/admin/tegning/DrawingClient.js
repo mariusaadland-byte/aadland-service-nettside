@@ -363,11 +363,10 @@ function PlanItemGlyph({item,active}){
  if(o.type==="opening")return <><line x1="0" y1={o.h/2} x2={o.w} y2={o.h/2} stroke="#fff" strokeWidth="100"/><line x1="0" y1="0" x2="0" y2={o.h} stroke="#777" strokeWidth="16"/><line x1={o.w} y1="0" x2={o.w} y2={o.h} stroke="#777" strokeWidth="16"/></>;
  if(o.type==="window")return <><rect width={o.w} height={Math.max(o.h,100)} fill="#dfeef1" stroke="#51462f" strokeWidth="18"/><line x1="0" y1={o.h/2} x2={o.w} y2={o.h/2} stroke="#64828a" strokeWidth="18"/></>;
  if(o.type==="customwall"||o.type==="customfloor"){
-  const cols=Math.max(1,Math.min(8,Math.round(Number(o.sectionsX)||1))),rows=Math.max(1,Math.min(6,Math.round(Number(o.sectionsY)||1)));
+  const grid=furnitureGridMetrics(o);
   return <g>
    <rect width={o.w} height={o.h} rx="18" fill={active?"#f0dfbd":"#efe7d8"} stroke="#6e5633" strokeWidth="18"/>
-   {Array.from({length:cols-1},(_,i)=><line key={"c"+i} x1={o.w*(i+1)/cols} y1="0" x2={o.w*(i+1)/cols} y2={o.h} stroke="#9a815a" strokeWidth="10"/>)}
-   {Array.from({length:rows-1},(_,i)=><line key={"r"+i} x1="0" y1={o.h*(i+1)/rows} x2={o.w} y2={o.h*(i+1)/rows} stroke="#9a815a" strokeWidth="10"/>)}
+   {grid.colEdges.slice(1,-1).map((edge,i)=><line key={"c"+i} x1={o.w*edge} y1="0" x2={o.w*edge} y2={o.h} stroke="#9a815a" strokeWidth="10"/>)}
   </g>;
  }
  if(o.type==="ledstrip"){
@@ -991,7 +990,7 @@ export default function DrawingClient(){
   else if(key==="sillHeight"){const opening=Math.max(100,Number(item.openingHeight)||1200);next.sillHeight=clamp(n,0,Math.max(0,H-opening))}
   else if(key==="openingHeight"){const sill=item.type==="window"?Math.max(0,Number(item.sillHeight)||0):0;next.openingHeight=clamp(n,100,Math.max(100,H-sill))}
   else if(key==="elevation"){const height=Math.max(50,modelHeight(item));next.elevation=clamp(n,0,Math.max(0,H-height))}
-  else if(key==="modelHeight"){const elevation=Math.max(0,Number(item.elevation)||0);next.modelHeight=clamp(n,50,Math.max(50,H-elevation))}
+  else if(key==="modelHeight"){const elevation=Math.max(0,Number(item.elevation)||0);next.modelHeight=clamp(n,50,Math.max(50,H-elevation));if(["customwall","customfloor"].includes(item.type))next.rowHeights=furnitureDimArray(item.sectionsY,next.modelHeight,item.rowHeights)}
   else return;
   mutate(d=>({...d,items:d.items.map(o=>o.id===itemId?next:o)}));
  };
@@ -1211,7 +1210,7 @@ export default function DrawingClient(){
   if(openingTypes.has(item.type)&&openingCollision(wall,item.id,startGap,width)){setMessage("Åpningen overlapper en annen åpning");setTimeout(()=>setMessage(""),2200);return}
   mutate(d=>{
    const live=d.items.find(o=>o.id===itemId),liveWall=live?.wallId?d.walls.find(w=>w.id===live.wallId):null;if(!live||!liveWall)return d;
-   const center=startGap+width/2,nextBase={...live,w:width,wallOffset:center},placed=mountedItemCenter(nextBase,liveWall,d.zones||[]);
+   const center=startGap+width/2,nextBase={...live,w:width,wallOffset:center,...(live.type==="customwall"?{colWidths:furnitureDimArray(live.sectionsX,width,live.colWidths)}:{})},placed=mountedItemCenter(nextBase,liveWall,d.zones||[]);
    const updated={...nextBase,x:placed.cx-width/2,y:placed.cy-live.h/2,rot:placed.a*180/Math.PI,wallOffset:placed.off};
    return {...d,items:d.items.map(o=>o.id===itemId?updated:o)};
   });
@@ -1243,7 +1242,9 @@ export default function DrawingClient(){
       const off=clamp(desired,limits.min,limits.max),a=Math.atan2(w.y2-w.y1,w.x2-w.x1),cx=w.x1+Math.cos(a)*off,cy=w.y1+Math.sin(a)*off;
       return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off};
      }
-     const changed={...o,[key]:n};
+     let changed={...o,[key]:n};
+     if(["customwall","customfloor"].includes(o.type)&&key==="w")changed={...changed,colWidths:furnitureDimArray(o.sectionsX,n,o.colWidths)};
+     if(["customwall","customfloor"].includes(o.type)&&key==="modelHeight")changed={...changed,rowHeights:furnitureDimArray(o.sectionsY,n,o.rowHeights)};
      return wallTypes.has(o.type)?changed:constrainFreeItemStrict(changed,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackItem:o,fallbackCenter:itemCenter(o),snapDistance:0});
     })};
    }
@@ -1705,7 +1706,7 @@ export default function DrawingClient(){
      {isOpening&&<label>Åpningshøyde (mm)<input type="number" min="100" max={Math.round(Number(wallForView.h)||2400)} value={Math.round(Number(wallSelectedItem.openingHeight)||openingDefaults(wallSelectedItem.type).openingHeight||2100)} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"openingHeight",e.target.value)}/></label>}
      {wallSelectedItem.type==="window"&&<label>Brystning (mm)<input type="number" min="0" value={Math.round(Number(wallSelectedItem.sillHeight)||0)} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"sillHeight",e.target.value)}/></label>}
      {isElectrical&&<label>Høyde fra gulv (mm)<input type="number" min="0" max={Math.round(Number(wallForView.h)||2400)} value={Math.round(Number(wallSelectedItem.mountHeight)||0)} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"mountHeight",e.target.value)}/></label>}
-     {isCustom&&<><label>Møbelhøyde (mm)<input type="number" min="50" value={Math.round(modelHeight(wallSelectedItem))} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"modelHeight",e.target.value)}/></label><label>Fra gulv (mm)<input type="number" min="0" value={Math.round(Number(wallSelectedItem.elevation)||0)} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"elevation",e.target.value)}/></label><div className={styles.wallFurnitureDimensions}><b>Feltbredder</b>{furnitureGridMetrics(wallSelectedItem).colWidths.map((value,i)=><label key={"wcw-"+i}>F{i+1}<input type="number" min="50" value={value} onChange={e=>updateCustomFurnitureColumn(wallSelectedItem.id,i,e.target.value)}/><span>mm</span></label>)}</div><div className={styles.wallFurnitureDimensions}><b>Radhøyder</b>{furnitureGridMetrics(wallSelectedItem).rowHeights.map((value,i)=><label key={"wrh-"+i}>R{i+1}<input type="number" min="50" value={value} onChange={e=>updateCustomFurnitureRow(wallSelectedItem.id,i,e.target.value)}/><span>mm</span></label>)}</div></>}
+     {isCustom&&<><label>Møbelhøyde (mm)<input type="number" min="50" value={Math.round(modelHeight(wallSelectedItem))} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"modelHeight",e.target.value)}/></label><label>Fra gulv (mm)<input type="number" min="0" value={Math.round(Number(wallSelectedItem.elevation)||0)} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"elevation",e.target.value)}/></label><div className={styles.wallFurnitureDimensions}><b>Feltbredder</b>{furnitureGridMetrics(wallSelectedItem).colWidths.map((value,i)=><label key={"wcw-"+i}>F{i+1}<input type="number" min="50" value={value} onChange={e=>updateCustomFurnitureColumn(wallSelectedItem.id,i,e.target.value)}/><span>mm</span></label>)}</div><div className={styles.wallFurnitureDimensions}><b>Radhøyder</b>{furnitureGridMetrics(wallSelectedItem).rowHeights.map((value,i)=><label key={"wrh-"+i}>R{i+1}<input type="number" min="50" value={value} onChange={e=>updateCustomFurnitureRow(wallSelectedItem.id,i,e.target.value)}/><span>mm</span></label>)}</div><div className={styles.wallFurnitureFronts}><b>Fronter</b>{furnitureCellArray(wallSelectedItem.sectionsX,wallSelectedItem.sectionsY,wallSelectedItem.cellTypes,"open").map((type,i)=><button type="button" key={"wfront-"+i} onClick={()=>{const cells=furnitureCellArray(wallSelectedItem.sectionsX,wallSelectedItem.sectionsY,wallSelectedItem.cellTypes,"open");cells[i]=nextFurnitureCellType(cells[i]);mutate(d=>({...d,items:d.items.map(o=>o.id===wallSelectedItem.id?{...o,cellTypes:cells}:o)}))}}>F{i+1}: {furnitureCellLabel(type)}</button>)}</div></>}
      <div className={styles.wallInlineActions}><button type="button" onClick={duplicate}>Dupliser</button><button type="button" onClick={remove}>Slett</button></div>
     </div>})()}
     <div className={styles.wallViewHint}>{furnitureGapPick?<><b>Velg mellomrom rett forfra:</b> du ser den valgte veggen frontalt. Seng, garderobe, kommode, skap og andre møbler i rommet projiseres inn på veggen med riktig plassering langs veggen og riktig høyde. De grønne feltene er de ledige breddene mellom møblene. Trykk på feltet du vil fylle, så får møbelet automatisk akkurat den bredden og plasseres på veggen der.</>:<>Klikk et objekt på veggen for å redigere det uten å forlate veggvisningen. Rutenettet er 100 mm. Vegglengde, vegghøyde, åpninger, EL-punkter og egne møbler vises i samme frontvisning.</>}</div>
