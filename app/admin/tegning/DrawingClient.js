@@ -142,6 +142,27 @@ function polygonCentroid(points){
 const electricalTypes=new Set(["ceilinglight","downlight","ledstrip","walllight","outlet","doubleoutlet","switch","dimmer","thermostat","junction"]);
 const wallElectricalTypes=new Set(["walllight","outlet","doubleoutlet","switch","dimmer","thermostat"]);
 const ceilingElectricalTypes=new Set(["ceilinglight","downlight","ledstrip","junction"]);
+function wallFurnitureGaps(wall,items,excludeId=null){
+ const L=Math.max(1,len(wall));
+ const blockers=(items||[])
+  .filter(item=>item.wallId===wall.id&&item.id!==excludeId&&!wallElectricalTypes.has(item.type)&&!["railing","screen"].includes(item.type))
+  .map(item=>{const gaps=wallEdgeOffsets(item,wall),start=clamp(gaps.start,0,L),end=clamp(gaps.start+Math.max(0,Number(item.w)||0),0,L);return{start,end}})
+  .filter(row=>row.end>row.start)
+  .sort((a,b)=>a.start-b.start);
+ const merged=[];
+ for(const row of blockers){
+  const last=merged.at(-1);
+  if(last&&row.start<=last.end)last.end=Math.max(last.end,row.end);
+  else merged.push({...row});
+ }
+ const gaps=[];let cursor=0;
+ for(const row of merged){
+  if(row.start-cursor>=100)gaps.push({start:cursor,end:row.start,width:row.start-cursor});
+  cursor=Math.max(cursor,row.end);
+ }
+ if(L-cursor>=100)gaps.push({start:cursor,end:L,width:L-cursor});
+ return gaps.map(g=>({start:Math.round(g.start),end:Math.round(g.end),width:Math.round(g.width)}));
+}
 const roomBoundedTypes=new Set(["toilet","walltoilet","shower","bath","sink","washer","base","wallcab","tallcab","fridge","oven","dishwasher","island","sofa","table","chair","bed","wardrobe","tv","nightstand","dresser","desk","bookshelf","vanity","armchair","ottoman","headboard","ceilinglight","downlight","ledstrip","junction","customfloor"]);
 const item3DHeight={
  toilet:780,walltoilet:450,shower:2100,bath:600,sink:850,washer:850,
@@ -406,10 +427,11 @@ function Drawing3DPreview({doc,onWallSelect,onItemSelect,camera}){
   })}
  </svg>;
 }
-function WallElevationPreview({wall,items,onSelectItem,selectedItemId}){
+function WallElevationPreview({wall,items,onSelectItem,selectedItemId,gapPickMode=false,onSelectGap}){
  if(!wall)return null;
  const L=Math.max(1,len(wall)),H=Math.max(300,Number(wall.h)||2400),padX=Math.max(140,L*.035),padY=Math.max(140,H*.07);
  const wallItems=(items||[]).filter(item=>item.wallId===wall.id).sort((a,b)=>(Number(a.wallOffset)||0)-(Number(b.wallOffset)||0));
+ const freeGaps=gapPickMode?wallFurnitureGaps(wall,items):[];
  const itemBox=item=>{
   const gaps=wallEdgeOffsets(item,wall),width=Math.max(60,Number(item.w)||120),start=gaps.start;
   if(openingTypes.has(item.type)){
@@ -430,6 +452,11 @@ function WallElevationPreview({wall,items,onSelectItem,selectedItemId}){
   <line x1="0" y1={H} x2={L} y2={H} stroke="#2b2a27" strokeWidth="22"/>
   <text x={L/2} y={-55} textAnchor="middle" fontSize="80" fontWeight="800" fill="#554a37">{L} mm</text>
   <text x={-70} y={H/2} textAnchor="middle" transform={"rotate(-90 -70 "+H/2+")"} fontSize="74" fontWeight="700" fill="#554a37">{Math.round(H)} mm</text>
+  {gapPickMode&&freeGaps.map((gap,index)=><g key={"gap-"+index} onClick={()=>onSelectGap?.(gap)} style={{cursor:"pointer"}}>
+   <rect x={gap.start+10} y="10" width={Math.max(20,gap.width-20)} height={Math.max(20,H-20)} rx="24" fill="rgba(47,132,108,.13)" stroke="#2f846c" strokeWidth="12" strokeDasharray="35 24"/>
+   <text x={gap.start+gap.width/2} y={H/2-35} textAnchor="middle" fontSize="74" fontWeight="900" fill="#236853">TRYKK HER</text>
+   <text x={gap.start+gap.width/2} y={H/2+55} textAnchor="middle" fontSize="62" fontWeight="700" fill="#236853">{gap.width} mm ledig</text>
+  </g>)}
   {wallItems.map(item=>{
    const b=itemBox(item),active=selectedItemId===item.id,custom=item.type==="customwall";
    return <g key={"elev-"+item.id} onClick={()=>onSelectItem?.(item)} style={{cursor:"pointer"}}>
@@ -539,7 +566,7 @@ function nearestWall(o,walls){
 }
 
 export default function DrawingClient(){
- const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[customers,setCustomers]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[measureDrag,setMeasureDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null),[mobileEditOpen,setMobileEditOpen]=useState(false),[roomBuilder,setRoomBuilder]=useState(null),[quickAddOpen,setQuickAddOpen]=useState(false),[fieldMode,setFieldMode]=useState(false),[canvasAspect,setCanvasAspect]=useState(1),[wallBuilder,setWallBuilder]=useState(null),[snapHint,setSnapHint]=useState(null),[wallChain,setWallChain]=useState(null),[online,setOnline]=useState(true),[saveState,setSaveState]=useState("local"),[lastSavedAt,setLastSavedAt]=useState(null),[fieldReturnZoneId,setFieldReturnZoneId]=useState(null),[roomPickerOpen,setRoomPickerOpen]=useState(false),[deleteConfirmOpen,setDeleteConfirmOpen]=useState(false),[deleteBusy,setDeleteBusy]=useState(false),[printMode,setPrintMode]=useState(false),[quoteWarningOpen,setQuoteWarningOpen]=useState(false),[show3D,setShow3D]=useState(false),[elPlan,setElPlan]=useState(false),[wallViewId,setWallViewId]=useState(null),[furnitureBuilder,setFurnitureBuilder]=useState(null),[focusView,setFocusView]=useState(false);
+ const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[customers,setCustomers]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[measureDrag,setMeasureDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null),[mobileEditOpen,setMobileEditOpen]=useState(false),[roomBuilder,setRoomBuilder]=useState(null),[quickAddOpen,setQuickAddOpen]=useState(false),[fieldMode,setFieldMode]=useState(false),[canvasAspect,setCanvasAspect]=useState(1),[wallBuilder,setWallBuilder]=useState(null),[snapHint,setSnapHint]=useState(null),[wallChain,setWallChain]=useState(null),[online,setOnline]=useState(true),[saveState,setSaveState]=useState("local"),[lastSavedAt,setLastSavedAt]=useState(null),[fieldReturnZoneId,setFieldReturnZoneId]=useState(null),[roomPickerOpen,setRoomPickerOpen]=useState(false),[deleteConfirmOpen,setDeleteConfirmOpen]=useState(false),[deleteBusy,setDeleteBusy]=useState(false),[printMode,setPrintMode]=useState(false),[quoteWarningOpen,setQuoteWarningOpen]=useState(false),[show3D,setShow3D]=useState(false),[elPlan,setElPlan]=useState(false),[wallViewId,setWallViewId]=useState(null),[furnitureBuilder,setFurnitureBuilder]=useState(null),[furnitureGapPick,setFurnitureGapPick]=useState(null),[focusView,setFocusView]=useState(false);
  const [camera3D,setCamera3D]=useState({yaw:42,pitch:34,zoom:1});
  const camera3DDrag=useRef(null);
  const svg=useRef(null);
@@ -885,19 +912,20 @@ export default function DrawingClient(){
   const template=furnitureTemplates.find(x=>x.id===templateId)||furnitureTemplates.at(-1);
   setFurnitureBuilder(v=>v?{...v,templateId:template.id,name:template.name,width:String(template.width),depth:String(template.depth),height:String(template.height),elevation:String(template.elevation),mount:template.mount,sectionsX:String(template.sectionsX),sectionsY:String(template.sectionsY)}:v);
  };
- const createCustomFurniture=()=>{
-  if(!furnitureBuilder)return;
-  const width=Number(furnitureBuilder.width),depth=Number(furnitureBuilder.depth),height=Number(furnitureBuilder.height),elevation=Number(furnitureBuilder.elevation)||0,sectionsX=clamp(Math.round(Number(furnitureBuilder.sectionsX)||1),1,8),sectionsY=clamp(Math.round(Number(furnitureBuilder.sectionsY)||1),1,6),name=String(furnitureBuilder.name||"").trim()||"Eget møbel";
+ const placeCustomFurniture=(builder,fitGap=null)=>{
+  if(!builder)return;
+  const width=fitGap?Number(fitGap.width):Number(builder.width),depth=Number(builder.depth),height=Number(builder.height),elevation=Number(builder.elevation)||0,sectionsX=clamp(Math.round(Number(builder.sectionsX)||1),1,8),sectionsY=clamp(Math.round(Number(builder.sectionsY)||1),1,6),name=String(builder.name||"").trim()||"Eget møbel";
   if(!Number.isFinite(width)||!Number.isFinite(depth)||!Number.isFinite(height)||width<100||depth<50||height<50||width>6000||depth>2000||height>5000||elevation<0||elevation>5000){setMessage("Sjekk møbelmålene");setTimeout(()=>setMessage(""),2000);return}
   const id=uid();
-  if(furnitureBuilder.mount==="wall"){
-   const wall=doc.walls.find(w=>w.id===furnitureBuilder.wallId)||wallForView||(selected?.kind==="wall"?doc.walls.find(w=>w.id===selected.id):null);
+  if(builder.mount==="wall"||fitGap){
+   const wall=doc.walls.find(w=>w.id===builder.wallId)||wallForView||(selected?.kind==="wall"?doc.walls.find(w=>w.id===selected.id):null);
    if(!wall){setMessage("Velg en vegg for veggmontert møbel");setTimeout(()=>setMessage(""),2000);return}
    const L=len(wall),wallHeight=Math.max(300,Number(wall.h)||Number(doc.defaultWallHeight)||2400);if(width>L){setMessage("Møbelet er bredere enn veggen");setTimeout(()=>setMessage(""),2000);return}if(elevation+height>wallHeight){setMessage("Møbelet går over veggens høyde");setTimeout(()=>setMessage(""),2200);return}
-   const rawStart=String(furnitureBuilder.start||"").trim()===""?(L-width)/2:Number(furnitureBuilder.start);
+   const rawStart=fitGap?Number(fitGap.start):(String(builder.start||"").trim()===""?(L-width)/2:Number(builder.start));
    const start=clamp(Number.isFinite(rawStart)?rawStart:(L-width)/2,0,Math.max(0,L-width)),off=start+width/2,base={id,type:"customwall",customName:name,x:0,y:0,w:width,h:depth,rot:0,wallId:wall.id,wallOffset:off,modelHeight:height,elevation,sectionsX,sectionsY},placed=mountedItemCenter(base,wall,doc.zones||[]);
    mutate(d=>({...d,items:[...d.items,{...base,x:placed.cx-width/2,y:placed.cy-depth/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}]}));
    setWallViewId(wall.id);setSelected({kind:"item",id});
+   if(fitGap){setMessage("Møbelet ble tilpasset mellomrommet automatisk · "+Math.round(width)+" mm");setTimeout(()=>setMessage(""),2600)}
   }else{
    const zone=selected?.kind==="zone"?(doc.zones||[]).find(z=>z.id===selected.id):null,center=zone?polygonCentroid(zone.points):{x:pan.x+viewWidth/2,y:pan.y+viewHeight/2};
    mutate(d=>{
@@ -907,8 +935,19 @@ export default function DrawingClient(){
    });
    setSelected({kind:"item",id});
   }
-  setFurnitureBuilder(null);setTool("select");
+  setFurnitureBuilder(null);setFurnitureGapPick(null);setTool("select");
  };
+ const createCustomFurniture=()=>placeCustomFurniture(furnitureBuilder);
+ const startFurnitureGapPick=()=>{
+  if(!furnitureBuilder)return;
+  const wallId=furnitureBuilder.wallId||wallForView?.id||(selected?.kind==="wall"?selected.id:"")||doc.walls[0]?.id||"";
+  if(!wallId){setMessage("Tegn en vegg først");setTimeout(()=>setMessage(""),1800);return}
+  const wall=doc.walls.find(w=>w.id===wallId),gaps=wallFurnitureGaps(wall,doc.items);
+  if(!gaps.length){setMessage("Fant ikke et ledig mellomrom på denne veggen");setTimeout(()=>setMessage(""),2200);return}
+  setFurnitureGapPick({...furnitureBuilder,mount:"wall",wallId});setFurnitureBuilder(null);setWallViewId(wallId);setSelected({kind:"wall",id:wallId});setShow3D(false);
+  setMessage("Trykk på mellomrommet der møbelet skal stå");setTimeout(()=>setMessage(""),3200);
+ };
+ const chooseFurnitureGap=gap=>{if(furnitureGapPick)placeCustomFurniture(furnitureGapPick,gap)};
  const openWallBuilder=()=>{
   const wall=selected?.kind==="wall"?doc.walls.find(item=>item.id===selected.id):null;
   setWallBuilder({
@@ -1354,7 +1393,7 @@ export default function DrawingClient(){
  const copyAiBrief=async(showMessage=true)=>{try{await navigator.clipboard.writeText(aiBrief());if(showMessage){setMessage("ChatGPT-brief kopiert");setTimeout(()=>setMessage(""),1800)}return true}catch{if(showMessage){setMessage("Kunne ikke kopiere brief");setTimeout(()=>setMessage(""),1800)}return false}};
  const prepareChatGptPackage=async()=>{const copied=await copyAiBrief(false);exportPng();setMessage(copied?"PNG eksporteres · ChatGPT-brief kopiert":"PNG eksporteres · brief kunne ikke kopieres");setTimeout(()=>setMessage(""),2600)};
  return <main className={styles.shell+(fieldMode?" "+styles.fieldMode:"")+(focusView?" "+styles.focusView:"")}>
-  <header className={styles.top}><Link href="/admin">← Backoffice</Link><strong>Tegning & visualisering</strong><input className={styles.name} value={doc.name} onChange={e=>setDoc(d=>({...d,name:e.target.value}))}/><span className={styles.saved}>{message||saveStatusText()}</span>{overallSurveyProgress.total>0&&<button type="button" className={overallSurveyProgress.complete?styles.surveyBadgeDone:overallSurveyProgress.stale?styles.surveyBadgeStale:styles.surveyBadge} onClick={()=>{const zones=doc.zones||[],target=zones.find(zone=>!zoneSurveyState(zone,doc.walls,doc.items).finished)||zones[0];if(target){setSelected({kind:"zone",id:target.id});setTimeout(()=>scrollPanel(rightPanel),0)}}}>{overallSurveyProgress.complete?"✓ Befaring ferdig":"Befaring "+overallSurveyProgress.done+"/"+overallSurveyProgress.total+(overallSurveyProgress.stale?" · sjekk "+overallSurveyProgress.stale:"")}</button>}<button className={styles.btn} onClick={()=>persist()}>Lagre på oppdrag</button><button className={styles.btn} onClick={undo} disabled={!history.length}>Angre</button><button className={styles.btn} onClick={redo} disabled={!future.length}>Gjør om</button><button className={styles.btn} onClick={()=>zoomBy(-.25)}>−</button><span className={styles.zoom}>{Math.round((doc.zoom||1)*100)}%</span><button className={styles.btn} onClick={()=>zoomBy(.25)}>+</button><details className={styles.moreMenu}><summary aria-label="Flere verktøy" title="Flere verktøy">☰</summary><div className={styles.moreMenuPanel} onClick={e=>{if(e.target.closest("button"))e.currentTarget.parentElement.open=false}}><button className={styles.btn} onClick={fitView}>Tilpass tegning</button><button className={focusView?styles.activeBtn:styles.btn} onClick={()=>{setFocusView(value=>!value);setTimeout(fitView,60)}}>{focusView?"Vis paneler":"Fokus tegning"}</button><button className={tool==="pan"?styles.activeBtn:styles.btn} onClick={()=>{setTool(tool==="pan"?"select":"pan");setDraft(null);setMeasureDraft(null)}}>Flytt visning</button><button className={elPlan?styles.activeBtn:styles.btn} onClick={()=>setElPlan(value=>!value)}>EL-tegning</button><button className={styles.btn} onClick={()=>setShow3D(true)}>3D-visning</button><button className={styles.btn} onClick={()=>openWallView()}>Veggvisning</button><button className={styles.btn} onClick={()=>openFurnitureBuilder(selected?.kind==="wall"?selected.id:null)}>Bygg møbel</button><button className={styles.btn} onClick={runPrint}>PDF / rapport</button><button className={styles.btn} onClick={openMaterialCalculator}>Materialkalkulator</button><button className={styles.btn} onClick={newQuoteFromDrawing}>Nytt tilbud fra tegning</button></div></details></header>
+  <header className={styles.top}><Link href="/admin">← Backoffice</Link><strong>Tegning & visualisering</strong><input className={styles.name} value={doc.name} onChange={e=>setDoc(d=>({...d,name:e.target.value}))}/><span className={styles.saved}>{message||saveStatusText()}</span>{overallSurveyProgress.total>0&&<button type="button" className={overallSurveyProgress.complete?styles.surveyBadgeDone:overallSurveyProgress.stale?styles.surveyBadgeStale:styles.surveyBadge} onClick={()=>{const zones=doc.zones||[],target=zones.find(zone=>!zoneSurveyState(zone,doc.walls,doc.items).finished)||zones[0];if(target){setSelected({kind:"zone",id:target.id});setTimeout(()=>scrollPanel(rightPanel),0)}}}>{overallSurveyProgress.complete?"✓ Befaring ferdig":"Befaring "+overallSurveyProgress.done+"/"+overallSurveyProgress.total+(overallSurveyProgress.stale?" · sjekk "+overallSurveyProgress.stale:"")}</button>}<button className={styles.btn} onClick={()=>persist()}>Lagre på oppdrag</button><button className={styles.btn} onClick={undo} disabled={!history.length}>Angre</button><button className={styles.btn} onClick={redo} disabled={!future.length}>Gjør om</button><button className={styles.btn} onClick={()=>zoomBy(-.25)}>−</button><span className={styles.zoom}>{Math.round((doc.zoom||1)*100)}%</span><button className={styles.btn} onClick={()=>zoomBy(.25)}>+</button><details className={styles.moreMenu}><summary aria-label="Flere verktøy" title="Flere verktøy">☰</summary><div className={styles.moreMenuPanel} onClick={e=>{if(e.target.closest("button"))e.currentTarget.parentElement.open=false}}><button className={styles.btn} onClick={fitView}>◎ Sentrer alt</button><button className={focusView?styles.activeBtn:styles.btn} onClick={()=>{setFocusView(value=>!value);setTimeout(fitView,60)}}>{focusView?"Vis paneler":"Fokus tegning"}</button><button className={tool==="pan"?styles.activeBtn:styles.btn} onClick={()=>{setTool(tool==="pan"?"select":"pan");setDraft(null);setMeasureDraft(null)}}>Flytt visning</button><button className={elPlan?styles.activeBtn:styles.btn} onClick={()=>setElPlan(value=>!value)}>EL-tegning</button><button className={styles.btn} onClick={()=>setShow3D(true)}>3D-visning</button><button className={styles.btn} onClick={()=>openWallView()}>Veggvisning</button><button className={styles.btn} onClick={()=>openFurnitureBuilder(selected?.kind==="wall"?selected.id:null)}>Bygg møbel</button><button className={styles.btn} onClick={runPrint}>PDF / rapport</button><button className={styles.btn} onClick={openMaterialCalculator}>Materialkalkulator</button><button className={styles.btn} onClick={newQuoteFromDrawing}>Nytt tilbud fra tegning</button></div></details></header>
   <nav className={styles.mobileTools} aria-label="Tegneverktøy mobil">
    <button type="button" className={tool==="select"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("select");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Velg</button>
    <button type="button" className={tool==="wall"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("wall");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Vegg</button>
@@ -1369,7 +1408,7 @@ export default function DrawingClient(){
    <button type="button" className={styles.mobileTool} onClick={()=>zoomBy(-.25)}>−</button>
    <span className={styles.mobileZoom}>{Math.round((doc.zoom||1)*100)}%</span>
    <button type="button" className={styles.mobileTool} onClick={()=>zoomBy(.25)}>+</button>
-   <button type="button" className={styles.mobileTool} onClick={fitView}>Tilpass</button>
+   <button type="button" className={styles.mobileTool} onClick={fitView}>Sentrer alt</button>
    <span className={styles.mobileDivider}/>
    <button type="button" className={styles.mobileTool} onClick={()=>scrollPanel(leftPanel)}>Objekter</button>
    <button type="button" className={styles.mobileTool} onClick={()=>scrollPanel(rightPanel)}>Egenskaper</button>
@@ -1479,14 +1518,14 @@ export default function DrawingClient(){
    </div>
    <button type="button" className={styles.mobileAllProps} onClick={()=>scrollPanel(rightPanel)}>Vis alle egenskaper</button>
   </div>}
-  {wallForView&&<div className={styles.wallViewBackdrop} role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)setWallViewId(null)}}>
+  {wallForView&&<div className={styles.wallViewBackdrop} role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget){if(furnitureGapPick){setFurnitureBuilder(furnitureGapPick);setFurnitureGapPick(null)}setWallViewId(null)}}}>
    <section className={styles.wallViewModal} role="dialog" aria-modal="true" aria-label="Veggvisning og veggtegning">
     <header>
      <div><span>VEGGTEGNING</span><h2>Vegg {Math.max(1,doc.walls.findIndex(w=>w.id===wallForView.id)+1)} · {len(wallForView)} × {Math.round(Number(wallForView.h)||2400)} mm</h2><p>Arbeid rett på veggen. Alt som hører til veggen vises med faktisk bredde og høyde, slik at du kan bygge opp veggen før du går tilbake til plantegningen.</p></div>
      <button type="button" onClick={()=>setWallViewId(null)} aria-label="Lukk veggtegning">×</button>
     </header>
     <div className={styles.wallStrip}>{doc.walls.map((wall,index)=><button type="button" key={wall.id} data-active={wall.id===wallForView.id?"true":"false"} onClick={()=>openWallView(wall.id)}><b>Vegg {index+1}</b><small>{len(wall)} × {Math.round(Number(wall.h)||2400)} mm</small></button>)}</div>
-    <div className={styles.wallViewToolbar}><button type="button" onClick={()=>cycleWallView(-1)}>← Forrige</button><button type="button" className={styles.wallViewBuild} onClick={()=>openFurnitureBuilder(wallForView.id)}>+ Bygg eget møbel</button><button type="button" onClick={()=>cycleWallView(1)}>Neste →</button></div>
+    <div className={styles.wallViewToolbar}><button type="button" onClick={()=>cycleWallView(-1)}>← Forrige</button><button type="button" className={styles.wallViewBuild} onClick={()=>openFurnitureBuilder(wallForView.id)}>+ Bygg eget møbel</button>{furnitureGapPick&&<button type="button" className={styles.wallGapCancel} onClick={()=>{setFurnitureBuilder(furnitureGapPick);setFurnitureGapPick(null)}}>Avbryt mellomrom</button>}<button type="button" onClick={()=>cycleWallView(1)}>Neste →</button></div>
     <div className={styles.wallWorkspaceTools}>
      <button type="button" onClick={()=>openFurnitureBuilder(wallForView.id)}>+ Eget møbel</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("door",900,100)}>+ Dør</button>
@@ -1500,7 +1539,7 @@ export default function DrawingClient(){
      <button type="button" onClick={()=>addWallWorkspaceItem("thermostat",140,100)}>+ Termostat</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("walllight",180,100)}>+ Vegglampe</button>
     </div>
-    <div className={styles.wallViewCanvas}><WallElevationPreview wall={wallForView} items={doc.items} selectedItemId={selected?.kind==="item"?selected.id:null} onSelectItem={item=>setSelected({kind:"item",id:item.id})}/></div>
+    <div className={styles.wallViewCanvas+(furnitureGapPick?" "+styles.wallGapPickCanvas:"")}><WallElevationPreview wall={wallForView} items={doc.items} selectedItemId={selected?.kind==="item"?selected.id:null} gapPickMode={!!furnitureGapPick} onSelectGap={chooseFurnitureGap} onSelectItem={item=>{if(!furnitureGapPick)setSelected({kind:"item",id:item.id})}}/></div>
     {wallSelectedItem&&(()=>{const gaps=wallEdgeOffsets(wallSelectedItem,wallForView),isOpening=openingTypes.has(wallSelectedItem.type),isElectrical=wallElectricalTypes.has(wallSelectedItem.type),isCustom=wallSelectedItem.type==="customwall";return <div className={styles.wallInlineEditor}>
      <div><strong>{wallSelectedItem.customName||labelFor(wallSelectedItem.type)}</strong><small>Valgt på vegg {Math.max(1,doc.walls.findIndex(w=>w.id===wallForView.id)+1)}</small></div>
      <label>Fra venstre (mm)<input type="number" min="0" max={Math.max(0,gaps.L-Number(wallSelectedItem.w||0))} value={gaps.start} onChange={e=>updateWallItemById(wallSelectedItem.id,"wallStartGap",e.target.value)}/></label>
@@ -1511,7 +1550,7 @@ export default function DrawingClient(){
      {isCustom&&<><label>Møbelhøyde (mm)<input type="number" min="50" value={Math.round(modelHeight(wallSelectedItem))} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"modelHeight",e.target.value)}/></label><label>Fra gulv (mm)<input type="number" min="0" value={Math.round(Number(wallSelectedItem.elevation)||0)} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"elevation",e.target.value)}/></label></>}
      <div className={styles.wallInlineActions}><button type="button" onClick={duplicate}>Dupliser</button><button type="button" onClick={remove}>Slett</button></div>
     </div>})()}
-    <div className={styles.wallViewHint}>Klikk et objekt på veggen for å redigere det uten å forlate veggvisningen. Rutenettet er 100 mm. Vegglengde, vegghøyde, åpninger, EL-punkter og egne møbler vises i samme frontvisning.</div>
+    <div className={styles.wallViewHint}>{furnitureGapPick?<><b>Velg mellomrom:</b> trykk i et grønt felt. Møbelet du laget får automatisk nøyaktig bredde på mellomrommet og plasseres kant-i-kant.</>:<>Klikk et objekt på veggen for å redigere det uten å forlate veggvisningen. Rutenettet er 100 mm. Vegglengde, vegghøyde, åpninger, EL-punkter og egne møbler vises i samme frontvisning.</>}</div>
     <footer><span>Vegg: <b>{len(wallForView)} × {Math.round(Number(wallForView.h)||2400)} × {Math.round(Number(wallForView.t)||98)} mm</b></span><span>Objekter: <b>{doc.items.filter(item=>item.wallId===wallForView.id).length}</b></span><button type="button" onClick={()=>setWallViewId(null)}>Tilbake til plantegning →</button></footer>
    </section>
   </div>}
@@ -1534,6 +1573,7 @@ export default function DrawingClient(){
      <div style={{aspectRatio:Math.max(.35,Math.min(3,Number(furnitureBuilder.width||1)/Math.max(1,Number(furnitureBuilder.height)||1)))}}>{Array.from({length:Math.max(1,Math.min(8,Math.round(Number(furnitureBuilder.sectionsX)||1)))*Math.max(1,Math.min(6,Math.round(Number(furnitureBuilder.sectionsY)||1)))},(_,i)=><span key={i}/>)}</div>
      <p>{furnitureBuilder.name||"Eget møbel"} · {furnitureBuilder.width||0} × {furnitureBuilder.depth||0} × {furnitureBuilder.height||0} mm</p>
     </div>
+    <div className={styles.furnitureSmartActions}>{furnitureBuilder.mount==="wall"&&<><button type="button" onClick={()=>setFurnitureBuilder(v=>{const wall=doc.walls.find(w=>w.id===v?.wallId)||wallForView;if(!v||!wall)return v;const width=Math.min(Math.max(100,Number(v.width)||100),len(wall));return {...v,width:String(Math.round(width)),start:String(Math.round((len(wall)-width)/2))}})}>Sentrer på veggen</button><button type="button" className={styles.smartGapButton} onClick={startFurnitureGapPick}>↔ Velg mellomrom – tilpass automatisk</button></>}</div>
     <div className={styles.roomModalActions}><button type="button" onClick={()=>setFurnitureBuilder(null)}>Avbryt</button><button type="button" onClick={createCustomFurniture}>Legg inn møbel</button></div>
    </section>
   </div>}
