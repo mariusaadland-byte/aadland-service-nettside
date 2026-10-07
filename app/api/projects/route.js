@@ -62,10 +62,13 @@ export async function GET(request){
   return NextResponse.json({project:map(data),previousProject,nextProject});
  }
 
- let query=s.from("projects").select("*").eq("active",true).order("sort_order").order("created_at",{ascending:false});
- if(!all) query=query.eq("featured",true).limit(4);
+ const makeQuery=()=>{
+  let query=s.from("projects").select("*").eq("active",true).order("sort_order").order("created_at",{ascending:false});
+  if(!all)query=query.eq("featured",true).limit(4);
+  return query;
+ };
 
- const {data,error}=await withSupabaseRetry(()=>query);
+ const {data,error}=await withSupabaseRetry(makeQuery);
  if(error){
   console.error("PROJECTS GET ERROR:",error);
   if(error.code==="42P01")return NextResponse.json({projects:[],setupRequired:true},{status:503});
