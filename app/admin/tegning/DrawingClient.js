@@ -324,23 +324,7 @@ function constrainFreeItem(item,zones,{fallbackCenter=null,snapDistance=140}={})
   zone=[...zones].sort((a,b)=>{const ac=polygonCentroid(a.points||[]),bc=polygonCentroid(b.points||[]);return Math.hypot(ac.x-center.x,ac.y-center.y)-Math.hypot(bc.x-center.x,bc.y-center.y)})[0];
  }
  if(!zone){const clamped=constrainFreeItem({...item,type:"__canvas__"},[],{});return {...clamped,type:item.type}}
- if(itemFitsZone(item,zone)) {
-  const safe=safeCenterInZone(item,zone,fallback);
-  if(safe&&snapDistance>0){
-   const vx=center.x-safe.x,vy=center.y-safe.y,L=Math.hypot(vx,vy);
-   if(L>1){
-    const extended={x:center.x+vx/L*snapDistance,y:center.y+vy/L*snapDistance};
-    const ex=extended.x-item.w/2,ey=extended.y-item.h/2;
-    if(!itemFitsZone(item,zone,ex,ey)){
-     let lo=0,hi=1;
-     for(let i=0;i<24;i++){const mid=(lo+hi)/2,cx=center.x+(extended.x-center.x)*mid,cy=center.y+(extended.y-center.y)*mid;if(itemFitsZone(item,zone,cx-item.w/2,cy-item.h/2))lo=mid;else hi=mid}
-     const cx=center.x+(extended.x-center.x)*lo,cy=center.y+(extended.y-center.y)*lo;
-     return {...item,x:cx-item.w/2,y:cy-item.h/2,roomId:zone.id};
-    }
-   }
-  }
-  return {...item,roomId:zone.id};
- }
+ if(itemFitsZone(item,zone))return {...item,roomId:zone.id};
  const safe=safeCenterInZone(item,zone,fallback);
  if(!safe)return {...item,x:fallback.x-item.w/2,y:fallback.y-item.h/2,roomId:zone.id};
  let lo=0,hi=1,best=safe;
@@ -403,7 +387,7 @@ function rebuildLinkedRoomGeometry(doc,zone,innerPoints,thicknessOverrides={}){
  });
  const zones=syncLinkedZones(walls,doc.zones||[]),measurements=syncAnchoredMeasurements(walls,doc.measurements||[]),items=(doc.items||[]).map(item=>{
   if(!item.wallId)return item;const wall=walls.find(w=>w.id===item.wallId);if(!wall)return {...item,wallId:null,wallOffset:null};
-  const remembered=oldFaceStarts.get(item.id),base=remembered==null?item:{...item,wallOffset:wallOffsetFromFaceStart(wall,remembered,Number(item.w)||0,zones,walls,doc.defaultWallThickness||98)},placed=mountedItemCenter(base,wall,zones);
+  const remembered=oldFaceStarts.get(item.id),base=remembered==null?item:{...item,wallOffset:wallOffsetFromFaceStart(wall,remembered,Number(item.w)||0,zones,walls,doc.defaultWallThickness||98)},placed=mountedItemCenter(base,wall,zones,walls,doc.defaultWallThickness||98);
   return {...base,x:placed.cx-(Number(base.w)||0)/2,y:placed.cy-(Number(base.h)||0)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off};
  });
  return {...doc,walls,zones,measurements,items};
@@ -470,11 +454,15 @@ function wallInwardNormal(wall,zones){
  const dx=wall.x2-wall.x1,dy=wall.y2-wall.y1,L=Math.hypot(dx,dy)||1,ccw=polygonSignedArea(zone.points||[])>=0;
  return ccw?{x:-dy/L,y:dx/L}:{x:dy/L,y:-dx/L};
 }
-function mountedItemCenter(item,wall,zones=[]){
- const limits=mountedLimits(item,wall),off=clamp(Number.isFinite(item?.wallOffset)?item.wallOffset:wallOffset(item,wall),limits.min,limits.max),a=Math.atan2(wall.y2-wall.y1,wall.x2-wall.x1);
+function mountedItemCenter(item,wall,zones=[],walls=[],defaultThickness=98){
+ const face=wallFaceMetrics(wall,zones,walls?.length?walls:[wall],defaultThickness);
+ const width=Math.max(0,Number(item?.w)||0),half=width/2,minimum=face.startOffset+half,maximum=face.endOffset-half;
+ const wanted=Number.isFinite(item?.wallOffset)?Number(item.wallOffset):wallOffset(item,wall);
+ const off=minimum<=maximum?clamp(wanted,minimum,maximum):(face.startOffset+face.endOffset)/2;
+ const a=Math.atan2(wall.y2-wall.y1,wall.x2-wall.x1);
  let cx=wall.x1+Math.cos(a)*off,cy=wall.y1+Math.sin(a)*off;
  if(item?.type==="customwall"||wallPlaceableFurnitureTypes.has(item?.type)){
-  const inward=wallInwardNormal(wall,zones),shift=Math.max(0,(Number(wall.t)||98)/2)+Math.max(0,Number(item.h)||0)/2;
+  const inward=wallInwardNormal(wall,zones),shift=Math.max(0,(Number(wall.t)||Number(defaultThickness)||98)/2)+Math.max(0,Number(item.h)||0)/2;
   cx+=inward.x*shift;cy+=inward.y*shift;
  }
  return{off,a,cx,cy};
@@ -849,8 +837,8 @@ function normalizeDrawingDocument(raw){
   const face=wallFaceMetrics(wall,zones,walls,base.defaultWallThickness||98),width=Math.max(1,Number(item.w)||1);
   if(width>face.L+1)return item;
   const gaps=wallFaceOffsets(item,wall,zones,walls,base.defaultWallThickness||98),safeStart=clamp(gaps.start,0,Math.max(0,face.L-width));
-  if(Math.abs(safeStart-gaps.start)<.5)return item;
-  const wallOffset=wallOffsetFromFaceStart(wall,safeStart,width,zones,walls,base.defaultWallThickness||98),baseItem={...item,wallOffset},placed=mountedItemCenter(baseItem,wall,zones);
+  // Always recalculate saved furniture position from the finished inner wall.
+  const wallOffset=wallOffsetFromFaceStart(wall,safeStart,width,zones,walls,base.defaultWallThickness||98),baseItem={...item,wallOffset},placed=mountedItemCenter(baseItem,wall,zones,walls,base.defaultWallThickness||98);
   return {...baseItem,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off};
  });
  return {...base,walls,zones,measurements,items};
@@ -989,7 +977,7 @@ export default function DrawingClient(){
  },[online]);
  const persist=async(next=docRef.current)=>{writeLocalSnapshot(next);if(!next.orderId&&!next.projectId&&!next.customerUserId){setMessage("Lagret på enheten");setTimeout(()=>setMessage(""),1800);return}await syncServer(next,{quiet:false})};
  const checkpoint=()=>setHistory(h=>[...h.slice(-24),JSON.stringify(doc)]);
- const syncMounted=(walls,items,zones=[])=>items.map(o=>{if(!o.wallId)return o;const w=walls.find(x=>x.id===o.wallId);if(!w)return {...o,wallId:null,wallOffset:null};const {off,a,cx,cy}=mountedItemCenter(o,w,zones);return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off}});
+ const syncMounted=(walls,items,zones=[])=>items.map(o=>{if(!o.wallId)return o;const w=walls.find(x=>x.id===o.wallId);if(!w)return {...o,wallId:null,wallOffset:null};const {off,a,cx,cy}=mountedItemCenter(o,w,zones,walls,doc.defaultWallThickness||98);return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off}});
  const mutate=fn=>{checkpoint();setFuture([]);setDoc(d=>fn(d))};
  const undo=()=>{const last=history.at(-1);if(!last)return;setFuture(f=>[JSON.stringify(doc),...f].slice(0,25));setDoc(normalizeDrawingDocument(JSON.parse(last)));setHistory(h=>h.slice(0,-1));setSelected(null)};
  const redo=()=>{const next=future[0];if(!next)return;setHistory(h=>[...h.slice(-24),JSON.stringify(doc)]);setDoc(normalizeDrawingDocument(JSON.parse(next)));setFuture(f=>f.slice(1));setSelected(null)};
@@ -1027,7 +1015,7 @@ export default function DrawingClient(){
   if(start+width>face.L+1){setMessage("Ikke plass til en kopi til høyre");setTimeout(()=>setMessage(""),1800);return}
   const occupied=doc.items.filter(o=>o.wallId===wall.id&&o.id!==item.id&&!wallElectricalTypes.has(o.type)).some(o=>{const g=wallFaceOffsets(o,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);return start<g.start+Number(o.w||0)-3&&start+width>g.start+3});
   if(occupied){setMessage("Neste plass på veggen er opptatt");setTimeout(()=>setMessage(""),1800);return}
-  const id=uid(),base={...item,id,wallOffset:wallOffsetFromFaceStart(wall,start,width,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98)},placed=mountedItemCenter(base,wall,doc.zones||[]);
+  const id=uid(),base={...item,id,wallOffset:wallOffsetFromFaceStart(wall,start,width,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98)},placed=mountedItemCenter(base,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
   mutate(d=>({...d,items:[...d.items,{...base,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}]}));setSelected({kind:"item",id});
  };
  const fillWallRight=itemId=>{
@@ -1036,9 +1024,9 @@ export default function DrawingClient(){
   if(count<1&&space<30){setMessage("Ingen ledig plass å fylle");setTimeout(()=>setMessage(""),1800);return}
   mutate(d=>{
    const liveWall=d.walls.find(w=>w.id===wall.id)||wall,added=[];
-   for(let i=0;i<count;i++){const start=current.start+width*(i+1),id=uid(),base={...item,id,wallOffset:wallOffsetFromFaceStart(liveWall,start,width,d.zones||[],d.walls||[],d.defaultWallThickness||98)},placed=mountedItemCenter(base,liveWall,d.zones||[]);added.push({...base,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off})}
+   for(let i=0;i<count;i++){const start=current.start+width*(i+1),id=uid(),base={...item,id,wallOffset:wallOffsetFromFaceStart(liveWall,start,width,d.zones||[],d.walls||[],d.defaultWallThickness||98)},placed=mountedItemCenter(base,liveWall,d.zones||[],d.walls||[],d.defaultWallThickness||98);added.push({...base,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off})}
    const used=count*width,remainder=Math.round(space-used);
-   if(kitchenTypes.has(item.type)&&remainder>=10){const start=current.start+width*(count+1),id=uid(),base={id,type:"filler",x:0,y:0,w:remainder,h:Number(item.h)||600,rot:0,wallId:liveWall.id,wallOffset:wallOffsetFromFaceStart(liveWall,start,remainder,d.zones||[],d.walls||[],d.defaultWallThickness||98),modelHeight:modelHeight(item),elevation:Number(item.elevation)||0},placed=mountedItemCenter(base,liveWall,d.zones||[]);added.push({...base,x:placed.cx-remainder/2,y:placed.cy-(Number(base.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off})}
+   if(kitchenTypes.has(item.type)&&remainder>=10){const start=current.start+width*(count+1),id=uid(),base={id,type:"filler",x:0,y:0,w:remainder,h:Number(item.h)||600,rot:0,wallId:liveWall.id,wallOffset:wallOffsetFromFaceStart(liveWall,start,remainder,d.zones||[],d.walls||[],d.defaultWallThickness||98),modelHeight:modelHeight(item),elevation:Number(item.elevation)||0},placed=mountedItemCenter(base,liveWall,d.zones||[],d.walls||[],d.defaultWallThickness||98);added.push({...base,x:placed.cx-remainder/2,y:placed.cy-(Number(base.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off})}
    return {...d,items:[...d.items,...added]};
   });setMessage("Veggrekken er fylt mot høyre");setTimeout(()=>setMessage(""),1800);
  };
@@ -1083,10 +1071,10 @@ export default function DrawingClient(){
     const wall=d.walls.find(w=>w.id===wallId);if(!wall)return d;
     const face=wallFaceMetrics(wall,d.zones||[],d.walls||[],d.defaultWallThickness||98),metrics=o=>wallFaceOffsets(o,wall,d.zones||[],d.walls||[],d.defaultWallThickness||98);
     const sorted=[...chosen].sort((a,b)=>metrics(a).start-metrics(b).start);
-    if(mode==="pack"){let cursor=metrics(sorted[0]).start;for(const item of sorted){const width=Number(item.w)||1,base={...item,wallOffset:wallOffsetFromFaceStart(wall,cursor,width,d.zones||[],d.walls||[],d.defaultWallThickness||98)},placed=mountedItemCenter(base,wall,d.zones||[]);items=items.map(o=>o.id===item.id?{...base,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}:o);cursor+=width}}
-    else if(mode==="distribute"){const total=sorted.reduce((sum,o)=>sum+(Number(o.w)||0),0),gap=Math.max(0,(face.L-total)/(sorted.length+1));let cursor=gap;for(const item of sorted){const width=Number(item.w)||1,base={...item,wallOffset:wallOffsetFromFaceStart(wall,cursor,width,d.zones||[],d.walls||[],d.defaultWallThickness||98)},placed=mountedItemCenter(base,wall,d.zones||[]);items=items.map(o=>o.id===item.id?{...base,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}:o);cursor+=width+gap}}
+    if(mode==="pack"){let cursor=metrics(sorted[0]).start;for(const item of sorted){const width=Number(item.w)||1,base={...item,wallOffset:wallOffsetFromFaceStart(wall,cursor,width,d.zones||[],d.walls||[],d.defaultWallThickness||98)},placed=mountedItemCenter(base,wall,d.zones||[],d.walls||[],d.defaultWallThickness||98);items=items.map(o=>o.id===item.id?{...base,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}:o);cursor+=width}}
+    else if(mode==="distribute"){const total=sorted.reduce((sum,o)=>sum+(Number(o.w)||0),0),gap=Math.max(0,(face.L-total)/(sorted.length+1));let cursor=gap;for(const item of sorted){const width=Number(item.w)||1,base={...item,wallOffset:wallOffsetFromFaceStart(wall,cursor,width,d.zones||[],d.walls||[],d.defaultWallThickness||98)},placed=mountedItemCenter(base,wall,d.zones||[],d.walls||[],d.defaultWallThickness||98);items=items.map(o=>o.id===item.id?{...base,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}:o);cursor+=width+gap}}
     else if(mode==="sameHeight"){const elevation=Number(sorted[0].elevation)||0;items=items.map(o=>multiSelectedIds.includes(o.id)?{...o,elevation}:o)}
-    else if(mode==="sameWidth"){const width=Number(sorted[0].w)||1;items=items.map(o=>{if(!multiSelectedIds.includes(o.id))return o;const live=metrics(o),start=clamp(live.start,0,Math.max(0,face.L-width)),base={...o,w:width,wallOffset:wallOffsetFromFaceStart(wall,start,width,d.zones||[],d.walls||[],d.defaultWallThickness||98)},placed=mountedItemCenter(base,wall,d.zones||[]);return {...base,x:placed.cx-width/2,y:placed.cy-(Number(o.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}})}
+    else if(mode==="sameWidth"){const width=Number(sorted[0].w)||1;items=items.map(o=>{if(!multiSelectedIds.includes(o.id))return o;const live=metrics(o),start=clamp(live.start,0,Math.max(0,face.L-width)),base={...o,w:width,wallOffset:wallOffsetFromFaceStart(wall,start,width,d.zones||[],d.walls||[],d.defaultWallThickness||98)},placed=mountedItemCenter(base,wall,d.zones||[],d.walls||[],d.defaultWallThickness||98);return {...base,x:placed.cx-width/2,y:placed.cy-(Number(o.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}})}
    }else{
     const free=chosen.filter(o=>!o.wallId),boxes=free.map(item=>({item,box:itemAabb(item)})),left=Math.min(...boxes.map(x=>x.box.left)),right=Math.max(...boxes.map(x=>x.box.right)),top=Math.min(...boxes.map(x=>x.box.top)),bottom=Math.max(...boxes.map(x=>x.box.bottom)),cx=(left+right)/2,first=free[0];
     let targets=new Map();
@@ -1107,7 +1095,7 @@ export default function DrawingClient(){
    if(sameWall){
     const wall=d.walls.find(w=>w.id===chosen[0].wallId);if(!wall)return d;const face=wallFaceMetrics(wall,d.zones||[],d.walls||[],d.defaultWallThickness||98),metric=o=>wallFaceOffsets(o,wall,d.zones||[],d.walls||[],d.defaultWallThickness||98),min=Math.min(...chosen.map(o=>metric(o).start)),max=Math.max(...chosen.map(o=>metric(o).start+Number(o.w||0))),span=max-min,shift=span+100;
     if(max+shift>face.L){setTimeout(()=>{setMessage("Ikke plass til å kopiere gruppen til høyre");setTimeout(()=>setMessage(""),1800)},0);return d}
-    const added=chosen.map(o=>{const width=Number(o.w)||1,start=metric(o).start+shift,base={...o,id:uid(),wallOffset:wallOffsetFromFaceStart(wall,start,width,d.zones||[],d.walls||[],d.defaultWallThickness||98)},placed=mountedItemCenter(base,wall,d.zones||[]);return{...base,x:placed.cx-width/2,y:placed.cy-(Number(o.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}});
+    const added=chosen.map(o=>{const width=Number(o.w)||1,start=metric(o).start+shift,base={...o,id:uid(),wallOffset:wallOffsetFromFaceStart(wall,start,width,d.zones||[],d.walls||[],d.defaultWallThickness||98)},placed=mountedItemCenter(base,wall,d.zones||[],d.walls||[],d.defaultWallThickness||98);return{...base,x:placed.cx-width/2,y:placed.cy-(Number(o.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}});
     return {...d,items:[...d.items,...added]};
    }
    const added=chosen.map(o=>({...o,id:uid(),x:o.x+200,y:o.y+200,wallId:null,wallOffset:null}));return {...d,items:[...d.items,...added]};
@@ -1317,7 +1305,7 @@ export default function DrawingClient(){
  const moveWallItem2D=(itemId,{start,elevation})=>{
   setDoc(d=>{
    const item=d.items.find(o=>o.id===itemId),wall=item?.wallId?d.walls.find(w=>w.id===item.wallId):null;if(!item||!wall)return d;
-   const width=Math.max(1,Number(item.w)||1),off=wallOffsetFromFaceStart(wall,Number(start)||0,width,d.zones||[],d.walls||[],d.defaultWallThickness||98),nextBase={...item,wallOffset:off,elevation:Number.isFinite(Number(elevation))?Number(elevation):(Number(item.elevation)||0)},placed=mountedItemCenter(nextBase,wall,d.zones||[]);
+   const width=Math.max(1,Number(item.w)||1),off=wallOffsetFromFaceStart(wall,Number(start)||0,width,d.zones||[],d.walls||[],d.defaultWallThickness||98),nextBase={...item,wallOffset:off,elevation:Number.isFinite(Number(elevation))?Number(elevation):(Number(item.elevation)||0)},placed=mountedItemCenter(nextBase,wall,d.zones||[],d.walls||[],d.defaultWallThickness||98);
    return {...d,items:d.items.map(o=>o.id===itemId?{...nextBase,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}:o)};
   });
  };
@@ -1393,7 +1381,7 @@ export default function DrawingClient(){
    if(!wall){setMessage("Velg en vegg for veggmontert møbel");setTimeout(()=>setMessage(""),2000);return}
    const face=wallFaceMetrics(wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),L=face.L,wallHeight=Math.max(300,Number(wall.h)||Number(doc.defaultWallHeight)||2400);if(width>L+1){setMessage("Møbelet er bredere enn innvendig veggmål");setTimeout(()=>setMessage(""),2000);return}if(elevation+height>wallHeight){setMessage("Møbelet går over veggens høyde");setTimeout(()=>setMessage(""),2200);return}
    const rawStart=fitGap?Number(fitGap.start):(String(builder.start||"").trim()===""?(L-width)/2:Number(builder.start));
-   const start=clamp(Number.isFinite(rawStart)?rawStart:(L-width)/2,0,Math.max(0,L-width)),off=wallOffsetFromFaceStart(wall,start,width,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),base={id,type:"customwall",customName:name,x:0,y:0,w:width,h:depth,rot:0,wallId:wall.id,wallOffset:off,modelHeight:height,elevation,sectionsX,sectionsY,cellTypes,colWidths,rowHeights},placed=mountedItemCenter(base,wall,doc.zones||[]);
+   const start=clamp(Number.isFinite(rawStart)?rawStart:(L-width)/2,0,Math.max(0,L-width)),off=wallOffsetFromFaceStart(wall,start,width,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),base={id,type:"customwall",customName:name,x:0,y:0,w:width,h:depth,rot:0,wallId:wall.id,wallOffset:off,modelHeight:height,elevation,sectionsX,sectionsY,cellTypes,colWidths,rowHeights},placed=mountedItemCenter(base,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
    mutate(d=>({...d,items:[...d.items,{...base,x:placed.cx-width/2,y:placed.cy-depth/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}]}));
    setWallViewId(wall.id);setSelected({kind:"item",id});
    if(fitGap){setMessage("Møbelet ble tilpasset mellomrommet automatisk · "+Math.round(width)+" mm");setTimeout(()=>setMessage(""),2600)}
@@ -1468,7 +1456,7 @@ export default function DrawingClient(){
    if(start==null){setMessage("Ikke nok ledig plass på veggen");setTimeout(()=>setMessage(""),2200);return}
    const faceStart=start,off=wallOffsetFromFaceStart(selectedWall,faceStart,w,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
    mutate(d=>{
-    const liveWall=d.walls.find(wall=>wall.id===selectedWall.id)||selectedWall,base={id,type,x:0,y:0,w,h,rot:0,wallId:liveWall.id,wallOffset:off,...openingDefaults(type),...itemDefaults(type,d)},placed=mountedItemCenter(base,liveWall,d.zones||[]);
+    const liveWall=d.walls.find(wall=>wall.id===selectedWall.id)||selectedWall,base={id,type,x:0,y:0,w,h,rot:0,wallId:liveWall.id,wallOffset:off,...openingDefaults(type),...itemDefaults(type,d)},placed=mountedItemCenter(base,liveWall,d.zones||[],d.walls||[],d.defaultWallThickness||98);
     return {...d,items:[...d.items,{...base,x:placed.cx-w/2,y:placed.cy-h/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}]};
    });
   }else{
@@ -1506,7 +1494,7 @@ export default function DrawingClient(){
   if(W>L+2){setMessage("Møbelet er bredere enn innvendig veggmål");setTimeout(()=>setMessage(""),2000);return}
   const dx=b.x-a.x,dy=b.y-a.y,ux=dx/L,uy=dy/L,inward=wallInwardNormal(wall,[context.zone]),baseAngle=Math.atan2(dy,dx),localY={x:-Math.sin(baseAngle),y:Math.cos(baseAngle)},rot=localY.x*inward.x+localY.y*inward.y>=0?baseAngle:baseAngle+Math.PI;
   const faceStart=mode==="start"?0:mode==="end"?L-W:(L-W)/2,off=wallOffsetFromFaceStart(wall,faceStart,W,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
-  const base={...item,wallId:wall.id,wallOffset:off,roomId:context.zone.id,rot:rot*180/Math.PI},placed=mountedItemCenter(base,wall,doc.zones||[]),next={...base,x:placed.cx-W/2,y:placed.cy-D/2,rot:placed.a*180/Math.PI,wallOffset:placed.off};
+  const base={...item,wallId:wall.id,wallOffset:off,roomId:context.zone.id,rot:rot*180/Math.PI},placed=mountedItemCenter(base,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),next={...base,x:placed.cx-W/2,y:placed.cy-D/2,rot:placed.a*180/Math.PI,wallOffset:placed.off};
   if(!itemFitsZone(next,context.inset)){setMessage("Møbelet får ikke plass helt der i dette rommet");setTimeout(()=>setMessage(""),2000);return}
   mutate(d=>({...d,items:d.items.map(o=>o.id===itemId?next:o)}));
   setFurnitureSnapWallId(wall.id);
@@ -1607,7 +1595,7 @@ export default function DrawingClient(){
   if(openingTypes.has(item.type)){if(openingCollision(wall,item.id,startGap,width,doc.items,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98)){setMessage("Åpningen overlapper en annen åpning");setTimeout(()=>setMessage(""),2200);return}}
   mutate(d=>{
    const live=d.items.find(o=>o.id===itemId),liveWall=live?.wallId?d.walls.find(w=>w.id===live.wallId):null;if(!live||!liveWall)return d;
-   const center=wallOffsetFromFaceStart(liveWall,startGap,width,d.zones||[],d.walls||[],d.defaultWallThickness||98),nextBase={...live,w:width,wallOffset:center,...(["customwall","customfloor"].includes(live.type)?{colWidths:furnitureDimArray(live.sectionsX,width,live.colWidths)}:{})},placed=mountedItemCenter(nextBase,liveWall,d.zones||[]);
+   const center=wallOffsetFromFaceStart(liveWall,startGap,width,d.zones||[],d.walls||[],d.defaultWallThickness||98),nextBase={...live,w:width,wallOffset:center,...(["customwall","customfloor"].includes(live.type)?{colWidths:furnitureDimArray(live.sectionsX,width,live.colWidths)}:{})},placed=mountedItemCenter(nextBase,liveWall,d.zones||[],d.walls||[],d.defaultWallThickness||98);
    const updated={...nextBase,x:placed.cx-width/2,y:placed.cy-live.h/2,rot:placed.a*180/Math.PI,wallOffset:placed.off};
    return {...d,items:d.items.map(o=>o.id===itemId?updated:o)};
   });
@@ -1637,7 +1625,7 @@ export default function DrawingClient(){
       let desired=n;
       if(key==="wallStartGap")desired=n+half;
       if(key==="wallEndGap")desired=limits.L-n-half;
-      const off=clamp(desired,limits.min,limits.max),base={...o,wallOffset:off},placed=mountedItemCenter(base,w,d.zones||[]);
+      const off=clamp(desired,limits.min,limits.max),base={...o,wallOffset:off},placed=mountedItemCenter(base,w,d.zones||[],d.walls||[],d.defaultWallThickness||98);
       return {...base,x:placed.cx-o.w/2,y:placed.cy-o.h/2,rot:placed.a*180/Math.PI,wallOffset:placed.off};
      }
      let changed={...o,[key]:n};
@@ -1671,7 +1659,7 @@ export default function DrawingClient(){
   mutate(d=>({...d,items:d.items.map(o=>{
    if(o.id!==itemId)return o;
    if(!wall)return {...o,w:width,colWidths:cols};
-   const liveWall=d.walls.find(w=>w.id===wall.id),face=wallFaceMetrics(liveWall,d.zones||[],d.walls||[],d.defaultWallThickness||98),start=clamp(wallFaceOffsets(o,liveWall,d.zones||[],d.walls||[],d.defaultWallThickness||98).start,0,Math.max(0,face.L-width)),base={...o,w:width,colWidths:cols,wallOffset:wallOffsetFromFaceStart(liveWall,start,width,d.zones||[],d.walls||[],d.defaultWallThickness||98)},placed=mountedItemCenter(base,liveWall,d.zones||[]);
+   const liveWall=d.walls.find(w=>w.id===wall.id),face=wallFaceMetrics(liveWall,d.zones||[],d.walls||[],d.defaultWallThickness||98),start=clamp(wallFaceOffsets(o,liveWall,d.zones||[],d.walls||[],d.defaultWallThickness||98).start,0,Math.max(0,face.L-width)),base={...o,w:width,colWidths:cols,wallOffset:wallOffsetFromFaceStart(liveWall,start,width,d.zones||[],d.walls||[],d.defaultWallThickness||98)},placed=mountedItemCenter(base,liveWall,d.zones||[],d.walls||[],d.defaultWallThickness||98);
    return {...base,x:placed.cx-width/2,y:placed.cy-o.h/2,rot:placed.a*180/Math.PI,wallOffset:placed.off};
   })}));
  };
@@ -1692,7 +1680,7 @@ export default function DrawingClient(){
    if(openingTypes.has(sel.type)&&start==null){setMessage("Ikke ledig plass til kopi på veggen");setTimeout(()=>setMessage(""),2000);return}
    if(start==null)start=current.start;
    const id=uid(),center=wallOffsetFromFaceStart(wall,start,width,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),base={...sel,id,wallOffset:center};
-   mutate(d=>{const liveWall=d.walls.find(w=>w.id===wall.id)||wall,placed=mountedItemCenter(base,liveWall,d.zones||[]);return {...d,items:[...d.items,{...base,x:placed.cx-width/2,y:placed.cy-(Number(sel.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}]}});setSelected({kind:"item",id});return;
+   mutate(d=>{const liveWall=d.walls.find(w=>w.id===wall.id)||wall,placed=mountedItemCenter(base,liveWall,d.zones||[],d.walls||[],d.defaultWallThickness||98);return {...d,items:[...d.items,{...base,x:placed.cx-width/2,y:placed.cy-(Number(sel.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}]}});setSelected({kind:"item",id});return;
   }
   mutate(d=>{const copy={...sel,id:uid(),x:sel.x+200,y:sel.y+200};return {...d,items:[...d.items,constrainFreeItemStrict(copy,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackItem:{...sel,id:copy.id},fallbackCenter:itemCenter(sel),snapDistance:0})]}})
  };
@@ -1782,14 +1770,26 @@ export default function DrawingClient(){
   }
   const current=doc.items.find(o=>o.id===drag.id);if(!current||current.locked)return;
   let proposed={...current,x:snapTo(p.x-drag.dx,doc.snapSize||50),y:snapTo(p.y-drag.dy,doc.snapSize||50)};
-  if(!current.wallId){const snapped=smartSnapFreeItem(proposed,doc);proposed=snapped.item;setSnapGuide(snapped.guide)}else setSnapGuide(null);
+  if(!current.wallId){const snapped=smartSnapFreeItem(proposed,doc);proposed=snapped.item;setSnapGuide(snapped.guide)}
+   else{
+    setSnapGuide(null);
+    const wall=doc.walls.find(w=>w.id===current.wallId);
+    if(wall){
+     const face=wallFaceMetrics(wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),dx=wall.x2-wall.x1,dy=wall.y2-wall.y1,L=Math.hypot(dx,dy)||1;
+     const target={x:p.x-drag.dx+current.w/2,y:p.y-drag.dy+current.h/2};
+     const projection=((target.x-wall.x1)*dx+(target.y-wall.y1)*dy)/L;
+     const off=wallOffsetFromFaceStart(wall,projection-face.startOffset-current.w/2,current.w,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
+     const mounted=mountedItemCenter({...current,wallOffset:off},wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
+     proposed={...current,x:mounted.cx-current.w/2,y:mounted.cy-current.h/2,rot:mounted.a*180/Math.PI,wallOffset:mounted.off};
+    }
+   }
   setDoc(d=>({...d,items:d.items.map(o=>{if(o.id!==drag.id)return o;return o.wallId?proposed:constrainFreeItemStrict(proposed,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackItem:o,fallbackCenter:drag.startCenter,snapDistance:150})})}));
  };
  const up=e=>{
   if(e)releasePointer(e);if(panning){setPanning(null);return}if(wallDrag){endWallDrag();return}if(zoneDrag){endZoneDrag();return}if(measureDrag){endMeasurementDrag();return}if(!drag)return;
   setSnapGuide(null);setHistory(h=>[...h.slice(-24),drag.start]);setFuture([]);
   if(drag.ids?.length>1){setDrag(null);return}
-  setDoc(d=>{const o=d.items.find(x=>x.id===drag.id);if(!o||!wallTypes.has(o.type)||o.locked)return d;const n=nearestWall({x:o.x+o.w/2,y:o.y+o.h/2},d.walls);if(!n||n.dist>450)return wallElectricalTypes.has(o.type)||o.type==="customwall"?JSON.parse(drag.start):{...d,items:d.items.map(x=>x.id!==o.id?x:{...x,wallId:null,wallOffset:null})};const face=wallFaceMetrics(n.wall,d.zones||[],d.walls||[],d.defaultWallThickness||98),projected=n.t*Math.max(1,len(n.wall))-face.startOffset,preferred=clamp(Math.round(projected-o.w/2),0,Math.max(0,face.L-o.w)),safeStart=openingTypes.has(o.type)?findOpeningStart(n.wall,o.w,d.items,o.id,preferred,d.zones||[],d.walls||[],d.defaultWallThickness||98):preferred;if(safeStart==null)return JSON.parse(drag.start);const off=wallOffsetFromFaceStart(n.wall,safeStart,o.w,d.zones||[],d.walls||[],d.defaultWallThickness||98),base={...o,wallId:n.wall.id,wallOffset:off},placed=mountedItemCenter(base,n.wall,d.zones||[]);return {...d,items:d.items.map(x=>x.id!==o.id?x:{...base,x:placed.cx-o.w/2,y:placed.cy-o.h/2,rot:placed.a*180/Math.PI,wallOffset:placed.off})}});
+  setDoc(d=>{const o=d.items.find(x=>x.id===drag.id);if(!o||!wallTypes.has(o.type)||o.locked)return d;if(o.wallId)return d;const n=nearestWall({x:o.x+o.w/2,y:o.y+o.h/2},d.walls);if(!n||n.dist>450)return wallElectricalTypes.has(o.type)||o.type==="customwall"?JSON.parse(drag.start):{...d,items:d.items.map(x=>x.id!==o.id?x:{...x,wallId:null,wallOffset:null})};const face=wallFaceMetrics(n.wall,d.zones||[],d.walls||[],d.defaultWallThickness||98),projected=n.t*Math.max(1,len(n.wall))-face.startOffset,preferred=clamp(Math.round(projected-o.w/2),0,Math.max(0,face.L-o.w)),safeStart=openingTypes.has(o.type)?findOpeningStart(n.wall,o.w,d.items,o.id,preferred,d.zones||[],d.walls||[],d.defaultWallThickness||98):preferred;if(safeStart==null)return JSON.parse(drag.start);const off=wallOffsetFromFaceStart(n.wall,safeStart,o.w,d.zones||[],d.walls||[],d.defaultWallThickness||98),base={...o,wallId:n.wall.id,wallOffset:off},placed=mountedItemCenter(base,n.wall,d.zones||[],d.walls||[],d.defaultWallThickness||98);return {...d,items:d.items.map(x=>x.id!==o.id?x:{...base,x:placed.cx-o.w/2,y:placed.cy-o.h/2,rot:placed.a*180/Math.PI,wallOffset:placed.off})}});
   setDrag(null);
  };
  const applyCanvasPoint=p=>{
