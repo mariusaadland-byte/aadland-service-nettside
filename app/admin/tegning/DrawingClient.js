@@ -1196,7 +1196,7 @@ export default function DrawingClient(){
  const moveWallItem2D=(itemId,{start,elevation})=>{
   setDoc(d=>{
    const item=d.items.find(o=>o.id===itemId),wall=item?.wallId?d.walls.find(w=>w.id===item.wallId):null;if(!item||!wall)return d;
-   const width=Math.max(1,Number(item.w)||1),off=clamp(Number(start)+width/2,width/2,Math.max(width/2,len(wall)-width/2)),nextBase={...item,wallOffset:off,elevation:Number.isFinite(Number(elevation))?Number(elevation):(Number(item.elevation)||0)},placed=mountedItemCenter(nextBase,wall,d.zones||[]);
+   const width=Math.max(1,Number(item.w)||1),off=wallOffsetFromFaceStart(wall,Number(start)||0,width,d.zones||[],d.walls||[],d.defaultWallThickness||98),nextBase={...item,wallOffset:off,elevation:Number.isFinite(Number(elevation))?Number(elevation):(Number(item.elevation)||0)},placed=mountedItemCenter(nextBase,wall,d.zones||[]);
    return {...d,items:d.items.map(o=>o.id===itemId?{...nextBase,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}:o)};
   });
  };
@@ -1238,6 +1238,12 @@ export default function DrawingClient(){
    colWidths:furnitureDimArray(template.sectionsX,template.width,[]),rowHeights:furnitureDimArray(template.sectionsY,template.height,[])
   });
  };
+ const openGapShelfBuilder=(wallId=null)=>{
+  const wall=doc.walls.find(w=>w.id===(wallId||wallForView?.id||""))||(selected?.kind==="wall"?doc.walls.find(w=>w.id===selected.id):null);
+  if(!wall){setMessage("Velg veggen der hyllen skal stå");setTimeout(()=>setMessage(""),1800);return}
+  const template=furnitureTemplates.find(x=>x.id==="hylle");
+  setFurnitureBuilder({templateId:"hylle",fitMode:"between",name:"Hylle mellom skap",width:"",depth:String(template.depth),height:String(template.height),elevation:String(template.elevation),mount:"wall",wallId:wall.id,start:"",sectionsX:"3",sectionsY:"1",cellTypes:furnitureCellArray(3,1,[],"shelf"),colWidths:[],rowHeights:furnitureDimArray(1,template.height,[])});
+ };
  const applyFurnitureTemplate=templateId=>{
   const template=furnitureTemplates.find(x=>x.id===templateId)||furnitureTemplates.at(-1);
   setFurnitureBuilder(v=>v?{...v,templateId:template.id,name:template.name,width:String(template.width),depth:String(template.depth),height:String(template.height),elevation:String(template.elevation),mount:template.mount,sectionsX:String(template.sectionsX),sectionsY:String(template.sectionsY),cellTypes:furnitureCellArray(template.sectionsX,template.sectionsY,[],template.cellType||"open"),colWidths:furnitureDimArray(template.sectionsX,template.width,[]),rowHeights:furnitureDimArray(template.sectionsY,template.height,[])}:v);
@@ -1264,9 +1270,9 @@ export default function DrawingClient(){
   if(builder.mount==="wall"||fitGap){
    const wall=doc.walls.find(w=>w.id===builder.wallId)||wallForView||(selected?.kind==="wall"?doc.walls.find(w=>w.id===selected.id):null);
    if(!wall){setMessage("Velg en vegg for veggmontert møbel");setTimeout(()=>setMessage(""),2000);return}
-   const L=len(wall),wallHeight=Math.max(300,Number(wall.h)||Number(doc.defaultWallHeight)||2400);if(width>L){setMessage("Møbelet er bredere enn veggen");setTimeout(()=>setMessage(""),2000);return}if(elevation+height>wallHeight){setMessage("Møbelet går over veggens høyde");setTimeout(()=>setMessage(""),2200);return}
+   const face=wallFaceMetrics(wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),L=face.L,wallHeight=Math.max(300,Number(wall.h)||Number(doc.defaultWallHeight)||2400);if(width>L+1){setMessage("Møbelet er bredere enn innvendig veggmål");setTimeout(()=>setMessage(""),2000);return}if(elevation+height>wallHeight){setMessage("Møbelet går over veggens høyde");setTimeout(()=>setMessage(""),2200);return}
    const rawStart=fitGap?Number(fitGap.start):(String(builder.start||"").trim()===""?(L-width)/2:Number(builder.start));
-   const start=clamp(Number.isFinite(rawStart)?rawStart:(L-width)/2,0,Math.max(0,L-width)),off=start+width/2,base={id,type:"customwall",customName:name,x:0,y:0,w:width,h:depth,rot:0,wallId:wall.id,wallOffset:off,modelHeight:height,elevation,sectionsX,sectionsY,cellTypes,colWidths,rowHeights},placed=mountedItemCenter(base,wall,doc.zones||[]);
+   const start=clamp(Number.isFinite(rawStart)?rawStart:(L-width)/2,0,Math.max(0,L-width)),off=wallOffsetFromFaceStart(wall,start,width,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),base={id,type:"customwall",customName:name,x:0,y:0,w:width,h:depth,rot:0,wallId:wall.id,wallOffset:off,modelHeight:height,elevation,sectionsX,sectionsY,cellTypes,colWidths,rowHeights},placed=mountedItemCenter(base,wall,doc.zones||[]);
    mutate(d=>({...d,items:[...d.items,{...base,x:placed.cx-width/2,y:placed.cy-depth/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}]}));
    setWallViewId(wall.id);setSelected({kind:"item",id});
    if(fitGap){setMessage("Møbelet ble tilpasset mellomrommet automatisk · "+Math.round(width)+" mm");setTimeout(()=>setMessage(""),2600)}
@@ -1288,7 +1294,7 @@ export default function DrawingClient(){
   if(!wallId){setMessage("Tegn en vegg først");setTimeout(()=>setMessage(""),1800);return}
   const wall=doc.walls.find(w=>w.id===wallId);
   if(!wall){setMessage("Fant ikke valgt vegg");setTimeout(()=>setMessage(""),1800);return}
-  const gaps=wallFurnitureGaps(wall,doc.items,doc.zones||[]);
+  const gaps=wallFurnitureGaps(wall,doc.items,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
   setFurnitureGapPick({...furnitureBuilder,mount:"wall",wallId});
   setFurnitureBuilder(null);
   setWallViewId(wallId);
@@ -1337,9 +1343,9 @@ export default function DrawingClient(){
    selectedWall=nearestWall(viewCenter,doc.walls)?.wall||doc.walls[0];
   }
   if(selectedWall&&wallTypes.has(type)){
-   const start=openingTypes.has(type)?findOpeningStart(selectedWall,w):Math.max(0,(len(selectedWall)-w)/2);
+   const face=wallFaceMetrics(selectedWall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),preferred=Math.max(0,(face.L-w)/2),start=openingTypes.has(type)?findOpeningStart(selectedWall,w,doc.items,null,face.startOffset+preferred):preferred;
    if(start==null){setMessage("Ikke nok ledig plass på veggen");setTimeout(()=>setMessage(""),2200);return}
-   const off=start+w/2;
+   const faceStart=openingTypes.has(type)?Math.max(0,start-face.startOffset):start,off=wallOffsetFromFaceStart(selectedWall,faceStart,w,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
    mutate(d=>{
     const liveWall=d.walls.find(wall=>wall.id===selectedWall.id)||selectedWall,base={id,type,x:0,y:0,w,h,rot:0,wallId:liveWall.id,wallOffset:off,...openingDefaults(type),...itemDefaults(type,d)},placed=mountedItemCenter(base,liveWall,d.zones||[]);
     return {...d,items:[...d.items,{...base,x:placed.cx-w/2,y:placed.cy-h/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}]};
@@ -1376,10 +1382,9 @@ export default function DrawingClient(){
   const item=doc.items.find(o=>o.id===itemId);if(!item)return;
   const context=roomFurnitureSnapContext(item);if(!context){setMessage("Møbelet må ligge i et rom først");setTimeout(()=>setMessage(""),1800);return}
   const target=context.walls.find(row=>row.wall.id===(wallId||context.chosen.wall.id))||context.chosen,{wall,a,b,L}=target,W=Math.max(1,Number(item.w)||1),D=Math.max(1,Number(item.h)||1);
-  if(W>L+2){setMessage("Møbelet er bredere enn denne veggen");setTimeout(()=>setMessage(""),2000);return}
+  if(W>L+2){setMessage("Møbelet er bredere enn innvendig veggmål");setTimeout(()=>setMessage(""),2000);return}
   const dx=b.x-a.x,dy=b.y-a.y,ux=dx/L,uy=dy/L,inward=wallInwardNormal(wall,[context.zone]),baseAngle=Math.atan2(dy,dx),localY={x:-Math.sin(baseAngle),y:Math.cos(baseAngle)},rot=localY.x*inward.x+localY.y*inward.y>=0?baseAngle:baseAngle+Math.PI;
-  let off=mode==="start"?W/2:mode==="end"?L-W/2:L/2;
-  off=clamp(off,W/2,Math.max(W/2,L-W/2));
+  const faceStart=mode==="start"?0:mode==="end"?L-W:(L-W)/2,off=wallOffsetFromFaceStart(wall,faceStart,W,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
   const base={...item,wallId:wall.id,wallOffset:off,roomId:context.zone.id,rot:rot*180/Math.PI},placed=mountedItemCenter(base,wall,doc.zones||[]),next={...base,x:placed.cx-W/2,y:placed.cy-D/2,rot:placed.a*180/Math.PI,wallOffset:placed.off};
   if(!itemFitsZone(next,context.inset)){setMessage("Møbelet får ikke plass helt der i dette rommet");setTimeout(()=>setMessage(""),2000);return}
   mutate(d=>({...d,items:d.items.map(o=>o.id===itemId?next:o)}));
@@ -1454,14 +1459,14 @@ export default function DrawingClient(){
   const item=doc.items.find(o=>o.id===itemId),wall=item?.wallId?doc.walls.find(w=>w.id===item.wallId):null;
   if(!item)return;
   if(!wall){mutate(d=>({...d,items:d.items.map(o=>o.id===itemId?{...o,[key]:n}:o)}));return}
-  const current=wallEdgeOffsets(item,wall),width=key==="w"?n:Number(item.w)||0,maxGap=Math.max(0,current.L-width),startGap=key==="wallStartGap"?n:key==="wallEndGap"?current.L-n-width:current.start;
-  if(width<100||width>12000){setMessage("Bredde må være 100–12000 mm");setTimeout(()=>setMessage(""),1800);return}
-  if(width>current.L){setMessage("Objektet kan ikke være bredere enn veggen");setTimeout(()=>setMessage(""),2000);return}
-  if(startGap<0||startGap>maxGap){setMessage("Plasseringen går utenfor veggen");setTimeout(()=>setMessage(""),1800);return}
-  if(openingTypes.has(item.type)&&openingCollision(wall,item.id,startGap,width)){setMessage("Åpningen overlapper en annen åpning");setTimeout(()=>setMessage(""),2200);return}
+  const current=wallFaceOffsets(item,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),width=key==="w"?n:Number(item.w)||0,maxGap=Math.max(0,current.L-width),startGap=key==="wallStartGap"?n:key==="wallEndGap"?current.L-n-width:current.start;
+  if(width<30||width>12000){setMessage("Bredde må være 30–12000 mm");setTimeout(()=>setMessage(""),1800);return}
+  if(width>current.L+1){setMessage("Objektet kan ikke være bredere enn innvendig veggmål");setTimeout(()=>setMessage(""),2000);return}
+  if(startGap<-.5||startGap>maxGap+.5){setMessage("Plasseringen går utenfor innvendig vegg");setTimeout(()=>setMessage(""),1800);return}
+  if(openingTypes.has(item.type)){const centerStart=wallFaceMetrics(wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98).startOffset+startGap;if(openingCollision(wall,item.id,centerStart,width)){setMessage("Åpningen overlapper en annen åpning");setTimeout(()=>setMessage(""),2200);return}}
   mutate(d=>{
    const live=d.items.find(o=>o.id===itemId),liveWall=live?.wallId?d.walls.find(w=>w.id===live.wallId):null;if(!live||!liveWall)return d;
-   const center=startGap+width/2,nextBase={...live,w:width,wallOffset:center,...(live.type==="customwall"?{colWidths:furnitureDimArray(live.sectionsX,width,live.colWidths)}:{})},placed=mountedItemCenter(nextBase,liveWall,d.zones||[]);
+   const center=wallOffsetFromFaceStart(liveWall,startGap,width,d.zones||[],d.walls||[],d.defaultWallThickness||98),nextBase={...live,w:width,wallOffset:center,...(["customwall","customfloor"].includes(live.type)?{colWidths:furnitureDimArray(live.sectionsX,width,live.colWidths)}:{})},placed=mountedItemCenter(nextBase,liveWall,d.zones||[]);
    const updated={...nextBase,x:placed.cx-width/2,y:placed.cy-live.h/2,rot:placed.a*180/Math.PI,wallOffset:placed.off};
    return {...d,items:d.items.map(o=>o.id===itemId?updated:o)};
   });
