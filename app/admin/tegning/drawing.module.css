@@ -1049,3 +1049,22 @@
  .preview3DCellEditor{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
  .preview3DCellEditor button{flex:0 0 auto;min-height:38px!important}
 }
+
+
+/* Exact custom furniture section sizes */
+.furnitureSectionSizes{
+ display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0;padding:10px;border:1px solid #d8cfbf;border-radius:10px;background:#f4f0e7
+}
+.furnitureSectionSizes>div{display:grid;gap:6px}
+.furnitureSectionSizes b{font-size:10px;color:#5d5447}
+.furnitureSectionSizes label{
+ display:grid;grid-template-columns:30px minmax(0,1fr) 24px;align-items:center;gap:6px;font-size:9px;font-weight:800;color:#6a6154
+}
+.furnitureSectionSizes input{
+ width:100%;min-height:34px;box-sizing:border-box;border:1px solid #c7bdab;border-radius:7px;background:#fff;padding:0 8px;font:inherit;color:#2a261f
+}
+.furnitureSectionSizes span{font-size:8px;color:#7a7266}
+@media(max-width:700px){
+ .furnitureSectionSizes{grid-template-columns:1fr}
+ .furnitureSectionSizes input{min-height:42px}
+}
