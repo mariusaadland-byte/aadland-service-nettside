@@ -388,6 +388,21 @@ function camera3DPoint(x,y,z,camera,origin){
  const dx=(Number(x)||0)-origin.x,dy=(Number(y)||0)-origin.y,rx=dx*Math.cos(yaw)-dy*Math.sin(yaw),ry=dx*Math.sin(yaw)+dy*Math.cos(yaw);
  return{x:rx*zoom,y:(ry*Math.sin(pitch)-(Number(z)||0)*Math.cos(pitch))*zoom,depth:ry*Math.cos(pitch)+(Number(z)||0)*Math.sin(pitch)};
 }
+function FurnitureFront3D({item,a,b,z0,height,project,prefix}){
+ const cols=Math.max(1,Math.min(8,Math.round(Number(item.sectionsX)||1))),rows=Math.max(1,Math.min(6,Math.round(Number(item.sectionsY)||1))),cells=furnitureCellArray(cols,rows,item.cellTypes,"open");
+ const point=(t,z)=>project(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,z);
+ return <g pointerEvents="none">{cells.map((type,i)=>{
+  const col=i%cols,row=Math.floor(i/cols),t0=col/cols,t1=(col+1)/cols,zTop=z0+height*(1-row/rows),zBottom=z0+height*(1-(row+1)/rows);
+  const p0=point(t0,zBottom),p1=point(t1,zBottom),p2=point(t1,zTop),p3=point(t0,zTop),mid=point((t0+t1)/2,(zTop+zBottom)/2);
+  return <g key={prefix+"-"+i}>
+   <polygon points={pointsAttr([p0,p1,p2,p3])} fill={type==="open"?"rgba(87,68,44,.18)":type==="drawer"?"rgba(222,193,143,.92)":"rgba(235,216,180,.94)"} stroke="#6a5336" strokeWidth="7"/>
+   {type==="door"&&<><line x1={p3.x+(p2.x-p3.x)*.08} y1={p3.y+(p2.y-p3.y)*.08} x2={p0.x+(p1.x-p0.x)*.08} y2={p0.y+(p1.y-p0.y)*.08} stroke="#8d7147" strokeWidth="6"/><circle cx={mid.x+(p2.x-p3.x)*.35} cy={mid.y+(p2.y-p3.y)*.35} r="9" fill="#4d3a23"/></>}
+   {type==="drawer"&&[.25,.5,.75].map((q,n)=>{const l=point(t0,zBottom+(zTop-zBottom)*q),rr=point(t1,zBottom+(zTop-zBottom)*q);return <line key={n} x1={l.x} y1={l.y} x2={rr.x} y2={rr.y} stroke="#80633f" strokeWidth="6"/>})}
+   {type==="shelf"&&[1/3,2/3].map((q,n)=>{const l=point(t0,zBottom+(zTop-zBottom)*q),rr=point(t1,zBottom+(zTop-zBottom)*q);return <line key={n} x1={l.x} y1={l.y} x2={rr.x} y2={rr.y} stroke="#725736" strokeWidth="8"/>})}
+   {type==="open"&&<text x={mid.x} y={mid.y+14} textAnchor="middle" fontSize="38" fontWeight="900" fill="#6e5a3c">ÅPEN</text>}
+  </g>
+ })}</g>;
+}
 function Drawing3DPreview({doc,onWallSelect,onItemSelect,camera}){
  const zones=doc.zones||[],walls=doc.walls||[],items=doc.items||[],planPoints=[];
  for(const z of zones)for(const p of z.points||[])planPoints.push({x:Number(p.x)||0,y:Number(p.y)||0});
@@ -438,11 +453,20 @@ function Drawing3DPreview({doc,onWallSelect,onItemSelect,camera}){
     return <g key={"el3d-"+item.id} onClick={e=>{e.stopPropagation();select()}} style={{cursor:onItemSelect?"pointer":"default"}}><polygon points={pointsAttr([{x:p.x,y:p.y-size},{x:p.x+size,y:p.y},{x:p.x,y:p.y+size},{x:p.x-size,y:p.y}])} fill="#ffe773" stroke="#89691e" strokeWidth="14"/><text x={p.x} y={p.y+28} textAnchor="middle" fontSize="80" fontWeight="900" fill="#5f4715">{electricalSymbol(item.type)}</text></g>;
    }
    if(["railing","screen"].includes(item.type))return null;
-   const corners=rotatedItemCorners(item),h=modelHeight(item),z0=Math.max(0,Number(item.elevation)||0),base=corners.map(p=>project(p.x,p.y,z0)),top=corners.map(p=>project(p.x,p.y,z0+h));
+   const corners=rotatedItemCorners(item),h=modelHeight(item),z0=Math.max(0,Number(item.elevation)||0),base=corners.map(p=>project(p.x,p.y,z0)),top=corners.map(p=>project(p.x,p.y,z0+h)),custom=["customfloor","customwall"].includes(item.type);
+   let frontA=corners[3],frontB=corners[2];
+   if(item.type==="customwall"&&item.wallId){
+    const wall=walls.find(w=>w.id===item.wallId);
+    if(wall){
+     const inward=wallInwardNormal(wall,zones),a=(Number(item.rot)||0)*Math.PI/180,localY={x:-Math.sin(a),y:Math.cos(a)};
+     if(localY.x*inward.x+localY.y*inward.y<0){frontA=corners[0];frontB=corners[1]}
+    }
+   }
    return <g key={"obj3d-"+item.id} onClick={e=>{e.stopPropagation();select()}} style={{cursor:onItemSelect?"pointer":"default"}}>
     <polygon points={pointsAttr([base[1],base[2],top[2],top[1]])} fill="#9c7b48" stroke="#675236" strokeWidth="11"/>
     <polygon points={pointsAttr([base[2],base[3],top[3],top[2]])} fill="#80643d" stroke="#675236" strokeWidth="11"/>
     <polygon points={pointsAttr(top)} fill="url(#item3d)" stroke="#675236" strokeWidth="12"/>
+    {custom&&<FurnitureFront3D item={item} a={frontA} b={frontB} z0={z0} height={h} project={project} prefix={"front-"+item.id}/>}
    </g>
   })}
  </svg>;
@@ -1684,7 +1708,7 @@ export default function DrawingClient(){
     <div className={styles.preview3DCanvas+" "+styles.preview3DOrbit} onPointerDown={start3DOrbit} onPointerMove={move3DOrbit} onPointerUp={end3DOrbit} onPointerCancel={end3DOrbit}>
      <Drawing3DPreview doc={doc} camera={camera3D} onWallSelect={wall=>openWallView(wall.id)} onItemSelect={item=>setSelected({kind:"item",id:item.id})}/>
     </div>
-    {selected?.kind==="item"&&doc.items.find(item=>item.id===selected.id)&&<div className={styles.preview3DSelection}><span>Valgt: <b>{doc.items.find(item=>item.id===selected.id)?.customName||labelFor(doc.items.find(item=>item.id===selected.id)?.type)}</b></span><button type="button" onClick={()=>{setShow3D(false);setTimeout(()=>scrollPanel(rightPanel),0)}}>Rediger mål og plassering →</button></div>}
+    {selected?.kind==="item"&&doc.items.find(item=>item.id===selected.id)&&(()=>{const item=doc.items.find(item=>item.id===selected.id),custom=["customfloor","customwall"].includes(item.type);return <div className={styles.preview3DSelection}><div><span>Valgt: <b>{item.customName||labelFor(item.type)}</b></span>{custom&&<div className={styles.preview3DCellEditor}>{furnitureCellArray(item.sectionsX,item.sectionsY,item.cellTypes,"open").map((type,i)=><button type="button" key={i} onClick={e=>{e.stopPropagation();const cells=furnitureCellArray(item.sectionsX,item.sectionsY,item.cellTypes,"open");cells[i]=nextFurnitureCellType(cells[i]);mutate(d=>({...d,items:d.items.map(o=>o.id===item.id?{...o,cellTypes:cells}:o)}))}}>F{i+1}: {furnitureCellLabel(type)}</button>)}</div>}</div><button type="button" onClick={()=>{setShow3D(false);setTimeout(()=>scrollPanel(rightPanel),0)}}>Rediger mål og plassering →</button></div>})()}
     <div className={styles.previewWallStrip}>{doc.walls.map((wall,index)=><button type="button" key={wall.id} onClick={()=>openWallView(wall.id)}>Vegg {index+1}<small>{len(wall)} × {Math.round(Number(wall.h)||2400)} × {Math.round(Number(wall.t)||98)} mm</small></button>)}</div>
     <footer><span><b>Dra:</b> roter 3D-visningen</span><span><b>Vegger:</b> klikk for frontvisning</span><span><b>Møbler:</b> klikk for å velge</span><span><b>Kunde:</b> delt tegning får samme dreibare 3D-visning</span></footer>
    </section>
