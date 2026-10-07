@@ -4131,3 +4131,49 @@ body:has(.customerPage) .customerPage{
 @media(max-width:600px){
  .adminStandalonePage{padding:16px}
 }
+
+
+/* Clickable overview stat cards */
+.adminOverviewStats .adminStatLink{
+ appearance:none;
+ width:100%;
+ display:grid;
+ gap:5px;
+ align-content:start;
+ min-height:112px;
+ padding:18px 20px;
+ border:1px solid #d9d0c5;
+ border-radius:18px;
+ background:#fff;
+ color:#181613;
+ font:inherit;
+ text-align:left;
+ cursor:pointer;
+ box-shadow:none;
+ transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease,background .16s ease;
+}
+.adminOverviewStats .adminStatLink:hover{
+ transform:translateY(-2px);
+ border-color:#c69a4f;
+ background:#fffaf1;
+ box-shadow:0 10px 24px rgba(61,48,29,.09);
+}
+.adminOverviewStats .adminStatLink:focus-visible{
+ outline:3px solid rgba(207,161,83,.35);
+ outline-offset:2px;
+}
+.adminOverviewStats .adminStatLink>b{
+ margin-top:1px;
+ font-size:30px;
+ line-height:1;
+}
+.adminOverviewStats .adminStatLink>small{
+ margin-top:auto;
+ color:#8a672d;
+ font-size:10px;
+ font-weight:800;
+}
+@media(max-width:600px){
+ .adminOverviewStats .adminStatLink{min-height:96px;padding:15px}
+ .adminOverviewStats .adminStatLink>b{font-size:26px}
+}
