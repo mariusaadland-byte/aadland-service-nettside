@@ -187,7 +187,8 @@ export async function PATCH(req){
      await sendRentalConfirmation({
       booking,
       itemName:booking.rental_items?.name||"utstyret",
-      req
+      req,
+      idempotencyKey:"rental-confirmation/billing/"+booking.id
      });
      const sentAt=new Date().toISOString();
      const {error:stampError}=await s.from("rental_bookings")
