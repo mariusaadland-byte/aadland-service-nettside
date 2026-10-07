@@ -33,6 +33,7 @@ export default function MinSide(){
  const [editingProfile,setEditingProfile]=useState(false);
  const [profileForm,setProfileForm]=useState({name:"",phone:"",address:""});
  const [rentalContext,setRentalContext]=useState(false);
+ const [activePanel,setActivePanel]=useState("overview");
 
  async function load(){
   try{
@@ -182,6 +183,13 @@ export default function MinSide(){
   window.location.href="/utleie/"+encodeURIComponent(slug);
  }
 
+ function selectPanel(id){
+  setActivePanel(id);
+  window.setTimeout(()=>{
+   document.querySelector(".customerPortalContent")?.scrollIntoView({behavior:"smooth",block:"start"});
+  },40);
+ }
+
  if(loading)return <main className="customerPage"><p>Laster …</p></main>;
 
  if(!data)return <main className="customerPage customerLoginPage">
@@ -269,42 +277,76 @@ export default function MinSide(){
   }))
  ].filter(item=>item.date).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,6);
 
- return <main className="customerPage">
-  <Link href={rentalContext?"/utleie":"/"}>← {rentalContext?"Aadland Utleie":"Aadland Service"}</Link>
-  <header className="customerDashboardHeader">
-   <div>
-    <div className="kicker">{rentalContext?"AADLAND UTLEIE · MIN SIDE":"MIN SIDE"}</div>
-    <h1>Hei, {data.customer.name||"kunde"}</h1>
-    <p>{data.customer.email}</p>
-   </div>
-   <button className="btn alt" onClick={logout}>Logg ut</button>
+ return <main className="customerPage customerPortalPage">
+  <header className="customerPortalTopbar">
+   <Link className="customerPortalBack" href={rentalContext?"/utleie":"/"}>← {rentalContext?"Aadland Utleie":"Aadland Service"}</Link>
+   <button type="button" className="customerPortalLogout" onClick={logout}>Logg ut</button>
   </header>
-  {info&&<p className="success customerDashboardNotice">{info}</p>}
-  {error&&<p className="notice customerDashboardNotice">{error}</p>}
 
-  <nav className="customerOverview" aria-label="Oversikt over Min side">
-   <a href="#foresporsler"><small>FORESPØRSLER</small><b>{openEnquiries}</b><span>aktive nå</span></a>
-   <a href="#tilbud"><small>ÅPNE TILBUD</small><b>{openQuotes}</b><span>{openQuotes===1?"tilbud venter":"tilbud venter"}</span></a>
-   <a href="#oppdrag"><small>AKTIVE OPPDRAG</small><b>{activeJobs}</b><span>{activeJobs===1?"oppdrag":"oppdrag"}</span></a>
-   <a href="#bestillinger"><small>BESTILLINGER</small><b>{activePurchases}</b><span>aktive nå</span></a>
-   <a href="#utleie"><small>UTLEIE</small><b>{activeRentals}</b><span>aktive nå</span></a>
-  </nav>
+  <div className="customerPortalLayout">
+   <aside className="customerPortalSidebar">
+    <div className="customerPortalIdentity">
+     <span className="customerPortalAvatar">{String(data.customer.name||"K").trim().charAt(0).toUpperCase()}</span>
+     <div>
+      <small>{rentalContext?"AADLAND UTLEIE · MIN SIDE":"MIN SIDE"}</small>
+      <b>{data.customer.name||"Kunde"}</b>
+      <span>{data.customer.email}</span>
+     </div>
+    </div>
 
-  {recentActivity.length>0&&<section className="customerDashboardSection customerRecentActivity">
-   <div className="customerSectionHead">
-    <div><div className="kicker">SISTE NYTT</div><h2>Siste aktivitet</h2></div>
-   </div>
-   <div className="customerActivityList">
-    {recentActivity.map(item=><a className="customerActivityItem" href={item.href} key={item.key}>
-     <span className="customerActivityType">{item.type}</span>
-     <span className="customerActivityMain"><b>{item.title}</b><small>{item.meta}{item.meta?" · ":""}{dateTime(item.date)}</small></span>
-     <span className="customerActivityStatus">{item.status}</span>
-     <span className="customerActivityArrow">→</span>
-    </a>)}
-   </div>
-  </section>}
+    <nav className="customerPortalNav" aria-label="Min side">
+     <button type="button" className={activePanel==="overview"?"isActive":""} onClick={()=>selectPanel("overview")}><span>Oversikt</span></button>
+     <button type="button" className={activePanel==="foresporsler"?"isActive":""} onClick={()=>selectPanel("foresporsler")}><span>Forespørsler</span><b>{openEnquiries}</b></button>
+     <button type="button" className={activePanel==="tilbud"?"isActive":""} onClick={()=>selectPanel("tilbud")}><span>Tilbud</span><b>{openQuotes}</b></button>
+     <button type="button" className={activePanel==="oppdrag"?"isActive":""} onClick={()=>selectPanel("oppdrag")}><span>Oppdrag</span><b>{activeJobs}</b></button>
+     <button type="button" className={activePanel==="bestillinger"?"isActive":""} onClick={()=>selectPanel("bestillinger")}><span>Bestillinger</span><b>{activePurchases}</b></button>
+     <button type="button" className={activePanel==="utleie"?"isActive":""} onClick={()=>selectPanel("utleie")}><span>Utleie</span><b>{activeRentals}</b></button>
+     <button type="button" className={activePanel==="konto"?"isActive":""} onClick={()=>selectPanel("konto")}><span>Mine opplysninger</span></button>
+    </nav>
+   </aside>
 
-  <section id="konto" className="customerDashboardSection customerAccountSection">
+   <div className="customerPortalContent">
+    {info&&<p className="success customerDashboardNotice">{info}</p>}
+    {error&&<p className="notice customerDashboardNotice">{error}</p>}
+
+    {activePanel==="overview"&&<section className="customerPortalOverview">
+     <div className="customerPortalWelcome">
+      <div className="kicker">OVERSIKT</div>
+      <h1>Hei, {(data.customer.name||"kunde").split(" ")[0]}</h1>
+      <p>Her finner du det viktigste samlet – tilbud, oppdrag, bestillinger og utleie.</p>
+     </div>
+
+     <div className="customerPortalStats">
+      <button type="button" onClick={()=>selectPanel("foresporsler")}><small>FORESPØRSLER</small><b>{openEnquiries}</b><span>aktive</span></button>
+      <button type="button" onClick={()=>selectPanel("tilbud")}><small>TILBUD</small><b>{openQuotes}</b><span>venter</span></button>
+      <button type="button" onClick={()=>selectPanel("oppdrag")}><small>OPPDRAG</small><b>{activeJobs}</b><span>aktive</span></button>
+      <button type="button" onClick={()=>selectPanel("bestillinger")}><small>BESTILLINGER</small><b>{activePurchases}</b><span>aktive</span></button>
+      <button type="button" onClick={()=>selectPanel("utleie")}><small>UTLEIE</small><b>{activeRentals}</b><span>aktive</span></button>
+     </div>
+
+     {recentActivity.length>0&&<div className="customerPortalRecent">
+      <div className="customerPortalBlockHead"><div><div className="kicker">SISTE NYTT</div><h2>Siste aktivitet</h2></div></div>
+      <div className="customerActivityList">
+       {recentActivity.map(item=><button type="button" className="customerActivityItem" onClick={()=>{
+        const panel=item.type==="Tilbud"?"tilbud":item.type==="Forespørsel"?"foresporsler":item.type==="Oppdrag"?"oppdrag":item.type==="Bestilling"?"bestillinger":"utleie";
+        selectPanel(panel);
+       }} key={item.key}>
+        <span className="customerActivityType">{item.type}</span>
+        <span className="customerActivityMain"><b>{item.title}</b><small>{item.meta}{item.meta?" · ":""}{dateTime(item.date)}</small></span>
+        <span className="customerActivityStatus">{item.status}</span>
+        <span className="customerActivityArrow">→</span>
+       </button>)}
+      </div>
+     </div>}
+
+     <div className="customerPortalQuickActions">
+      <a className="btn" href={rentalContext?"https://www.aadland-service.no/#befaring":"/#befaring"}>Ny forespørsel</a>
+      <a className="btn alt" href={rentalContext?"https://www.aadland-service.no/produkter":"/produkter"}>Se produkter</a>
+      <Link className="btn alt" href="/utleie">Se utleie</Link>
+     </div>
+    </section>}
+
+  {activePanel==="konto"&&<section id="konto" className="customerDashboardSection customerAccountSection customerPortalPanel">
    <div className="customerSectionHead">
     <div><div className="kicker">KONTO</div><h2>Mine opplysninger</h2></div>
     {!editingProfile&&<button type="button" className="btn alt customerEditProfileButton" onClick={()=>setEditingProfile(true)}>Rediger</button>}
@@ -330,9 +372,9 @@ export default function MinSide(){
      <button type="button" className="btn alt" disabled={busy} onClick={()=>{setEditingProfile(false);setProfileForm({name:data.customer.name||"",phone:data.customer.phone||"",address:data.customer.address||""})}}>Avbryt</button>
     </div>
    </form>}
-  </section>
+  </section>}
 
-  <section id="foresporsler" className="customerDashboardSection">
+  {activePanel==="foresporsler"&&<section id="foresporsler" className="customerDashboardSection customerPortalPanel">
    <div className="customerSectionHead">
     <div><div className="kicker">KONTAKT</div><h2>Forespørsler og befaring</h2></div>
     <div className="customerSectionActions"><span>{enquiries.length}</span><a className="btn alt" href={rentalContext?"https://www.aadland-service.no/#befaring":"/#befaring"}>Ny forespørsel</a></div>
@@ -351,9 +393,9 @@ export default function MinSide(){
      {o.survey_reminder_sent_at&&<span><small>Påminnelse</small><b>Sendt {dateTime(o.survey_reminder_sent_at)}</b></span>}
     </div>
    </article>)}</div>}
-  </section>
+  </section>}
 
-  <section id="tilbud" className="customerDashboardSection">
+  {activePanel==="tilbud"&&<section id="tilbud" className="customerDashboardSection customerPortalPanel">
    <div className="customerSectionHead">
     <div><div className="kicker">DOKUMENTER</div><h2>Tilbud</h2></div>
     <span>{quotes.length}</span>
@@ -380,9 +422,9 @@ export default function MinSide(){
      </article>
     })}
    </div>}
-  </section>
+  </section>}
 
-  <section id="oppdrag" className="customerDashboardSection customerJobsSection">
+  {activePanel==="oppdrag"&&<section id="oppdrag" className="customerDashboardSection customerJobsSection customerPortalPanel">
    <div className="customerSectionHead">
     <div><div className="kicker">MINE OPPDRAG</div><h2>Oppdrag</h2></div>
     <span>{jobs.length}</span>
@@ -433,9 +475,9 @@ export default function MinSide(){
      {q?.href&&<Link className="btn alt" href={q.href}>Åpne godkjent tilbud</Link>}
     </article>;
    })}</div>}
-  </section>
+  </section>}
 
-  <section id="bestillinger" className="customerDashboardSection">
+  {activePanel==="bestillinger"&&<section id="bestillinger" className="customerDashboardSection customerPortalPanel">
    <div className="customerSectionHead"><div><div className="kicker">HANDEL</div><h2>Bestillinger</h2></div><div className="customerSectionActions"><span>{purchases.length}</span><a className="btn alt" href={rentalContext?"https://www.aadland-service.no/produkter":"/produkter"}>Se produkter</a></div></div>
    {!purchases.length?<div className="card customerEmpty"><p>Ingen produktbestillinger knyttet til kontoen ennå.</p></div>:
    <div className="customerGrid">{purchases.map(o=><article className="card customerHistoryCard" key={o.id}>
@@ -509,9 +551,9 @@ export default function MinSide(){
      {o.receipt_sent_at&&<span>Betalingsbekreftelse sendt {dateTimeFull(o.receipt_sent_at)}</span>}
     </div>}
    </article>)}</div>}
-  </section>
+  </section>}
 
-  <section id="utleie" className="customerDashboardSection">
+  {activePanel==="utleie"&&<section id="utleie" className="customerDashboardSection customerPortalPanel">
    <div className="customerSectionHead"><div><div className="kicker">UTLEIE</div><h2>Utleie</h2></div><div className="customerSectionActions"><span>{rentals.length}</span><Link className="btn alt" href="/utleie">Se utleie</Link></div></div>
    {!rentals.length?<div className="card customerEmpty"><p>Ingen utleier knyttet til kontoen ennå.</p></div>:
    <div className="customerGrid">{rentals.map(r=><article className="card customerHistoryCard" key={r.id}>
@@ -555,6 +597,8 @@ export default function MinSide(){
     </div>}
     {r.rental_items?.slug&&<button type="button" className="btn alt" onClick={()=>repeatRental(r)}>Lei igjen</button>}
    </article>)}</div>}
-  </section>
+  </section>}
+   </div>
+  </div>
  </main>;
 }
