@@ -86,13 +86,21 @@ const wallOpeningLayout=(wall,items)=>{
 
 const dim=w=>{const dx=w.x2-w.x1,dy=w.y2-w.y1,L=Math.hypot(dx,dy)||1,nx=-dy/L,ny=dx/L,off=150;return {ax:w.x1+nx*off,ay:w.y1+ny*off,bx:w.x2+nx*off,by:w.y2+ny*off,nx,ny,mx:(w.x1+w.x2)/2+nx*(off+70),my:(w.y1+w.y2)/2+ny*(off+70)}};
 const furnitureTemplates=[
- {id:"underskap",label:"Underskap",name:"Underskap",width:600,depth:600,height:900,elevation:0,mount:"floor",sectionsX:1,sectionsY:1},
- {id:"overskap",label:"Overskap",name:"Overskap",width:600,depth:350,height:700,elevation:1400,mount:"wall",sectionsX:1,sectionsY:1},
- {id:"garderobe",label:"Garderobe",name:"Garderobe",width:1200,depth:600,height:2100,elevation:0,mount:"floor",sectionsX:2,sectionsY:1},
- {id:"hylle",label:"Vegghylle",name:"Vegghylle",width:1200,depth:300,height:350,elevation:1500,mount:"wall",sectionsX:3,sectionsY:1},
- {id:"benk",label:"Benk",name:"Benk",width:1200,depth:450,height:500,elevation:0,mount:"floor",sectionsX:2,sectionsY:1},
- {id:"custom",label:"Fra bunnen",name:"Eget møbel",width:1000,depth:450,height:900,elevation:0,mount:"floor",sectionsX:2,sectionsY:1}
+ {id:"underskap",label:"Underskap",name:"Underskap",width:600,depth:600,height:900,elevation:0,mount:"floor",sectionsX:1,sectionsY:1,cellType:"door"},
+ {id:"overskap",label:"Overskap",name:"Overskap",width:600,depth:350,height:700,elevation:1400,mount:"wall",sectionsX:1,sectionsY:1,cellType:"door"},
+ {id:"garderobe",label:"Garderobe",name:"Garderobe",width:1200,depth:600,height:2100,elevation:0,mount:"floor",sectionsX:2,sectionsY:1,cellType:"door"},
+ {id:"hylle",label:"Vegghylle",name:"Vegghylle",width:1200,depth:300,height:350,elevation:1500,mount:"wall",sectionsX:3,sectionsY:1,cellType:"shelf"},
+ {id:"benk",label:"Benk",name:"Benk",width:1200,depth:450,height:500,elevation:0,mount:"floor",sectionsX:2,sectionsY:1,cellType:"drawer"},
+ {id:"custom",label:"Fra bunnen",name:"Eget møbel",width:1000,depth:450,height:900,elevation:0,mount:"floor",sectionsX:2,sectionsY:1,cellType:"open"}
 ];
+const furnitureCellTypes=["open","door","drawer","shelf"];
+const furnitureCellLabel=type=>({open:"Åpent",door:"Dør",drawer:"Skuffer",shelf:"Hyller"})[type]||"Åpent";
+const furnitureCellSymbol=type=>({open:"ÅPEN",door:"DØR",drawer:"SKUFFER",shelf:"HYLLER"})[type]||"ÅPEN";
+const furnitureCellArray=(cols,rows,source=[],fallback="open")=>{
+ const count=Math.max(1,Math.min(8,Math.round(Number(cols)||1)))*Math.max(1,Math.min(6,Math.round(Number(rows)||1)));
+ return Array.from({length:count},(_,i)=>furnitureCellTypes.includes(source?.[i])?source[i]:fallback);
+};
+const nextFurnitureCellType=type=>furnitureCellTypes[(Math.max(0,furnitureCellTypes.indexOf(type))+1)%furnitureCellTypes.length];
 const wallPresets=[
  ["Lettvegg · 70 mm / 2400 mm",70,2400],
  ["Innervegg · 98 mm / 2400 mm",98,2400],
@@ -963,16 +971,17 @@ export default function DrawingClient(){
   setFurnitureBuilder({
    templateId:template.id,name:template.name,width:String(template.width),depth:String(template.depth),height:String(template.height),
    elevation:String(template.elevation),mount:resolvedWall&&mount==="wall"?"wall":mount,wallId:resolvedWall?.id||"",
-   start:"",sectionsX:String(template.sectionsX),sectionsY:String(template.sectionsY)
+   start:"",sectionsX:String(template.sectionsX),sectionsY:String(template.sectionsY),
+   cellTypes:furnitureCellArray(template.sectionsX,template.sectionsY,[],template.cellType||"open")
   });
  };
  const applyFurnitureTemplate=templateId=>{
   const template=furnitureTemplates.find(x=>x.id===templateId)||furnitureTemplates.at(-1);
-  setFurnitureBuilder(v=>v?{...v,templateId:template.id,name:template.name,width:String(template.width),depth:String(template.depth),height:String(template.height),elevation:String(template.elevation),mount:template.mount,sectionsX:String(template.sectionsX),sectionsY:String(template.sectionsY)}:v);
+  setFurnitureBuilder(v=>v?{...v,templateId:template.id,name:template.name,width:String(template.width),depth:String(template.depth),height:String(template.height),elevation:String(template.elevation),mount:template.mount,sectionsX:String(template.sectionsX),sectionsY:String(template.sectionsY),cellTypes:furnitureCellArray(template.sectionsX,template.sectionsY,[],template.cellType||"open")}:v);
  };
  const placeCustomFurniture=(builder,fitGap=null)=>{
   if(!builder)return;
-  const width=fitGap?Number(fitGap.width):Number(builder.width),depth=Number(builder.depth),height=Number(builder.height),elevation=Number(builder.elevation)||0,sectionsX=clamp(Math.round(Number(builder.sectionsX)||1),1,8),sectionsY=clamp(Math.round(Number(builder.sectionsY)||1),1,6),name=String(builder.name||"").trim()||"Eget møbel";
+  const width=fitGap?Number(fitGap.width):Number(builder.width),depth=Number(builder.depth),height=Number(builder.height),elevation=Number(builder.elevation)||0,sectionsX=clamp(Math.round(Number(builder.sectionsX)||1),1,8),sectionsY=clamp(Math.round(Number(builder.sectionsY)||1),1,6),name=String(builder.name||"").trim()||"Eget møbel",cellTypes=furnitureCellArray(sectionsX,sectionsY,builder.cellTypes,"open");
   if(!Number.isFinite(width)||!Number.isFinite(depth)||!Number.isFinite(height)||width<100||depth<50||height<50||width>6000||depth>2000||height>5000||elevation<0||elevation>5000){setMessage("Sjekk møbelmålene");setTimeout(()=>setMessage(""),2000);return}
   const id=uid();
   if(builder.mount==="wall"||fitGap){
@@ -980,14 +989,14 @@ export default function DrawingClient(){
    if(!wall){setMessage("Velg en vegg for veggmontert møbel");setTimeout(()=>setMessage(""),2000);return}
    const L=len(wall),wallHeight=Math.max(300,Number(wall.h)||Number(doc.defaultWallHeight)||2400);if(width>L){setMessage("Møbelet er bredere enn veggen");setTimeout(()=>setMessage(""),2000);return}if(elevation+height>wallHeight){setMessage("Møbelet går over veggens høyde");setTimeout(()=>setMessage(""),2200);return}
    const rawStart=fitGap?Number(fitGap.start):(String(builder.start||"").trim()===""?(L-width)/2:Number(builder.start));
-   const start=clamp(Number.isFinite(rawStart)?rawStart:(L-width)/2,0,Math.max(0,L-width)),off=start+width/2,base={id,type:"customwall",customName:name,x:0,y:0,w:width,h:depth,rot:0,wallId:wall.id,wallOffset:off,modelHeight:height,elevation,sectionsX,sectionsY},placed=mountedItemCenter(base,wall,doc.zones||[]);
+   const start=clamp(Number.isFinite(rawStart)?rawStart:(L-width)/2,0,Math.max(0,L-width)),off=start+width/2,base={id,type:"customwall",customName:name,x:0,y:0,w:width,h:depth,rot:0,wallId:wall.id,wallOffset:off,modelHeight:height,elevation,sectionsX,sectionsY,cellTypes},placed=mountedItemCenter(base,wall,doc.zones||[]);
    mutate(d=>({...d,items:[...d.items,{...base,x:placed.cx-width/2,y:placed.cy-depth/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}]}));
    setWallViewId(wall.id);setSelected({kind:"item",id});
    if(fitGap){setMessage("Møbelet ble tilpasset mellomrommet automatisk · "+Math.round(width)+" mm");setTimeout(()=>setMessage(""),2600)}
   }else{
    const zone=selected?.kind==="zone"?(doc.zones||[]).find(z=>z.id===selected.id):null,center=zone?polygonCentroid(zone.points):{x:pan.x+viewWidth/2,y:pan.y+viewHeight/2};
    mutate(d=>{
-    const proposed={id,type:"customfloor",customName:name,x:center.x-width/2,y:center.y-depth/2,w:width,h:depth,rot:0,modelHeight:height,elevation,sectionsX,sectionsY};
+    const proposed={id,type:"customfloor",customName:name,x:center.x-width/2,y:center.y-depth/2,w:width,h:depth,rot:0,modelHeight:height,elevation,sectionsX,sectionsY,cellTypes};
     const placed=constrainFreeItemStrict(proposed,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackItem:proposed,fallbackCenter:center,snapDistance:0});
     return {...d,items:[...d.items,placed]};
    });
@@ -1628,14 +1637,17 @@ export default function DrawingClient(){
      <label>Dybde (mm)<input type="number" min="50" max="2000" value={furnitureBuilder.depth} onChange={e=>setFurnitureBuilder(v=>({...v,depth:e.target.value}))}/></label>
      <label>Høyde (mm)<input type="number" min="50" max="5000" value={furnitureBuilder.height} onChange={e=>setFurnitureBuilder(v=>({...v,height:e.target.value}))}/></label>
      <label>Fra gulv (mm)<input type="number" min="0" max="5000" value={furnitureBuilder.elevation} onChange={e=>setFurnitureBuilder(v=>({...v,elevation:e.target.value}))}/></label>
-     <label>Felt bortover<input type="number" min="1" max="8" value={furnitureBuilder.sectionsX} onChange={e=>setFurnitureBuilder(v=>({...v,sectionsX:e.target.value}))}/></label>
-     <label>Felt i høyden<input type="number" min="1" max="6" value={furnitureBuilder.sectionsY} onChange={e=>setFurnitureBuilder(v=>({...v,sectionsY:e.target.value}))}/></label>
+     <label>Felt bortover<input type="number" min="1" max="8" value={furnitureBuilder.sectionsX} onChange={e=>setFurnitureBuilder(v=>{const sectionsX=e.target.value;return {...v,sectionsX,cellTypes:furnitureCellArray(sectionsX,v.sectionsY,v.cellTypes,"open")}})}/></label>
+     <label>Felt i høyden<input type="number" min="1" max="6" value={furnitureBuilder.sectionsY} onChange={e=>setFurnitureBuilder(v=>{const sectionsY=e.target.value;return {...v,sectionsY,cellTypes:furnitureCellArray(v.sectionsX,sectionsY,v.cellTypes,"open")}})}/></label>
      <label className={styles.furnitureWide}>Plassering<select value={furnitureBuilder.mount} onChange={e=>setFurnitureBuilder(v=>({...v,mount:e.target.value}))}><option value="floor">På gulv / fritt i rom</option><option value="wall">På vegg</option></select></label>
      {furnitureBuilder.mount==="wall"&&<><label className={styles.furnitureWide}>Vegg<select value={furnitureBuilder.wallId||""} onChange={e=>setFurnitureBuilder(v=>({...v,wallId:e.target.value}))}><option value="">Velg vegg…</option>{doc.walls.map((wall,index)=><option value={wall.id} key={wall.id}>Vegg {index+1} · {len(wall)} mm</option>)}</select></label><label className={styles.furnitureWide}>Fra veggens start (mm)<input type="number" min="0" placeholder="Tomt = sentrert" value={furnitureBuilder.start} onChange={e=>setFurnitureBuilder(v=>({...v,start:e.target.value}))}/><small>Lar du feltet stå tomt, sentreres møbelet på veggen.</small></label></>}
     </div>
     <div className={styles.furniturePreview}>
-     <div style={{aspectRatio:Math.max(.35,Math.min(3,Number(furnitureBuilder.width||1)/Math.max(1,Number(furnitureBuilder.height)||1)))}}>{Array.from({length:Math.max(1,Math.min(8,Math.round(Number(furnitureBuilder.sectionsX)||1)))*Math.max(1,Math.min(6,Math.round(Number(furnitureBuilder.sectionsY)||1)))},(_,i)=><span key={i}/>)}</div>
+     <div className={styles.furnitureCellPreview} style={{aspectRatio:Math.max(.35,Math.min(3,Number(furnitureBuilder.width||1)/Math.max(1,Number(furnitureBuilder.height)||1))),gridTemplateColumns:"repeat("+Math.max(1,Math.min(8,Math.round(Number(furnitureBuilder.sectionsX)||1)))+",1fr)",gridTemplateRows:"repeat("+Math.max(1,Math.min(6,Math.round(Number(furnitureBuilder.sectionsY)||1)))+",1fr)"}}>
+      {furnitureCellArray(furnitureBuilder.sectionsX,furnitureBuilder.sectionsY,furnitureBuilder.cellTypes,"open").map((type,i)=><button type="button" key={i} data-cell-type={type} title={"Felt "+(i+1)+": "+furnitureCellLabel(type)+" · trykk for å bytte"} onClick={()=>setFurnitureBuilder(v=>{if(!v)return v;const cells=furnitureCellArray(v.sectionsX,v.sectionsY,v.cellTypes,"open");cells[i]=nextFurnitureCellType(cells[i]);return {...v,cellTypes:cells}})}><b>{furnitureCellSymbol(type)}</b>{type==="door"&&<span className={styles.furnitureDoorHandle}/>} {type==="drawer"&&<><i/><i/></>} {type==="shelf"&&<><em/><em/></>}</button>)}
+     </div>
      <p>{furnitureBuilder.name||"Eget møbel"} · {furnitureBuilder.width||0} × {furnitureBuilder.depth||0} × {furnitureBuilder.height||0} mm</p>
+     <small className={styles.furnitureCellHint}>Trykk på hvert felt for å bytte mellom <b>åpent → dør → skuffer → hyller</b>. Oppsettet lagres med møbelet.</small>
     </div>
     <div className={styles.furnitureSmartActions}>{furnitureBuilder.mount==="wall"&&<><button type="button" onClick={()=>setFurnitureBuilder(v=>{const wall=doc.walls.find(w=>w.id===v?.wallId)||wallForView;if(!v||!wall)return v;const width=Math.min(Math.max(100,Number(v.width)||100),len(wall));return {...v,width:String(Math.round(width)),start:String(Math.round((len(wall)-width)/2))}})}>Sentrer på veggen</button><button type="button" className={styles.smartGapButton} onClick={e=>{e.preventDefault();e.stopPropagation();startFurnitureGapPick()}}>↔ Velg mellomrom – tilpass automatisk</button></>}</div>
     <div className={styles.roomModalActions}><button type="button" onClick={()=>setFurnitureBuilder(null)}>Avbryt</button><button type="button" onClick={createCustomFurniture}>Legg inn møbel</button></div>
