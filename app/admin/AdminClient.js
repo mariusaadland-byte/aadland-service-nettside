@@ -1478,7 +1478,12 @@ function Jobs({orders,status,canUpdateOrders,reload,onCreateProject=null,initial
  const [openId,setOpenId]=useState(null);
  const [savingId,setSavingId]=useState("");
  const [message,setMessage]=useState("");
- useEffect(()=>{if(initialOpenId)setOpenId(initialOpenId)},[initialOpenId]);
+ useEffect(()=>{
+  if(!initialOpenId)return;
+  setOpenId(initialOpenId);
+  const timer=window.setTimeout(()=>document.getElementById("job-"+initialOpenId)?.scrollIntoView({behavior:"smooth",block:"center"}),90);
+  return ()=>window.clearTimeout(timer);
+ },[initialOpenId]);
 
  async function archive(order){
   if(!confirm("Flytte dette oppdraget til arkivet?"))return;
@@ -1509,7 +1514,7 @@ function Jobs({orders,status,canUpdateOrders,reload,onCreateProject=null,initial
  return <>
   {message&&<p className="notice">{message}</p>}
   <div className="jobGrid">
-   {orders.map(order=><article className="card jobCard" key={order.id}>
+   {orders.map(order=><article id={"job-"+order.id} className={"card jobCard "+(initialOpenId===order.id?"adminCalendarRecordTarget":"")} key={order.id}>
     <div className="jobCardTop">
      <div>
       <div className="kicker">{order.orderNumber}</div>
@@ -4485,7 +4490,12 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
  const [message,setMessage]=useState("");
  const [openId,setOpenId]=useState(null);
  const [migrationCopied,setMigrationCopied]=useState(false);
- useEffect(()=>{if(initialOpenId)setOpenId(initialOpenId)},[initialOpenId]);
+ useEffect(()=>{
+  if(!initialOpenId)return;
+  setOpenId(initialOpenId);
+  const timer=window.setTimeout(()=>document.getElementById("rental-booking-"+initialOpenId)?.scrollIntoView({behavior:"smooth",block:"center"}),90);
+  return ()=>window.clearTimeout(timer);
+ },[initialOpenId]);
 
  async function patch(id,changes){
   setMessage("");
@@ -4660,7 +4670,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
    const issue=attentionIssue(b);
    const waitingForFinalConfirmation=b.status==="confirmed"&&!b.confirmationSentAt;
    const visibleStatus=waitingForFinalConfirmation?"Reservert":(statuses[b.status]||b.status);
-   return <article className={"card rentalBookingCard "+(isOpen?"isOpen":"isCompact")} key={b.id}>
+   return <article id={"rental-booking-"+b.id} className={"card rentalBookingCard "+(isOpen?"isOpen":"isCompact")+" "+(initialOpenId===b.id?"adminCalendarRecordTarget":"")} key={b.id}>
    <button className="rentalBookingCompactHead" type="button" aria-expanded={isOpen} onClick={()=>setOpenId(isOpen?null:b.id)}>
     <span className="rentalBookingCompactMain">
      <b>{b.customer?.name||"Ukjent kunde"}</b>
