@@ -973,3 +973,9 @@
 @media(max-width:900px), (pointer:coarse) and (min-width:901px) and (max-width:1200px){
  .moreMenu{display:none}
 }
+
+
+/* Allow the desktop burger dropdown to extend below the sticky toolbar. */
+@media(min-width:901px){
+ .top{overflow:visible}
+}
