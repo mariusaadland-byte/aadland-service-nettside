@@ -321,12 +321,19 @@ function itemCeilingHeight(item,doc){
  const center=itemCenter(item),zone=zoneContainingPoint(center,doc.zones||[]);
  return Number(zone?.ceilingHeight)||Number(doc.defaultWallHeight)||2400;
 }
+function wallPrismCorners(w){
+ const dx=w.x2-w.x1,dy=w.y2-w.y1,L=Math.hypot(dx,dy)||1,half=Math.max(20,Number(w.t)||98)/2,nx=-dy/L,ny=dx/L;
+ return [
+  {x:w.x1+nx*half,y:w.y1+ny*half},{x:w.x2+nx*half,y:w.y2+ny*half},
+  {x:w.x2-nx*half,y:w.y2-ny*half},{x:w.x1-nx*half,y:w.y1-ny*half}
+ ];
+}
 function Drawing3DPreview({doc,onWallSelect}){
  const zones=doc.zones||[],walls=doc.walls||[],items=doc.items||[];
  const projected=[];
  const addPoint=(x,y,z=0)=>projected.push(isoPoint(x,y,z));
  for(const z of zones)for(const p of z.points||[]){addPoint(p.x,p.y,0);addPoint(p.x,p.y,Number(z.ceilingHeight)||Number(doc.defaultWallHeight)||2400)}
- for(const w of walls){addPoint(w.x1,w.y1,0);addPoint(w.x2,w.y2,0);addPoint(w.x1,w.y1,Number(w.h)||2400);addPoint(w.x2,w.y2,Number(w.h)||2400)}
+ for(const w of walls){const h=Number(w.h)||2400;for(const p of wallPrismCorners(w)){addPoint(p.x,p.y,0);addPoint(p.x,p.y,h)}}
  for(const item of items){
   const height=ceilingElectricalTypes.has(item.type)?itemCeilingHeight(item,doc):wallElectricalTypes.has(item.type)?Number(item.mountHeight)||1200:modelHeight(item);
   for(const p of rotatedItemCorners(item)){addPoint(p.x,p.y,0);addPoint(p.x,p.y,height)}
@@ -343,7 +350,14 @@ function Drawing3DPreview({doc,onWallSelect}){
    <linearGradient id="item3d" x1="0" x2="1"><stop offset="0" stopColor="#d8b979"/><stop offset="1" stopColor="#9d7b42"/></linearGradient>
   </defs>
   {zones.map(zone=><polygon key={"floor-"+zone.id} points={pointsAttr((zone.points||[]).map(p=>isoPoint(p.x,p.y,0)))} fill="url(#floor3d)" stroke="#b8ad9b" strokeWidth="18"/>)}
-  {wallRows.map(w=>{const h=Number(w.h)||2400,p1=isoPoint(w.x1,w.y1,0),p2=isoPoint(w.x2,w.y2,0),p3=isoPoint(w.x2,w.y2,h),p4=isoPoint(w.x1,w.y1,h);return <polygon key={"wall3d-"+w.id} points={pointsAttr([p1,p2,p3,p4])} fill="url(#wall3d)" stroke="#81796d" strokeWidth="16" opacity=".88" role={onWallSelect?"button":undefined} tabIndex={onWallSelect?0:undefined} style={{cursor:onWallSelect?"pointer":"default"}} onClick={()=>onWallSelect?.(w)} onKeyDown={e=>{if(onWallSelect&&(e.key==="Enter"||e.key===" ")){e.preventDefault();onWallSelect(w)}}}/>})}
+  {wallRows.map((w,index)=>{const h=Number(w.h)||2400,fp=wallPrismCorners(w),base=fp.map(p=>isoPoint(p.x,p.y,0)),top=fp.map(p=>isoPoint(p.x,p.y,h)),mid=isoPoint((w.x1+w.x2)/2,(w.y1+w.y2)/2,h+90);return <g key={"wall3d-"+w.id} role={onWallSelect?"button":undefined} tabIndex={onWallSelect?0:undefined} style={{cursor:onWallSelect?"pointer":"default"}} onClick={()=>onWallSelect?.(w)} onKeyDown={e=>{if(onWallSelect&&(e.key==="Enter"||e.key===" ")){e.preventDefault();onWallSelect(w)}}}>
+   <polygon points={pointsAttr([base[0],base[1],top[1],top[0]])} fill="url(#wall3d)" stroke="#81796d" strokeWidth="12" opacity=".9"/>
+   <polygon points={pointsAttr([base[1],base[2],top[2],top[1]])} fill="#aaa295" stroke="#81796d" strokeWidth="11" opacity=".92"/>
+   <polygon points={pointsAttr([base[2],base[3],top[3],top[2]])} fill="#c9c1b5" stroke="#81796d" strokeWidth="11" opacity=".92"/>
+   <polygon points={pointsAttr([base[3],base[0],top[0],top[3]])} fill="#b8b0a4" stroke="#81796d" strokeWidth="11" opacity=".92"/>
+   <polygon points={pointsAttr(top)} fill="#e6e0d6" stroke="#81796d" strokeWidth="11" opacity=".96"/>
+   <text x={mid.x} y={mid.y} textAnchor="middle" fontSize="72" fontWeight="900" fill="#5e5548">V{index+1}</text>
+  </g>})}
   {itemRows.map(item=>{
    const center=itemCenter(item);
    if(openingTypes.has(item.type)){
@@ -799,6 +813,19 @@ export default function DrawingClient(){
  const makeRoom=()=>openRoomBuilder("rect");
  const makeLRoom=()=>openRoomBuilder("l");
  const wallForView=wallViewId?doc.walls.find(w=>w.id===wallViewId)||null:null;
+ const wallSelectedItem=wallForView&&selected?.kind==="item"?doc.items.find(item=>item.id===selected.id&&item.wallId===wallForView.id)||null:null;
+ const updateWallVerticalItem=(itemId,key,value)=>{
+  const n=Number(value);if(!Number.isFinite(n))return;
+  const item=doc.items.find(o=>o.id===itemId),wall=item?.wallId?doc.walls.find(w=>w.id===item.wallId):null;if(!item||!wall)return;
+  const H=Math.max(300,Number(wall.h)||Number(doc.defaultWallHeight)||2400),next={...item};
+  if(key==="mountHeight")next.mountHeight=clamp(n,0,H);
+  else if(key==="sillHeight"){const opening=Math.max(100,Number(item.openingHeight)||1200);next.sillHeight=clamp(n,0,Math.max(0,H-opening))}
+  else if(key==="openingHeight"){const sill=item.type==="window"?Math.max(0,Number(item.sillHeight)||0):0;next.openingHeight=clamp(n,100,Math.max(100,H-sill))}
+  else if(key==="elevation"){const height=Math.max(50,modelHeight(item));next.elevation=clamp(n,0,Math.max(0,H-height))}
+  else if(key==="modelHeight"){const elevation=Math.max(0,Number(item.elevation)||0);next.modelHeight=clamp(n,50,Math.max(50,H-elevation))}
+  else return;
+  mutate(d=>({...d,items:d.items.map(o=>o.id===itemId?next:o)}));
+ };
  const openWallView=(wallId=null)=>{
   const id=wallId||(selected?.kind==="wall"?selected.id:null)||doc.walls[0]?.id;
   if(!id){setMessage("Tegn minst én vegg først");setTimeout(()=>setMessage(""),1800);return}
@@ -902,6 +929,7 @@ export default function DrawingClient(){
   setFieldReturnZoneId(returnZoneId||null);setSelected({kind:"item",id});setTool("select");setQuickAddOpen(false);setTimeout(()=>setMobileEditOpen(true),0);
  };
  const addItem=(type,w,h)=>addItemToWall(type,w,h);
+ const addWallWorkspaceItem=(type,w,h)=>{if(!wallForView)return;addItemToWall(type,w,h,wallForView.id);setTimeout(()=>setMobileEditOpen(false),0)};
  const sel=useMemo(()=>selected?.kind==="wall"?doc.walls.find(x=>x.id===selected.id):selected?.kind==="item"?doc.items.find(x=>x.id===selected.id):selected?.kind==="zone"?(doc.zones||[]).find(x=>x.id===selected.id):selected?.kind==="measurement"?(doc.measurements||[]).find(x=>x.id===selected.id):null,[selected,doc]);
  const selectedZoneWalls=useMemo(()=>selected?.kind==="zone"&&Array.isArray(sel?.wallIds)?sel.wallIds.map(id=>doc.walls.find(w=>w.id===id)).filter(Boolean):[],[selected,sel,doc.walls]);
  const selectedRoomDiagnostics=useMemo(()=>linkedRoomDiagnostics(selectedZoneWalls),[selectedZoneWalls]);
@@ -1415,14 +1443,39 @@ export default function DrawingClient(){
    <button type="button" className={styles.mobileAllProps} onClick={()=>scrollPanel(rightPanel)}>Vis alle egenskaper</button>
   </div>}
   {wallForView&&<div className={styles.wallViewBackdrop} role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)setWallViewId(null)}}>
-   <section className={styles.wallViewModal} role="dialog" aria-modal="true" aria-label="Veggvisning">
+   <section className={styles.wallViewModal} role="dialog" aria-modal="true" aria-label="Veggvisning og veggtegning">
     <header>
-     <div><span>VEGGVISNING</span><h2>Vegg {Math.max(1,doc.walls.findIndex(w=>w.id===wallForView.id)+1)} · {len(wallForView)} mm</h2><p>Se veggen rett forfra. Klikk et objekt for å velge det, eller bygg et møbel direkte på veggen.</p></div>
-     <button type="button" onClick={()=>setWallViewId(null)} aria-label="Lukk veggvisning">×</button>
+     <div><span>VEGGTEGNING</span><h2>Vegg {Math.max(1,doc.walls.findIndex(w=>w.id===wallForView.id)+1)} · {len(wallForView)} × {Math.round(Number(wallForView.h)||2400)} mm</h2><p>Arbeid rett på veggen. Alt som hører til veggen vises med faktisk bredde og høyde, slik at du kan bygge opp veggen før du går tilbake til plantegningen.</p></div>
+     <button type="button" onClick={()=>setWallViewId(null)} aria-label="Lukk veggtegning">×</button>
     </header>
-    <div className={styles.wallViewToolbar}><button type="button" onClick={()=>cycleWallView(-1)}>← Forrige vegg</button><button type="button" className={styles.wallViewBuild} onClick={()=>openFurnitureBuilder(wallForView.id)}>+ Bygg møbel på veggen</button><button type="button" onClick={()=>cycleWallView(1)}>Neste vegg →</button></div>
+    <div className={styles.wallStrip}>{doc.walls.map((wall,index)=><button type="button" key={wall.id} data-active={wall.id===wallForView.id?"true":"false"} onClick={()=>openWallView(wall.id)}><b>Vegg {index+1}</b><small>{len(wall)} × {Math.round(Number(wall.h)||2400)} mm</small></button>)}</div>
+    <div className={styles.wallViewToolbar}><button type="button" onClick={()=>cycleWallView(-1)}>← Forrige</button><button type="button" className={styles.wallViewBuild} onClick={()=>openFurnitureBuilder(wallForView.id)}>+ Bygg eget møbel</button><button type="button" onClick={()=>cycleWallView(1)}>Neste →</button></div>
+    <div className={styles.wallWorkspaceTools}>
+     <button type="button" onClick={()=>openFurnitureBuilder(wallForView.id)}>+ Eget møbel</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("door",900,100)}>+ Dør</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("sliding",1800,100)}>+ Skyvedør</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("window",1200,100)}>+ Vindu</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("opening",1000,100)}>+ Åpning</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("outlet",180,100)}>+ Stikk</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("doubleoutlet",220,100)}>+ Dobbel stikk</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("switch",120,100)}>+ Bryter</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("dimmer",120,100)}>+ Dimmer</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("thermostat",140,100)}>+ Termostat</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("walllight",180,100)}>+ Vegglampe</button>
+    </div>
     <div className={styles.wallViewCanvas}><WallElevationPreview wall={wallForView} items={doc.items} selectedItemId={selected?.kind==="item"?selected.id:null} onSelectItem={item=>setSelected({kind:"item",id:item.id})}/></div>
-    <footer><span>Vegg: <b>{len(wallForView)} × {Math.round(Number(wallForView.h)||2400)} mm</b></span><span>Objekter på veggen: <b>{doc.items.filter(item=>item.wallId===wallForView.id).length}</b></span>{selected?.kind==="item"&&doc.items.find(item=>item.id===selected.id)?.wallId===wallForView.id&&<button type="button" onClick={()=>{setWallViewId(null);setTimeout(()=>scrollPanel(rightPanel),0)}}>Rediger valgt objekt →</button>}</footer>
+    {wallSelectedItem&&(()=>{const gaps=wallEdgeOffsets(wallSelectedItem,wallForView),isOpening=openingTypes.has(wallSelectedItem.type),isElectrical=wallElectricalTypes.has(wallSelectedItem.type),isCustom=wallSelectedItem.type==="customwall";return <div className={styles.wallInlineEditor}>
+     <div><strong>{wallSelectedItem.customName||labelFor(wallSelectedItem.type)}</strong><small>Valgt på vegg {Math.max(1,doc.walls.findIndex(w=>w.id===wallForView.id)+1)}</small></div>
+     <label>Fra venstre (mm)<input type="number" min="0" max={Math.max(0,gaps.L-Number(wallSelectedItem.w||0))} value={gaps.start} onChange={e=>updateWallItemById(wallSelectedItem.id,"wallStartGap",e.target.value)}/></label>
+     <label>Bredde (mm)<input type="number" min="100" max={gaps.L} value={Math.round(Number(wallSelectedItem.w)||0)} onChange={e=>updateWallItemById(wallSelectedItem.id,"w",e.target.value)}/></label>
+     {isOpening&&<label>Åpningshøyde (mm)<input type="number" min="100" max={Math.round(Number(wallForView.h)||2400)} value={Math.round(Number(wallSelectedItem.openingHeight)||openingDefaults(wallSelectedItem.type).openingHeight||2100)} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"openingHeight",e.target.value)}/></label>}
+     {wallSelectedItem.type==="window"&&<label>Brystning (mm)<input type="number" min="0" value={Math.round(Number(wallSelectedItem.sillHeight)||0)} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"sillHeight",e.target.value)}/></label>}
+     {isElectrical&&<label>Høyde fra gulv (mm)<input type="number" min="0" max={Math.round(Number(wallForView.h)||2400)} value={Math.round(Number(wallSelectedItem.mountHeight)||0)} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"mountHeight",e.target.value)}/></label>}
+     {isCustom&&<><label>Møbelhøyde (mm)<input type="number" min="50" value={Math.round(modelHeight(wallSelectedItem))} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"modelHeight",e.target.value)}/></label><label>Fra gulv (mm)<input type="number" min="0" value={Math.round(Number(wallSelectedItem.elevation)||0)} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"elevation",e.target.value)}/></label></>}
+     <div className={styles.wallInlineActions}><button type="button" onClick={duplicate}>Dupliser</button><button type="button" onClick={remove}>Slett</button></div>
+    </div>})()}
+    <div className={styles.wallViewHint}>Klikk et objekt på veggen for å redigere det uten å forlate veggvisningen. Rutenettet er 100 mm. Vegglengde, vegghøyde, åpninger, EL-punkter og egne møbler vises i samme frontvisning.</div>
+    <footer><span>Vegg: <b>{len(wallForView)} × {Math.round(Number(wallForView.h)||2400)} × {Math.round(Number(wallForView.t)||98)} mm</b></span><span>Objekter: <b>{doc.items.filter(item=>item.wallId===wallForView.id).length}</b></span><button type="button" onClick={()=>setWallViewId(null)}>Tilbake til plantegning →</button></footer>
    </section>
   </div>}
   {furnitureBuilder&&<div className={styles.furnitureBuilderBackdrop} role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)setFurnitureBuilder(null)}}>
@@ -1451,7 +1504,8 @@ export default function DrawingClient(){
    <section className={styles.preview3DModal} role="dialog" aria-modal="true" aria-label="3D-visning">
     <header><div><span>3D-VISNING</span><h2>{doc.name||"Tegning"}</h2><p>Klikk på en vegg i 3D-visningen for å åpne veggen rett forfra og bygge møbler på den.</p></div><button type="button" onClick={()=>setShow3D(false)} aria-label="Lukk 3D-visning">×</button></header>
     <div className={styles.preview3DCanvas}><Drawing3DPreview doc={doc} onWallSelect={wall=>openWallView(wall.id)}/></div>
-    <footer><span><b>Tips:</b> klikk vegg for veggvisning</span><span><b>Vegger:</b> faktisk vegghøyde</span><span><b>Møbler:</b> bredde, dybde og høyde</span><span><b>Elektro:</b> høyde/takpunkt</span></footer>
+    <div className={styles.previewWallStrip}>{doc.walls.map((wall,index)=><button type="button" key={wall.id} onClick={()=>openWallView(wall.id)}>Vegg {index+1}<small>{len(wall)} × {Math.round(Number(wall.h)||2400)} × {Math.round(Number(wall.t)||98)} mm</small></button>)}</div>
+    <footer><span><b>Tips:</b> klikk en vegg eller velg den i listen</span><span><b>Vegger:</b> faktisk høyde og tykkelse</span><span><b>Møbler:</b> bredde, dybde og høyde</span><span><b>Elektro:</b> høyde/takpunkt</span></footer>
    </section>
   </div>}
   {wallBuilder&&<div className={styles.roomModalBackdrop} role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)setWallBuilder(null)}}>
