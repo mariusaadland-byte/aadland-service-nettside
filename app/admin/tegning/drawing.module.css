@@ -1196,3 +1196,28 @@
  .furnitureQuickPlacement>div:last-of-type{grid-template-columns:1fr}
  .furnitureQuickPlacement button{min-height:44px;font-size:10px}
 }
+
+
+/* Interactive 2D wall furniture builder */
+.wallProjectedEditor{
+ display:grid;grid-template-columns:minmax(180px,1fr) repeat(3,minmax(118px,auto));gap:7px;align-items:center;
+ padding:9px 12px;border-top:1px solid #343a43;background:#1a2027;color:#eef1f3
+}
+.wallProjectedEditor>div{display:grid;gap:2px;min-width:0}
+.wallProjectedEditor strong{font-size:11px;color:#f3d58e}
+.wallProjectedEditor small{font-size:9px;color:#aeb6bd;line-height:1.25}
+.wallProjectedEditor button{
+ min-height:38px;border:1px solid #59636d;border-radius:8px;background:#252c34;color:#f2f5f7;
+ padding:0 9px;font:800 9px/1.1 inherit;cursor:pointer
+}
+.wallProjectedEditor button:nth-of-type(2){background:#d7a74e;border-color:#d7a74e;color:#1e1608}
+.wallViewCanvas svg{touch-action:none}
+@media(max-width:760px){
+ .wallProjectedEditor{grid-template-columns:1fr 1fr 1fr}
+ .wallProjectedEditor>div{grid-column:1/-1}
+ .wallProjectedEditor button{min-height:44px}
+}
+@media(max-width:430px){
+ .wallProjectedEditor{grid-template-columns:1fr}
+ .wallProjectedEditor>div,.wallProjectedEditor button{grid-column:1/-1}
+}
