@@ -223,6 +223,76 @@ function electricalSymbol(type){
  return ({ceilinglight:"⊗",downlight:"⊙",walllight:"◐",outlet:"◫",doubleoutlet:"▣",switch:"S",dimmer:"D",thermostat:"T",junction:"●"})[type]||"";
 }
 function modelHeight(item){return Math.max(80,Number(item?.modelHeight)||item3DHeight[item?.type]||600)}
+
+function PlanItemGlyph({item,active}){
+ const o=item;
+ if(o.type==="door")return <g transform={o.flip?"translate("+o.w+" 0) scale(-1 1)":undefined}><line x1="0" y1={o.h/2} x2={o.w} y2={o.h/2} stroke="#51462f" strokeWidth="28"/><path d={"M0 "+o.h/2+" A "+o.w+" "+o.w+" 0 0 1 "+o.w+" "+(o.h/2-o.w)} fill="none" stroke="#8b806a" strokeWidth="18"/></g>;
+ if(o.type==="sliding")return <><rect width={o.w} height={Math.max(o.h,100)} fill="#f7f7f7" stroke="#51462f" strokeWidth="18"/><line x1="60" y1="20" x2={o.w*.62} y2="20" stroke="#51462f" strokeWidth="22"/><line x1={o.w*.38} y1={o.h-20} x2={o.w-60} y2={o.h-20} stroke="#51462f" strokeWidth="22"/></>;
+ if(o.type==="opening")return <><line x1="0" y1={o.h/2} x2={o.w} y2={o.h/2} stroke="#fff" strokeWidth="100"/><line x1="0" y1="0" x2="0" y2={o.h} stroke="#777" strokeWidth="16"/><line x1={o.w} y1="0" x2={o.w} y2={o.h} stroke="#777" strokeWidth="16"/></>;
+ if(o.type==="window")return <><rect width={o.w} height={Math.max(o.h,100)} fill="#dfeef1" stroke="#51462f" strokeWidth="18"/><line x1="0" y1={o.h/2} x2={o.w} y2={o.h/2} stroke="#64828a" strokeWidth="18"/></>;
+ if(electricalTypes.has(o.type)){
+  const cx=o.w/2,cy=o.h/2,r=Math.max(52,Math.min(o.w,o.h)*.34);
+  return <g>
+   <rect width={o.w} height={o.h} rx="24" fill={active?"#fff0bf":"#fff9df"} stroke="#b28a30" strokeWidth="14"/>
+   {["ceilinglight","downlight","junction"].includes(o.type)&&<circle cx={cx} cy={cy} r={r} fill="#fff" stroke="#b28a30" strokeWidth="16"/>}
+   {o.type==="ceilinglight"&&<><line x1={cx-r*.7} y1={cy-r*.7} x2={cx+r*.7} y2={cy+r*.7} stroke="#b28a30" strokeWidth="14"/><line x1={cx+r*.7} y1={cy-r*.7} x2={cx-r*.7} y2={cy+r*.7} stroke="#b28a30" strokeWidth="14"/></>}
+   {o.type==="downlight"&&<circle cx={cx} cy={cy} r={r*.25} fill="#b28a30"/>}
+   {o.type==="junction"&&<circle cx={cx} cy={cy} r={r*.22} fill="#b28a30"/>}
+   {!["ceilinglight","downlight","junction"].includes(o.type)&&<text x={cx} y={cy+30} textAnchor="middle" fontSize="82" fontWeight="900" fill="#7a5a1c">{electricalSymbol(o.type)}</text>}
+  </g>;
+ }
+ return <rect width={o.w} height={o.h} rx="30" fill={active?"#eadcbf":"#f5f1e7"} stroke="#51462f" strokeWidth="18"/>;
+}
+function isoPoint(x,y,z=0){return{x:(x-y)*.8660254,y:(x+y)*.5-z}}
+function pointsAttr(points){return points.map(p=>p.x+","+p.y).join(" ")}
+function itemCeilingHeight(item,doc){
+ const center=itemCenter(item),zone=zoneContainingPoint(center,doc.zones||[]);
+ return Number(zone?.ceilingHeight)||Number(doc.defaultWallHeight)||2400;
+}
+function Drawing3DPreview({doc}){
+ const zones=doc.zones||[],walls=doc.walls||[],items=doc.items||[];
+ const projected=[];
+ const addPoint=(x,y,z=0)=>projected.push(isoPoint(x,y,z));
+ for(const z of zones)for(const p of z.points||[]){addPoint(p.x,p.y,0);addPoint(p.x,p.y,Number(z.ceilingHeight)||Number(doc.defaultWallHeight)||2400)}
+ for(const w of walls){addPoint(w.x1,w.y1,0);addPoint(w.x2,w.y2,0);addPoint(w.x1,w.y1,Number(w.h)||2400);addPoint(w.x2,w.y2,Number(w.h)||2400)}
+ for(const item of items){
+  const height=ceilingElectricalTypes.has(item.type)?itemCeilingHeight(item,doc):wallElectricalTypes.has(item.type)?Number(item.mountHeight)||1200:modelHeight(item);
+  for(const p of rotatedItemCorners(item)){addPoint(p.x,p.y,0);addPoint(p.x,p.y,height)}
+ }
+ if(!projected.length)projected.push({x:0,y:0},{x:1000,y:700});
+ const minX=Math.min(...projected.map(p=>p.x)),maxX=Math.max(...projected.map(p=>p.x)),minY=Math.min(...projected.map(p=>p.y)),maxY=Math.max(...projected.map(p=>p.y)),pad=Math.max(400,(maxX-minX+maxY-minY)*.04);
+ const viewBox=[minX-pad,minY-pad,Math.max(1000,maxX-minX+pad*2),Math.max(800,maxY-minY+pad*2)].join(" ");
+ const wallRows=[...walls].sort((a,b)=>isoPoint((a.x1+a.x2)/2,(a.y1+a.y2)/2,0).y-isoPoint((b.x1+b.x2)/2,(b.y1+b.y2)/2,0).y);
+ const itemRows=[...items].sort((a,b)=>isoPoint(itemCenter(a).x,itemCenter(a).y,0).y-isoPoint(itemCenter(b).x,itemCenter(b).y,0).y);
+ return <svg viewBox={viewBox} role="img" aria-label="Isometrisk 3D-visning av tegningen">
+  <defs>
+   <linearGradient id="floor3d" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#faf7ef"/><stop offset="1" stopColor="#e9e1d4"/></linearGradient>
+   <linearGradient id="wall3d" x1="0" x2="1"><stop offset="0" stopColor="#d9d2c6"/><stop offset="1" stopColor="#b9b1a5"/></linearGradient>
+   <linearGradient id="item3d" x1="0" x2="1"><stop offset="0" stopColor="#d8b979"/><stop offset="1" stopColor="#9d7b42"/></linearGradient>
+  </defs>
+  {zones.map(zone=><polygon key={"floor-"+zone.id} points={pointsAttr((zone.points||[]).map(p=>isoPoint(p.x,p.y,0)))} fill="url(#floor3d)" stroke="#b8ad9b" strokeWidth="18"/>)}
+  {wallRows.map(w=>{const h=Number(w.h)||2400,p1=isoPoint(w.x1,w.y1,0),p2=isoPoint(w.x2,w.y2,0),p3=isoPoint(w.x2,w.y2,h),p4=isoPoint(w.x1,w.y1,h);return <polygon key={"wall3d-"+w.id} points={pointsAttr([p1,p2,p3,p4])} fill="url(#wall3d)" stroke="#81796d" strokeWidth="16" opacity=".88"/>})}
+  {itemRows.map(item=>{
+   const center=itemCenter(item);
+   if(openingTypes.has(item.type)){
+    const a=(Number(item.rot)||0)*Math.PI/180,ux=Math.cos(a),uy=Math.sin(a),half=(Number(item.w)||0)/2,z0=item.type==="window"?Number(item.sillHeight)||0:0,z1=z0+(Number(item.openingHeight)||openingDefaults(item.type).openingHeight||2100);
+    const a0=isoPoint(center.x-ux*half,center.y-uy*half,z0),b0=isoPoint(center.x+ux*half,center.y+uy*half,z0),b1=isoPoint(center.x+ux*half,center.y+uy*half,z1),a1=isoPoint(center.x-ux*half,center.y-uy*half,z1);
+    return <polygon key={"opening3d-"+item.id} points={pointsAttr([a0,b0,b1,a1])} fill={item.type==="window"?"rgba(147,205,221,.78)":"rgba(250,248,242,.9)"} stroke="#5d5b56" strokeWidth="15"/>;
+   }
+   if(electricalTypes.has(item.type)){
+    const z=ceilingElectricalTypes.has(item.type)?itemCeilingHeight(item,doc):Number(item.mountHeight)||1200,p=isoPoint(center.x,center.y,z),size=Math.max(90,Math.min(Number(item.w)||140,240));
+    return <g key={"el3d-"+item.id}><polygon points={pointsAttr([{x:p.x,y:p.y-size},{x:p.x+size,y:p.y},{x:p.x,y:p.y+size},{x:p.x-size,y:p.y}])} fill="#ffe773" stroke="#89691e" strokeWidth="14"/><text x={p.x} y={p.y+28} textAnchor="middle" fontSize="80" fontWeight="900" fill="#5f4715">{electricalSymbol(item.type)}</text></g>;
+   }
+   if(["railing","screen"].includes(item.type))return null;
+   const corners=rotatedItemCorners(item),h=modelHeight(item),base=corners.map(p=>isoPoint(p.x,p.y,0)),top=corners.map(p=>isoPoint(p.x,p.y,h));
+   return <g key={"obj3d-"+item.id}>
+    <polygon points={pointsAttr([base[1],base[2],top[2],top[1]])} fill="#9c7b48" stroke="#675236" strokeWidth="11"/>
+    <polygon points={pointsAttr([base[2],base[3],top[3],top[2]])} fill="#80643d" stroke="#675236" strokeWidth="11"/>
+    <polygon points={pointsAttr(top)} fill="url(#item3d)" stroke="#675236" strokeWidth="12"/>
+   </g>
+  })}
+ </svg>;
+}
 function syncLinkedZones(walls,zones){
  const byId=new Map((walls||[]).map(w=>[w.id,w]));
  return (zones||[]).map(zone=>{
