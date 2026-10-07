@@ -3208,6 +3208,13 @@ body:has(.customerPage) .customerPage{
 .customerBillingCheck input{width:18px;height:18px;margin-top:2px}
 .customerBillingCheck span{display:grid;gap:3px}
 .customerBillingCheck small{color:#756f66;line-height:1.35}
+.customerCreditUsage{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:10px;border:1px solid #e0d9ce;border-radius:10px;background:#fff}
+.customerCreditUsage span{display:grid;gap:3px;min-width:0}
+.customerCreditUsage small{color:#756f66;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+.customerCreditUsage b{font-size:12px}
+.customerCreditUsage.isOverLimit{border-color:#c75d52;background:#fff7f5}
+.customerBillingBadge.isOverLimit{border-color:rgba(177,61,48,.5);background:rgba(177,61,48,.12);color:#8d2d24}
+@media(max-width:640px){.customerCreditUsage{grid-template-columns:1fr}}
 
 /* Admin utleiebookinger skal alltid være lesbare i lys backoffice. */
 .adminmain .rentalBookingCard{background:#fff;color:#181613;border-color:#e2d9cc}
