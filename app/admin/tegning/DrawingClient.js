@@ -375,6 +375,33 @@ function offsetPolygon(points,distance,inward=true){
   return{x:point.x+(prev.nx+next.nx)*distance/2,y:point.y+(prev.ny+next.ny)*distance/2};
  });
 }
+function centerlinePointsFromInner(points,wallIds,walls,defaultThickness=98,thicknessOverrides={}){
+ if(!Array.isArray(points)||points.length<3||!Array.isArray(wallIds)||wallIds.length!==points.length)return points||[];
+ const byId=new Map((walls||[]).map(w=>[w.id,w])),orientation=polygonSignedArea(points)>=0?1:-1,shifted=[];
+ for(let i=0;i<points.length;i++){
+  const a=points[i],b=points[(i+1)%points.length],dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1,wallId=wallIds[i],wall=byId.get(wallId),thickness=Number(thicknessOverrides?.[wallId]??wall?.t??defaultThickness)||98,distance=Math.max(0,thickness/2);
+  const inX=orientation>0?-dy/L:dy/L,inY=orientation>0?dx/L:-dx/L,outX=-inX,outY=-inY;
+  shifted.push({a:{x:a.x+outX*distance,y:a.y+outY*distance},b:{x:b.x+outX*distance,y:b.y+outY*distance},outX,outY,distance});
+ }
+ return points.map((point,i)=>{
+  const prev=shifted[(i-1+shifted.length)%shifted.length],next=shifted[i],hit=infiniteLineIntersection(prev.a,prev.b,next.a,next.b);
+  if(hit&&Number.isFinite(hit.x)&&Number.isFinite(hit.y)&&Math.hypot(hit.x-point.x,hit.y-point.y)<3000)return hit;
+  return{x:point.x+(prev.outX*prev.distance+next.outX*next.distance)/2,y:point.y+(prev.outY*prev.distance+next.outY*next.distance)/2};
+ });
+}
+function rebuildLinkedRoomGeometry(doc,zone,innerPoints,thicknessOverrides={}){
+ if(!zone||!Array.isArray(zone.wallIds)||zone.wallIds.length!==innerPoints?.length)return doc;
+ const centers=centerlinePointsFromInner(innerPoints,zone.wallIds,doc.walls||[],doc.defaultWallThickness||98,thicknessOverrides),indexById=new Map(zone.wallIds.map((id,i)=>[id,i]));
+ const walls=(doc.walls||[]).map(w=>{
+  const i=indexById.get(w.id);if(i==null)return w;const a=centers[i],b=centers[(i+1)%centers.length],nextT=thicknessOverrides?.[w.id];
+  return {...w,x1:a.x,y1:a.y,x2:b.x,y2:b.y,...(nextT==null?{}:{t:Number(nextT)})};
+ });
+ const zones=syncLinkedZones(walls,doc.zones||[]),measurements=syncAnchoredMeasurements(walls,doc.measurements||[]),items=(doc.items||[]).map(item=>{
+  if(!item.wallId)return item;const wall=walls.find(w=>w.id===item.wallId);if(!wall)return {...item,wallId:null,wallOffset:null};const placed=mountedItemCenter(item,wall,zones);
+  return {...item,x:placed.cx-(Number(item.w)||0)/2,y:placed.cy-(Number(item.h)||0)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off};
+ });
+ return {...doc,walls,zones,measurements,items};
+}
 function insetLinkedZone(zone,walls,defaultThickness=98){
  const points=zone?.points||[],ids=Array.isArray(zone?.wallIds)?zone.wallIds:[];
  if(points.length<3||ids.length!==points.length)return zone;
@@ -1532,20 +1559,35 @@ export default function DrawingClient(){
  const updateWallById=(wallId,key,value)=>{
   let n=Number(value);if(!Number.isFinite(n))return;
   if(key==="len"&&(n<100||n>12000)){setMessage("Vegglengde må være 100–12000 mm");setTimeout(()=>setMessage(""),1800);return}
+  if(key==="t"&&(n<40||n>600)){setMessage("Veggtykkelse må være 40–600 mm");setTimeout(()=>setMessage(""),1800);return}
   if(key==="angle"){n=normalizeAngle(n);if(n==null)return}
-  mutate(d=>applyWallValue(d,wallId,key,n))
+  mutate(d=>{
+   if(key==="t"){
+    const zone=(d.zones||[]).find(z=>Array.isArray(z.wallIds)&&z.wallIds.includes(wallId));
+    if(zone){const inner=roomInnerZone(zone,d.walls,d.defaultWallThickness).points;return rebuildLinkedRoomGeometry(d,zone,inner,{[wallId]:n})}
+   }
+   return applyWallValue(d,wallId,key,n);
+  })
  };
  const updateRoomInnerWallLength=(wallId,value)=>{
   const n=Number(value),wall=doc.walls.find(w=>w.id===wallId);if(!Number.isFinite(n)||!wall||n<100||n>12000)return;
-  const face=wallFaceMetrics(wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),centerLength=Math.max(100,len(wall)+(n-face.L));
-  updateWallById(wallId,"len",centerLength);
+  const zone=(doc.zones||[]).find(z=>Array.isArray(z.wallIds)&&z.wallIds.includes(wallId));
+  if(!zone){updateWallById(wallId,"len",n);return}
+  const inner=roomInnerZone(zone,doc.walls,doc.defaultWallThickness),points=(inner.points||[]).map(p=>({...p})),index=zone.wallIds.indexOf(wallId),a=points[index],b=points[(index+1)%points.length];if(!a||!b)return;
+  const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1;points[(index+1)%points.length]={x:a.x+dx/L*n,y:a.y+dy/L*n};
+  mutate(d=>{const liveZone=(d.zones||[]).find(z=>z.id===zone.id);return liveZone?rebuildLinkedRoomGeometry(d,liveZone,points):d});
  };
  const updateRoomWalls=(key,value)=>{
   let n=Number(value);if(!Number.isFinite(n)||!selectedZoneWalls.length)return;
   if(key==="t"&&(n<40||n>600)){setMessage("Veggtykkelse må være 40–600 mm");setTimeout(()=>setMessage(""),1800);return}
   if(key==="h"&&(n<300||n>6000)){setMessage("Vegghøyde må være 300–6000 mm");setTimeout(()=>setMessage(""),1800);return}
   const ids=new Set(selectedZoneWalls.map(w=>w.id));
-  mutate(d=>({...d,walls:d.walls.map(w=>ids.has(w.id)?{...w,[key]:n}:w)}));
+  mutate(d=>{
+   if(key==="t"&&selected?.kind==="zone"&&sel?.id){
+    const zone=(d.zones||[]).find(z=>z.id===sel.id);if(zone){const inner=roomInnerZone(zone,d.walls,d.defaultWallThickness).points,overrides=Object.fromEntries((zone.wallIds||[]).map(id=>[id,n]));return rebuildLinkedRoomGeometry(d,zone,inner,overrides)}
+   }
+   return {...d,walls:d.walls.map(w=>ids.has(w.id)?{...w,[key]:n}:w)};
+  });
  };
  const updateWallItemById=(itemId,key,value)=>{
   const n=Number(value);if(!Number.isFinite(n))return;
@@ -1647,7 +1689,7 @@ export default function DrawingClient(){
   if(sel.wallId&&openingTypes.has(sel.type)){updateWallItemById(sel.id,"w",w);return}
   mutate(d=>{const items=d.items.map(o=>{if(o.id!==sel.id)return o;const changed={...o,x:o.x+(o.w-w)/2,y:o.y+(o.h-h)/2,w,h};return o.wallId?changed:constrainFreeItemStrict(changed,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackItem:o,fallbackCenter:itemCenter(o),snapDistance:0})});return {...d,items:syncMounted(d.walls,items,d.zones)}})
  };
- const applyWallPreset=value=>{if(selected?.kind!=="wall"||!sel||!value)return;const [t,h]=value.split("x").map(Number);if(!Number.isFinite(t)||!Number.isFinite(h)||t<=0||h<=0)return;mutate(d=>({...d,walls:d.walls.map(w=>w.id!==sel.id?w:{...w,t,h})}))};
+ const applyWallPreset=value=>{if(selected?.kind!=="wall"||!sel||!value)return;const [t,h]=value.split("x").map(Number);if(!Number.isFinite(t)||!Number.isFinite(h)||t<=0||h<=0)return;mutate(d=>{const zone=(d.zones||[]).find(z=>Array.isArray(z.wallIds)&&z.wallIds.includes(sel.id));let next=d;if(zone){const inner=roomInnerZone(zone,d.walls,d.defaultWallThickness).points;next=rebuildLinkedRoomGeometry(d,zone,inner,{[sel.id]:t})}else next={...d,walls:d.walls.map(w=>w.id!==sel.id?w:{...w,t})};return {...next,walls:next.walls.map(w=>w.id!==sel.id?w:{...w,h})}})};
  const finishZone=()=>{if(zoneDraft.length<3){setMessage("Romsonen trenger minst 3 punkter");setTimeout(()=>setMessage(""),1800);return}const zone={id:uid(),name:"Rom "+((doc.zones||[]).length+1),points:zoneDraft,ceilingHeight:Number(doc.defaultWallHeight)||2400,floorFinish:"",notes:""};mutate(d=>({...d,zones:[...(d.zones||[]),zone]}));setZoneDraft([]);setTool("select");setSelected({kind:"zone",id:zone.id})};
  const cancelZone=()=>{setZoneDraft([]);setTool("select")};
  const updateZoneField=(key,value,numeric=false)=>{if(selected?.kind!=="zone"||!sel)return;const next=numeric?Number(value):String(value);if(numeric&&!Number.isFinite(next))return;
