@@ -205,8 +205,12 @@ function drawingCollisions(items=[],walls=[],zones=[],defaultThickness=98){
    const ah=Math.max(0,Number(a.w)||0)/2,bh=Math.max(0,Number(b.w)||0)/2,ao=Number(a.wallOffset)||0,bo=Number(b.wallOffset)||0;
    const horizontal=Math.abs(ao-bo)<ah+bh-4,vertical=az0<bz1-4&&az1>bz0+4,types=new Set([a.type,b.type]),overlay=(types.has("countertop")&&(types.has("cooktop")||types.has("kitchensink")))||(types.has("plinth")&&[a.type,b.type].some(t=>["base","sinkcab","cornerbase","dishwasher","oven"].includes(t)));
    if(horizontal&&vertical&&!overlay&&!wallElectricalTypes.has(a.type)&&!wallElectricalTypes.has(b.type)){mark(a.id,b.id,"overlapper på vegg");mark(b.id,a.id,"overlapper på vegg")}
-  }else if(!a.wallId&&!b.wallId&&!electricalTypes.has(a.type)&&!electricalTypes.has(b.type)&&boxesOverlap(itemAabb(a),itemAabb(b),8)){
-   mark(a.id,b.id,"objekter overlapper");mark(b.id,a.id,"objekter overlapper");
+  }else if(!electricalTypes.has(a.type)&&!electricalTypes.has(b.type)&&!openingTypes.has(a.type)&&!openingTypes.has(b.type)&&boxesOverlap(itemAabb(a),itemAabb(b),8)){
+   const az0=Math.max(0,Number(a.elevation)||0),bz0=Math.max(0,Number(b.elevation)||0);
+   if(az0<bz0+modelHeight(b)-2&&bz0<az0+modelHeight(a)-2){
+    const reason=a.wallId||b.wallId?"Veggmøbel og gulvmøbel overlapper":"objekter overlapper";
+    mark(a.id,b.id,reason);mark(b.id,a.id,reason);
+   }
   }
   const aSwing=doorSwingBox(a),bSwing=doorSwingBox(b);
   if(aSwing&&!b.wallId&&!electricalTypes.has(b.type)&&boxesOverlap(aSwing,itemAabb(b),5)){mark(a.id,b.id,"dørslag er blokkert");mark(b.id,a.id,"blokkerer dørslag")}
@@ -278,10 +282,10 @@ function pointOnSegment(point,a,b,tolerance=2){
  const t=clamp(((point.x-a.x)*dx+(point.y-a.y)*dy)/L2,0,1);
  return Math.hypot(point.x-(a.x+t*dx),point.y-(a.y+t*dy))<=tolerance;
 }
-function pointInPolygonInclusive(point,points){
+function pointInPolygonInclusive(point,points,tolerance=3){
  if(!Array.isArray(points)||points.length<3)return false;
  for(let i=0,j=points.length-1;i<points.length;j=i++){
-  if(pointOnSegment(point,points[j],points[i],3))return true;
+  if(pointOnSegment(point,points[j],points[i],tolerance))return true;
  }
  let inside=false;
  for(let i=0,j=points.length-1;i<points.length;j=i++){
@@ -296,7 +300,18 @@ function rotatedItemCorners(item,x=item.x,y=item.y){
  return [[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]].map(([dx,dy])=>({x:cx+dx*cos-dy*sin,y:cy+dx*sin+dy*cos}));
 }
 function itemFitsZone(item,zone,x=item.x,y=item.y){
- return !!zone?.points?.length&&rotatedItemCorners(item,x,y).every(point=>pointInPolygonInclusive(point,zone.points));
+ const boundary=zone?.points||[],corners=rotatedItemCorners(item,x,y);
+ if(boundary.length<3||!corners.every(point=>pointInPolygonInclusive(point,boundary,.05)))return false;
+ // A piece can bridge the missing corner of an L-shaped room even if its four corners are inside.
+ const side=(a,b,c)=>(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);
+ for(let i=0;i<corners.length;i++){
+  const a=corners[i],b=corners[(i+1)%corners.length];
+  for(let j=0;j<boundary.length;j++){
+   const c=boundary[j],d=boundary[(j+1)%boundary.length];
+   if(side(a,b,c)*side(a,b,d)<-1e-7&&side(c,d,a)*side(c,d,b)<-1e-7)return false;
+  }
+ }
+ return true;
 }
 function itemCenter(item,x=item.x,y=item.y){return{x:x+(Number(item.w)||0)/2,y:y+(Number(item.h)||0)/2}}
 function zoneContainingPoint(point,zones){return (zones||[]).find(zone=>pointInPolygonInclusive(point,zone.points||[]))||null}
