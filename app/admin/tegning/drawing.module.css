@@ -951,3 +951,25 @@
  .preview3DSelection{align-items:stretch;flex-direction:column}
  .preview3DSelection button{min-height:42px}
 }
+
+
+/* Compact desktop toolbar: advanced actions live in the burger menu. */
+.moreMenu{position:relative;flex:0 0 auto}
+.moreMenu>summary{
+ list-style:none;display:grid;place-items:center;min-width:44px;height:40px;border:1px solid #555;border-radius:8px;
+ background:#252624;color:#fff;font-size:22px;line-height:1;cursor:pointer;user-select:none
+}
+.moreMenu>summary::-webkit-details-marker{display:none}
+.moreMenu[open]>summary{background:#eadcbf;border-color:#c9a85e;color:#241d10}
+.moreMenuPanel{
+ position:absolute;top:calc(100% + 8px);right:0;z-index:80;display:grid;gap:6px;min-width:225px;padding:9px;
+ border:1px solid #4a4c48;border-radius:10px;background:#171816;box-shadow:0 14px 34px #0007
+}
+.moreMenuPanel .btn,.moreMenuPanel .activeBtn{
+ display:block!important;width:100%;min-height:40px;text-align:left;color:#fff;background:#252724;border-color:#454843
+}
+.moreMenuPanel .activeBtn{background:#eadcbf;color:#241d10;border-color:#c9a85e}
+.moreMenuPanel .btn:hover{background:#333631}
+@media(max-width:900px), (pointer:coarse) and (min-width:901px) and (max-width:1200px){
+ .moreMenu{display:none}
+}
