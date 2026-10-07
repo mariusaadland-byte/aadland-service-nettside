@@ -159,7 +159,7 @@ function wallFurnitureGaps(wall,items,excludeId=null){
  const mounted=(items||[])
   .filter(item=>item.wallId===wall.id&&item.id!==excludeId&&!wallElectricalTypes.has(item.type)&&!["railing","screen"].includes(item.type))
   .map(item=>{const gaps=wallEdgeOffsets(item,wall),start=clamp(gaps.start,0,L),end=clamp(gaps.start+Math.max(0,Number(item.w)||0),0,L);return{start,end}});
- const floor=wallProjectedFurniture(wall,items).filter(row=>row.item.id!==excludeId&&row.blocksGap).map(row=>({start:row.start,end:row.end}));
+ const floor=wallProjectedFurniture(wall,items).filter(row=>row.item.id!==excludeId).map(row=>({start:row.start,end:row.end}));
  const blockers=[...mounted,...floor].filter(row=>row.end>row.start).sort((a,b)=>a.start-b.start);
  const merged=[];
  for(const row of blockers){
@@ -439,6 +439,36 @@ function Drawing3DPreview({doc,onWallSelect,onItemSelect,camera}){
   })}
  </svg>;
 }
+function FurnitureGapPlanPreview({doc,wall,onSelectGap}){
+ const walls=doc.walls||[],items=doc.items||[],gaps=wallFurnitureGaps(wall,items),points=[];
+ for(const w of walls)points.push({x:Number(w.x1)||0,y:Number(w.y1)||0},{x:Number(w.x2)||0,y:Number(w.y2)||0});
+ for(const item of items)for(const p of rotatedItemCorners(item))points.push(p);
+ if(!points.length)points.push({x:0,y:0},{x:4000,y:3000});
+ const xs=points.map(p=>p.x),ys=points.map(p=>p.y),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys),pad=Math.max(350,Math.max(maxX-minX,maxY-minY)*.08);
+ const dx=wall.x2-wall.x1,dy=wall.y2-wall.y1,L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L,nx=-uy,ny=ux;
+ const gapPoly=gap=>{const thickness=240,a={x:wall.x1+ux*gap.start,y:wall.y1+uy*gap.start},b={x:wall.x1+ux*gap.end,y:wall.y1+uy*gap.end};return[
+  {x:a.x+nx*thickness,y:a.y+ny*thickness},{x:b.x+nx*thickness,y:b.y+ny*thickness},
+  {x:b.x-nx*thickness,y:b.y-ny*thickness},{x:a.x-nx*thickness,y:a.y-ny*thickness}
+ ]};
+ return <svg viewBox={[minX-pad,minY-pad,Math.max(900,maxX-minX+pad*2),Math.max(700,maxY-minY+pad*2)].join(" ")} role="img" aria-label="Velg mellomrom i plantegningen">
+  <defs><pattern id={"gap-plan-grid-"+wall.id} width="100" height="100" patternUnits="userSpaceOnUse"><path d="M100 0H0V100" fill="none" stroke="#ebe7dd" strokeWidth="4"/></pattern></defs>
+  <rect x={minX-pad} y={minY-pad} width={Math.max(900,maxX-minX+pad*2)} height={Math.max(700,maxY-minY+pad*2)} fill={"url(#gap-plan-grid-"+wall.id+")"}/>
+  {(doc.zones||[]).map(z=><polygon key={"gap-zone-"+z.id} points={(z.points||[]).map(p=>p.x+","+p.y).join(" ")} fill="rgba(50,106,118,.07)" stroke="#8da2a7" strokeWidth="10" strokeDasharray="35 22"/>)}
+  {walls.map(w=><line key={"gap-wall-"+w.id} x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} stroke={w.id===wall.id?"#2f846c":"#333"} strokeWidth={w.id===wall.id?Math.max(75,Number(w.t)||98):Math.max(35,Number(w.t)||98)} strokeLinecap="square"/>)}
+  {items.map(item=><g key={"gap-item-"+item.id} transform={"translate("+item.x+" "+item.y+") rotate("+item.rot+" "+item.w/2+" "+item.h/2+")"} pointerEvents="none">
+   <PlanItemGlyph item={item} active={false}/>
+   {!electricalTypes.has(item.type)&&<><text x={item.w/2} y={item.h/2} textAnchor="middle" dominantBaseline="middle" fontSize="95" fontWeight="800" fill="#332d24">{item.customName||labelFor(item.type)}</text><text x={item.w/2} y={item.h/2+120} textAnchor="middle" fontSize="70" fill="#5f5547">{Math.round(item.w)} × {Math.round(item.h)}</text></>}
+  </g>)}
+  {gaps.map((gap,index)=>{const poly=gapPoly(gap),mid={x:wall.x1+ux*(gap.start+gap.width/2),y:wall.y1+uy*(gap.start+gap.width/2)};return <g key={"plan-gap-"+index} onPointerDown={e=>{e.stopPropagation();onSelectGap?.(gap)}} style={{cursor:"pointer"}}>
+   <polygon points={pointsAttr(poly)} fill="rgba(47,132,108,.30)" stroke="#1f6c57" strokeWidth="22" strokeDasharray="45 24"/>
+   <circle cx={mid.x} cy={mid.y} r="145" fill="#1f6c57" stroke="#fff" strokeWidth="18"/>
+   <text x={mid.x} y={mid.y-12} textAnchor="middle" fontSize="68" fontWeight="900" fill="#fff">VELG</text>
+   <text x={mid.x} y={mid.y+72} textAnchor="middle" fontSize="56" fontWeight="800" fill="#fff">{gap.width} mm</text>
+  </g>})}
+  <g pointerEvents="none"><rect x={minX-pad+45} y={minY-pad+45} width={Math.min(1900,Math.max(900,(maxX-minX)*.55))} height="165" rx="28" fill="rgba(255,255,255,.95)" stroke="#2f846c" strokeWidth="12"/><text x={minX-pad+90} y={minY-pad+112} fontSize="58" fontWeight="900" fill="#205f4e">VELG MELLOMROM I PLANTEGNINGEN</text><text x={minX-pad+90} y={minY-pad+174} fontSize="46" fontWeight="700" fill="#5a5246">Alle senger, skap og øvrige møbler vises mens du velger.</text></g>
+ </svg>;
+}
+
 function WallElevationPreview({wall,items,onSelectItem,selectedItemId,gapPickMode=false,onSelectGap}){
  if(!wall)return null;
  const L=Math.max(1,len(wall)),H=Math.max(300,Number(wall.h)||2400),padX=Math.max(140,L*.035),padY=Math.max(140,H*.07);
@@ -1566,7 +1596,7 @@ export default function DrawingClient(){
      <button type="button" onClick={()=>addWallWorkspaceItem("thermostat",140,100)}>+ Termostat</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("walllight",180,100)}>+ Vegglampe</button>
     </div>
-    <div className={styles.wallViewCanvas+(furnitureGapPick?" "+styles.wallGapPickCanvas:"")}><WallElevationPreview wall={wallForView} items={doc.items} selectedItemId={selected?.kind==="item"?selected.id:null} gapPickMode={!!furnitureGapPick} onSelectGap={chooseFurnitureGap} onSelectItem={item=>{if(!furnitureGapPick)setSelected({kind:"item",id:item.id})}}/></div>
+    <div className={styles.wallViewCanvas+(furnitureGapPick?" "+styles.wallGapPickCanvas:"")}>{furnitureGapPick?<FurnitureGapPlanPreview doc={doc} wall={wallForView} onSelectGap={chooseFurnitureGap}/>:<WallElevationPreview wall={wallForView} items={doc.items} selectedItemId={selected?.kind==="item"?selected.id:null} onSelectItem={item=>setSelected({kind:"item",id:item.id})}/>}</div>
     {wallSelectedItem&&(()=>{const gaps=wallEdgeOffsets(wallSelectedItem,wallForView),isOpening=openingTypes.has(wallSelectedItem.type),isElectrical=wallElectricalTypes.has(wallSelectedItem.type),isCustom=wallSelectedItem.type==="customwall";return <div className={styles.wallInlineEditor}>
      <div><strong>{wallSelectedItem.customName||labelFor(wallSelectedItem.type)}</strong><small>Valgt på vegg {Math.max(1,doc.walls.findIndex(w=>w.id===wallForView.id)+1)}</small></div>
      <label>Fra venstre (mm)<input type="number" min="0" max={Math.max(0,gaps.L-Number(wallSelectedItem.w||0))} value={gaps.start} onChange={e=>updateWallItemById(wallSelectedItem.id,"wallStartGap",e.target.value)}/></label>
@@ -1577,7 +1607,7 @@ export default function DrawingClient(){
      {isCustom&&<><label>Møbelhøyde (mm)<input type="number" min="50" value={Math.round(modelHeight(wallSelectedItem))} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"modelHeight",e.target.value)}/></label><label>Fra gulv (mm)<input type="number" min="0" value={Math.round(Number(wallSelectedItem.elevation)||0)} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"elevation",e.target.value)}/></label></>}
      <div className={styles.wallInlineActions}><button type="button" onClick={duplicate}>Dupliser</button><button type="button" onClick={remove}>Slett</button></div>
     </div>})()}
-    <div className={styles.wallViewHint}>{furnitureGapPick?<><b>Velg mellomrom:</b> alle vanlige møbler som overlapper denne veggens retning vises nå, også om de står et stykke inn i rommet. Brune møbler brukes som faktiske kanter for mellomrommet, mens grå møbler bare viser hvor seng, skap, kommode osv. står. Hvis hele veggen fortsatt er grønn, betyr det at ingen av de synlige møblene er nær nok denne veggen til å være en kant.</>:<>Klikk et objekt på veggen for å redigere det uten å forlate veggvisningen. Rutenettet er 100 mm. Vegglengde, vegghøyde, åpninger, EL-punkter og egne møbler vises i samme frontvisning.</>}</div>
+    <div className={styles.wallViewHint}>{furnitureGapPick?<><b>Velg mellomrom i plantegningen:</b> du ser nå rommet slik du tegnet det, med seng, skap, kommode og resten av møblene på riktig plass. Grønne felt ligger langs den valgte veggen mellom møblenes projiserte kanter. Trykk på feltet du vil fylle, så får møbelet automatisk akkurat den bredden.</>:<>Klikk et objekt på veggen for å redigere det uten å forlate veggvisningen. Rutenettet er 100 mm. Vegglengde, vegghøyde, åpninger, EL-punkter og egne møbler vises i samme frontvisning.</>}</div>
     <footer><span>Vegg: <b>{len(wallForView)} × {Math.round(Number(wallForView.h)||2400)} × {Math.round(Number(wallForView.t)||98)} mm</b></span><span>Objekter: <b>{doc.items.filter(item=>item.wallId===wallForView.id).length}</b></span><button type="button" onClick={()=>setWallViewId(null)}>Tilbake til plantegning →</button></footer>
    </section>
   </div>}
