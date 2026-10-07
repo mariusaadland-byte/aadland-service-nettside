@@ -3,11 +3,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import styles from "./drawing.module.css";
 
-const GRID=100, VIEW=8000, STORE="aadlandDrawingsV2", LAST_STORE="aadlandDrawingsV2:last", FURNITURE_TEMPLATE_STORE="aadlandFurnitureTemplatesV1";
+const GRID=100, VIEW=8000, STORE="aadlandDrawingsV2", LAST_STORE="aadlandDrawingsV2:last", FURNITURE_TEMPLATE_STORE="aadlandFurnitureTemplatesV1", VERSION_STORE="aadlandDrawingVersionsV1";
 const catalog=[
  {group:"Bygg",items:[["door","Dør",900,100],["sliding","Skyvedør",1800,100],["window","Vindu",1200,100],["opening","Åpning",1000,100],["stairs","Trapp",900,2500],["post","Stolpe",98,98]]},
  {group:"Bad",items:[["toilet","Toalett",400,700],["walltoilet","Vegghengt toalett",400,600],["shower","Dusj",900,900],["bath","Badekar",750,1700],["sink","Servant",600,500],["washer","Vaskemaskin",600,600]]},
- {group:"Kjøkken",items:[["base","Benkeskap",600,600],["wallcab","Overskap",600,350],["tallcab","Høyskap",600,600],["fridge","Kjøleskap",600,600],["oven","Komfyr",600,600],["dishwasher","Oppvaskmaskin",600,600],["island","Kjøkkenøy",1800,900]]},
+ {group:"Kjøkken",items:[["base","Benkeskap",600,600],["sinkcab","Vaskeskap",600,600],["cornerbase","Hjørneskap",900,900],["wallcab","Overskap",600,350],["tallcab","Høyskap",600,600],["fridge","Kjøleskap",600,600],["integratedfridge","Integrert kjøl/frys",600,600],["oven","Komfyr",600,600],["dishwasher","Oppvaskmaskin",600,600],["cooktop","Platetopp",600,600],["hood","Ventilator",600,350],["countertop","Benkeplate",1200,600],["filler","Foring",100,600],["island","Kjøkkenøy",1800,900]]},
  {group:"Møbler",items:[["sofa","Sofa",2200,900],["table","Spisebord",1800,900],["chair","Stol",500,500],["bed","Seng",1800,2000],["wardrobe","Garderobe",1200,600],["tv","TV",1200,120]]},
  {group:"Soverom",items:[["nightstand","Nattbord",500,450],["dresser","Kommode",1200,450],["desk","Skrivebord",1200,600],["bookshelf","Bokhylle",900,350],["vanity","Sminkebord",1000,450],["armchair","Lenestol",850,850],["ottoman","Puff",600,600],["headboard","Hodegavl",1800,120]]},
  {group:"Ute",items:[["deck","Terrassefelt",3000,3000],["railing","Rekkverk",2000,100],["screen","Levegg",1800,100],["bench","Benk",1800,500],["planter","Plantekasse",1200,450]]},
@@ -37,11 +37,18 @@ const sizePresets={
  sink:[["40 × 40 cm",400,400],["60 × 50 cm",600,500],["80 × 50 cm",800,500],["100 × 50 cm",1000,500],["120 × 50 cm",1200,500]],
  washer:[["60 × 60 cm",600,600]],
  base:[["40 cm benkeskap",400,600],["60 cm benkeskap",600,600],["80 cm benkeskap",800,600],["100 cm benkeskap",1000,600]],
+ sinkcab:[["60 cm vaskeskap",600,600],["80 cm vaskeskap",800,600],["100 cm vaskeskap",1000,600]],
+ cornerbase:[["90 × 90 cm hjørneskap",900,900],["100 × 100 cm hjørneskap",1000,1000]],
  wallcab:[["40 cm overskap",400,350],["60 cm overskap",600,350],["80 cm overskap",800,350],["100 cm overskap",1000,350]],
  tallcab:[["40 cm høyskap",400,600],["60 cm høyskap",600,600]],
  fridge:[["60 × 60 cm",600,600],["90 × 70 cm",900,700]],
+ integratedfridge:[["60 × 60 cm",600,600]],
  oven:[["60 × 60 cm",600,600]],
  dishwasher:[["45 × 60 cm",450,600],["60 × 60 cm",600,600]],
+ cooktop:[["60 cm platetopp",600,600],["80 cm platetopp",800,600]],
+ hood:[["60 cm ventilator",600,350],["80 cm ventilator",800,350],["90 cm ventilator",900,350]],
+ countertop:[["60 cm",600,600],["120 cm",1200,600],["180 cm",1800,600],["240 cm",2400,600]],
+ filler:[["10 cm foring",100,600],["15 cm foring",150,600],["20 cm foring",200,600]],
  island:[["120 × 90 cm",1200,900],["180 × 90 cm",1800,900],["240 × 100 cm",2400,1000]],
  sofa:[["180 × 90 cm",1800,900],["220 × 90 cm",2200,900],["260 × 100 cm",2600,1000],["300 × 100 cm",3000,1000]],
  table:[["120 × 80 cm",1200,800],["160 × 90 cm",1600,900],["180 × 90 cm",1800,900],["220 × 100 cm",2200,1000]],
@@ -174,6 +181,30 @@ function polygonCentroid(points){
 const electricalTypes=new Set(["ceilinglight","downlight","ledstrip","walllight","outlet","doubleoutlet","switch","dimmer","thermostat","junction"]);
 const wallElectricalTypes=new Set(["walllight","outlet","doubleoutlet","switch","dimmer","thermostat"]);
 const ceilingElectricalTypes=new Set(["ceilinglight","downlight","ledstrip","junction"]);
+const kitchenTypes=new Set(["base","sinkcab","cornerbase","wallcab","tallcab","fridge","integratedfridge","oven","dishwasher","cooktop","hood","countertop","filler","island"]);
+const furnitureTypes=new Set(["sofa","table","chair","bed","wardrobe","tv","nightstand","dresser","desk","bookshelf","vanity","armchair","ottoman","headboard","bench","customfloor","customwall"]);
+const itemLayer=type=>electricalTypes.has(type)?"electrical":openingTypes.has(type)?"openings":kitchenTypes.has(type)?"kitchen":furnitureTypes.has(type)?"furniture":"construction";
+const itemAabb=item=>{const c=rotatedItemCorners(item),xs=c.map(p=>p.x),ys=c.map(p=>p.y);return{left:Math.min(...xs),right:Math.max(...xs),top:Math.min(...ys),bottom:Math.max(...ys)}};
+const boxesOverlap=(a,b,pad=0)=>a.left<b.right-pad&&a.right>b.left+pad&&a.top<b.bottom-pad&&a.bottom>b.top+pad;
+function drawingCollisions(items=[]){
+ const result=new Map();
+ const mark=(a,b,reason)=>{if(!result.has(a))result.set(a,[]);result.get(a).push({id:b,reason})};
+ for(let i=0;i<items.length;i++)for(let j=i+1;j<items.length;j++){
+  const a=items[i],b=items[j];
+  if(a.locked&&b.locked&&openingTypes.has(a.type)&&openingTypes.has(b.type))continue;
+  if(a.wallId&&b.wallId&&a.wallId===b.wallId){
+   const az0=Number(a.elevation)||0,az1=az0+modelHeight(a),bz0=Number(b.elevation)||0,bz1=bz0+modelHeight(b);
+   const ah=Math.max(0,Number(a.w)||0)/2,bh=Math.max(0,Number(b.w)||0)/2,ao=Number(a.wallOffset)||0,bo=Number(b.wallOffset)||0;
+   const horizontal=Math.abs(ao-bo)<ah+bh-4,vertical=az0<bz1-4&&az1>bz0+4;
+   if(horizontal&&vertical&&!wallElectricalTypes.has(a.type)&&!wallElectricalTypes.has(b.type)){mark(a.id,b.id,"overlapper på vegg");mark(b.id,a.id,"overlapper på vegg")}
+   continue;
+  }
+  if(a.wallId||b.wallId)continue;
+  if(electricalTypes.has(a.type)||electricalTypes.has(b.type))continue;
+  if(boxesOverlap(itemAabb(a),itemAabb(b),8)){mark(a.id,b.id,"objekter overlapper");mark(b.id,a.id,"objekter overlapper")}
+ }
+ return result;
+}
 function wallRoomZones(wall,zones=[]){
  return (zones||[]).filter(zone=>Array.isArray(zone.wallIds)&&zone.wallIds.includes(wall?.id));
 }
@@ -209,10 +240,10 @@ function wallFurnitureGaps(wall,items,zones=[],excludeId=null){
  if(L-cursor>=100)gaps.push({start:cursor,end:L,width:L-cursor});
  return gaps.map(g=>({start:Math.round(g.start),end:Math.round(g.end),width:Math.round(g.width)}));
 }
-const roomBoundedTypes=new Set(["toilet","walltoilet","shower","bath","sink","washer","base","wallcab","tallcab","fridge","oven","dishwasher","island","sofa","table","chair","bed","wardrobe","tv","nightstand","dresser","desk","bookshelf","vanity","armchair","ottoman","headboard","ceilinglight","downlight","ledstrip","junction","customfloor"]);
+const roomBoundedTypes=new Set(["toilet","walltoilet","shower","bath","sink","washer","base","sinkcab","cornerbase","wallcab","tallcab","fridge","integratedfridge","oven","dishwasher","cooktop","hood","countertop","filler","island","sofa","table","chair","bed","wardrobe","tv","nightstand","dresser","desk","bookshelf","vanity","armchair","ottoman","headboard","ceilinglight","downlight","ledstrip","junction","customfloor"]);
 const item3DHeight={
  toilet:780,walltoilet:450,shower:2100,bath:600,sink:850,washer:850,
- base:900,wallcab:700,tallcab:2200,fridge:2000,oven:900,dishwasher:850,island:900,
+ base:900,sinkcab:900,cornerbase:900,wallcab:700,tallcab:2200,fridge:2000,integratedfridge:2200,oven:900,dishwasher:850,cooktop:40,hood:500,countertop:30,filler:900,island:900,
  sofa:850,table:750,chair:900,bed:550,wardrobe:2100,tv:750,nightstand:550,dresser:900,desk:750,bookshelf:1900,vanity:780,armchair:900,ottoman:450,headboard:1200,bench:500,planter:550,post:2400,customfloor:900,customwall:700
 };
 const itemDefaults=(type,doc)=>({
@@ -220,7 +251,7 @@ const itemDefaults=(type,doc)=>({
  ...(wallElectricalTypes.has(type)?{mountHeight:type==="outlet"||type==="doubleoutlet"?300:type==="switch"||type==="dimmer"?1100:type==="thermostat"?1500:1800}:{}),
  ...(ceilingElectricalTypes.has(type)?{mountHeight:Number(doc?.defaultWallHeight)||2400}:{}),
  modelHeight:item3DHeight[type]||600,
- elevation:type==="wallcab"?1400:type==="tv"?900:type==="walltoilet"?250:0
+ elevation:type==="wallcab"||type==="hood"?1400:type==="countertop"?900:type==="cooktop"?900:type==="tv"?900:type==="walltoilet"?250:0
 });
 function pointOnSegment(point,a,b,tolerance=2){
  const dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy;
@@ -715,7 +746,7 @@ function normalizeDrawingDocument(raw){
  });
  return {...base,walls,zones,measurements,items};
 }
-const wallPlaceableFurnitureTypes=new Set(["base","wallcab","tallcab","fridge","oven","dishwasher","bed","wardrobe","nightstand","dresser","desk","bookshelf","vanity","headboard","tv","sofa","bench"]);
+const wallPlaceableFurnitureTypes=new Set(["base","sinkcab","cornerbase","wallcab","tallcab","fridge","integratedfridge","oven","dishwasher","cooktop","hood","countertop","filler","bed","wardrobe","nightstand","dresser","desk","bookshelf","vanity","headboard","tv","sofa","bench"]);
 const wallTypes=new Set(["door","sliding","window","opening","railing","screen","walllight","outlet","doubleoutlet","switch","dimmer","thermostat","customwall",...wallPlaceableFurnitureTypes]);
 const openingTypes=new Set(["door","sliding","window","opening"]);
 const openingDefaults=type=>type==="window"?{openingHeight:1200,sillHeight:900}:openingTypes.has(type)?{openingHeight:2100,sillHeight:0}:{};
@@ -726,7 +757,7 @@ function nearestWall(o,walls){
 }
 
 export default function DrawingClient(){
- const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[customers,setCustomers]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[measureDrag,setMeasureDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null),[mobileEditOpen,setMobileEditOpen]=useState(false),[roomBuilder,setRoomBuilder]=useState(null),[quickAddOpen,setQuickAddOpen]=useState(false),[fieldMode,setFieldMode]=useState(false),[canvasAspect,setCanvasAspect]=useState(1),[wallBuilder,setWallBuilder]=useState(null),[snapHint,setSnapHint]=useState(null),[wallChain,setWallChain]=useState(null),[online,setOnline]=useState(true),[saveState,setSaveState]=useState("local"),[lastSavedAt,setLastSavedAt]=useState(null),[fieldReturnZoneId,setFieldReturnZoneId]=useState(null),[roomPickerOpen,setRoomPickerOpen]=useState(false),[deleteConfirmOpen,setDeleteConfirmOpen]=useState(false),[deleteBusy,setDeleteBusy]=useState(false),[printMode,setPrintMode]=useState(false),[quoteWarningOpen,setQuoteWarningOpen]=useState(false),[show3D,setShow3D]=useState(false),[elPlan,setElPlan]=useState(false),[wallViewId,setWallViewId]=useState(null),[furnitureBuilder,setFurnitureBuilder]=useState(null),[furnitureGapPick,setFurnitureGapPick]=useState(null),[customFurnitureTemplates,setCustomFurnitureTemplates]=useState([]),[furnitureSnapWallId,setFurnitureSnapWallId]=useState(""),[focusView,setFocusView]=useState(false);
+ const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[customers,setCustomers]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[measureDrag,setMeasureDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null),[mobileEditOpen,setMobileEditOpen]=useState(false),[roomBuilder,setRoomBuilder]=useState(null),[quickAddOpen,setQuickAddOpen]=useState(false),[fieldMode,setFieldMode]=useState(false),[canvasAspect,setCanvasAspect]=useState(1),[wallBuilder,setWallBuilder]=useState(null),[snapHint,setSnapHint]=useState(null),[wallChain,setWallChain]=useState(null),[online,setOnline]=useState(true),[saveState,setSaveState]=useState("local"),[lastSavedAt,setLastSavedAt]=useState(null),[fieldReturnZoneId,setFieldReturnZoneId]=useState(null),[roomPickerOpen,setRoomPickerOpen]=useState(false),[deleteConfirmOpen,setDeleteConfirmOpen]=useState(false),[deleteBusy,setDeleteBusy]=useState(false),[printMode,setPrintMode]=useState(false),[quoteWarningOpen,setQuoteWarningOpen]=useState(false),[show3D,setShow3D]=useState(false),[elPlan,setElPlan]=useState(false),[wallViewId,setWallViewId]=useState(null),[furnitureBuilder,setFurnitureBuilder]=useState(null),[furnitureGapPick,setFurnitureGapPick]=useState(null),[customFurnitureTemplates,setCustomFurnitureTemplates]=useState([]),[furnitureSnapWallId,setFurnitureSnapWallId]=useState(""),[focusView,setFocusView]=useState(false),[multiSelectMode,setMultiSelectMode]=useState(false),[multiSelectedIds,setMultiSelectedIds]=useState([]),[snapGuide,setSnapGuide]=useState(null),[layerVisibility,setLayerVisibility]=useState({construction:true,openings:true,kitchen:true,furniture:true,electrical:true,measurements:true}),[versions,setVersions]=useState([]),[versionLabel,setVersionLabel]=useState("");
  const [camera3D,setCamera3D]=useState({yaw:42,pitch:34,zoom:1});
  const camera3DDrag=useRef(null);
  const svg=useRef(null);
