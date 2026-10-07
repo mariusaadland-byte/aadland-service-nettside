@@ -454,6 +454,17 @@ function constrainFreeItemStrict(item,zones,{fallbackItem=null,fallbackCenter=nu
  if(!roomBoundedTypes.has(item?.type)||!(zones||[]).length||itemFitsSomePlacementZone(placed,zones))return placed;
  return fallbackItem?{...fallbackItem}:placed;
 }
+function constrainEditedFurniture(next,previous,doc){
+ if(!next.wallId)return constrainFreeItemStrict(next,roomPlacementZones(doc.zones,doc.walls,doc.defaultWallThickness||98),{fallbackItem:previous,fallbackCenter:itemCenter(previous),snapDistance:0});
+ const wall=(doc.walls||[]).find(w=>w.id===next.wallId);if(!wall)return previous;
+ if(next.type!=="customwall"&&!wallPlaceableFurnitureTypes.has(next.type))return next;
+ const face=wallFaceMetrics(wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
+ if((Number(next.w)||0)>face.L+1)return previous;
+ const position=mountedItemCenter(next,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
+ const placed={...next,x:position.cx-(Number(next.w)||0)/2,y:position.cy-(Number(next.h)||0)/2,rot:position.a*180/Math.PI,wallOffset:position.off};
+ const roomZones=roomPlacementZones(doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
+ return roomZones.length&&!itemFitsSomePlacementZone(placed,roomZones)?previous:placed;
+}
 function wallInwardNormal(wall,zones){
  const zone=(zones||[]).find(z=>Array.isArray(z.wallIds)&&z.wallIds.includes(wall?.id));
  if(!zone)return{x:0,y:0};
@@ -1656,7 +1667,7 @@ export default function DrawingClient(){
      let changed={...o,[key]:n};
      if(["customwall","customfloor"].includes(o.type)&&key==="w")changed={...changed,colWidths:furnitureDimArray(o.sectionsX,n,o.colWidths)};
      if(["customwall","customfloor"].includes(o.type)&&key==="modelHeight")changed={...changed,rowHeights:furnitureDimArray(o.sectionsY,n,o.rowHeights)};
-     return wallTypes.has(o.type)?changed:constrainFreeItemStrict(changed,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackItem:o,fallbackCenter:itemCenter(o),snapDistance:0});
+     return constrainEditedFurniture(changed,o,d);
     })};
    }
    return applyWallValue(d,selected?.id,key,n);
@@ -1711,7 +1722,7 @@ export default function DrawingClient(){
  };
  const applySizePreset=value=>{if(selected?.kind!=="item"||!sel||!value)return;if(sel.locked){setMessage("Objektet er låst");setTimeout(()=>setMessage(""),1400);return}const [w,h]=value.split("x").map(Number);if(!Number.isFinite(w)||!Number.isFinite(h)||w<=0||h<=0)return;
   if(sel.wallId&&openingTypes.has(sel.type)){updateWallItemById(sel.id,"w",w);return}
-  mutate(d=>{const items=d.items.map(o=>{if(o.id!==sel.id)return o;const changed={...o,x:o.x+(o.w-w)/2,y:o.y+(o.h-h)/2,w,h};return o.wallId?changed:constrainFreeItemStrict(changed,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackItem:o,fallbackCenter:itemCenter(o),snapDistance:0})});return {...d,items:syncMounted(d.walls,items,d.zones)}})
+  mutate(d=>{const items=d.items.map(o=>{if(o.id!==sel.id)return o;const changed={...o,x:o.x+(o.w-w)/2,y:o.y+(o.h-h)/2,w,h};return constrainEditedFurniture(changed,o,d)});return {...d,items}})
  };
  const applyWallPreset=value=>{if(selected?.kind!=="wall"||!sel||!value)return;const [t,h]=value.split("x").map(Number);if(!Number.isFinite(t)||!Number.isFinite(h)||t<=0||h<=0)return;mutate(d=>{const zone=(d.zones||[]).find(z=>Array.isArray(z.wallIds)&&z.wallIds.includes(sel.id));let next=d;if(zone){const inner=roomInnerZone(zone,d.walls,d.defaultWallThickness).points;next=rebuildLinkedRoomGeometry(d,zone,inner,{[sel.id]:t})}else next={...d,walls:d.walls.map(w=>w.id!==sel.id?w:{...w,t})};return {...next,walls:next.walls.map(w=>w.id!==sel.id?w:{...w,h})}})};
  const finishZone=()=>{if(zoneDraft.length<3){setMessage("Romsonen trenger minst 3 punkter");setTimeout(()=>setMessage(""),1800);return}const zone={id:uid(),name:"Rom "+((doc.zones||[]).length+1),points:zoneDraft,ceilingHeight:Number(doc.defaultWallHeight)||2400,floorFinish:"",notes:""};mutate(d=>({...d,zones:[...(d.zones||[]),zone]}));setZoneDraft([]);setTool("select");setSelected({kind:"zone",id:zone.id})};
