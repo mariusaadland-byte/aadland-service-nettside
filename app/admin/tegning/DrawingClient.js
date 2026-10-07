@@ -9,7 +9,18 @@ const catalog=[
  {group:"Bad",items:[["toilet","Toalett",400,700],["walltoilet","Vegghengt toalett",400,600],["shower","Dusj",900,900],["bath","Badekar",750,1700],["sink","Servant",600,500],["washer","Vaskemaskin",600,600]]},
  {group:"Kjøkken",items:[["base","Benkeskap",600,600],["wallcab","Overskap",600,350],["tallcab","Høyskap",600,600],["fridge","Kjøleskap",600,600],["oven","Komfyr",600,600],["dishwasher","Oppvaskmaskin",600,600],["island","Kjøkkenøy",1800,900]]},
  {group:"Møbler",items:[["sofa","Sofa",2200,900],["table","Spisebord",1800,900],["chair","Stol",500,500],["bed","Seng",1800,2000],["wardrobe","Garderobe",1200,600],["tv","TV",1200,120]]},
- {group:"Ute",items:[["deck","Terrassefelt",3000,3000],["railing","Rekkverk",2000,100],["screen","Levegg",1800,100],["bench","Benk",1800,500],["planter","Plantekasse",1200,450]]}
+ {group:"Ute",items:[["deck","Terrassefelt",3000,3000],["railing","Rekkverk",2000,100],["screen","Levegg",1800,100],["bench","Benk",1800,500],["planter","Plantekasse",1200,450]]},
+ {group:"Elektro",items:[
+  ["ceilinglight","Lyspunkt tak",180,180],
+  ["downlight","Downlight",120,120],
+  ["walllight","Lyspunkt vegg",180,100],
+  ["outlet","Stikk",180,100],
+  ["doubleoutlet","Dobbel stikk",220,100],
+  ["switch","Bryter",120,100],
+  ["dimmer","Dimmer",120,100],
+  ["thermostat","Termostat",140,100],
+  ["junction","Koblingspunkt",140,140]
+ ]}
 ];
 const sizePresets={
  door:[["70 cm dør",700,100],["80 cm dør",800,100],["90 cm dør",900,100],["100 cm dør",1000,100]],
@@ -37,7 +48,10 @@ const sizePresets={
  wardrobe:[["60 × 60 cm",600,600],["120 × 60 cm",1200,600],["180 × 60 cm",1800,600],["240 × 60 cm",2400,600]],
  tv:[["100 cm TV",1000,120],["120 cm TV",1200,120],["150 cm TV",1500,120],["180 cm TV",1800,120]],
  bench:[["120 × 50 cm",1200,500],["180 × 50 cm",1800,500],["240 × 50 cm",2400,500]],
- planter:[["80 × 40 cm",800,400],["120 × 45 cm",1200,450],["180 × 50 cm",1800,500]]
+ planter:[["80 × 40 cm",800,400],["120 × 45 cm",1200,450],["180 × 50 cm",1800,500]],
+ ceilinglight:[["Lyspunkt",180,180]],downlight:[["Downlight",120,120]],
+ walllight:[["Vegglampe",180,100]],outlet:[["Stikk",180,100]],doubleoutlet:[["Dobbel stikk",220,100]],
+ switch:[["Bryter",120,100]],dimmer:[["Dimmer",120,100]],thermostat:[["Termostat",140,100]],junction:[["Koblingspunkt",140,140]]
 };
 const flat=catalog.flatMap(g=>g.items), labelFor=t=>flat.find(x=>x[0]===t)?.[1]||t;
 const uid=()=>globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2);
@@ -105,6 +119,110 @@ function polygonCentroid(points){
  for(const p of points){x+=p.x;y+=p.y}
  return{x:x/points.length,y:y/points.length};
 }
+
+const electricalTypes=new Set(["ceilinglight","downlight","walllight","outlet","doubleoutlet","switch","dimmer","thermostat","junction"]);
+const wallElectricalTypes=new Set(["walllight","outlet","doubleoutlet","switch","dimmer","thermostat"]);
+const ceilingElectricalTypes=new Set(["ceilinglight","downlight","junction"]);
+const roomBoundedTypes=new Set(["toilet","walltoilet","shower","bath","sink","washer","base","wallcab","tallcab","fridge","oven","dishwasher","island","sofa","table","chair","bed","wardrobe","tv","ceilinglight","downlight","junction"]);
+const item3DHeight={
+ toilet:780,walltoilet:450,shower:2100,bath:600,sink:850,washer:850,
+ base:900,wallcab:700,tallcab:2200,fridge:2000,oven:900,dishwasher:850,island:900,
+ sofa:850,table:750,chair:900,bed:550,wardrobe:2100,tv:750,bench:500,planter:550,post:2400
+};
+const itemDefaults=(type,doc)=>({
+ ...(electricalTypes.has(type)?{circuit:"",itemNote:""}:{}),
+ ...(wallElectricalTypes.has(type)?{mountHeight:type==="outlet"||type==="doubleoutlet"?300:type==="switch"||type==="dimmer"?1100:type==="thermostat"?1500:1800}:{}),
+ ...(ceilingElectricalTypes.has(type)?{mountHeight:Number(doc?.defaultWallHeight)||2400}:{}),
+ modelHeight:item3DHeight[type]||600
+});
+function pointOnSegment(point,a,b,tolerance=2){
+ const dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy;
+ if(!L2)return Math.hypot(point.x-a.x,point.y-a.y)<=tolerance;
+ const t=clamp(((point.x-a.x)*dx+(point.y-a.y)*dy)/L2,0,1);
+ return Math.hypot(point.x-(a.x+t*dx),point.y-(a.y+t*dy))<=tolerance;
+}
+function pointInPolygonInclusive(point,points){
+ if(!Array.isArray(points)||points.length<3)return false;
+ for(let i=0,j=points.length-1;i<points.length;j=i++){
+  if(pointOnSegment(point,points[j],points[i],3))return true;
+ }
+ let inside=false;
+ for(let i=0,j=points.length-1;i<points.length;j=i++){
+  const a=points[i],b=points[j];
+  const hit=((a.y>point.y)!==(b.y>point.y))&&(point.x<(b.x-a.x)*(point.y-a.y)/((b.y-a.y)||1e-9)+a.x);
+  if(hit)inside=!inside;
+ }
+ return inside;
+}
+function rotatedItemCorners(item,x=item.x,y=item.y){
+ const w=Math.max(1,Number(item.w)||1),h=Math.max(1,Number(item.h)||1),cx=x+w/2,cy=y+h/2,a=(Number(item.rot)||0)*Math.PI/180,cos=Math.cos(a),sin=Math.sin(a);
+ return [[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]].map(([dx,dy])=>({x:cx+dx*cos-dy*sin,y:cy+dx*sin+dy*cos}));
+}
+function itemFitsZone(item,zone,x=item.x,y=item.y){
+ return !!zone?.points?.length&&rotatedItemCorners(item,x,y).every(point=>pointInPolygonInclusive(point,zone.points));
+}
+function itemCenter(item,x=item.x,y=item.y){return{x:x+(Number(item.w)||0)/2,y:y+(Number(item.h)||0)/2}}
+function zoneContainingPoint(point,zones){return (zones||[]).find(zone=>pointInPolygonInclusive(point,zone.points||[]))||null}
+function safeCenterInZone(item,zone,preferred){
+ const points=zone?.points||[];if(points.length<3)return null;
+ const candidates=[];
+ if(preferred)candidates.push(preferred);
+ const centroid=polygonCentroid(points);candidates.push(centroid);
+ const xs=points.map(p=>p.x),ys=points.map(p=>p.y),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+ candidates.push({x:(minX+maxX)/2,y:(minY+maxY)/2});
+ for(let gy=1;gy<=7;gy++)for(let gx=1;gx<=7;gx++)candidates.push({x:minX+(maxX-minX)*gx/8,y:minY+(maxY-minY)*gy/8});
+ let best=null;
+ for(const center of candidates){
+  const x=center.x-item.w/2,y=center.y-item.h/2;
+  if(itemFitsZone(item,zone,x,y)){
+   const score=preferred?Math.hypot(center.x-preferred.x,center.y-preferred.y):0;
+   if(!best||score<best.score)best={center,score};
+  }
+ }
+ return best?.center||null;
+}
+function constrainFreeItem(item,zones,{fallbackCenter=null,snapDistance=140}={}){
+ if(!item||item.wallId||!roomBoundedTypes.has(item.type)){
+  const corners=rotatedItemCorners(item),minX=Math.min(...corners.map(p=>p.x)),maxX=Math.max(...corners.map(p=>p.x)),minY=Math.min(...corners.map(p=>p.y)),maxY=Math.max(...corners.map(p=>p.y));
+  const dx=minX<0?-minX:maxX>VIEW?VIEW-maxX:0,dy=minY<0?-minY:maxY>VIEW?VIEW-maxY:0;
+  return {...item,x:item.x+dx,y:item.y+dy};
+ }
+ const center=itemCenter(item),fallback=fallbackCenter||center;
+ let zone=zoneContainingPoint(center,zones)||zoneContainingPoint(fallback,zones);
+ if(!zone&&zones?.length){
+  zone=[...zones].sort((a,b)=>{const ac=polygonCentroid(a.points||[]),bc=polygonCentroid(b.points||[]);return Math.hypot(ac.x-center.x,ac.y-center.y)-Math.hypot(bc.x-center.x,bc.y-center.y)})[0];
+ }
+ if(!zone)return constrainFreeItem({...item,type:"__canvas__"},[],{});
+ if(itemFitsZone(item,zone)) {
+  const safe=safeCenterInZone(item,zone,fallback);
+  if(safe&&snapDistance>0){
+   const vx=center.x-safe.x,vy=center.y-safe.y,L=Math.hypot(vx,vy);
+   if(L>1){
+    const extended={x:center.x+vx/L*snapDistance,y:center.y+vy/L*snapDistance};
+    const ex=extended.x-item.w/2,ey=extended.y-item.h/2;
+    if(!itemFitsZone(item,zone,ex,ey)){
+     let lo=0,hi=1;
+     for(let i=0;i<24;i++){const mid=(lo+hi)/2,cx=center.x+(extended.x-center.x)*mid,cy=center.y+(extended.y-center.y)*mid;if(itemFitsZone(item,zone,cx-item.w/2,cy-item.h/2))lo=mid;else hi=mid}
+     const cx=center.x+(extended.x-center.x)*lo,cy=center.y+(extended.y-center.y)*lo;
+     return {...item,x:cx-item.w/2,y:cy-item.h/2,roomId:zone.id};
+    }
+   }
+  }
+  return {...item,roomId:zone.id};
+ }
+ const safe=safeCenterInZone(item,zone,fallback);
+ if(!safe)return {...item,x:fallback.x-item.w/2,y:fallback.y-item.h/2,roomId:zone.id};
+ let lo=0,hi=1,best=safe;
+ for(let i=0;i<28;i++){
+  const mid=(lo+hi)/2,cx=safe.x+(center.x-safe.x)*mid,cy=safe.y+(center.y-safe.y)*mid;
+  if(itemFitsZone(item,zone,cx-item.w/2,cy-item.h/2)){lo=mid;best={x:cx,y:cy}}else hi=mid;
+ }
+ return {...item,x:best.x-item.w/2,y:best.y-item.h/2,roomId:zone.id};
+}
+function electricalSymbol(type){
+ return ({ceilinglight:"⊗",downlight:"⊙",walllight:"◐",outlet:"◫",doubleoutlet:"▣",switch:"S",dimmer:"D",thermostat:"T",junction:"●"})[type]||"";
+}
+function modelHeight(item){return Math.max(80,Number(item?.modelHeight)||item3DHeight[item?.type]||600)}
 function syncLinkedZones(walls,zones){
  const byId=new Map((walls||[]).map(w=>[w.id,w]));
  return (zones||[]).map(zone=>{
@@ -190,7 +308,7 @@ function zoneSurveyStatusText(state){
 }
 
 const initial=()=>({id:uid(),name:"Ny tegning",orderId:"",projectId:"",customer:"",address:"",notes:"",visualizationNotes:"",walls:[],items:[],zones:[],measurements:[],snapSize:50,showGrid:true,scale:"1:50",zoom:1,defaultWallThickness:98,defaultWallHeight:2400});
-const wallTypes=new Set(["door","sliding","window","opening","railing","screen"]);
+const wallTypes=new Set(["door","sliding","window","opening","railing","screen","walllight","outlet","doubleoutlet","switch","dimmer","thermostat"]);
 const openingTypes=new Set(["door","sliding","window","opening"]);
 const openingDefaults=type=>type==="window"?{openingHeight:1200,sillHeight:900}:openingTypes.has(type)?{openingHeight:2100,sillHeight:0}:{};
 function nearestWall(o,walls){
