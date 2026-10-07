@@ -203,8 +203,8 @@ function drawingCollisions(items=[],walls=[],zones=[]){
   if(a.wallId&&b.wallId&&a.wallId===b.wallId){
    const az0=Number(a.elevation)||0,az1=az0+modelHeight(a),bz0=Number(b.elevation)||0,bz1=bz0+modelHeight(b);
    const ah=Math.max(0,Number(a.w)||0)/2,bh=Math.max(0,Number(b.w)||0)/2,ao=Number(a.wallOffset)||0,bo=Number(b.wallOffset)||0;
-   const horizontal=Math.abs(ao-bo)<ah+bh-4,vertical=az0<bz1-4&&az1>bz0+4;
-   if(horizontal&&vertical&&!wallElectricalTypes.has(a.type)&&!wallElectricalTypes.has(b.type)){mark(a.id,b.id,"overlapper på vegg");mark(b.id,a.id,"overlapper på vegg")}
+   const horizontal=Math.abs(ao-bo)<ah+bh-4,vertical=az0<bz1-4&&az1>bz0+4,types=new Set([a.type,b.type]),overlay=(types.has("countertop")&&(types.has("cooktop")||types.has("kitchensink")))||(types.has("plinth")&&[a.type,b.type].some(t=>["base","sinkcab","cornerbase","dishwasher","oven"].includes(t)));
+   if(horizontal&&vertical&&!overlay&&!wallElectricalTypes.has(a.type)&&!wallElectricalTypes.has(b.type)){mark(a.id,b.id,"overlapper på vegg");mark(b.id,a.id,"overlapper på vegg")}
   }else if(!a.wallId&&!b.wallId&&!electricalTypes.has(a.type)&&!electricalTypes.has(b.type)&&boxesOverlap(itemAabb(a),itemAabb(b),8)){
    mark(a.id,b.id,"objekter overlapper");mark(b.id,a.id,"objekter overlapper");
   }
@@ -1001,7 +1001,7 @@ export default function DrawingClient(){
    const liveWall=d.walls.find(w=>w.id===wall.id)||wall,added=[];
    for(let i=0;i<count;i++){const start=current.start+width*(i+1),id=uid(),base={...item,id,wallOffset:wallOffsetFromFaceStart(liveWall,start,width,d.zones||[],d.walls||[],d.defaultWallThickness||98)},placed=mountedItemCenter(base,liveWall,d.zones||[]);added.push({...base,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off})}
    const used=count*width,remainder=Math.round(space-used);
-   if(kitchenTypes.has(item.type)&&remainder>=30){const start=current.start+width*(count+1),id=uid(),base={id,type:"filler",x:0,y:0,w:remainder,h:Number(item.h)||600,rot:0,wallId:liveWall.id,wallOffset:wallOffsetFromFaceStart(liveWall,start,remainder,d.zones||[],d.walls||[],d.defaultWallThickness||98),modelHeight:modelHeight(item),elevation:Number(item.elevation)||0},placed=mountedItemCenter(base,liveWall,d.zones||[]);added.push({...base,x:placed.cx-remainder/2,y:placed.cy-(Number(base.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off})}
+   if(kitchenTypes.has(item.type)&&remainder>=10){const start=current.start+width*(count+1),id=uid(),base={id,type:"filler",x:0,y:0,w:remainder,h:Number(item.h)||600,rot:0,wallId:liveWall.id,wallOffset:wallOffsetFromFaceStart(liveWall,start,remainder,d.zones||[],d.walls||[],d.defaultWallThickness||98),modelHeight:modelHeight(item),elevation:Number(item.elevation)||0},placed=mountedItemCenter(base,liveWall,d.zones||[]);added.push({...base,x:placed.cx-remainder/2,y:placed.cy-(Number(base.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off})}
    return {...d,items:[...d.items,...added]};
   });setMessage("Veggrekken er fylt mot høyre");setTimeout(()=>setMessage(""),1800);
  };
@@ -1549,7 +1549,7 @@ export default function DrawingClient(){
   if(!item)return;if(item.locked){setMessage("Objektet er låst");setTimeout(()=>setMessage(""),1400);return}
   if(!wall){mutate(d=>({...d,items:d.items.map(o=>o.id===itemId?{...o,[key]:n}:o)}));return}
   const current=wallFaceOffsets(item,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),width=key==="w"?n:Number(item.w)||0,maxGap=Math.max(0,current.L-width),startGap=key==="wallStartGap"?n:key==="wallEndGap"?current.L-n-width:current.start;
-  if(width<30||width>12000){setMessage("Bredde må være 30–12000 mm");setTimeout(()=>setMessage(""),1800);return}
+  if(width<10||width>12000){setMessage("Bredde må være 10–12000 mm");setTimeout(()=>setMessage(""),1800);return}
   if(width>current.L+1){setMessage("Objektet kan ikke være bredere enn innvendig veggmål");setTimeout(()=>setMessage(""),2000);return}
   if(startGap<-.5||startGap>maxGap+.5){setMessage("Plasseringen går utenfor innvendig vegg");setTimeout(()=>setMessage(""),1800);return}
   if(openingTypes.has(item.type)){if(openingCollision(wall,item.id,startGap,width,doc.items,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98)){setMessage("Åpningen overlapper en annen åpning");setTimeout(()=>setMessage(""),2200);return}}
@@ -2100,7 +2100,7 @@ export default function DrawingClient(){
     {wallSelectedItem&&(()=>{const gaps=wallFaceOffsets(wallSelectedItem,wallForView,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),neighbors=wallNeighborDistances(wallSelectedItem),isOpening=openingTypes.has(wallSelectedItem.type),isElectrical=wallElectricalTypes.has(wallSelectedItem.type),isCustom=wallSelectedItem.type==="customwall";return <div className={styles.wallInlineEditor}>
      <div><strong>{wallSelectedItem.customName||labelFor(wallSelectedItem.type)}</strong><small>Valgt på vegg {Math.max(1,doc.walls.findIndex(w=>w.id===wallForView.id)+1)}</small></div>
      <label>Fra venstre (mm)<CommitNumberInput min="0" max={Math.max(0,gaps.L-Number(wallSelectedItem.w||0))} value={gaps.start} onCommit={value=>updateWallItemById(wallSelectedItem.id,"wallStartGap",value)}/></label>
-     <label>Bredde (mm)<CommitNumberInput min="30" max={gaps.L} value={Math.round(Number(wallSelectedItem.w)||0)} onCommit={value=>updateWallItemById(wallSelectedItem.id,"w",value)}/></label>
+     <label>Bredde (mm)<CommitNumberInput min="10" max={gaps.L} value={Math.round(Number(wallSelectedItem.w)||0)} onCommit={value=>updateWallItemById(wallSelectedItem.id,"w",value)}/></label>
      {!isElectrical&&neighbors&&<><label>Avstand venstre / forrige (mm)<CommitNumberInput min="0" value={neighbors.prevGap} onCommit={value=>updateWallNeighborGap(wallSelectedItem.id,"prev",value)}/></label><label>Avstand høyre / neste (mm)<CommitNumberInput min="0" value={neighbors.nextGap} onCommit={value=>updateWallNeighborGap(wallSelectedItem.id,"next",value)}/></label></>}
      {isOpening&&<label>Åpningshøyde (mm)<CommitNumberInput min="100" max={Math.round(Number(wallForView.h)||2400)} value={Math.round(Number(wallSelectedItem.openingHeight)||openingDefaults(wallSelectedItem.type).openingHeight||2100)} onCommit={value=>updateWallVerticalItem(wallSelectedItem.id,"openingHeight",value)}/></label>}
      {wallSelectedItem.type==="window"&&<label>Brystning (mm)<CommitNumberInput min="0" value={Math.round(Number(wallSelectedItem.sillHeight)||0)} onCommit={value=>updateWallVerticalItem(wallSelectedItem.id,"sillHeight",value)}/></label>}
