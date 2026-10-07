@@ -979,3 +979,25 @@
 @media(min-width:901px){
  .top{overflow:visible}
 }
+
+
+/* Smart furniture placement */
+.furnitureSmartActions{
+ display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 12px
+}
+.furnitureSmartActions button{
+ min-height:40px;border:1px solid #4b5660;border-radius:9px;background:#20272e;color:#eef2f4;padding:0 12px;font:800 10px/1 inherit;cursor:pointer
+}
+.furnitureSmartActions .smartGapButton{
+ background:#1e4d40;border-color:#3b8a73;color:#eafff7
+}
+.wallGapPickCanvas{
+ outline:3px solid #3b8a73;outline-offset:-3px;background:#eff8f4
+}
+.wallGapCancel{
+ border-color:#8a6d38!important;background:#302713!important;color:#ffe4a0!important
+}
+@media(max-width:900px){
+ .furnitureSmartActions{display:grid;grid-template-columns:1fr;padding:0 10px 10px}
+ .furnitureSmartActions button{min-height:46px}
+}
