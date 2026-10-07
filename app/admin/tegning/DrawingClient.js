@@ -186,22 +186,28 @@ const furnitureTypes=new Set(["sofa","table","chair","bed","wardrobe","tv","nigh
 const itemLayer=type=>electricalTypes.has(type)?"electrical":openingTypes.has(type)?"openings":kitchenTypes.has(type)?"kitchen":furnitureTypes.has(type)?"furniture":"construction";
 const itemAabb=item=>{const c=rotatedItemCorners(item),xs=c.map(p=>p.x),ys=c.map(p=>p.y);return{left:Math.min(...xs),right:Math.max(...xs),top:Math.min(...ys),bottom:Math.max(...ys)}};
 const boxesOverlap=(a,b,pad=0)=>a.left<b.right-pad&&a.right>b.left+pad&&a.top<b.bottom-pad&&a.bottom>b.top+pad;
-function drawingCollisions(items=[]){
- const result=new Map();
- const mark=(a,b,reason)=>{if(!result.has(a))result.set(a,[]);result.get(a).push({id:b,reason})};
+function drawingCollisions(items=[],walls=[],zones=[]){
+ const result=new Map(),byWall=new Map((walls||[]).map(w=>[w.id,w]));
+ const mark=(a,b,reason)=>{if(!result.has(a))result.set(a,[]);if(!result.get(a).some(row=>row.id===b&&row.reason===reason))result.get(a).push({id:b,reason})};
+ const doorSwingBox=door=>{
+  if(door.type!=="door"||!door.wallId)return null;const wall=byWall.get(door.wallId);if(!wall)return null;
+  const L=Math.max(1,len(wall)),dx=(wall.x2-wall.x1)/L,dy=(wall.y2-wall.y1)/L,inward=wallInwardNormal(wall,zones),g=wallEdgeOffsets(door,wall),W=Math.max(100,Number(door.w)||900),hingeOff=door.flip?g.start+W:g.start,along=door.flip?-1:1,hx=wall.x1+dx*hingeOff,hy=wall.y1+dy*hingeOff;
+  const pts=[{x:hx,y:hy},{x:hx+dx*W*along,y:hy+dy*W*along},{x:hx+dx*W*along+inward.x*W,y:hy+dy*W*along+inward.y*W},{x:hx+inward.x*W,y:hy+inward.y*W}],xs=pts.map(p=>p.x),ys=pts.map(p=>p.y);
+  return{left:Math.min(...xs),right:Math.max(...xs),top:Math.min(...ys),bottom:Math.max(...ys)};
+ };
  for(let i=0;i<items.length;i++)for(let j=i+1;j<items.length;j++){
   const a=items[i],b=items[j];
-  if(a.locked&&b.locked&&openingTypes.has(a.type)&&openingTypes.has(b.type))continue;
   if(a.wallId&&b.wallId&&a.wallId===b.wallId){
    const az0=Number(a.elevation)||0,az1=az0+modelHeight(a),bz0=Number(b.elevation)||0,bz1=bz0+modelHeight(b);
    const ah=Math.max(0,Number(a.w)||0)/2,bh=Math.max(0,Number(b.w)||0)/2,ao=Number(a.wallOffset)||0,bo=Number(b.wallOffset)||0;
    const horizontal=Math.abs(ao-bo)<ah+bh-4,vertical=az0<bz1-4&&az1>bz0+4;
    if(horizontal&&vertical&&!wallElectricalTypes.has(a.type)&&!wallElectricalTypes.has(b.type)){mark(a.id,b.id,"overlapper på vegg");mark(b.id,a.id,"overlapper på vegg")}
-   continue;
+  }else if(!a.wallId&&!b.wallId&&!electricalTypes.has(a.type)&&!electricalTypes.has(b.type)&&boxesOverlap(itemAabb(a),itemAabb(b),8)){
+   mark(a.id,b.id,"objekter overlapper");mark(b.id,a.id,"objekter overlapper");
   }
-  if(a.wallId||b.wallId)continue;
-  if(electricalTypes.has(a.type)||electricalTypes.has(b.type))continue;
-  if(boxesOverlap(itemAabb(a),itemAabb(b),8)){mark(a.id,b.id,"objekter overlapper");mark(b.id,a.id,"objekter overlapper")}
+  const aSwing=doorSwingBox(a),bSwing=doorSwingBox(b);
+  if(aSwing&&!b.wallId&&!electricalTypes.has(b.type)&&boxesOverlap(aSwing,itemAabb(b),5)){mark(a.id,b.id,"dørslag er blokkert");mark(b.id,a.id,"blokkerer dørslag")}
+  if(bSwing&&!a.wallId&&!electricalTypes.has(a.type)&&boxesOverlap(bSwing,itemAabb(a),5)){mark(b.id,a.id,"dørslag er blokkert");mark(a.id,b.id,"blokkerer dørslag")}
  }
  return result;
 }
@@ -348,6 +354,20 @@ function infiniteLineIntersection(a,b,c,d){
  const t=((c.x-a.x)*s.y-(c.y-a.y)*s.x)/den;
  return{x:a.x+t*r.x,y:a.y+t*r.y};
 }
+function offsetPolygon(points,distance,inward=true){
+ if(!Array.isArray(points)||points.length<3)return points||[];
+ const orientation=polygonSignedArea(points)>=0?1:-1,shifted=[],direction=inward?1:-1;
+ for(let i=0;i<points.length;i++){
+  const a=points[i],b=points[(i+1)%points.length],dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1;
+  const ix=orientation>0?-dy/L:dy/L,iy=orientation>0?dx/L:-dx/L,nx=ix*direction,ny=iy*direction;
+  shifted.push({a:{x:a.x+nx*distance,y:a.y+ny*distance},b:{x:b.x+nx*distance,y:b.y+ny*distance},nx,ny});
+ }
+ return points.map((point,i)=>{
+  const prev=shifted[(i-1+shifted.length)%shifted.length],next=shifted[i],hit=infiniteLineIntersection(prev.a,prev.b,next.a,next.b);
+  if(hit&&Number.isFinite(hit.x)&&Number.isFinite(hit.y)&&Math.hypot(hit.x-point.x,hit.y-point.y)<3000)return hit;
+  return{x:point.x+(prev.nx+next.nx)*distance/2,y:point.y+(prev.ny+next.ny)*distance/2};
+ });
+}
 function insetLinkedZone(zone,walls,defaultThickness=98){
  const points=zone?.points||[],ids=Array.isArray(zone?.wallIds)?zone.wallIds:[];
  if(points.length<3||ids.length!==points.length)return zone;
@@ -365,6 +385,23 @@ function insetLinkedZone(zone,walls,defaultThickness=98){
   return{x:point.x+nx/2,y:point.y+ny/2};
  });
  return {...zone,points:inset,_sourcePoints:points};
+}
+function wallFaceMetrics(wall,zones=[],walls=[],defaultThickness=98){
+ const rawL=Math.max(1,len(wall)),dx=(wall.x2-wall.x1)/rawL,dy=(wall.y2-wall.y1)/rawL,zone=(zones||[]).find(z=>Array.isArray(z.wallIds)&&z.wallIds.includes(wall?.id));
+ if(!zone)return{startOffset:0,endOffset:rawL,L:rawL,a:{x:wall.x1,y:wall.y1},b:{x:wall.x2,y:wall.y2}};
+ const inset=insetLinkedZone(zone,walls?.length?walls:[wall],defaultThickness),index=zone.wallIds.indexOf(wall.id),a=inset?.points?.[index],b=inset?.points?.[(index+1)%inset.points.length];
+ if(!a||!b)return{startOffset:0,endOffset:rawL,L:rawL,a:{x:wall.x1,y:wall.y1},b:{x:wall.x2,y:wall.y2}};
+ let start=(a.x-wall.x1)*dx+(a.y-wall.y1)*dy,end=(b.x-wall.x1)*dx+(b.y-wall.y1)*dy;
+ if(end<start){const t=start;start=end;end=t}
+ return{startOffset:start,endOffset:end,L:Math.max(1,end-start),a,b};
+}
+function wallFaceOffsets(item,wall,zones=[],walls=[],defaultThickness=98){
+ const face=wallFaceMetrics(wall,zones,walls,defaultThickness),width=Math.max(0,Number(item?.w)||0),center=Number.isFinite(item?.wallOffset)?Number(item.wallOffset):wallOffset(item,wall),start=center-face.startOffset-width/2,end=face.L-start-width;
+ return{start:Math.round(start),end:Math.round(end),center:Math.round(center-face.startOffset),L:Math.round(face.L),wallOffset:center,faceStartOffset:face.startOffset,tooWide:width>face.L};
+}
+function wallOffsetFromFaceStart(wall,start,width,zones=[],walls=[],defaultThickness=98){
+ const face=wallFaceMetrics(wall,zones,walls,defaultThickness);
+ return face.startOffset+clamp(Number(start)||0,0,Math.max(0,face.L-(Number(width)||0)))+(Number(width)||0)/2;
 }
 function roomPlacementZones(zones,walls,defaultThickness=98){
  return (zones||[]).map(zone=>insetLinkedZone(zone,walls,defaultThickness));
