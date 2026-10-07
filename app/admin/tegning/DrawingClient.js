@@ -214,23 +214,23 @@ function drawingCollisions(items=[],walls=[],zones=[]){
 function wallRoomZones(wall,zones=[]){
  return (zones||[]).filter(zone=>Array.isArray(zone.wallIds)&&zone.wallIds.includes(wall?.id));
 }
-function wallProjectedFurniture(wall,items,zones=[]){
- const L=Math.max(1,len(wall)),dx=wall.x2-wall.x1,dy=wall.y2-wall.y1,raw=Math.hypot(dx,dy)||1,ux=dx/raw,uy=dy/raw,nx=-uy,ny=ux,rooms=wallRoomZones(wall,zones);
+function wallProjectedFurniture(wall,items,zones=[],walls=[],defaultThickness=98){
+ const face=wallFaceMetrics(wall,zones,walls,defaultThickness),L=Math.max(1,face.L),dx=wall.x2-wall.x1,dy=wall.y2-wall.y1,raw=Math.hypot(dx,dy)||1,ux=dx/raw,uy=dy/raw,nx=-uy,ny=ux,rooms=wallRoomZones(wall,zones);
  return (items||[]).filter(item=>!item.wallId&&!electricalTypes.has(item.type)&&!openingTypes.has(item.type)&&!["deck","railing","screen","post","stairs"].includes(item.type)).map(item=>{
-  const center=itemCenter(item),sameRoom=!rooms.length||rooms.some(zone=>pointInPolygonInclusive(center,zone.points||[]));
-  const corners=rotatedItemCorners(item),along=corners.map(p=>(p.x-wall.x1)*ux+(p.y-wall.y1)*uy),normal=corners.map(p=>(p.x-wall.x1)*nx+(p.y-wall.y1)*ny);
+  const center=itemCenter(item),sameRoom=!rooms.length||rooms.some(zone=>pointInPolygonInclusive(center,insetLinkedZone(zone,walls,defaultThickness).points||[]));
+  const corners=rotatedItemCorners(item),along=corners.map(p=>(p.x-wall.x1)*ux+(p.y-wall.y1)*uy-face.startOffset),normal=corners.map(p=>(p.x-wall.x1)*nx+(p.y-wall.y1)*ny);
   const rawStart=Math.min(...along),rawEnd=Math.max(...along),start=clamp(rawStart,0,L),end=clamp(rawEnd,0,L);
   const minN=Math.min(...normal),maxN=Math.max(...normal),distance=minN<=0&&maxN>=0?0:Math.min(Math.abs(minN),Math.abs(maxN));
   const blockDistance=500,visible=sameRoom&&end-start>=40,blocksGap=visible&&distance<=blockDistance;
   return {item,start,end,width:Math.max(0,end-start),distance,blockDistance,blocksGap,sameRoom};
  }).filter(row=>row.visible).sort((a,b)=>a.distance-b.distance);
 }
-function wallFurnitureGaps(wall,items,zones=[],excludeId=null){
- const L=Math.max(1,len(wall));
+function wallFurnitureGaps(wall,items,zones=[],walls=[],defaultThickness=98,excludeId=null){
+ const face=wallFaceMetrics(wall,zones,walls,defaultThickness),L=Math.max(1,face.L);
  const mounted=(items||[])
   .filter(item=>item.wallId===wall.id&&item.id!==excludeId&&!wallElectricalTypes.has(item.type)&&!["railing","screen"].includes(item.type))
-  .map(item=>{const gaps=wallEdgeOffsets(item,wall),start=clamp(gaps.start,0,L),end=clamp(gaps.start+Math.max(0,Number(item.w)||0),0,L);return{start,end}});
- const floor=wallProjectedFurniture(wall,items,zones).filter(row=>row.item.id!==excludeId&&row.blocksGap).map(row=>({start:row.start,end:row.end}));
+  .map(item=>{const gaps=wallFaceOffsets(item,wall,zones,walls,defaultThickness),start=clamp(gaps.start,0,L),end=clamp(gaps.start+Math.max(0,Number(item.w)||0),0,L);return{start,end}});
+ const floor=wallProjectedFurniture(wall,items,zones,walls,defaultThickness).filter(row=>row.item.id!==excludeId&&row.blocksGap).map(row=>({start:row.start,end:row.end}));
  const blockers=[...mounted,...floor].filter(row=>row.end>row.start).sort((a,b)=>a.start-b.start);
  const merged=[];
  for(const row of blockers){
@@ -565,7 +565,7 @@ function Drawing3DPreview({doc,onWallSelect,onItemSelect,camera}){
  </svg>;
 }
 function FurnitureGapPlanPreview({doc,wall,onSelectGap}){
- const walls=doc.walls||[],items=doc.items||[],gaps=wallFurnitureGaps(wall,items,doc.zones||[]),points=[];
+ const walls=doc.walls||[],items=doc.items||[],gaps=wallFurnitureGaps(wall,items,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),points=[];
  for(const w of walls)points.push({x:Number(w.x1)||0,y:Number(w.y1)||0},{x:Number(w.x2)||0,y:Number(w.y2)||0});
  for(const item of items)for(const p of rotatedItemCorners(item))points.push(p);
  if(!points.length)points.push({x:0,y:0},{x:4000,y:3000});
@@ -594,10 +594,10 @@ function FurnitureGapPlanPreview({doc,wall,onSelectGap}){
  </svg>;
 }
 
-function WallElevationPreview({wall,items,zones=[],onSelectItem,onMoveItem,onMoveStart,onMoveEnd,selectedItemId,gapPickMode=false,onSelectGap}){
+function WallElevationPreview({wall,items,zones=[],walls=[],defaultWallThickness=98,onSelectItem,onMoveItem,onMoveStart,onMoveEnd,selectedItemId,gapPickMode=false,onSelectGap}){
  const svgRef=useRef(null),dragRef=useRef(null);
  if(!wall)return null;
- const L=Math.max(1,len(wall)),H=Math.max(300,Number(wall.h)||2400),padX=Math.max(140,L*.035),padY=Math.max(140,H*.07);
+ const face=wallFaceMetrics(wall,zones,walls,defaultWallThickness),L=Math.max(1,face.L),H=Math.max(300,Number(wall.h)||2400),padX=Math.max(140,L*.035),padY=Math.max(140,H*.07);
  const pointerWorldDelta=(e,start)=>{
   const rect=svgRef.current?.getBoundingClientRect?.();if(!rect)return{dx:0,dy:0};
   return {dx:(e.clientX-start.clientX)*(L+padX*2)/Math.max(1,rect.width),dy:(e.clientY-start.clientY)*(H+padY*2)/Math.max(1,rect.height)};
@@ -606,7 +606,7 @@ function WallElevationPreview({wall,items,zones=[],onSelectItem,onMoveItem,onMov
   if(gapPickMode||!onMoveItem)return;
   e.stopPropagation();onSelectItem?.(item);if(item.locked)return;
   e.currentTarget.setPointerCapture?.(e.pointerId);
-  const gaps=wallEdgeOffsets(item,wall),elev=Math.max(0,Number(item.elevation)||0);
+  const gaps=wallFaceOffsets(item,wall,zones,walls,defaultWallThickness),elev=Math.max(0,Number(item.elevation)||0);
   dragRef.current={pointerId:e.pointerId,itemId:item.id,clientX:e.clientX,clientY:e.clientY,start:gaps.start,elevation:elev};
   onMoveStart?.(item);
  };
@@ -623,11 +623,11 @@ function WallElevationPreview({wall,items,zones=[],onSelectItem,onMoveItem,onMov
   dragRef.current=null;try{e.currentTarget.releasePointerCapture?.(e.pointerId)}catch{}onMoveEnd?.();
  };
  const wallItems=(items||[]).filter(item=>item.wallId===wall.id).sort((a,b)=>(Number(a.wallOffset)||0)-(Number(b.wallOffset)||0));
- const projectedFurniture=wallProjectedFurniture(wall,items,zones);
+ const projectedFurniture=wallProjectedFurniture(wall,items,zones,walls,defaultWallThickness);
  const blockingFurniture=projectedFurniture.filter(row=>row.blocksGap);
- const freeGaps=gapPickMode?wallFurnitureGaps(wall,items,zones):[];
+ const freeGaps=gapPickMode?wallFurnitureGaps(wall,items,zones,walls,defaultWallThickness):[];
  const itemBox=item=>{
-  const gaps=wallEdgeOffsets(item,wall),width=Math.max(60,Number(item.w)||120),start=gaps.start;
+  const gaps=wallFaceOffsets(item,wall,zones,walls,defaultWallThickness),width=Math.max(60,Number(item.w)||120),start=gaps.start;
   if(openingTypes.has(item.type)){
    const z0=item.type==="window"?Math.max(0,Number(item.sillHeight)||0):0;
    const height=Math.max(100,Number(item.openingHeight)||openingDefaults(item.type).openingHeight||2100);
@@ -1192,7 +1192,7 @@ export default function DrawingClient(){
  const makeLRoom=()=>openRoomBuilder("l");
  const wallForView=wallViewId?doc.walls.find(w=>w.id===wallViewId)||null:null;
  const wallSelectedItem=wallForView&&selected?.kind==="item"?doc.items.find(item=>item.id===selected.id&&item.wallId===wallForView.id)||null:null;
- const wallProjectedSelected=wallForView&&selected?.kind==="item"&&!wallSelectedItem?wallProjectedFurniture(wallForView,doc.items,doc.zones||[]).find(row=>row.item.id===selected.id)?.item||null:null;
+ const wallProjectedSelected=wallForView&&selected?.kind==="item"&&!wallSelectedItem?wallProjectedFurniture(wallForView,doc.items,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98).find(row=>row.item.id===selected.id)?.item||null:null;
  const moveWallItem2D=(itemId,{start,elevation})=>{
   setDoc(d=>{
    const item=d.items.find(o=>o.id===itemId),wall=item?.wallId?d.walls.find(w=>w.id===item.wallId):null;if(!item||!wall)return d;
@@ -1985,7 +1985,7 @@ export default function DrawingClient(){
      <button type="button" onClick={()=>addWallWorkspaceItem("thermostat",140,100)}>+ Termostat</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("walllight",180,100)}>+ Vegglampe</button>
     </div>
-    <div className={styles.wallViewCanvas+(furnitureGapPick?" "+styles.wallGapPickCanvas:"")}><WallElevationPreview wall={wallForView} items={doc.items} zones={doc.zones||[]} selectedItemId={selected?.kind==="item"?selected.id:null} gapPickMode={!!furnitureGapPick} onSelectGap={chooseFurnitureGap} onMoveStart={beginWallItem2DMove} onMoveItem={moveWallItem2D} onMoveEnd={()=>{}} onSelectItem={item=>{if(!furnitureGapPick)setSelected({kind:"item",id:item.id})}}/></div>
+    <div className={styles.wallViewCanvas+(furnitureGapPick?" "+styles.wallGapPickCanvas:"")}><WallElevationPreview wall={wallForView} items={doc.items} zones={doc.zones||[]} walls={doc.walls||[]} defaultWallThickness={doc.defaultWallThickness||98} selectedItemId={selected?.kind==="item"?selected.id:null} gapPickMode={!!furnitureGapPick} onSelectGap={chooseFurnitureGap} onMoveStart={beginWallItem2DMove} onMoveItem={moveWallItem2D} onMoveEnd={()=>{}} onSelectItem={item=>{if(!furnitureGapPick)setSelected({kind:"item",id:item.id})}}/></div>
     {wallProjectedSelected&&<div className={styles.wallProjectedEditor}><div><strong>{wallProjectedSelected.customName||labelFor(wallProjectedSelected.type)}</strong><small>Dette møbelet står i rommet. Fest det til denne veggen for eksakt 2D-plassering.</small></div><button type="button" onClick={()=>snapRoomFurniture(wallProjectedSelected.id,"start",wallForView.id)}>← Helt i hjørne</button><button type="button" onClick={()=>snapRoomFurniture(wallProjectedSelected.id,"center",wallForView.id)}>Sentrer på vegg</button><button type="button" onClick={()=>snapRoomFurniture(wallProjectedSelected.id,"end",wallForView.id)}>Helt i hjørne →</button></div>}
     {wallSelectedItem&&(()=>{const gaps=wallEdgeOffsets(wallSelectedItem,wallForView),isOpening=openingTypes.has(wallSelectedItem.type),isElectrical=wallElectricalTypes.has(wallSelectedItem.type),isCustom=wallSelectedItem.type==="customwall";return <div className={styles.wallInlineEditor}>
      <div><strong>{wallSelectedItem.customName||labelFor(wallSelectedItem.type)}</strong><small>Valgt på vegg {Math.max(1,doc.walls.findIndex(w=>w.id===wallForView.id)+1)}</small></div>
@@ -1998,7 +1998,7 @@ export default function DrawingClient(){
      <div className={styles.wallInlineActions}><button type="button" onClick={duplicate}>Dupliser</button><button type="button" onClick={remove}>Slett</button></div>
     </div>})()}
     <div className={styles.wallViewHint}>{furnitureGapPick?<><b>Velg mellomrom rett forfra:</b> du ser den valgte veggen frontalt. Seng, garderobe, kommode, skap og andre møbler i rommet projiseres inn på veggen med riktig plassering langs veggen og riktig høyde. De grønne feltene er de ledige breddene mellom møblene. Trykk på feltet du vil fylle, så får møbelet automatisk akkurat den bredden og plasseres på veggen der.</>:<><b>2D veggbygger:</b> møbler vises rett forfra. Du kan legge inn kjøkkenskap, hvitevarer, seng og garderobe direkte her, dra dem sidelengs på veggen og dra overskap/veggmøbler opp og ned. Klikk et eksisterende rommøbel for å feste/sentrere det på denne veggen.</>}</div>
-    <footer><span>Vegg: <b>{len(wallForView)} × {Math.round(Number(wallForView.h)||2400)} × {Math.round(Number(wallForView.t)||98)} mm</b></span><span>På veggen: <b>{doc.items.filter(item=>item.wallId===wallForView.id).length}</b></span><span>Rom-møbler forfra: <b>{wallProjectedFurniture(wallForView,doc.items,doc.zones||[]).length}</b></span><button type="button" onClick={()=>setWallViewId(null)}>Tilbake til plantegning →</button></footer>
+    <footer><span>Vegg: <b>{len(wallForView)} × {Math.round(Number(wallForView.h)||2400)} × {Math.round(Number(wallForView.t)||98)} mm</b></span><span>På veggen: <b>{doc.items.filter(item=>item.wallId===wallForView.id).length}</b></span><span>Rom-møbler forfra: <b>{wallProjectedFurniture(wallForView,doc.items,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98).length}</b></span><button type="button" onClick={()=>setWallViewId(null)}>Tilbake til plantegning →</button></footer>
    </section>
   </div>}
   {furnitureBuilder&&<div className={styles.furnitureBuilderBackdrop} role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)setFurnitureBuilder(null)}}>
