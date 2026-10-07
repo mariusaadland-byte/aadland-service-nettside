@@ -3,6 +3,7 @@
 import {useEffect,useState} from "react";
 import Link from "next/link";
 import {osloDateKey} from "../../lib/osloTime";
+import CustomerDrawingViewer from "./CustomerDrawingViewer";
 
 const orderStatus={new:"Mottatt",confirmed:"Bekreftet",processing:"Under behandling",in_progress:"Under arbeid",ready:"Klar",completed:"Fullført",cancelled:"Kansellert"};
 const enquiryStatus={new:"Mottatt",confirmed:"Befaring avtalt",processing:"Under behandling",in_progress:"Under arbeid",ready:"Klar for oppfølging",completed:"Ferdig",cancelled:"Avbrutt"};
@@ -286,6 +287,7 @@ export default function MinSide(){
  const enquiries=customOrders.filter(order=>!order.source_quote);
  const purchases=(data.orders||[]).filter(order=>order.order_type!=="custom");
  const rentals=data.rentals||[];
+ const drawings=data.drawings||[];
  const activeEnquiries=[...enquiries].filter(o=>!["completed","cancelled"].includes(o.status)).sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")));
  const pastEnquiries=[...enquiries].filter(o=>["completed","cancelled"].includes(o.status)).sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")));
  const activeQuotes=[...quotes].filter(q=>effectiveQuoteStatus(q)==="sent").sort((a,b)=>String(b.sentAt||b.createdAt||"").localeCompare(String(a.sentAt||a.createdAt||"")));
@@ -306,6 +308,7 @@ export default function MinSide(){
  const activeJobs=jobs.filter(o=>!["completed","cancelled"].includes(o.status)).length;
  const activePurchases=purchases.filter(o=>!["completed","cancelled"].includes(o.status)).length;
  const activeRentals=rentals.filter(r=>["new","confirmed","active"].includes(r.status)).length;
+ const visibleDrawings=drawings.length;
  const pendingRentalRows=rentals.filter(r=>r.status==="confirmed"&&!r.confirmation_sent_at);
  const readyPurchaseRows=purchases.filter(o=>o.status==="ready");
  const portalAttentionCount=openQuotes+pendingRentalRows.length+readyPurchaseRows.length;
@@ -390,6 +393,7 @@ export default function MinSide(){
      <button type="button" className={activePanel==="foresporsler"?"isActive":""} onClick={()=>selectPanel("foresporsler")}><span>Forespørsler</span><b>{openEnquiries}</b></button>
      <button type="button" className={activePanel==="tilbud"?"isActive":""} onClick={()=>selectPanel("tilbud")}><span>Tilbud</span><b>{openQuotes}</b></button>
      <button type="button" className={activePanel==="oppdrag"?"isActive":""} onClick={()=>selectPanel("oppdrag")}><span>Oppdrag</span><b>{activeJobs}</b></button>
+     <button type="button" className={activePanel==="tegninger"?"isActive":""} onClick={()=>selectPanel("tegninger")}><span>Tegninger</span><b>{visibleDrawings}</b></button>
      <button type="button" className={activePanel==="bestillinger"?"isActive":""} onClick={()=>selectPanel("bestillinger")}><span>Bestillinger</span><b>{activePurchases}</b></button>
      <button type="button" className={activePanel==="utleie"?"isActive":""} onClick={()=>selectPanel("utleie")}><span>Utleie</span><b>{activeRentals}</b></button>
      <button type="button" className={activePanel==="konto"?"isActive":""} onClick={()=>selectPanel("konto")}><span>Mine opplysninger</span></button>
@@ -423,6 +427,7 @@ export default function MinSide(){
       <button type="button" onClick={()=>selectPanel("foresporsler")}><small>FORESPØRSLER</small><b>{openEnquiries}</b><span>aktive</span></button>
       <button type="button" onClick={()=>selectPanel("tilbud")}><small>TILBUD</small><b>{openQuotes}</b><span>venter</span></button>
       <button type="button" onClick={()=>selectPanel("oppdrag")}><small>OPPDRAG</small><b>{activeJobs}</b><span>aktive</span></button>
+      <button type="button" onClick={()=>selectPanel("tegninger")}><small>TEGNINGER</small><b>{visibleDrawings}</b><span>delt med deg</span></button>
       <button type="button" onClick={()=>selectPanel("bestillinger")}><small>BESTILLINGER</small><b>{activePurchases}</b><span>aktive</span></button>
       <button type="button" onClick={()=>selectPanel("utleie")}><small>UTLEIE</small><b>{activeRentals}</b><span>aktive</span></button>
      </div>
@@ -660,6 +665,20 @@ export default function MinSide(){
      </div>
     </div>}
    </>}
+  </section>}
+
+  {activePanel==="tegninger"&&<section id="tegninger" className="customerDashboardSection customerPortalPanel customerDrawingsPanel">
+   <div className="customerSectionHead">
+    <div><div className="kicker">TEGNINGER</div><h2>Mine tegninger</h2><p>Her ser du tegninger Aadland Service har delt med deg. Du kan veksle mellom plantegning og 3D, og dra 3D-visningen rundt for å se løsningen fra flere vinkler.</p></div>
+    <span>{drawings.length}</span>
+   </div>
+   {!drawings.length?<div className="card customerEmpty"><p>Ingen tegninger er delt med kontoen din ennå.</p></div>:<div className="customerDrawingList">
+    {drawings.map(drawing=><article className="card customerDrawingCard" key={drawing.id}>
+     <header><div><small>TEGNING</small><h3>{drawing.name||"Tegning"}</h3>{drawing.address&&<p>{drawing.address}</p>}</div><span>Sist oppdatert {dateTime(drawing.updatedAt)}</span></header>
+     {drawing.notes&&<p className="customerDrawingNote">{drawing.notes}</p>}
+     <CustomerDrawingViewer drawing={drawing}/>
+    </article>)}
+   </div>}
   </section>}
 
   {activePanel==="bestillinger"&&<section id="bestillinger" className="customerDashboardSection customerPortalPanel">
