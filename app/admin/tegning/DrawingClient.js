@@ -974,6 +974,19 @@ export default function DrawingClient(){
    return {...d,items:[...d.items,...added]};
   });setMessage("Veggrekken er fylt mot høyre");setTimeout(()=>setMessage(""),1800);
  };
+ const wallNeighborDistances=item=>{
+  const wall=item?.wallId?doc.walls.find(w=>w.id===item.wallId):null;if(!item||!wall)return null;
+  const current=wallFaceOffsets(item,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),width=Math.max(1,Number(item.w)||1);
+  const rows=doc.items.filter(o=>o.wallId===wall.id&&o.id!==item.id&&!wallElectricalTypes.has(o.type)).map(o=>({item:o,g:wallFaceOffsets(o,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98)})).sort((a,b)=>a.g.start-b.g.start);
+  const prev=rows.filter(row=>row.g.start+Number(row.item.w||0)<=current.start+2).at(-1)||null,next=rows.find(row=>row.g.start>=current.start+width-2)||null;
+  const prevEdge=prev?prev.g.start+Number(prev.item.w||0):0,nextEdge=next?next.g.start:current.L;
+  return {wall,current,width,prev,next,prevGap:Math.max(0,Math.round(current.start-prevEdge)),nextGap:Math.max(0,Math.round(nextEdge-(current.start+width))),prevEdge,nextEdge};
+ };
+ const updateWallNeighborGap=(itemId,side,value)=>{
+  const gap=Math.max(0,Number(value)||0),item=doc.items.find(o=>o.id===itemId),info=wallNeighborDistances(item);if(!item||!info)return;
+  const start=side==="prev"?info.prevEdge+gap:info.nextEdge-gap-info.width;
+  updateWallItemById(itemId,"wallStartGap",clamp(start,0,Math.max(0,info.current.L-info.width)));
+ };
  const alignMulti=mode=>{
   const chosen=multiItems.filter(o=>!o.locked);if(chosen.length<2){setMessage("Velg minst to ulåste objekter");setTimeout(()=>setMessage(""),1600);return}
   const wallId=chosen[0].wallId,sameWall=!!wallId&&chosen.every(o=>o.wallId===wallId);
@@ -981,11 +994,12 @@ export default function DrawingClient(){
    let items=[...d.items];
    if(sameWall){
     const wall=d.walls.find(w=>w.id===wallId);if(!wall)return d;
-    const sorted=[...chosen].sort((a,b)=>wallEdgeOffsets(a,wall).start-wallEdgeOffsets(b,wall).start);
-    if(mode==="pack"){let cursor=wallEdgeOffsets(sorted[0],wall).start;for(const item of sorted){const width=Number(item.w)||1,base={...item,wallOffset:cursor+width/2},placed=mountedItemCenter(base,wall,d.zones||[]);items=items.map(o=>o.id===item.id?{...base,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}:o);cursor+=width}}
-    else if(mode==="distribute"){const total=sorted.reduce((sum,o)=>sum+(Number(o.w)||0),0),gap=Math.max(0,(len(wall)-total)/(sorted.length+1));let cursor=gap;for(const item of sorted){const width=Number(item.w)||1,base={...item,wallOffset:cursor+width/2},placed=mountedItemCenter(base,wall,d.zones||[]);items=items.map(o=>o.id===item.id?{...base,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}:o);cursor+=width+gap}}
+    const face=wallFaceMetrics(wall,d.zones||[],d.walls||[],d.defaultWallThickness||98),metrics=o=>wallFaceOffsets(o,wall,d.zones||[],d.walls||[],d.defaultWallThickness||98);
+    const sorted=[...chosen].sort((a,b)=>metrics(a).start-metrics(b).start);
+    if(mode==="pack"){let cursor=metrics(sorted[0]).start;for(const item of sorted){const width=Number(item.w)||1,base={...item,wallOffset:wallOffsetFromFaceStart(wall,cursor,width,d.zones||[],d.walls||[],d.defaultWallThickness||98)},placed=mountedItemCenter(base,wall,d.zones||[]);items=items.map(o=>o.id===item.id?{...base,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}:o);cursor+=width}}
+    else if(mode==="distribute"){const total=sorted.reduce((sum,o)=>sum+(Number(o.w)||0),0),gap=Math.max(0,(face.L-total)/(sorted.length+1));let cursor=gap;for(const item of sorted){const width=Number(item.w)||1,base={...item,wallOffset:wallOffsetFromFaceStart(wall,cursor,width,d.zones||[],d.walls||[],d.defaultWallThickness||98)},placed=mountedItemCenter(base,wall,d.zones||[]);items=items.map(o=>o.id===item.id?{...base,x:placed.cx-width/2,y:placed.cy-(Number(item.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}:o);cursor+=width+gap}}
     else if(mode==="sameHeight"){const elevation=Number(sorted[0].elevation)||0;items=items.map(o=>multiSelectedIds.includes(o.id)?{...o,elevation}:o)}
-    else if(mode==="sameWidth"){const width=Number(sorted[0].w)||1;items=items.map(o=>{if(!multiSelectedIds.includes(o.id))return o;const live=wallEdgeOffsets(o,wall),start=clamp(live.start,0,Math.max(0,len(wall)-width)),base={...o,w:width,wallOffset:start+width/2},placed=mountedItemCenter(base,wall,d.zones||[]);return {...base,x:placed.cx-width/2,y:placed.cy-(Number(o.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}})}
+    else if(mode==="sameWidth"){const width=Number(sorted[0].w)||1;items=items.map(o=>{if(!multiSelectedIds.includes(o.id))return o;const live=metrics(o),start=clamp(live.start,0,Math.max(0,face.L-width)),base={...o,w:width,wallOffset:wallOffsetFromFaceStart(wall,start,width,d.zones||[],d.walls||[],d.defaultWallThickness||98)},placed=mountedItemCenter(base,wall,d.zones||[]);return {...base,x:placed.cx-width/2,y:placed.cy-(Number(o.h)||1)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}})}
    }else{
     const boxes=chosen.map(item=>({item,box:itemAabb(item)})),left=Math.min(...boxes.map(x=>x.box.left)),right=Math.max(...boxes.map(x=>x.box.right)),top=Math.min(...boxes.map(x=>x.box.top)),bottom=Math.max(...boxes.map(x=>x.box.bottom)),cx=(left+right)/2;
     items=items.map(o=>{if(!multiSelectedIds.includes(o.id)||o.wallId)return o;let next={...o};if(mode==="left")next.x+=left-itemAabb(o).left;if(mode==="right")next.x+=right-itemAabb(o).right;if(mode==="center")next.x+=cx-(itemAabb(o).left+itemAabb(o).right)/2;if(mode==="top")next.y+=top-itemAabb(o).top;if(mode==="bottom")next.y+=bottom-itemAabb(o).bottom;if(mode==="sameWidth")next.w=Number(chosen[0].w)||next.w;return constrainFreeItemStrict(next,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackItem:o,fallbackCenter:itemCenter(o),snapDistance:0})});
