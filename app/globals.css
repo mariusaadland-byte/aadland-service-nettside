@@ -4035,3 +4035,99 @@ body:has(.customerPage) .customerPage{
  outline:2px solid rgba(207,161,83,.35);
  border-radius:8px;
 }
+
+
+/* Final PC backoffice contrast audit */
+.adminStandalonePage{
+ display:block!important;
+ min-height:100vh;
+ padding:34px;
+ background:#f3efe8!important;
+ color:#181613!important;
+}
+.adminStandalonePage>h1,
+.adminStandalonePage h2,
+.adminStandalonePage h3,
+.adminStandalonePage h4,
+.adminStandalonePage h5,
+.adminStandalonePage p,
+.adminStandalonePage label,
+.adminStandalonePage th,
+.adminStandalonePage td,
+.adminStandalonePage code{
+ color:#181613;
+}
+.adminStandalonePage .card,
+.adminStandalonePage .stat,
+.adminStandalonePage .table{
+ background:#fff;
+ color:#181613;
+}
+.adminStandalonePage input:not([type="checkbox"]):not([type="radio"]),
+.adminStandalonePage select,
+.adminStandalonePage textarea{
+ background:#fff!important;
+ color:#181613!important;
+ -webkit-text-fill-color:#181613!important;
+ caret-color:#181613!important;
+ color-scheme:light;
+ border-color:#d9d0c5;
+}
+.adminStandalonePage .muted,
+.adminStandalonePage small.muted{color:#756f66!important}
+.adminStandalonePage .btn{background:#181613;color:#fff}
+.adminStandalonePage .btn.alt{background:#fff;color:#181613;border:1px solid #d9d0c5}
+
+/* Customer-portal styles share a few class names with backoffice. Keep admin light/readable. */
+.adminmain .customerCardMeta span,
+.adminStandalonePage .customerCardMeta span{
+ background:#fff!important;
+ border-color:#e0d9ce!important;
+ color:#181613!important;
+}
+.adminmain .customerCardMeta small,
+.adminStandalonePage .customerCardMeta small{
+ color:#756f66!important;
+}
+.adminmain .customerCardMeta b,
+.adminStandalonePage .customerCardMeta b{
+ color:#181613!important;
+}
+.adminmain .customerPaymentConfirmation,
+.adminStandalonePage .customerPaymentConfirmation{
+ background:#edf7ef!important;
+ border-color:#b9d7c0!important;
+ color:#285b30!important;
+}
+.adminmain .customerPaymentConfirmation span,
+.adminStandalonePage .customerPaymentConfirmation span{
+ color:#4c6c53!important;
+}
+
+/* Keep intentionally dark/gold status pills and primary buttons readable. */
+.adminmain .quoteSummaryTotal,
+.adminmain .quoteDocLineHead,
+.adminmain .quoteDocGrandTotal,
+.adminmain .quoteLineNumber,
+.adminmain .quoteFilters button.active{
+ color:#fff!important;
+}
+.adminmain .quoteRevisionButton{color:#fff!important}
+.adminmain .jobPlanningSend,
+.adminmain .quoteSendButton,
+.adminmain .quoteCreateJobButton{
+ color:#17130c!important;
+}
+
+/* Calendar jumps land clearly on the exact record. */
+.adminCalendarRecordTarget{
+ outline:3px solid rgba(207,161,83,.42);
+ box-shadow:0 0 0 5px rgba(207,161,83,.10),0 14px 34px rgba(0,0,0,.08)!important;
+}
+
+@media(max-width:900px){
+ .adminStandalonePage{padding:20px}
+}
+@media(max-width:600px){
+ .adminStandalonePage{padding:16px}
+}
