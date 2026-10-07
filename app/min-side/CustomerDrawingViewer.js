@@ -14,9 +14,17 @@ const wallElectrical=new Set(["walllight","outlet","doubleoutlet","switch","dimm
 const ceilingElectrical=new Set(["ceilinglight","downlight","ledstrip","junction"]);
 const openingTypes=new Set(["door","sliding","window","opening"]);
 const customCellTypes=["open","door","drawer","shelf"];
+const customDimArray=(count,total,source=[])=>{
+ count=Math.max(1,Math.round(Number(count)||1));total=Math.max(count*50,Math.round(Number(total)||count*100));
+ const valid=Array.isArray(source)&&source.length===count&&source.every(v=>Number(v)>=50);
+ if(valid){const sum=source.reduce((a,b)=>a+Number(b),0)||1;let used=0;return source.map((v,i)=>{if(i===count-1)return Math.max(50,total-used);const n=Math.max(50,Math.round(Number(v)*total/sum));used+=n;return n})}
+ const base=Math.floor(total/count),out=Array(count).fill(base);out[count-1]+=total-base*count;return out;
+};
 const customCells=item=>{
  const cols=Math.max(1,Math.min(8,Math.round(Number(item?.sectionsX)||1))),rows=Math.max(1,Math.min(6,Math.round(Number(item?.sectionsY)||1))),count=cols*rows,source=Array.isArray(item?.cellTypes)?item.cellTypes:[];
- return {cols,rows,cells:Array.from({length:count},(_,i)=>customCellTypes.includes(source[i])?source[i]:"open")};
+ const colWidths=customDimArray(cols,Math.max(100,Number(item?.w)||1000),item?.colWidths),rowHeights=customDimArray(rows,Math.max(50,itemHeight(item)),item?.rowHeights),cwTotal=colWidths.reduce((a,b)=>a+b,0)||1,rhTotal=rowHeights.reduce((a,b)=>a+b,0)||1;
+ const colEdges=[0],rowEdges=[0];for(const v of colWidths)colEdges.push(colEdges.at(-1)+v/cwTotal);for(const v of rowHeights)rowEdges.push(rowEdges.at(-1)+v/rhTotal);
+ return {cols,rows,cells:Array.from({length:count},(_,i)=>customCellTypes.includes(source[i])?source[i]:"open"),colEdges,rowEdges};
 };
 const polygonSignedArea=points=>{let area=0;for(let i=0;i<(points||[]).length;i++){const a=points[i],b=points[(i+1)%points.length];area+=(Number(a.x)||0)*(Number(b.y)||0)-(Number(b.x)||0)*(Number(a.y)||0)}return area/2};
 function wallInwardNormal(wall,zones=[]){
@@ -58,9 +66,9 @@ function ceilingHeight(item,doc){
  return wallElectrical.has(item.type)?Number(item.mountHeight)||1200:ceilingElectrical.has(item.type)?fallback:itemHeight(item);
 }
 function FurnitureFront({item,a,b,z0,height,project,prefix}){
- const {cols,rows,cells}=customCells(item),point=(t,z)=>project(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,z);
+ const {cols,rows,cells,colEdges,rowEdges}=customCells(item),point=(t,z)=>project(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,z);
  return <g>{cells.map((type,i)=>{
-  const col=i%cols,row=Math.floor(i/cols),t0=col/cols,t1=(col+1)/cols,zTop=z0+height*(1-row/rows),zBottom=z0+height*(1-(row+1)/rows);
+  const col=i%cols,row=Math.floor(i/cols),t0=colEdges[col],t1=colEdges[col+1],zTop=z0+height*(1-rowEdges[row]),zBottom=z0+height*(1-rowEdges[row+1]);
   const p0=point(t0,zBottom),p1=point(t1,zBottom),p2=point(t1,zTop),p3=point(t0,zTop),mid=point((t0+t1)/2,(zTop+zBottom)/2);
   return <g key={prefix+"-"+i}>
    <polygon points={pointsAttr([p0,p1,p2,p3])} fill={type==="open"?"rgba(88,69,45,.18)":type==="drawer"?"rgba(222,193,143,.92)":"rgba(235,216,180,.94)"} stroke="#665136" strokeWidth="6"/>
