@@ -531,6 +531,8 @@ function nearestWall(o,walls){
 
 export default function DrawingClient(){
  const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[customers,setCustomers]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[measureDrag,setMeasureDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null),[mobileEditOpen,setMobileEditOpen]=useState(false),[roomBuilder,setRoomBuilder]=useState(null),[quickAddOpen,setQuickAddOpen]=useState(false),[fieldMode,setFieldMode]=useState(false),[canvasAspect,setCanvasAspect]=useState(1),[wallBuilder,setWallBuilder]=useState(null),[snapHint,setSnapHint]=useState(null),[wallChain,setWallChain]=useState(null),[online,setOnline]=useState(true),[saveState,setSaveState]=useState("local"),[lastSavedAt,setLastSavedAt]=useState(null),[fieldReturnZoneId,setFieldReturnZoneId]=useState(null),[roomPickerOpen,setRoomPickerOpen]=useState(false),[deleteConfirmOpen,setDeleteConfirmOpen]=useState(false),[deleteBusy,setDeleteBusy]=useState(false),[printMode,setPrintMode]=useState(false),[quoteWarningOpen,setQuoteWarningOpen]=useState(false),[show3D,setShow3D]=useState(false),[elPlan,setElPlan]=useState(false),[wallViewId,setWallViewId]=useState(null),[furnitureBuilder,setFurnitureBuilder]=useState(null),[focusView,setFocusView]=useState(false);
+ const [camera3D,setCamera3D]=useState({yaw:42,pitch:34,zoom:1});
+ const camera3DDrag=useRef(null);
  const svg=useRef(null);
  const leftPanel=useRef(null),rightPanel=useRef(null);
  const touchPointers=useRef(new Map()),pinchGesture=useRef(null),pendingCanvasTouch=useRef(null);
@@ -847,6 +849,9 @@ export default function DrawingClient(){
   else return;
   mutate(d=>({...d,items:d.items.map(o=>o.id===itemId?next:o)}));
  };
+ const start3DOrbit=e=>{camera3DDrag.current={id:e.pointerId,x:e.clientX,y:e.clientY,yaw:camera3D.yaw,pitch:camera3D.pitch};e.currentTarget.setPointerCapture?.(e.pointerId)};
+ const move3DOrbit=e=>{const d=camera3DDrag.current;if(!d||d.id!==e.pointerId)return;setCamera3D(c=>({...c,yaw:d.yaw+(e.clientX-d.x)*.35,pitch:clamp(d.pitch-(e.clientY-d.y)*.22,8,78)}))};
+ const end3DOrbit=e=>{if(camera3DDrag.current?.id===e.pointerId)camera3DDrag.current=null;try{e.currentTarget.releasePointerCapture?.(e.pointerId)}catch{}};
  const openWallView=(wallId=null)=>{
   const id=wallId||(selected?.kind==="wall"?selected.id:null)||doc.walls[0]?.id;
   if(!id){setMessage("Tegn minst én vegg først");setTimeout(()=>setMessage(""),1800);return}
@@ -1523,10 +1528,32 @@ export default function DrawingClient(){
   </div>}
   {show3D&&<div className={styles.preview3DBackdrop} role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)setShow3D(false)}}>
    <section className={styles.preview3DModal} role="dialog" aria-modal="true" aria-label="3D-visning">
-    <header><div><span>3D-VISNING</span><h2>{doc.name||"Tegning"}</h2><p>Klikk på en vegg i 3D-visningen for å åpne veggen rett forfra og bygge møbler på den.</p></div><button type="button" onClick={()=>setShow3D(false)} aria-label="Lukk 3D-visning">×</button></header>
-    <div className={styles.preview3DCanvas}><Drawing3DPreview doc={doc} onWallSelect={wall=>openWallView(wall.id)}/></div>
+    <header><div><span>3D-VISNING</span><h2>{doc.name||"Tegning"}</h2><p>Dra visningen med finger eller mus for å gå rundt rommet. Klikk møbler for å velge dem, eller klikk en vegg for full veggtegning.</p></div><button type="button" onClick={()=>setShow3D(false)} aria-label="Lukk 3D-visning">×</button></header>
+    <div className={styles.preview3DControls}>
+     <button type="button" onClick={()=>setCamera3D(c=>({...c,yaw:c.yaw-20}))}>↺ Venstre</button>
+     <button type="button" onClick={()=>setCamera3D(c=>({...c,yaw:c.yaw+20}))}>Høyre ↻</button>
+     <button type="button" onClick={()=>setCamera3D(c=>({...c,pitch:clamp(c.pitch+8,8,78)}))}>Se ovenfra</button>
+     <button type="button" onClick={()=>setCamera3D(c=>({...c,pitch:clamp(c.pitch-8,8,78)}))}>Se lavere</button>
+     <button type="button" onClick={()=>setCamera3D(c=>({...c,zoom:clamp(c.zoom+.12,.55,2.5)}))}>Zoom +</button>
+     <button type="button" onClick={()=>setCamera3D(c=>({...c,zoom:clamp(c.zoom-.12,.55,2.5)}))}>Zoom −</button>
+     <button type="button" onClick={()=>setCamera3D({yaw:42,pitch:34,zoom:1})}>Nullstill</button>
+    </div>
+    <div className={styles.preview3DAdd}>
+     <b>Legg til mens du ser i 3D:</b>
+     <button type="button" onClick={()=>addItem("bed",1800,2000)}>Seng</button>
+     <button type="button" onClick={()=>addItem("nightstand",500,450)}>Nattbord</button>
+     <button type="button" onClick={()=>addItem("dresser",1200,450)}>Kommode</button>
+     <button type="button" onClick={()=>addItem("wardrobe",1200,600)}>Garderobe</button>
+     <button type="button" onClick={()=>addItem("desk",1200,600)}>Skrivebord</button>
+     <button type="button" onClick={()=>addItem("bookshelf",900,350)}>Bokhylle</button>
+     <button type="button" onClick={()=>openFurnitureBuilder(null)}>Eget møbel</button>
+    </div>
+    <div className={styles.preview3DCanvas+" "+styles.preview3DOrbit} onPointerDown={start3DOrbit} onPointerMove={move3DOrbit} onPointerUp={end3DOrbit} onPointerCancel={end3DOrbit}>
+     <Drawing3DPreview doc={doc} camera={camera3D} onWallSelect={wall=>openWallView(wall.id)} onItemSelect={item=>setSelected({kind:"item",id:item.id})}/>
+    </div>
+    {selected?.kind==="item"&&doc.items.find(item=>item.id===selected.id)&&<div className={styles.preview3DSelection}><span>Valgt: <b>{doc.items.find(item=>item.id===selected.id)?.customName||labelFor(doc.items.find(item=>item.id===selected.id)?.type)}</b></span><button type="button" onClick={()=>{setShow3D(false);setTimeout(()=>scrollPanel(rightPanel),0)}}>Rediger mål og plassering →</button></div>}
     <div className={styles.previewWallStrip}>{doc.walls.map((wall,index)=><button type="button" key={wall.id} onClick={()=>openWallView(wall.id)}>Vegg {index+1}<small>{len(wall)} × {Math.round(Number(wall.h)||2400)} × {Math.round(Number(wall.t)||98)} mm</small></button>)}</div>
-    <footer><span><b>Tips:</b> klikk en vegg eller velg den i listen</span><span><b>Vegger:</b> faktisk høyde og tykkelse</span><span><b>Møbler:</b> bredde, dybde og høyde</span><span><b>Elektro:</b> høyde/takpunkt</span></footer>
+    <footer><span><b>Dra:</b> roter 3D-visningen</span><span><b>Vegger:</b> klikk for frontvisning</span><span><b>Møbler:</b> klikk for å velge</span><span><b>Kunde:</b> delt tegning får samme dreibare 3D-visning</span></footer>
    </section>
   </div>}
   {wallBuilder&&<div className={styles.roomModalBackdrop} role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)setWallBuilder(null)}}>
