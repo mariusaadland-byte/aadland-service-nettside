@@ -496,23 +496,24 @@ function WallElevationPreview({wall,items,onSelectItem,selectedItemId,gapPickMod
   <line x1="0" y1={H} x2={L} y2={H} stroke="#2b2a27" strokeWidth="22"/>
   <text x={L/2} y={-55} textAnchor="middle" fontSize="80" fontWeight="800" fill="#554a37">{L} mm</text>
   <text x={-70} y={H/2} textAnchor="middle" transform={"rotate(-90 -70 "+H/2+")"} fontSize="74" fontWeight="700" fill="#554a37">{Math.round(H)} mm</text>
-  {gapPickMode&&freeGaps.map((gap,index)=><g key={"gap-"+index} onClick={()=>onSelectGap?.(gap)} style={{cursor:"pointer"}}>
-   <rect x={gap.start+10} y="10" width={Math.max(20,gap.width-20)} height={Math.max(20,H-20)} rx="24" fill="rgba(47,132,108,.13)" stroke="#2f846c" strokeWidth="12" strokeDasharray="35 24"/>
-   <text x={gap.start+gap.width/2} y={H/2-35} textAnchor="middle" fontSize="74" fontWeight="900" fill="#236853">TRYKK HER</text>
-   <text x={gap.start+gap.width/2} y={H/2+55} textAnchor="middle" fontSize="62" fontWeight="700" fill="#236853">{gap.width} mm ledig</text>
-  </g>)}
   {gapPickMode&&projectedFurniture.slice().reverse().map(({item,start,end,distance,blocksGap})=>{
    const height=Math.max(80,Math.min(H,modelHeight(item))),z0=Math.max(0,Number(item.elevation)||0),y=H-Math.min(H,z0+height),w=Math.max(60,end-start),opacity=blocksGap?.96:.58;
    return <g key={"context-"+item.id} opacity={opacity} pointerEvents="none">
     <rect x={start} y={y} width={w} height={Math.min(height,H-y)} rx="18" fill={blocksGap?"#cdb489":"#e8e1d6"} stroke={blocksGap?"#5f482c":"#9d9589"} strokeWidth={blocksGap?20:12} strokeDasharray={blocksGap?undefined:"28 20"}/>
     <text x={start+w/2} y={Math.max(70,y+75)} textAnchor="middle" fontSize="58" fontWeight="900" fill="#493d2d">{item.customName||labelFor(item.type)}</text>
-    <text x={start+w/2} y={Math.min(H-35,y+145)} textAnchor="middle" fontSize="48" fontWeight="700" fill="#665846">{Math.round(w)} mm{blocksGap?" · teller som kant":" · vises som oversikt"}</text>
+    <text x={start+w/2} y={Math.min(H-35,y+145)} textAnchor="middle" fontSize="48" fontWeight="700" fill="#665846">{Math.round(w)} mm · sett forfra</text>
    </g>
   })}
+  {gapPickMode&&freeGaps.map((gap,index)=><g key={"gap-"+index} onClick={()=>onSelectGap?.(gap)} style={{cursor:"pointer"}}>
+   <rect x={gap.start+10} y="10" width={Math.max(20,gap.width-20)} height={Math.max(20,H-20)} rx="24" fill="rgba(47,132,108,.04)" stroke="#2f846c" strokeWidth="14" strokeDasharray="35 24"/>
+   <rect x={gap.start+gap.width/2-Math.min(360,gap.width*.42)} y={H*.43} width={Math.min(720,gap.width*.84)} height="190" rx="30" fill="rgba(255,255,255,.94)" stroke="#2f846c" strokeWidth="10"/>
+   <text x={gap.start+gap.width/2} y={H*.43+73} textAnchor="middle" fontSize="68" fontWeight="900" fill="#236853">TRYKK HER</text>
+   <text x={gap.start+gap.width/2} y={H*.43+145} textAnchor="middle" fontSize="56" fontWeight="800" fill="#236853">{gap.width} mm ledig</text>
+  </g>)}
   {gapPickMode&&<g pointerEvents="none">
-   <rect x="20" y="20" width={Math.min(1450,Math.max(620,L*.42))} height="150" rx="24" fill="rgba(255,255,255,.94)" stroke="#2f846c" strokeWidth="10"/>
-   <text x="55" y="82" fontSize="54" fontWeight="900" fill="#236853">Møbler synlig: {projectedFurniture.length} · kanter brukt: {blockingFurniture.length}</text>
-   <text x="55" y="137" fontSize="43" fontWeight="700" fill="#665f54">Brune møbler begrenser mellomrommet. Grå møbler vises for orientering.</text>
+   <rect x="20" y="20" width={Math.min(1700,Math.max(760,L*.48))} height="150" rx="24" fill="rgba(255,255,255,.94)" stroke="#2f846c" strokeWidth="10"/>
+   <text x="55" y="82" fontSize="54" fontWeight="900" fill="#236853">FRONTVISNING · møbler funnet: {projectedFurniture.length}</text>
+   <text x="55" y="137" fontSize="43" fontWeight="700" fill="#665f54">Møblene vises projisert rett mot veggen. Grønne felt er ledig bredde mellom dem.</text>
   </g>}
   {wallItems.map(item=>{
    const b=itemBox(item),active=selectedItemId===item.id,custom=item.type==="customwall";
@@ -1596,7 +1597,7 @@ export default function DrawingClient(){
      <button type="button" onClick={()=>addWallWorkspaceItem("thermostat",140,100)}>+ Termostat</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("walllight",180,100)}>+ Vegglampe</button>
     </div>
-    <div className={styles.wallViewCanvas+(furnitureGapPick?" "+styles.wallGapPickCanvas:"")}>{furnitureGapPick?<FurnitureGapPlanPreview doc={doc} wall={wallForView} onSelectGap={chooseFurnitureGap}/>:<WallElevationPreview wall={wallForView} items={doc.items} selectedItemId={selected?.kind==="item"?selected.id:null} onSelectItem={item=>setSelected({kind:"item",id:item.id})}/>}</div>
+    <div className={styles.wallViewCanvas+(furnitureGapPick?" "+styles.wallGapPickCanvas:"")}><WallElevationPreview wall={wallForView} items={doc.items} selectedItemId={selected?.kind==="item"?selected.id:null} gapPickMode={!!furnitureGapPick} onSelectGap={chooseFurnitureGap} onSelectItem={item=>{if(!furnitureGapPick)setSelected({kind:"item",id:item.id})}}/></div>
     {wallSelectedItem&&(()=>{const gaps=wallEdgeOffsets(wallSelectedItem,wallForView),isOpening=openingTypes.has(wallSelectedItem.type),isElectrical=wallElectricalTypes.has(wallSelectedItem.type),isCustom=wallSelectedItem.type==="customwall";return <div className={styles.wallInlineEditor}>
      <div><strong>{wallSelectedItem.customName||labelFor(wallSelectedItem.type)}</strong><small>Valgt på vegg {Math.max(1,doc.walls.findIndex(w=>w.id===wallForView.id)+1)}</small></div>
      <label>Fra venstre (mm)<input type="number" min="0" max={Math.max(0,gaps.L-Number(wallSelectedItem.w||0))} value={gaps.start} onChange={e=>updateWallItemById(wallSelectedItem.id,"wallStartGap",e.target.value)}/></label>
@@ -1607,7 +1608,7 @@ export default function DrawingClient(){
      {isCustom&&<><label>Møbelhøyde (mm)<input type="number" min="50" value={Math.round(modelHeight(wallSelectedItem))} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"modelHeight",e.target.value)}/></label><label>Fra gulv (mm)<input type="number" min="0" value={Math.round(Number(wallSelectedItem.elevation)||0)} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"elevation",e.target.value)}/></label></>}
      <div className={styles.wallInlineActions}><button type="button" onClick={duplicate}>Dupliser</button><button type="button" onClick={remove}>Slett</button></div>
     </div>})()}
-    <div className={styles.wallViewHint}>{furnitureGapPick?<><b>Velg mellomrom i plantegningen:</b> du ser nå rommet slik du tegnet det, med seng, skap, kommode og resten av møblene på riktig plass. Grønne felt ligger langs den valgte veggen mellom møblenes projiserte kanter. Trykk på feltet du vil fylle, så får møbelet automatisk akkurat den bredden.</>:<>Klikk et objekt på veggen for å redigere det uten å forlate veggvisningen. Rutenettet er 100 mm. Vegglengde, vegghøyde, åpninger, EL-punkter og egne møbler vises i samme frontvisning.</>}</div>
+    <div className={styles.wallViewHint}>{furnitureGapPick?<><b>Velg mellomrom rett forfra:</b> du ser den valgte veggen frontalt. Seng, garderobe, kommode, skap og andre møbler i rommet projiseres inn på veggen med riktig plassering langs veggen og riktig høyde. De grønne feltene er de ledige breddene mellom møblene. Trykk på feltet du vil fylle, så får møbelet automatisk akkurat den bredden og plasseres på veggen der.</>:<>Klikk et objekt på veggen for å redigere det uten å forlate veggvisningen. Rutenettet er 100 mm. Vegglengde, vegghøyde, åpninger, EL-punkter og egne møbler vises i samme frontvisning.</>}</div>
     <footer><span>Vegg: <b>{len(wallForView)} × {Math.round(Number(wallForView.h)||2400)} × {Math.round(Number(wallForView.t)||98)} mm</b></span><span>Objekter: <b>{doc.items.filter(item=>item.wallId===wallForView.id).length}</b></span><button type="button" onClick={()=>setWallViewId(null)}>Tilbake til plantegning →</button></footer>
    </section>
   </div>}
