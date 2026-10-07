@@ -1097,3 +1097,31 @@
 @media(max-width:430px){
  .savedFurnitureTemplates>div:last-child{grid-template-columns:1fr}
 }
+
+
+/* Edit exact custom furniture field sizes after placement */
+.customDimensionEditor{display:grid;gap:8px}
+.customDimensionEditor>div{
+ display:grid;grid-template-columns:52px minmax(0,1fr) 34px;gap:5px;align-items:center;padding:7px;border:1px solid #d7ccb9;border-radius:8px;background:#f7f3eb
+}
+.customDimensionEditor>div>span{grid-column:1/-1;font-size:9px;font-weight:900;color:#655b4b}
+.customDimensionEditor>div>label{display:contents;font-size:9px;font-weight:800}
+.customDimensionEditor>div>label input{
+ width:100%;min-height:32px;border:1px solid #c9bdab;border-radius:6px;background:#fff;padding:0 7px;box-sizing:border-box;font:inherit;color:#2a261f
+}
+.customDimensionEditor>div>label small{font-size:8px;color:#807668}
+.wallFurnitureDimensions{
+ display:grid;grid-template-columns:52px repeat(2,minmax(78px,1fr));gap:6px;align-items:center;min-width:0
+}
+.wallFurnitureDimensions>b{grid-column:1/-1;font-size:10px;color:#61533f}
+.wallFurnitureDimensions label{display:grid;grid-template-columns:24px minmax(54px,1fr) 22px;gap:4px;align-items:center;font-size:9px;font-weight:800}
+.wallFurnitureDimensions input{
+ min-width:0;width:100%;min-height:34px;border:1px solid #bcb19f;border-radius:6px;padding:0 6px;box-sizing:border-box
+}
+.wallFurnitureDimensions span{font-size:8px;color:#766d60}
+@media(max-width:900px){
+ .customDimensionEditor>div{grid-template-columns:44px minmax(0,1fr) 30px}
+ .customDimensionEditor>div>label input{min-height:40px}
+ .wallFurnitureDimensions{grid-template-columns:1fr}
+ .wallFurnitureDimensions label{grid-template-columns:30px minmax(0,1fr) 26px}
+}
