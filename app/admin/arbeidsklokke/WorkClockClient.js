@@ -270,7 +270,7 @@ export default function WorkClockClient({userName}){
   const blob=new Blob([workbook],{type:"application/vnd.ms-excel;charset=utf-8"});
   const url=URL.createObjectURL(blob);
   const link=document.createElement("a");
-  link.href=url; link.download="arbeidstid-"+month+".xml"; link.click();
+  link.href=url; link.download="arbeidstid-"+month+".xls"; link.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
  }
 
