@@ -4366,7 +4366,7 @@ alter table public.rental_bookings add column if not exists deposit_charged_ore 
 
 function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired=false}){
  const statuses={new:"Ny",confirmed:"Bekreftet",active:"Utlevert",returned:"Returnert",completed:"Ferdig",cancelled:"Avbrutt"};
- const paymentLabels={unpaid:"Ikke betalt",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert"};
+ const paymentLabels={unpaid:"Ikke betalt",pending:"Venter",authorized:"Reservert",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert",cancelled:"Kansellert"};
  const depositLabels={not_paid:"Ikke mottatt",held:"Holdes",released:"Frigitt",partially_charged:"Delvis brukt",charged:"Brukt"};
  const settlementIssue=booking=>{
   const total=Math.max(0,Number(booking.totalOre)||0);
