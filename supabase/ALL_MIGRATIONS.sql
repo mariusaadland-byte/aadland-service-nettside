@@ -1568,3 +1568,975 @@ update public.material_suppliers
 set default_markup_percent = 20.00,
     updated_at = now()
 where default_markup_percent = 15.00;
+
+-- ============================================================
+-- 20260928051633_vipps_epayment_orders.sql
+-- ============================================================
+
+create schema if not exists private;
+
+alter table public.orders
+  add column if not exists payment_provider text,
+  add column if not exists payment_reference text,
+  add column if not exists payment_psp_reference text,
+  add column if not exists payment_reserved_ore integer not null default 0,
+  add column if not exists payment_captured_ore integer not null default 0,
+  add column if not exists payment_authorized_at timestamptz,
+  add column if not exists payment_captured_at timestamptz,
+  add column if not exists payment_cancelled_at timestamptz,
+  add column if not exists payment_refunded_at timestamptz,
+  add column if not exists payment_refunded_ore integer not null default 0,
+  add column if not exists payment_capture_guaranteed_until timestamptz,
+  add column if not exists vipps_checkout_started_at timestamptz;
+
+create index if not exists orders_payment_provider_reference_idx
+  on public.orders(payment_provider,payment_reference);
+create index if not exists orders_payment_status_idx
+  on public.orders(payment_status);
+
+create table if not exists private.vipps_payment_events(
+  psp_reference text primary key,
+  payment_reference text not null,
+  event_name text not null,
+  amount_ore integer not null default 0,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create or replace function public.record_vipps_payment_event_once(
+  event_psp_reference text,
+  event_payment_reference text,
+  event_name text,
+  event_amount_ore integer,
+  event_payload jsonb
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, private
+as $function$
+begin
+  insert into private.vipps_payment_events(
+    psp_reference,payment_reference,event_name,amount_ore,payload
+  ) values (
+    event_psp_reference,event_payment_reference,event_name,
+    greatest(coalesce(event_amount_ore,0),0),coalesce(event_payload,'{}'::jsonb)
+  )
+  on conflict (psp_reference) do nothing;
+  return found;
+end;
+$function$;
+
+revoke all on function public.record_vipps_payment_event_once(text,text,text,integer,jsonb) from public,anon,authenticated;
+grant execute on function public.record_vipps_payment_event_once(text,text,text,integer,jsonb) to service_role;
+
+-- ============================================================
+-- 20260928052246_vipps_webhook_registration.sql
+-- ============================================================
+
+create schema if not exists private;
+
+create table if not exists private.vipps_webhook_registrations(
+  webhook_id text primary key,
+  environment text not null check (environment in ('test','production')),
+  secret text not null,
+  callback_url text not null,
+  events jsonb not null default '[]'::jsonb,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create or replace function public.upsert_vipps_webhook_registration(
+  target_webhook_id text,
+  target_environment text,
+  target_secret text,
+  target_callback_url text,
+  target_events jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, private
+as $function$
+begin
+  if coalesce(target_webhook_id,'')='' or coalesce(target_secret,'')='' or coalesce(target_callback_url,'')='' then
+    raise exception 'INVALID_VIPPS_WEBHOOK_REGISTRATION';
+  end if;
+  if target_environment not in ('test','production') then
+    raise exception 'INVALID_VIPPS_ENVIRONMENT';
+  end if;
+
+  insert into private.vipps_webhook_registrations(
+    webhook_id,environment,secret,callback_url,events,active,updated_at
+  ) values (
+    target_webhook_id,target_environment,target_secret,target_callback_url,
+    coalesce(target_events,'[]'::jsonb),true,now()
+  )
+  on conflict (webhook_id) do update
+  set environment=excluded.environment,
+      secret=excluded.secret,
+      callback_url=excluded.callback_url,
+      events=excluded.events,
+      active=true,
+      updated_at=now();
+end;
+$function$;
+
+create or replace function public.deactivate_vipps_webhook_registration(
+  target_webhook_id text,
+  target_environment text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, private
+as $function$
+declare affected integer;
+begin
+  update private.vipps_webhook_registrations
+  set active=false,updated_at=now()
+  where webhook_id=target_webhook_id
+    and environment=target_environment
+    and active=true;
+  get diagnostics affected=row_count;
+  return affected>0;
+end;
+$function$;
+
+create or replace function public.get_vipps_webhook_secret(
+  target_webhook_id text,
+  target_environment text
+)
+returns text
+language sql
+security definer
+set search_path = pg_catalog, private
+as $function$
+  select secret
+  from private.vipps_webhook_registrations
+  where webhook_id=target_webhook_id
+    and environment=target_environment
+    and active=true
+  limit 1
+$function$;
+
+revoke all on function public.upsert_vipps_webhook_registration(text,text,text,text,jsonb) from public,anon,authenticated;
+grant execute on function public.upsert_vipps_webhook_registration(text,text,text,text,jsonb) to service_role;
+revoke all on function public.deactivate_vipps_webhook_registration(text,text) from public,anon,authenticated;
+grant execute on function public.deactivate_vipps_webhook_registration(text,text) to service_role;
+revoke all on function public.get_vipps_webhook_secret(text,text) from public,anon,authenticated;
+grant execute on function public.get_vipps_webhook_secret(text,text) to service_role;
+
+-- ============================================================
+-- 20260928052649_vipps_webhook_readiness.sql
+-- ============================================================
+
+create or replace function public.has_active_vipps_webhook_registration(
+  target_environment text
+)
+returns boolean
+language sql
+security definer
+set search_path = pg_catalog, private
+as $function$
+  select exists(
+    select 1
+    from private.vipps_webhook_registrations
+    where environment=target_environment
+      and active=true
+  )
+$function$;
+
+revoke all on function public.has_active_vipps_webhook_registration(text) from public,anon,authenticated;
+grant execute on function public.has_active_vipps_webhook_registration(text) to service_role;
+
+-- ============================================================
+-- 20260928053104_vipps_webhook_auth_context.sql
+-- ============================================================
+
+create or replace function public.get_vipps_webhook_auth(
+  target_webhook_id text,
+  target_environment text
+)
+returns jsonb
+language sql
+security definer
+set search_path = pg_catalog, private
+as $function$
+  select jsonb_build_object(
+    'secret',secret,
+    'callback_url',callback_url
+  )
+  from private.vipps_webhook_registrations
+  where webhook_id=target_webhook_id
+    and environment=target_environment
+    and active=true
+  limit 1
+$function$;
+
+revoke all on function public.get_vipps_webhook_auth(text,text) from public,anon,authenticated;
+grant execute on function public.get_vipps_webhook_auth(text,text) to service_role;
+
+-- ============================================================
+-- 20261001235835_vipps_epayment_foundation.sql
+-- ============================================================
+
+alter table public.rental_bookings
+  add column if not exists payment_provider text,
+  add column if not exists payment_psp_reference text,
+  add column if not exists payment_reserved_ore integer not null default 0,
+  add column if not exists payment_authorized_at timestamptz,
+  add column if not exists payment_captured_at timestamptz,
+  add column if not exists payment_cancelled_at timestamptz,
+  add column if not exists payment_capture_guaranteed_until timestamptz,
+  add column if not exists vipps_checkout_started_at timestamptz;
+
+create table if not exists public.vipps_webhook_events (
+  id uuid primary key default gen_random_uuid(),
+  unit text not null check (unit in ('service','rental')),
+  idempotency_key text not null,
+  event_name text not null,
+  payment_reference text not null,
+  psp_reference text,
+  amount_ore integer,
+  event_timestamp timestamptz,
+  payload jsonb not null default '{}'::jsonb,
+  processed_at timestamptz,
+  process_error text,
+  received_at timestamptz not null default now(),
+  unique(unit,idempotency_key)
+);
+
+alter table public.vipps_webhook_events enable row level security;
+revoke all on table public.vipps_webhook_events from public,anon,authenticated;
+grant select,insert,update,delete on table public.vipps_webhook_events to service_role;
+
+create index if not exists vipps_webhook_events_reference_idx
+  on public.vipps_webhook_events(unit,payment_reference,received_at desc);
+
+create or replace function public.apply_vipps_payment_event(
+  target_unit text,
+  target_reference text,
+  event_name_value text,
+  amount_ore_value integer default 0,
+  psp_reference_value text default null,
+  event_timestamp_value timestamptz default null,
+  capture_guaranteed_until_value timestamptz default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $vipps_event$
+declare
+  now_value timestamptz := coalesce(event_timestamp_value,now());
+  amount_value integer := greatest(coalesce(amount_ore_value,0),0);
+  order_row public.orders%rowtype;
+  rental_row public.rental_bookings%rowtype;
+  next_captured integer;
+  next_refunded integer;
+  next_status text;
+begin
+  if target_unit='service' then
+    select * into order_row from public.orders
+    where order_number=target_reference or payment_reference=target_reference
+    order by case when order_number=target_reference then 0 else 1 end
+    limit 1 for update;
+    if not found then raise exception 'VIPPS_PAYMENT_TARGET_NOT_FOUND'; end if;
+
+    next_captured:=greatest(coalesce(order_row.payment_captured_ore,0),0);
+    next_refunded:=greatest(coalesce(order_row.payment_refunded_ore,0),0);
+    next_status:=coalesce(order_row.payment_status,'pending');
+
+    if event_name_value='AUTHORIZED' then
+      next_status:='authorized';
+      update public.orders set payment_provider='vipps',payment_reference=target_reference,
+        payment_psp_reference=coalesce(nullif(psp_reference_value,''),payment_psp_reference),
+        payment_reserved_ore=greatest(coalesce(payment_reserved_ore,0),amount_value),
+        payment_authorized_at=coalesce(payment_authorized_at,now_value),
+        payment_capture_guaranteed_until=coalesce(capture_guaranteed_until_value,payment_capture_guaranteed_until),
+        payment_status=next_status,updated_at=now()
+      where id=order_row.id;
+    elsif event_name_value='CAPTURED' then
+      next_captured:=next_captured+amount_value;
+      next_status:=case when next_captured>=greatest(coalesce(order_row.total_ore,0),1) then 'paid' else 'partial' end;
+      update public.orders set payment_provider='vipps',payment_reference=target_reference,
+        payment_psp_reference=coalesce(nullif(psp_reference_value,''),payment_psp_reference),
+        payment_captured_ore=next_captured,payment_captured_at=now_value,payment_status=next_status,updated_at=now()
+      where id=order_row.id;
+    elsif event_name_value='REFUNDED' then
+      next_refunded:=least(next_captured,next_refunded+amount_value);
+      next_status:=case when next_captured>0 and next_refunded>=next_captured then 'refunded' else order_row.payment_status end;
+      update public.orders set payment_provider='vipps',payment_reference=target_reference,
+        payment_psp_reference=coalesce(nullif(psp_reference_value,''),payment_psp_reference),
+        payment_refunded_ore=next_refunded,payment_refunded_at=now_value,payment_status=next_status,updated_at=now()
+      where id=order_row.id;
+    elsif event_name_value in ('CANCELLED','ABORTED','EXPIRED','TERMINATED') then
+      next_status:=case when next_captured>next_refunded then order_row.payment_status else 'cancelled' end;
+      update public.orders set payment_provider='vipps',payment_reference=target_reference,
+        payment_psp_reference=coalesce(nullif(psp_reference_value,''),payment_psp_reference),
+        payment_cancelled_at=coalesce(payment_cancelled_at,now_value),payment_status=next_status,updated_at=now()
+      where id=order_row.id;
+    else
+      update public.orders set payment_provider='vipps',payment_reference=coalesce(payment_reference,target_reference),
+        payment_psp_reference=coalesce(nullif(psp_reference_value,''),payment_psp_reference),updated_at=now()
+      where id=order_row.id;
+    end if;
+
+    return jsonb_build_object('ok',true,'target','order','id',order_row.id,'status',next_status);
+  elsif target_unit='rental' then
+    select * into rental_row from public.rental_bookings
+    where booking_number=target_reference or payment_reference=target_reference
+    order by case when booking_number=target_reference then 0 else 1 end
+    limit 1 for update;
+    if not found then raise exception 'VIPPS_PAYMENT_TARGET_NOT_FOUND'; end if;
+
+    next_captured:=greatest(coalesce(rental_row.payment_captured_ore,0),0);
+    next_refunded:=greatest(coalesce(rental_row.payment_refunded_ore,0),0);
+    next_status:=coalesce(rental_row.payment_status,'unpaid');
+
+    if event_name_value='AUTHORIZED' then
+      next_status:='authorized';
+      update public.rental_bookings set payment_provider='vipps',payment_reference=target_reference,
+        payment_psp_reference=coalesce(nullif(psp_reference_value,''),payment_psp_reference),
+        payment_reserved_ore=greatest(coalesce(payment_reserved_ore,0),amount_value),
+        payment_authorized_at=coalesce(payment_authorized_at,now_value),
+        payment_capture_guaranteed_until=coalesce(capture_guaranteed_until_value,payment_capture_guaranteed_until),
+        payment_status=next_status,updated_at=now()
+      where id=rental_row.id;
+    elsif event_name_value='CAPTURED' then
+      next_captured:=next_captured+amount_value;
+      next_status:=case when next_captured>=greatest(coalesce(rental_row.total_ore,0),1) then 'paid' else 'partial' end;
+      update public.rental_bookings set payment_provider='vipps',payment_reference=target_reference,
+        payment_psp_reference=coalesce(nullif(psp_reference_value,''),payment_psp_reference),
+        payment_captured_ore=next_captured,payment_captured_at=now_value,payment_status=next_status,updated_at=now()
+      where id=rental_row.id;
+    elsif event_name_value='REFUNDED' then
+      next_refunded:=least(next_captured,next_refunded+amount_value);
+      next_status:=case when next_captured>0 and next_refunded>=next_captured then 'refunded' else rental_row.payment_status end;
+      update public.rental_bookings set payment_provider='vipps',payment_reference=target_reference,
+        payment_psp_reference=coalesce(nullif(psp_reference_value,''),payment_psp_reference),
+        payment_refunded_ore=next_refunded,payment_refunded_at=now_value,payment_status=next_status,updated_at=now()
+      where id=rental_row.id;
+    elsif event_name_value in ('CANCELLED','ABORTED','EXPIRED','TERMINATED') then
+      next_status:=case when next_captured>next_refunded then rental_row.payment_status else 'cancelled' end;
+      update public.rental_bookings set payment_provider='vipps',payment_reference=target_reference,
+        payment_psp_reference=coalesce(nullif(psp_reference_value,''),payment_psp_reference),
+        payment_cancelled_at=coalesce(payment_cancelled_at,now_value),payment_status=next_status,updated_at=now()
+      where id=rental_row.id;
+    else
+      update public.rental_bookings set payment_provider='vipps',payment_reference=coalesce(payment_reference,target_reference),
+        payment_psp_reference=coalesce(nullif(psp_reference_value,''),payment_psp_reference),updated_at=now()
+      where id=rental_row.id;
+    end if;
+
+    return jsonb_build_object('ok',true,'target','rental','id',rental_row.id,'status',next_status);
+  end if;
+  raise exception 'VIPPS_PAYMENT_UNIT_INVALID';
+end;
+$vipps_event$;
+
+revoke all on function public.apply_vipps_payment_event(text,text,text,integer,text,timestamptz,timestamptz) from public,anon,authenticated;
+grant execute on function public.apply_vipps_payment_event(text,text,text,integer,text,timestamptz,timestamptz) to service_role;
+
+-- ============================================================
+-- 20261002000114_vipps_private_webhook_v2.sql
+-- ============================================================
+
+drop table if exists public.vipps_webhook_events;
+
+alter table private.vipps_payment_events
+  add column if not exists unit text,
+  add column if not exists idempotency_key text,
+  add column if not exists event_timestamp timestamptz,
+  add column if not exists processed_at timestamptz,
+  add column if not exists process_error text;
+
+create unique index if not exists vipps_payment_events_unit_idempotency_idx
+  on private.vipps_payment_events(unit,idempotency_key)
+  where unit is not null and idempotency_key is not null;
+
+alter table private.vipps_webhook_registrations
+  add column if not exists unit text,
+  add column if not exists msn text;
+
+create index if not exists vipps_webhook_registrations_unit_env_idx
+  on private.vipps_webhook_registrations(unit,environment)
+  where active=true;
+
+create or replace function public.get_vipps_webhook_auth(target_webhook_id text,target_environment text)
+returns jsonb language sql security definer set search_path = pg_catalog, private
+as $function$
+  select jsonb_build_object('secret',secret,'callback_url',callback_url,'unit',unit,'msn',msn)
+  from private.vipps_webhook_registrations
+  where webhook_id=target_webhook_id and environment=target_environment and active=true
+  limit 1
+$function$;
+
+create or replace function public.upsert_vipps_webhook_registration_v2(
+  target_webhook_id text,target_environment text,target_secret text,target_callback_url text,
+  target_events jsonb,target_unit text,target_msn text
+)
+returns void language plpgsql security definer set search_path = pg_catalog, private
+as $function$
+begin
+  if coalesce(target_webhook_id,'')='' or coalesce(target_secret,'')='' or coalesce(target_callback_url,'')='' then raise exception 'INVALID_VIPPS_WEBHOOK_REGISTRATION'; end if;
+  if target_environment not in ('test','production') then raise exception 'INVALID_VIPPS_ENVIRONMENT'; end if;
+  if target_unit not in ('service','rental') then raise exception 'INVALID_VIPPS_UNIT'; end if;
+  if coalesce(target_msn,'')='' then raise exception 'INVALID_VIPPS_MSN'; end if;
+  insert into private.vipps_webhook_registrations(webhook_id,environment,secret,callback_url,events,active,unit,msn,updated_at)
+  values(target_webhook_id,target_environment,target_secret,target_callback_url,coalesce(target_events,'[]'::jsonb),true,target_unit,target_msn,now())
+  on conflict (webhook_id) do update
+  set environment=excluded.environment,secret=excluded.secret,callback_url=excluded.callback_url,
+      events=excluded.events,active=true,unit=excluded.unit,msn=excluded.msn,updated_at=now();
+end;
+$function$;
+
+create or replace function public.record_vipps_payment_event_once_v2(
+  event_unit text,event_idempotency_key text,event_psp_reference text,event_payment_reference text,
+  event_name text,event_amount_ore integer,event_timestamp_value timestamptz,event_payload jsonb
+)
+returns boolean language plpgsql security definer set search_path = pg_catalog, private
+as $function$
+begin
+  if event_unit not in ('service','rental') then raise exception 'INVALID_VIPPS_UNIT'; end if;
+  if coalesce(event_idempotency_key,'')='' then raise exception 'INVALID_VIPPS_IDEMPOTENCY_KEY'; end if;
+  if coalesce(event_psp_reference,'')='' or coalesce(event_payment_reference,'')='' or coalesce(event_name,'')='' then raise exception 'INVALID_VIPPS_EVENT'; end if;
+  insert into private.vipps_payment_events(psp_reference,payment_reference,event_name,amount_ore,payload,unit,idempotency_key,event_timestamp)
+  values(event_psp_reference,event_payment_reference,event_name,greatest(coalesce(event_amount_ore,0),0),coalesce(event_payload,'{}'::jsonb),event_unit,event_idempotency_key,event_timestamp_value)
+  on conflict (unit,idempotency_key) where unit is not null and idempotency_key is not null do nothing;
+  return found;
+end;
+$function$;
+
+create or replace function public.mark_vipps_payment_event_processed(event_unit text,event_idempotency_key text,event_error text default null)
+returns boolean language plpgsql security definer set search_path = pg_catalog, private
+as $function$
+declare affected integer;
+begin
+  update private.vipps_payment_events
+  set processed_at=case when event_error is null then now() else processed_at end,
+      process_error=nullif(left(coalesce(event_error,''),1000),'')
+  where unit=event_unit and idempotency_key=event_idempotency_key;
+  get diagnostics affected=row_count;
+  return affected>0;
+end;
+$function$;
+
+create or replace function public.get_vipps_webhook_status(target_environment text)
+returns jsonb language sql security definer set search_path = pg_catalog, private
+as $function$
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'unit',unit,'msn',msn,'webhookId',webhook_id,'callbackUrl',callback_url,
+    'events',events,'active',active,'updatedAt',updated_at
+  ) order by unit,updated_at desc),'[]'::jsonb)
+  from private.vipps_webhook_registrations
+  where environment=target_environment and active=true
+$function$;
+
+revoke all on function public.upsert_vipps_webhook_registration_v2(text,text,text,text,jsonb,text,text) from public,anon,authenticated;
+grant execute on function public.upsert_vipps_webhook_registration_v2(text,text,text,text,jsonb,text,text) to service_role;
+revoke all on function public.record_vipps_payment_event_once_v2(text,text,text,text,text,integer,timestamptz,jsonb) from public,anon,authenticated;
+grant execute on function public.record_vipps_payment_event_once_v2(text,text,text,text,text,integer,timestamptz,jsonb) to service_role;
+revoke all on function public.mark_vipps_payment_event_processed(text,text,text) from public,anon,authenticated;
+grant execute on function public.mark_vipps_payment_event_processed(text,text,text) to service_role;
+revoke all on function public.get_vipps_webhook_status(text) from public,anon,authenticated;
+grant execute on function public.get_vipps_webhook_status(text) to service_role;
+revoke all on function public.get_vipps_webhook_auth(text,text) from public,anon,authenticated;
+grant execute on function public.get_vipps_webhook_auth(text,text) to service_role;
+
+-- ============================================================
+-- 20261002000209_vipps_atomic_event_processing.sql
+-- ============================================================
+
+create or replace function public.process_vipps_payment_event_once(
+  event_unit text,event_idempotency_key text,event_psp_reference text,event_payment_reference text,
+  event_name text,event_amount_ore integer,event_timestamp_value timestamptz,
+  capture_guaranteed_until_value timestamptz,event_payload jsonb
+)
+returns jsonb language plpgsql security definer set search_path = pg_catalog, public, private
+as $function$
+declare inserted boolean := false; apply_result jsonb;
+begin
+  if event_unit not in ('service','rental') then raise exception 'INVALID_VIPPS_UNIT'; end if;
+  if coalesce(event_idempotency_key,'')='' then raise exception 'INVALID_VIPPS_IDEMPOTENCY_KEY'; end if;
+  if coalesce(event_psp_reference,'')='' or coalesce(event_payment_reference,'')='' or coalesce(event_name,'')='' then raise exception 'INVALID_VIPPS_EVENT'; end if;
+
+  insert into private.vipps_payment_events(psp_reference,payment_reference,event_name,amount_ore,payload,unit,idempotency_key,event_timestamp)
+  values(event_psp_reference,event_payment_reference,upper(event_name),greatest(coalesce(event_amount_ore,0),0),coalesce(event_payload,'{}'::jsonb),event_unit,event_idempotency_key,event_timestamp_value)
+  on conflict (unit,idempotency_key) where unit is not null and idempotency_key is not null do nothing;
+
+  inserted:=found;
+  if not inserted then return jsonb_build_object('ok',true,'duplicate',true); end if;
+
+  apply_result:=public.apply_vipps_payment_event(
+    event_unit,event_payment_reference,upper(event_name),greatest(coalesce(event_amount_ore,0),0),
+    event_psp_reference,event_timestamp_value,capture_guaranteed_until_value
+  );
+
+  update private.vipps_payment_events set processed_at=now(),process_error=null
+  where unit=event_unit and idempotency_key=event_idempotency_key;
+
+  return jsonb_build_object('ok',true,'duplicate',false,'applied',apply_result);
+end;
+$function$;
+
+revoke all on function public.process_vipps_payment_event_once(text,text,text,text,text,integer,timestamptz,timestamptz,jsonb) from public,anon,authenticated;
+grant execute on function public.process_vipps_payment_event_once(text,text,text,text,text,integer,timestamptz,timestamptz,jsonb) to service_role;
+
+-- ============================================================
+-- 20261002092456_vipps_payment_snapshot_sync.sql
+-- ============================================================
+
+create or replace function public.sync_vipps_payment_snapshot(
+  target_unit text,
+  target_reference text,
+  payment_state_value text,
+  psp_reference_value text,
+  authorized_ore_value integer,
+  cancelled_ore_value integer,
+  captured_ore_value integer,
+  refunded_ore_value integer,
+  capture_guaranteed_until_value timestamptz default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $function$
+declare
+  authorized_ore integer := greatest(coalesce(authorized_ore_value,0),0);
+  cancelled_ore integer := greatest(coalesce(cancelled_ore_value,0),0);
+  captured_ore integer := greatest(coalesce(captured_ore_value,0),0);
+  refunded_ore integer := greatest(coalesce(refunded_ore_value,0),0);
+  state_value text := upper(coalesce(payment_state_value,''));
+  status_value text;
+  order_row public.orders%rowtype;
+  rental_row public.rental_bookings%rowtype;
+begin
+  if target_unit not in ('service','rental') then raise exception 'VIPPS_PAYMENT_UNIT_INVALID'; end if;
+  if coalesce(target_reference,'')='' then raise exception 'VIPPS_PAYMENT_REFERENCE_REQUIRED'; end if;
+
+  status_value:=case
+    when captured_ore>0 and refunded_ore>=captured_ore then 'refunded'
+    when captured_ore>0 then
+      case
+        when target_unit='service' then
+          case when captured_ore>=(select greatest(coalesce(total_ore,0),1) from public.orders where order_number=target_reference or payment_reference=target_reference order by case when order_number=target_reference then 0 else 1 end limit 1) then 'paid' else 'partial' end
+        else
+          case when captured_ore>=(select greatest(coalesce(total_ore,0),1) from public.rental_bookings where booking_number=target_reference or payment_reference=target_reference order by case when booking_number=target_reference then 0 else 1 end limit 1) then 'paid' else 'partial' end
+      end
+    when state_value='AUTHORIZED' and authorized_ore>cancelled_ore then 'authorized'
+    when state_value in ('ABORTED','EXPIRED','TERMINATED') then 'cancelled'
+    when state_value='AUTHORIZED' and authorized_ore>0 and cancelled_ore>=authorized_ore then 'cancelled'
+    else case when target_unit='service' then 'pending' else 'unpaid' end
+  end;
+
+  if target_unit='service' then
+    select * into order_row
+    from public.orders
+    where order_number=target_reference or payment_reference=target_reference
+    order by case when order_number=target_reference then 0 else 1 end
+    limit 1
+    for update;
+    if not found then raise exception 'VIPPS_PAYMENT_TARGET_NOT_FOUND'; end if;
+
+    update public.orders set
+      payment_provider='vipps',
+      payment_reference=target_reference,
+      payment_psp_reference=coalesce(nullif(psp_reference_value,''),payment_psp_reference),
+      payment_reserved_ore=authorized_ore,
+      payment_captured_ore=captured_ore,
+      payment_refunded_ore=least(captured_ore,refunded_ore),
+      payment_capture_guaranteed_until=coalesce(capture_guaranteed_until_value,payment_capture_guaranteed_until),
+      payment_status=status_value,
+      updated_at=now()
+    where id=order_row.id;
+
+    return jsonb_build_object('ok',true,'target','order','id',order_row.id,'status',status_value,
+      'authorizedOre',authorized_ore,'cancelledOre',cancelled_ore,'capturedOre',captured_ore,
+      'refundedOre',least(captured_ore,refunded_ore));
+  end if;
+
+  select * into rental_row
+  from public.rental_bookings
+  where booking_number=target_reference or payment_reference=target_reference
+  order by case when booking_number=target_reference then 0 else 1 end
+  limit 1
+  for update;
+  if not found then raise exception 'VIPPS_PAYMENT_TARGET_NOT_FOUND'; end if;
+
+  update public.rental_bookings set
+    payment_provider='vipps',
+    payment_reference=target_reference,
+    payment_psp_reference=coalesce(nullif(psp_reference_value,''),payment_psp_reference),
+    payment_reserved_ore=authorized_ore,
+    payment_captured_ore=captured_ore,
+    payment_refunded_ore=least(captured_ore,refunded_ore),
+    payment_capture_guaranteed_until=coalesce(capture_guaranteed_until_value,payment_capture_guaranteed_until),
+    payment_status=status_value,
+    updated_at=now()
+  where id=rental_row.id;
+
+  return jsonb_build_object('ok',true,'target','rental','id',rental_row.id,'status',status_value,
+    'authorizedOre',authorized_ore,'cancelledOre',cancelled_ore,'capturedOre',captured_ore,
+    'refundedOre',least(captured_ore,refunded_ore));
+end;
+$function$;
+
+revoke all on function public.sync_vipps_payment_snapshot(text,text,text,text,integer,integer,integer,integer,timestamptz) from public,anon,authenticated;
+grant execute on function public.sync_vipps_payment_snapshot(text,text,text,text,integer,integer,integer,integer,timestamptz) to service_role;
+
+-- ============================================================
+-- 20261002093013_vipps_release_stock_on_failed_checkout.sql
+-- ============================================================
+
+create or replace function public.process_vipps_payment_event_once(
+  event_unit text,
+  event_idempotency_key text,
+  event_psp_reference text,
+  event_payment_reference text,
+  event_name text,
+  event_amount_ore integer,
+  event_timestamp_value timestamptz,
+  capture_guaranteed_until_value timestamptz,
+  event_payload jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, private
+as $function$
+declare
+  inserted boolean := false;
+  apply_result jsonb;
+  target_id uuid;
+begin
+  if event_unit not in ('service','rental') then
+    raise exception 'INVALID_VIPPS_UNIT';
+  end if;
+  if coalesce(event_idempotency_key,'')='' then
+    raise exception 'INVALID_VIPPS_IDEMPOTENCY_KEY';
+  end if;
+  if coalesce(event_psp_reference,'')='' or coalesce(event_payment_reference,'')='' or coalesce(event_name,'')='' then
+    raise exception 'INVALID_VIPPS_EVENT';
+  end if;
+
+  insert into private.vipps_payment_events(
+    psp_reference,payment_reference,event_name,amount_ore,payload,
+    unit,idempotency_key,event_timestamp
+  ) values (
+    event_psp_reference,event_payment_reference,upper(event_name),
+    greatest(coalesce(event_amount_ore,0),0),coalesce(event_payload,'{}'::jsonb),
+    event_unit,event_idempotency_key,event_timestamp_value
+  )
+  on conflict (unit,idempotency_key) where unit is not null and idempotency_key is not null
+  do nothing;
+
+  inserted:=found;
+  if not inserted then return jsonb_build_object('ok',true,'duplicate',true); end if;
+
+  apply_result:=public.apply_vipps_payment_event(
+    event_unit,event_payment_reference,upper(event_name),
+    greatest(coalesce(event_amount_ore,0),0),event_psp_reference,
+    event_timestamp_value,capture_guaranteed_until_value
+  );
+
+  if event_unit='service'
+     and upper(event_name) in ('ABORTED','EXPIRED','TERMINATED')
+     and coalesce(apply_result->>'status','')='cancelled' then
+    target_id:=(apply_result->>'id')::uuid;
+    perform public.cancel_product_order_once(
+      target_id,
+      case upper(event_name)
+        when 'ABORTED' then 'Vipps-betalingen ble avbrutt av kunden.'
+        when 'EXPIRED' then 'Vipps-betalingen utløp før den ble godkjent.'
+        else 'Vipps-betalingen ble avsluttet før autorisasjon.'
+      end
+    );
+  end if;
+
+  update private.vipps_payment_events
+  set processed_at=now(),process_error=null
+  where unit=event_unit and idempotency_key=event_idempotency_key;
+
+  return jsonb_build_object('ok',true,'duplicate',false,'applied',apply_result);
+end;
+$function$;
+
+revoke all on function public.process_vipps_payment_event_once(text,text,text,text,text,integer,timestamptz,timestamptz,jsonb) from public,anon,authenticated;
+grant execute on function public.process_vipps_payment_event_once(text,text,text,text,text,integer,timestamptz,timestamptz,jsonb) to service_role;
+
+-- ============================================================
+-- 20261003132541_payment_receipt_delivery_claim.sql
+-- ============================================================
+
+alter table public.orders
+  add column if not exists receipt_sending_at timestamptz;
+
+alter table public.rental_bookings
+  add column if not exists receipt_sending_at timestamptz;
+
+create or replace function public.claim_payment_receipt(
+  target_unit text,
+  target_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $function$
+declare
+  affected integer := 0;
+begin
+  if target_unit='service' then
+    update public.orders
+    set receipt_sending_at=now(),updated_at=now()
+    where id=target_id
+      and order_type='order'
+      and payment_status='paid'
+      and coalesce(payment_captured_ore,0)>0
+      and receipt_sent_at is null
+      and (receipt_sending_at is null or receipt_sending_at<now()-interval '15 minutes');
+    get diagnostics affected=row_count;
+    return affected>0;
+  elsif target_unit='rental' then
+    update public.rental_bookings
+    set receipt_sending_at=now(),updated_at=now()
+    where id=target_id
+      and payment_status='paid'
+      and coalesce(payment_captured_ore,0)>0
+      and receipt_sent_at is null
+      and (receipt_sending_at is null or receipt_sending_at<now()-interval '15 minutes');
+    get diagnostics affected=row_count;
+    return affected>0;
+  end if;
+  raise exception 'PAYMENT_RECEIPT_UNIT_INVALID';
+end;
+$function$;
+
+revoke all on function public.claim_payment_receipt(text,uuid) from public,anon,authenticated;
+grant execute on function public.claim_payment_receipt(text,uuid) to service_role;
+
+-- ============================================================
+-- 20261003132657_vipps_snapshot_payment_timestamps.sql
+-- ============================================================
+
+create or replace function public.sync_vipps_payment_snapshot(
+  target_unit text,
+  target_reference text,
+  payment_state_value text,
+  psp_reference_value text,
+  authorized_ore_value integer,
+  cancelled_ore_value integer,
+  captured_ore_value integer,
+  refunded_ore_value integer,
+  capture_guaranteed_until_value timestamptz default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $function$
+declare
+  authorized_ore integer := greatest(coalesce(authorized_ore_value,0),0);
+  cancelled_ore integer := greatest(coalesce(cancelled_ore_value,0),0);
+  captured_ore integer := greatest(coalesce(captured_ore_value,0),0);
+  refunded_ore integer := greatest(coalesce(refunded_ore_value,0),0);
+  state_value text := upper(coalesce(payment_state_value,''));
+  status_value text;
+  order_row public.orders%rowtype;
+  rental_row public.rental_bookings%rowtype;
+begin
+  if target_unit not in ('service','rental') then raise exception 'VIPPS_PAYMENT_UNIT_INVALID'; end if;
+  if coalesce(target_reference,'')='' then raise exception 'VIPPS_PAYMENT_REFERENCE_REQUIRED'; end if;
+
+  status_value:=case
+    when captured_ore>0 and refunded_ore>=captured_ore then 'refunded'
+    when captured_ore>0 then
+      case
+        when target_unit='service' then
+          case when captured_ore>=(select greatest(coalesce(total_ore,0),1) from public.orders where order_number=target_reference or payment_reference=target_reference order by case when order_number=target_reference then 0 else 1 end limit 1) then 'paid' else 'partial' end
+        else
+          case when captured_ore>=(select greatest(coalesce(total_ore,0),1) from public.rental_bookings where booking_number=target_reference or payment_reference=target_reference order by case when booking_number=target_reference then 0 else 1 end limit 1) then 'paid' else 'partial' end
+      end
+    when state_value='AUTHORIZED' and authorized_ore>cancelled_ore then 'authorized'
+    when state_value in ('ABORTED','EXPIRED','TERMINATED') then 'cancelled'
+    when state_value='AUTHORIZED' and authorized_ore>0 and cancelled_ore>=authorized_ore then 'cancelled'
+    else case when target_unit='service' then 'pending' else 'unpaid' end
+  end;
+
+  if target_unit='service' then
+    select * into order_row
+    from public.orders
+    where order_number=target_reference or payment_reference=target_reference
+    order by case when order_number=target_reference then 0 else 1 end
+    limit 1
+    for update;
+    if not found then raise exception 'VIPPS_PAYMENT_TARGET_NOT_FOUND'; end if;
+
+    update public.orders set
+      payment_provider='vipps',
+      payment_reference=target_reference,
+      payment_psp_reference=coalesce(nullif(psp_reference_value,''),payment_psp_reference),
+      payment_reserved_ore=authorized_ore,
+      payment_captured_ore=captured_ore,
+      payment_refunded_ore=least(captured_ore,refunded_ore),
+      payment_authorized_at=case when authorized_ore>0 then coalesce(payment_authorized_at,now()) else payment_authorized_at end,
+      payment_captured_at=case when captured_ore>0 then coalesce(payment_captured_at,now()) else payment_captured_at end,
+      payment_refunded_at=case when refunded_ore>0 then coalesce(payment_refunded_at,now()) else payment_refunded_at end,
+      payment_cancelled_at=case when status_value='cancelled' then coalesce(payment_cancelled_at,now()) else payment_cancelled_at end,
+      payment_capture_guaranteed_until=coalesce(capture_guaranteed_until_value,payment_capture_guaranteed_until),
+      payment_status=status_value,
+      updated_at=now()
+    where id=order_row.id;
+
+    return jsonb_build_object('ok',true,'target','order','id',order_row.id,'status',status_value,
+      'authorizedOre',authorized_ore,'cancelledOre',cancelled_ore,'capturedOre',captured_ore,
+      'refundedOre',least(captured_ore,refunded_ore));
+  end if;
+
+  select * into rental_row
+  from public.rental_bookings
+  where booking_number=target_reference or payment_reference=target_reference
+  order by case when booking_number=target_reference then 0 else 1 end
+  limit 1
+  for update;
+  if not found then raise exception 'VIPPS_PAYMENT_TARGET_NOT_FOUND'; end if;
+
+  update public.rental_bookings set
+    payment_provider='vipps',
+    payment_reference=target_reference,
+    payment_psp_reference=coalesce(nullif(psp_reference_value,''),payment_psp_reference),
+    payment_reserved_ore=authorized_ore,
+    payment_captured_ore=captured_ore,
+    payment_refunded_ore=least(captured_ore,refunded_ore),
+    payment_authorized_at=case when authorized_ore>0 then coalesce(payment_authorized_at,now()) else payment_authorized_at end,
+    payment_captured_at=case when captured_ore>0 then coalesce(payment_captured_at,now()) else payment_captured_at end,
+    payment_refunded_at=case when refunded_ore>0 then coalesce(payment_refunded_at,now()) else payment_refunded_at end,
+    payment_cancelled_at=case when status_value='cancelled' then coalesce(payment_cancelled_at,now()) else payment_cancelled_at end,
+    payment_capture_guaranteed_until=coalesce(capture_guaranteed_until_value,payment_capture_guaranteed_until),
+    payment_status=status_value,
+    updated_at=now()
+  where id=rental_row.id;
+
+  return jsonb_build_object('ok',true,'target','rental','id',rental_row.id,'status',status_value,
+    'authorizedOre',authorized_ore,'cancelledOre',cancelled_ore,'capturedOre',captured_ore,
+    'refundedOre',least(captured_ore,refunded_ore));
+end;
+$function$;
+
+revoke all on function public.sync_vipps_payment_snapshot(text,text,text,text,integer,integer,integer,integer,timestamptz) from public,anon,authenticated;
+grant execute on function public.sync_vipps_payment_snapshot(text,text,text,text,integer,integer,integer,integer,timestamptz) to service_role;
+
+-- ============================================================
+-- 20261003133858_vipps_refund_notice_claims.sql
+-- ============================================================
+
+alter table public.orders
+  add column if not exists refund_notice_total_ore integer not null default 0,
+  add column if not exists refund_notice_claim_ore integer,
+  add column if not exists refund_notice_sending_at timestamptz;
+
+alter table public.rental_bookings
+  add column if not exists refund_notice_total_ore integer not null default 0,
+  add column if not exists refund_notice_claim_ore integer,
+  add column if not exists refund_notice_sending_at timestamptz;
+
+create or replace function public.claim_vipps_refund_notice(target_unit text,target_id uuid)
+returns jsonb language plpgsql security definer set search_path = pg_catalog, public
+as $function$
+declare claimed_total integer; previous_total integer;
+begin
+  if target_unit='service' then
+    with candidate as (
+      select id,greatest(coalesce(payment_refunded_ore,0),0) as current_total,
+             greatest(coalesce(refund_notice_total_ore,0),0) as notified_total
+      from public.orders
+      where id=target_id and order_type='order' and payment_provider='vipps'
+        and greatest(coalesce(payment_refunded_ore,0),0)>greatest(coalesce(refund_notice_total_ore,0),0)
+        and (refund_notice_sending_at is null or refund_notice_sending_at<now()-interval '15 minutes')
+      for update
+    )
+    update public.orders o
+    set refund_notice_claim_ore=c.current_total,refund_notice_sending_at=now(),updated_at=now()
+    from candidate c where o.id=c.id
+    returning c.current_total,c.notified_total into claimed_total,previous_total;
+  elsif target_unit='rental' then
+    with candidate as (
+      select id,greatest(coalesce(payment_refunded_ore,0),0) as current_total,
+             greatest(coalesce(refund_notice_total_ore,0),0) as notified_total
+      from public.rental_bookings
+      where id=target_id and payment_provider='vipps'
+        and greatest(coalesce(payment_refunded_ore,0),0)>greatest(coalesce(refund_notice_total_ore,0),0)
+        and (refund_notice_sending_at is null or refund_notice_sending_at<now()-interval '15 minutes')
+      for update
+    )
+    update public.rental_bookings b
+    set refund_notice_claim_ore=c.current_total,refund_notice_sending_at=now(),updated_at=now()
+    from candidate c where b.id=c.id
+    returning c.current_total,c.notified_total into claimed_total,previous_total;
+  else
+    raise exception 'VIPPS_REFUND_NOTICE_UNIT_INVALID';
+  end if;
+
+  if claimed_total is null then return jsonb_build_object('claimed',false); end if;
+  return jsonb_build_object('claimed',true,'totalOre',claimed_total,'previousNotifiedOre',previous_total,'refundOre',greatest(claimed_total-previous_total,0));
+end;
+$function$;
+
+create or replace function public.complete_vipps_refund_notice(target_unit text,target_id uuid,claimed_total_ore integer)
+returns boolean language plpgsql security definer set search_path = pg_catalog, public
+as $function$
+declare affected integer:=0; current_previous integer:=0;
+begin
+  if target_unit='service' then
+    select greatest(coalesce(refund_notice_total_ore,0),0) into current_previous from public.orders where id=target_id for update;
+    update public.orders
+    set refund_last_ore=greatest(claimed_total_ore-current_previous,0),
+        refund_reference=coalesce(nullif(payment_psp_reference,''),payment_reference,refund_reference),
+        refund_note=coalesce(refund_note,'Vipps-refusjon'),
+        refund_notice_total_ore=greatest(coalesce(refund_notice_total_ore,0),claimed_total_ore),
+        refund_notice_sent_at=now(),refund_notice_claim_ore=null,refund_notice_sending_at=null,updated_at=now()
+    where id=target_id and refund_notice_claim_ore=claimed_total_ore;
+    get diagnostics affected=row_count; return affected>0;
+  elsif target_unit='rental' then
+    select greatest(coalesce(refund_notice_total_ore,0),0) into current_previous from public.rental_bookings where id=target_id for update;
+    update public.rental_bookings
+    set refund_last_ore=greatest(claimed_total_ore-current_previous,0),
+        refund_reference=coalesce(nullif(payment_psp_reference,''),payment_reference,refund_reference),
+        refund_note=coalesce(refund_note,'Vipps-refusjon'),
+        refund_notice_total_ore=greatest(coalesce(refund_notice_total_ore,0),claimed_total_ore),
+        refund_notice_sent_at=now(),refund_notice_claim_ore=null,refund_notice_sending_at=null,updated_at=now()
+    where id=target_id and refund_notice_claim_ore=claimed_total_ore;
+    get diagnostics affected=row_count; return affected>0;
+  end if;
+  raise exception 'VIPPS_REFUND_NOTICE_UNIT_INVALID';
+end;
+$function$;
+
+create or replace function public.release_vipps_refund_notice_claim(target_unit text,target_id uuid,claimed_total_ore integer)
+returns boolean language plpgsql security definer set search_path = pg_catalog, public
+as $function$
+declare affected integer:=0;
+begin
+  if target_unit='service' then
+    update public.orders set refund_notice_claim_ore=null,refund_notice_sending_at=null,updated_at=now()
+    where id=target_id and refund_notice_claim_ore=claimed_total_ore;
+  elsif target_unit='rental' then
+    update public.rental_bookings set refund_notice_claim_ore=null,refund_notice_sending_at=null,updated_at=now()
+    where id=target_id and refund_notice_claim_ore=claimed_total_ore;
+  else
+    raise exception 'VIPPS_REFUND_NOTICE_UNIT_INVALID';
+  end if;
+  get diagnostics affected=row_count; return affected>0;
+end;
+$function$;
+
+revoke all on function public.claim_vipps_refund_notice(text,uuid) from public,anon,authenticated;
+grant execute on function public.claim_vipps_refund_notice(text,uuid) to service_role;
+revoke all on function public.complete_vipps_refund_notice(text,uuid,integer) from public,anon,authenticated;
+grant execute on function public.complete_vipps_refund_notice(text,uuid,integer) to service_role;
+revoke all on function public.release_vipps_refund_notice_claim(text,uuid,integer) from public,anon,authenticated;
+grant execute on function public.release_vipps_refund_notice_claim(text,uuid,integer) to service_role;
