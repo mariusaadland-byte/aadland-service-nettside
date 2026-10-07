@@ -1173,24 +1173,20 @@ export default function DrawingClient(){
   const w=Number(roomBuilder.w),h=Number(roomBuilder.h),name=String(roomBuilder.name||"").trim()||"Rom "+((doc.zones||[]).length+1);
   if(!Number.isFinite(w)||!Number.isFinite(h)||w<300||h<300||w>7000||h>7000){setMessage("Sjekk rommålene");setTimeout(()=>setMessage(""),1800);return}
   const t=Number(doc.defaultWallThickness)||98,H=Number(doc.defaultWallHeight)||2400,{x,y}=roomStart(w,h);
+  let innerPoints;
   if(roomBuilder.type==="l"){
    const rw=Number(roomBuilder.rw),rh=Number(roomBuilder.rh);
    if(!Number.isFinite(rw)||!Number.isFinite(rh)||w<600||h<600||rw<300||rh<300||rw>=w-300||rh>=h-300){setMessage("Innhakket passer ikke i L-rommet");setTimeout(()=>setMessage(""),2200);return}
-   const pts=[[x,y],[x+w-rw,y],[x+w-rw,y+rh],[x+w,y+rh],[x+w,y+h],[x,y+h],[x,y]];
-   const walls=pts.slice(0,-1).map((p,i)=>({id:uid(),x1:p[0],y1:p[1],x2:pts[i+1][0],y2:pts[i+1][1],t,h:H}));
-   const points=walls.map(wall=>({x:wall.x1,y:wall.y1})),zone={id:uid(),name,points,wallIds:walls.map(wall=>wall.id),ceilingHeight:H,floorFinish:"",notes:""};
-   mutate(d=>({...d,walls:[...d.walls,...walls],zones:[...(d.zones||[]),zone]}));
-   setSelected({kind:"zone",id:zone.id});
-  }else{
-   const walls=[{id:uid(),x1:x,y1:y,x2:x+w,y2:y,t,h:H},{id:uid(),x1:x+w,y1:y,x2:x+w,y2:y+h,t,h:H},{id:uid(),x1:x+w,y1:y+h,x2:x,y2:y+h,t,h:H},{id:uid(),x1:x,y1:y+h,x2:x,y2:y,t,h:H}];
-   const points=walls.map(wall=>({x:wall.x1,y:wall.y1})),zone={id:uid(),name,points,wallIds:walls.map(wall=>wall.id),ceilingHeight:H,floorFinish:"",notes:""};
-   mutate(d=>({...d,walls:[...d.walls,...walls],zones:[...(d.zones||[]),zone]}));
-   setSelected({kind:"zone",id:zone.id});
-  }
-  const focusZoom=clamp(VIEW/Math.max(500,Math.max(w,h)*1.18),.5,5),focusView=VIEW/focusZoom;
+   innerPoints=[{x,y},{x:x+w-rw,y},{x:x+w-rw,y:y+rh},{x:x+w,y:y+rh},{x:x+w,y:y+h},{x,y:y+h}];
+  }else innerPoints=[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}];
+  const centerPoints=offsetPolygon(innerPoints,t/2,false),walls=centerPoints.map((p,i)=>({id:uid(),x1:p.x,y1:p.y,x2:centerPoints[(i+1)%centerPoints.length].x,y2:centerPoints[(i+1)%centerPoints.length].y,t,h:H}));
+  const zone={id:uid(),name,points:centerPoints.map(p=>({...p})),wallIds:walls.map(wall=>wall.id),ceilingHeight:H,floorFinish:"",notes:"",dimensionMode:"inner",enteredInnerWidth:w,enteredInnerHeight:h};
+  mutate(d=>({...d,walls:[...d.walls,...walls],zones:[...(d.zones||[]),zone]}));
+  setSelected({kind:"zone",id:zone.id});
+  const focusZoom=clamp(VIEW/Math.max(500,Math.max(w+t,h+t)*1.18),.5,5),focusView=VIEW/focusZoom;
   setPan(clampPanForZoom({x:x+w/2-focusView/2,y:y+h/2-focusView/2},focusZoom));
   setDoc(d=>({...d,zoom:focusZoom}));
-  setRoomBuilder(null);setTool("select");
+  setRoomBuilder(null);setTool("select");setMessage("Rom opprettet med innvendige mål "+Math.round(w)+" × "+Math.round(h)+" mm");setTimeout(()=>setMessage(""),2200);
  };
  const makeRoom=()=>openRoomBuilder("rect");
  const makeLRoom=()=>openRoomBuilder("l");
