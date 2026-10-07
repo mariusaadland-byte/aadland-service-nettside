@@ -142,13 +142,23 @@ function polygonCentroid(points){
 const electricalTypes=new Set(["ceilinglight","downlight","ledstrip","walllight","outlet","doubleoutlet","switch","dimmer","thermostat","junction"]);
 const wallElectricalTypes=new Set(["walllight","outlet","doubleoutlet","switch","dimmer","thermostat"]);
 const ceilingElectricalTypes=new Set(["ceilinglight","downlight","ledstrip","junction"]);
+function wallProjectedFurniture(wall,items){
+ const L=Math.max(1,len(wall)),dx=wall.x2-wall.x1,dy=wall.y2-wall.y1,raw=Math.hypot(dx,dy)||1,ux=dx/raw,uy=dy/raw,nx=-uy,ny=ux;
+ return (items||[]).filter(item=>!item.wallId&&!electricalTypes.has(item.type)&&!openingTypes.has(item.type)&&!["deck","railing","screen","post","stairs"].includes(item.type)).map(item=>{
+  const corners=rotatedItemCorners(item),along=corners.map(p=>(p.x-wall.x1)*ux+(p.y-wall.y1)*uy),normal=corners.map(p=>(p.x-wall.x1)*nx+(p.y-wall.y1)*ny);
+  const rawStart=Math.min(...along),rawEnd=Math.max(...along),start=clamp(rawStart,0,L),end=clamp(rawEnd,0,L);
+  const minN=Math.min(...normal),maxN=Math.max(...normal),distance=minN<=0&&maxN>=0?0:Math.min(Math.abs(minN),Math.abs(maxN));
+  const visible=end-start>=60&&distance<=2600,blocksGap=visible&&distance<=220;
+  return {item,start,end,width:Math.max(0,end-start),distance,blocksGap};
+ }).filter(row=>row.visible).sort((a,b)=>a.distance-b.distance);
+}
 function wallFurnitureGaps(wall,items,excludeId=null){
  const L=Math.max(1,len(wall));
- const blockers=(items||[])
+ const mounted=(items||[])
   .filter(item=>item.wallId===wall.id&&item.id!==excludeId&&!wallElectricalTypes.has(item.type)&&!["railing","screen"].includes(item.type))
-  .map(item=>{const gaps=wallEdgeOffsets(item,wall),start=clamp(gaps.start,0,L),end=clamp(gaps.start+Math.max(0,Number(item.w)||0),0,L);return{start,end}})
-  .filter(row=>row.end>row.start)
-  .sort((a,b)=>a.start-b.start);
+  .map(item=>{const gaps=wallEdgeOffsets(item,wall),start=clamp(gaps.start,0,L),end=clamp(gaps.start+Math.max(0,Number(item.w)||0),0,L);return{start,end}});
+ const floor=wallProjectedFurniture(wall,items).filter(row=>row.item.id!==excludeId&&row.blocksGap).map(row=>({start:row.start,end:row.end}));
+ const blockers=[...mounted,...floor].filter(row=>row.end>row.start).sort((a,b)=>a.start-b.start);
  const merged=[];
  for(const row of blockers){
   const last=merged.at(-1);
@@ -431,6 +441,7 @@ function WallElevationPreview({wall,items,onSelectItem,selectedItemId,gapPickMod
  if(!wall)return null;
  const L=Math.max(1,len(wall)),H=Math.max(300,Number(wall.h)||2400),padX=Math.max(140,L*.035),padY=Math.max(140,H*.07);
  const wallItems=(items||[]).filter(item=>item.wallId===wall.id).sort((a,b)=>(Number(a.wallOffset)||0)-(Number(b.wallOffset)||0));
+ const projectedFurniture=gapPickMode?wallProjectedFurniture(wall,items):[];
  const freeGaps=gapPickMode?wallFurnitureGaps(wall,items):[];
  const itemBox=item=>{
   const gaps=wallEdgeOffsets(item,wall),width=Math.max(60,Number(item.w)||120),start=gaps.start;
@@ -457,6 +468,14 @@ function WallElevationPreview({wall,items,onSelectItem,selectedItemId,gapPickMod
    <text x={gap.start+gap.width/2} y={H/2-35} textAnchor="middle" fontSize="74" fontWeight="900" fill="#236853">TRYKK HER</text>
    <text x={gap.start+gap.width/2} y={H/2+55} textAnchor="middle" fontSize="62" fontWeight="700" fill="#236853">{gap.width} mm ledig</text>
   </g>)}
+  {gapPickMode&&projectedFurniture.slice().reverse().map(({item,start,end,distance,blocksGap})=>{
+   const height=Math.max(80,Math.min(H,modelHeight(item))),z0=Math.max(0,Number(item.elevation)||0),y=H-Math.min(H,z0+height),w=Math.max(60,end-start),opacity=blocksGap?.88:Math.max(.25,.68-distance/5000);
+   return <g key={"context-"+item.id} opacity={opacity} pointerEvents="none">
+    <rect x={start} y={y} width={w} height={Math.min(height,H-y)} rx="18" fill={blocksGap?"#cdb489":"#ddd5c8"} stroke={blocksGap?"#755d3b":"#9d9589"} strokeWidth={blocksGap?16:10} strokeDasharray={blocksGap?undefined:"28 20"}/>
+    <text x={start+w/2} y={Math.max(70,y+75)} textAnchor="middle" fontSize="58" fontWeight="900" fill="#493d2d">{item.customName||labelFor(item.type)}</text>
+    <text x={start+w/2} y={Math.min(H-35,y+145)} textAnchor="middle" fontSize="48" fontWeight="700" fill="#665846">{Math.round(w)} mm{blocksGap?" · ved veggen":" · lenger inn"}</text>
+   </g>
+  })}
   {wallItems.map(item=>{
    const b=itemBox(item),active=selectedItemId===item.id,custom=item.type==="customwall";
    return <g key={"elev-"+item.id} onClick={()=>onSelectItem?.(item)} style={{cursor:"pointer"}}>
@@ -1550,7 +1569,7 @@ export default function DrawingClient(){
      {isCustom&&<><label>Møbelhøyde (mm)<input type="number" min="50" value={Math.round(modelHeight(wallSelectedItem))} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"modelHeight",e.target.value)}/></label><label>Fra gulv (mm)<input type="number" min="0" value={Math.round(Number(wallSelectedItem.elevation)||0)} onChange={e=>updateWallVerticalItem(wallSelectedItem.id,"elevation",e.target.value)}/></label></>}
      <div className={styles.wallInlineActions}><button type="button" onClick={duplicate}>Dupliser</button><button type="button" onClick={remove}>Slett</button></div>
     </div>})()}
-    <div className={styles.wallViewHint}>{furnitureGapPick?<><b>Velg mellomrom:</b> trykk i et grønt felt. Møbelet du laget får automatisk nøyaktig bredde på mellomrommet og plasseres kant-i-kant.</>:<>Klikk et objekt på veggen for å redigere det uten å forlate veggvisningen. Rutenettet er 100 mm. Vegglengde, vegghøyde, åpninger, EL-punkter og egne møbler vises i samme frontvisning.</>}</div>
+    <div className={styles.wallViewHint}>{furnitureGapPick?<><b>Velg mellomrom:</b> nå vises også seng, garderobe, kommode, skap og andre møbler i rommet. Møbler som står inntil denne veggen vises tydelig og teller som kant for mellomrommet; møbler lenger inn i rommet vises svakere som orientering. Trykk i et grønt felt, så får møbelet automatisk riktig bredde og plassering.</>:<>Klikk et objekt på veggen for å redigere det uten å forlate veggvisningen. Rutenettet er 100 mm. Vegglengde, vegghøyde, åpninger, EL-punkter og egne møbler vises i samme frontvisning.</>}</div>
     <footer><span>Vegg: <b>{len(wallForView)} × {Math.round(Number(wallForView.h)||2400)} × {Math.round(Number(wallForView.t)||98)} mm</b></span><span>Objekter: <b>{doc.items.filter(item=>item.wallId===wallForView.id).length}</b></span><button type="button" onClick={()=>setWallViewId(null)}>Tilbake til plantegning →</button></footer>
    </section>
   </div>}
