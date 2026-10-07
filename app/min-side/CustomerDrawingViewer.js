@@ -87,8 +87,10 @@ function PlanView({doc}){
   {(doc.zones||[]).map(z=><polygon key={z.id} points={pointsAttr((z.points||[]).map(p=>({x:Number(p.x)||0,y:Number(p.y)||0})))} fill="#f2eee5" stroke="#d0c7b7" strokeWidth="20"/>)}
   {(doc.walls||[]).map((w,i)=><g key={w.id}><line x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} stroke="#403d37" strokeWidth={Math.max(35,Number(w.t)||98)} strokeLinecap="square"/><text x={(Number(w.x1)+Number(w.x2))/2} y={(Number(w.y1)+Number(w.y2))/2-80} textAnchor="middle" fontSize="90" fontWeight="800" fill="#736957">V{i+1}</text></g>)}
   {(doc.items||[]).filter(item=>!electrical.has(item.type)).map(item=>{
-   const c=rotatedCorners(item);
-   return <polygon key={item.id} points={pointsAttr(c)} fill={openingTypes.has(item.type)?"#dfeaec":"#dcc598"} stroke="#6a5738" strokeWidth="18"/>;
+   const c=rotatedCorners(item),custom=["customwall","customfloor"].includes(item.type);
+   if(!custom)return <polygon key={item.id} points={pointsAttr(c)} fill={openingTypes.has(item.type)?"#dfeaec":"#dcc598"} stroke="#6a5738" strokeWidth="18"/>;
+   const {colEdges}=customCells(item);
+   return <g key={item.id}><polygon points={pointsAttr(c)} fill="#dcc598" stroke="#6a5738" strokeWidth="18"/>{colEdges.slice(1,-1).map((edge,i)=>{const a={x:c[0].x+(c[1].x-c[0].x)*edge,y:c[0].y+(c[1].y-c[0].y)*edge},b={x:c[3].x+(c[2].x-c[3].x)*edge,y:c[3].y+(c[2].y-c[3].y)*edge};return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#8d7249" strokeWidth="11"/>})}</g>;
   })}
   {(doc.items||[]).filter(item=>electrical.has(item.type)).map(item=>{
    if(item.type==="ledstrip")return <polygon key={item.id} points={pointsAttr(rotatedCorners(item))} fill="#fff0a8" stroke="#8c6b1f" strokeWidth="16"/>;
