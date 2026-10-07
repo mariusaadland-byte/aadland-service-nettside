@@ -929,3 +929,25 @@
  .wallInlineActions{grid-column:1/-1}
  .wallInlineActions button{flex:1}
 }
+
+
+/* Interactive 3D workspace */
+.preview3DControls,.preview3DAdd{
+ display:flex;flex-wrap:wrap;gap:7px;padding:8px 12px;background:#11161b;border-bottom:1px solid #303640;color:#dfe4e8;align-items:center
+}
+.preview3DControls button,.preview3DAdd button,.preview3DSelection button{
+ min-height:34px;border:1px solid #3d4650;border-radius:8px;background:#222a32;color:#eef1f3;padding:0 10px;font:800 10px/1 inherit;cursor:pointer
+}
+.preview3DAdd b{font-size:10px;margin-right:3px;color:#d7b76d}
+.preview3DOrbit{touch-action:none;cursor:grab;user-select:none}
+.preview3DOrbit:active{cursor:grabbing}
+.preview3DSelection{
+ display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;background:#1a2026;border-top:1px solid #343b43;color:#e9edf0;font-size:11px
+}
+.preview3DSelection b{color:#f0cf83}
+@media(max-width:900px){
+ .preview3DControls,.preview3DAdd{flex-wrap:nowrap;overflow-x:auto}
+ .preview3DControls button,.preview3DAdd button{flex:0 0 auto;min-height:42px}
+ .preview3DSelection{align-items:stretch;flex-direction:column}
+ .preview3DSelection button{min-height:42px}
+}
