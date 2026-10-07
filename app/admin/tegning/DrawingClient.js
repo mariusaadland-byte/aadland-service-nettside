@@ -194,7 +194,7 @@ function drawingCollisions(items=[],walls=[],zones=[]){
  const mark=(a,b,reason)=>{if(!result.has(a))result.set(a,[]);if(!result.get(a).some(row=>row.id===b&&row.reason===reason))result.get(a).push({id:b,reason})};
  const doorSwingBox=door=>{
   if(door.type!=="door"||!door.wallId)return null;const wall=byWall.get(door.wallId);if(!wall)return null;
-  const L=Math.max(1,len(wall)),dx=(wall.x2-wall.x1)/L,dy=(wall.y2-wall.y1)/L,inward=wallInwardNormal(wall,zones),g=wallEdgeOffsets(door,wall),W=Math.max(100,Number(door.w)||900),hingeOff=door.flip?g.start+W:g.start,along=door.flip?-1:1,hx=wall.x1+dx*hingeOff,hy=wall.y1+dy*hingeOff;
+  const rawL=Math.max(1,len(wall)),dx=(wall.x2-wall.x1)/rawL,dy=(wall.y2-wall.y1)/rawL,inward=wallInwardNormal(wall,zones),face=wallFaceMetrics(wall,zones,walls,98),g=wallFaceOffsets(door,wall,zones,walls,98),W=Math.max(100,Number(door.w)||900),hingeOff=face.startOffset+(door.flip?g.start+W:g.start),along=door.flip?-1:1,hx=wall.x1+dx*hingeOff,hy=wall.y1+dy*hingeOff;
   const pts=[{x:hx,y:hy},{x:hx+dx*W*along,y:hy+dy*W*along},{x:hx+dx*W*along+inward.x*W,y:hy+dy*W*along+inward.y*W},{x:hx+inward.x*W,y:hy+inward.y*W}],xs=pts.map(p=>p.x),ys=pts.map(p=>p.y);
   return{left:Math.min(...xs),right:Math.max(...xs),top:Math.min(...ys),bottom:Math.max(...ys)};
  };
@@ -2215,7 +2215,7 @@ export default function DrawingClient(){
      <Drawing3DPreview doc={doc} camera={camera3D} onWallSelect={wall=>openWallView(wall.id)} onItemSelect={item=>setSelected({kind:"item",id:item.id})}/>
     </div>
     {selected?.kind==="item"&&doc.items.find(item=>item.id===selected.id)&&(()=>{const item=doc.items.find(item=>item.id===selected.id),custom=["customfloor","customwall"].includes(item.type);return <div className={styles.preview3DSelection}><div><span>Valgt: <b>{item.customName||labelFor(item.type)}</b></span>{custom&&<div className={styles.preview3DCellEditor}>{furnitureCellArray(item.sectionsX,item.sectionsY,item.cellTypes,"open").map((type,i)=><button type="button" key={i} onClick={e=>{e.stopPropagation();const cells=furnitureCellArray(item.sectionsX,item.sectionsY,item.cellTypes,"open");cells[i]=nextFurnitureCellType(cells[i]);mutate(d=>({...d,items:d.items.map(o=>o.id===item.id?{...o,cellTypes:cells}:o)}))}}>F{i+1}: {furnitureCellLabel(type)}</button>)}</div>}</div><button type="button" onClick={()=>{setShow3D(false);setTimeout(()=>scrollPanel(rightPanel),0)}}>Rediger mål og plassering →</button></div>})()}
-    <div className={styles.previewWallStrip}>{doc.walls.map((wall,index)=><button type="button" key={wall.id} onClick={()=>openWallView(wall.id)}>Vegg {index+1}<small>{len(wall)} × {Math.round(Number(wall.h)||2400)} × {Math.round(Number(wall.t)||98)} mm</small></button>)}</div>
+    <div className={styles.previewWallStrip}>{doc.walls.map((wall,index)=><button type="button" key={wall.id} onClick={()=>openWallView(wall.id)}>Vegg {index+1}<small>{Math.round(wallFaceMetrics(wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98).L)} × {Math.round(Number(wall.h)||2400)} mm innv. · {Math.round(Number(wall.t)||98)} mm vegg</small></button>)}</div>
     <footer><span><b>Dra:</b> roter 3D-visningen</span><span><b>Vegger:</b> klikk for frontvisning</span><span><b>Møbler:</b> klikk for å velge</span><span><b>Kunde:</b> delt tegning får samme dreibare 3D-visning</span></footer>
    </section>
   </div>}
