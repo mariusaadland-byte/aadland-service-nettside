@@ -11,6 +11,7 @@ const quoteStatus={sent:"Sendt",accepted:"Godkjent",declined:"Avslått",expired:
 const paymentStatus={unpaid:"Ikke betalt",pending:"Avventer betaling",authorized:"Reservert",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert"};
 const depositStatus={not_paid:"Ikke mottatt",held:"Holdes",released:"Frigitt",partially_charged:"Delvis trukket",charged:"Trukket"};
 const fulfillmentStatus={pickup:"Henting",delivery:"Levering",shipping:"Post / Bring"};
+const rentalDisplayStatus=r=>r?.status==="confirmed"&&!r?.confirmation_sent_at?"Reservert":(rentalStatus[r?.status]||r?.status||"");
 
 const date=v=>v?new Intl.DateTimeFormat("nb-NO").format(new Date(v+"T12:00:00")):"";
 const dateTime=v=>v?new Intl.DateTimeFormat("nb-NO",{dateStyle:"medium"}).format(new Date(v)):"";
@@ -263,7 +264,7 @@ export default function MinSide(){
    title:r.rental_items?.name||"Utleie",
    meta:r.booking_number||"",
    date:r.created_at,
-   status:rentalStatus[r.status]||r.status,
+   status:rentalDisplayStatus(r),
    href:"#utleie"
   }))
  ].filter(item=>item.date).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,6);
@@ -514,7 +515,7 @@ export default function MinSide(){
    <div className="customerSectionHead"><div><div className="kicker">UTLEIE</div><h2>Utleie</h2></div><div className="customerSectionActions"><span>{rentals.length}</span><Link className="btn alt" href="/utleie">Se utleie</Link></div></div>
    {!rentals.length?<div className="card customerEmpty"><p>Ingen utleier knyttet til kontoen ennå.</p></div>:
    <div className="customerGrid">{rentals.map(r=><article className="card customerHistoryCard" key={r.id}>
-    <div className="customerCardTop"><div><small>{r.booking_number}</small><h3>{r.rental_items?.name||"Utleie"}</h3><p className="customerHistoryDate">Booket {dateTime(r.created_at)}</p></div><span className={"customerStatus customerStatus-"+r.status}>{rentalStatus[r.status]||r.status}</span></div>
+    <div className="customerCardTop"><div><small>{r.booking_number}</small><h3>{r.rental_items?.name||"Utleie"}</h3><p className="customerHistoryDate">Booket {dateTime(r.created_at)}</p></div><span className={"customerStatus customerStatus-"+r.status}>{rentalDisplayStatus(r)}</span></div>
     <div className="customerCardMeta">
      <span><small>Periode</small><b>{date(r.start_date)} – {date(r.end_date)}</b></span>
      <span><small>Leiepris</small><b>{kr(r.total_ore)}</b></span>
