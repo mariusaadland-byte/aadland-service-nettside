@@ -48,6 +48,7 @@ export default function AdminClient({ user }) {
   const [focusedRentalBookingId,setFocusedRentalBookingId]=useState("");
   const [focusedJobId,setFocusedJobId]=useState("");
   const [focusedRentalItemId,setFocusedRentalItemId]=useState("");
+  const [focusedRentalBlockId,setFocusedRentalBlockId]=useState("");
   const [projects, setProjects] = useState([]);
   const [projectDraft, setProjectDraft] = useState(null);
   const [projectStorySetupRequired, setProjectStorySetupRequired] = useState(false);
@@ -803,7 +804,7 @@ export default function AdminClient({ user }) {
         )}
 
         {tab === "rental" && canManageProducts && (
-          <RentalItems items={rentalItems} categories={rentalCategories} blocks={rentalBlocks} reload={load} setError={setError} categorySetupRequired={rentalCategorySetupRequired} initialItemId={focusedRentalItemId} />
+          <RentalItems items={rentalItems} categories={rentalCategories} blocks={rentalBlocks} reload={load} setError={setError} categorySetupRequired={rentalCategorySetupRequired} initialItemId={focusedRentalItemId} initialBlockId={focusedRentalBlockId} />
         )}
 
         {tab === "rentalCalendar" && canViewOrders && (
@@ -812,7 +813,7 @@ export default function AdminClient({ user }) {
             bookings={rentalBookings}
             blocks={rentalBlocks}
             onOpenBooking={(id)=>{setFocusedRentalBookingId(id);setTab("rentalBookings");}}
-            onOpenBlock={(itemId)=>{setFocusedRentalItemId(itemId);setTab("rental");}}
+            onOpenBlock={(itemId,blockId)=>{setFocusedRentalItemId(itemId);setFocusedRentalBlockId(blockId);setTab("rental");}}
           />
         )}
 
@@ -4341,13 +4342,14 @@ function ServiceEditor({ service, reload, setError, close }) {
   </form>;
 }
 
-function RentalItems({items,categories,blocks,reload,setError,initialItemId=""}){
+function RentalItems({items,categories,blocks,reload,setError,initialItemId="",initialBlockId=""}){
  const [block,setBlock]=useState({itemId:"",startDate:"",endDate:"",reason:""});
  useEffect(()=>{
-  if(!initialItemId)return;
-  const timer=window.setTimeout(()=>document.getElementById("rental-item-"+initialItemId)?.scrollIntoView({behavior:"smooth",block:"center"}),80);
+  const targetId=initialBlockId?"rental-block-"+initialBlockId:(initialItemId?"rental-item-"+initialItemId:"");
+  if(!targetId)return;
+  const timer=window.setTimeout(()=>document.getElementById(targetId)?.scrollIntoView({behavior:"smooth",block:"center"}),80);
   return ()=>window.clearTimeout(timer);
- },[initialItemId]);
+ },[initialItemId,initialBlockId]);
  async function addBlock(e){e.preventDefault();setError("");const r=await fetch("/api/admin/rental/blocks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(block)});const d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Perioden kunne ikke blokkeres.");return;}setBlock({itemId:"",startDate:"",endDate:"",reason:""});await reload();}
  async function removeBlock(id){const entry=blocks.find(item=>item.id===id);const label=entry?(items.find(item=>item.id===entry.itemId)?.name||"utstyret")+" · "+entry.startDate+" – "+entry.endDate:"denne blokkeringen";if(!window.confirm("Fjerne blokkeringen for "+label+"?"))return;const r=await fetch("/api/admin/rental/blocks",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});if(!r.ok){setError("Blokkeringen kunne ikke fjernes.");return;}await reload();}
  return <><div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20}}><a className="btn alt" href="/admin/utleiekategorier">Utleiekategorier</a><a className="btn" href="/admin/utleie/ny">Legg til utstyr</a></div>
@@ -4356,7 +4358,7 @@ function RentalItems({items,categories,blocks,reload,setError,initialItemId=""})
  <form onSubmit={addBlock}><div className="field"><label>Utstyr</label><select required value={block.itemId} onChange={e=>setBlock({...block,itemId:e.target.value})}><option value="">Velg utstyr</option>{items.map(i=><option key={i.id} value={i.id}>{i.name}</option>)}</select></div>
  <div style={{display:"flex",gap:12,flexWrap:"wrap"}}><div className="field"><label>Fra</label><input required type="date" value={block.startDate} onChange={e=>setBlock({...block,startDate:e.target.value})}/></div><div className="field"><label>Til</label><input required type="date" min={block.startDate} value={block.endDate} onChange={e=>setBlock({...block,endDate:e.target.value})}/></div></div>
  <div className="field"><label>Årsak</label><input value={block.reason} onChange={e=>setBlock({...block,reason:e.target.value})} placeholder="F.eks. service"/></div><button className="btn">Blokker periode</button></form>
- {blocks.length>0&&<div style={{marginTop:18}}>{blocks.map(b=><div key={b.id} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"10px 0",borderTop:"1px solid #ddd"}}><span><b>{items.find(i=>i.id===b.itemId)?.name||"Utstyr"}</b> · {b.startDate} – {b.endDate}{b.reason?" · "+b.reason:""}</span><button className="btn alt" onClick={()=>removeBlock(b.id)}>Fjern</button></div>)}</div>}</div></>;
+ {blocks.length>0&&<div style={{marginTop:18}}>{blocks.map(b=><div id={"rental-block-"+b.id} className={initialBlockId===b.id?"adminCalendarBlockTarget":""} key={b.id} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"10px 0",borderTop:"1px solid #ddd"}}><span><b>{items.find(i=>i.id===b.itemId)?.name||"Utstyr"}</b> · {b.startDate} – {b.endDate}{b.reason?" · "+b.reason:""}</span><button className="btn alt" onClick={()=>removeBlock(b.id)}>Fjern</button></div>)}</div>}</div></>;
 }
 function RentalEditor({item,categories=[],reload,setError,close}){
  const isNew=!item,[editing,setEditing]=useState(isNew),[saving,setSaving]=useState(false),[uploading,setUploading]=useState(false);
@@ -4401,7 +4403,7 @@ function RentalCalendar({items,bookings,blocks,onOpenBooking,onOpenBlock}){
  function move(n){const d=new Date(year,m+n,1);setMonth(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"))}
  function openEvent(event){
   if(event.kind==="booking")onOpenBooking?.(event.id);
-  else onOpenBlock?.(event.itemId);
+  else onOpenBlock?.(event.itemId,event.id);
  }
  return <div className="card rentalCalendar adminCompactCalendar"><div className="calendarHead"><div><div className="kicker">UTLEIEKALENDER</div><h3>{first.toLocaleDateString("nb-NO",{month:"long",year:"numeric"})}</h3></div><div><button className="btn alt" onClick={()=>move(-1)}>←</button><button className="btn alt" onClick={()=>setMonth(new Date().toISOString().slice(0,7))}>I dag</button><button className="btn alt" onClick={()=>move(1)}>→</button></div></div>
  <div className="calendarGrid">{["Man","Tir","Ons","Tor","Fre","Lør","Søn"].map(x=><b className="calendarWeekday" key={x}>{x}</b>)}{cells.map((day,i)=>day?<div className="calendarDay" key={i}><strong>{day}</strong>{events(day).map((e,j)=><button type="button" title={e.title+" · "+e.meta} className={"calendarEvent "+e.kind} key={e.kind+"-"+e.id+"-"+j} onClick={()=>openEvent(e)}>{e.label}</button>)}</div>:<div className="calendarDay empty" key={i}/>)}</div><p className="muted">Klikk på en booking for å åpne hele bookingen. Klikk på en blokkert/serviceperiode for å gå til utstyret.</p></div>;
