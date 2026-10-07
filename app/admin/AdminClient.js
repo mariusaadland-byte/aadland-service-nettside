@@ -45,6 +45,9 @@ export default function AdminClient({ user }) {
   const [rentalPaymentSetupRequired, setRentalPaymentSetupRequired] = useState(false);
   const [rentalBookings, setRentalBookings] = useState([]);
   const [rentalBlocks, setRentalBlocks] = useState([]);
+  const [focusedRentalBookingId,setFocusedRentalBookingId]=useState("");
+  const [focusedJobId,setFocusedJobId]=useState("");
+  const [focusedRentalItemId,setFocusedRentalItemId]=useState("");
   const [projects, setProjects] = useState([]);
   const [projectDraft, setProjectDraft] = useState(null);
   const [projectStorySetupRequired, setProjectStorySetupRequired] = useState(false);
@@ -465,6 +468,7 @@ export default function AdminClient({ user }) {
 
   if (canViewOrders) tabs.push(["orders", "Bestillinger"]);
   if (canViewOrders) tabs.push(["jobs", "Oppdrag"]);
+  if (canViewOrders) tabs.push(["jobCalendar", "Oppdragskalender"]);
   if (canViewOrders) tabs.push(["archive", "Arkiv"]);
   if (canViewOrders) tabs.push(["surveys", "Befaringer"]);
   if (canViewOrders) tabs.push(["customers", "Kunder"]);
@@ -537,6 +541,8 @@ export default function AdminClient({ user }) {
             ? "Bestillinger"
             : tab === "jobs"
             ? "Oppdrag"
+            : tab === "jobCalendar"
+            ? "Oppdragskalender"
             : tab === "archive"
             ? "Arkiv"
             : tab === "surveys"
@@ -742,6 +748,7 @@ export default function AdminClient({ user }) {
             status={status}
             canUpdateOrders={canUpdateOrders}
             reload={load}
+            initialOpenId={focusedJobId}
             onCreateProject={canManageProducts?(order)=>{
               setProjectDraft({
                 title:order.sourceQuoteTitle||"Oppdrag",
@@ -751,6 +758,13 @@ export default function AdminClient({ user }) {
               });
               setTab("projects");
             }:null}
+          />
+        )}
+
+        {tab === "jobCalendar" && canViewOrders && (
+          <JobCalendar
+            orders={activeOrders.filter(order => order.orderType === "custom" && order.sourceQuoteId)}
+            onOpenJob={(id)=>{setFocusedJobId(id);setTab("jobs");}}
           />
         )}
 
@@ -789,15 +803,21 @@ export default function AdminClient({ user }) {
         )}
 
         {tab === "rental" && canManageProducts && (
-          <RentalItems items={rentalItems} categories={rentalCategories} blocks={rentalBlocks} reload={load} setError={setError} categorySetupRequired={rentalCategorySetupRequired} />
+          <RentalItems items={rentalItems} categories={rentalCategories} blocks={rentalBlocks} reload={load} setError={setError} categorySetupRequired={rentalCategorySetupRequired} initialItemId={focusedRentalItemId} />
         )}
 
         {tab === "rentalCalendar" && canViewOrders && (
-          <RentalCalendar items={rentalItems} bookings={rentalBookings} blocks={rentalBlocks} />
+          <RentalCalendar
+            items={rentalItems}
+            bookings={rentalBookings}
+            blocks={rentalBlocks}
+            onOpenBooking={(id)=>{setFocusedRentalBookingId(id);setTab("rentalBookings");}}
+            onOpenBlock={(itemId)=>{setFocusedRentalItemId(itemId);setTab("rental");}}
+          />
         )}
 
         {tab === "rentalBookings" && canViewOrders && (
-          <RentalBookings bookings={rentalBookings} reload={load} setError={setError} canUpdate={canUpdateOrders} paymentSetupRequired={rentalPaymentSetupRequired} />
+          <RentalBookings bookings={rentalBookings} reload={load} setError={setError} canUpdate={canUpdateOrders} paymentSetupRequired={rentalPaymentSetupRequired} initialOpenId={focusedRentalBookingId} />
         )}
 
         {tab === "projects" && canManageProducts && (
@@ -1453,10 +1473,11 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
  </article>}):<div className="card"><p>Ingen bestillinger ennå.</p></div>}</div></>;
 }
 
-function Jobs({orders,status,canUpdateOrders,reload,onCreateProject=null}){
+function Jobs({orders,status,canUpdateOrders,reload,onCreateProject=null,initialOpenId=""}){
  const [openId,setOpenId]=useState(null);
  const [savingId,setSavingId]=useState("");
  const [message,setMessage]=useState("");
+ useEffect(()=>{if(initialOpenId)setOpenId(initialOpenId)},[initialOpenId]);
 
  async function archive(order){
   if(!confirm("Flytte dette oppdraget til arkivet?"))return;
@@ -4320,12 +4341,17 @@ function ServiceEditor({ service, reload, setError, close }) {
   </form>;
 }
 
-function RentalItems({items,categories,blocks,reload,setError}){
+function RentalItems({items,categories,blocks,reload,setError,initialItemId=""}){
  const [block,setBlock]=useState({itemId:"",startDate:"",endDate:"",reason:""});
+ useEffect(()=>{
+  if(!initialItemId)return;
+  const timer=window.setTimeout(()=>document.getElementById("rental-item-"+initialItemId)?.scrollIntoView({behavior:"smooth",block:"center"}),80);
+  return ()=>window.clearTimeout(timer);
+ },[initialItemId]);
  async function addBlock(e){e.preventDefault();setError("");const r=await fetch("/api/admin/rental/blocks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(block)});const d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Perioden kunne ikke blokkeres.");return;}setBlock({itemId:"",startDate:"",endDate:"",reason:""});await reload();}
  async function removeBlock(id){const entry=blocks.find(item=>item.id===id);const label=entry?(items.find(item=>item.id===entry.itemId)?.name||"utstyret")+" · "+entry.startDate+" – "+entry.endDate:"denne blokkeringen";if(!window.confirm("Fjerne blokkeringen for "+label+"?"))return;const r=await fetch("/api/admin/rental/blocks",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});if(!r.ok){setError("Blokkeringen kunne ikke fjernes.");return;}await reload();}
  return <><div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20}}><a className="btn alt" href="/admin/utleiekategorier">Utleiekategorier</a><a className="btn" href="/admin/utleie/ny">Legg til utstyr</a></div>
- <div className="grid">{items.map(item=><RentalEditor key={item.id} item={item} categories={categories} reload={reload} setError={setError}/>)}</div>
+ <div className="grid">{items.map(item=><div id={"rental-item-"+item.id} className={initialItemId===item.id?"adminCalendarTarget":""} key={item.id}><RentalEditor item={item} categories={categories} reload={reload} setError={setError}/></div>)}</div>
  <div className="card" style={{marginTop:24}}><div className="kicker">Tilgjengelighet</div><h3>Blokker datoer manuelt</h3><p className="muted">Bruk dette ved service, eget bruk eller andre perioder utstyret ikke kan leies ut. En manuell blokk gjelder alle eksemplarer av valgt utstyr.</p>
  <form onSubmit={addBlock}><div className="field"><label>Utstyr</label><select required value={block.itemId} onChange={e=>setBlock({...block,itemId:e.target.value})}><option value="">Velg utstyr</option>{items.map(i=><option key={i.id} value={i.id}>{i.name}</option>)}</select></div>
  <div style={{display:"flex",gap:12,flexWrap:"wrap"}}><div className="field"><label>Fra</label><input required type="date" value={block.startDate} onChange={e=>setBlock({...block,startDate:e.target.value})}/></div><div className="field"><label>Til</label><input required type="date" min={block.startDate} value={block.endDate} onChange={e=>setBlock({...block,endDate:e.target.value})}/></div></div>
@@ -4355,15 +4381,52 @@ function RentalEditor({item,categories=[],reload,setError,close}){
  <label><input type="checkbox" checked={v.pickupAvailable} onChange={e=>set("pickupAvailable",e.target.checked)}/> Henting mulig</label><br/><label><input type="checkbox" checked={v.deliveryAvailable} onChange={e=>set("deliveryAvailable",e.target.checked)}/> Levering mulig</label><br/><label><input type="checkbox" checked={v.active} onChange={e=>set("active",e.target.checked)}/> Publisert</label>
  <div style={{display:"flex",gap:10,marginTop:18}}><button className="btn" disabled={saving||uploading}>{saving?"Lagrer …":"Lagre"}</button>{!isNew&&<button type="button" className="btn alt" onClick={()=>setEditing(false)}>Avbryt</button>}</div></form>;
 }
-function RentalCalendar({items,bookings,blocks}){
+function RentalCalendar({items,bookings,blocks,onOpenBooking,onOpenBlock}){
  const [month,setMonth]=useState(()=>new Date().toISOString().slice(0,7));
  const first=new Date(month+"-01T12:00:00"),year=first.getFullYear(),m=first.getMonth(),days=new Date(year,m+1,0).getDate(),offset=(new Date(year,m,1).getDay()+6)%7;
  const cells=[...Array(offset).fill(null),...Array.from({length:days},(_,i)=>i+1)];
  function iso(day){return month+"-"+String(day).padStart(2,"0")}
- function events(day){const d=iso(day),out=[];(bookings||[]).filter(b=>b.status!=="cancelled"&&b.startDate<=d&&b.endDate>=d).forEach(b=>out.push({kind:"booking",label:(b.itemName||"Utstyr")+" · "+(b.customer?.name||"Kunde")}));(blocks||[]).filter(b=>b.startDate<=d&&b.endDate>=d).forEach(b=>out.push({kind:"block",label:(items||[]).find(i=>i.id===b.itemId)?.name||"Blokkert"}));return out}
+ function events(day){
+  const d=iso(day),out=[];
+  (bookings||[]).filter(b=>b.status!=="cancelled"&&b.startDate<=d&&b.endDate>=d).forEach(b=>out.push({
+   id:b.id,kind:"booking",label:(b.itemName||"Utstyr")+" · "+(b.customer?.name||"Kunde"),
+   title:b.bookingNumber||"Utleiebooking",meta:b.startDate+" – "+b.endDate
+  }));
+  (blocks||[]).filter(b=>b.startDate<=d&&b.endDate>=d).forEach(b=>{
+   const item=(items||[]).find(i=>i.id===b.itemId);
+   out.push({id:b.id,itemId:b.itemId,kind:"block",label:(item?.name||"Utstyr")+" · blokkert",title:item?.name||"Blokkert periode",meta:b.startDate+" – "+b.endDate+(b.reason?" · "+b.reason:"")});
+  });
+  return out;
+ }
  function move(n){const d=new Date(year,m+n,1);setMonth(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"))}
- return <div className="card rentalCalendar"><div className="calendarHead"><div><div className="kicker">UTLEIEKALENDER</div><h3>{first.toLocaleDateString("nb-NO",{month:"long",year:"numeric"})}</h3></div><div><button className="btn alt" onClick={()=>move(-1)}>←</button><button className="btn alt" onClick={()=>setMonth(new Date().toISOString().slice(0,7))}>I dag</button><button className="btn alt" onClick={()=>move(1)}>→</button></div></div>
- <div className="calendarGrid">{["Man","Tir","Ons","Tor","Fre","Lør","Søn"].map(x=><b className="calendarWeekday" key={x}>{x}</b>)}{cells.map((day,i)=>day?<div className="calendarDay" key={i}><strong>{day}</strong>{events(day).map((e,j)=><span className={"calendarEvent "+e.kind} key={j}>{e.label}</span>)}</div>:<div className="calendarDay empty" key={i}/>)}</div><p className="muted">Bookinger og manuelt blokkerte perioder vises samlet. Serviceperioder kan fortsatt legges inn under Utleieutstyr.</p></div>;
+ function openEvent(event){
+  if(event.kind==="booking")onOpenBooking?.(event.id);
+  else onOpenBlock?.(event.itemId);
+ }
+ return <div className="card rentalCalendar adminCompactCalendar"><div className="calendarHead"><div><div className="kicker">UTLEIEKALENDER</div><h3>{first.toLocaleDateString("nb-NO",{month:"long",year:"numeric"})}</h3></div><div><button className="btn alt" onClick={()=>move(-1)}>←</button><button className="btn alt" onClick={()=>setMonth(new Date().toISOString().slice(0,7))}>I dag</button><button className="btn alt" onClick={()=>move(1)}>→</button></div></div>
+ <div className="calendarGrid">{["Man","Tir","Ons","Tor","Fre","Lør","Søn"].map(x=><b className="calendarWeekday" key={x}>{x}</b>)}{cells.map((day,i)=>day?<div className="calendarDay" key={i}><strong>{day}</strong>{events(day).map((e,j)=><button type="button" title={e.title+" · "+e.meta} className={"calendarEvent "+e.kind} key={e.kind+"-"+e.id+"-"+j} onClick={()=>openEvent(e)}>{e.label}</button>)}</div>:<div className="calendarDay empty" key={i}/>)}</div><p className="muted">Klikk på en booking for å åpne hele bookingen. Klikk på en blokkert/serviceperiode for å gå til utstyret.</p></div>;
+}
+
+function JobCalendar({orders,onOpenJob}){
+ const [month,setMonth]=useState(()=>new Date().toISOString().slice(0,7));
+ const first=new Date(month+"-01T12:00:00"),year=first.getFullYear(),m=first.getMonth(),days=new Date(year,m+1,0).getDate(),offset=(new Date(year,m,1).getDay()+6)%7;
+ const cells=[...Array(offset).fill(null),...Array.from({length:days},(_,i)=>i+1)];
+ function iso(day){return month+"-"+String(day).padStart(2,"0")}
+ function move(n){const d=new Date(year,m+n,1);setMonth(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"))}
+ function events(day){
+  const date=iso(day);
+  return (orders||[])
+   .filter(order=>order.jobStartAt&&String(order.jobStartAt).slice(0,10)===date&&!["cancelled"].includes(order.status))
+   .sort((a,b)=>String(a.jobStartAt).localeCompare(String(b.jobStartAt)));
+ }
+ return <div className="card jobCalendar adminCompactCalendar">
+  <div className="calendarHead"><div><div className="kicker">OPPDRAGSKALENDER</div><h3>{first.toLocaleDateString("nb-NO",{month:"long",year:"numeric"})}</h3></div><div><button className="btn alt" onClick={()=>move(-1)}>←</button><button className="btn alt" onClick={()=>setMonth(new Date().toISOString().slice(0,7))}>I dag</button><button className="btn alt" onClick={()=>move(1)}>→</button></div></div>
+  <div className="calendarGrid">
+   {["Man","Tir","Ons","Tor","Fre","Lør","Søn"].map(x=><b className="calendarWeekday" key={x}>{x}</b>)}
+   {cells.map((day,i)=>day?<div className="calendarDay" key={i}><strong>{day}</strong>{events(day).map(order=><button type="button" className="calendarEvent job" key={order.id} onClick={()=>onOpenJob?.(order.id)} title={(order.sourceQuoteTitle||"Oppdrag")+" · "+(order.customerName||"Kunde")}><b>{new Date(order.jobStartAt).toLocaleTimeString("nb-NO",{hour:"2-digit",minute:"2-digit",timeZone:"Europe/Oslo"})}</b> {order.sourceQuoteTitle||order.customerName||"Oppdrag"}</button>)}</div>:<div className="calendarDay empty" key={i}/>)}
+  </div>
+  <p className="muted">Oppdrag vises på avtalt oppstartsdato. Klikk på oppdraget i kalenderen for å åpne oppdragskortet.</p>
+ </div>;
 }
 
 const rentalPaymentMigrationSql=`alter table public.rental_bookings add column if not exists payment_reference text;
@@ -4375,7 +4438,7 @@ alter table public.rental_bookings add column if not exists deposit_received_at 
 alter table public.rental_bookings add column if not exists deposit_released_at timestamptz;
 alter table public.rental_bookings add column if not exists deposit_charged_ore integer not null default 0;`;
 
-function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired=false}){
+function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired=false,initialOpenId=""}){
  const statuses={new:"Ny",confirmed:"Bekreftet",active:"Utlevert",returned:"Returnert",completed:"Ferdig",cancelled:"Avbrutt"};
  const paymentLabels={unpaid:"Ikke betalt",pending:"Venter",authorized:"Reservert",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert",cancelled:"Kansellert"};
  const depositLabels={not_paid:"Ikke mottatt",held:"Holdes",released:"Frigitt",partially_charged:"Delvis brukt",charged:"Brukt"};
@@ -4420,6 +4483,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
  const [message,setMessage]=useState("");
  const [openId,setOpenId]=useState(null);
  const [migrationCopied,setMigrationCopied]=useState(false);
+ useEffect(()=>{if(initialOpenId)setOpenId(initialOpenId)},[initialOpenId]);
 
  async function patch(id,changes){
   setMessage("");
