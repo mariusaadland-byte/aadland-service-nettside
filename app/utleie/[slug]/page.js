@@ -332,7 +332,7 @@ export default function RentalDetailPage(){
    <div className="catalogWrap">
     <form className="rentalBookingCard" onSubmit={book}>
      <div className="rentalBookingIntro">
-      <span className="catalogEyebrow">BOOKINGFORESPØRSEL</span>
+      <span className="catalogEyebrow">BOOKING</span>
       <h2>{item.name}</h2>
       <p>{displayDate(chosen.startDate)} – {displayDate(chosen.endDate)}</p>
       <div className="rentalBookingPrice"><b>{kr(chosen.pricing?.totalOre)}</b>{item.depositOre>0&&<span>+ depositum {kr(item.depositOre)}</span>}</div>
@@ -348,7 +348,7 @@ export default function RentalDetailPage(){
       <label><span>Henting / levering</span><select value={fulfillment} onChange={e=>setFulfillment(e.target.value)}>{item.pickupAvailable&&<option value="pickup">Jeg henter selv</option>}{item.deliveryAvailable&&<option value="delivery">Jeg ønsker levering</option>}</select></label>
       <label className="rentalTerms"><input type="checkbox" required checked={accepted} onChange={e=>setAccepted(e.target.checked)}/><span>Jeg godtar <a href="/vilkar/utleie" target="_blank" rel="noreferrer">utleiebetingelsene</a>.</span></label>
       <div className="rentalBookingActions">
-       <button className="catalogGoldButton" disabled={booking}>{booking?"Sender …":"Send bookingforespørsel →"}</button>
+       <button className="catalogGoldButton" disabled={booking}>{booking?"Sender …":"Send booking →"}</button>
        <button type="button" className="rentalCancelButton" disabled={booking} onClick={()=>setChosen(null)}>Endre periode</button>
       </div>
      </div>
