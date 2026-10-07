@@ -9,9 +9,9 @@ const itemHeight=item=>Math.max(80,Number(item?.modelHeight)||({
  bed:550,nightstand:550,dresser:900,desk:750,bookshelf:1900,vanity:780,armchair:900,ottoman:450,headboard:1200,
  wardrobe:2100,sofa:850,table:750,chair:900,tv:750,base:900,wallcab:700,tallcab:2200,fridge:2000,oven:900,dishwasher:850,island:900
 })[item?.type]||600);
-const electrical=new Set(["ceilinglight","downlight","walllight","outlet","doubleoutlet","switch","dimmer","thermostat","junction"]);
+const electrical=new Set(["ceilinglight","downlight","ledstrip","walllight","outlet","doubleoutlet","switch","dimmer","thermostat","junction"]);
 const wallElectrical=new Set(["walllight","outlet","doubleoutlet","switch","dimmer","thermostat"]);
-const ceilingElectrical=new Set(["ceilinglight","downlight","junction"]);
+const ceilingElectrical=new Set(["ceilinglight","downlight","ledstrip","junction"]);
 const openingTypes=new Set(["door","sliding","window","opening"]);
 
 function rotatedCorners(item){
@@ -57,6 +57,7 @@ function PlanView({doc}){
    return <polygon key={item.id} points={pointsAttr(c)} fill={openingTypes.has(item.type)?"#dfeaec":"#dcc598"} stroke="#6a5738" strokeWidth="18"/>;
   })}
   {(doc.items||[]).filter(item=>electrical.has(item.type)).map(item=>{
+   if(item.type==="ledstrip")return <polygon key={item.id} points={pointsAttr(rotatedCorners(item))} fill="#fff0a8" stroke="#8c6b1f" strokeWidth="16"/>;
    const cx=(Number(item.x)||0)+(Number(item.w)||0)/2,cy=(Number(item.y)||0)+(Number(item.h)||0)/2;
    return <circle key={item.id} cx={cx} cy={cy} r="70" fill="#f1d66d" stroke="#80631f" strokeWidth="16"/>;
   })}
@@ -85,6 +86,10 @@ function ThreeDView({doc,camera}){
   </g>})}
   {itemRows.map(item=>{
    const center={x:(Number(item.x)||0)+(Number(item.w)||0)/2,y:(Number(item.y)||0)+(Number(item.h)||0)/2};
+   if(item.type==="ledstrip"){
+    const z=ceilingHeight(item,doc)-12,top=rotatedCorners(item).map(p=>project(p.x,p.y,z));
+    return <polygon key={item.id} points={pointsAttr(top)} fill="#ffe78a" stroke="#8b6a1f" strokeWidth="10"/>;
+   }
    if(electrical.has(item.type)){
     const z=ceilingHeight(item,doc),p=project(center.x,center.y,z),size=80;
     return <polygon key={item.id} points={pointsAttr([{x:p.x,y:p.y-size},{x:p.x+size,y:p.y},{x:p.x,y:p.y+size},{x:p.x-size,y:p.y}])} fill="#efd86f" stroke="#7f6722" strokeWidth="10"/>;
