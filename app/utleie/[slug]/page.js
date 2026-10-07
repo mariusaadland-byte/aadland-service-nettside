@@ -265,7 +265,7 @@ export default function RentalDetailPage(){
    });
    const data=await response.json().catch(()=>({}));
    if(!response.ok)throw new Error(data.error||"Kunne ikke sende booking.");
-   setMessage("Booking "+data.bookingNumber+" er mottatt. Vi tar kontakt med deg.");
+   setMessage(data.message||("Booking "+data.bookingNumber+" er registrert. Sjekk innboks og søppelpost for e-post om leien."));
    setChosen(null);
    setAccepted(false);
    setCustomer(customerAccount?{
@@ -323,7 +323,7 @@ export default function RentalDetailPage(){
    </div>
   </section>
 
-  {message&&<div className="catalogWrap"><div className="rentalMessage success"><b>Booking mottatt</b><p>{message}</p>{customerAccount&&<Link className="catalogGoldButton" href="/min-side">Se bookingen på Min side →</Link>}</div></div>}
+  {message&&<div className="catalogWrap"><div className="rentalMessage success"><b>Booking registrert</b><p>{message}</p><p><strong>Finner du ikke e-posten, sjekk søppelpost/spam.</strong></p>{customerAccount&&<Link className="catalogGoldButton" href="/min-side">Se bookingen på Min side →</Link>}</div></div>}
   {error&&<div className="catalogWrap"><div className="rentalMessage notice"><b>Noe gikk galt</b><p>{error}</p></div></div>}
 
   {canFulfill&&item.status==="available"&&<div className="catalogWrap rentalDetailCalendarWrap"><RentalCalendar item={item} onChoose={choosePeriod} refreshKey={refreshKey}/></div>}
