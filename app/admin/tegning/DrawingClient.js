@@ -530,8 +530,8 @@ function WallElevationPreview({wall,items,zones=[],onSelectItem,selectedItemId,g
  if(!wall)return null;
  const L=Math.max(1,len(wall)),H=Math.max(300,Number(wall.h)||2400),padX=Math.max(140,L*.035),padY=Math.max(140,H*.07);
  const wallItems=(items||[]).filter(item=>item.wallId===wall.id).sort((a,b)=>(Number(a.wallOffset)||0)-(Number(b.wallOffset)||0));
- const projectedFurniture=gapPickMode?wallProjectedFurniture(wall,items,zones):[];
- const blockingFurniture=gapPickMode?projectedFurniture.filter(row=>row.blocksGap):[];
+ const projectedFurniture=wallProjectedFurniture(wall,items,zones);
+ const blockingFurniture=projectedFurniture.filter(row=>row.blocksGap);
  const freeGaps=gapPickMode?wallFurnitureGaps(wall,items,zones):[];
  const itemBox=item=>{
   const gaps=wallEdgeOffsets(item,wall),width=Math.max(60,Number(item.w)||120),start=gaps.start;
@@ -553,10 +553,12 @@ function WallElevationPreview({wall,items,zones=[],onSelectItem,selectedItemId,g
   <line x1="0" y1={H} x2={L} y2={H} stroke="#2b2a27" strokeWidth="22"/>
   <text x={L/2} y={-55} textAnchor="middle" fontSize="80" fontWeight="800" fill="#554a37">{L} mm</text>
   <text x={-70} y={H/2} textAnchor="middle" transform={"rotate(-90 -70 "+H/2+")"} fontSize="74" fontWeight="700" fill="#554a37">{Math.round(H)} mm</text>
-  {gapPickMode&&projectedFurniture.slice().reverse().map(({item,start,end,distance,blocksGap})=>{
-   const height=Math.max(80,Math.min(H,modelHeight(item))),z0=Math.max(0,Number(item.elevation)||0),y=H-Math.min(H,z0+height),w=Math.max(60,end-start),opacity=blocksGap?.96:.58;
+  {projectedFurniture.slice().reverse().map(({item,start,end,distance,blocksGap})=>{
+   const height=Math.max(80,Math.min(H,modelHeight(item))),z0=Math.max(0,Number(item.elevation)||0),y=H-Math.min(H,z0+height),w=Math.max(60,end-start);
+   const opacity=gapPickMode?(blocksGap?.96:.58):.82;
+   const fill=gapPickMode?(blocksGap?"#cdb489":"#e8e1d6"):"#ddd0b7",stroke=gapPickMode?(blocksGap?"#5f482c":"#9d9589"):"#756044";
    return <g key={"context-"+item.id} opacity={opacity} pointerEvents="none">
-    <rect x={start} y={y} width={w} height={Math.min(height,H-y)} rx="18" fill={blocksGap?"#cdb489":"#e8e1d6"} stroke={blocksGap?"#5f482c":"#9d9589"} strokeWidth={blocksGap?20:12} strokeDasharray={blocksGap?undefined:"28 20"}/>
+    <rect x={start} y={y} width={w} height={Math.min(height,H-y)} rx="18" fill={fill} stroke={stroke} strokeWidth={gapPickMode?(blocksGap?20:12):14} strokeDasharray={gapPickMode&&!blocksGap?"28 20":undefined}/>
     <text x={start+w/2} y={Math.max(70,y+75)} textAnchor="middle" fontSize="58" fontWeight="900" fill="#493d2d">{item.customName||labelFor(item.type)}</text>
     <text x={start+w/2} y={Math.min(H-35,y+145)} textAnchor="middle" fontSize="48" fontWeight="700" fill="#665846">{Math.round(w)} mm · sett forfra</text>
    </g>
@@ -1733,8 +1735,8 @@ export default function DrawingClient(){
      {isCustom&&<><label>Møbelhøyde (mm)<CommitNumberInput min="50" value={Math.round(modelHeight(wallSelectedItem))} onCommit={value=>updateWallVerticalItem(wallSelectedItem.id,"modelHeight",value)}/></label><label>Fra gulv (mm)<CommitNumberInput min="0" value={Math.round(Number(wallSelectedItem.elevation)||0)} onCommit={value=>updateWallVerticalItem(wallSelectedItem.id,"elevation",value)}/></label><div className={styles.wallFurnitureDimensions}><b>Feltbredder</b>{furnitureGridMetrics(wallSelectedItem).colWidths.map((value,i)=><label key={"wcw-"+i+"-"+value}>F{i+1}<CommitNumberInput min="50" value={value} onCommit={next=>updateCustomFurnitureColumn(wallSelectedItem.id,i,next)}/><span>mm</span></label>)}</div><div className={styles.wallFurnitureDimensions}><b>Radhøyder</b>{furnitureGridMetrics(wallSelectedItem).rowHeights.map((value,i)=><label key={"wrh-"+i+"-"+value}>R{i+1}<CommitNumberInput min="50" value={value} onCommit={next=>updateCustomFurnitureRow(wallSelectedItem.id,i,next)}/><span>mm</span></label>)}</div><div className={styles.wallFurnitureFronts}><b>Fronter</b>{furnitureCellArray(wallSelectedItem.sectionsX,wallSelectedItem.sectionsY,wallSelectedItem.cellTypes,"open").map((type,i)=><button type="button" key={"wfront-"+i} onClick={()=>{const cells=furnitureCellArray(wallSelectedItem.sectionsX,wallSelectedItem.sectionsY,wallSelectedItem.cellTypes,"open");cells[i]=nextFurnitureCellType(cells[i]);mutate(d=>({...d,items:d.items.map(o=>o.id===wallSelectedItem.id?{...o,cellTypes:cells}:o)}))}}>F{i+1}: {furnitureCellLabel(type)}</button>)}</div></>}
      <div className={styles.wallInlineActions}><button type="button" onClick={duplicate}>Dupliser</button><button type="button" onClick={remove}>Slett</button></div>
     </div>})()}
-    <div className={styles.wallViewHint}>{furnitureGapPick?<><b>Velg mellomrom rett forfra:</b> du ser den valgte veggen frontalt. Seng, garderobe, kommode, skap og andre møbler i rommet projiseres inn på veggen med riktig plassering langs veggen og riktig høyde. De grønne feltene er de ledige breddene mellom møblene. Trykk på feltet du vil fylle, så får møbelet automatisk akkurat den bredden og plasseres på veggen der.</>:<>Klikk et objekt på veggen for å redigere det uten å forlate veggvisningen. Rutenettet er 100 mm. Vegglengde, vegghøyde, åpninger, EL-punkter og egne møbler vises i samme frontvisning.</>}</div>
-    <footer><span>Vegg: <b>{len(wallForView)} × {Math.round(Number(wallForView.h)||2400)} × {Math.round(Number(wallForView.t)||98)} mm</b></span><span>Objekter: <b>{doc.items.filter(item=>item.wallId===wallForView.id).length}</b></span><button type="button" onClick={()=>setWallViewId(null)}>Tilbake til plantegning →</button></footer>
+    <div className={styles.wallViewHint}>{furnitureGapPick?<><b>Velg mellomrom rett forfra:</b> du ser den valgte veggen frontalt. Seng, garderobe, kommode, skap og andre møbler i rommet projiseres inn på veggen med riktig plassering langs veggen og riktig høyde. De grønne feltene er de ledige breddene mellom møblene. Trykk på feltet du vil fylle, så får møbelet automatisk akkurat den bredden og plasseres på veggen der.</>:<><b>Frontvisning av rommet:</b> møbler som står i rommet vises projisert rett mot valgt vegg, sammen med dører, vinduer, EL-punkter og veggmonterte møbler. Klikk et objekt som er festet til veggen for å redigere det.</>}</div>
+    <footer><span>Vegg: <b>{len(wallForView)} × {Math.round(Number(wallForView.h)||2400)} × {Math.round(Number(wallForView.t)||98)} mm</b></span><span>På veggen: <b>{doc.items.filter(item=>item.wallId===wallForView.id).length}</b></span><span>Rom-møbler forfra: <b>{wallProjectedFurniture(wallForView,doc.items,doc.zones||[]).length}</b></span><button type="button" onClick={()=>setWallViewId(null)}>Tilbake til plantegning →</button></footer>
    </section>
   </div>}
   {furnitureBuilder&&<div className={styles.furnitureBuilderBackdrop} role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)setFurnitureBuilder(null)}}>
