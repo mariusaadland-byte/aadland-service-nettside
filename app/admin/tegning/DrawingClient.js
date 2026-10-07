@@ -228,12 +228,16 @@ function wallProjectedFurniture(wall,items,zones=[],walls=[],defaultThickness=98
   return {item,start,end,width:Math.max(0,end-start),distance,blockDistance,blocksGap,sameRoom};
  }).filter(row=>row.visible).sort((a,b)=>a.distance-b.distance);
 }
-function wallFurnitureGaps(wall,items,zones=[],walls=[],defaultThickness=98,excludeId=null){
- const face=wallFaceMetrics(wall,zones,walls,defaultThickness),L=Math.max(1,face.L);
+function wallFurnitureGaps(wall,items,zones=[],walls=[],defaultThickness=98,excludeId=null,verticalRange=null){
+ const face=wallFaceMetrics(wall,zones,walls,defaultThickness),L=Math.max(1,face.L),overlapsHeight=item=>{
+  if(!verticalRange)return true;
+  const z0=openingTypes.has(item.type)?(item.type==="window"?Math.max(0,Number(item.sillHeight)||0):0):Math.max(0,Number(item.elevation)||0),z1=openingTypes.has(item.type)?z0+Math.max(100,Number(item.openingHeight)||openingDefaults(item.type).openingHeight||2100):z0+Math.max(50,modelHeight(item));
+  return z0<Number(verticalRange.z1)-2&&z1>Number(verticalRange.z0)+2;
+ };
  const mounted=(items||[])
-  .filter(item=>item.wallId===wall.id&&item.id!==excludeId&&!wallElectricalTypes.has(item.type)&&!["railing","screen"].includes(item.type))
+  .filter(item=>item.wallId===wall.id&&item.id!==excludeId&&!wallElectricalTypes.has(item.type)&&!["railing","screen"].includes(item.type)&&overlapsHeight(item))
   .map(item=>{const gaps=wallFaceOffsets(item,wall,zones,walls,defaultThickness),start=clamp(gaps.start,0,L),end=clamp(gaps.start+Math.max(0,Number(item.w)||0),0,L);return{start,end}});
- const floor=wallProjectedFurniture(wall,items,zones,walls,defaultThickness).filter(row=>row.item.id!==excludeId).map(row=>({start:row.start,end:row.end}));
+ const floor=wallProjectedFurniture(wall,items,zones,walls,defaultThickness).filter(row=>row.item.id!==excludeId&&row.blocksGap&&overlapsHeight(row.item)).map(row=>({start:row.start,end:row.end}));
  const blockers=[...mounted,...floor].filter(row=>row.end>row.start).sort((a,b)=>a.start-b.start);
  const merged=[];
  for(const row of blockers){
@@ -607,7 +611,7 @@ function FurnitureGapPlanPreview({doc,wall,onSelectGap}){
  </svg>;
 }
 
-function WallElevationPreview({wall,items,zones=[],walls=[],defaultWallThickness=98,onSelectItem,onMoveItem,onMoveStart,onMoveEnd,selectedItemId,gapPickMode=false,onSelectGap}){
+function WallElevationPreview({wall,items,zones=[],walls=[],defaultWallThickness=98,onSelectItem,onMoveItem,onMoveStart,onMoveEnd,selectedItemId,gapPickMode=false,onSelectGap,gapVerticalRange=null}){
  const svgRef=useRef(null),dragRef=useRef(null),[wallSnapGuide,setWallSnapGuide]=useState(null);
  if(!wall)return null;
  const face=wallFaceMetrics(wall,zones,walls,defaultWallThickness),L=Math.max(1,face.L),H=Math.max(300,Number(wall.h)||2400),padX=Math.max(140,L*.035),padY=Math.max(140,H*.07);
@@ -648,7 +652,7 @@ function WallElevationPreview({wall,items,zones=[],walls=[],defaultWallThickness
  const wallItems=(items||[]).filter(item=>item.wallId===wall.id).sort((a,b)=>(Number(a.wallOffset)||0)-(Number(b.wallOffset)||0));
  const projectedFurniture=wallProjectedFurniture(wall,items,zones,walls,defaultWallThickness);
  const blockingFurniture=projectedFurniture.filter(row=>row.blocksGap);
- const freeGaps=gapPickMode?wallFurnitureGaps(wall,items,zones,walls,defaultWallThickness):[];
+ const freeGaps=gapPickMode?wallFurnitureGaps(wall,items,zones,walls,defaultWallThickness,null,gapVerticalRange):[];
  const itemBox=item=>{
   const gaps=wallFaceOffsets(item,wall,zones,walls,defaultWallThickness),width=Math.min(L,Math.max(60,Number(item.w)||120)),start=clamp(gaps.start,0,Math.max(0,L-width));
   if(openingTypes.has(item.type)){
@@ -1378,7 +1382,7 @@ export default function DrawingClient(){
   if(!wallId){setMessage("Tegn en vegg først");setTimeout(()=>setMessage(""),1800);return}
   const wall=doc.walls.find(w=>w.id===wallId);
   if(!wall){setMessage("Fant ikke valgt vegg");setTimeout(()=>setMessage(""),1800);return}
-  const gaps=wallFurnitureGaps(wall,doc.items,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
+  const verticalRange={z0:Math.max(0,Number(furnitureBuilder.elevation)||0),z1:Math.max(0,Number(furnitureBuilder.elevation)||0)+Math.max(50,Number(furnitureBuilder.height)||900)},gaps=wallFurnitureGaps(wall,doc.items,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98,null,verticalRange);
   setFurnitureGapPick({...furnitureBuilder,mount:"wall",wallId});
   setFurnitureBuilder(null);
   setWallViewId(wallId);
@@ -2095,7 +2099,7 @@ export default function DrawingClient(){
      <button type="button" onClick={()=>addWallWorkspaceItem("thermostat",140,100)}>+ Termostat</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("walllight",180,100)}>+ Vegglampe</button>
     </div>
-    <div className={styles.wallViewCanvas+(furnitureGapPick?" "+styles.wallGapPickCanvas:"")}><WallElevationPreview wall={wallForView} items={doc.items} zones={doc.zones||[]} walls={doc.walls||[]} defaultWallThickness={doc.defaultWallThickness||98} selectedItemId={selected?.kind==="item"?selected.id:null} gapPickMode={!!furnitureGapPick} onSelectGap={chooseFurnitureGap} onMoveStart={beginWallItem2DMove} onMoveItem={moveWallItem2D} onMoveEnd={()=>{}} onSelectItem={item=>{if(!furnitureGapPick)setSelected({kind:"item",id:item.id})}}/></div>
+    <div className={styles.wallViewCanvas+(furnitureGapPick?" "+styles.wallGapPickCanvas:"")}><WallElevationPreview wall={wallForView} items={doc.items} zones={doc.zones||[]} walls={doc.walls||[]} defaultWallThickness={doc.defaultWallThickness||98} selectedItemId={selected?.kind==="item"?selected.id:null} gapPickMode={!!furnitureGapPick} gapVerticalRange={furnitureGapPick?{z0:Math.max(0,Number(furnitureGapPick.elevation)||0),z1:Math.max(0,Number(furnitureGapPick.elevation)||0)+Math.max(50,Number(furnitureGapPick.height)||900)}:null} onSelectGap={chooseFurnitureGap} onMoveStart={beginWallItem2DMove} onMoveItem={moveWallItem2D} onMoveEnd={()=>{}} onSelectItem={item=>{if(!furnitureGapPick)setSelected({kind:"item",id:item.id})}}/></div>
     {wallProjectedSelected&&<div className={styles.wallProjectedEditor}><div><strong>{wallProjectedSelected.customName||labelFor(wallProjectedSelected.type)}</strong><small>Dette møbelet står i rommet. Fest det til denne veggen for eksakt 2D-plassering.</small></div><button type="button" onClick={()=>snapRoomFurniture(wallProjectedSelected.id,"start",wallForView.id)}>← Helt i hjørne</button><button type="button" onClick={()=>snapRoomFurniture(wallProjectedSelected.id,"center",wallForView.id)}>Sentrer på vegg</button><button type="button" onClick={()=>snapRoomFurniture(wallProjectedSelected.id,"end",wallForView.id)}>Helt i hjørne →</button></div>}
     {wallSelectedItem&&(()=>{const gaps=wallFaceOffsets(wallSelectedItem,wallForView,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),neighbors=wallNeighborDistances(wallSelectedItem),isOpening=openingTypes.has(wallSelectedItem.type),isElectrical=wallElectricalTypes.has(wallSelectedItem.type),isCustom=wallSelectedItem.type==="customwall";return <div className={styles.wallInlineEditor}>
      <div><strong>{wallSelectedItem.customName||labelFor(wallSelectedItem.type)}</strong><small>Valgt på vegg {Math.max(1,doc.walls.findIndex(w=>w.id===wallForView.id)+1)}</small></div>
