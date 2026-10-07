@@ -1003,3 +1003,37 @@
  .furnitureSmartActions{display:grid;grid-template-columns:1fr;padding:0 10px 10px}
  .furnitureSmartActions button{min-height:46px}
 }
+
+
+/* Rich custom furniture builder */
+.furniturePreview .furnitureCellPreview{
+ width:min(460px,96%);max-height:300px;display:grid;border:8px solid #6e5633;background:#e8d6b6;overflow:hidden
+}
+.furnitureCellPreview button{
+ position:relative;display:grid;place-items:center;min-width:0;min-height:58px;border:1px solid #9a815a;background:#efe3cd;color:#4d3b25;
+ font:800 9px/1 inherit;cursor:pointer;overflow:hidden
+}
+.furnitureCellPreview button:hover{background:#f5ead7}
+.furnitureCellPreview button[data-cell-type="open"]{background:#f7f2e8}
+.furnitureCellPreview button[data-cell-type="door"]{background:#e6d2ad}
+.furnitureCellPreview button[data-cell-type="drawer"]{background:#dcc092}
+.furnitureCellPreview button[data-cell-type="shelf"]{background:#ead9bb}
+.furnitureCellPreview button b{position:relative;z-index:3;font-size:9px;letter-spacing:.05em}
+.furnitureCellPreview button i,.furnitureCellPreview button em{
+ position:absolute;left:10%;right:10%;height:2px;background:#7f6541;content:"";display:block
+}
+.furnitureCellPreview button i:first-of-type{top:34%}.furnitureCellPreview button i:last-of-type{top:66%}
+.furnitureCellPreview button em:first-of-type{top:38%}.furnitureCellPreview button em:last-of-type{top:70%}
+.furnitureDoorHandle{position:absolute;right:10%;top:45%;width:6px;height:16px;border-radius:6px;background:#6e5633}
+.furnitureCellHint{display:block;max-width:560px;text-align:center;color:#665f54;font-size:10px;line-height:1.45}
+.customCellEditor>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:6px}
+.customCellEditor button{
+ min-height:34px;border:1px solid #c9bea9;border-radius:7px;background:#f8f3e8;color:#4e4537;padding:0 8px;font:800 9px/1 inherit;cursor:pointer
+}
+.customCellEditor button:hover{background:#eee2ca}
+@media(max-width:700px){
+ .furniturePreview .furnitureCellPreview{width:100%;max-height:none}
+ .furnitureCellPreview button{min-height:64px}
+ .customCellEditor>div{grid-template-columns:1fr 1fr}
+ .customCellEditor button{min-height:42px}
+}
