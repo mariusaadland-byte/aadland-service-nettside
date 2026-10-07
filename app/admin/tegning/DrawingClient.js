@@ -567,10 +567,11 @@ function WallElevationPreview({wall,items,zones=[],onSelectItem,onMoveItem,onMov
  };
  const beginItemDrag=(e,item)=>{
   if(gapPickMode||!onMoveItem)return;
-  e.stopPropagation();e.currentTarget.setPointerCapture?.(e.pointerId);
+  e.stopPropagation();onSelectItem?.(item);if(item.locked)return;
+  e.currentTarget.setPointerCapture?.(e.pointerId);
   const gaps=wallEdgeOffsets(item,wall),elev=Math.max(0,Number(item.elevation)||0);
   dragRef.current={pointerId:e.pointerId,itemId:item.id,clientX:e.clientX,clientY:e.clientY,start:gaps.start,elevation:elev};
-  onSelectItem?.(item);onMoveStart?.(item);
+  onMoveStart?.(item);
  };
  const moveItemDrag=e=>{
   const drag=dragRef.current;if(!drag||drag.pointerId!==e.pointerId)return;
@@ -986,6 +987,25 @@ export default function DrawingClient(){
   if(diff>7)return endpoint;
   const rad=nearest*Math.PI/180,point={x:clamp(origin.x+Math.cos(rad)*L,0,VIEW),y:clamp(origin.y+Math.sin(rad)*L,0,VIEW)};
   return {point,snapped:true,label:(((nearest%360)+360)%360)+"°"};
+ };
+ const smartSnapFreeItem=(item,sourceDoc)=>{
+  if(!item||item.wallId||Math.abs(((Number(item.rot)||0)%90+90)%90)>1)return{item,guide:null};
+  const threshold=Math.max(35,90/(sourceDoc.zoom||1)),box=itemAabb(item),xPoints=[{v:box.left,k:"venstre kant"},{v:(box.left+box.right)/2,k:"senter"},{v:box.right,k:"høyre kant"}],yPoints=[{v:box.top,k:"topp"},{v:(box.top+box.bottom)/2,k:"midte"},{v:box.bottom,k:"bunn"}];
+  const otherX=[],otherY=[];
+  for(const o of sourceDoc.items||[]){
+   if(o.id===item.id||o.wallId||!isItemVisible(o))continue;
+   const b=itemAabb(o);otherX.push({v:b.left,k:"kant"},{v:(b.left+b.right)/2,k:"senter"},{v:b.right,k:"kant"});otherY.push({v:b.top,k:"kant"},{v:(b.top+b.bottom)/2,k:"midte"},{v:b.bottom,k:"kant"});
+  }
+  const zone=zoneContainingPoint(itemCenter(item),roomPlacementZones(sourceDoc.zones,sourceDoc.walls,sourceDoc.defaultWallThickness));
+  if(zone?.points?.length){
+   const xs=zone.points.map(p=>p.x),ys=zone.points.map(p=>p.y),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+   otherX.push({v:minX,k:"vegg"},{v:(minX+maxX)/2,k:"romsenter"},{v:maxX,k:"vegg"});otherY.push({v:minY,k:"vegg"},{v:(minY+maxY)/2,k:"romsenter"},{v:maxY,k:"vegg"});
+  }
+  let bestX=null,bestY=null;
+  for(const a of xPoints)for(const b of otherX){const delta=b.v-a.v;if(Math.abs(delta)<=threshold&&(!bestX||Math.abs(delta)<Math.abs(bestX.delta)))bestX={delta,x:b.v,label:a.k===b.k&&a.k==="senter"?"Sentrert":"Snap "+b.k}}
+  for(const a of yPoints)for(const b of otherY){const delta=b.v-a.v;if(Math.abs(delta)<=threshold&&(!bestY||Math.abs(delta)<Math.abs(bestY.delta)))bestY={delta,y:b.v,label:a.k===b.k&&a.k==="midte"?"Sentrert":"Snap "+b.k}}
+  const next={...item,x:item.x+(bestX?.delta||0),y:item.y+(bestY?.delta||0)};
+  return {item:next,guide:bestX||bestY?{x:bestX?.x??null,y:bestY?.y??null,label:[bestX?.label,bestY?.label].filter(Boolean).join(" · ")}:null};
  };
  const clampPanForZoom=(value,zoom)=>{const dims=viewDimsFor(zoom);return{x:clamp(value.x,0,Math.max(0,VIEW-dims.w)),y:clamp(value.y,0,Math.max(0,VIEW-dims.h))}};
  const zoomBy=delta=>setDoc(d=>{const oldZoom=d.zoom||1,oldDims=viewDimsFor(oldZoom),zoom=clamp(oldZoom+delta,.5,5),nextDims=viewDimsFor(zoom);setPan(p=>clampPanForZoom({x:p.x+oldDims.w/2-nextDims.w/2,y:p.y+oldDims.h/2-nextDims.h/2},zoom));return {...d,zoom}});
@@ -1559,9 +1579,34 @@ export default function DrawingClient(){
  const downMeasurementEnd=(e,m,end)=>{e.stopPropagation();capturePointer(e);setTool("select");setSelected({kind:"measurement",id:m.id});setMeasureDrag({id:m.id,end,start:JSON.stringify(doc)})};
  const moveMeasurementEnd=e=>{if(!measureDrag)return;const p=point(e),magnet=magneticPoint(p),q=magnet.point;setSnapHint(magnet.snapped?{...q,label:"Hjørne"}:null);setDoc(d=>({...d,measurements:(d.measurements||[]).map(m=>m.id!==measureDrag.id?m:measureDrag.end===1?{...m,x1:q.x,y1:q.y,anchor1:magnet.anchor||null}:{...m,x2:q.x,y2:q.y,anchor2:magnet.anchor||null})}))};
  const endMeasurementDrag=()=>{if(!measureDrag)return;setSnapHint(null);setHistory(h=>[...h.slice(-24),measureDrag.start]);setFuture([]);setMeasureDrag(null)};
- const downItem=(e,o)=>{if(["wall","measure","zone"].includes(tool)){e.stopPropagation();drawingPointDown(e);return}e.stopPropagation();capturePointer(e);setTool("select");setSelected({kind:"item",id:o.id});const p=point(e);setDrag({id:o.id,dx:p.x-o.x,dy:p.y-o.y,start:JSON.stringify(doc),startCenter:itemCenter(o)})};
- const move=e=>{if(panning){movePan(e);return}if(wallDrag){moveWallEnd(e);return}if(zoneDrag){moveZonePoint(e);return}if(measureDrag){moveMeasurementEnd(e);return}if(!drag)return;const p=point(e);setDoc(d=>({...d,items:d.items.map(o=>{if(o.id!==drag.id)return o;const proposed={...o,x:snapTo(p.x-drag.dx,d.snapSize||50),y:snapTo(p.y-drag.dy,d.snapSize||50)};return wallTypes.has(o.type)?proposed:constrainFreeItemStrict(proposed,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackItem:o,fallbackCenter:drag.startCenter,snapDistance:150})})}))};
- const up=e=>{if(e)releasePointer(e);if(panning){setPanning(null);return}if(wallDrag){endWallDrag();return}if(zoneDrag){endZoneDrag();return}if(measureDrag){endMeasurementDrag();return}if(!drag)return;setHistory(h=>[...h.slice(-24),drag.start]);setFuture([]);setDoc(d=>{const o=d.items.find(x=>x.id===drag.id);if(!o||!wallTypes.has(o.type))return d;const n=nearestWall({x:o.x+o.w/2,y:o.y+o.h/2},d.walls);if(!n||n.dist>450)return wallElectricalTypes.has(o.type)||o.type==="customwall"?JSON.parse(drag.start):{...d,items:d.items.map(x=>x.id!==o.id?x:{...x,wallId:null,wallOffset:null})};const a=Math.atan2(n.wall.y2-n.wall.y1,n.wall.x2-n.wall.x1)*180/Math.PI,limits=mountedLimits(o,n.wall),preferred=clamp(Math.round(n.t*limits.L)-o.w/2,0,Math.max(0,limits.L-o.w)),safeStart=openingTypes.has(o.type)?findOpeningStart(n.wall,o.w,d.items,o.id,preferred):preferred;if(safeStart==null)return JSON.parse(drag.start);const off=safeStart+o.w/2,base={...o,wallId:n.wall.id,wallOffset:off,rot:a},placed=mountedItemCenter(base,n.wall,d.zones||[]);return {...d,items:d.items.map(x=>x.id!==o.id?x:{...x,x:placed.cx-o.w/2,y:placed.cy-o.h/2,rot:placed.a*180/Math.PI,wallId:n.wall.id,wallOffset:placed.off})}});setDrag(null)};
+ const downItem=(e,o)=>{
+  if(["wall","measure","zone"].includes(tool)){e.stopPropagation();drawingPointDown(e);return}
+  e.stopPropagation();setTool("select");setSelected({kind:"item",id:o.id});
+  if(multiSelectMode||e.shiftKey){toggleMulti(o.id);return}
+  if(o.locked){setMessage("Objektet er låst");setTimeout(()=>setMessage(""),1200);return}
+  capturePointer(e);const p=point(e),groupIds=multiSelectedIds.length>1&&multiSelectedIds.includes(o.id)?multiSelectedIds.filter(id=>!doc.items.find(x=>x.id===id)?.locked):[];
+  const starts=groupIds.map(id=>{const item=doc.items.find(x=>x.id===id);return item?{id,x:item.x,y:item.y,center:itemCenter(item)}:null}).filter(Boolean);
+  setDrag({id:o.id,ids:groupIds,starts,startPointer:p,dx:p.x-o.x,dy:p.y-o.y,start:JSON.stringify(doc),startCenter:itemCenter(o)});
+ };
+ const move=e=>{
+  if(panning){movePan(e);return}if(wallDrag){moveWallEnd(e);return}if(zoneDrag){moveZonePoint(e);return}if(measureDrag){moveMeasurementEnd(e);return}if(!drag)return;
+  const p=point(e);
+  if(drag.ids?.length>1){
+   const dx=p.x-drag.startPointer.x,dy=p.y-drag.startPointer.y;setSnapGuide(null);
+   setDoc(d=>({...d,items:d.items.map(o=>{const start=drag.starts.find(x=>x.id===o.id);if(!start||o.wallId)return o;const proposed={...o,x:start.x+dx,y:start.y+dy};return constrainFreeItemStrict(proposed,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackItem:o,fallbackCenter:start.center,snapDistance:0})})}));return;
+  }
+  const current=doc.items.find(o=>o.id===drag.id);if(!current||current.locked)return;
+  let proposed={...current,x:snapTo(p.x-drag.dx,doc.snapSize||50),y:snapTo(p.y-drag.dy,doc.snapSize||50)};
+  if(!current.wallId){const snapped=smartSnapFreeItem(proposed,doc);proposed=snapped.item;setSnapGuide(snapped.guide)}else setSnapGuide(null);
+  setDoc(d=>({...d,items:d.items.map(o=>{if(o.id!==drag.id)return o;return o.wallId?proposed:constrainFreeItemStrict(proposed,roomPlacementZones(d.zones,d.walls,d.defaultWallThickness),{fallbackItem:o,fallbackCenter:drag.startCenter,snapDistance:150})})}));
+ };
+ const up=e=>{
+  if(e)releasePointer(e);if(panning){setPanning(null);return}if(wallDrag){endWallDrag();return}if(zoneDrag){endZoneDrag();return}if(measureDrag){endMeasurementDrag();return}if(!drag)return;
+  setSnapGuide(null);setHistory(h=>[...h.slice(-24),drag.start]);setFuture([]);
+  if(drag.ids?.length>1){setDrag(null);return}
+  setDoc(d=>{const o=d.items.find(x=>x.id===drag.id);if(!o||!wallTypes.has(o.type)||o.locked)return d;const n=nearestWall({x:o.x+o.w/2,y:o.y+o.h/2},d.walls);if(!n||n.dist>450)return wallElectricalTypes.has(o.type)||o.type==="customwall"?JSON.parse(drag.start):{...d,items:d.items.map(x=>x.id!==o.id?x:{...x,wallId:null,wallOffset:null})};const limits=mountedLimits(o,n.wall),preferred=clamp(Math.round(n.t*limits.L)-o.w/2,0,Math.max(0,limits.L-o.w)),safeStart=openingTypes.has(o.type)?findOpeningStart(n.wall,o.w,d.items,o.id,preferred):preferred;if(safeStart==null)return JSON.parse(drag.start);const off=safeStart+o.w/2,base={...o,wallId:n.wall.id,wallOffset:off},placed=mountedItemCenter(base,n.wall,d.zones||[]);return {...d,items:d.items.map(x=>x.id!==o.id?x:{...base,x:placed.cx-o.w/2,y:placed.cy-o.h/2,rot:placed.a*180/Math.PI,wallOffset:placed.off})}});
+  setDrag(null);
+ };
  const applyCanvasPoint=p=>{
   setSelected(null);
   const magnet=tool==="wall"&&draft?wallMagneticPoint(p,draft):magneticPoint(p),q=magnet.point;
@@ -1597,7 +1642,7 @@ export default function DrawingClient(){
  const canvasDown=e=>{
   if(e.target.dataset?.canvas!=="yes")return;
   if(tool==="pan"){startPan(e);return}
-  if(tool==="select"){setSelected(null);return}
+  if(tool==="select"){setSelected(null);setMultiSelectedIds([]);return}
   drawingPointDown(e);
  };
  const summary=useMemo(()=>{
