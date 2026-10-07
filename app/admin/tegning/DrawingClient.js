@@ -391,14 +391,20 @@ function centerlinePointsFromInner(points,wallIds,walls,defaultThickness=98,thic
 }
 function rebuildLinkedRoomGeometry(doc,zone,innerPoints,thicknessOverrides={}){
  if(!zone||!Array.isArray(zone.wallIds)||zone.wallIds.length!==innerPoints?.length)return doc;
+ const linkedIds=new Set(zone.wallIds),oldFaceStarts=new Map();
+ for(const item of doc.items||[]){
+  if(!item.wallId||!linkedIds.has(item.wallId))continue;const oldWall=(doc.walls||[]).find(w=>w.id===item.wallId);if(!oldWall)continue;
+  oldFaceStarts.set(item.id,wallFaceOffsets(item,oldWall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98).start);
+ }
  const centers=centerlinePointsFromInner(innerPoints,zone.wallIds,doc.walls||[],doc.defaultWallThickness||98,thicknessOverrides),indexById=new Map(zone.wallIds.map((id,i)=>[id,i]));
  const walls=(doc.walls||[]).map(w=>{
   const i=indexById.get(w.id);if(i==null)return w;const a=centers[i],b=centers[(i+1)%centers.length],nextT=thicknessOverrides?.[w.id];
   return {...w,x1:a.x,y1:a.y,x2:b.x,y2:b.y,...(nextT==null?{}:{t:Number(nextT)})};
  });
  const zones=syncLinkedZones(walls,doc.zones||[]),measurements=syncAnchoredMeasurements(walls,doc.measurements||[]),items=(doc.items||[]).map(item=>{
-  if(!item.wallId)return item;const wall=walls.find(w=>w.id===item.wallId);if(!wall)return {...item,wallId:null,wallOffset:null};const placed=mountedItemCenter(item,wall,zones);
-  return {...item,x:placed.cx-(Number(item.w)||0)/2,y:placed.cy-(Number(item.h)||0)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off};
+  if(!item.wallId)return item;const wall=walls.find(w=>w.id===item.wallId);if(!wall)return {...item,wallId:null,wallOffset:null};
+  const remembered=oldFaceStarts.get(item.id),base=remembered==null?item:{...item,wallOffset:wallOffsetFromFaceStart(wall,remembered,Number(item.w)||0,zones,walls,doc.defaultWallThickness||98)},placed=mountedItemCenter(base,wall,zones);
+  return {...base,x:placed.cx-(Number(base.w)||0)/2,y:placed.cy-(Number(base.h)||0)/2,rot:placed.a*180/Math.PI,wallOffset:placed.off};
  });
  return {...doc,walls,zones,measurements,items};
 }
