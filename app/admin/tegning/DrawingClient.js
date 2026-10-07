@@ -665,6 +665,20 @@ function zoneSurveyStatusText(state){
 }
 
 const initial=()=>({id:uid(),name:"Ny tegning",orderId:"",projectId:"",customerUserId:"",customerVisible:false,customer:"",address:"",notes:"",visualizationNotes:"",walls:[],items:[],zones:[],measurements:[],snapSize:50,showGrid:true,scale:"1:50",zoom:1,defaultWallThickness:98,defaultWallHeight:2400});
+function normalizeDrawingDocument(raw){
+ const base={...initial(),...(raw&&typeof raw==="object"?raw:{})},walls=Array.isArray(base.walls)?base.walls:[],zones=Array.isArray(base.zones)?base.zones:[],measurements=Array.isArray(base.measurements)?base.measurements:[],wallIds=new Set(walls.map(w=>w.id));
+ const items=(Array.isArray(base.items)?base.items:[]).map(item=>{
+  let next={...item};
+  if(next.wallId&&!wallIds.has(next.wallId))next={...next,wallId:null,wallOffset:null};
+  if(["customwall","customfloor"].includes(next.type)){
+   const sectionsX=clamp(Math.round(Number(next.sectionsX)||1),1,8),sectionsY=clamp(Math.round(Number(next.sectionsY)||1),1,6),width=Math.max(100,Number(next.w)||1000),height=Math.max(50,Number(next.modelHeight)||item3DHeight[next.type]||900);
+   next={...next,sectionsX,sectionsY,modelHeight:height,cellTypes:furnitureCellArray(sectionsX,sectionsY,next.cellTypes,"open"),colWidths:furnitureDimArray(sectionsX,width,next.colWidths),rowHeights:furnitureDimArray(sectionsY,height,next.rowHeights)};
+  }
+  if(electricalTypes.has(next.type))next={...next,circuit:String(next.circuit||""),itemNote:String(next.itemNote||"")};
+  return next;
+ });
+ return {...base,walls,zones,measurements,items};
+}
 const wallTypes=new Set(["door","sliding","window","opening","railing","screen","walllight","outlet","doubleoutlet","switch","dimmer","thermostat","customwall"]);
 const openingTypes=new Set(["door","sliding","window","opening"]);
 const openingDefaults=type=>type==="window"?{openingHeight:1200,sillHeight:900}:openingTypes.has(type)?{openingHeight:2100,sillHeight:0}:{};
@@ -711,7 +725,7 @@ export default function DrawingClient(){
  },[]);
 
  useEffect(()=>{const el=svg.current;if(!el||typeof ResizeObserver==="undefined")return;const update=()=>{const r=el.getBoundingClientRect();if(r.width>0&&r.height>0)setCanvasAspect(clamp(r.width/r.height,.35,2.8))};update();const observer=new ResizeObserver(update);observer.observe(el);window.addEventListener("orientationchange",update);return()=>{observer.disconnect();window.removeEventListener("orientationchange",update)}},[]);
- useEffect(()=>{try{const d=JSON.parse(localStorage.getItem(STORE)||"[]");if(d.length){const lastId=localStorage.getItem(LAST_STORE),active=d.find(item=>item.id===lastId)||d[0];setDocs(d);setDoc({...initial(),...active})}else{const old=JSON.parse(localStorage.getItem("aadlandDrawing")||"null");if(old)setDoc({...initial(),...old})}}catch{} try{const templates=JSON.parse(localStorage.getItem(FURNITURE_TEMPLATE_STORE)||"[]");if(Array.isArray(templates))setCustomFurnitureTemplates(templates.slice(0,24))}catch{} Promise.all([
+ useEffect(()=>{try{const d=JSON.parse(localStorage.getItem(STORE)||"[]");if(d.length){const lastId=localStorage.getItem(LAST_STORE),active=d.find(item=>item.id===lastId)||d[0];setDocs(d);setDoc(normalizeDrawingDocument(active))}else{const old=JSON.parse(localStorage.getItem("aadlandDrawing")||"null");if(old)setDoc(normalizeDrawingDocument(old))}}catch{} try{const templates=JSON.parse(localStorage.getItem(FURNITURE_TEMPLATE_STORE)||"[]");if(Array.isArray(templates))setCustomFurnitureTemplates(templates.slice(0,24))}catch{} Promise.all([
   fetch("/api/admin/orders").then(r=>r.ok?r.json():null).catch(()=>null),
   fetch("/api/admin/projects").then(r=>r.ok?r.json():null).catch(()=>null),
   fetch("/api/admin/customers").then(r=>r.ok?r.json():null).catch(()=>null)
@@ -796,8 +810,8 @@ export default function DrawingClient(){
  const checkpoint=()=>setHistory(h=>[...h.slice(-24),JSON.stringify(doc)]);
  const syncMounted=(walls,items,zones=[])=>items.map(o=>{if(!o.wallId)return o;const w=walls.find(x=>x.id===o.wallId);if(!w)return {...o,wallId:null,wallOffset:null};const {off,a,cx,cy}=mountedItemCenter(o,w,zones);return {...o,x:cx-o.w/2,y:cy-o.h/2,rot:a*180/Math.PI,wallOffset:off}});
  const mutate=fn=>{checkpoint();setFuture([]);setDoc(d=>fn(d))};
- const undo=()=>{const last=history.at(-1);if(!last)return;setFuture(f=>[JSON.stringify(doc),...f].slice(0,25));setDoc(JSON.parse(last));setHistory(h=>h.slice(0,-1));setSelected(null)};
- const redo=()=>{const next=future[0];if(!next)return;setHistory(h=>[...h.slice(-24),JSON.stringify(doc)]);setDoc(JSON.parse(next));setFuture(f=>f.slice(1));setSelected(null)};
+ const undo=()=>{const last=history.at(-1);if(!last)return;setFuture(f=>[JSON.stringify(doc),...f].slice(0,25));setDoc(normalizeDrawingDocument(JSON.parse(last)));setHistory(h=>h.slice(0,-1));setSelected(null)};
+ const redo=()=>{const next=future[0];if(!next)return;setHistory(h=>[...h.slice(-24),JSON.stringify(doc)]);setDoc(normalizeDrawingDocument(JSON.parse(next)));setFuture(f=>f.slice(1));setSelected(null)};
  const viewDimsFor=(zoom=doc.zoom||1)=>{
   const aspect=clamp(canvasAspect||1,.35,2.8),base=VIEW/zoom;
   return aspect>=1?{w:base,h:base/aspect}:{w:base*aspect,h:base};
@@ -892,15 +906,15 @@ export default function DrawingClient(){
  const startPan=e=>{if(tool!=="pan")return;capturePointer(e);setPanning({cx:e.clientX,cy:e.clientY,x:pan.x,y:pan.y})};
  const movePan=e=>{if(!panning)return;const r=svg.current.getBoundingClientRect();setPan(clampPanForZoom({x:panning.x-(e.clientX-panning.cx)*viewWidth/r.width,y:panning.y-(e.clientY-panning.cy)*viewHeight/r.height},doc.zoom||1))};
  const newDoc=()=>{const d=initial();try{localStorage.setItem(LAST_STORE,d.id)}catch{}setDoc(d);setSelected(null);setHistory([]);setFuture([])};
- const openDoc=id=>{const d=docs.find(x=>x.id===id);if(d){try{localStorage.setItem(LAST_STORE,d.id)}catch{}setDoc(d);setSelected(null);setHistory([]);setFuture([])}};
+ const openDoc=id=>{const d=docs.find(x=>x.id===id);if(d){try{localStorage.setItem(LAST_STORE,d.id)}catch{}setDoc(normalizeDrawingDocument(d));setSelected(null);setHistory([]);setFuture([])}};
  const chooseLocalOrServer=(local,incoming)=>{
   if(!local)return incoming;
   const localTime=Number(local._localSavedAt)||0,serverTime=Date.parse(incoming._serverUpdatedAt||"")||0,same=serverSignature(local)===serverSignature(incoming);
   return !same&&localTime>serverTime?local:incoming;
  };
  const mergeIncomingDrawings=incoming=>{if(!incoming.length)return;const merged=[...(docsRef.current||[])];let keptLocal=0;for(const drawing of incoming){const i=merged.findIndex(x=>x.serverId===drawing.serverId);if(i>=0){const chosen=chooseLocalOrServer(merged[i],drawing);if(chosen===merged[i])keptLocal++;merged[i]=chosen}else merged.push(drawing)}docsRef.current=merged;setDocs(merged);localStorage.setItem(STORE,JSON.stringify(merged));setMessage(keptLocal?"Nyere lokal tegning beholdt":incoming.length+" tegning(er) hentet");setTimeout(()=>setMessage(""),2200)};
- const loadOrderDrawings=async orderId=>{if(!orderId)return;try{const r=await fetch("/api/admin/project-drawings?orderId="+encodeURIComponent(orderId)),x=await r.json();if(!r.ok||x.setupRequired)return;const incoming=(x.drawings||[]).map(row=>({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||orderId,projectId:row.projectId||"",customerUserId:row.customerUserId||"",customerVisible:row.customerVisible===true,name:row.name,customer:row.customer,address:row.address,notes:row.notes,_serverUpdatedAt:row.updatedAt||null}));mergeIncomingDrawings(incoming)}catch{}};
- const loadProjectDrawings=async projectId=>{if(!projectId)return;try{const r=await fetch("/api/admin/project-drawings?projectId="+encodeURIComponent(projectId)),x=await r.json();if(!r.ok||x.setupRequired)return;const incoming=(x.drawings||[]).map(row=>({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||"",projectId:row.projectId,customerUserId:row.customerUserId||"",customerVisible:row.customerVisible===true,name:row.name,customer:row.customer,address:row.address,notes:row.notes,_serverUpdatedAt:row.updatedAt||null}));mergeIncomingDrawings(incoming)}catch{}};
+ const loadOrderDrawings=async orderId=>{if(!orderId)return;try{const r=await fetch("/api/admin/project-drawings?orderId="+encodeURIComponent(orderId)),x=await r.json();if(!r.ok||x.setupRequired)return;const incoming=(x.drawings||[]).map(row=>normalizeDrawingDocument({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||orderId,projectId:row.projectId||"",customerUserId:row.customerUserId||"",customerVisible:row.customerVisible===true,name:row.name,customer:row.customer,address:row.address,notes:row.notes,_serverUpdatedAt:row.updatedAt||null}));mergeIncomingDrawings(incoming)}catch{}};
+ const loadProjectDrawings=async projectId=>{if(!projectId)return;try{const r=await fetch("/api/admin/project-drawings?projectId="+encodeURIComponent(projectId)),x=await r.json();if(!r.ok||x.setupRequired)return;const incoming=(x.drawings||[]).map(row=>normalizeDrawingDocument({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||"",projectId:row.projectId,customerUserId:row.customerUserId||"",customerVisible:row.customerVisible===true,name:row.name,customer:row.customer,address:row.address,notes:row.notes,_serverUpdatedAt:row.updatedAt||null}));mergeIncomingDrawings(incoming)}catch{}};
  const changeOrder=e=>{const orderId=e.target.value,order=orders.find(item=>item.id===orderId),email=String(order?.customer?.email||"").trim().toLowerCase(),account=customers.find(c=>String(c.email||"").trim().toLowerCase()===email);setDoc(d=>({...d,orderId,projectId:orderId?"":d.projectId,customerUserId:orderId?(account?.id||d.customerUserId):d.customerUserId,customer:orderId?(order?.customerName||d.customer):d.customer,address:orderId?(order?.customer?.address||d.address):d.address,name:orderId&&d.name==="Ny tegning"?"Tegning – "+(order?.orderNumber||"oppdrag"):d.name}));if(orderId)loadOrderDrawings(orderId)};
  const changeProject=e=>{const projectId=e.target.value;setDoc(d=>({...d,projectId,orderId:projectId?"":d.orderId}));if(projectId)loadProjectDrawings(projectId)};
  useEffect(()=>{
@@ -917,7 +931,7 @@ export default function DrawingClient(){
     const r=await fetch("/api/admin/project-drawings?orderId="+encodeURIComponent(orderId)),x=await r.json();
     if(cancelled)return;
     if(r.ok&&!x.setupRequired&&Array.isArray(x.drawings)&&x.drawings.length){
-     const incoming=x.drawings.map(row=>({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||orderId,projectId:row.projectId||"",customerUserId:row.customerUserId||"",customerVisible:row.customerVisible===true,name:row.name,customer:row.customer,address:row.address,notes:row.notes,_serverUpdatedAt:row.updatedAt||null}));
+     const incoming=x.drawings.map(row=>normalizeDrawingDocument({...initial(),...(row.drawingData||{}),serverId:row.id,orderId:row.orderId||orderId,projectId:row.projectId||"",customerUserId:row.customerUserId||"",customerVisible:row.customerVisible===true,name:row.name,customer:row.customer,address:row.address,notes:row.notes,_serverUpdatedAt:row.updatedAt||null}));
      const latest=incoming[0],sameLocal=(docsRef.current||[]).find(item=>item.serverId===latest.serverId),serverChoice=chooseLocalOrServer(sameLocal,latest);
      let chosen=serverChoice;
      if(activeLocal&&!activeLocal.serverId){
