@@ -1317,3 +1317,254 @@ $$;
 
 revoke all on function public.create_rental_booking_if_available(jsonb,date,date) from public, anon, authenticated;
 grant execute on function public.create_rental_booking_if_available(jsonb,date,date) to service_role;
+
+-- ============================================================
+-- 20260930235535_payment_reminders.sql
+-- ============================================================
+
+create sequence if not exists public.payment_reminder_number_seq
+  start with 1013
+  increment by 1
+  minvalue 1013;
+
+create table if not exists public.payment_reminders (
+  id uuid primary key default gen_random_uuid(),
+  reminder_number bigint not null default nextval('public.payment_reminder_number_seq') unique,
+  invoice_number text not null,
+  customer_name text not null,
+  customer_email text not null,
+  amount_ore integer not null check (amount_ore >= 0),
+  original_due_date date,
+  reminder_due_date date not null,
+  subject text not null,
+  message text not null,
+  attachment_filename text not null,
+  status text not null default 'draft' check (status in ('draft','sent','failed')),
+  sent_at timestamptz,
+  sent_by uuid,
+  error_message text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.payment_reminders enable row level security;
+
+revoke all on table public.payment_reminders from public, anon, authenticated;
+grant select, insert, update, delete on table public.payment_reminders to service_role;
+
+revoke all on sequence public.payment_reminder_number_seq from public, anon, authenticated;
+grant usage, select on sequence public.payment_reminder_number_seq to service_role;
+
+create index if not exists payment_reminders_created_at_idx
+  on public.payment_reminders(created_at desc);
+
+create index if not exists payment_reminders_customer_email_idx
+  on public.payment_reminders(lower(customer_email));
+
+-- ============================================================
+-- 20261003150145_work_time_entries.sql
+-- ============================================================
+
+-- Persistent arbeidsklokke / timeregistrering for innlogget admin.
+create table if not exists public.work_time_entries (
+  id uuid primary key default gen_random_uuid(),
+  admin_user_id uuid not null references public.admin_users(id) on delete restrict,
+  order_id uuid references public.orders(id) on delete set null,
+  work_date date not null default ((now() at time zone 'Europe/Oslo')::date),
+  project_label text not null default '',
+  customer_label text not null default '',
+  note text not null default '',
+  started_at timestamptz,
+  ended_at timestamptz,
+  duration_minutes integer not null default 0 check (duration_minutes >= 0 and duration_minutes <= 100000),
+  hourly_rate_ore integer not null default 50000 check (hourly_rate_ore >= 0 and hourly_rate_ore <= 10000000),
+  distance_km numeric(10,2) not null default 0 check (distance_km >= 0 and distance_km <= 1000000),
+  km_rate_ore integer not null default 530 check (km_rate_ore >= 0 and km_rate_ore <= 100000),
+  toll_ore integer not null default 0 check (toll_ore >= 0 and toll_ore <= 100000000),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (ended_at is null or started_at is not null),
+  check (ended_at is null or ended_at >= started_at)
+);
+
+create index if not exists work_time_entries_user_date_idx
+  on public.work_time_entries(admin_user_id, work_date desc, created_at desc);
+
+create index if not exists work_time_entries_order_idx
+  on public.work_time_entries(order_id)
+  where order_id is not null;
+
+create unique index if not exists work_time_entries_one_active_timer_per_user_idx
+  on public.work_time_entries(admin_user_id)
+  where started_at is not null and ended_at is null;
+
+alter table public.work_time_entries enable row level security;
+
+revoke all on table public.work_time_entries from anon, authenticated;
+grant select, insert, update, delete on table public.work_time_entries to service_role;
+
+-- ============================================================
+-- 20261007005500_material_supplier_catalog.sql
+-- ============================================================
+
+-- Leverandøruavhengig materialkatalog for pris- og materialkalkulator.
+create table if not exists public.material_suppliers (
+  id text primary key,
+  name text not null,
+  active boolean not null default true,
+  is_primary boolean not null default false,
+  default_markup_percent numeric(6,2) not null default 15.00
+    check (default_markup_percent >= 0 and default_markup_percent <= 1000),
+  last_import_at timestamptz,
+  last_source_filename text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists material_suppliers_one_primary_idx
+  on public.material_suppliers ((is_primary))
+  where is_primary = true;
+
+insert into public.material_suppliers (id,name,active,is_primary,default_markup_percent)
+values
+  ('byggern','Bygger’n',true,true,15.00),
+  ('ahlsell','Ahlsell',true,false,15.00),
+  ('optimera','Optimera / MinOptimera',true,false,15.00),
+  ('byggmakker','Byggmakker Proff',true,false,15.00),
+  ('megaflis','Megaflis',true,false,15.00)
+on conflict (id) do update
+set name=excluded.name,
+    active=excluded.active,
+    updated_at=now();
+
+create table if not exists public.material_supplier_products (
+  supplier_id text not null references public.material_suppliers(id) on delete cascade,
+  supplier_sku text not null,
+  name text not null,
+  cost_ex_vat_ore bigint not null check (cost_ex_vat_ore >= 0),
+  unit text not null default 'STK',
+  category_code text not null default '',
+  category_name text not null default '',
+  ean text not null default '',
+  module_number text not null default '',
+  active boolean not null default true,
+  source_filename text not null default '',
+  import_batch text not null default '',
+  imported_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  search_document tsvector generated always as (
+    to_tsvector(
+      'simple',
+      coalesce(supplier_sku,'') || ' ' ||
+      coalesce(name,'') || ' ' ||
+      coalesce(category_code,'') || ' ' ||
+      coalesce(category_name,'') || ' ' ||
+      coalesce(ean,'') || ' ' ||
+      coalesce(module_number,'')
+    )
+  ) stored,
+  primary key (supplier_id,supplier_sku)
+);
+
+create index if not exists material_supplier_products_supplier_active_idx
+  on public.material_supplier_products (supplier_id,active,name);
+
+create index if not exists material_supplier_products_ean_idx
+  on public.material_supplier_products (ean)
+  where ean <> '';
+
+create index if not exists material_supplier_products_module_idx
+  on public.material_supplier_products (module_number)
+  where module_number <> '';
+
+create index if not exists material_supplier_products_search_idx
+  on public.material_supplier_products using gin (search_document);
+
+alter table public.material_suppliers enable row level security;
+alter table public.material_supplier_products enable row level security;
+
+revoke all on table public.material_suppliers from anon, authenticated;
+revoke all on table public.material_supplier_products from anon, authenticated;
+grant select, insert, update, delete on table public.material_suppliers to service_role;
+grant select, insert, update, delete on table public.material_supplier_products to service_role;
+
+create or replace function public.search_material_supplier_products(
+  search_query text,
+  supplier_filter text default null,
+  result_limit integer default 20
+)
+returns table (
+  supplier_id text,
+  supplier_name text,
+  supplier_is_primary boolean,
+  supplier_sku text,
+  product_name text,
+  unit text,
+  cost_ex_vat_ore bigint,
+  category_code text,
+  category_name text,
+  ean text,
+  module_number text
+)
+language sql
+stable
+security invoker
+set search_path = public, pg_temp
+as $$
+  select
+    p.supplier_id,
+    s.name,
+    s.is_primary,
+    p.supplier_sku,
+    p.name,
+    p.unit,
+    p.cost_ex_vat_ore,
+    p.category_code,
+    p.category_name,
+    p.ean,
+    p.module_number
+  from public.material_supplier_products p
+  join public.material_suppliers s on s.id = p.supplier_id
+  where p.active = true
+    and s.active = true
+    and (supplier_filter is null or supplier_filter = '' or p.supplier_id = supplier_filter)
+    and nullif(btrim(search_query),'') is not null
+    and (
+      lower(p.supplier_sku) like '%' || lower(btrim(search_query)) || '%'
+      or lower(p.ean) like '%' || lower(btrim(search_query)) || '%'
+      or lower(p.module_number) like '%' || lower(btrim(search_query)) || '%'
+      or lower(p.name) like '%' || lower(btrim(search_query)) || '%'
+      or lower(p.category_name) like '%' || lower(btrim(search_query)) || '%'
+      or p.search_document @@ plainto_tsquery('simple', btrim(search_query))
+    )
+  order by
+    case
+      when lower(p.supplier_sku) = lower(btrim(search_query)) then 0
+      when p.ean <> '' and lower(p.ean) = lower(btrim(search_query)) then 1
+      when p.module_number <> '' and lower(p.module_number) = lower(btrim(search_query)) then 2
+      when lower(p.name) like lower(btrim(search_query)) || '%' then 3
+      else 4
+    end,
+    s.is_primary desc,
+    ts_rank_cd(p.search_document, plainto_tsquery('simple', btrim(search_query))) desc,
+    p.name asc
+  limit least(greatest(coalesce(result_limit,20),1),50);
+$$;
+
+revoke all on function public.search_material_supplier_products(text,text,integer)
+  from public, anon, authenticated;
+grant execute on function public.search_material_supplier_products(text,text,integer)
+  to service_role;
+
+-- ============================================================
+-- 20261007193000_material_markup_20_percent.sql
+-- ============================================================
+
+-- Standard materialpåslag endres fra 15 % til 20 %.
+alter table public.material_suppliers
+  alter column default_markup_percent set default 20.00;
+
+update public.material_suppliers
+set default_markup_percent = 20.00,
+    updated_at = now()
+where default_markup_percent = 15.00;
