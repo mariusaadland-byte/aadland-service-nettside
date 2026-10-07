@@ -239,7 +239,7 @@ export async function POST(req){
    }
 
    try{
-    const adminTo=String(process.env.RENTAL_ORDER_EMAIL_TO||process.env.ORDER_EMAIL_TO||"post@aadland-service.no").trim();
+    const adminTo=String(process.env.RENTAL_ORDER_EMAIL_TO||"post@aadland-service.no").trim();
     const result=await resend.emails.send({
      from:sender,
      to:adminTo,
@@ -280,7 +280,9 @@ export async function POST(req){
    billingReason:billing.reason,
    message:confirmationSent
     ?"Bookingen er bekreftet. Sjekk innboks og søppelpost for leiebekreftelsen."
-    :"Bookingen er registrert og perioden er reservert. Sjekk innboks og søppelpost for e-post fra Aadland Utleie."
+    :acknowledgementSent
+      ?"Bookingen er registrert og perioden er reservert. Sjekk innboks og søppelpost for bookingbekreftelse og betalingsinformasjon."
+      :"Bookingen er registrert og perioden er reservert, men e-posten kunne ikke sendes. Kontakt oss hvis du trenger bekreftelsen."
   });
  }catch(e){
   console.error(e);
