@@ -18,12 +18,13 @@ export async function POST(req){
   const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
   if(!url||!key||!process.env.SESSION_SECRET)return NextResponse.json({error:"Kundeinnlogging er ikke konfigurert."},{status:503});
 
-  const s=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
-  const {data,error}=await s.auth.signInWithPassword({email:value,password:secret});
+  const authClient=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
+  const serviceClient=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
+  const {data,error}=await authClient.auth.signInWithPassword({email:value,password:secret});
   if(error||!data.user)return NextResponse.json({error:"Feil e-post eller passord, eller e-postadressen er ikke bekreftet."},{status:401});
   if(!data.user.email_confirmed_at)return NextResponse.json({error:"Bekreft e-postadressen din før du logger inn."},{status:403});
 
-  let {data:profile,error:profileError}=await s.from("customer_profiles").select("*").eq("id",data.user.id).maybeSingle();
+  let {data:profile,error:profileError}=await serviceClient.from("customer_profiles").select("*").eq("id",data.user.id).maybeSingle();
   if(profileError){
    if(String(profileError.code||"")==="42P01")return NextResponse.json({error:"Kundekonto er ikke aktivert i databasen ennå.",setupRequired:true},{status:409});
    console.error("CUSTOMER PROFILE LOOKUP",profileError);
@@ -32,7 +33,7 @@ export async function POST(req){
 
   if(!profile){
    let historyCustomer=null;
-   const {data:historyOrder}=await s.from("orders")
+   const {data:historyOrder}=await serviceClient.from("orders")
     .select("customer")
     .contains("customer",{email:value})
     .order("created_at",{ascending:false})
@@ -49,7 +50,7 @@ export async function POST(req){
     address:String(historyCustomer?.address||"").trim().slice(0,300)
    };
 
-   const {data:created,error:createError}=await s.from("customer_profiles")
+   const {data:created,error:createError}=await serviceClient.from("customer_profiles")
     .upsert(repair,{onConflict:"id"})
     .select("*")
     .single();
@@ -62,8 +63,8 @@ export async function POST(req){
   }
 
   const [ordersLink,rentalsLink]=await Promise.all([
-   s.from("orders").update({customer_user_id:data.user.id}).is("customer_user_id",null).contains("customer",{email:value}),
-   s.from("rental_bookings").update({customer_user_id:data.user.id}).is("customer_user_id",null).contains("customer",{email:value})
+   serviceClient.from("orders").update({customer_user_id:data.user.id}).is("customer_user_id",null).contains("customer",{email:value}),
+   serviceClient.from("rental_bookings").update({customer_user_id:data.user.id}).is("customer_user_id",null).contains("customer",{email:value})
   ]);
   if(ordersLink.error)console.error("CUSTOMER ORDER HISTORY LINK",ordersLink.error);
   if(rentalsLink.error)console.error("CUSTOMER RENTAL HISTORY LINK",rentalsLink.error);
