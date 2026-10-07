@@ -246,6 +246,9 @@ export default function MinSide(){
  const activeJobs=jobs.filter(o=>!["completed","cancelled"].includes(o.status)).length;
  const activePurchases=purchases.filter(o=>!["completed","cancelled"].includes(o.status)).length;
  const activeRentals=rentals.filter(r=>["new","confirmed","active"].includes(r.status)).length;
+ const pendingRentalRows=rentals.filter(r=>r.status==="confirmed"&&!r.confirmation_sent_at);
+ const readyPurchaseRows=purchases.filter(o=>o.status==="ready");
+ const portalAttentionCount=openQuotes+pendingRentalRows.length+readyPurchaseRows.length;
  const recentActivity=[
   ...quotes.map(q=>({
    key:"quote-"+q.id,
@@ -343,6 +346,18 @@ export default function MinSide(){
       <h1>Hei, {(data.customer.name||"kunde").split(" ")[0]}</h1>
       <p>Her finner du det viktigste samlet – tilbud, oppdrag, bestillinger og utleie.</p>
      </div>
+
+     {portalAttentionCount>0&&<div className="customerPortalAttention">
+      <div className="customerPortalBlockHead">
+       <div><div className="kicker">FØLG OPP</div><h2>Dette bør du se på</h2></div>
+       <span>{portalAttentionCount}</span>
+      </div>
+      <div className="customerPortalAttentionList">
+       {openQuotes>0&&<button type="button" onClick={()=>selectPanel("tilbud")}><span><b>{openQuotes===1?"Ett tilbud venter på svar":openQuotes+" tilbud venter på svar"}</b><small>Åpne tilbud og se frist, pris og detaljer.</small></span><strong>→</strong></button>}
+       {pendingRentalRows.length>0&&<button type="button" onClick={()=>selectPanel("utleie")}><span><b>{pendingRentalRows.length===1?"Én utleie venter på betaling/kreditt":pendingRentalRows.length+" utleier venter på betaling/kreditt"}</b><small>Perioden er reservert, men endelig bekreftelse er ikke sendt ennå.</small></span><strong>→</strong></button>}
+       {readyPurchaseRows.length>0&&<button type="button" onClick={()=>selectPanel("bestillinger")}><span><b>{readyPurchaseRows.length===1?"Én bestilling er klar":readyPurchaseRows.length+" bestillinger er klare"}</b><small>Se levering/henting og siste status.</small></span><strong>→</strong></button>}
+      </div>
+     </div>}
 
      <div className="customerPortalStats">
       <button type="button" onClick={()=>selectPanel("foresporsler")}><small>FORESPØRSLER</small><b>{openEnquiries}</b><span>aktive</span></button>
