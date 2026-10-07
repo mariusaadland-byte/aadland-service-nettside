@@ -1372,15 +1372,24 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
    {order.orderType!=="custom"&&<div className="orderPaymentPanel">
     <h4>Betaling og kvittering</h4>
     <div className="orderPaymentFacts">
-     <span><small>Status</small><b>{order.paymentStatus==="paid"?"Betalt":order.paymentStatus==="authorized"?"Reservert":order.paymentStatus==="refunded"?"Refundert":order.paymentStatus==="partial"?"Delvis betalt":"Ikke betalt"}</b></span>
+     <span><small>Status</small><b>{order.paymentStatus==="paid"?"Betalt":order.paymentStatus==="authorized"?"Reservert":order.paymentStatus==="refunded"?"Refundert":order.paymentStatus==="partial"?"Delvis betalt":order.paymentStatus==="cancelled"?"Kansellert":"Ikke betalt"}</b></span>
+     {String(order.paymentProvider||"").toLowerCase()==="vipps"&&<span><small>Betalingsmåte</small><b>Vipps</b></span>}
+     {String(order.paymentProvider||"").toLowerCase()==="vipps"&&Number(order.paymentReservedOre)>0&&<span><small>Reservert</small><b>{nok(order.paymentReservedOre)}</b></span>}
      <span><small>Registrert betalt</small><b>{nok(order.paymentCapturedOre||0)}</b></span>
      {Number(order.paymentRefundedOre)>0&&<span><small>Tilbakebetalt</small><b>{nok(order.paymentRefundedOre)}</b></span>}
+     {String(order.paymentProvider||"").toLowerCase()==="vipps"&&order.paymentCaptureGuaranteedUntil&&<span><small>Capture garantert til</small><b>{new Date(order.paymentCaptureGuaranteedUntil).toLocaleString("nb-NO")}</b></span>}
      {order.paymentRefundedAt&&<span><small>Sist tilbakebetalt</small><b>{new Date(order.paymentRefundedAt).toLocaleString("nb-NO")}</b></span>}
      {order.receiptSentAt&&<span><small>Betalingsbekreftelse</small><b>Sendt {new Date(order.receiptSentAt).toLocaleString("nb-NO")}</b></span>}
      {order.refundNoticeSentAt&&<span><small>Tilbakebetalingsbekreftelse</small><b>Sendt {new Date(order.refundNoticeSentAt).toLocaleString("nb-NO")}</b></span>}
     </div>
-    <div className="field"><label>Betalingsreferanse <span className="muted">(f.eks. Vipps-ref., kontant eller bank)</span></label><input id={"payment-reference-"+order.id} defaultValue={order.paymentReference||""} maxLength={120} placeholder="Valgfri referanse"/></div>
-    {canUpdateOrders&&order.paymentStatus!=="refunded"&&Number(order.paymentRefundedOre||0)===0&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>registerPayment(order)}>{savingId===order.id?"Sender …":order.paymentStatus==="paid"?"Send betalingsbekreftelse på nytt":"Registrer betalt + send bekreftelse"}</button>}
+    {String(order.paymentProvider||"").toLowerCase()==="vipps"&&canUpdateOrders&&<div className="rentalBookingActions">
+     <button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>vippsOrderAction(order,"sync")}>{savingId===order.id?"Synker …":"Synk Vipps-status"}</button>
+     {order.paymentStatus==="authorized"&&Number(order.paymentReservedOre||0)>Number(order.paymentCapturedOre||0)&&<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>vippsOrderAction(order,"capture")}>Capture Vipps</button>}
+     {order.paymentStatus==="authorized"&&Number(order.paymentReservedOre||0)>Number(order.paymentCapturedOre||0)&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>vippsOrderAction(order,"cancel")}>Kanseller reservasjon</button>}
+     {Number(order.paymentCapturedOre||0)>Number(order.paymentRefundedOre||0)&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>vippsOrderAction(order,"refund")}>Refunder via Vipps</button>}
+    </div>}
+    {String(order.paymentProvider||"").toLowerCase()!=="vipps"&&<div className="field"><label>Betalingsreferanse <span className="muted">(f.eks. bank, kontant eller annen manuell betaling)</span></label><input id={"payment-reference-"+order.id} defaultValue={order.paymentReference||""} maxLength={120} placeholder="Valgfri referanse"/></div>}
+    {String(order.paymentProvider||"").toLowerCase()!=="vipps"&&canUpdateOrders&&order.paymentStatus!=="refunded"&&Number(order.paymentRefundedOre||0)===0&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>registerPayment(order)}>{savingId===order.id?"Sender …":order.paymentStatus==="paid"?"Send betalingsbekreftelse på nytt":"Registrer betalt + send bekreftelse"}</button>}
     {Number(order.paymentCapturedOre)>Number(order.paymentRefundedOre||0)&&String(order.paymentProvider||"").toLowerCase()!=="vipps"&&<div className="orderRefundPanel">
      <h4>Tilbakebetaling</h4>
      <p className="muted">Gjenstår å kunne tilbakebetale: <b>{nok(Math.max(0,Number(order.paymentCapturedOre||0)-Number(order.paymentRefundedOre||0)))}</b></p>
@@ -1389,7 +1398,7 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
      <div className="field"><label>Merknad til kunden</label><textarea id={"refund-note-"+order.id} defaultValue={order.refundNote||""} maxLength={1000} rows="3" placeholder="Valgfritt"/></div>
      {canUpdateOrders&&<button className="btn alt" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>recordRefund(order,false)}>{savingId===order.id?"Behandler …":"Registrer tilbakebetaling + send bekreftelse"}</button>}
     </div>}
-    {String(order.paymentProvider||"").toLowerCase()==="vipps"&&Number(order.paymentCapturedOre)>Number(order.paymentRefundedOre||0)&&<p className="muted">Vipps-refusjon håndteres gjennom Vipps-betalingsflyten når den aktiveres.</p>}
+    {String(order.paymentProvider||"").toLowerCase()==="vipps"&&<p className="muted">Vipps-beløp synkroniseres mot Vipps. Capture skal først gjøres når varen eller tjenesten kan leveres.</p>}
     {Number(order.refundLastOre)>0&&canUpdateOrders&&<button className="btn alt" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>recordRefund(order,true)}>{savingId===order.id?"Sender …":"Send tilbakebetalingsbekreftelse på nytt"}</button>}
    </div>}
    {order.status==="cancelled"&&<div className="orderPaymentPanel">
@@ -4608,15 +4617,24 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
     <h4>Leiebetaling</h4>
     <div className="orderPaymentFacts">
      <span><small>Status</small><b>{paymentLabels[b.paymentStatus]||b.paymentStatus}</b></span>
+     {String(b.paymentProvider||"").toLowerCase()==="vipps"&&<span><small>Betalingsmåte</small><b>Vipps</b></span>}
+     {String(b.paymentProvider||"").toLowerCase()==="vipps"&&Number(b.paymentReservedOre)>0&&<span><small>Reservert</small><b>{nok(b.paymentReservedOre)}</b></span>}
      <span><small>Registrert betalt</small><b>{nok(b.paymentCapturedOre||0)}</b></span>
      {Number(b.paymentRefundedOre)>0&&<span><small>Tilbakebetalt</small><b>{nok(b.paymentRefundedOre)}</b></span>}
+     {String(b.paymentProvider||"").toLowerCase()==="vipps"&&b.paymentCaptureGuaranteedUntil&&<span><small>Capture garantert til</small><b>{new Date(b.paymentCaptureGuaranteedUntil).toLocaleString("nb-NO")}</b></span>}
      {Number(b.paymentCapturedOre)>Number(b.paymentRefundedOre||0)&&<span><small>Netto registrert</small><b>{nok(Number(b.paymentCapturedOre)-Number(b.paymentRefundedOre||0))}</b></span>}
      {b.receiptSentAt&&<span><small>Kvittering</small><b>Sendt {new Date(b.receiptSentAt).toLocaleString("nb-NO")}</b></span>}
     </div>
-    <div className="field"><label>Betalingsreferanse <span className="muted">(Vipps, bank, kontant osv.)</span></label><input id={"rental-payment-reference-"+b.id} defaultValue={b.paymentReference||""} maxLength={120} placeholder="Valgfri referanse"/></div>
-    {canUpdate&&<button className="btn" type="button" disabled={savingId===b.id||paymentSetupRequired||!b.customer?.email||Number(b.paymentRefundedOre)>0} onClick={()=>registerPayment(b)}>{savingId===b.id?"Sender …":Number(b.paymentRefundedOre)>0?"Tilbakebetaling registrert":b.paymentStatus==="paid"?"Send kvittering på nytt":"Registrer leie betalt + send kvittering/PDF"}</button>}
-    <p className="muted">Betalingsstatus oppdateres automatisk når leien registreres som betalt. Dette hindrer at «Betalt» settes uten registrert beløp.</p>
-    {Number(b.paymentCapturedOre)>Number(b.paymentRefundedOre||0)&&canUpdate&&<div className="rentalRefundPanel">
+    {String(b.paymentProvider||"").toLowerCase()==="vipps"&&canUpdate&&<div className="rentalBookingActions">
+     <button className="btn alt" type="button" disabled={savingId===b.id} onClick={()=>vippsRentalAction(b,"sync")}>{savingId===b.id?"Synker …":"Synk Vipps-status"}</button>
+     {b.paymentStatus==="authorized"&&Number(b.paymentReservedOre||0)>Number(b.paymentCapturedOre||0)&&<button className="btn" type="button" disabled={savingId===b.id} onClick={()=>vippsRentalAction(b,"capture")}>Capture Vipps</button>}
+     {b.paymentStatus==="authorized"&&Number(b.paymentReservedOre||0)>Number(b.paymentCapturedOre||0)&&<button className="btn alt" type="button" disabled={savingId===b.id} onClick={()=>vippsRentalAction(b,"cancel")}>Kanseller reservasjon</button>}
+     {Number(b.paymentCapturedOre||0)>Number(b.paymentRefundedOre||0)&&<button className="btn alt" type="button" disabled={savingId===b.id} onClick={()=>vippsRentalAction(b,"refund")}>Refunder via Vipps</button>}
+    </div>}
+    {String(b.paymentProvider||"").toLowerCase()!=="vipps"&&<div className="field"><label>Betalingsreferanse <span className="muted">(bank, kontant eller annen manuell betaling)</span></label><input id={"rental-payment-reference-"+b.id} defaultValue={b.paymentReference||""} maxLength={120} placeholder="Valgfri referanse"/></div>}
+    {String(b.paymentProvider||"").toLowerCase()!=="vipps"&&canUpdate&&<button className="btn" type="button" disabled={savingId===b.id||paymentSetupRequired||!b.customer?.email||Number(b.paymentRefundedOre)>0} onClick={()=>registerPayment(b)}>{savingId===b.id?"Sender …":Number(b.paymentRefundedOre)>0?"Tilbakebetaling registrert":b.paymentStatus==="paid"?"Send kvittering på nytt":"Registrer leie betalt + send kvittering/PDF"}</button>}
+    <p className="muted">{String(b.paymentProvider||"").toLowerCase()==="vipps"?"Vipps-betalingen synkroniseres mot Vipps. Capture gjøres først når leien kan leveres/utleveres.":"Betalingsstatus oppdateres automatisk når leien registreres som betalt. Dette hindrer at «Betalt» settes uten registrert beløp."}</p>
+    {String(b.paymentProvider||"").toLowerCase()!=="vipps"&&Number(b.paymentCapturedOre)>Number(b.paymentRefundedOre||0)&&canUpdate&&<div className="rentalRefundPanel">
      <h5>Registrer tilbakebetaling</h5>
      <p className="muted">Registrer bare penger som faktisk er tilbakebetalt i bank, Vipps eller kontant. Systemet utfører ikke selve overføringen.</p>
      <div className="field"><label>Tilbakebetalt beløp (kr)</label><input id={"rental-refund-amount-"+b.id} type="number" min="0.01" step="0.01" max={(Number(b.paymentCapturedOre)-Number(b.paymentRefundedOre||0))/100} defaultValue={((Number(b.paymentCapturedOre)-Number(b.paymentRefundedOre||0))/100).toFixed(2)}/></div>
