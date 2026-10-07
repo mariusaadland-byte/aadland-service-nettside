@@ -4,6 +4,7 @@ import {vippsPaymentsEnabled} from "../../../../lib/vippsClient";
 import {verifyVippsWebhookRequest} from "../../../../lib/vippsWebhook";
 import {sendVippsPaymentReceiptIfNeeded} from "../../../../lib/vippsPaymentReceipt";
 import {sendVippsRefundNoticeIfNeeded} from "../../../../lib/vippsRefundNotice";
+import {sendPaidRentalConfirmationIfNeeded} from "../../../../lib/rentalConfirmationEmail";
 
 export const runtime="nodejs";
 
@@ -112,12 +113,28 @@ export async function POST(req){
     targetId=target?.id||null;
    }
    if(targetId&&eventName==="CAPTURED"){
-    const receipt=await sendVippsPaymentReceiptIfNeeded({s,unit,id:targetId,req});
-    if(receipt?.sent)console.log("VIPPS RECEIPT SENT",{unit,reference});
+    try{
+     const receipt=await sendVippsPaymentReceiptIfNeeded({s,unit,id:targetId,req});
+     if(receipt?.sent)console.log("VIPPS RECEIPT SENT",{unit,reference});
+    }catch(error){
+     console.error("VIPPS RECEIPT BEST EFFORT ERROR",{unit,reference,message:error?.message});
+    }
+    if(unit==="rental"){
+     try{
+      const confirmation=await sendPaidRentalConfirmationIfNeeded({s,id:targetId,req});
+      if(confirmation?.sent)console.log("VIPPS RENTAL CONFIRMATION SENT",{reference});
+     }catch(error){
+      console.error("VIPPS RENTAL CONFIRMATION BEST EFFORT ERROR",{reference,message:error?.message});
+     }
+    }
    }
    if(targetId&&eventName==="REFUNDED"){
-    const notice=await sendVippsRefundNoticeIfNeeded({s,unit,id:targetId,req});
-    if(notice?.sent)console.log("VIPPS REFUND NOTICE SENT",{unit,reference});
+    try{
+     const notice=await sendVippsRefundNoticeIfNeeded({s,unit,id:targetId,req});
+     if(notice?.sent)console.log("VIPPS REFUND NOTICE SENT",{unit,reference});
+    }catch(error){
+     console.error("VIPPS REFUND NOTICE BEST EFFORT ERROR",{unit,reference,message:error?.message});
+    }
    }
   }catch(error){
    console.error("VIPPS PAYMENT NOTICE BEST EFFORT ERROR",{unit,reference,eventName,message:error?.message});
