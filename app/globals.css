@@ -3859,3 +3859,169 @@ body:has(.customerPage) .customerPage{
 .rentalTermsNotice{display:grid;gap:4px;margin:4px 0 12px;padding:12px 14px;border:1px solid rgba(215,167,78,.35);background:rgba(215,167,78,.07);border-radius:10px}
 .rentalTermsNotice b{font-size:12px;letter-spacing:.06em;text-transform:uppercase}
 .rentalTermsNotice span{font-size:13px;line-height:1.5;color:var(--muted,#aaa)}
+
+
+/* Backoffice readability + compact interactive calendars */
+.adminmain{
+ background:#f3efe8;
+ color:#181613;
+}
+.adminmain>.kicker{color:#9a6d25}
+.adminmain>h1,
+.adminmain .card,
+.adminmain .stat,
+.adminmain .table,
+.adminmain .jobCard,
+.adminmain .orderCard,
+.adminmain .rentalBookingCard,
+.adminmain .rentalCalendar,
+.adminmain .jobCalendar,
+.adminmain details{
+ color:#181613;
+}
+.adminmain .card h1,
+.adminmain .card h2,
+.adminmain .card h3,
+.adminmain .card h4,
+.adminmain .card h5,
+.adminmain .card h6,
+.adminmain .card p,
+.adminmain .card label,
+.adminmain .card legend,
+.adminmain .card summary,
+.adminmain .table th,
+.adminmain .table td{
+ color:#181613;
+}
+.adminmain .muted,
+.adminmain small.muted{color:#756f66!important}
+.adminmain input:not([type="checkbox"]):not([type="radio"]),
+.adminmain select,
+.adminmain textarea{
+ background:#fff!important;
+ color:#181613!important;
+ -webkit-text-fill-color:#181613!important;
+ caret-color:#181613!important;
+ color-scheme:light;
+ border-color:#d9d0c5;
+}
+.adminmain input::placeholder,
+.adminmain textarea::placeholder{
+ color:#9b968e!important;
+ -webkit-text-fill-color:#9b968e!important;
+ opacity:1;
+}
+.adminmain .btn{
+ color:#fff;
+}
+.adminmain .btn.alt{
+ background:#fff;
+ color:#181613;
+ border:1px solid #d9d0c5;
+}
+.adminmain .btn.alt:hover{
+ border-color:#b98a3e;
+ background:#fffaf0;
+}
+.adminmain .notice{color:#7b321e}
+.adminmain .success{color:#285b30}
+.adminmain .orderCompactHead,
+.adminmain .rentalBookingCompactHead{
+ color:#181613;
+}
+
+.adminCompactCalendar{
+ width:min(100%,1040px);
+ padding:16px;
+}
+.adminCompactCalendar .calendarHead{
+ margin-bottom:10px;
+}
+.adminCompactCalendar .calendarHead h3{
+ margin:4px 0 0;
+ font-size:20px;
+}
+.adminCompactCalendar .calendarHead .btn{
+ min-width:38px;
+ padding:8px 11px;
+}
+.adminCompactCalendar .calendarWeekday{
+ padding:6px 4px;
+ font-size:10px;
+ color:#6c655b;
+ background:#f8f5ef;
+}
+.adminCompactCalendar .calendarDay{
+ min-height:78px;
+ padding:5px;
+ background:#fff;
+}
+.adminCompactCalendar .calendarDay>strong{
+ display:block;
+ font-size:11px;
+ color:#504a42;
+}
+.adminCompactCalendar .calendarDay.empty{
+ background:#f5f2ec;
+}
+.adminCompactCalendar .calendarEvent{
+ width:100%;
+ display:block;
+ margin-top:4px;
+ padding:5px 6px;
+ border:1px solid #ded7cb;
+ border-radius:7px;
+ background:#f0ede7;
+ color:#181613;
+ font:inherit;
+ font-size:10px;
+ font-weight:700;
+ line-height:1.2;
+ text-align:left;
+ overflow:hidden;
+ text-overflow:ellipsis;
+ white-space:nowrap;
+ cursor:pointer;
+}
+.adminCompactCalendar .calendarEvent:hover{
+ border-color:#c79a45;
+ background:#fff8e8;
+}
+.adminCompactCalendar .calendarEvent.booking{border-left:3px solid #b98a3e}
+.adminCompactCalendar .calendarEvent.block{border-style:dashed;border-left:3px solid #8a8175}
+.adminCompactCalendar .calendarEvent.job{border-left:3px solid #537a5b}
+.adminCalendarTarget>.card{
+ outline:3px solid rgba(207,161,83,.4);
+ box-shadow:0 0 0 5px rgba(207,161,83,.10);
+}
+
+@media(min-width:901px){
+ .admin{
+  background:#f3efe8;
+  color:#181613;
+ }
+ .admin .side{
+  color:#181613;
+ }
+ .admin .side button:not(.active){
+  color:#181613;
+ }
+}
+
+@media(max-width:760px){
+ .adminCompactCalendar{
+  padding:10px;
+ }
+ .adminCompactCalendar .calendarHead,
+ .adminCompactCalendar .calendarGrid{
+  min-width:0!important;
+ }
+ .adminCompactCalendar .calendarDay{
+  min-height:62px;
+  padding:3px;
+ }
+ .adminCompactCalendar .calendarEvent{
+  padding:3px;
+  font-size:8px;
+ }
+}
