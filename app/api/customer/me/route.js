@@ -182,6 +182,38 @@ export async function GET(){
   }));
  }
 
+ // Include only immutable drawing versions actually shared with this email
+ // through a sent offer. A newly registered Min side account sees the same
+ // history, while unshared admin drawings remain completely private.
+ if(customerEmail){
+  const {data:published,error:publishedError}=await s.from("quote_drawing_publications")
+   .select("id,quote_id,drawing_id,name,address,notes,drawing_data,published_at")
+   .eq("customer_email",customerEmail)
+   .order("published_at",{ascending:false})
+   .limit(150);
+  if(publishedError){
+   console.error("CUSTOMER PUBLISHED DRAWINGS",publishedError);
+  }else{
+   const seen=new Set(drawings.map(row=>row.id));
+   for(const row of published||[]){
+    const id=row.drawing_id||row.id;
+    if(seen.has(id))continue;
+    seen.add(id);
+    drawings.push({
+     id,
+     orderId:"",
+     name:row.name||"Tegning",
+     address:row.address||"",
+     notes:row.notes||"",
+     updatedAt:row.published_at||null,
+     drawingData:row.drawing_data&&typeof row.drawing_data==="object"?row.drawing_data:{},
+     sharedWithQuoteId:row.quote_id,
+     publishedCopy:true
+    });
+   }
+  }
+ }
+
  return NextResponse.json({
   customer,
   orders,

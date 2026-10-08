@@ -1,0 +1,35 @@
+.page{max-width:1220px;margin:0 auto;min-height:100vh;padding:24px 24px 70px;background:#f8f6f0;color:#26231e;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}
+.header{background:#191a17;color:#f3f0e8;border-radius:17px;padding:24px 27px;margin-bottom:18px}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:11px;font-weight:900;letter-spacing:.10em;color:#d8b47b}
+.brand a{color:#f2eee6;text-decoration:none;letter-spacing:0;font-size:13px}
+.heading{display:flex;justify-content:space-between;align-items:flex-end;gap:25px;margin-top:23px}
+.heading h1{font-size:clamp(25px,4vw,40px);letter-spacing:-.035em;margin:0 0 8px}
+.heading p{max-width:670px;color:#c5c2b8;line-height:1.55;margin:0;font-size:13px}
+.newButton,.actions a,.actions button{display:inline-flex;align-items:center;justify-content:center;border:1px solid #c89c54;border-radius:9px;text-decoration:none;font-weight:850;font-size:13px;min-height:43px;padding:9px 15px;box-sizing:border-box;cursor:pointer}
+.newButton{background:#d0a35a;color:#161512;white-space:nowrap}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:15px}
+.stats>div{display:flex;flex-direction:column;gap:8px;background:#fff;border:1px solid #e4dccd;border-radius:12px;padding:18px}
+.stats span{color:#6b6259;font-size:12px}.stats strong{font-size:29px;font-weight:900}
+.toolbar{background:#fff;border:1px solid #e2d8c6;border-radius:12px;padding:14px;display:flex;gap:12px;align-items:flex-end;margin-bottom:20px}
+.toolbar label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:800;flex:1;min-width:0}
+.toolbar label+label{flex:0 0 220px}
+.toolbar input,.toolbar select{width:100%;box-sizing:border-box;border:1px solid #c9c0b3;border-radius:8px;padding:11px;background:#fff;color:#27231d;font:14px Arial,Helvetica,sans-serif}
+.toolbar button{padding:10px;border:1px solid #b7a892;border-radius:7px;background:#f3e9d7;color:#282019;cursor:pointer;font-weight:800}
+.group{background:#fff;border:1px solid #e2d8c6;border-radius:13px;margin-bottom:16px;overflow:hidden}
+.groupTitle{padding:18px 20px 14px;display:flex;justify-content:space-between;align-items:center;gap:15px;background:#f0eadf}
+.groupTitle h2{font-size:19px;margin:0 0 4px}
+.groupTitle small{color:#6a6052;font-size:12px}
+.groupTitle span{font-weight:800;color:#795b2d;font-size:12px;white-space:nowrap}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0}
+.card{padding:18px 20px;display:flex;flex-direction:column;justify-content:space-between;gap:16px;border-top:1px solid #ebe6dd;min-width:0}
+.card:nth-child(odd){border-right:1px solid #ebe6dd}
+.cardMain h3{margin:8px 0 5px;font-size:18px;line-height:1.25}
+.cardMain p{color:#605e54;font-size:13px;margin:0 0 8px;line-height:1.45}
+.cardMain small{display:block;color:#777166;font-size:11px;line-height:1.4}
+.status{display:inline-block;border-radius:30px;background:#ede7da;color:#695637;padding:5px 9px;font-size:10px;font-weight:900}
+.actions{display:flex;gap:9px;flex-wrap:wrap}.actions a{background:#262924;color:white;border-color:#262924}.actions button{background:#fff;color:#352a1c}
+.notice,.error,.empty{padding:23px;border-radius:12px;border:1px solid #e3dac9;background:white;margin-bottom:16px}
+.error{color:#862a21;border-color:#dda69a;background:#fff3f0}
+.empty h2{margin:0 0 8px}.empty p{line-height:1.6}.empty a{color:#775828;font-weight:900}
+.explanation{color:#686159;font-size:12px;line-height:1.6;max-width:800px;margin:22px 0}
+@media(max-width:700px){.page{padding:10px 10px 60px}.header{padding:18px}.heading{flex-direction:column;align-items:stretch;margin-top:18px;gap:16px}.newButton{width:100%}.stats{gap:7px}.stats>div{padding:11px}.stats span{font-size:10px}.stats strong{font-size:23px}.toolbar{display:grid;grid-template-columns:1fr;padding:12px}.toolbar label+label{flex:auto}.cards{grid-template-columns:1fr}.card:nth-child(odd){border-right:0}.groupTitle{padding:14px}.groupTitle h2{font-size:16px}.actions a,.actions button{flex:1}}

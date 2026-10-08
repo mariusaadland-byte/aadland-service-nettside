@@ -118,9 +118,10 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
 </body></html>`;
 
  let pdf;
+ let drawings=[];
  const filename=quotePdfFilename(quote);
  try{
-  const drawings=await loadQuoteDrawings(s,quote);
+  drawings=await loadQuoteDrawings(s,quote);
   pdf=await buildQuotePdf(quote,drawings);
   if(!pdf?.length||pdf.subarray(0,8).toString("ascii")!=="%PDF-1.4"){
    throw new Error("Ugyldig tilbuds-PDF");
@@ -128,6 +129,26 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  }catch(err){
   console.error("QUOTE PDF GENERATION ERROR",{quoteId:id,message:err?.message});
   return NextResponse.json({error:"PDF-kopien kunne ikke lages: "+String(err?.message||"Ukjent feil").slice(0,180)+". Tilbudet er ikke sendt."},{status:500});
+ }
+
+ // Prevent sharing a linked customer's drawing with a different offer recipient.
+ if(drawings.length){
+  const ids=[...new Set(drawings.map(row=>row.customer_contact_id).filter(Boolean))];
+  const owners=new Map();
+  if(ids.length){
+   const {data:contacts,error:contactError}=await s.from("admin_customer_contacts")
+    .select("id,email").in("id",ids);
+   if(contactError)return NextResponse.json({error:"Kunne ikke kontrollere eieren av tegningsvedlegget. Tilbudet er ikke sendt."},{status:500});
+   for(const row of contacts||[])owners.set(row.id,String(row.email||"").trim().toLowerCase());
+  }
+  for(const drawing of drawings){
+   const storedEmail=String(drawing.drawing_data?.customerEmail||"").trim().toLowerCase();
+   const linkedEmail=owners.get(drawing.customer_contact_id)||"";
+   const expectedEmail=linkedEmail||storedEmail;
+   if(expectedEmail&&expectedEmail!==customerEmail){
+    return NextResponse.json({error:"En valgt tegning er knyttet til en annen e-postadresse enn tilbudskunden. Velg riktig kunde og tegning før du sender."},{status:409});
+   }
+  }
  }
 
  try{
@@ -164,6 +185,31 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  }
 
  const deliveryType=overrideEmail&&overrideEmail!==customerEmail?"alternate":"primary";
+ // Never publish an attachment to a customer when this email was an admin test
+ // or was delivered to any address other than the customer's own.
+ let drawingsPublished=drawings.length===0;
+ if(drawings.length&&deliveryType==="primary"&&customerEmail){
+  const snapshots=drawings.map(row=>({
+   quote_id:quote.id,drawing_id:row.id,customer_email:customerEmail,
+   name:row.name||"Tegning",address:row.address||"",
+   // Customer-facing copy: keep geometry, not internal admin notes, contact
+   // records, project metadata or draft-only information.
+   notes:"",
+   drawing_data:{
+    walls:Array.isArray(row.drawing_data?.walls)?row.drawing_data.walls:[],
+    zones:Array.isArray(row.drawing_data?.zones)?row.drawing_data.zones:[],
+    items:Array.isArray(row.drawing_data?.items)?row.drawing_data.items:[],
+    defaultWallHeight:Number(row.drawing_data?.defaultWallHeight)||2400,
+    defaultWallThickness:Number(row.drawing_data?.defaultWallThickness)||98
+   },
+   published_at:now
+  }));
+  const {error:publishError}=await s.from("quote_drawing_publications")
+   .upsert(snapshots,{onConflict:"quote_id,drawing_id",ignoreDuplicates:true});
+  if(publishError)console.error("QUOTE DRAWING PUBLICATION",{quoteId:id,message:publishError.message});
+  else drawingsPublished=true;
+ }
+
  try{
   await s.from("quote_send_log").insert({
    quote_id:id,
@@ -175,5 +221,5 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
   console.error("QUOTE SEND LOG",logError);
  }
 
- return NextResponse.json({ok:true,sentTo:email,sentAt:now,deliveryType,link,pdfAttached:true,pdfFilename:filename});
+ return NextResponse.json({ok:true,sentTo:email,sentAt:now,deliveryType,link,pdfAttached:true,pdfFilename:filename,drawingsPublished});
 }
