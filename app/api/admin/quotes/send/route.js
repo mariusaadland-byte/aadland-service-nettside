@@ -4,6 +4,9 @@ import {getAdminUser} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
 import {createQuoteToken} from "../../../../../lib/quoteLinks";
 import {osloDateKey} from "../../../../../lib/osloTime";
+import {buildQuotePdf,quotePdfFilename} from "../../../../../lib/quotePdf";
+
+export const runtime="nodejs";
 
 const nok=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",minimumFractionDigits:2,maximumFractionDigits:2}).format((Number(ore)||0)/100);
 function esc(value){
@@ -101,7 +104,7 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
   ${valid?`<div style="margin-top:6px;color:#777;font-size:12px">Gyldig til ${esc(valid)}</div>`:""}
   ${plannedStart?`<div style="margin-top:6px;color:#777;font-size:12px"><b>Tidligst oppstart:</b> ${esc(plannedStart)}</div><div style="margin-top:4px;color:#777;font-size:11px">Endelig oppstart avtales etter godkjenning.</div>`:""}
  </div>
- <p style="margin:0 0 20px;color:#625d55;line-height:1.65">Åpne tilbudet for full oversikt, betalingsplan og vilkår. Der kan du også godkjenne eller avslå tilbudet.</p>
+ <p style="margin:0 0 20px;color:#625d55;line-height:1.65">Du finner en PDF-kopi av hele tilbudet vedlagt denne e-posten. Åpne lenken nedenfor for å se tilbudet på nettsiden og godkjenne eller avslå det.</p>
  <a href="${link}" style="display:inline-block;background:#cfa153;color:#111;text-decoration:none;font-weight:900;padding:14px 22px">Åpne tilbud →</a>
  ${hasCustomerAccount?`<a href="${esc(minSideUrl)}" style="display:inline-block;margin-left:8px;border:1px solid #cfa153;color:#8a6326;text-decoration:none;font-weight:900;padding:13px 18px">Min side →</a>`:`<p style="margin:18px 0 0;color:#8a847a;font-size:11px;line-height:1.55">Vil du samle tilbud og oppdrag på ett sted? <a href="${esc(minSideUrl)}" style="color:#8a6326;font-weight:800">Opprett Min side med samme e-postadresse.</a></p>`}
  <p style="margin:26px 0 0;color:#8a847a;font-size:11px;line-height:1.55">Har du spørsmål kan du svare direkte på denne e-posten eller kontakte oss på 471 54 898.</p>
@@ -113,6 +116,18 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
 </td></tr></table>
 </body></html>`;
 
+ let pdf;
+ const filename=quotePdfFilename(quote);
+ try{
+  pdf=await buildQuotePdf(quote);
+  if(!pdf?.length||pdf.subarray(0,8).toString("ascii")!=="%PDF-1.4"){
+   throw new Error("Ugyldig tilbuds-PDF");
+  }
+ }catch(err){
+  console.error("QUOTE PDF GENERATION ERROR",{quoteId:id,message:err?.message});
+  return NextResponse.json({error:"PDF-kopien kunne ikke lages. Tilbudet er ikke sendt, prøv igjen."},{status:500});
+ }
+
  try{
   const {Resend}=await import("resend");
   const resend=new Resend(resendKey);
@@ -121,7 +136,8 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
    to:email,
    replyTo,
    subject:(revisionNumber>1?"Revidert tilbud ":"Tilbud ")+quote.quote_number+" – "+quote.title,
-   html
+   html,
+   attachments:[{filename,content:pdf.toString("base64")}]
   });
   if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
  }catch(err){
@@ -157,5 +173,5 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
   console.error("QUOTE SEND LOG",logError);
  }
 
- return NextResponse.json({ok:true,sentTo:email,sentAt:now,deliveryType,link});
+ return NextResponse.json({ok:true,sentTo:email,sentAt:now,deliveryType,link,pdfAttached:true,pdfFilename:filename});
 }
