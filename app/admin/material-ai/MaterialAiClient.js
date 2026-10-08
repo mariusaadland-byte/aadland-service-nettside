@@ -356,9 +356,9 @@ export default function MaterialAiClient(){
   </section>
 
   <section className={styles.supplierCard}>
-   <div className={styles.sectionHead}><div><span className={styles.kicker}>3 · LEVERANDØRPRISER</span><h2>Dine innkjøpspriser</h2><p>Bygger’n er primær. Importer prislisten som CSV; kalkulatoren prøver Bygger’n først og legger deretter på {decimal(number(markup),2)} %.</p></div><label className={styles.importBtn}>Importer prisfil<input type="file" accept=".csv,text/csv,.txt" onChange={importPriceFile}/></label></div>
+   <div className={styles.sectionHead}><div><span className={styles.kicker}>3 · LEVERANDØRPRISER</span><h2>Dine innkjøpspriser</h2><p>Bygger’n er primær. Søk direkte i den felles prisbasen på materiallinjene nedenfor, eller importer en egen CSV lokalt. Valgt påslag er {decimal(number(markup),2)} %.</p></div><label className={styles.importBtn}>Importer prisfil<input type="file" accept=".csv,text/csv,.txt" onChange={importPriceFile}/></label></div>
    <div className={styles.supplierGrid}>{SUPPLIERS.map(s=>{const status=supplierStatuses.find(item=>item.id===s.id);return <div key={s.id}><strong>{s.name}</strong><span>{status?.mode||s.mode}</span><small>{s.note}</small><b className={status?.connected?styles.connected:undefined}>{status?.connected?"Direkte koblet ✓":"Prisfil / manuell pris"}</b></div>})}</div>
-   <div className={styles.catalogStatus}><span>{catalog.length?catalog.length+" varer i lokal prisbase":"Ingen prisfil importert ennå"}</span><div>{catalog.length>0&&rows.length>0&&<button type="button" onClick={()=>{const count=matchAllPrices();setMessage(count?count+" materialer matchet mot prisbasen":"Fant ingen sikre treff");setTimeout(()=>setMessage(""),1800)}}>Match alle materialer</button>}{catalog.length>0&&<button type="button" onClick={clearCatalog}>Tøm prisbase</button>}</div></div>
+   <div className={styles.catalogStatus}><span>{sharedSuppliers.some(s=>s.isPrimary&&s.lastImportAt)?"Felles katalog: Bygger’n er importert":"Felles katalog: venter på import"} · {catalog.length?catalog.length+" varer i lokal CSV":"Ingen lokal CSV lastet"}</span><div>{catalog.length>0&&rows.length>0&&<button type="button" onClick={()=>{const count=matchAllPrices();setMessage(count?count+" materialer matchet mot prisbasen":"Fant ingen sikre treff");setTimeout(()=>setMessage(""),1800)}}>Match alle materialer</button>}{catalog.length>0&&<button type="button" onClick={clearCatalog}>Tøm prisbase</button>}</div></div>
    <p className={styles.fileHelp}>CSV kan ha kolonner som leverandør, varenr, produkt/navn, enhet, pris eks. mva eller pris inkl. mva, pakningsstørrelse og prisbasis.</p>
   </section>
 
@@ -396,14 +396,24 @@ export default function MaterialAiClient(){
      <div className={styles.formulaBox}><small>REGNESTYKKE</small><b>{line.missing?line.missing:line.calculation}</b>{!line.missing&&<span>Teoretisk {decimal(line.requiredQuantity)} {line.unit} → + {decimal(number(line.waste),2)} % svinn → {line.packages>0?line.packages+" pakke(r), ":""}{decimal(line.purchaseQuantity)} {line.unit}</span>}</div>
 
      <div className={styles.priceGrid}>
-      <label>Leverandør<select value={p.supplier||"Bygger’n"} onChange={e=>updatePrice(line.id,"supplier",e.target.value)}>{SUPPLIERS.map(s=><option key={s.id} value={s.name}>{s.name}</option>)}</select></label>
+      <label>Leverandør<select value={p.supplier||"Bygger’n"} onChange={e=>updatePrice(line.id,"supplier",e.target.value)}>{visibleSuppliers.map(s=><option key={s.id} value={s.name}>{s.name}</option>)}</select></label>
       <label>Varenr.<input value={p.sku||""} onChange={e=>updatePrice(line.id,"sku",e.target.value)} placeholder="Valgfritt"/></label>
       <label>Innkjøpspris eks. mva<input inputMode="decimal" value={p.costExVat||""} onChange={e=>updatePrice(line.id,"costExVat",e.target.value)} placeholder="0,00"/></label>
       <label>Pris gjelder<select value={priceBasis} onChange={e=>updatePrice(line.id,"priceBasis",e.target.value)}><option value="unit">Per {line.unit}</option><option value="package">Per pakke</option></select></label>
-      <div className={styles.priceActions}><button type="button" className={styles.matchBtn} onClick={()=>autoMatch(line)} disabled={!catalog.length}>Match prisfil</button><button type="button" className={styles.directBtn} onClick={()=>directLookup(line)} disabled={!p.supplier||directBusy===line.id||!supplierStatuses.find(s=>s.name===p.supplier)?.connected}>{directBusy===line.id?"Henter…":"Hent min pris"}</button></div>
+      <div className={styles.priceActions}><button type="button" className={styles.matchBtn} onClick={()=>autoMatch(line)} disabled={!catalog.length}>Match lokal CSV</button><button type="button" className={styles.directBtn} onClick={()=>directLookup(line)} disabled={!p.supplier||directBusy===line.id||!supplierStatuses.find(s=>s.name===p.supplier)?.connected}>{directBusy===line.id?"Henter…":"Hent min pris"}</button></div>
      </div>
      {p.productName&&<p className={styles.matchInfo}>{p.direct?"Direkte pris":"Matchet"}: <b>{p.productName}</b>{p.sku?" · "+p.sku:""}</p>}
-     <div className={styles.priceSummary}><span>Kost: <b>{money(qty*cost)}</b></span><span>+ {decimal(number(markup),2)} %: <b>{money(sales)} / {priceBasis==="package"?"pk":line.unit}</b></span><strong>Tilbudslinje {money(total)} eks. mva</strong><button type="button" onClick={()=>saveFavorite(line)}>Lagre materiale</button><button type="button" onClick={()=>removeRow(line.id)}>Slett linje</button></div>
+     <div className={styles.sharedCatalogBox}>
+       <label htmlFor={"shared-catalog-"+line.id}>Søk i felles leverandørprisbase (gratis)</label>
+       <div className={styles.sharedCatalogSearch}>
+        <input id={"shared-catalog-"+line.id} value={sharedQueries[line.id]??(line.material||line.specification||"")} onChange={e=>setSharedQueries(current=>({...current,[line.id]:e.target.value}))} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();lookupSharedPrice(line)}}} placeholder="Produktnavn, varenummer eller EAN" />
+        <button type="button" disabled={sharedBusy===line.id} onClick={()=>lookupSharedPrice(line)}>{sharedBusy===line.id?"Søker …":"Finn varer"}</button>
+       </div>
+       {sharedErrors[line.id]&&<p className={styles.sharedCatalogError} role="status">{sharedErrors[line.id]}</p>}
+       {(sharedMatches[line.id]||[]).length>0&&<div className={styles.sharedCatalogMatches}>{sharedMatches[line.id].map(product=><button type="button" key={product.supplierId+"-"+product.sku} onClick={()=>chooseSharedPrice(line,product)}><span><strong>{product.name}</strong><small>{product.supplierName} · varenr. {product.sku}</small></span><span><b>{money(product.costExVat)}</b><small>eks. mva / {product.unit||"stk"}</small></span></button>)}</div>}
+       {p.shared&&<p className={styles.sharedCatalogSelected}>Hentet fra felles prisbase · {p.sku||"uten varenr."} · pris per {p.catalogUnit||"STK"}. Kontroller «Pris gjelder» før tilbud.</p>}
+      </div>
+      <div className={styles.priceSummary}><span>Kost: <b>{money(qty*cost)}</b></span><span>+ {decimal(number(markup),2)} %: <b>{money(sales)} / {priceBasis==="package"?"pk":line.unit}</b></span><strong>Tilbudslinje {money(total)} eks. mva</strong><button type="button" onClick={()=>saveFavorite(line)}>Lagre materiale</button><button type="button" onClick={()=>removeRow(line.id)}>Slett linje</button></div>
     </article>
    })}</div>
 
