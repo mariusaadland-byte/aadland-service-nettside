@@ -903,6 +903,7 @@ function nearestWall(o,walls){
 export default function DrawingClient(){
  const [docs,setDocs]=useState([]),[doc,setDoc]=useState(initial),[selected,setSelected]=useState(null),[draft,setDraft]=useState(null),[zoneDraft,setZoneDraft]=useState([]),[tool,setTool]=useState("select"),[drag,setDrag]=useState(null),[history,setHistory]=useState([]),[future,setFuture]=useState([]),[message,setMessage]=useState(""),[orders,setOrders]=useState([]),[projects,setProjects]=useState([]),[customers,setCustomers]=useState([]),[measureDraft,setMeasureDraft]=useState(null),[wallDrag,setWallDrag]=useState(null),[zoneDrag,setZoneDrag]=useState(null),[measureDrag,setMeasureDrag]=useState(null),[pan,setPan]=useState({x:0,y:0}),[panning,setPanning]=useState(null),[mobileEditOpen,setMobileEditOpen]=useState(false),[roomBuilder,setRoomBuilder]=useState(null),[quickAddOpen,setQuickAddOpen]=useState(false),[fieldMode,setFieldMode]=useState(false),[canvasAspect,setCanvasAspect]=useState(1),[wallBuilder,setWallBuilder]=useState(null),[snapHint,setSnapHint]=useState(null),[wallChain,setWallChain]=useState(null),[online,setOnline]=useState(true),[saveState,setSaveState]=useState("local"),[lastSavedAt,setLastSavedAt]=useState(null),[fieldReturnZoneId,setFieldReturnZoneId]=useState(null),[roomPickerOpen,setRoomPickerOpen]=useState(false),[deleteConfirmOpen,setDeleteConfirmOpen]=useState(false),[deleteBusy,setDeleteBusy]=useState(false),[printMode,setPrintMode]=useState(false),[quoteWarningOpen,setQuoteWarningOpen]=useState(false),[show3D,setShow3D]=useState(false),[elPlan,setElPlan]=useState(false),[wallViewId,setWallViewId]=useState(null),[furnitureBuilder,setFurnitureBuilder]=useState(null),[furnitureGapPick,setFurnitureGapPick]=useState(null),[customFurnitureTemplates,setCustomFurnitureTemplates]=useState([]),[furnitureSnapWallId,setFurnitureSnapWallId]=useState(""),[focusView,setFocusView]=useState(false),[multiSelectMode,setMultiSelectMode]=useState(false),[multiSelectedIds,setMultiSelectedIds]=useState([]),[snapGuide,setSnapGuide]=useState(null),[layerVisibility,setLayerVisibility]=useState({construction:true,openings:true,kitchen:true,furniture:true,electrical:true,measurements:true}),[versions,setVersions]=useState([]),[versionLabel,setVersionLabel]=useState("");
  const [camera3D,setCamera3D]=useState({yaw:42,pitch:34,zoom:1});
+ const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
  const [quickCustomerOpen,setQuickCustomerOpen]=useState(false);
  const [reportBusy,setReportBusy]=useState(false);
  const camera3DDrag=useRef(null);
@@ -911,6 +912,7 @@ export default function DrawingClient(){
  const touchPointers=useRef(new Map()),pinchGesture=useRef(null),pendingCanvasTouch=useRef(null);
  const linkedOrderHandled=useRef(""),linkedLocalOrderHandled=useRef(""),printSelectionRef=useRef(null);
  const autosaveReady=useRef(false),docRef=useRef(doc),docsRef=useRef(docs),serverSyncInFlight=useRef(false),serverSyncQueued=useRef(false),serverSyncedSignature=useRef("");
+ useEffect(()=>{if(!mobileMenuOpen)return;const handleKey=e=>{if(e.key==="Escape")setMobileMenuOpen(false)};window.addEventListener("keydown",handleKey);return()=>window.removeEventListener("keydown",handleKey)},[mobileMenuOpen]);
  useEffect(()=>{docRef.current=doc},[doc]);
  useEffect(()=>{docsRef.current=docs},[docs]);
  useEffect(()=>{
@@ -2047,30 +2049,66 @@ export default function DrawingClient(){
  return <main className={styles.shell+(fieldMode?" "+styles.fieldMode:"")+(focusView?" "+styles.focusView:"")}>
   {quickCustomerOpen&&<QuickCustomerPanel onClose={()=>setQuickCustomerOpen(false)} onChoose={quickChooseCustomer}/>}
   <header className={styles.top}><Link href="/admin">← Backoffice</Link><strong>Tegning & visualisering</strong><input className={styles.name} value={doc.name} onChange={e=>setDoc(d=>({...d,name:e.target.value}))}/><span className={styles.saved}>{message||saveStatusText()}</span>{overallSurveyProgress.total>0&&<button type="button" className={overallSurveyProgress.complete?styles.surveyBadgeDone:overallSurveyProgress.stale?styles.surveyBadgeStale:styles.surveyBadge} onClick={()=>{const zones=doc.zones||[],target=zones.find(zone=>!zoneSurveyState(zone,doc.walls,doc.items).finished)||zones[0];if(target){setSelected({kind:"zone",id:target.id});setTimeout(()=>scrollPanel(rightPanel),0)}}}>{overallSurveyProgress.complete?"✓ Befaring ferdig":"Befaring "+overallSurveyProgress.done+"/"+overallSurveyProgress.total+(overallSurveyProgress.stale?" · sjekk "+overallSurveyProgress.stale:"")}</button>}<button className={styles.btn} type="button" onClick={()=>setQuickCustomerOpen(true)}>＋ Kunde</button><button className={styles.btn} onClick={()=>persist()}>Lagre tegning</button><button className={styles.btn} onClick={undo} disabled={!history.length}>Angre</button><button className={styles.btn} onClick={redo} disabled={!future.length}>Gjør om</button><button className={styles.btn} onClick={()=>zoomBy(-.25)}>−</button><span className={styles.zoom}>{Math.round((doc.zoom||1)*100)}%</span><button className={styles.btn} onClick={()=>zoomBy(.25)}>+</button><details className={styles.moreMenu}><summary aria-label="Flere verktøy" title="Flere verktøy">☰</summary><div className={styles.moreMenuPanel} onClick={e=>{if(e.target.closest("button"))e.currentTarget.parentElement.open=false}}><button className={styles.btn} onClick={fitView}>◎ Sentrer alt</button><button className={focusView?styles.activeBtn:styles.btn} onClick={()=>{setFocusView(value=>!value);setTimeout(fitView,60)}}>{focusView?"Vis paneler":"Fokus tegning"}</button><button className={tool==="pan"?styles.activeBtn:styles.btn} onClick={()=>{setTool(tool==="pan"?"select":"pan");setDraft(null);setMeasureDraft(null)}}>Flytt visning</button><button className={elPlan?styles.activeBtn:styles.btn} onClick={()=>setElPlan(value=>!value)}>EL-tegning</button><button className={styles.btn} onClick={()=>setShow3D(true)}>3D-visning</button><button className={styles.btn} onClick={()=>openWallView()}>Veggvisning</button><button className={styles.btn} onClick={()=>openFurnitureBuilder(selected?.kind==="wall"?selected.id:null)}>Bygg møbel</button><button className={styles.btn} onClick={()=>openGapShelfBuilder(selected?.kind==="wall"?selected.id:null)}>Hylle mellom skap</button><button className={styles.btn} onClick={runPrint}>PDF / rapport</button><button className={styles.btn} onClick={openMaterialCalculator}>Materialkalkulator</button><button className={styles.btn} onClick={newQuoteFromDrawing}>Nytt tilbud fra tegning</button></div></details></header>
+
   <nav className={styles.mobileTools} aria-label="Tegneverktøy mobil">
+   <button type="button" className={styles.mobileMenuToggle+(mobileMenuOpen?" "+styles.mobileMenuToggleOpen:"")} aria-expanded={mobileMenuOpen} aria-controls="drawing-mobile-more" aria-label={mobileMenuOpen?"Lukk menyen":"Åpne meny med 3D, PDF og flere verktøy"} onClick={()=>setMobileMenuOpen(value=>!value)}><span aria-hidden="true">{mobileMenuOpen?"✕":"☰"}</span><span>Meny</span></button>
+   <div className={styles.mobilePrimaryTools}>
    <button type="button" className={tool==="select"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("select");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Velg</button>
    <button type="button" className={tool==="wall"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("wall");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Vegg</button>
    <button type="button" className={tool==="pan"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("pan");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Flytt</button>
    <button type="button" className={tool==="measure"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("measure");setDraft(null);setWallChain(null);setSnapHint(null);setZoneDraft([]);setMeasureDraft(null)}}>Mål</button>
    <button type="button" className={tool==="zone"?styles.mobileActive:styles.mobileTool} onClick={()=>{setTool("zone");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Romsone</button>
-   <button type="button" className={quickAddOpen?styles.mobileActive:styles.mobileTool} onClick={()=>{setMobileEditOpen(false);setRoomPickerOpen(false);setQuickAddOpen(value=>!value)}}>+ Legg til</button><button type="button" className={roomPickerOpen?styles.mobileActive:overallSurveyProgress.complete?styles.mobileSurveyDone:styles.mobileTool} onClick={()=>{setMobileEditOpen(false);setQuickAddOpen(false);setRoomPickerOpen(value=>!value)}}>{overallSurveyProgress.total?overallSurveyProgress.complete?"✓ Rom":"Rom "+overallSurveyProgress.done+"/"+overallSurveyProgress.total:"Rom"}</button><button type="button" className={fieldMode?styles.mobileActive:styles.mobileTool} onClick={()=>{if(fieldMode)persist(docRef.current);setFieldMode(value=>!value);setQuickAddOpen(false);setRoomPickerOpen(false);setMobileEditOpen(false)}}>{fieldMode?"Avslutt befaring":"Befaring"}</button>
+   <button type="button" className={quickAddOpen?styles.mobileActive:styles.mobileTool} onClick={()=>{setMobileEditOpen(false);setRoomPickerOpen(false);setQuickAddOpen(value=>!value)}}>+ Legg til</button>
    {(draft||measureDraft||zoneDraft.length>0)&&<button type="button" className={styles.mobileDone} onClick={()=>{if(tool==="zone"&&zoneDraft.length>=3)finishZone();else{setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([]);setTool("select")}}}>{tool==="zone"&&zoneDraft.length>=3?"Lukk sone":"Ferdig"}</button>}
-   <button type="button" className={multiSelectMode?styles.mobileActive:styles.mobileTool} onClick={()=>{setMultiSelectMode(v=>!v);if(multiSelectMode)clearMulti()}}>Flervalg</button><button type="button" className={elPlan?styles.mobileActive:styles.mobileTool} onClick={()=>setElPlan(value=>!value)}>EL</button><button type="button" className={styles.mobileTool} onClick={()=>setShow3D(true)}>3D</button><button type="button" className={styles.mobileTool} onClick={()=>openWallView()}>Veggvisning</button><button type="button" className={styles.mobileTool} onClick={()=>openFurnitureBuilder(selected?.kind==="wall"?selected.id:null)}>Møbel</button><button type="button" className={focusView?styles.mobileActive:styles.mobileTool} onClick={()=>{setFocusView(value=>!value);setTimeout(fitView,60)}}>Fokus</button><span className={styles.mobileDivider}/>
-   <button type="button" className={styles.mobileTool} onClick={undo} disabled={!history.length}>↶</button>
-   <button type="button" className={styles.mobileTool} onClick={redo} disabled={!future.length}>↷</button>
-   <button type="button" className={styles.mobileTool} onClick={()=>zoomBy(-.25)}>−</button>
-   <span className={styles.mobileZoom}>{Math.round((doc.zoom||1)*100)}%</span>
-   <button type="button" className={styles.mobileTool} onClick={()=>zoomBy(.25)}>+</button>
-   <button type="button" className={styles.mobileTool} onClick={fitView}>Sentrer alt</button>
-   <span className={styles.mobileDivider}/>
-   <button type="button" className={styles.mobileTool} onClick={()=>scrollPanel(leftPanel)}>Objekter</button>
-   <button type="button" className={styles.mobileTool} onClick={()=>scrollPanel(rightPanel)}>Egenskaper</button>
-   <button type="button" className={styles.mobileTool} onClick={()=>setQuickCustomerOpen(true)}>＋ Kunde</button>
-   <button type="button" className={styles.mobileTool} onClick={runPrint}>Rapport/PDF</button>
-   <button type="button" className={styles.mobileTool} onClick={openMaterialCalculator}>Materialkalkulator</button>
-   <span className={styles.mobileSyncStatus} data-state={online?saveState:"offline"}>{!online?"Offline":saveState==="syncing"?"Synk…":saveState==="server"?"Synket":"Lokalt"}</span>
+   </div>
    <button type="button" className={styles.mobileSave} onClick={()=>persist()}>Lagre</button>
   </nav>
+  {mobileMenuOpen&&<>
+   <button type="button" className={styles.mobileMenuBackdrop} aria-label="Lukk menyen" onClick={()=>setMobileMenuOpen(false)}/>
+   <aside className={styles.mobileMenuPanel} id="drawing-mobile-more" aria-label="Flere tegneverktøy">
+    <div className={styles.mobileMenuHead}><div><strong>Flere verktøy</strong><small>{doc.name||"Tegning"} · {online?(saveState==="server"?"Synkronisert":saveState==="syncing"?"Synkroniserer":"Lagret lokalt"):"Frakoblet"}</small></div><button type="button" onClick={()=>setMobileMenuOpen(false)} aria-label="Lukk">✕</button></div>
+    <div className={styles.mobileMenuSections} onClick={event=>{if(event.target.closest("button,a"))setMobileMenuOpen(false)}}>
+     <section>
+      <h3>Visning og tegning</h3>
+      <div className={styles.mobileMenuGrid}>
+       <button type="button" onClick={()=>setShow3D(true)}>◈ 3D-visning</button>
+       <button type="button" onClick={()=>openWallView()}>▤ Veggvisning</button>
+       <button type="button" onClick={()=>openFurnitureBuilder(selected?.kind==="wall"?selected.id:null)}>▣ Bygg møbel</button>
+       <button type="button" onClick={()=>openGapShelfBuilder(selected?.kind==="wall"?selected.id:null)}>↔ Hylle mellom skap</button>
+       <button type="button" onClick={()=>setElPlan(value=>!value)}>{elPlan?"✓ ":""}EL-tegning</button>
+       <button type="button" onClick={()=>{setFocusView(value=>!value);setTimeout(fitView,60)}}>{focusView?"Vis paneler":"Fokus tegning"}</button>
+       <button type="button" onClick={()=>{setMobileEditOpen(false);setQuickAddOpen(false);setRoomPickerOpen(value=>!value)}}>▭ Rom og befaring {overallSurveyProgress.total?"("+overallSurveyProgress.done+"/"+overallSurveyProgress.total+")":""}</button>
+       <button type="button" onClick={()=>{if(fieldMode)persist(docRef.current);setFieldMode(value=>!value);setQuickAddOpen(false);setRoomPickerOpen(false);setMobileEditOpen(false)}}>{fieldMode?"Avslutt befaring":"Start befaring"}</button>
+       <button type="button" onClick={()=>{setMultiSelectMode(value=>!value);if(multiSelectMode)clearMulti()}}>{multiSelectMode?"Avslutt flervalg":"Flervalg"}</button>
+      </div>
+     </section>
+     <section>
+      <h3>Utskrift og kunde</h3>
+      <div className={styles.mobileMenuGrid}>
+       <button type="button" onClick={()=>setQuickCustomerOpen(true)}>＋ Opprett / velg kunde</button>
+       <button type="button" onClick={runPrint}>↓ PDF / rapport</button>
+       <button type="button" onClick={newQuoteFromDrawing}>Nytt tilbud fra tegning</button>
+       <button type="button" onClick={openMaterialCalculator}>Materialkalkulator</button>
+      </div>
+     </section>
+     <section>
+      <h3>Redigering og navigering</h3>
+      <div className={styles.mobileMenuGrid}>
+       <button type="button" onClick={undo} disabled={!history.length}>↶ Angre</button>
+       <button type="button" onClick={redo} disabled={!future.length}>↷ Gjør om</button>
+       <button type="button" onClick={()=>zoomBy(-.25)}>− Zoom ut</button>
+       <button type="button" onClick={()=>zoomBy(.25)}>＋ Zoom inn</button>
+       <button type="button" onClick={fitView}>◎ Sentrer alt</button>
+       <button type="button" onClick={()=>scrollPanel(leftPanel)}>Objekter</button>
+       <button type="button" onClick={()=>scrollPanel(rightPanel)}>Egenskaper</button>
+       <button type="button" onClick={()=>{setTool(tool==="pan"?"select":"pan");setDraft(null);setMeasureDraft(null)}}>Flytt visning</button>
+      </div>
+     </section>
+     <Link className={styles.mobileMenuBackLink} href="/admin">← Tilbake til admin</Link>
+    </div>
+   </aside>
+  </>}
+
   {quickAddOpen&&<div className={styles.mobileQuickAdd}>
    <button type="button" onClick={openWallBuilder}>↔ Vegg med mål</button>
    <button type="button" onClick={makeRoom}>▭ Rektangulært rom</button>
