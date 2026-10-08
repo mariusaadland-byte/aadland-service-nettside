@@ -1,0 +1,45 @@
+.page{min-height:100vh;background:#f3efe8;color:#201b14;padding:24px;box-sizing:border-box;font-family:inherit}
+.shell{max-width:1160px;margin:0 auto}
+.header{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;margin-bottom:22px}
+.back{display:inline-block;color:#78603a;text-decoration:none;font-weight:750;margin-bottom:18px}
+.eyebrow{font-size:11px;letter-spacing:.15em;font-weight:900;color:#996d2c;margin:0 0 8px}
+.header h1{font-size:clamp(30px,3vw,46px);margin:0 0 8px;line-height:1.1}
+.intro{margin:0;max-width:750px;line-height:1.55;color:#60574b}
+.primary{border:0;border-radius:10px;background:#211a15;color:white;padding:13px 19px;font-size:14px;font-weight:850;white-space:nowrap;cursor:pointer}
+.primary:disabled{opacity:.5;cursor:wait}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0 10px}
+.stats>div{background:#fff;border:1px solid #e4dacb;border-radius:13px;padding:16px;display:flex;flex-direction:column;gap:3px}
+.stats b{font-size:29px}.stats span{font-size:12px;color:#6d6254;font-weight:700}
+.progressLine{height:7px;border-radius:100px;background:#e6ddcf;overflow:hidden;margin-bottom:26px}
+.progressLine span{display:block;height:100%;background:#64866a;transition:width .2s}
+.filters{display:grid;grid-template-columns:minmax(190px,1.3fr) repeat(2,minmax(160px,.65fr));gap:10px;background:#fff;border:1px solid #e7dccd;border-radius:13px;padding:15px;margin-bottom:19px}
+.filters label,.addForm label,.taskControls label,.noteWrap label{display:flex;flex-direction:column;gap:6px;font-weight:800;font-size:12px;color:#554b40}
+.filters input,.filters select,.addForm input,.addForm select,.addForm textarea,.taskControls select,.noteWrap textarea{font:inherit;background:#fff;border:1px solid #d9cdbb;color:#231c16;border-radius:8px;padding:10px 11px;box-sizing:border-box;width:100%;min-width:0}
+.group{margin:23px 0 28px}
+.groupHead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.groupHead h2{margin:0;font-size:21px}
+.groupHead span{color:#725d42;font-size:13px;font-weight:700}
+.taskList{display:grid;gap:12px}
+.task{background:#fff;border:1px solid #e2d8c9;border-radius:13px;padding:19px;display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:14px 22px}
+.task.complete{border-color:#bed3c1;background:#f9fcf9}
+.taskTitle{display:flex;align-items:flex-start;gap:12px}
+.taskTitle h3{font-size:16px;line-height:1.4;margin:0 0 6px}
+.taskTitle p{font-size:13px;line-height:1.55;margin:0;color:#665d51}
+.doneCheck{display:flex;align-items:center;justify-content:center;width:25px;min-width:25px;padding-top:2px}
+.doneCheck input{width:22px;height:22px;accent-color:#446f4a;cursor:pointer}
+.taskControls{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
+.taskControls select{font-size:12px;padding:9px 6px}
+.noteWrap{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) 140px;align-items:end;gap:14px;padding-top:13px;border-top:1px solid #eee7de}
+.noteWrap textarea{resize:vertical;min-height:62px;font-size:13px;font-weight:400;line-height:1.45}
+.noteActions{display:flex;flex-direction:column;align-items:stretch;gap:7px}
+.noteActions button{border:1px solid #c7b8a0;border-radius:8px;background:#f1e8dc;color:#2d261f;padding:10px;font-size:12px;font-weight:800;cursor:pointer}
+.noteActions button:disabled{opacity:.45;cursor:default}
+.noteActions .delete{border-color:#e1c1b6;color:#8b3b2d;background:#fff}
+.addForm{background:#fff;border:1px solid #dfd3c2;border-radius:14px;padding:22px;margin-bottom:20px;display:grid;gap:13px}
+.addForm h2{margin:0;font-size:20px}
+.addFields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.addForm .primary{justify-self:start}
+.error,.message,.empty,.loading{padding:14px 16px;border-radius:10px;margin:14px 0;background:#fff;border:1px solid #e5d8c6}
+.error{color:#8b2c24;background:#fff2f0;border-color:#efc4bd}
+.message{color:#295e35;background:#f0f8f0;border-color:#c2dfc5}
+@media(max-width:740px){.page{padding:17px}.header{align-items:flex-start;flex-direction:column}.header .primary{width:100%}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.filters{grid-template-columns:1fr}.task{grid-template-columns:1fr;padding:15px}.taskControls{grid-template-columns:1fr 1fr}.noteWrap{grid-template-columns:1fr}.noteActions{flex-direction:row;justify-content:flex-end}.groupHead h2{font-size:18px}}
