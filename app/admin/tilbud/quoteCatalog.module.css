@@ -1,0 +1,23 @@
+.box{border:1px solid #d9cfbb;background:#fcfaf5;border-radius:12px;padding:15px;margin:0 0 16px;display:grid;gap:10px;color:#26231e;max-width:100%;min-width:0}
+.search{display:grid;gap:7px;font-size:12px;font-weight:900;color:#29251e}
+.search input{box-sizing:border-box;min-height:48px;width:100%;min-width:0;border:1px solid #b7a58c;border-radius:8px;background:#fff!important;color:#1e1b16!important;-webkit-text-fill-color:#1e1b16!important;caret-color:#1e1b16!important;font-size:16px;padding:11px 13px;color-scheme:light}
+.search input::placeholder{color:#797267!important;-webkit-text-fill-color:#797267!important}
+.options{display:grid;grid-template-columns:minmax(0,1fr) 140px;gap:10px}
+.options label{display:grid;gap:5px;font-size:11px;font-weight:800;color:#655c4c}
+.options select,.options input{box-sizing:border-box;width:100%;min-height:40px;padding:8px 9px;background:#fff!important;color:#1e1b16!important;-webkit-text-fill-color:#1e1b16!important;caret-color:#1e1b16;border:1px solid #cec6b9;border-radius:8px;font-size:14px;color-scheme:light}
+.results{border:1px solid #dfd7ca;border-radius:9px;overflow:auto;max-height:300px;background:#fff}
+.results>p{margin:0;padding:13px;color:#6b6255;font-size:12px}
+.results button{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center;min-height:57px;width:100%;background:#fff;color:#251d15;border:0;border-bottom:1px solid #ece7df;text-align:left;padding:10px;font:inherit;cursor:pointer}
+.results button:hover,.results button:focus-visible{background:#f9f0dd}
+.results button:last-child{border-bottom:0}
+.results button span{display:grid;gap:4px;min-width:0}
+.results button strong{font-size:12px;overflow-wrap:anywhere}
+.results button small{font-size:10px;color:#6e675d;line-height:1.4}
+.results button b{font-size:13px;white-space:nowrap}
+.results button>span:nth-child(2){text-align:right}
+.results button em{font-style:normal;color:#846021;font-weight:900;white-space:nowrap;font-size:12px}
+.note{color:#746b60;font-size:11px;line-height:1.5}
+.notice,.error{margin:0;padding:10px;border-radius:8px;font-size:12px;font-weight:750;line-height:1.4}
+.notice{background:#eaf7ed;color:#245c34;border:1px solid #bdd8c1}
+.error{background:#fff1ee;color:#8a3124;border:1px solid #e2b4ac}
+@media(max-width:600px){.box{padding:11px}.options{grid-template-columns:minmax(0,1fr) 105px}.results button{grid-template-columns:1fr auto}.results button em{grid-column:1/-1}.results button>span:nth-child(2){text-align:right}}
