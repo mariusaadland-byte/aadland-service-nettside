@@ -19,3 +19,8 @@
 .create button{border:0;border-radius:9px;background:#171613;color:white;font-weight:800;padding:13px;cursor:pointer}
 .error{margin:15px 28px 0;padding:12px;background:#f8e8e6;color:#862b20;border:1px solid #d9a49b;border-radius:9px}
 @media(max-width:650px){.body{grid-template-columns:1fr;gap:26px;padding:17px}.dialog header{padding:19px}.dialog header h2{font-size:21px}.results{max-height:180px}}
+
+/* Mobile Safari may prefer dark form controls even inside a light dialog. */
+.dialog{color-scheme:light}
+.body input{color:#211c18;-webkit-text-fill-color:#211c18;caret-color:#211c18;color-scheme:light}
+.body input::placeholder{color:#77736a;-webkit-text-fill-color:#77736a;opacity:1}
