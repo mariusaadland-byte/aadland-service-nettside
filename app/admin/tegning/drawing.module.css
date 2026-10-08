@@ -1383,3 +1383,38 @@
  .roomDistancePanel>div,.mobileRoomDistances{grid-template-columns:1fr}
  .mobileRoomDistances>b{grid-column:1}
 }
+
+
+/* iOS/Android: never inherit light text into light editable controls.
+   Keep the document-name field and the dark wall-elevation editor dark. */
+@media (max-width:900px), (pointer:coarse) and (min-width:901px) and (max-width:1200px){
+ .shell{color-scheme:light}
+ .shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not(.name),
+ .shell textarea,
+ .shell select{
+  color:#1d1d1b!important;
+  -webkit-text-fill-color:#1d1d1b!important;
+  caret-color:#1d1d1b!important;
+  color-scheme:light
+ }
+ .shell input:not(.name)::placeholder,
+ .shell textarea::placeholder{
+  color:#77736a!important;
+  -webkit-text-fill-color:#77736a!important;
+  opacity:1
+ }
+ .shell input:not(.name):-webkit-autofill,
+ .shell input:not(.name):-webkit-autofill:hover,
+ .shell input:not(.name):-webkit-autofill:focus{
+  -webkit-text-fill-color:#1d1d1b!important;
+  caret-color:#1d1d1b!important;
+  -webkit-box-shadow:0 0 0 1000px #fff inset!important
+ }
+ .shell .top .name,
+ .shell .wallInlineEditor input{
+  color:#f4f4f1!important;
+  -webkit-text-fill-color:#f4f4f1!important;
+  caret-color:#f4f4f1!important;
+  color-scheme:dark
+ }
+}
