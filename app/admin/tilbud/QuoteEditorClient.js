@@ -4,6 +4,7 @@ import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
 import {osloDateKey,shiftDateKey} from "../../../lib/osloTime";
+import {CATALOG_QUOTE_TRANSFER_KEY} from "../../../lib/calculatorQuoteLines";
 
 const nok=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",maximumFractionDigits:2}).format((Number(ore)||0)/100);
 const lineId=()=>("line-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,7));
@@ -219,8 +220,43 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      plannedStartDate:quote.plannedStartDate||"",
      autoFollowUp:quote.autoFollowUp!==false
     };
-    setV(loadedState);
+    // Add selected supplier goods to an EXISTING draft only after we have loaded
+    // its persisted lines. Never replace the customer's existing offer content.
+    let mergedState=loadedState,importedCount=0,transferProblem="";
+    try{
+     const raw=sessionStorage.getItem(CATALOG_QUOTE_TRANSFER_KEY);
+     if(raw){
+      const transfer=JSON.parse(raw);
+      if(transfer?.quoteId===quoteId){
+       sessionStorage.removeItem(CATALOG_QUOTE_TRANSFER_KEY);
+       const expired=!Number.isFinite(transfer.createdAt)||Date.now()-transfer.createdAt>10*60*1000;
+       const expectedEmail=String(transfer.customer?.email||"").trim().toLowerCase();
+       const actualEmail=String(quote.customer?.email||"").trim().toLowerCase();
+       const sameCustomer=expectedEmail&&actualEmail
+        ?expectedEmail===actualEmail
+        :String(transfer.customer?.name||"").trim().toLowerCase()===String(quote.customer?.name||"").trim().toLowerCase();
+       if(expired)transferProblem="Overføringen fra priskalkulatoren er utløpt. Prøv på nytt.";
+       else if(quote.status!=="draft")transferProblem="Bare tilbudskladder kan få nye varer. Opprett en revisjon av sendte tilbud.";
+       else if(!sameCustomer)transferProblem="Kunden i kalkulatoren er ikke den samme som på tilbudet. Varene er ikke lagt til.";
+       else{
+        const incoming=(Array.isArray(transfer.lineItems)?transfer.lineItems:[]).slice(0,110).map(row=>({
+         id:lineId(),type:["work","material","other"].includes(row.type)?row.type:"material",
+         description:String(row.description||"").trim().slice(0,500),
+         quantity:Number(row.quantity)||1,
+         unit:String(row.unit||"stk").slice(0,40),
+         unitPriceOre:Math.max(0,Math.round(Number(row.unitPriceOre)||0)),vatRate:Number(row.vatRate)===0?0:25
+        })).filter(row=>row.description&&row.quantity>0);
+        if(!incoming.length)transferProblem="Ingen gyldige varelinjer ble funnet i overføringen.";
+        else if(loadedState.lineItems.length+incoming.length>120)transferProblem="Dette tilbudet har ikke plass til så mange nye varelinjer (maks 120).";
+        else{mergedState={...loadedState,lineItems:[...loadedState.lineItems,...incoming]};importedCount=incoming.length;}
+       }
+      }
+     }
+    }catch{transferProblem="Varene fra kalkulatoren kunne ikke leses. Prøv på nytt."}
+    setV(mergedState);
     setSavedSnapshot(JSON.stringify(loadedState));
+    if(importedCount)setSavedMessage(importedCount+" varelinje(r) lagt til i tilbudskladden. Kontroller prisene og trykk «Lagre tilbud».");
+    if(transferProblem)setError(transferProblem);
    })
    .catch(err=>{if(!cancelled)setError(err.message||"Tilbudet kunne ikke lastes.")})
    .finally(()=>{if(!cancelled)setLoading(false)});
