@@ -912,6 +912,7 @@ export default function DrawingClient(){
  const touchPointers=useRef(new Map()),pinchGesture=useRef(null),pendingCanvasTouch=useRef(null);
  const linkedOrderHandled=useRef(""),linkedLocalOrderHandled=useRef(""),printSelectionRef=useRef(null);
  const autosaveReady=useRef(false),docRef=useRef(doc),docsRef=useRef(docs),serverSyncInFlight=useRef(false),serverSyncQueued=useRef(false),serverSyncedSignature=useRef("");
+ useEffect(()=>{if(!mobileMenuOpen)return;const handleKey=e=>{if(e.key==="Escape")setMobileMenuOpen(false)};window.addEventListener("keydown",handleKey);return()=>window.removeEventListener("keydown",handleKey)},[mobileMenuOpen]);
  useEffect(()=>{docRef.current=doc},[doc]);
  useEffect(()=>{docsRef.current=docs},[docs]);
  useEffect(()=>{
