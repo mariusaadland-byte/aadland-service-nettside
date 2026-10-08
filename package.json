@@ -5,7 +5,7 @@
   "scripts": {
     "prebuild": "node scripts/validate-production-env.mjs",
     "dev": "next dev",
-    "build": "node scripts/smoke-kitchen-walls.mjs && node scripts/smoke-drawing-pdf.mjs && node scripts/smoke-calculator-to-quote.mjs && next build",
+    "build": "node scripts/smoke-kitchen-walls.mjs && node scripts/smoke-drawing-pdf.mjs && node scripts/smoke-calculator-to-quote.mjs && node scripts/smoke-quote-private-pdf.mjs && next build",
     "start": "next start"
   },
   "dependencies": {
