@@ -285,7 +285,7 @@
 }
 .quoteGoodsNumber{align-self:center;color:#d7b76d;font-size:13px;font-weight:900;text-align:center}
 .quoteGoodsLine label{display:grid;gap:5px;min-width:0;font-size:11px;font-weight:800;color:#bfc1c6}
-.quoteGoodsLine label>span{min-height:26px;display:flex;align-items:end}
+.quoteGoodsLine label>span{min-height:26px;display:flex;align-items:flex-end}
 .quoteGoodsLine label small{min-height:13px;color:#93999c;font-size:10px;line-height:1.25;overflow-wrap:anywhere}
 .quoteGoodsLine input{width:100%;min-width:0;min-height:42px;box-sizing:border-box;border:1px solid #414955;border-radius:8px;background:#0e1218;color:#fff;-webkit-text-fill-color:#fff;caret-color:#e2bb6d;padding:0 9px;font-size:14px;color-scheme:dark}
 .quoteGoodsLine input::placeholder{color:#b3b7c0;-webkit-text-fill-color:#b3b7c0;opacity:1}
