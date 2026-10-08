@@ -280,7 +280,7 @@
 .quoteGoodsLines{display:grid;gap:8px}
 .quoteGoodsLine{
  display:grid;grid-template-columns:28px minmax(175px,2.3fr) minmax(68px,.55fr) minmax(62px,.45fr) minmax(106px,.78fr) minmax(122px,.95fr) minmax(105px,.85fr) 35px;
- gap:8px;align-items:end;border:1px solid #343943;border-radius:11px;
+ gap:8px;align-items:flex-end;border:1px solid #343943;border-radius:11px;
  padding:12px;background:#101318
 }
 .quoteGoodsNumber{align-self:center;color:#d7b76d;font-size:13px;font-weight:900;text-align:center}
