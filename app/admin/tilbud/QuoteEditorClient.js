@@ -4,6 +4,8 @@ import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
 import {osloDateKey,shiftDateKey} from "../../../lib/osloTime";
+import {CATALOG_QUOTE_TRANSFER_KEY} from "../../../lib/calculatorQuoteLines";
+import QuoteCatalogSearch from "./QuoteCatalogSearch";
 
 const nok=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",maximumFractionDigits:2}).format((Number(ore)||0)/100);
 const lineId=()=>("line-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,7));
@@ -107,7 +109,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    if(!raw)return;
    sessionStorage.removeItem("aadlandQuoteDraftFromDrawing");
    const draft=JSON.parse(raw);
-   const importedLines=(Array.isArray(draft?.lineItems)?draft.lineItems:[]).slice(0,80).map(line=>({
+   const importedLines=(Array.isArray(draft?.lineItems)?draft.lineItems:[]).slice(0,120).map(line=>({
     id:lineId(),
     type:["work","material","other"].includes(line?.type)?line.type:"other",
     description:String(line?.description||"").trim().slice(0,500),
@@ -219,8 +221,43 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      plannedStartDate:quote.plannedStartDate||"",
      autoFollowUp:quote.autoFollowUp!==false
     };
-    setV(loadedState);
+    // Add selected supplier goods to an EXISTING draft only after we have loaded
+    // its persisted lines. Never replace the customer's existing offer content.
+    let mergedState=loadedState,importedCount=0,transferProblem="";
+    try{
+     const raw=sessionStorage.getItem(CATALOG_QUOTE_TRANSFER_KEY);
+     if(raw){
+      const transfer=JSON.parse(raw);
+      if(transfer?.quoteId===quoteId){
+       sessionStorage.removeItem(CATALOG_QUOTE_TRANSFER_KEY);
+       const expired=!Number.isFinite(transfer.createdAt)||Date.now()-transfer.createdAt>10*60*1000;
+       const expectedEmail=String(transfer.customer?.email||"").trim().toLowerCase();
+       const actualEmail=String(quote.customer?.email||"").trim().toLowerCase();
+       const sameCustomer=expectedEmail&&actualEmail
+        ?expectedEmail===actualEmail
+        :String(transfer.customer?.name||"").trim().toLowerCase()===String(quote.customer?.name||"").trim().toLowerCase();
+       if(expired)transferProblem="Overføringen fra priskalkulatoren er utløpt. Prøv på nytt.";
+       else if(quote.status!=="draft")transferProblem="Bare tilbudskladder kan få nye varer. Opprett en revisjon av sendte tilbud.";
+       else if(!sameCustomer)transferProblem="Kunden i kalkulatoren er ikke den samme som på tilbudet. Varene er ikke lagt til.";
+       else{
+        const incoming=(Array.isArray(transfer.lineItems)?transfer.lineItems:[]).slice(0,110).map(row=>({
+         id:lineId(),type:["work","material","other"].includes(row.type)?row.type:"material",
+         description:String(row.description||"").trim().slice(0,500),
+         quantity:Number(row.quantity)||1,
+         unit:String(row.unit||"stk").slice(0,40),
+         unitPriceOre:Math.max(0,Math.round(Number(row.unitPriceOre)||0)),vatRate:Number(row.vatRate)===0?0:25
+        })).filter(row=>row.description&&row.quantity>0);
+        if(!incoming.length)transferProblem="Ingen gyldige varelinjer ble funnet i overføringen.";
+        else if(loadedState.lineItems.length+incoming.length>120)transferProblem="Dette tilbudet har ikke plass til så mange nye varelinjer (maks 120).";
+        else{mergedState={...loadedState,lineItems:[...loadedState.lineItems,...incoming]};importedCount=incoming.length;}
+       }
+      }
+     }
+    }catch{transferProblem="Varene fra kalkulatoren kunne ikke leses. Prøv på nytt."}
+    setV(mergedState);
     setSavedSnapshot(JSON.stringify(loadedState));
+    if(importedCount)setSavedMessage(importedCount+" varelinje(r) lagt til i tilbudskladden. Kontroller prisene og trykk «Lagre tilbud».");
+    if(transferProblem)setError(transferProblem);
    })
    .catch(err=>{if(!cancelled)setError(err.message||"Tilbudet kunne ikke lastes.")})
    .finally(()=>{if(!cancelled)setLoading(false)});
@@ -231,6 +268,23 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  function setCustomer(key,value){setV(current=>({...current,customer:{...current.customer,[key]:value}}))}
  function chooseDrawing(row,checked){if(checked&&row.customer&&v.customer.name&&String(row.customer).trim().toLowerCase()!==String(v.customer.name).trim().toLowerCase()){if(!window.confirm("Denne tegningen er registrert på «"+row.customer+"», men tilbudet gjelder «"+v.customer.name+"». Er du sikker på at riktig tegning skal sendes?"))return;}setV(current=>({...current,drawingIds:checked?[...current.drawingIds,row.id].slice(0,8):current.drawingIds.filter(id=>id!==row.id)}))}
  function updateLine(id,key,value){setV(current=>({...current,lineItems:current.lineItems.map(line=>line.id===id?{...line,[key]:value}:line)}))}
+ function addCatalogProduct(product,markup){
+  if(locked||v.lineItems.length>=120){setError("Tilbudet er låst, eller har nådd maksimum 120 linjer.");return false;}
+  const description=[String(product.name||"").trim(),product.sku?"Varenr. "+String(product.sku).trim():""].filter(Boolean).join(" · ");
+  if(!description)return false;
+  const quantity=1,unit=String(product.unit||"stk").trim().slice(0,40)||"stk";
+  const unitPriceOre=Math.max(0,Math.round((Number(product.costExVat)||0)*(1+Math.max(0,markup)/100)*100));
+  setV(current=>{
+   const old=current.lineItems;
+   const blank=old.length===1&&!String(old[0].description||"").trim()&&old[0].unitPriceOre==="";
+   const items=blank?[]:old;
+   const exists=items.find(line=>line.type==="material"&&line.description===description&&line.unit===unit&&Number(line.unitPriceOre)===unitPriceOre);
+   if(exists)return {...current,lineItems:items.map(line=>line.id===exists.id?{...line,quantity:(Number(line.quantity)||0)+1}:line)};
+   return {...current,lineItems:[...items,{id:lineId(),type:"material",description,quantity,unit,unitPriceOre,vatRate:25}]};
+  });
+  setError("");
+  return true;
+ }
  function addLine(type){
   setV(current=>({...current,lineItems:[...current.lineItems,{
    id:lineId(),type,description:"",quantity:1,unit:type==="work"?"time":"stk",unitPriceOre:"",vatRate:25
@@ -516,6 +570,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
        <div><div className="kicker">PRISLINJER</div><h3>Arbeid og materialer</h3></div>
        <div><button type="button" className="btn alt" onClick={()=>addLine("work")}>+ Arbeid</button><button type="button" className="btn alt" onClick={()=>addLine("material")}>+ Materiale</button></div>
       </div>
+
+      {!locked&&<QuoteCatalogSearch onChoose={addCatalogProduct}/>}
 
       <div className="quoteLines">
        {v.lineItems.map((line,index)=><div className="quoteLineEditor" key={line.id}>

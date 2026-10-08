@@ -262,3 +262,83 @@
  .page .moneyInput,.page .suffixInput{background:#fff!important;color:#171717!important}
  .page .moneyInput input,.page .suffixInput input{-webkit-text-fill-color:#171717!important;color:#171717!important}
 }
+
+
+/* One-search, offer-style material editor – no separate material catalogue list. */
+.grid>.card:nth-child(2){grid-column:1/-1}
+.catalogSearchBlock>.field{margin-top:0}
+.catalogSearchBlock>.field input{min-height:51px;font-size:16px}
+.catalogFilter{margin-top:9px;border-radius:9px;color:#b6bdc6;font-size:12px}
+.catalogFilter summary{display:inline-flex;padding:9px 0;color:#d7b76d;cursor:pointer;font-weight:750}
+.catalogFilter>.field{max-width:360px;margin:2px 0 8px}
+.addedNotice{padding:10px 12px;margin:8px 0;background:#163326;border:1px solid #36644c;border-radius:9px;color:#d3f4d9;font-size:12px;font-weight:700}
+.quoteGoodsHead{display:flex;gap:12px;align-items:center;justify-content:space-between;margin:18px 0 9px}
+.quoteGoodsHead>div{display:grid;gap:4px}
+.quoteGoodsHead strong{font-size:17px;color:#f5f1e8}
+.quoteGoodsHead small{color:#aeb0ad;font-size:12px}
+.quoteGoodsHead button{border:1px solid #7e704b;background:#252319;color:#e6c984;border-radius:9px;min-height:41px;padding:9px 13px;font-weight:850;cursor:pointer}
+.quoteGoodsLines{display:grid;gap:8px}
+.quoteGoodsLine{
+ display:grid;grid-template-columns:28px minmax(175px,2.3fr) minmax(68px,.55fr) minmax(62px,.45fr) minmax(106px,.78fr) minmax(122px,.95fr) minmax(105px,.85fr) 35px;
+ gap:8px;align-items:flex-end;border:1px solid #343943;border-radius:11px;
+ padding:12px;background:#101318
+}
+.quoteGoodsNumber{align-self:center;color:#d7b76d;font-size:13px;font-weight:900;text-align:center}
+.quoteGoodsLine label{display:grid;gap:5px;min-width:0;font-size:11px;font-weight:800;color:#bfc1c6}
+.quoteGoodsLine label>span{min-height:26px;display:flex;align-items:flex-end}
+.quoteGoodsLine label small{min-height:13px;color:#93999c;font-size:10px;line-height:1.25;overflow-wrap:anywhere}
+.quoteGoodsLine input{width:100%;min-width:0;min-height:42px;box-sizing:border-box;border:1px solid #414955;border-radius:8px;background:#0e1218;color:#fff;-webkit-text-fill-color:#fff;caret-color:#e2bb6d;padding:0 9px;font-size:14px;color-scheme:dark}
+.quoteGoodsLine input::placeholder{color:#b3b7c0;-webkit-text-fill-color:#b3b7c0;opacity:1}
+.quoteGoodsTotal{display:grid;gap:4px;align-self:center;min-width:0}
+.quoteGoodsTotal small{font-size:10px;color:#a9acb1}
+.quoteGoodsTotal strong{font-size:15px;color:#f3d390;overflow-wrap:anywhere}
+.quoteGoodsRemove{border:1px solid #664343;color:#ffc3b9;background:#361c1d;border-radius:8px;min-height:42px;font-size:22px;cursor:pointer}
+.legacyMaterialCost{margin-top:12px;padding:10px 12px;background:#101318;border:1px solid #2c333d;border-radius:9px}
+.legacyMaterialCost summary{color:#bfc2c5;font-size:12px;font-weight:800;cursor:pointer}
+.legacyMaterialCost p{font-size:11px;color:#aeb4ba;line-height:1.5}
+.quoteTransfer{margin:18px 0 12px;border:1px solid #b39a5d;border-radius:13px;background:#171e18;overflow:hidden}
+.quoteTransferToggle{display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%;padding:16px 17px;border:0;background:#252e23;color:#eaece6;cursor:pointer;text-align:left}
+.quoteTransferToggle span{display:grid;gap:5px}.quoteTransferToggle strong{font-size:17px}.quoteTransferToggle small{font-size:11px;color:#c5d0be;line-height:1.5}
+.quoteTransferToggle>b{font-size:12px;color:#f1d38d;white-space:nowrap}
+.quoteTransferBody{padding:15px;display:grid;gap:14px}
+.transferGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.transferField{display:grid;gap:7px;font-size:12px;color:#d5d8d1;font-weight:850;min-width:0}
+.transferField input,.transferField select{min-height:44px;box-sizing:border-box;width:100%;padding:9px 11px;border:1px solid #4a5552;background:#101820!important;color:#f5f1e8!important;-webkit-text-fill-color:#f5f1e8!important;caret-color:#eac983;border-radius:8px;font-size:15px;color-scheme:dark}
+.transferCustomerNotice{padding:12px 13px;background:#263b2b;border:1px solid #46694c;border-radius:9px;font-size:12px;color:#edf5eb}
+.transferCheck{display:flex;align-items:flex-start;gap:9px;font-size:12px;color:#e9e3d6;line-height:1.5;cursor:pointer}
+.transferCheck input{width:18px;height:18px;margin:0;accent-color:#d7b76d;flex:0 0 auto}
+.transferSummary{display:grid;gap:6px;font-size:13px;color:#e4dabb;font-weight:850}
+.transferSummary small{font-size:11px;line-height:1.5;font-weight:400;color:#bbc3bb}
+.quoteTransferSubmit{border:0;border-radius:10px;background:#d7b76d;color:#201909;padding:15px 16px;min-height:48px;font-size:14px;font-weight:900;cursor:pointer}
+.quoteTransferSubmit:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:1130px){
+ .quoteGoodsLine{grid-template-columns:28px minmax(170px,2fr) 77px 78px minmax(100px,1fr) 34px}
+ .quoteGoodsLine>label:nth-of-type(4),.quoteGoodsLine>label:nth-of-type(5){grid-row:2}
+ .quoteGoodsTotal{grid-column:5;grid-row:2}
+ .quoteGoodsRemove{grid-column:6;grid-row:1}
+}
+@media(max-width:760px){
+ .quoteGoodsLine{grid-template-columns:28px repeat(2,minmax(0,1fr)) 34px;gap:9px;padding:10px}
+ .quoteGoodsNumber{grid-column:1;grid-row:1}
+ .quoteGoodsDescription{grid-column:2/4;grid-row:1}
+ .quoteGoodsRemove{grid-column:4;grid-row:1}
+ .quoteGoodsLine>label:nth-of-type(2){grid-column:2;grid-row:2}
+ .quoteGoodsLine>label:nth-of-type(3){grid-column:3;grid-row:2}
+ .quoteGoodsLine>label:nth-of-type(4){grid-column:2;grid-row:3}
+ .quoteGoodsLine>label:nth-of-type(5){grid-column:3;grid-row:3}
+ .quoteGoodsTotal{grid-column:2/4;grid-row:4}
+ .quoteGoodsLine label>span{min-height:0}
+ .transferGrid{grid-template-columns:1fr}
+}
+@media(max-width:520px){
+ .quoteTransferToggle{flex-direction:column;align-items:stretch;gap:8px}
+ .quoteGoodsHead{flex-wrap:wrap}
+ .quoteGoodsHead button{width:100%}
+ .quoteGoodsLine input{font-size:16px}
+}
+@media print{
+ .quoteTransfer,.catalogSearchBlock,.catalogFilter,.quoteGoodsRemove,.quoteGoodsHead button,.legacyMaterialCost,.importPanel{display:none!important}
+ .quoteGoodsLine{background:#fff;color:#111;border-color:#bbb}
+ .quoteGoodsLine input{background:#fff!important;color:#111!important;-webkit-text-fill-color:#111!important}
+ .quoteGoodsHead strong,.quoteGoodsLine label,.quoteGoodsNumber,.quoteGoodsTotal strong{color:#111}
+}
