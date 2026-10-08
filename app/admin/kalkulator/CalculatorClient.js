@@ -3,6 +3,8 @@
 import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import styles from "./calculator.module.css";
+import QuoteTransferPanel from "./QuoteTransferPanel";
+import {unitSaleExVat} from "../../../lib/calculatorQuoteLines";
 
 const STORAGE_KEY="aadland-service-calculator-v1";
 const VAT_RATE=0.25;
@@ -55,6 +57,7 @@ function Field({label,help,children}){
 export default function CalculatorClient(){
  const [form,setForm]=useState(DEFAULTS);
  const [copied,setCopied]=useState(false);
+ const [addedNotice,setAddedNotice]=useState("");
  const [catalogSuppliers,setCatalogSuppliers]=useState([]);
  const [catalogSupplier,setCatalogSupplier]=useState("byggern");
  const [materialQuery,setMaterialQuery]=useState("");
@@ -135,22 +138,29 @@ export default function CalculatorClient(){
   setForm(current=>{
    const items=Array.isArray(current.materialItems)?current.materialItems:[];
    const existing=items.find(item=>item.key===key);
+   if(items.length>=110&&!existing)return current;
    const next=existing
     ?items.map(item=>item.key===key?{...item,qty:String(number(item.qty)+1)}:item)
     :[...items,{
-      key,
-      supplierId:product.supplierId,
-      supplierName:product.supplierName||product.supplierId,
-      sku:product.sku,
-      name:product.name||"",
-      unit:product.unit||"STK",
-      costExVat:number(product.costExVat),
-      qty:"1"
+      key,supplierId:product.supplierId,supplierName:product.supplierName||product.supplierId,
+      sku:product.sku,name:product.name||"",unit:product.unit||"STK",
+      costExVat:number(product.costExVat),qty:"1",saleExVat:""
      }];
    return {...current,materialItems:next};
   });
+  setMaterialQuery("");setMaterialResults([]);
+  setAddedNotice("Vare lagt til. Endre antall på linjen under, eller søk etter neste vare.");
+  document.getElementById("calculator-product-search")?.focus();
  }
-
+ function addCustomMaterial(){
+  setForm(current=>{
+   const items=Array.isArray(current.materialItems)?current.materialItems:[];
+   if(items.length>=110)return current;
+   const key="custom::"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,7);
+   return {...current,materialItems:[...items,{key,supplierId:"",supplierName:"Manuell vare",sku:"",name:"",unit:"stk",costExVat:"",qty:"1",saleExVat:""}]};
+  });
+  setAddedNotice("Fyll inn beskrivelse og pris på den nye linjen.");
+ }
  function updateMaterial(key,field,value){
   setForm(current=>({...current,materialItems:(Array.isArray(current.materialItems)?current.materialItems:[]).map(item=>item.key===key?{...item,[field]:value}:item)}));
  }
@@ -201,11 +211,12 @@ export default function CalculatorClient(){
 
   const manualMaterialCost=number(form.materialCost);
   const materialItems=Array.isArray(form.materialItems)?form.materialItems:[];
+  const markup=number(form.materialMarkup);
   const catalogMaterialCostExVat=materialItems.reduce((sum,item)=>sum+number(item.qty)*number(item.costExVat),0);
   const catalogMaterialCostIncVat=catalogMaterialCostExVat*(1+VAT_RATE);
+  const catalogMaterialSalesExVat=materialItems.reduce((sum,item)=>sum+number(item.qty)*unitSaleExVat(item,markup),0);
   const materialCost=manualMaterialCost+catalogMaterialCostIncVat;
-  const markup=number(form.materialMarkup);
-  const materials=materialCost*(1+markup/100);
+  const materials=(catalogMaterialSalesExVat+manualMaterialCost/(1+VAT_RATE)*(1+markup/100))*(1+VAT_RATE);
 
   const oneWayDistance=number(form.distanceOneWay);
   const trips=Math.max(0,Math.round(number(form.oneWayTrips)));
@@ -220,7 +231,7 @@ export default function CalculatorClient(){
   const exVat=withoutVat(total);
   const vat=total-exVat;
 
-  return {hours,hourlyRate,fixedLabor,labor,manualMaterialCost,catalogMaterialCostExVat,catalogMaterialCostIncVat,materialCost,markup,materials,oneWayDistance,trips,totalKm,travel,tollPerWay,toll,total,exVat,vat,preset};
+  return {hours,hourlyRate,fixedLabor,labor,manualMaterialCost,catalogMaterialCostExVat,catalogMaterialCostIncVat,catalogMaterialSalesExVat,materialCost,markup,materials,oneWayDistance,trips,totalKm,travel,tollPerWay,toll,total,exVat,vat,preset};
  },[form]);
 
  const primaryTotal=form.businessExVat?calc.exVat:calc.total;
