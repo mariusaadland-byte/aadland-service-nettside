@@ -6,6 +6,7 @@ import {useRouter} from "next/navigation";
 import {osloDateKey,shiftDateKey} from "../../../lib/osloTime";
 import {CATALOG_QUOTE_TRANSFER_KEY} from "../../../lib/calculatorQuoteLines";
 import QuoteCatalogSearch from "./QuoteCatalogSearch";
+import {calculateContribution,withPrivateCosts} from "../../../lib/quotePrivateCosts";
 
 const nok=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",maximumFractionDigits:2}).format((Number(ore)||0)/100);
 const lineId=()=>("line-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,7));
@@ -74,6 +75,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [availableDrawings,setAvailableDrawings]=useState([]);
  const [showAllDrawings,setShowAllDrawings]=useState(false);
  const calc=useMemo(()=>calculate(v.lineItems),[v.lineItems]);
+ const contribution=useMemo(()=>calculateContribution(v.lineItems),[v.lineItems]);
  const planSum=useMemo(()=>v.paymentPlan.reduce((sum,row)=>sum+(Number(row.percent)||0),0),[v.paymentPlan]);
  const isDirty=useMemo(()=>Boolean(savedSnapshot)&&JSON.stringify(v)!==savedSnapshot,[v,savedSnapshot]);
  const locked=quoteId&&v.status!=="draft";
@@ -116,7 +118,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     quantity:Math.max(0.01,Number(line?.quantity)||1),
     unit:String(line?.unit||"stk").trim().slice(0,20),
     unitPriceOre:Number.isFinite(Number(line?.unitPriceOre))&&Number(line.unitPriceOre)>=0?Math.round(Number(line.unitPriceOre)):"",
-    vatRate:Number(line?.vatRate)===0?0:25
+    vatRate:Number(line?.vatRate)===0?0:25,
+    internalUnitCostOre:line?.internalUnitCostOre==null||line.internalUnitCostOre===""?"":Math.max(0,Math.round(Number(line.internalUnitCostOre)||0))
    })).filter(line=>line.description);
    setV(current=>({
     ...current,
@@ -213,7 +216,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      },
      drawingIds:Array.isArray(quote.drawingIds)?quote.drawingIds:[],
      introText:quote.introText||"",
-     lineItems:Array.isArray(quote.lineItems)&&quote.lineItems.length?quote.lineItems:[{id:lineId(),type:"work",description:"",quantity:1,unit:"time",unitPriceOre:"",vatRate:25}],
+     lineItems:Array.isArray(quote.lineItems)&&quote.lineItems.length?withPrivateCosts(quote.lineItems,quote.internalCosts):[{id:lineId(),type:"work",description:"",quantity:1,unit:"time",unitPriceOre:"",vatRate:25}],
      paymentPlan:Array.isArray(quote.paymentPlan)&&quote.paymentPlan.length?quote.paymentPlan:defaultPlan,
      notes:quote.notes||"",
      terms:quote.terms||defaultTerms,
@@ -245,7 +248,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
          description:String(row.description||"").trim().slice(0,500),
          quantity:Number(row.quantity)||1,
          unit:String(row.unit||"stk").slice(0,40),
-         unitPriceOre:Math.max(0,Math.round(Number(row.unitPriceOre)||0)),vatRate:Number(row.vatRate)===0?0:25
+         unitPriceOre:Math.max(0,Math.round(Number(row.unitPriceOre)||0)),vatRate:Number(row.vatRate)===0?0:25,
+         internalUnitCostOre:row.internalUnitCostOre==null||row.internalUnitCostOre===""?"":Math.max(0,Math.round(Number(row.internalUnitCostOre)||0))
         })).filter(row=>row.description&&row.quantity>0);
         if(!incoming.length)transferProblem="Ingen gyldige varelinjer ble funnet i overføringen.";
         else if(loadedState.lineItems.length+incoming.length>120)transferProblem="Dette tilbudet har ikke plass til så mange nye varelinjer (maks 120).";
@@ -256,6 +260,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     }catch{transferProblem="Varene fra kalkulatoren kunne ikke leses. Prøv på nytt."}
     setV(mergedState);
     setSavedSnapshot(JSON.stringify(loadedState));
+    if(quote.privateCostsUnavailable)setError("Interne kostnader kunne ikke hentes. Kontroller disse før du lagrer.");
     if(importedCount)setSavedMessage(importedCount+" varelinje(r) lagt til i tilbudskladden. Kontroller prisene og trykk «Lagre tilbud».");
     if(transferProblem)setError(transferProblem);
    })
@@ -280,14 +285,14 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    const items=blank?[]:old;
    const exists=items.find(line=>line.type==="material"&&line.description===description&&line.unit===unit&&Number(line.unitPriceOre)===unitPriceOre);
    if(exists)return {...current,lineItems:items.map(line=>line.id===exists.id?{...line,quantity:(Number(line.quantity)||0)+1}:line)};
-   return {...current,lineItems:[...items,{id:lineId(),type:"material",description,quantity,unit,unitPriceOre,vatRate:25}]};
+   return {...current,lineItems:[...items,{id:lineId(),type:"material",description,quantity,unit,unitPriceOre,vatRate:25,internalUnitCostOre:Math.max(0,Math.round((Number(product.costExVat)||0)*100))}]};
   });
   setError("");
   return true;
  }
  function addLine(type){
   setV(current=>({...current,lineItems:[...current.lineItems,{
-   id:lineId(),type,description:"",quantity:1,unit:type==="work"?"time":"stk",unitPriceOre:"",vatRate:25
+   id:lineId(),type,description:"",quantity:1,unit:type==="work"?"time":"stk",unitPriceOre:"",vatRate:25,internalUnitCostOre:""
   }]}));
  }
  function removeLine(id){
