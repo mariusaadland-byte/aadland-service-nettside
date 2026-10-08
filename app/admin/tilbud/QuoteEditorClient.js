@@ -325,7 +325,13 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   });
   const data=await response.json().catch(()=>({}));
   setSaving(false);
-  if(!response.ok){setError(data.error||"Tilbudet kunne ikke lagres.");return null;}
+  if(!response.ok){
+   if(!quoteId&&data.quoteId){
+    router.replace("/admin/tilbud/"+data.quoteId);
+    return null;
+   }
+   setError(data.error||"Tilbudet kunne ikke lagres.");return null;
+  }
   if(!quoteId){
    router.push("/admin/tilbud/"+data.quote.id);
    return data.quote;
@@ -510,7 +516,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      {quoteId&&<div className={isDirty?"quoteSaveState quoteSaveStateDirty":"quoteSaveState"}>{locked?"🔒 Låst versjon":isDirty?"● Ulagrede endringer":"✓ Alt er lagret"}</div>}
     </div>
     <div className="quoteEditorHeaderActions">
-     {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Papirutgave / skriv ut</button>}
+     {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Forhåndsvis / last ned PDF</button>}
      {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
      {quoteId&&v.status==="draft"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
      {quoteId&&v.status==="sent"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy} onClick={registerPaperIssue}>Registrer utlevert på papir</button>}
@@ -651,7 +657,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={()=>sendQuote()}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
      {!locked&&<button type="button" className="btn" disabled={saving||sending||converting} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>}
      {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
-     {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Papirutgave / skriv ut</button>}
+     {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Forhåndsvis / last ned PDF</button>}
      {quoteId&&<div className="quoteHistory">
       <div className="kicker">HISTORIKK</div>
       {revisionHistory.length>1&&<div className="quoteRevisionHistory">
