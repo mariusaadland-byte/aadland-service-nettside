@@ -946,7 +946,7 @@ export default function DrawingClient(){
  ]).then(([orderData,projectData,customerData])=>{
   setOrders((orderData?.orders||[]).filter(order=>order.orderType==="custom"&&!order.archivedAt));
   setProjects(projectData?.projects||[]);
-  setCustomers(customerData?.customers||[]);
+  setCustomers((customerData?.customers||[]).filter(c=>c.hasAccount!==false));
  }).catch(()=>{});},[]);
  useEffect(()=>{
   const readyTimer=setTimeout(()=>{autosaveReady.current=true},700);
