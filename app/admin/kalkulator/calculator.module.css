@@ -207,3 +207,58 @@
  .field input,.field select{color:#111}
  .grid{gap:10px}
 }
+
+
+/* iOS Safari / mobile dark mode: pin BOTH background and glyph color.
+   Native controls and saved/autofilled input values must never become
+   white-on-white or black-on-black. Keep the calculator's dark UI intact. */
+.page{color-scheme:dark}
+.page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.page textarea,
+.page select{
+ background:#0f1217;
+ color:#f5f1e8!important;
+ -webkit-text-fill-color:#f5f1e8!important;
+ caret-color:#f5d98f!important;
+ color-scheme:dark;
+}
+.page select option{background:#0f1217;color:#f5f1e8}
+.page input:not([type="checkbox"]):not([type="radio"])::placeholder,
+.page textarea::placeholder{
+ color:#a6a9af!important;
+ -webkit-text-fill-color:#a6a9af!important;
+ opacity:1;
+}
+.page .moneyInput,
+.page .suffixInput{
+ background:#0f1217!important;
+ color:#f5f1e8!important;
+}
+.page .moneyInput input,
+.page .suffixInput input{
+ background:transparent!important;
+ -webkit-text-fill-color:#f5f1e8!important;
+ caret-color:#f5d98f!important;
+}
+.page input:-webkit-autofill,
+.page input:-webkit-autofill:hover,
+.page input:-webkit-autofill:focus,
+.page textarea:-webkit-autofill,
+.page select:-webkit-autofill{
+ -webkit-text-fill-color:#f5f1e8!important;
+ caret-color:#f5d98f!important;
+ -webkit-box-shadow:0 0 0 1000px #0f1217 inset!important;
+ box-shadow:0 0 0 1000px #0f1217 inset!important;
+}
+@media print{
+ .page{color-scheme:light}
+ .page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+ .page textarea,.page select{
+  background:#fff!important;color:#171717!important;
+  -webkit-text-fill-color:#171717!important;caret-color:#171717!important;
+  color-scheme:light
+ }
+ .page select option{background:#fff;color:#171717}
+ .page .moneyInput,.page .suffixInput{background:#fff!important;color:#171717!important}
+ .page .moneyInput input,.page .suffixInput input{-webkit-text-fill-color:#171717!important;color:#171717!important}
+}

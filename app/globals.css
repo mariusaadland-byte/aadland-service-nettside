@@ -4206,3 +4206,42 @@ body:has(.customerPage) .customerPage{
  .customerDrawingControls{overflow-x:auto;flex-wrap:nowrap}
  .customerDrawingControls button{flex:0 0 auto;min-height:44px}
 }
+
+
+/* Keep admin forms legible in Mobile Safari, including dark appearance,
+   stored form values and autofill. Scope to LIGHT backoffice surfaces;
+   individual dark tools retain their own scoped theme. */
+.adminmain input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.adminmain textarea,
+.adminmain select,
+.adminStandalonePage input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.adminStandalonePage textarea,
+.adminStandalonePage select{
+ color:#181613!important;
+ -webkit-text-fill-color:#181613!important;
+ caret-color:#181613!important;
+ color-scheme:light;
+}
+.adminmain input::placeholder,
+.adminmain textarea::placeholder,
+.adminStandalonePage input::placeholder,
+.adminStandalonePage textarea::placeholder{
+ color:#827d74!important;
+ -webkit-text-fill-color:#827d74!important;
+ opacity:1;
+}
+.adminmain input:-webkit-autofill,
+.adminmain input:-webkit-autofill:hover,
+.adminmain input:-webkit-autofill:focus,
+.adminmain textarea:-webkit-autofill,
+.adminmain select:-webkit-autofill,
+.adminStandalonePage input:-webkit-autofill,
+.adminStandalonePage input:-webkit-autofill:hover,
+.adminStandalonePage input:-webkit-autofill:focus,
+.adminStandalonePage textarea:-webkit-autofill,
+.adminStandalonePage select:-webkit-autofill{
+ -webkit-text-fill-color:#181613!important;
+ caret-color:#181613!important;
+ -webkit-box-shadow:0 0 0 1000px #fff inset!important;
+ box-shadow:0 0 0 1000px #fff inset!important;
+}
