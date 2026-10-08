@@ -172,3 +172,28 @@
 @media(max-width:480px){
  .materialIdentity{grid-template-columns:1fr}
 }
+
+/* Shared server-side supplier price search - never requires AI tokens or a local CSV. */
+.sharedCatalogBox{border:1px solid #d6dbc9;background:#f6f9f3;border-radius:10px;padding:12px;margin:12px 0}
+.sharedCatalogBox>label{display:block;color:#37513a;font-size:12px;font-weight:900;margin-bottom:8px}
+.sharedCatalogSearch{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.sharedCatalogSearch input{min-width:0;border:1px solid #b8c5af;background:#fff;color:#1e261f;-webkit-text-fill-color:#1e261f;caret-color:#1e261f;border-radius:8px;padding:10px;font-size:15px;color-scheme:light}
+.sharedCatalogSearch input::placeholder{color:#6e7669;-webkit-text-fill-color:#6e7669;opacity:1}
+.sharedCatalogSearch button{border:0;border-radius:8px;background:#345c40;color:#fff;font-weight:900;padding:10px 16px;min-height:43px;cursor:pointer}
+.sharedCatalogSearch button:disabled{opacity:.65;cursor:wait}
+.sharedCatalogMatches{display:grid;gap:6px;max-height:310px;overflow:auto;overscroll-behavior:contain;margin-top:10px}
+.sharedCatalogMatches button{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;text-align:left;min-height:57px;padding:11px;border:1px solid #d5ddd1;border-radius:8px;background:#fff;color:#263127;cursor:pointer}
+.sharedCatalogMatches button:hover,.sharedCatalogMatches button:focus-visible{background:#eaf4e6;border-color:#9ba98d}
+.sharedCatalogMatches button span{display:grid;gap:4px;min-width:0}
+.sharedCatalogMatches button strong{font-size:12px;line-height:1.35;overflow-wrap:anywhere}
+.sharedCatalogMatches button small{font-size:10px;color:#6a7164;line-height:1.4}
+.sharedCatalogMatches button b{font-size:13px;white-space:nowrap}
+.sharedCatalogMatches button>span:last-child{text-align:right}
+.sharedCatalogError{margin:9px 0 0;color:#805126;font-size:12px;font-weight:750}
+.sharedCatalogSelected{margin:9px 0 0;color:#3d6144;font-size:11px;font-weight:750;line-height:1.5}
+@media(max-width:520px){
+ .sharedCatalogSearch{grid-template-columns:minmax(0,1fr)}
+ .sharedCatalogSearch button{width:100%}
+ .sharedCatalogMatches button{grid-template-columns:minmax(0,1fr)}
+ .sharedCatalogMatches button>span:last-child{text-align:left}
+}

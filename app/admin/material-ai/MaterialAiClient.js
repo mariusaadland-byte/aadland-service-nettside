@@ -170,6 +170,11 @@ export default function MaterialAiClient(){
  const [catalog,setCatalog]=useState([]);
  const [favorites,setFavorites]=useState([]);
  const [supplierStatuses,setSupplierStatuses]=useState([]);
+ const [sharedSuppliers,setSharedSuppliers]=useState([]);
+ const [sharedQueries,setSharedQueries]=useState({});
+ const [sharedMatches,setSharedMatches]=useState({});
+ const [sharedBusy,setSharedBusy]=useState("");
+ const [sharedErrors,setSharedErrors]=useState({});
  const [directBusy,setDirectBusy]=useState("");
  const [error,setError]=useState("");
  const [message,setMessage]=useState("");
@@ -192,6 +197,16 @@ export default function MaterialAiClient(){
   let cancelled=false;
   fetch("/api/admin/material-suppliers").then(async r=>{const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error();return data.suppliers||[]}).then(items=>{if(!cancelled)setSupplierStatuses(items)}).catch(()=>{});
   return()=>{cancelled=true};
+ },[]);
+
+ useEffect(()=>{
+  let active=true;
+  fetch("/api/admin/material-catalog",{cache:"no-store"}).then(async r=>{
+   const data=await r.json().catch(()=>({}));
+   if(!r.ok)throw new Error(data.error||"Kunne ikke hente felles prisbase");
+   return data.suppliers||[];
+  }).then(suppliers=>{if(active)setSharedSuppliers(suppliers)}).catch(()=>{});
+  return()=>{active=false};
  },[]);
 
  useEffect(()=>{
@@ -233,6 +248,40 @@ export default function MaterialAiClient(){
   }
   if(matched)setPrices(current=>{const next={...current};for(const [id,value] of Object.entries(updates))next[id]={...(next[id]||{}),...value};return next});
   return matched;
+ }
+ const visibleSuppliers=[...SUPPLIERS,...sharedSuppliers.filter(shared=>!SUPPLIERS.some(item=>normalizeText(item.name)===normalizeText(shared.name))).map(item=>({id:item.id,name:item.name}))];
+ async function lookupSharedPrice(line){
+  const chosen=prices[line.id]?.supplier||"Bygger’n";
+  const query=String(sharedQueries[line.id]??(line.material||line.specification||"")).trim();
+  if(query.length<2){setSharedErrors(value=>({...value,[line.id]:"Skriv minst to tegn for å søke."}));return}
+  setSharedBusy(line.id);setSharedErrors(value=>({...value,[line.id]:""}));
+  try{
+   const params=new URLSearchParams({q:query,limit:"20"});
+   const matched=sharedSuppliers.find(item=>normalizeText(item.name)===normalizeText(chosen)||item.id===chosen);
+   if(matched)params.set("supplier",matched.id);
+   const response=await fetch("/api/admin/material-catalog?"+params.toString(),{cache:"no-store"});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Kunne ikke søke i felles prisbase.");
+   setSharedMatches(current=>({...current,[line.id]:data.products||[]}));
+   if(Array.isArray(data.suppliers))setSharedSuppliers(data.suppliers);
+   if(!(data.products||[]).length)setSharedErrors(current=>({...current,[line.id]:"Ingen treff. Prøv varenummer, kortere produktnavn eller en annen leverandør."}));
+  }catch(e){
+   setSharedErrors(current=>({...current,[line.id]:e.message||"Søket feilet."}));
+   setSharedMatches(current=>({...current,[line.id]:[]}));
+  }finally{setSharedBusy("")}
+ }
+ function chooseSharedPrice(line,product){
+  const packUnits=new Set(["PAK","PK","PKT","ESK","KRT","BOX","POS","SEK"]);
+  const basis=packUnits.has(String(product.unit||"").toUpperCase())?"package":"unit";
+  setPrices(current=>({...current,[line.id]:{
+   ...current[line.id],supplier:product.supplierName||"Bygger’n",sku:product.sku||"",
+   productName:product.name||"",costExVat:String(product.costExVat??""),priceBasis:basis,
+   catalogUnit:product.unit||"STK",matched:true,direct:false,shared:true
+  }}));
+  setSharedMatches(current=>({...current,[line.id]:[]}));
+  setSharedErrors(current=>({...current,[line.id]:""}));
+  setMessage("Varenr. "+product.sku+" hentet fra "+product.supplierName+". Kontroller enheten "+(product.unit||"STK")+".");
+  setTimeout(()=>setMessage(""),3600);
  }
  function autoMatch(line){
   const current=prices[line.id]||{},preferred=current.supplier||"Bygger’n",match=matchCatalog(line,catalog,preferred)||matchCatalog(line,catalog,"Bygger’n")||matchCatalog(line,catalog,"");
@@ -307,9 +356,9 @@ export default function MaterialAiClient(){
   </section>
 
   <section className={styles.supplierCard}>
-   <div className={styles.sectionHead}><div><span className={styles.kicker}>3 · LEVERANDØRPRISER</span><h2>Dine innkjøpspriser</h2><p>Bygger’n er primær. Importer prislisten som CSV; kalkulatoren prøver Bygger’n først og legger deretter på {decimal(number(markup),2)} %.</p></div><label className={styles.importBtn}>Importer prisfil<input type="file" accept=".csv,text/csv,.txt" onChange={importPriceFile}/></label></div>
+   <div className={styles.sectionHead}><div><span className={styles.kicker}>3 · LEVERANDØRPRISER</span><h2>Dine innkjøpspriser</h2><p>Bygger’n er primær. Søk direkte i den felles prisbasen på materiallinjene nedenfor, eller importer en egen CSV lokalt. Valgt påslag er {decimal(number(markup),2)} %.</p></div><label className={styles.importBtn}>Importer prisfil<input type="file" accept=".csv,text/csv,.txt" onChange={importPriceFile}/></label></div>
    <div className={styles.supplierGrid}>{SUPPLIERS.map(s=>{const status=supplierStatuses.find(item=>item.id===s.id);return <div key={s.id}><strong>{s.name}</strong><span>{status?.mode||s.mode}</span><small>{s.note}</small><b className={status?.connected?styles.connected:undefined}>{status?.connected?"Direkte koblet ✓":"Prisfil / manuell pris"}</b></div>})}</div>
-   <div className={styles.catalogStatus}><span>{catalog.length?catalog.length+" varer i lokal prisbase":"Ingen prisfil importert ennå"}</span><div>{catalog.length>0&&rows.length>0&&<button type="button" onClick={()=>{const count=matchAllPrices();setMessage(count?count+" materialer matchet mot prisbasen":"Fant ingen sikre treff");setTimeout(()=>setMessage(""),1800)}}>Match alle materialer</button>}{catalog.length>0&&<button type="button" onClick={clearCatalog}>Tøm prisbase</button>}</div></div>
+   <div className={styles.catalogStatus}><span>{sharedSuppliers.some(s=>s.isPrimary&&s.lastImportAt)?"Felles katalog: Bygger’n er importert":"Felles katalog: venter på import"} · {catalog.length?catalog.length+" varer i lokal CSV":"Ingen lokal CSV lastet"}</span><div>{catalog.length>0&&rows.length>0&&<button type="button" onClick={()=>{const count=matchAllPrices();setMessage(count?count+" materialer matchet mot prisbasen":"Fant ingen sikre treff");setTimeout(()=>setMessage(""),1800)}}>Match alle materialer</button>}{catalog.length>0&&<button type="button" onClick={clearCatalog}>Tøm prisbase</button>}</div></div>
    <p className={styles.fileHelp}>CSV kan ha kolonner som leverandør, varenr, produkt/navn, enhet, pris eks. mva eller pris inkl. mva, pakningsstørrelse og prisbasis.</p>
   </section>
 
@@ -347,14 +396,24 @@ export default function MaterialAiClient(){
      <div className={styles.formulaBox}><small>REGNESTYKKE</small><b>{line.missing?line.missing:line.calculation}</b>{!line.missing&&<span>Teoretisk {decimal(line.requiredQuantity)} {line.unit} → + {decimal(number(line.waste),2)} % svinn → {line.packages>0?line.packages+" pakke(r), ":""}{decimal(line.purchaseQuantity)} {line.unit}</span>}</div>
 
      <div className={styles.priceGrid}>
-      <label>Leverandør<select value={p.supplier||"Bygger’n"} onChange={e=>updatePrice(line.id,"supplier",e.target.value)}>{SUPPLIERS.map(s=><option key={s.id} value={s.name}>{s.name}</option>)}</select></label>
+      <label>Leverandør<select value={p.supplier||"Bygger’n"} onChange={e=>updatePrice(line.id,"supplier",e.target.value)}>{visibleSuppliers.map(s=><option key={s.id} value={s.name}>{s.name}</option>)}</select></label>
       <label>Varenr.<input value={p.sku||""} onChange={e=>updatePrice(line.id,"sku",e.target.value)} placeholder="Valgfritt"/></label>
       <label>Innkjøpspris eks. mva<input inputMode="decimal" value={p.costExVat||""} onChange={e=>updatePrice(line.id,"costExVat",e.target.value)} placeholder="0,00"/></label>
       <label>Pris gjelder<select value={priceBasis} onChange={e=>updatePrice(line.id,"priceBasis",e.target.value)}><option value="unit">Per {line.unit}</option><option value="package">Per pakke</option></select></label>
-      <div className={styles.priceActions}><button type="button" className={styles.matchBtn} onClick={()=>autoMatch(line)} disabled={!catalog.length}>Match prisfil</button><button type="button" className={styles.directBtn} onClick={()=>directLookup(line)} disabled={!p.supplier||directBusy===line.id||!supplierStatuses.find(s=>s.name===p.supplier)?.connected}>{directBusy===line.id?"Henter…":"Hent min pris"}</button></div>
+      <div className={styles.priceActions}><button type="button" className={styles.matchBtn} onClick={()=>autoMatch(line)} disabled={!catalog.length}>Match lokal CSV</button><button type="button" className={styles.directBtn} onClick={()=>directLookup(line)} disabled={!p.supplier||directBusy===line.id||!supplierStatuses.find(s=>s.name===p.supplier)?.connected}>{directBusy===line.id?"Henter…":"Hent min pris"}</button></div>
      </div>
      {p.productName&&<p className={styles.matchInfo}>{p.direct?"Direkte pris":"Matchet"}: <b>{p.productName}</b>{p.sku?" · "+p.sku:""}</p>}
-     <div className={styles.priceSummary}><span>Kost: <b>{money(qty*cost)}</b></span><span>+ {decimal(number(markup),2)} %: <b>{money(sales)} / {priceBasis==="package"?"pk":line.unit}</b></span><strong>Tilbudslinje {money(total)} eks. mva</strong><button type="button" onClick={()=>saveFavorite(line)}>Lagre materiale</button><button type="button" onClick={()=>removeRow(line.id)}>Slett linje</button></div>
+     <div className={styles.sharedCatalogBox}>
+       <label htmlFor={"shared-catalog-"+line.id}>Søk i felles leverandørprisbase (gratis)</label>
+       <div className={styles.sharedCatalogSearch}>
+        <input id={"shared-catalog-"+line.id} value={sharedQueries[line.id]??(line.material||line.specification||"")} onChange={e=>setSharedQueries(current=>({...current,[line.id]:e.target.value}))} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();lookupSharedPrice(line)}}} placeholder="Produktnavn, varenummer eller EAN" />
+        <button type="button" disabled={sharedBusy===line.id} onClick={()=>lookupSharedPrice(line)}>{sharedBusy===line.id?"Søker …":"Finn varer"}</button>
+       </div>
+       {sharedErrors[line.id]&&<p className={styles.sharedCatalogError} role="status">{sharedErrors[line.id]}</p>}
+       {(sharedMatches[line.id]||[]).length>0&&<div className={styles.sharedCatalogMatches}>{sharedMatches[line.id].map(product=><button type="button" key={product.supplierId+"-"+product.sku} onClick={()=>chooseSharedPrice(line,product)}><span><strong>{product.name}</strong><small>{product.supplierName} · varenr. {product.sku}</small></span><span><b>{money(product.costExVat)}</b><small>eks. mva / {product.unit||"stk"}</small></span></button>)}</div>}
+       {p.shared&&<p className={styles.sharedCatalogSelected}>Hentet fra felles prisbase · {p.sku||"uten varenr."} · pris per {p.catalogUnit||"STK"}. Kontroller «Pris gjelder» før tilbud.</p>}
+      </div>
+      <div className={styles.priceSummary}><span>Kost: <b>{money(qty*cost)}</b></span><span>+ {decimal(number(markup),2)} %: <b>{money(sales)} / {priceBasis==="package"?"pk":line.unit}</b></span><strong>Tilbudslinje {money(total)} eks. mva</strong><button type="button" onClick={()=>saveFavorite(line)}>Lagre materiale</button><button type="button" onClick={()=>removeRow(line.id)}>Slett linje</button></div>
     </article>
    })}</div>
 
