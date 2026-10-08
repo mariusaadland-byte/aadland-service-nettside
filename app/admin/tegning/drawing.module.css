@@ -1539,3 +1539,8 @@
  .kitchenWallPreview{max-height:120px}
  .kitchenWallModal input{font-size:16px;color:#1d1d1b;-webkit-text-fill-color:#1d1d1b;caret-color:#1d1d1b;color-scheme:light}
 }
+
+.kitchenWallDirection{display:grid;gap:8px;margin:6px 0 14px;font-size:12px;font-weight:800;color:#4f473a}
+.kitchenWallDirection>div{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kitchenWallDirection button{min-height:42px;border:1px solid #d1c5ae;background:#fff;color:#30291f;border-radius:8px;font:800 13px Arial,sans-serif}
+.kitchenWallDirection button[aria-pressed="true"]{background:#eadcbf;color:#352713;border:2px solid #a5844c}
