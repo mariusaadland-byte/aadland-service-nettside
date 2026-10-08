@@ -131,6 +131,26 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
   return NextResponse.json({error:"PDF-kopien kunne ikke lages: "+String(err?.message||"Ukjent feil").slice(0,180)+". Tilbudet er ikke sendt."},{status:500});
  }
 
+ // Prevent sharing a linked customer's drawing with a different offer recipient.
+ if(drawings.length){
+  const ids=[...new Set(drawings.map(row=>row.customer_contact_id).filter(Boolean))];
+  const owners=new Map();
+  if(ids.length){
+   const {data:contacts,error:contactError}=await s.from("admin_customer_contacts")
+    .select("id,email").in("id",ids);
+   if(contactError)return NextResponse.json({error:"Kunne ikke kontrollere eieren av tegningsvedlegget. Tilbudet er ikke sendt."},{status:500});
+   for(const row of contacts||[])owners.set(row.id,String(row.email||"").trim().toLowerCase());
+  }
+  for(const drawing of drawings){
+   const storedEmail=String(drawing.drawing_data?.customerEmail||"").trim().toLowerCase();
+   const linkedEmail=owners.get(drawing.customer_contact_id)||"";
+   const expectedEmail=linkedEmail||storedEmail;
+   if(expectedEmail&&expectedEmail!==customerEmail){
+    return NextResponse.json({error:"En valgt tegning er knyttet til en annen e-postadresse enn tilbudskunden. Velg riktig kunde og tegning før du sender."},{status:409});
+   }
+  }
+ }
+
  try{
   const {Resend}=await import("resend");
   const resend=new Resend(resendKey);
