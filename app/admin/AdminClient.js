@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { nok } from "../../lib/catalog";
 import {osloDateKey,osloDateTimeLocal,osloLocalDateTimeToIso} from "../../lib/osloTime";
 import { useRouter } from "next/navigation";
+import navStyles from "./adminNav.module.css";
 
 const ADMIN_IMAGE_TYPES=new Set(["image/jpeg","image/png","image/webp"]);
 const ADMIN_IMAGE_MAX_BYTES=4*1024*1024;
@@ -29,9 +30,20 @@ const labels = {
 };
 
 
+const ADMIN_NAV_GROUPS=[
+  {id:"sales",title:"Salg og kunder",icon:"◎",ids:["orders","surveys","customers","quotes","reminders","archive"]},
+  {id:"jobs",title:"Oppdrag og planlegging",icon:"▤",ids:["jobs","jobCalendar","workClock","drawing"]},
+  {id:"shop",title:"Produkter og tjenester",icon:"◫",ids:["products","categories","services"]},
+  {id:"rental",title:"Utleie",icon:"▣",ids:["rental","rentalCalendar","rentalBookings"]},
+  {id:"tools",title:"Kalkyle og betaling",icon:"⌗",ids:["calculator","materialAi","vipps"]},
+  {id:"website",title:"Nettsiden",icon:"▥",ids:["projects","homepage"]},
+  {id:"settings",title:"Styring og utvikling",icon:"⚙",ids:["roadmap","users"]}
+];
 export default function AdminClient({ user }) {
   const [tab, setTab] = useState("overview");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuGroupId,setMenuGroupId]=useState("sales");
+  const [menuSearch,setMenuSearch]=useState("");
   const [orders, setOrders] = useState([]);
   const [customerProfiles, setCustomerProfiles] = useState([]);
   const [customerBillingProfiles, setCustomerBillingProfiles] = useState([]);
@@ -484,8 +496,21 @@ export default function AdminClient({ user }) {
   if (canManageProducts) tabs.push(["homepage", "Forside"]);
   if (canManageProducts) tabs.push(["drawing", "Tegning & visualisering"]);
   if (canManageUsers) tabs.push(["users", "Brukere"]);
+  if (canUpdateOrders || canManageProducts) tabs.push(["quotes", "Tilbud"]);
+  if (user?.role === "owner") tabs.push(["roadmap", "Utviklingsplan"]);
+  const navLabels=new Map(tabs);
+  const searchText=menuSearch.trim().toLocaleLowerCase("nb-NO");
+  const groupedNav=ADMIN_NAV_GROUPS.map(group=>({
+    ...group,options:group.ids.filter(id=>navLabels.has(id)).map(id=>({id,label:navLabels.get(id)}))
+      .filter(item=>!searchText||item.label.toLocaleLowerCase("nb-NO").includes(searchText)||group.title.toLocaleLowerCase("nb-NO").includes(searchText))
+  })).filter(group=>group.options.length);
 
   function chooseTab(id) {
+    const parent=ADMIN_NAV_GROUPS.find(group=>group.ids.includes(id));
+    if(parent)setMenuGroupId(parent.id);
+    setMenuSearch("");
+    if (id === "quotes") {setMenuOpen(false);router.push("/admin/tilbud");return;}
+    if (id === "roadmap") {setMenuOpen(false);router.push("/admin/utviklingsplan");return;}
     if (id === "drawing") { setMenuOpen(false); router.push("/admin/tegning"); return; }
     if (id === "workClock") { setMenuOpen(false); router.push("/admin/arbeidsklokke"); return; }
     if (id === "calculator") { setMenuOpen(false); router.push("/admin/kalkulator"); return; }
@@ -509,25 +534,35 @@ export default function AdminClient({ user }) {
           Aadland
         </div>
 
-        {tabs.map(([id, label]) => (
-          <button
-            key={id}
-            className={tab === id ? "active" : ""}
-            onClick={() => chooseTab(id)}
-          >
-            {label}
-            {id === "orders" && fresh ? ` (${fresh})` : ""}
-            {id === "surveys" && freshEnquiries ? ` (${freshEnquiries})` : ""}
-          </button>
-        ))}
-
-        {(canUpdateOrders || canManageProducts) && (
-          <button onClick={() => { setMenuOpen(false); router.push("/admin/tilbud"); }}>
-            Tilbud
-          </button>
-        )}
-
-        <button onClick={() => { setMenuOpen(false); logout(); }}>Logg ut</button>
+        <nav aria-label="Backoffice-meny" className={navStyles.navigation}>
+          <button type="button" className={navStyles.overview+(tab==="overview"?" "+navStyles.selected:"")} onClick={()=>chooseTab("overview")}>⌂ <span>Oversikt</span></button>
+          <label className={navStyles.search}>
+            <span>Søk i menyen</span>
+            <input type="search" value={menuSearch} onChange={event=>setMenuSearch(event.target.value)} placeholder="Finn et valg…" aria-label="Søk etter adminvalg"/>
+          </label>
+          <div className={navStyles.groups}>
+            {groupedNav.map(group=>{
+              const expanded=Boolean(searchText)||menuGroupId===group.id;
+              const groupActive=group.options.some(item=>item.id===tab);
+              return <div className={navStyles.group} key={group.id}>
+                <button type="button" className={navStyles.groupButton+(groupActive?" "+navStyles.currentGroup:"")} aria-expanded={expanded} aria-controls={"admin-nav-"+group.id} onClick={()=>{if(!searchText)setMenuGroupId(current=>current===group.id?"":group.id)}}>
+                  <span aria-hidden="true" className={navStyles.groupIcon}>{group.icon}</span>
+                  <span className={navStyles.groupTitle}>{group.title}</span>
+                  <span aria-hidden="true" className={navStyles.chevron}>{expanded?"⌃":"⌄"}</span>
+                </button>
+                {expanded&&<div id={"admin-nav-"+group.id} className={navStyles.groupItems}>
+                  {group.options.map(item=><button type="button" key={item.id} className={navStyles.subItem+(tab===item.id?" "+navStyles.selected:"")} aria-current={tab===item.id?"page":undefined} onClick={()=>chooseTab(item.id)}>
+                    <span>{item.label}</span>
+                    {item.id==="orders"&&fresh>0&&<span className={navStyles.count}>{fresh}</span>}
+                    {item.id==="surveys"&&freshEnquiries>0&&<span className={navStyles.count}>{freshEnquiries}</span>}
+                  </button>)}
+                </div>}
+              </div>
+            })}
+            {searchText&&!groupedNav.length&&<p className={navStyles.noResults}>Ingen valg passer søket.</p>}
+          </div>
+          <button type="button" className={navStyles.signout} onClick={()=>{setMenuOpen(false);logout();}}>↩ Logg ut</button>
+        </nav>
       </aside>
 
       <section className="adminmain">
