@@ -4,7 +4,7 @@ import QuoteEditorClient from "../QuoteEditorClient";
 
 export default async function NewQuotePage({searchParams}){
  const admin=await getAdminUser();
- if(!admin)redirect("/admin/login");
+ if(!admin)redirect("/admin/login?next=%2Fadmin%2Ftilbud%2Fny");
  if(!(admin.role==="owner"||admin.canUpdateOrders||admin.canManageProducts))redirect("/admin");
  const resolved=await searchParams;
  const sourceOrderId=String(resolved?.orderId||"").trim()||null;
