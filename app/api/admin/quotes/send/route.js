@@ -118,9 +118,10 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
 </body></html>`;
 
  let pdf;
+ let drawings=[];
  const filename=quotePdfFilename(quote);
  try{
-  const drawings=await loadQuoteDrawings(s,quote);
+  drawings=await loadQuoteDrawings(s,quote);
   pdf=await buildQuotePdf(quote,drawings);
   if(!pdf?.length||pdf.subarray(0,8).toString("ascii")!=="%PDF-1.4"){
    throw new Error("Ugyldig tilbuds-PDF");
@@ -164,6 +165,22 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  }
 
  const deliveryType=overrideEmail&&overrideEmail!==customerEmail?"alternate":"primary";
+ // Never publish an attachment to a customer when this email was an admin test
+ // or was delivered to any address other than the customer's own.
+ let drawingsPublished=drawings.length===0;
+ if(drawings.length&&deliveryType==="primary"&&customerEmail){
+  const snapshots=drawings.map(row=>({
+   quote_id:quote.id,drawing_id:row.id,customer_email:customerEmail,
+   name:row.name||"Tegning",address:row.address||"",
+   notes:row.notes||"",drawing_data:row.drawing_data||{},
+   published_at:now
+  }));
+  const {error:publishError}=await s.from("quote_drawing_publications")
+   .upsert(snapshots,{onConflict:"quote_id,drawing_id"});
+  if(publishError)console.error("QUOTE DRAWING PUBLICATION",{quoteId:id,message:publishError.message});
+  else drawingsPublished=true;
+ }
+
  try{
   await s.from("quote_send_log").insert({
    quote_id:id,
@@ -175,5 +192,5 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
   console.error("QUOTE SEND LOG",logError);
  }
 
- return NextResponse.json({ok:true,sentTo:email,sentAt:now,deliveryType,link,pdfAttached:true,pdfFilename:filename});
+ return NextResponse.json({ok:true,sentTo:email,sentAt:now,deliveryType,link,pdfAttached:true,pdfFilename:filename,drawingsPublished});
 }
