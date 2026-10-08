@@ -1,0 +1,22 @@
+.navigation{display:flex;flex-direction:column;gap:12px;min-height:0}
+.overview{display:flex!important;align-items:center;gap:12px;width:100%;font-size:15px;background:#dfd5c4!important;color:#241e16!important}
+.overview.selected{background:#181613!important;color:#fff!important}
+.search{display:flex;flex-direction:column;gap:7px;color:#595248;font-weight:700;font-size:12px;padding:3px 1px}
+.search input{width:100%;box-sizing:border-box;border:1px solid #d6cbbb;border-radius:9px;background:#fff;color:#211a15;padding:11px 12px;font-size:14px}
+.groups{display:flex;flex-direction:column;gap:5px}
+.group{border:1px solid #ddd2c0;border-radius:12px;overflow:hidden;background:#f9f6ef}
+:global(.side) .groupButton{display:flex;align-items:center;gap:9px;width:100%;min-height:48px;padding:11px 12px;border-radius:0;background:transparent;color:#302a22;text-align:left}
+:global(.side) .groupButton:hover{background:#f0e8d9}
+:global(.side) .currentGroup{color:#74521e}
+.groupIcon{width:23px;text-align:center;font-size:17px;flex:0 0 23px}
+.groupTitle{flex:1;font-size:13px;font-weight:800;line-height:1.25}
+.chevron{color:#6c6256;font-size:19px}
+.groupItems{background:#fff;border-top:1px solid #e7dfd3;padding:5px}
+:global(.side) .subItem{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:40px;width:100%;padding:9px 11px;border-radius:8px;color:#3f382f;font-size:13px;font-weight:650;background:transparent}
+:global(.side) .subItem:hover{background:#eee7dc}
+:global(.side) .subItem.selected{background:#181613;color:#fff}
+.count{border-radius:100px;background:#bb8e45;color:#fff;padding:2px 7px;font-size:11px}
+.noResults{font-size:13px;color:#766a5b;padding:8px}
+:global(.side) .signout{margin-top:8px;border-top:1px solid #d7cbb9;border-radius:0;font-weight:700;color:#6a342a}
+.sideContainer{position:sticky;top:0;height:100vh;max-height:100vh;overflow-y:auto;overscroll-behavior:contain;box-sizing:border-box}
+@media(max-width:900px){.sideContainer{position:fixed;top:68px;height:calc(100dvh - 68px);max-height:calc(100dvh - 68px)}}
