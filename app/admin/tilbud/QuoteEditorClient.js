@@ -20,6 +20,7 @@ function blankState(){
   title:"",
   status:"draft",
   customer:{name:"",email:"",phone:"",address:""},
+  drawingIds:[],
   introText:"Takk for forespørselen. Vi tilbyr følgende arbeid og leveranser:",
   lineItems:[{id:lineId(),type:"work",description:"",quantity:1,unit:"time",unitPriceOre:"",vatRate:25}],
   paymentPlan:defaultPlan,
@@ -68,10 +69,22 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [paperBusy,setPaperBusy]=useState(false);
  const [showAlternateEmail,setShowAlternateEmail]=useState(false);
  const [alternateEmail,setAlternateEmail]=useState("");
+ const [availableDrawings,setAvailableDrawings]=useState([]);
+ const [showAllDrawings,setShowAllDrawings]=useState(false);
  const calc=useMemo(()=>calculate(v.lineItems),[v.lineItems]);
  const planSum=useMemo(()=>v.paymentPlan.reduce((sum,row)=>sum+(Number(row.percent)||0),0),[v.paymentPlan]);
  const isDirty=useMemo(()=>Boolean(savedSnapshot)&&JSON.stringify(v)!==savedSnapshot,[v,savedSnapshot]);
  const locked=quoteId&&v.status!=="draft";
+
+ useEffect(()=>{
+  let active=true;
+  fetch("/api/admin/project-drawings",{cache:"no-store"}).then(async response=>{
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error("Kunne ikke hente tegninger");
+   return data.drawings||[];
+  }).then(drawings=>{if(active)setAvailableDrawings(drawings)}).catch(()=>{});
+  return()=>{active=false};
+ },[]);
 
  useEffect(()=>{
   if(!quoteId&&!savedSnapshot)setSavedSnapshot(JSON.stringify(v));
@@ -109,8 +122,11 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     customer:{
      ...current.customer,
      name:String(draft?.customer?.name||current.customer.name||"").slice(0,120),
+     email:String(draft?.customer?.email||current.customer.email||"").slice(0,240),
+     phone:String(draft?.customer?.phone||current.customer.phone||"").slice(0,80),
      address:String(draft?.customer?.address||current.customer.address||"").slice(0,300)
     },
+    drawingIds:Array.isArray(draft?.drawingIds)?draft.drawingIds.slice(0,8):current.drawingIds,
     lineItems:importedLines.length?importedLines:current.lineItems,
     notes:String(draft?.notes||current.notes||"").slice(0,8000)
    }));
@@ -193,6 +209,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       phone:quote.customer?.phone||"",
       address:quote.customer?.address||""
      },
+     drawingIds:Array.isArray(quote.drawingIds)?quote.drawingIds:[],
      introText:quote.introText||"",
      lineItems:Array.isArray(quote.lineItems)&&quote.lineItems.length?quote.lineItems:[{id:lineId(),type:"work",description:"",quantity:1,unit:"time",unitPriceOre:"",vatRate:25}],
      paymentPlan:Array.isArray(quote.paymentPlan)&&quote.paymentPlan.length?quote.paymentPlan:defaultPlan,
@@ -479,6 +496,21 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      </section>
 
      <section className="card quoteEditorSection">
+      <div className="kicker">TEGNINGER SOM FØLGER TILBUDET</div>
+      <h3>Plantegning og veggtegninger i PDF</h3>
+      <p className="muted">Velg lagrede tegninger som skal følge med i PDF-kopien. Hver valgt tegning får en plantegning og en frontvisning av hver vegg. Du kan lage nye tegninger via <a href="/admin/tegning">tegneverktøyet</a>.</p>
+      <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,marginBottom:10}}><input type="checkbox" checked={showAllDrawings} onChange={e=>setShowAllDrawings(e.target.checked)}/> Vis tegninger for alle kunder</label>
+      <div style={{display:"grid",gap:8}}>
+       {availableDrawings.filter(row=>showAllDrawings||v.drawingIds.includes(row.id)||!v.customer.name||String(row.customer||"").trim().toLocaleLowerCase("nb-NO")===String(v.customer.name).trim().toLocaleLowerCase("nb-NO")).map(row=><label key={row.id} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px",border:"1px solid #e2dacd",borderRadius:8,background:"#fff",color:"#25221e",cursor:"pointer"}}>
+        <input type="checkbox" style={{marginTop:4}} checked={v.drawingIds.includes(row.id)} onChange={e=>setV(current=>({...current,drawingIds:e.target.checked?[...current.drawingIds,row.id].slice(0,8):current.drawingIds.filter(id=>id!==row.id)}))}/>
+        <span><b>{row.name}</b><small style={{display:"block",marginTop:3,color:"#666"}}>{[row.customer,row.address].filter(Boolean).join(" · ")} · {(row.drawingData?.walls||[]).length} vegger</small></span>
+       </label>)}
+      </div>
+      {!availableDrawings.length&&<p className="muted">Ingen tegninger er lagret på serveren ennå. Opprett kunde i tegneprogrammet og lagre tegningen.</p>}
+      <p className="muted" style={{marginTop:12}}><b>{v.drawingIds.length} tegning(er)</b> vil bli med som PDF-vedlegg.</p>
+     </section>
+
+     <section className="card quoteEditorSection">
       <div className="quoteSectionHead">
        <div><div className="kicker">PRISLINJER</div><h3>Arbeid og materialer</h3></div>
        <div><button type="button" className="btn alt" onClick={()=>addLine("work")}>+ Arbeid</button><button type="button" className="btn alt" onClick={()=>addLine("material")}>+ Materiale</button></div>
@@ -529,6 +561,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       <span><small>MVA</small><b>{nok(calc.vat)}</b></span>
       <span className="quoteSummaryTotal"><small>Total inkl. MVA</small><b>{nok(calc.total)}</b></span>
      </div>
+     <p className="muted">{v.drawingIds.length? v.drawingIds.length+" plantegning(er) med veggvisninger vedlagt PDF":"Ingen tegninger valgt"}</p>
      <div className="quoteSummaryPlan">
       {v.paymentPlan.map(row=><span key={row.id}><small>{row.label} · {row.percent}%</small><b>{nok(calc.total*(Number(row.percent)||0)/100)}</b></span>)}
      </div>
