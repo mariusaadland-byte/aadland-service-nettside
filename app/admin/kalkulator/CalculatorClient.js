@@ -274,38 +274,8 @@ export default function CalculatorClient(){
     </div>
    </div>
 
-   <section className={styles.summaryGrid}>
-    <div className={styles.totalCard}>
-     <span>{primaryLabel}</span>
-     <strong>{money(primaryTotal)}</strong>
-     {form.businessExVat?<small>{money(calc.total)} inkl. mva</small>:<small>{money(calc.exVat)} eks. mva</small>}
-    </div>
-    <div className={styles.statCard}><span>Arbeid</span><b>{money(calc.labor)}</b><small>{calc.fixedLabor>0?"Fastpris":decimal(calc.hours)+" t × "+money(calc.hourlyRate)}</small></div>
-    <div className={styles.statCard}><span>Materialer</span><b>{money(calc.materials)}</b><small>{decimal(calc.markup)} % påslag</small></div>
-    <div className={styles.statCard}><span>Reise + bom</span><b>{money(calc.travel+calc.toll)}</b><small>{decimal(calc.totalKm)} km · {calc.trips} vei(er)</small></div>
-   </section>
-
-   <div className={styles.grid}>
-    <section className={styles.card}>
-     <div className={styles.cardHead}><span className={styles.step}>1</span><div><h2>Arbeid</h2><p>Bruk timeberegning eller skriv inn ferdig fastpris.</p></div></div>
-     <Field label="Kunde / prosjekt" help="Valgfritt – brukes bare som merkelapp i kalkylen.">
-      <input value={form.project} onChange={e=>set("project",e.target.value)} placeholder="F.eks. Terrasse Toppe"/>
-     </Field>
-     <div className={styles.two}>
-      <Field label="Timer">
-       <input inputMode="decimal" value={form.hours} onChange={e=>set("hours",e.target.value)} />
-      </Field>
-      <Field label="Timepris inkl. mva">
-       <div className={styles.moneyInput}><span>kr</span><input inputMode="decimal" value={form.hourlyRate} onChange={e=>set("hourlyRate",e.target.value)} /></div>
-      </Field>
-     </div>
-     <Field label="Fastpris arbeid inkl. mva" help="Hvis du fyller inn fastpris, overstyrer den timer × timepris.">
-      <div className={styles.moneyInput}><span>kr</span><input inputMode="decimal" value={form.fixedLabor} onChange={e=>set("fixedLabor",e.target.value)} placeholder="Valgfritt"/></div>
-     </Field>
-    </section>
-
-    <section className={styles.card}>
-     <div className={styles.cardHead}><span className={styles.step}>2</span><div><h2>Materialer</h2><p>Ett søkefelt: velg vare, endre antall og overfør til tilbud.</p></div></div>
+    <section className={`${styles.card} ${styles.featuredMaterialsCard}`} id="material-search">
+     <div className={styles.cardHead}><span className={styles.step}>1</span><div><h2>Materialer</h2><p>Ett søkefelt: velg vare, endre antall og overfør til tilbud.</p></div></div>
 
      <div className={styles.catalogSearchBlock}>
        <Field label="Søk vare med navn, varenummer eller EAN">
@@ -378,6 +348,37 @@ export default function CalculatorClient(){
        <div className={styles.importActions}><button type="submit" className={styles.primary} disabled={importBusy}>{importBusy?"Importerer…":"Importer / oppdater prisliste"}</button>{importMessage&&<span>{importMessage}</span>}</div>
       </form>}
      </div>
+    </section>
+
+
+   <section className={styles.summaryGrid}>
+    <div className={styles.totalCard}>
+     <span>{primaryLabel}</span>
+     <strong>{money(primaryTotal)}</strong>
+     {form.businessExVat?<small>{money(calc.total)} inkl. mva</small>:<small>{money(calc.exVat)} eks. mva</small>}
+    </div>
+    <div className={styles.statCard}><span>Arbeid</span><b>{money(calc.labor)}</b><small>{calc.fixedLabor>0?"Fastpris":decimal(calc.hours)+" t × "+money(calc.hourlyRate)}</small></div>
+    <div className={styles.statCard}><span>Materialer</span><b>{money(calc.materials)}</b><small>{decimal(calc.markup)} % påslag</small></div>
+    <div className={styles.statCard}><span>Reise + bom</span><b>{money(calc.travel+calc.toll)}</b><small>{decimal(calc.totalKm)} km · {calc.trips} vei(er)</small></div>
+   </section>
+
+   <div className={styles.grid}>
+    <section className={styles.card}>
+     <div className={styles.cardHead}><span className={styles.step}>2</span><div><h2>Arbeid</h2><p>Bruk timeberegning eller skriv inn ferdig fastpris.</p></div></div>
+     <Field label="Kunde / prosjekt" help="Valgfritt – brukes bare som merkelapp i kalkylen.">
+      <input value={form.project} onChange={e=>set("project",e.target.value)} placeholder="F.eks. Terrasse Toppe"/>
+     </Field>
+     <div className={styles.two}>
+      <Field label="Timer">
+       <input inputMode="decimal" value={form.hours} onChange={e=>set("hours",e.target.value)} />
+      </Field>
+      <Field label="Timepris inkl. mva">
+       <div className={styles.moneyInput}><span>kr</span><input inputMode="decimal" value={form.hourlyRate} onChange={e=>set("hourlyRate",e.target.value)} /></div>
+      </Field>
+     </div>
+     <Field label="Fastpris arbeid inkl. mva" help="Hvis du fyller inn fastpris, overstyrer den timer × timepris.">
+      <div className={styles.moneyInput}><span>kr</span><input inputMode="decimal" value={form.fixedLabor} onChange={e=>set("fixedLabor",e.target.value)} placeholder="Valgfritt"/></div>
+     </Field>
     </section>
 
     <section className={styles.card}>

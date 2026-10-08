@@ -526,6 +526,30 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
 
    <div className="quoteEditorLayout">
     <fieldset className="quoteEditorContent quoteEditorFieldset" disabled={Boolean(locked)}>
+     <section id="quote-material-search" className="card quoteEditorSection">
+      <div className="quoteSectionHead">
+       <div><div className="kicker">PRISLINJER</div><h3>Arbeid og materialer</h3></div>
+       <div><button type="button" className="btn alt" onClick={()=>addLine("work")}>+ Arbeid</button><button type="button" className="btn alt" onClick={()=>addLine("material")}>+ Materiale</button></div>
+      </div>
+
+      {!locked&&<QuoteCatalogSearch onChoose={addCatalogProduct}/>}
+
+      <div className="quoteLines">
+       {v.lineItems.map((line,index)=><div className="quoteLineEditor" key={line.id}>
+        <div className="quoteLineNumber">{index+1}</div>
+        <div className="field quoteLineDescription"><label>Beskrivelse</label><input value={line.description} onChange={e=>updateLine(line.id,"description",e.target.value)} placeholder={line.type==="work"?"F.eks. Tømrerarbeid":"F.eks. Gipsplater og stendere"}/></div>
+        <div className="field quoteLineType"><label>Type</label><select value={line.type} onChange={e=>updateLine(line.id,"type",e.target.value)}><option value="work">Arbeid</option><option value="material">Materiale</option><option value="other">Annet</option></select></div>
+        <div className="field quoteLineQuantity"><label>Antall</label><input type="number" min="0.01" step="0.01" value={line.quantity} onChange={e=>updateLine(line.id,"quantity",e.target.value)}/></div>
+        <div className="field quoteLineUnit"><label>Enhet</label><input value={line.unit} onChange={e=>updateLine(line.id,"unit",e.target.value)} placeholder="time / stk"/></div>
+        <div className="field quoteLinePrice"><label>Pris eks. MVA</label><input type="number" min="0" step="0.01" value={line.unitPriceOre===""?"":Number(line.unitPriceOre)/100} onChange={e=>updateLine(line.id,"unitPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="0"/></div>
+        <div className="field quoteLineVat"><label>MVA</label><select value={line.vatRate} onChange={e=>updateLine(line.id,"vatRate",Number(e.target.value))}><option value="25">25 %</option><option value="0">0 %</option></select></div>
+        <div className="quoteLineTotal"><small>Linjesum eks.</small><b>{nok((Number(line.quantity)||0)*(Number(line.unitPriceOre)||0))}</b></div>
+        <button type="button" className="quoteLineRemove" aria-label="Fjern linje" onClick={()=>removeLine(line.id)}>×</button>
+       </div>)}
+      </div>
+     </section>
+
+
      <section className="card quoteEditorSection">
       <div className="kicker">KUNDE</div>
       <h3>Kundeopplysninger</h3>
@@ -563,29 +587,6 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       </div>
       {!availableDrawings.length&&<p className="muted">Ingen tegninger er lagret på serveren ennå. Opprett kunde i tegneprogrammet og lagre tegningen.</p>}
       <p className="muted" style={{marginTop:12}}><b>{v.drawingIds.length} tegning(er)</b> vil bli med som PDF-vedlegg.</p>
-     </section>
-
-     <section className="card quoteEditorSection">
-      <div className="quoteSectionHead">
-       <div><div className="kicker">PRISLINJER</div><h3>Arbeid og materialer</h3></div>
-       <div><button type="button" className="btn alt" onClick={()=>addLine("work")}>+ Arbeid</button><button type="button" className="btn alt" onClick={()=>addLine("material")}>+ Materiale</button></div>
-      </div>
-
-      {!locked&&<QuoteCatalogSearch onChoose={addCatalogProduct}/>}
-
-      <div className="quoteLines">
-       {v.lineItems.map((line,index)=><div className="quoteLineEditor" key={line.id}>
-        <div className="quoteLineNumber">{index+1}</div>
-        <div className="field quoteLineDescription"><label>Beskrivelse</label><input value={line.description} onChange={e=>updateLine(line.id,"description",e.target.value)} placeholder={line.type==="work"?"F.eks. Tømrerarbeid":"F.eks. Gipsplater og stendere"}/></div>
-        <div className="field quoteLineType"><label>Type</label><select value={line.type} onChange={e=>updateLine(line.id,"type",e.target.value)}><option value="work">Arbeid</option><option value="material">Materiale</option><option value="other">Annet</option></select></div>
-        <div className="field quoteLineQuantity"><label>Antall</label><input type="number" min="0.01" step="0.01" value={line.quantity} onChange={e=>updateLine(line.id,"quantity",e.target.value)}/></div>
-        <div className="field quoteLineUnit"><label>Enhet</label><input value={line.unit} onChange={e=>updateLine(line.id,"unit",e.target.value)} placeholder="time / stk"/></div>
-        <div className="field quoteLinePrice"><label>Pris eks. MVA</label><input type="number" min="0" step="0.01" value={line.unitPriceOre===""?"":Number(line.unitPriceOre)/100} onChange={e=>updateLine(line.id,"unitPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="0"/></div>
-        <div className="field quoteLineVat"><label>MVA</label><select value={line.vatRate} onChange={e=>updateLine(line.id,"vatRate",Number(e.target.value))}><option value="25">25 %</option><option value="0">0 %</option></select></div>
-        <div className="quoteLineTotal"><small>Linjesum eks.</small><b>{nok((Number(line.quantity)||0)*(Number(line.unitPriceOre)||0))}</b></div>
-        <button type="button" className="quoteLineRemove" aria-label="Fjern linje" onClick={()=>removeLine(line.id)}>×</button>
-       </div>)}
-      </div>
      </section>
 
      <section className="card quoteEditorSection">
