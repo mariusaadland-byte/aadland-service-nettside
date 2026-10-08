@@ -60,6 +60,7 @@ export async function POST(req){
   customer:source.customer||{},
   line_items:Array.isArray(source.line_items)?source.line_items:[],
   payment_plan:Array.isArray(source.payment_plan)?source.payment_plan:[],
+  drawing_ids:Array.isArray(source.drawing_ids)?source.drawing_ids:[],
   subtotal_ex_vat_ore:Number(source.subtotal_ex_vat_ore)||0,
   vat_ore:Number(source.vat_ore)||0,
   total_inc_vat_ore:Number(source.total_inc_vat_ore)||0,
