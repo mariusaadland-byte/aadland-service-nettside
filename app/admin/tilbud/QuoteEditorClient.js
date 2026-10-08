@@ -315,7 +315,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    deliveryType:data.deliveryType||((recipientOverride&&recipient!==String(v.customer.email||"").trim().toLowerCase())?"alternate":"primary"),
    sentAt:data.sentAt||new Date().toISOString()
   },...current].slice(0,20));
-  setSavedMessage("Tilbudet er sendt til "+(data.sentTo||recipient)+".");
+  setSavedMessage("Tilbudet er sendt til "+(data.sentTo||recipient)+(data.pdfAttached?" med PDF-kopi vedlagt.":". Kontrollér at PDF-kopien fulgte med."));
   return true;
  }
 
