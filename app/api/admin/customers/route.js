@@ -15,7 +15,7 @@ export async function GET(){
  const s=db();
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
 
- const [profilesResult,quotesResult,billingResult,creditBookingsResult]=await Promise.all([
+ const [profilesResult,quotesResult,billingResult,creditBookingsResult,contactsResult]=await Promise.all([
   s.from("customer_profiles")
    .select("id,email,name,phone,address,created_at,updated_at")
    .order("created_at",{ascending:false})
@@ -30,7 +30,8 @@ export async function GET(){
   s.from("rental_bookings")
    .select("customer,total_ore,payment_captured_ore,payment_refunded_ore,status")
    .in("status",["new","confirmed","active","returned","completed"])
-   .limit(5000)
+   .limit(5000),
+  s.from("admin_customer_contacts").select("id,name,email,phone,address,created_at,updated_at").order("created_at",{ascending:false}).limit(2000)
  ]);
 
  if(profilesResult.error){
@@ -91,7 +92,7 @@ export async function GET(){
  }
 
  return NextResponse.json({
-  customers:(profilesResult.data||[]).map(row=>{
+  customers:[...(profilesResult.data||[]).map(row=>{
    const billing=billingMap.get(String(row.email||"").toLowerCase())||{};
    return {
     id:row.id,
@@ -110,7 +111,7 @@ export async function GET(){
     remainingCreditOre:billing.remaining_credit_ore==null?null:Number(billing.remaining_credit_ore)||0,
     creditOverLimit:billing.credit_over_limit===true
    };
-  }),
+  }),...(contactsResult.error?[]:(contactsResult.data||[]).map(row=>({id:row.id,email:row.email||"",name:row.name||"",phone:row.phone||"",address:row.address||"",createdAt:row.created_at,updatedAt:row.updated_at,hasAccount:false})))],
   billingProfiles:(billingResult.data||[]).map(row=>({
    email:row.email||"",
    invoiceCustomer:row.invoice_customer===true,
