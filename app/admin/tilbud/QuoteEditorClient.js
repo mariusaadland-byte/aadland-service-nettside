@@ -547,6 +547,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
         <div className="field quoteLineQuantity"><label>Antall</label><input type="number" min="0.01" step="0.01" value={line.quantity} onChange={e=>updateLine(line.id,"quantity",e.target.value)}/></div>
         <div className="field quoteLineUnit"><label>Enhet</label><input value={line.unit} onChange={e=>updateLine(line.id,"unit",e.target.value)} placeholder="time / stk"/></div>
         <div className="field quoteLinePrice"><label>Pris eks. MVA</label><input type="number" min="0" step="0.01" value={line.unitPriceOre===""?"":Number(line.unitPriceOre)/100} onChange={e=>updateLine(line.id,"unitPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="0"/></div>
+        <div className="field quoteLineInternalCost"><label>Intern kostnad eks. MVA / enhet</label><input type="number" min="0" step="0.01" inputMode="decimal" value={line.internalUnitCostOre===""||line.internalUnitCostOre==null?"":Number(line.internalUnitCostOre)/100} onChange={e=>updateLine(line.id,"internalUnitCostOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="Ikke registrert" title="Kun intern kalkyle. Vises aldri for kunden."/><small className="muted">Kun internt</small></div>
         <div className="field quoteLineVat"><label>MVA</label><select value={line.vatRate} onChange={e=>updateLine(line.id,"vatRate",Number(e.target.value))}><option value="25">25 %</option><option value="0">0 %</option></select></div>
         <div className="quoteLineTotal"><small>Linjesum eks.</small><b>{nok((Number(line.quantity)||0)*(Number(line.unitPriceOre)||0))}</b></div>
         <button type="button" className="quoteLineRemove" aria-label="Fjern linje" onClick={()=>removeLine(line.id)}>×</button>
@@ -624,6 +625,19 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       <span><small>MVA</small><b>{nok(calc.vat)}</b></span>
       <span className="quoteSummaryTotal"><small>Total inkl. MVA</small><b>{nok(calc.total)}</b></span>
      </div>
+     <section className="quoteProfitPanel" aria-label="Intern kostnad og dekningsbidrag">
+      <div className="kicker">INTERN KALKYLE · KUN ADMIN</div>
+      <h4>Estimert dekningsbidrag</h4>
+      {contribution.known>0?<div className="quoteProfitNumbers">
+       <span><small>Salgsverdi for kalkulerte linjer eks. MVA</small><b>{nok(contribution.coveredSaleOre)}</b></span>
+       <span><small>Innkjøp og estimerte kostnader eks. MVA</small><b>{nok(contribution.costOre)}</b></span>
+       <span className="quoteProfitResult"><small>Dekningsbidrag (før andre kostnader/skatt)</small><b>{nok(contribution.contributionOre)}</b></span>
+       <span><small>Dekningsgrad for kalkulerte linjer</small><b>{new Intl.NumberFormat("nb-NO",{maximumFractionDigits:1}).format(contribution.contributionPercent)} %</b></span>
+      </div>:<p className="quoteProfitHelp">Legg inn intern kostnad per enhet på prislinjene for å se hva oppdraget er beregnet å gi.</p>}
+      {contribution.missing>0&&<p className="quoteProfitWarning">{contribution.missing} linje(r) mangler kostnadsgrunnlag. Tallene er derfor bare et delestimat, ikke samlet fortjeneste for tilbudet.</p>}
+      {contribution.complete&&contribution.known>0&&<p className="quoteProfitHelp">Alle linjer har kostnad. Dette er dekningsbidrag før faste driftsutgifter, eventuelle tillegg og skatt – ikke nettofortjeneste.</p>}
+      <small>Innkjøpspriser og denne oversikten lagres separat fra kundetilbudet og vises ikke i PDF, e-post eller på Min side.</small>
+     </section>
      <p className="muted">{v.drawingIds.length? v.drawingIds.length+" plantegning(er) med veggvisninger vedlagt PDF":"Ingen tegninger valgt"}</p>
      <div className="quoteSummaryPlan">
       {v.paymentPlan.map(row=><span key={row.id}><small>{row.label} · {row.percent}%</small><b>{nok(calc.total*(Number(row.percent)||0)/100)}</b></span>)}
