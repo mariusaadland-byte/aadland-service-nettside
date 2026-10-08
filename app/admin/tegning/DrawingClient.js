@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import styles from "./drawing.module.css";
 import QuickCustomerPanel from "./QuickCustomerPanel";
+import KitchenWallBuilder from "./KitchenWallBuilder";
+import {createKitchenWalls,kitchenWallDefaults} from "../../../lib/kitchenWallPresets";
 
 const GRID=100, VIEW=8000, STORE="aadlandDrawingsV2", LAST_STORE="aadlandDrawingsV2:last", FURNITURE_TEMPLATE_STORE="aadlandFurnitureTemplatesV1", VERSION_STORE="aadlandDrawingVersionsV1";
 const catalog=[
@@ -491,7 +493,11 @@ function constrainEditedFurniture(next,previous,doc){
 }
 function wallInwardNormal(wall,zones){
  const zone=(zones||[]).find(z=>Array.isArray(z.wallIds)&&z.wallIds.includes(wall?.id));
- if(!zone)return{x:0,y:0};
+ if(!zone){
+  if(wall?.insideSide!=="left"&&wall?.insideSide!=="right")return{x:0,y:0};
+  const dx=wall.x2-wall.x1,dy=wall.y2-wall.y1,L=Math.hypot(dx,dy)||1,side=wall.insideSide==="right"?-1:1;
+  return{x:-dy/L*side,y:dx/L*side};
+ }
  const dx=wall.x2-wall.x1,dy=wall.y2-wall.y1,L=Math.hypot(dx,dy)||1,ccw=polygonSignedArea(zone.points||[])>=0;
  return ccw?{x:-dy/L,y:dx/L}:{x:dy/L,y:-dx/L};
 }
@@ -906,6 +912,7 @@ export default function DrawingClient(){
  const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
  const [quickCustomerOpen,setQuickCustomerOpen]=useState(false);
  const [reportBusy,setReportBusy]=useState(false);
+ const [kitchenBuilder,setKitchenBuilder]=useState(null);
  const camera3DDrag=useRef(null);
  const svg=useRef(null);
  const leftPanel=useRef(null),rightPanel=useRef(null);
@@ -1325,6 +1332,31 @@ export default function DrawingClient(){
   })();
   return()=>{cancelled=true};
  },[orders]);
+ const openKitchenBuilder=()=>setKitchenBuilder({...kitchenWallDefaults,thickness:String(doc.defaultWallThickness||98),height:String(doc.defaultWallHeight||2400)});
+ const createKitchenSetup=config=>{
+  const dimensions=viewDimsFor();
+  const {walls,bounds,shape}=createKitchenWalls(config,{
+   center:{x:pan.x+dimensions.w/2,y:pan.y+dimensions.h/2},canvasSize:VIEW,idFactory:uid
+  });
+  mutate(d=>({...d,walls:[...d.walls,...walls]}));
+  const main=walls.find(w=>w.kitchenLabel==="Bakvegg")||walls[0];
+  setSelected({kind:"wall",id:main.id});
+  setTool("select");setDraft(null);setWallChain(null);setSnapHint(null);setQuickAddOpen(false);
+  const width=Math.max(400,bounds.maxX-bounds.minX),height=Math.max(400,bounds.maxY-bounds.minY);
+  const zoom=clamp(Math.min(VIEW/(width*1.45),VIEW/(height*1.75)),.65,4);
+  const span=VIEW/zoom,midX=(bounds.minX+bounds.maxX)/2,midY=(bounds.minY+bounds.maxY)/2;
+  setPan(clampPanForZoom({x:midX-span/2,y:midY-span/2},zoom));
+  setDoc(d=>({...d,zoom}));
+  setKitchenBuilder(null);
+  setMessage((shape==="straight"?"Én kjøkkenvegg":shape==="l"?"L-kjøkken":"U-kjøkken")+" opprettet uten lukket rom");
+  setTimeout(()=>setMessage(""),2800);
+ };
+ const setStandaloneWallInside=(wallId,side)=>{
+  mutate(d=>{
+   const walls=d.walls.map(w=>w.id===wallId?{...w,insideSide:side==="left"||side==="right"?side:null}:w);
+   return {...d,walls,items:syncMounted(walls,d.items,d.zones)};
+  });
+ };
  const openRoomBuilder=type=>setRoomBuilder(type==="l"
   ?{type:"l",name:"Rom "+((doc.zones||[]).length+1),w:"5000",h:"4000",rw:"1800",rh:"1500"}
   :{type:"rect",name:"Rom "+((doc.zones||[]).length+1),w:"4000",h:"3000"});
@@ -1480,7 +1512,7 @@ export default function DrawingClient(){
   const dims=viewDimsFor(),rad=A*Math.PI/180;
   const x1=selectedWall?selectedWall.x2:snapTo(pan.x+dims.w/2-Math.cos(rad)*L/2,doc.snapSize||50);
   const y1=selectedWall?selectedWall.y2:snapTo(pan.y+dims.h/2-Math.sin(rad)*L/2,doc.snapSize||50);
-  const id=uid(),wall={id,x1:clamp(x1,0,VIEW),y1:clamp(y1,0,VIEW),x2:clamp(x1+Math.cos(rad)*L,0,VIEW),y2:clamp(y1+Math.sin(rad)*L,0,VIEW),t,h};
+  const id=uid(),wall={id,x1:clamp(x1,0,VIEW),y1:clamp(y1,0,VIEW),x2:clamp(x1+Math.cos(rad)*L,0,VIEW),y2:clamp(y1+Math.sin(rad)*L,0,VIEW),t,h,insideSide:"left"};
   mutate(d=>({...d,walls:[...d.walls,wall]}));
   setSelected({kind:"wall",id});setTool("select");setWallBuilder(null);setQuickAddOpen(false);
  };
@@ -1870,7 +1902,7 @@ export default function DrawingClient(){
   const nextCount=(wallChain?.count||0)+1,closing=wallChain?.start&&nextCount>=3&&Math.hypot(q.x-wallChain.start.x,q.y-wallChain.start.y)<2;
   const chainPoints=[...(wallChain?.points||[draft]),q],zonePoints=closing?chainPoints.slice(0,-1):null,zoneId=closing?uid():null,wallId=uid();
   mutate(d=>{
-   const wall={id:wallId,x1:draft.x,y1:draft.y,x2:q.x,y2:q.y,t:Number(d.defaultWallThickness)||98,h:Number(d.defaultWallHeight)||2400};
+   const wall={id:wallId,x1:draft.x,y1:draft.y,x2:q.x,y2:q.y,t:Number(d.defaultWallThickness)||98,h:Number(d.defaultWallHeight)||2400,insideSide:"left"};
    if(!closing)return {...d,walls:[...d.walls,wall]};
    const wallIds=[...(wallChain?.wallIds||[]),wallId],zone={id:zoneId,name:"Rom "+((d.zones||[]).length+1),points:zonePoints,wallIds,ceilingHeight:Number(d.defaultWallHeight)||2400,floorFinish:"",notes:""};
    return {...d,walls:[...d.walls,wall],zones:[...(d.zones||[]),zone]};
