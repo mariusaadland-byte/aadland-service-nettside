@@ -101,5 +101,15 @@ export async function POST(req){
   return NextResponse.json({error:"Ny revisjon kunne ikke opprettes."},{status:500});
  }
 
- return NextResponse.json({ok:true,quoteId:created.id,quoteNumber:created.quote_number,revisionNumber:created.revision_number});
+ // Private cost snapshots belong to the revision and are NOT in line_items or PDFs.
+ const {data:privateCosts,error:readError}=await s.from("quote_internal_costs").select("line_costs").eq("quote_id",source.id).maybeSingle();
+ let internalCostsCopied=true;
+ if(readError){console.error("QUOTE PRIVATE REVISION READ",readError.code);internalCostsCopied=false}
+ else if(privateCosts?.line_costs){
+  const {error:copyError}=await s.from("quote_internal_costs").upsert({
+   quote_id:created.id,line_costs:privateCosts.line_costs,updated_at:now
+  },{onConflict:"quote_id"});
+  if(copyError){console.error("QUOTE PRIVATE REVISION COPY",copyError.code);internalCostsCopied=false}
+ }
+ return NextResponse.json({ok:true,quoteId:created.id,quoteNumber:created.quote_number,revisionNumber:created.revision_number,internalCostsCopied});
 }
