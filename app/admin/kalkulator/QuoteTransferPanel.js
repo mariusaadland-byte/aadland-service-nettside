@@ -29,6 +29,11 @@ export default function QuoteTransferPanel({form}){
  async function transfer(){
   setError("");
   if(!lines.length){setError("Legg inn minst én vare med navn og antall, eller ta med arbeid og øvrige kostnader.");return}
+  const bad=(Array.isArray(form.materialItems)?form.materialItems:[]).find(item=>{
+   const quantity=Number(String(item.qty??"").replace(",","."));
+   return !String(item.name||"").trim()||!Number.isFinite(quantity)||quantity<=0;
+  });
+  if(bad){setError("En varelinje mangler beskrivelse eller gyldig antall. Rett den før overføring.");return}
   if(!customer?.name?.trim()){setError("Velg en kunde eller opprett en ny.");return}
   if(destination==="existing"&&(!existingId||!candidateQuotes.some(q=>q.id===existingId))){setError("Velg et eksisterende tilbud som fortsatt er kladd.");return}
   if(lines.length>110){setError("For mange linjer. Del opp kalkylen i flere tilbud.");return}
