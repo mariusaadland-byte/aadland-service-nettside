@@ -229,6 +229,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
 
  function set(key,value){setV(current=>({...current,[key]:value}))}
  function setCustomer(key,value){setV(current=>({...current,customer:{...current.customer,[key]:value}}))}
+ function chooseDrawing(row,checked){if(checked&&row.customer&&v.customer.name&&String(row.customer).trim().toLowerCase()!==String(v.customer.name).trim().toLowerCase()){if(!window.confirm("Denne tegningen er registrert på «"+row.customer+"», men tilbudet gjelder «"+v.customer.name+"». Er du sikker på at riktig tegning skal sendes?"))return;}setV(current=>({...current,drawingIds:checked?[...current.drawingIds,row.id].slice(0,8):current.drawingIds.filter(id=>id!==row.id)}))}
  function updateLine(id,key,value){setV(current=>({...current,lineItems:current.lineItems.map(line=>line.id===id?{...line,[key]:value}:line)}))}
  function addLine(type){
   setV(current=>({...current,lineItems:[...current.lineItems,{
@@ -502,7 +503,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,marginBottom:10}}><input type="checkbox" checked={showAllDrawings} onChange={e=>setShowAllDrawings(e.target.checked)}/> Vis tegninger for alle kunder</label>
       <div style={{display:"grid",gap:8}}>
        {availableDrawings.filter(row=>showAllDrawings||v.drawingIds.includes(row.id)||!v.customer.name||String(row.customer||"").trim().toLocaleLowerCase("nb-NO")===String(v.customer.name).trim().toLocaleLowerCase("nb-NO")).map(row=><label key={row.id} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px",border:"1px solid #e2dacd",borderRadius:8,background:"#fff",color:"#25221e",cursor:"pointer"}}>
-        <input type="checkbox" style={{marginTop:4}} checked={v.drawingIds.includes(row.id)} onChange={e=>setV(current=>({...current,drawingIds:e.target.checked?[...current.drawingIds,row.id].slice(0,8):current.drawingIds.filter(id=>id!==row.id)}))}/>
+        <input type="checkbox" style={{marginTop:4}} checked={v.drawingIds.includes(row.id)} onChange={e=>chooseDrawing(row,e.target.checked)}/>
         <span><b>{row.name}</b><small style={{display:"block",marginTop:3,color:"#666"}}>{[row.customer,row.address].filter(Boolean).join(" · ")} · {(row.drawingData?.walls||[]).length} vegger</small></span>
        </label>)}
       </div>
