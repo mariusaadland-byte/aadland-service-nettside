@@ -31,7 +31,7 @@ const labels = {
 
 
 const ADMIN_NAV_GROUPS=[
-  {id:"sales",title:"Salg og kunder",icon:"◎",ids:["orders","surveys","customers","quotes","reminders","archive"]},
+  {id:"sales",title:"Salg og kunder",icon:"◎",ids:["orders","surveys","customers","drawings","quotes","reminders","archive"]},
   {id:"jobs",title:"Oppdrag og planlegging",icon:"▤",ids:["jobs","jobCalendar","workClock","drawing"]},
   {id:"shop",title:"Produkter og tjenester",icon:"◫",ids:["products","categories","services"]},
   {id:"rental",title:"Utleie",icon:"▣",ids:["rental","rentalCalendar","rentalBookings"]},
@@ -485,6 +485,7 @@ export default function AdminClient({ user }) {
   if (canViewOrders) tabs.push(["archive", "Arkiv"]);
   if (canViewOrders) tabs.push(["surveys", "Befaringer"]);
   if (canViewOrders) tabs.push(["customers", "Kunder"]);
+  if (canViewOrders || canManageProducts) tabs.push(["drawings", "Tegningsarkiv"]);
   if (canManageProducts) tabs.push(["products", "Produkter"]);
   if (canManageProducts) tabs.push(["categories", "Kategorier"]);
   if (canManageProducts) tabs.push(["services", "Tjenester"]);
@@ -512,6 +513,7 @@ export default function AdminClient({ user }) {
     if (id === "quotes") {setMenuOpen(false);router.push("/admin/tilbud");return;}
     if (id === "roadmap") {setMenuOpen(false);router.push("/admin/utviklingsplan");return;}
     if (id === "drawing") { setMenuOpen(false); router.push("/admin/tegning"); return; }
+    if (id === "drawings") { setMenuOpen(false); router.push("/admin/tegninger"); return; }
     if (id === "workClock") { setMenuOpen(false); router.push("/admin/arbeidsklokke"); return; }
     if (id === "calculator") { setMenuOpen(false); router.push("/admin/kalkulator"); return; }
     if (id === "materialAi") { setMenuOpen(false); router.push("/admin/material-ai"); return; }
@@ -1045,7 +1047,7 @@ function Customers({orders,bookings,profiles,billingProfiles,quotes,canUpdate,re
       </div>
      </details>}
 
-     <div className="customerAdminActions"><a className="btn alt" href={customerQuoteHref(customer)}>Nytt tilbud</a>{customer.email&&<a className="btn alt" href={"mailto:"+customer.email}>Send e-post</a>}</div>
+     <div className="customerAdminActions"><a className="btn alt" href={customerQuoteHref(customer)}>Nytt tilbud</a><a className="btn alt" href={"/admin/tegninger?"+(customer.email?"email="+encodeURIComponent(customer.email):"customer="+encodeURIComponent(customer.name))}>Tegninger</a>{customer.email&&<a className="btn alt" href={"mailto:"+customer.email}>Send e-post</a>}</div>
      <details><summary>Vis historikk ({customer.history.length})</summary>{customer.history.sort((x,y)=>String(y.date||"").localeCompare(String(x.date||""))).map((h,j)=><div key={h.number+j} className="customerHistory">{h.href?<a href={h.href}><b>{h.label}</b> · {h.number}</a>:<><b>{h.label}</b> · {h.number}</>}<br/><small>{h.date?new Date(h.date).toLocaleString("nb-NO"):""} · {nok(h.totalOre||0)}</small></div>)}</details>
     </article>)}
    </div>
