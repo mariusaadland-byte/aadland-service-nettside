@@ -1517,3 +1517,25 @@
 @media print{
  .mobileMenuPanel,.mobileMenuBackdrop{display:none!important}
 }
+
+/* Kitchen-only wall runs: one, L or U, without closing a room. */
+.kitchenWallModal{width:min(650px,calc(100% - 20px))}
+.kitchenWallIntro{font-size:13px;line-height:1.5;color:#625d53;margin:10px 0 16px}
+.kitchenWallPresets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.kitchenWallPresets button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:102px;padding:12px 5px;border:1px solid #d3c9b8;border-radius:10px;background:#fff;color:#24241f;cursor:pointer}
+.kitchenWallPresets button>span{font:900 40px/1 Arial,sans-serif;color:#373c36}
+.kitchenWallPresets button strong{font-size:13px}
+.kitchenWallPresets button small{font-size:10px;color:#756e63;text-align:center}
+.kitchenWallPresets .kitchenWallSelected{border:2px solid #b28a46;background:#f5ebd6;box-shadow:inset 0 0 0 1px #d5b97e}
+.kitchenWallPreview{display:block;width:100%;max-height:160px;border:1px solid #ddd5c8;border-radius:11px;margin:14px 0}
+.kitchenWallHelp{font-size:12px;line-height:1.5;color:#686054;background:#f6f2ea;border:1px solid #dfd3bf;border-radius:8px;padding:10px 12px}
+.kitchenWallError{font-size:13px;font-weight:700;color:#912d25;background:#fff1ee;border:1px solid #e0a8a0;border-radius:8px;padding:10px}
+@media(max-width:900px){
+ .kitchenWallModal{width:100%;max-height:calc(100dvh - 24px);overflow-y:auto;box-sizing:border-box}
+ .kitchenWallPresets button{min-height:87px;padding:9px 4px}
+ .kitchenWallPresets button>span{font-size:33px}
+ .kitchenWallPresets button strong{font-size:12px}
+ .kitchenWallPresets button small{font-size:9px}
+ .kitchenWallPreview{max-height:120px}
+ .kitchenWallModal input{font-size:16px;color:#1d1d1b;-webkit-text-fill-color:#1d1d1b;caret-color:#1d1d1b;color-scheme:light}
+}
