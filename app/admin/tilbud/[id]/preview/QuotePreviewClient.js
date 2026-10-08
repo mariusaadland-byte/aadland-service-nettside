@@ -37,6 +37,7 @@ export default function QuotePreviewClient({quoteId}){
   <div className="quotePreviewToolbar noPrint">
    <Link className="btn alt" href={"/admin/tilbud/"+quote.id}>← Rediger</Link>
    <span>{quote.quoteNumber} · {statusLabels[quote.status]||quote.status}</span>
+   <a className="btn alt" href={"/api/admin/quotes/pdf?id="+encodeURIComponent(quote.id)}>Last ned PDF-kopi</a>
    <button className="btn" type="button" onClick={()=>window.print()}>Skriv ut / lagre som PDF</button>
   </div>
 
