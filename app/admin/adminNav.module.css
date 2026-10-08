@@ -18,5 +18,5 @@
 .count{border-radius:100px;background:#bb8e45;color:#fff;padding:2px 7px;font-size:11px}
 .noResults{font-size:13px;color:#766a5b;padding:8px}
 :global(.side) .signout{margin-top:8px;border-top:1px solid #d7cbb9;border-radius:0;font-weight:700;color:#6a342a}
-:global(.admin) :global(.side){position:sticky;top:0;height:100vh;max-height:100vh;overflow-y:auto;overscroll-behavior:contain;box-sizing:border-box}
-@media(max-width:900px){:global(.admin) :global(.side){position:fixed;top:68px;height:calc(100dvh - 68px);max-height:calc(100dvh - 68px)}}
+.sideContainer{position:sticky;top:0;height:100vh;max-height:100vh;overflow-y:auto;overscroll-behavior:contain;box-sizing:border-box}
+@media(max-width:900px){.sideContainer{position:fixed;top:68px;height:calc(100dvh - 68px);max-height:calc(100dvh - 68px)}}
