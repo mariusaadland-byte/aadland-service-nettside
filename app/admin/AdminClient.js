@@ -721,6 +721,7 @@ export default function AdminClient({ user }) {
             {(canUpdateOrders || canManageProducts) && (
               <div className="adminOverviewActions">
                 <button className="btn alt" type="button" onClick={() => router.push("/admin/tilbud")}>Åpne tilbudsoversikt</button>
+                {user?.role==="owner"&&<button className="btn alt" type="button" onClick={()=>router.push("/admin/utviklingsplan")}>Åpne utviklingsplan</button>}
               </div>
             )}
 
