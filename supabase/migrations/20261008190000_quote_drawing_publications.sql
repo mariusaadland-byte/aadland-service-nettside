@@ -3,7 +3,7 @@
 create table if not exists public.quote_drawing_publications(
  id uuid primary key default gen_random_uuid(),
  quote_id uuid not null references public.quotes(id) on delete cascade,
- drawing_id uuid not null references public.project_drawings(id) on delete cascade,
+ drawing_id uuid references public.project_drawings(id) on delete set null,
  customer_email text not null,
  name text not null,
  address text not null default '',
