@@ -265,7 +265,7 @@ export default function CalculatorClient(){
      <Link href="/admin" className={styles.back}>← Tilbake til backoffice</Link>
      <span className={styles.eyebrow}>AADLAND SERVICE · INTERNVERKTØY</span>
      <h1>Pris- og fastpriskalkulator</h1>
-     <p>Regn arbeid, materialer, kjøring og bom i én kalkyle. Alle prisfelt er satt opp som beløp til kunde inkl. mva.</p>
+     <p>Søk varer, legg dem inn som tilbudslinjer og overfør til en valgt kunde. Arbeid, kjøring og bom kan tas med ved behov.</p>
     </div>
     <div className={styles.topActions}>
      <button type="button" className={styles.secondary} onClick={reset}>Nullstill</button>
@@ -305,54 +305,56 @@ export default function CalculatorClient(){
     </section>
 
     <section className={styles.card}>
-     <div className={styles.cardHead}><span className={styles.step}>2</span><div><h2>Materialer</h2><p>Søk i leverandørprisene, legg inn antall og få materialpåslag automatisk.</p></div></div>
+     <div className={styles.cardHead}><span className={styles.step}>2</span><div><h2>Materialer</h2><p>Ett søkefelt: velg vare, endre antall og overfør til tilbud.</p></div></div>
 
-     <div className={styles.catalogToolbar}>
-      <Field label="Leverandør">
-       <select value={catalogSupplier} onChange={e=>setCatalogSupplier(e.target.value)}>
-        <option value="">Alle leverandører</option>
-        {catalogSuppliers.map(item=><option key={item.id} value={item.id}>{item.name}{item.isPrimary?" · primær":""}</option>)}
-       </select>
-      </Field>
-      <Field label="Søk produkt" help="Søk på navn, varenummer, EAN, modulnummer eller varegruppe.">
-       <input value={materialQuery} onChange={e=>setMaterialQuery(e.target.value)} placeholder="F.eks. 28x120 terrasse, 48982916…"/>
-      </Field>
-     </div>
-
-     {catalogError&&<div className={styles.catalogError}>{catalogError}</div>}
-     {materialQuery.trim().length>=2&&<div className={styles.searchResults}>
-      {catalogBusy&&<div className={styles.catalogEmpty}>Søker…</div>}
-      {!catalogBusy&&!catalogError&&materialResults.length===0&&<div className={styles.catalogEmpty}>Ingen treff i prisbasen.</div>}
-      {!catalogBusy&&materialResults.map(product=><button type="button" key={product.supplierId+"::"+product.sku} className={styles.productResult} onClick={()=>addMaterial(product)}>
-       <span><b>{product.name}</b><small>{product.supplierName} · varenr. {product.sku}{product.categoryName?" · "+product.categoryName:""}</small></span>
-       <span><strong>{money(product.costExVat)}</strong><small>eks. mva / {product.unit||"stk"}</small></span>
-       <em>+ Legg til</em>
-      </button>)}
-     </div>}
-
-     {(Array.isArray(form.materialItems)?form.materialItems:[]).length>0&&<div className={styles.selectedMaterials}>
-      <div className={styles.materialListHead}><b>Valgte varer</b><span>{(form.materialItems||[]).length} varelinje(r)</span></div>
-      {(form.materialItems||[]).map(item=><div key={item.key} className={styles.materialLine}>
-       <div className={styles.materialName}><b>{item.name}</b><small>{item.supplierName} · {item.sku} · {money(number(item.costExVat))} eks. mva / {item.unit||"stk"}</small></div>
-       <label><span>Antall</span><input inputMode="decimal" value={item.qty} onChange={e=>updateMaterial(item.key,"qty",e.target.value)}/></label>
-       <div className={styles.materialLineTotal}><span>Innkjøp eks. mva</span><b>{money(number(item.qty)*number(item.costExVat))}</b></div>
-       <button type="button" className={styles.removeMaterial} onClick={()=>removeMaterial(item.key)} aria-label={"Fjern "+item.name}>×</button>
-      </div>)}
-      <div className={styles.materialTotals}>
-       <span>Leverandørvarer eks. mva <b>{money(calc.catalogMaterialCostExVat)}</b></span>
-       <span>Leverandørvarer inkl. mva <b>{money(calc.catalogMaterialCostIncVat)}</b></span>
+     <div className={styles.catalogSearchBlock}>
+       <Field label="Søk vare med navn, varenummer eller EAN">
+        <input id="calculator-product-search" type="search" value={materialQuery} onChange={e=>{setMaterialQuery(e.target.value);setAddedNotice("")}} placeholder="Søk for eksempel terrassebord, gips eller 49604414 …" autoComplete="off"/>
+       </Field>
+       <details className={styles.catalogFilter}><summary>Leverandør: {catalogSuppliers.find(item=>item.id===catalogSupplier)?.name||"Alle leverandører"} · Endre</summary>
+        <Field label="Søk hos"><select value={catalogSupplier} onChange={e=>setCatalogSupplier(e.target.value)}>
+         <option value="">Alle leverandører</option>{catalogSuppliers.map(item=><option key={item.id} value={item.id}>{item.name}{item.isPrimary?" · primær":""}</option>)}
+        </select></Field>
+       </details>
       </div>
-     </div>}
-
-     <Field label="Andre materialkostnader inkl. mva" help="Valgfritt. Bruk dette til materialer som ikke ligger i prisbasen.">
-      <div className={styles.moneyInput}><span>kr</span><input inputMode="decimal" value={form.materialCost} onChange={e=>set("materialCost",e.target.value)} placeholder="0"/></div>
-     </Field>
-     <Field label="Materialpåslag" help={"Kalkulert salgspris til kunde: "+money(calc.materials)}>
-      <div className={styles.suffixInput}><input inputMode="decimal" value={form.materialMarkup} onChange={e=>set("materialMarkup",e.target.value)}/><span>%</span></div>
-     </Field>
-     <div className={styles.calculationLine}><span>Samlet innkjøp inkl. mva</span><b>{money(calc.materialCost)}</b></div>
-
-     <div className={styles.importPanel}>
+      {catalogError&&<div className={styles.catalogError}>{catalogError}</div>}
+      {materialQuery.trim().length>=2&&<div className={styles.searchResults}>
+       {catalogBusy&&<div className={styles.catalogEmpty}>Søker …</div>}
+       {!catalogBusy&&!catalogError&&materialResults.length===0&&<div className={styles.catalogEmpty}>Ingen treff. Prøv et annet varenummer eller kortere navn.</div>}
+       {!catalogBusy&&materialResults.map(product=><button type="button" key={product.supplierId+"::"+product.sku} className={styles.productResult} onClick={()=>addMaterial(product)}>
+        <span><b>{product.name}</b><small>{product.supplierName} · varenr. {product.sku}</small></span>
+        <span><strong>{money(product.costExVat)}</strong><small>innkjøp eks. mva / {product.unit||"stk"}</small></span><em>+ Legg til</em>
+       </button>)}
+      </div>}
+      {addedNotice&&<p className={styles.addedNotice} role="status">{addedNotice}</p>}
+      <div className={styles.quoteGoodsHead}>
+       <div><strong>Varelinjer til tilbudet</strong><small>{(form.materialItems||[]).length} linje(r) · søk eller skriv inn selv</small></div>
+       <button type="button" onClick={addCustomMaterial}>＋ Manuell vare</button>
+      </div>
+      {(form.materialItems||[]).length===0?<div className={styles.catalogEmpty}>Søk etter en vare og trykk «+ Legg til». Da kommer den hit med redigerbart antall og pris.</div>:(
+       <div className={styles.quoteGoodsLines}>
+        {(form.materialItems||[]).map((item,index)=>{
+         const sale=unitSaleExVat(item,form.materialMarkup),qty=number(item.qty);
+         return <div key={item.key} className={styles.quoteGoodsLine}>
+          <span className={styles.quoteGoodsNumber}>{index+1}</span>
+          <label className={styles.quoteGoodsDescription}><span>Vare / beskrivelse</span><input value={item.name||""} onChange={e=>updateMaterial(item.key,"name",e.target.value)} placeholder="Hva skal leveres?"/><small>{item.sku?"Varenr. "+item.sku+" · ":""}{item.supplierName||"Manuell vare"}</small></label>
+          <label><span>Antall</span><input type="number" min="0" step="any" inputMode="decimal" value={item.qty} onChange={e=>updateMaterial(item.key,"qty",e.target.value)}/></label>
+          <label><span>Enhet</span><input value={item.unit||""} onChange={e=>updateMaterial(item.key,"unit",e.target.value)} placeholder="stk / lm"/></label>
+          <label><span>Innkjøp eks. mva.</span><input type="number" min="0" step="any" inputMode="decimal" value={item.costExVat??""} onChange={e=>updateMaterial(item.key,"costExVat",e.target.value)}/></label>
+          <label><span>Salgspris eks. mva.</span><input type="number" min="0" step="any" inputMode="decimal" value={item.saleExVat??""} placeholder={"Auto "+decimal(number(item.costExVat)*(1+number(form.materialMarkup)/100))} onChange={e=>updateMaterial(item.key,"saleExVat",e.target.value)}/><small>{item.saleExVat===""||item.saleExVat==null?"Automatisk med påslag":"Overstyrt"}</small></label>
+          <div className={styles.quoteGoodsTotal}><small>Sum eks. mva.</small><strong>{money(qty*sale)}</strong></div>
+          <button type="button" className={styles.quoteGoodsRemove} onClick={()=>removeMaterial(item.key)} aria-label={"Fjern "+(item.name||"varelinje")}>×</button>
+         </div>})}
+       </div>
+      )}
+      <div className={styles.materialTotals}><span>Innkjøp eks. mva. <b>{money(calc.catalogMaterialCostExVat)}</b></span><span>Tilbudspris eks. mva. <b>{money(calc.catalogMaterialSalesExVat)}</b></span><span>Tilbudspris inkl. mva. <b>{money(calc.catalogMaterialSalesExVat*1.25)}</b></span></div>
+      <Field label="Standard materialpåslag" help="Automatisk på varer uten overstyrt salgspris."><div className={styles.suffixInput}><input inputMode="decimal" value={form.materialMarkup} onChange={e=>set("materialMarkup",e.target.value)}/><span>%</span></div></Field>
+      <QuoteTransferPanel form={form}/>
+      <details className={styles.legacyMaterialCost}><summary>Andre materialkostnader (valgfritt)</summary>
+       <Field label="Beløp inkl. mva."><div className={styles.moneyInput}><span>kr</span><input inputMode="decimal" value={form.materialCost} onChange={e=>set("materialCost",e.target.value)} placeholder="0"/></div></Field>
+       <p>Bruk gjerne «Manuell vare» ovenfor i stedet. Andre materialkostnader tas med i tilbudet dersom du huker av for øvrige kostnader.</p>
+      </details>
+      <div className={styles.importPanel}>
       <button type="button" className={styles.importToggle} onClick={()=>{setImportOpen(value=>!value);setCatalogError("");setImportMessage("")}}>
        <span><b>Leverandørprislister</b><small>Importer eller oppdater Bygger’n og andre leverandører</small></span>
        <strong>{importOpen?"Lukk":"Åpne"} →</strong>
