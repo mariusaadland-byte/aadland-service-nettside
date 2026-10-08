@@ -5,6 +5,7 @@ import {db} from "../../../../../lib/supabase";
 import {createQuoteToken} from "../../../../../lib/quoteLinks";
 import {osloDateKey} from "../../../../../lib/osloTime";
 import {buildQuotePdf,quotePdfFilename} from "../../../../../lib/quotePdf";
+import {loadQuoteDrawings} from "../../../../../lib/quoteDrawingLoader";
 
 export const runtime="nodejs";
 
@@ -119,13 +120,14 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  let pdf;
  const filename=quotePdfFilename(quote);
  try{
-  pdf=await buildQuotePdf(quote);
+  const drawings=await loadQuoteDrawings(s,quote);
+  pdf=await buildQuotePdf(quote,drawings);
   if(!pdf?.length||pdf.subarray(0,8).toString("ascii")!=="%PDF-1.4"){
    throw new Error("Ugyldig tilbuds-PDF");
   }
  }catch(err){
   console.error("QUOTE PDF GENERATION ERROR",{quoteId:id,message:err?.message});
-  return NextResponse.json({error:"PDF-kopien kunne ikke lages. Tilbudet er ikke sendt, prøv igjen."},{status:500});
+  return NextResponse.json({error:"PDF-kopien kunne ikke lages: "+String(err?.message||"Ukjent feil").slice(0,180)+". Tilbudet er ikke sendt."},{status:500});
  }
 
  try{
