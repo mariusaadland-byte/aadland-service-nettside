@@ -6,6 +6,7 @@ import {useRouter} from "next/navigation";
 import {osloDateKey,shiftDateKey} from "../../../lib/osloTime";
 import {CATALOG_QUOTE_TRANSFER_KEY} from "../../../lib/calculatorQuoteLines";
 import QuoteCatalogSearch from "./QuoteCatalogSearch";
+import {calculateContribution,withPrivateCosts} from "../../../lib/quotePrivateCosts";
 
 const nok=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",maximumFractionDigits:2}).format((Number(ore)||0)/100);
 const lineId=()=>("line-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,7));
@@ -74,6 +75,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [availableDrawings,setAvailableDrawings]=useState([]);
  const [showAllDrawings,setShowAllDrawings]=useState(false);
  const calc=useMemo(()=>calculate(v.lineItems),[v.lineItems]);
+ const contribution=useMemo(()=>calculateContribution(v.lineItems),[v.lineItems]);
  const planSum=useMemo(()=>v.paymentPlan.reduce((sum,row)=>sum+(Number(row.percent)||0),0),[v.paymentPlan]);
  const isDirty=useMemo(()=>Boolean(savedSnapshot)&&JSON.stringify(v)!==savedSnapshot,[v,savedSnapshot]);
  const locked=quoteId&&v.status!=="draft";
@@ -116,7 +118,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     quantity:Math.max(0.01,Number(line?.quantity)||1),
     unit:String(line?.unit||"stk").trim().slice(0,20),
     unitPriceOre:Number.isFinite(Number(line?.unitPriceOre))&&Number(line.unitPriceOre)>=0?Math.round(Number(line.unitPriceOre)):"",
-    vatRate:Number(line?.vatRate)===0?0:25
+    vatRate:Number(line?.vatRate)===0?0:25,
+    internalUnitCostOre:line?.internalUnitCostOre==null||line.internalUnitCostOre===""?"":Math.max(0,Math.round(Number(line.internalUnitCostOre)||0))
    })).filter(line=>line.description);
    setV(current=>({
     ...current,
@@ -213,7 +216,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      },
      drawingIds:Array.isArray(quote.drawingIds)?quote.drawingIds:[],
      introText:quote.introText||"",
-     lineItems:Array.isArray(quote.lineItems)&&quote.lineItems.length?quote.lineItems:[{id:lineId(),type:"work",description:"",quantity:1,unit:"time",unitPriceOre:"",vatRate:25}],
+     lineItems:Array.isArray(quote.lineItems)&&quote.lineItems.length?withPrivateCosts(quote.lineItems,quote.internalCosts):[{id:lineId(),type:"work",description:"",quantity:1,unit:"time",unitPriceOre:"",vatRate:25}],
      paymentPlan:Array.isArray(quote.paymentPlan)&&quote.paymentPlan.length?quote.paymentPlan:defaultPlan,
      notes:quote.notes||"",
      terms:quote.terms||defaultTerms,
@@ -245,7 +248,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
          description:String(row.description||"").trim().slice(0,500),
          quantity:Number(row.quantity)||1,
          unit:String(row.unit||"stk").slice(0,40),
-         unitPriceOre:Math.max(0,Math.round(Number(row.unitPriceOre)||0)),vatRate:Number(row.vatRate)===0?0:25
+         unitPriceOre:Math.max(0,Math.round(Number(row.unitPriceOre)||0)),vatRate:Number(row.vatRate)===0?0:25,
+         internalUnitCostOre:row.internalUnitCostOre==null||row.internalUnitCostOre===""?"":Math.max(0,Math.round(Number(row.internalUnitCostOre)||0))
         })).filter(row=>row.description&&row.quantity>0);
         if(!incoming.length)transferProblem="Ingen gyldige varelinjer ble funnet i overføringen.";
         else if(loadedState.lineItems.length+incoming.length>120)transferProblem="Dette tilbudet har ikke plass til så mange nye varelinjer (maks 120).";
@@ -256,6 +260,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     }catch{transferProblem="Varene fra kalkulatoren kunne ikke leses. Prøv på nytt."}
     setV(mergedState);
     setSavedSnapshot(JSON.stringify(loadedState));
+    if(quote.privateCostsUnavailable)setError("Interne kostnader kunne ikke hentes. Kontroller disse før du lagrer.");
     if(importedCount)setSavedMessage(importedCount+" varelinje(r) lagt til i tilbudskladden. Kontroller prisene og trykk «Lagre tilbud».");
     if(transferProblem)setError(transferProblem);
    })
@@ -280,14 +285,14 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    const items=blank?[]:old;
    const exists=items.find(line=>line.type==="material"&&line.description===description&&line.unit===unit&&Number(line.unitPriceOre)===unitPriceOre);
    if(exists)return {...current,lineItems:items.map(line=>line.id===exists.id?{...line,quantity:(Number(line.quantity)||0)+1}:line)};
-   return {...current,lineItems:[...items,{id:lineId(),type:"material",description,quantity,unit,unitPriceOre,vatRate:25}]};
+   return {...current,lineItems:[...items,{id:lineId(),type:"material",description,quantity,unit,unitPriceOre,vatRate:25,internalUnitCostOre:Math.max(0,Math.round((Number(product.costExVat)||0)*100))}]};
   });
   setError("");
   return true;
  }
  function addLine(type){
   setV(current=>({...current,lineItems:[...current.lineItems,{
-   id:lineId(),type,description:"",quantity:1,unit:type==="work"?"time":"stk",unitPriceOre:"",vatRate:25
+   id:lineId(),type,description:"",quantity:1,unit:type==="work"?"time":"stk",unitPriceOre:"",vatRate:25,internalUnitCostOre:""
   }]}));
  }
  function removeLine(id){
@@ -320,7 +325,13 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   });
   const data=await response.json().catch(()=>({}));
   setSaving(false);
-  if(!response.ok){setError(data.error||"Tilbudet kunne ikke lagres.");return null;}
+  if(!response.ok){
+   if(!quoteId&&data.quoteId){
+    router.replace("/admin/tilbud/"+data.quoteId);
+    return null;
+   }
+   setError(data.error||"Tilbudet kunne ikke lagres.");return null;
+  }
   if(!quoteId){
    router.push("/admin/tilbud/"+data.quote.id);
    return data.quote;
@@ -505,7 +516,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      {quoteId&&<div className={isDirty?"quoteSaveState quoteSaveStateDirty":"quoteSaveState"}>{locked?"🔒 Låst versjon":isDirty?"● Ulagrede endringer":"✓ Alt er lagret"}</div>}
     </div>
     <div className="quoteEditorHeaderActions">
-     {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Papirutgave / skriv ut</button>}
+     {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Forhåndsvis / last ned PDF</button>}
      {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
      {quoteId&&v.status==="draft"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
      {quoteId&&v.status==="sent"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy} onClick={registerPaperIssue}>Registrer utlevert på papir</button>}
@@ -542,6 +553,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
         <div className="field quoteLineQuantity"><label>Antall</label><input type="number" min="0.01" step="0.01" value={line.quantity} onChange={e=>updateLine(line.id,"quantity",e.target.value)}/></div>
         <div className="field quoteLineUnit"><label>Enhet</label><input value={line.unit} onChange={e=>updateLine(line.id,"unit",e.target.value)} placeholder="time / stk"/></div>
         <div className="field quoteLinePrice"><label>Pris eks. MVA</label><input type="number" min="0" step="0.01" value={line.unitPriceOre===""?"":Number(line.unitPriceOre)/100} onChange={e=>updateLine(line.id,"unitPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="0"/></div>
+        <div className="field quoteLineInternalCost"><label>Intern kostnad eks. MVA / enhet</label><input type="number" min="0" step="0.01" inputMode="decimal" value={line.internalUnitCostOre===""||line.internalUnitCostOre==null?"":Number(line.internalUnitCostOre)/100} onChange={e=>updateLine(line.id,"internalUnitCostOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="Ikke registrert" title="Kun intern kalkyle. Vises aldri for kunden."/><small className="muted">Kun internt</small></div>
         <div className="field quoteLineVat"><label>MVA</label><select value={line.vatRate} onChange={e=>updateLine(line.id,"vatRate",Number(e.target.value))}><option value="25">25 %</option><option value="0">0 %</option></select></div>
         <div className="quoteLineTotal"><small>Linjesum eks.</small><b>{nok((Number(line.quantity)||0)*(Number(line.unitPriceOre)||0))}</b></div>
         <button type="button" className="quoteLineRemove" aria-label="Fjern linje" onClick={()=>removeLine(line.id)}>×</button>
@@ -619,6 +631,19 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       <span><small>MVA</small><b>{nok(calc.vat)}</b></span>
       <span className="quoteSummaryTotal"><small>Total inkl. MVA</small><b>{nok(calc.total)}</b></span>
      </div>
+     <section className="quoteProfitPanel" aria-label="Intern kostnad og dekningsbidrag">
+      <div className="kicker">INTERN KALKYLE · KUN ADMIN</div>
+      <h4>Estimert dekningsbidrag</h4>
+      {contribution.known>0?<div className="quoteProfitNumbers">
+       <span><small>Salgsverdi for kalkulerte linjer eks. MVA</small><b>{nok(contribution.coveredSaleOre)}</b></span>
+       <span><small>Innkjøp og estimerte kostnader eks. MVA</small><b>{nok(contribution.costOre)}</b></span>
+       <span className="quoteProfitResult"><small>Dekningsbidrag (før andre kostnader/skatt)</small><b>{nok(contribution.contributionOre)}</b></span>
+       <span><small>Dekningsgrad for kalkulerte linjer</small><b>{new Intl.NumberFormat("nb-NO",{maximumFractionDigits:1}).format(contribution.contributionPercent)} %</b></span>
+      </div>:<p className="quoteProfitHelp">Legg inn intern kostnad per enhet på prislinjene for å se hva oppdraget er beregnet å gi.</p>}
+      {contribution.missing>0&&<p className="quoteProfitWarning">{contribution.missing} linje(r) mangler kostnadsgrunnlag. Tallene er derfor bare et delestimat, ikke samlet fortjeneste for tilbudet.</p>}
+      {contribution.complete&&contribution.known>0&&<p className="quoteProfitHelp">Alle linjer har kostnad. Dette er dekningsbidrag før faste driftsutgifter, eventuelle tillegg og skatt – ikke nettofortjeneste.</p>}
+      <small>Innkjøpspriser og denne oversikten lagres separat fra kundetilbudet og vises ikke i PDF, e-post eller på Min side.</small>
+     </section>
      <p className="muted">{v.drawingIds.length? v.drawingIds.length+" plantegning(er) med veggvisninger vedlagt PDF":"Ingen tegninger valgt"}</p>
      <div className="quoteSummaryPlan">
       {v.paymentPlan.map(row=><span key={row.id}><small>{row.label} · {row.percent}%</small><b>{nok(calc.total*(Number(row.percent)||0)/100)}</b></span>)}
@@ -632,7 +657,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={()=>sendQuote()}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
      {!locked&&<button type="button" className="btn" disabled={saving||sending||converting} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>}
      {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
-     {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Papirutgave / skriv ut</button>}
+     {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Forhåndsvis / last ned PDF</button>}
      {quoteId&&<div className="quoteHistory">
       <div className="kicker">HISTORIKK</div>
       {revisionHistory.length>1&&<div className="quoteRevisionHistory">
