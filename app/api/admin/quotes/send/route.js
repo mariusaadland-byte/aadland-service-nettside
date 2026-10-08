@@ -196,7 +196,7 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
    published_at:now
   }));
   const {error:publishError}=await s.from("quote_drawing_publications")
-   .upsert(snapshots,{onConflict:"quote_id,drawing_id"});
+   .upsert(snapshots,{onConflict:"quote_id,drawing_id",ignoreDuplicates:true});
   if(publishError)console.error("QUOTE DRAWING PUBLICATION",{quoteId:id,message:publishError.message});
   else drawingsPublished=true;
  }
