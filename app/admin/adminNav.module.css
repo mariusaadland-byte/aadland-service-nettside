@@ -20,3 +20,21 @@
 :global(.side) .signout{margin-top:8px;border-top:1px solid #d7cbb9;border-radius:0;font-weight:700;color:#6a342a}
 .sideContainer{position:sticky;top:0;height:100vh;max-height:100vh;overflow-y:auto;overscroll-behavior:contain;box-sizing:border-box}
 @media(max-width:900px){.sideContainer{position:fixed;top:68px;height:calc(100dvh - 68px);max-height:calc(100dvh - 68px)}}
+
+
+/* Mobile admin menu search: always render dark text on its white field. */
+.search input{
+ color:#211a15!important;
+ -webkit-text-fill-color:#211a15!important;
+ caret-color:#211a15!important;
+ color-scheme:light;
+}
+.search input::placeholder{color:#77716a!important;-webkit-text-fill-color:#77716a!important;opacity:1}
+.search input:-webkit-autofill,
+.search input:-webkit-autofill:hover,
+.search input:-webkit-autofill:focus{
+ -webkit-text-fill-color:#211a15!important;
+ caret-color:#211a15!important;
+ -webkit-box-shadow:0 0 0 1000px #fff inset!important;
+ box-shadow:0 0 0 1000px #fff inset!important
+}
