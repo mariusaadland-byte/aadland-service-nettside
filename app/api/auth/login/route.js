@@ -3,6 +3,7 @@ import {sameOriginGuard} from "../../../../lib/requestGuard";
 import { NextResponse } from "next/server";
 import { setAdminCookie } from "../../../../lib/auth";
 import { createClient } from "@supabase/supabase-js";
+import {db} from "../../../../lib/supabase";
 
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;

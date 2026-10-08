@@ -48,7 +48,13 @@ export default function Login() {
         return;
       }
 
-      router.replace("/admin");
+      // Only internal admin URLs are allowed as a return destination.
+      // Keep users on the intended quote/calculator page after signing in.
+      const requested=new URLSearchParams(window.location.search).get("next")||"";
+      const safeNext=requested.startsWith("/admin/")&&
+       !requested.startsWith("//")&&!requested.includes("\\")&&
+       !/^\/admin\/login(?:[/?#]|$)/.test(requested)?requested:"/admin";
+      router.replace(safeNext);
       router.refresh();
     } catch {
       setError("Kunne ikke logge inn.");
