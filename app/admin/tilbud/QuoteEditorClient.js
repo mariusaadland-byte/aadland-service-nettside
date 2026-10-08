@@ -109,7 +109,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    if(!raw)return;
    sessionStorage.removeItem("aadlandQuoteDraftFromDrawing");
    const draft=JSON.parse(raw);
-   const importedLines=(Array.isArray(draft?.lineItems)?draft.lineItems:[]).slice(0,80).map(line=>({
+   const importedLines=(Array.isArray(draft?.lineItems)?draft.lineItems:[]).slice(0,120).map(line=>({
     id:lineId(),
     type:["work","material","other"].includes(line?.type)?line.type:"other",
     description:String(line?.description||"").trim().slice(0,500),
