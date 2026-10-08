@@ -1426,6 +1426,7 @@
 @media(max-width:900px), (pointer:coarse) and (min-width:901px) and (max-width:1200px){
  .mobileTools{
   overflow:visible;
+  z-index:62;
   width:100%;
   box-sizing:border-box;
   gap:7px;
