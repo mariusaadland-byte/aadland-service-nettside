@@ -499,7 +499,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      <section className="card quoteEditorSection">
       <div className="kicker">TEGNINGER SOM FØLGER TILBUDET</div>
       <h3>Plantegning og veggtegninger i PDF</h3>
-      <p className="muted">Velg lagrede tegninger som skal følge med i PDF-kopien. Hver valgt tegning får en plantegning og en frontvisning av hver vegg. Du kan lage nye tegninger via <a href="/admin/tegning">tegneverktøyet</a>.</p>
+      <p className="muted">Velg lagrede tegninger som skal følge med i PDF-kopien. Hver valgt tegning får en plantegning og en frontvisning av hver vegg. Du kan hente og redigere tegninger i <a href="/admin/tegninger">tegningsarkivet</a>, eller lage en ny tegning i <a href="/admin/tegning">tegneverktøyet</a>. Tegningen blir først synlig på kundens Min side når tilbudet sendes til kundens e-post.</p>
       <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,marginBottom:10}}><input type="checkbox" checked={showAllDrawings} onChange={e=>setShowAllDrawings(e.target.checked)}/> Vis tegninger for alle kunder</label>
       <div style={{display:"grid",gap:8}}>
        {availableDrawings.filter(row=>showAllDrawings||v.drawingIds.includes(row.id)||!v.customer.name||String(row.customer||"").trim().toLocaleLowerCase("nb-NO")===String(v.customer.name).trim().toLocaleLowerCase("nb-NO")).map(row=><label key={row.id} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px",border:"1px solid #e2dacd",borderRadius:8,background:"#fff",color:"#25221e",cursor:"pointer"}}>
