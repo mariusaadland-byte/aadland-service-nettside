@@ -170,6 +170,11 @@ export default function MaterialAiClient(){
  const [catalog,setCatalog]=useState([]);
  const [favorites,setFavorites]=useState([]);
  const [supplierStatuses,setSupplierStatuses]=useState([]);
+ const [sharedSuppliers,setSharedSuppliers]=useState([]);
+ const [sharedQueries,setSharedQueries]=useState({});
+ const [sharedMatches,setSharedMatches]=useState({});
+ const [sharedBusy,setSharedBusy]=useState("");
+ const [sharedErrors,setSharedErrors]=useState({});
  const [directBusy,setDirectBusy]=useState("");
  const [error,setError]=useState("");
  const [message,setMessage]=useState("");
@@ -192,6 +197,16 @@ export default function MaterialAiClient(){
   let cancelled=false;
   fetch("/api/admin/material-suppliers").then(async r=>{const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error();return data.suppliers||[]}).then(items=>{if(!cancelled)setSupplierStatuses(items)}).catch(()=>{});
   return()=>{cancelled=true};
+ },[]);
+
+ useEffect(()=>{
+  let active=true;
+  fetch("/api/admin/material-catalog",{cache:"no-store"}).then(async r=>{
+   const data=await r.json().catch(()=>({}));
+   if(!r.ok)throw new Error(data.error||"Kunne ikke hente felles prisbase");
+   return data.suppliers||[];
+  }).then(suppliers=>{if(active)setSharedSuppliers(suppliers)}).catch(()=>{});
+  return()=>{active=false};
  },[]);
 
  useEffect(()=>{
@@ -233,6 +248,40 @@ export default function MaterialAiClient(){
   }
   if(matched)setPrices(current=>{const next={...current};for(const [id,value] of Object.entries(updates))next[id]={...(next[id]||{}),...value};return next});
   return matched;
+ }
+ const visibleSuppliers=[...SUPPLIERS,...sharedSuppliers.filter(shared=>!SUPPLIERS.some(item=>normalizeText(item.name)===normalizeText(shared.name))).map(item=>({id:item.id,name:item.name}))];
+ async function lookupSharedPrice(line){
+  const chosen=prices[line.id]?.supplier||"Bygger’n";
+  const query=String(sharedQueries[line.id]??(line.material||line.specification||"")).trim();
+  if(query.length<2){setSharedErrors(value=>({...value,[line.id]:"Skriv minst to tegn for å søke."}));return}
+  setSharedBusy(line.id);setSharedErrors(value=>({...value,[line.id]:""}));
+  try{
+   const params=new URLSearchParams({q:query,limit:"20"});
+   const matched=sharedSuppliers.find(item=>normalizeText(item.name)===normalizeText(chosen)||item.id===chosen);
+   if(matched)params.set("supplier",matched.id);
+   const response=await fetch("/api/admin/material-catalog?"+params.toString(),{cache:"no-store"});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Kunne ikke søke i felles prisbase.");
+   setSharedMatches(current=>({...current,[line.id]:data.products||[]}));
+   if(Array.isArray(data.suppliers))setSharedSuppliers(data.suppliers);
+   if(!(data.products||[]).length)setSharedErrors(current=>({...current,[line.id]:"Ingen treff. Prøv varenummer, kortere produktnavn eller en annen leverandør."}));
+  }catch(e){
+   setSharedErrors(current=>({...current,[line.id]:e.message||"Søket feilet."}));
+   setSharedMatches(current=>({...current,[line.id]:[]}));
+  }finally{setSharedBusy("")}
+ }
+ function chooseSharedPrice(line,product){
+  const packUnits=new Set(["PAK","PK","PKT","ESK","KRT","BOX","POS","SEK"]);
+  const basis=packUnits.has(String(product.unit||"").toUpperCase())?"package":"unit";
+  setPrices(current=>({...current,[line.id]:{
+   ...current[line.id],supplier:product.supplierName||"Bygger’n",sku:product.sku||"",
+   productName:product.name||"",costExVat:String(product.costExVat??""),priceBasis:basis,
+   catalogUnit:product.unit||"STK",matched:true,direct:false,shared:true
+  }}));
+  setSharedMatches(current=>({...current,[line.id]:[]}));
+  setSharedErrors(current=>({...current,[line.id]:""}));
+  setMessage("Varenr. "+product.sku+" hentet fra "+product.supplierName+". Kontroller enheten "+(product.unit||"STK")+".");
+  setTimeout(()=>setMessage(""),3600);
  }
  function autoMatch(line){
   const current=prices[line.id]||{},preferred=current.supplier||"Bygger’n",match=matchCatalog(line,catalog,preferred)||matchCatalog(line,catalog,"Bygger’n")||matchCatalog(line,catalog,"");
