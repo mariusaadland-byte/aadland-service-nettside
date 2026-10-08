@@ -192,7 +192,16 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
   const snapshots=drawings.map(row=>({
    quote_id:quote.id,drawing_id:row.id,customer_email:customerEmail,
    name:row.name||"Tegning",address:row.address||"",
-   notes:row.notes||"",drawing_data:row.drawing_data||{},
+   // Customer-facing copy: keep geometry, not internal admin notes, contact
+   // records, project metadata or draft-only information.
+   notes:"",
+   drawing_data:{
+    walls:Array.isArray(row.drawing_data?.walls)?row.drawing_data.walls:[],
+    zones:Array.isArray(row.drawing_data?.zones)?row.drawing_data.zones:[],
+    items:Array.isArray(row.drawing_data?.items)?row.drawing_data.items:[],
+    defaultWallHeight:Number(row.drawing_data?.defaultWallHeight)||2400,
+    defaultWallThickness:Number(row.drawing_data?.defaultWallThickness)||98
+   },
    published_at:now
   }));
   const {error:publishError}=await s.from("quote_drawing_publications")
