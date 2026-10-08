@@ -528,7 +528,7 @@ export default function AdminClient({ user }) {
         <button className="adminMenuButton" type="button" aria-label={menuOpen ? "Lukk meny" : "Åpne meny"} aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>{menuOpen ? "×" : "☰"}</button>
       </header>
       {menuOpen && <button className="adminMenuBackdrop" type="button" aria-label="Lukk meny" onClick={() => setMenuOpen(false)} />}
-      <aside className="side">
+      <aside className={"side "+navStyles.sideContainer}>
         <div className="brand">
           <span className="mark">AS</span>
           Aadland
