@@ -333,7 +333,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    deliveryType:data.deliveryType||((recipientOverride&&recipient!==String(v.customer.email||"").trim().toLowerCase())?"alternate":"primary"),
    sentAt:data.sentAt||new Date().toISOString()
   },...current].slice(0,20));
-  setSavedMessage("Tilbudet er sendt til "+(data.sentTo||recipient)+(data.pdfAttached?" med PDF-kopi vedlagt.":". Kontrollér at PDF-kopien fulgte med.")+(data.drawingsPublished?" Tegningskopien er også tilgjengelig på kundens Min side.":v.drawingIds.length?" Tegningen er ikke delt på Min side (testadresse eller feil ved publisering).":""));
+  setSavedMessage("Tilbudet er sendt til "+(data.sentTo||recipient)+(data.pdfAttached?" med PDF-kopi vedlagt.":". Kontrollér at PDF-kopien fulgte med.")+(v.drawingIds.length?(data.drawingsPublished?" Tegningskopien er også tilgjengelig på kundens Min side.":" Tegningen er ikke delt på Min side (testadresse eller feil ved publisering)."):""));
   return true;
  }
 
