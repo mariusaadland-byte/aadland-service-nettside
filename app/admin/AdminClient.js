@@ -923,8 +923,7 @@ function Customers({orders,bookings,profiles,billingProfiles,quotes,canUpdate,re
   (profiles||[]).forEach(profile=>{
     const current=ensure(profile);
     if(!current)return;
-    current.hasAccount=true;
-    current.accountCreatedAt=profile.createdAt||null;
+    if(profile.hasAccount!==false){current.hasAccount=true;current.accountCreatedAt=profile.createdAt||null;}
     if(profile.name)current.name=profile.name;
     if(profile.phone)current.phone=profile.phone;
     if(profile.address)current.address=profile.address;

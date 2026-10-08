@@ -25,6 +25,7 @@ function mapQuote(q){
   status,
   title:q.title||"",
   customer:q.customer||{},
+  drawingIds:Array.isArray(q.drawing_ids)?q.drawing_ids:[],
   lineItems:Array.isArray(q.line_items)?q.line_items:[],
   paymentPlan:Array.isArray(q.payment_plan)?q.payment_plan:[],
   subtotalExVatOre:Number(q.subtotal_ex_vat_ore)||0,
@@ -129,6 +130,7 @@ function payload(body,user,existing){
  if(!lines.length)return {error:"Legg inn minst én tilbudslinje."};
  const paymentPlan=sanitizePlan(body.paymentPlan);
  if(!paymentPlan)return {error:"Betalingsplanen må til sammen være 100 %."};
+ const drawingIds=Array.isArray(body.drawingIds)?[...new Set(body.drawingIds.filter(id=>/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(id))))].slice(0,12):[];
  const calc=totals(lines);
  const rawValidUntil=String(body.validUntil||"").trim();
  const rawPlannedStartDate=String(body.plannedStartDate||"").trim();
@@ -144,6 +146,7 @@ function payload(body,user,existing){
    customer,
    line_items:lines,
    payment_plan:paymentPlan,
+   drawing_ids:drawingIds,
    subtotal_ex_vat_ore:calc.subtotalExVatOre,
    vat_ore:calc.vatOre,
    total_inc_vat_ore:calc.totalIncVatOre,
