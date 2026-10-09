@@ -69,6 +69,14 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [showAlternateEmail,setShowAlternateEmail]=useState(false);
  const [alternateEmail,setAlternateEmail]=useState("");
  const calc=useMemo(()=>calculate(v.lineItems),[v.lineItems]);
+ const costOverview=useMemo(()=>{
+  const costLines=v.lineItems.filter(line=>line.purchaseUnitPriceOre!==""&&line.purchaseUnitPriceOre!==null&&line.purchaseUnitPriceOre!==undefined&&Number.isFinite(Number(line.purchaseUnitPriceOre))&&Number(line.purchaseUnitPriceOre)>=0);
+  const purchaseCost=costLines.reduce((sum,line)=>sum+Math.round((Number(line.quantity)||0)*(Number(line.purchaseUnitPriceOre)||0)),0);
+  const profit=calc.subtotal-purchaseCost;
+  const margin=calc.subtotal>0?profit/calc.subtotal*100:0;
+  const missingMaterialCosts=v.lineItems.filter(line=>line.type==="material"&&(line.purchaseUnitPriceOre===""||line.purchaseUnitPriceOre===null||line.purchaseUnitPriceOre===undefined)).length;
+  return {purchaseCost,profit,margin,missingMaterialCosts};
+ },[v.lineItems,calc]);
  const planSum=useMemo(()=>v.paymentPlan.reduce((sum,row)=>sum+(Number(row.percent)||0),0),[v.paymentPlan]);
  const isDirty=useMemo(()=>Boolean(savedSnapshot)&&JSON.stringify(v)!==savedSnapshot,[v,savedSnapshot]);
  const locked=quoteId&&v.status!=="draft";
@@ -491,7 +499,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
         <div className="field quoteLineType"><label>Type</label><select value={line.type} onChange={e=>updateLine(line.id,"type",e.target.value)}><option value="work">Arbeid</option><option value="material">Materiale</option><option value="other">Annet</option></select></div>
         <div className="field quoteLineQuantity"><label>Antall</label><input type="number" min="0.01" step="0.01" value={line.quantity} onChange={e=>updateLine(line.id,"quantity",e.target.value)}/></div>
         <div className="field quoteLineUnit"><label>Enhet</label><input value={line.unit} onChange={e=>updateLine(line.id,"unit",e.target.value)} placeholder="time / stk"/></div>
-        <div className="field quoteLinePrice"><label>Pris eks. MVA</label><input type="number" min="0" step="0.01" value={line.unitPriceOre===""?"":Number(line.unitPriceOre)/100} onChange={e=>updateLine(line.id,"unitPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="0"/></div>
+        <div className="field quoteLinePrice"><label>Salgspris eks. MVA</label><input type="number" min="0" step="0.01" value={line.unitPriceOre===""?"":Number(line.unitPriceOre)/100} onChange={e=>updateLine(line.id,"unitPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="0"/></div>
+        <div className="field quoteLinePrice"><label>Innkjøpspris eks. MVA <small>(kun internt)</small></label><input type="number" min="0" step="0.01" value={line.purchaseUnitPriceOre===""||line.purchaseUnitPriceOre===undefined?"":Number(line.purchaseUnitPriceOre)/100} onChange={e=>updateLine(line.id,"purchaseUnitPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="Ikke registrert"/></div>
         <div className="field quoteLineVat"><label>MVA</label><select value={line.vatRate} onChange={e=>updateLine(line.id,"vatRate",Number(e.target.value))}><option value="25">25 %</option><option value="0">0 %</option></select></div>
         <div className="quoteLineTotal"><small>Linjesum eks.</small><b>{nok((Number(line.quantity)||0)*(Number(line.unitPriceOre)||0))}</b></div>
         <button type="button" className="quoteLineRemove" aria-label="Fjern linje" onClick={()=>removeLine(line.id)}>×</button>
@@ -528,6 +537,14 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       <span><small>Sum eks. MVA</small><b>{nok(calc.subtotal)}</b></span>
       <span><small>MVA</small><b>{nok(calc.vat)}</b></span>
       <span className="quoteSummaryTotal"><small>Total inkl. MVA</small><b>{nok(calc.total)}</b></span>
+     </div>
+     <div className="quoteProfitOverview">
+      <div className="kicker">INTERN FORTJENESTE</div>
+      <span><small>Registrert innkjøpskostnad</small><b>{nok(costOverview.purchaseCost)}</b></span>
+      <span><small>Beregnet fortjeneste før øvrige kostnader</small><b>{nok(costOverview.profit)}</b></span>
+      <span><small>Fortjeneste av salgspris</small><b>{calc.subtotal>0?costOverview.margin.toLocaleString("nb-NO",{maximumFractionDigits:1,minimumFractionDigits:1})+" %":"—"}</b></span>
+      {costOverview.missingMaterialCosts>0&&<p className="muted">Registrer innkjøpspris på {costOverview.missingMaterialCosts} materiallinje(r) for mer komplett oversikt. Linjer uten innkjøpspris regnes foreløpig som 0 kr i oversikten.</p>}
+      <small className="muted">Dette vises bare i backoffice og tas ikke med i kundens tilbud eller PDF.</small>
      </div>
      <div className="quoteSummaryPlan">
       {v.paymentPlan.map(row=><span key={row.id}><small>{row.label} · {row.percent}%</small><b>{nok(calc.total*(Number(row.percent)||0)/100)}</b></span>)}
