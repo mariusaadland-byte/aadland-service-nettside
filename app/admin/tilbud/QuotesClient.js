@@ -59,7 +59,8 @@ export default function QuotesClient(){
    body:JSON.stringify({
     title:quote.title,
     status:"draft",
-    customer:quote.customer,
+    // A copied quote is a new draft: never carry the previous recipient into it.
+    customer:{name:"",email:"",phone:"",address:""},
     lineItems:quote.lineItems,
     paymentPlan:quote.paymentPlan,
     introText:quote.introText,
