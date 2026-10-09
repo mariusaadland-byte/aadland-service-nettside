@@ -124,7 +124,7 @@ function withoutFollowUpField(record){
 
 function payload(body,user,existing){
  const customer=sanitizeCustomer(body.customer);
- if(!customer.name)return {error:"Kunden må ha navn."};
+ if(!customer.name&&body.allowBlankCustomer!==true)return {error:"Kunden må ha navn."};
  const title=clean(body.title,240);
  if(!title)return {error:"Tilbudet må ha en tittel."};
  const lines=sanitizeLines(body.lineItems);
