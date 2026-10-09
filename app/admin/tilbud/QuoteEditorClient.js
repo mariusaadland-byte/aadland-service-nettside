@@ -69,6 +69,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [showAlternateEmail,setShowAlternateEmail]=useState(false);
  const [alternateEmail,setAlternateEmail]=useState("");
  const [catalogSearch,setCatalogSearch]=useState({});
+ const [catalogSearch,setCatalogSearch]=useState({});
  const calc=useMemo(()=>calculate(v.lineItems),[v.lineItems]);
  const costOverview=useMemo(()=>{
   const costLines=v.lineItems.filter(line=>line.purchaseUnitPriceOre!==""&&line.purchaseUnitPriceOre!==null&&line.purchaseUnitPriceOre!==undefined&&Number.isFinite(Number(line.purchaseUnitPriceOre))&&Number(line.purchaseUnitPriceOre)>=0);
@@ -259,6 +260,31 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   updateLine(line.id,"purchaseCatalogCostOre",newCost);
   updateLine(line.id,"purchasePriceCheckedAt",new Date().toISOString());
   setCatalogSearch(current=>({...current,[line.id]:{loading:false,products:[],error:"",message:changed?"Katalogprisen er endret fra sist registrerte katalogpris. Kontroller at innkjøpsprisen stemmer.":"Katalogvare valgt. Salgsprisen er ikke endret."}}));
+ }
+ async function searchMaterialCatalog(line){
+  const id=line.id, query=String(line.description||"").trim();
+  if(!query){setCatalogSearch(current=>({...current,[id]:{error:"Skriv en beskrivelse først.",products:[]}}));return;}
+  setCatalogSearch(current=>({...current,[id]:{loading:true,products:[],error:""}}));
+  try{
+   const response=await fetch("/api/admin/material-catalog?q="+encodeURIComponent(query)+"&limit=12");
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Materialkatalogen kunne ikke søkes.");
+   setCatalogSearch(current=>({...current,[id]:{loading:false,products:Array.isArray(data.products)?data.products:[],error:""}}));
+  }catch(err){setCatalogSearch(current=>({...current,[id]:{loading:false,products:[],error:err.message||"Søket feilet."}}));}
+ }
+ function selectCatalogProduct(line,product){
+  const oldCost=Number(line.purchaseCatalogCostOre), newCost=Math.round(Number(product.costExVat||0)*100);
+  const hasOld=Number.isFinite(oldCost)&&oldCost>=0, changed=hasOld&&oldCost!==newCost;
+  updateLine(line.id,"description",product.name||line.description);
+  updateLine(line.id,"unit",product.unit||line.unit||"stk");
+  updateLine(line.id,"purchaseUnitPriceOre",newCost);
+  updateLine(line.id,"purchaseSupplierId",String(product.supplierId||"").slice(0,100));
+  updateLine(line.id,"purchaseSupplierName",String(product.supplierName||"").slice(0,180));
+  updateLine(line.id,"purchaseSku",String(product.sku||"").slice(0,120));
+  updateLine(line.id,"purchaseProductName",String(product.name||"").slice(0,500));
+  updateLine(line.id,"purchaseCatalogCostOre",newCost);
+  updateLine(line.id,"purchasePriceCheckedAt",new Date().toISOString());
+  setCatalogSearch(current=>({...current,[line.id]:{loading:false,products:[],error:"",message:changed?"Katalogprisen er endret fra sist registrerte katalogpris. Kontroller innkjøpsprisen.":"Katalogvare valgt. Salgsprisen er ikke endret."}}));
  }
  function updatePlan(id,key,value){
   setV(current=>({...current,paymentPlan:current.paymentPlan.map(row=>row.id===id?{...row,[key]:value}:row)}));
@@ -532,6 +558,24 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
         <div className="field quoteLineUnit"><label>Enhet</label><input value={line.unit} onChange={e=>updateLine(line.id,"unit",e.target.value)} placeholder="time / stk"/></div>
         <div className="field quoteLinePrice"><label>Salgspris eks. MVA</label><input type="number" min="0" step="0.01" value={line.unitPriceOre===""?"":Number(line.unitPriceOre)/100} onChange={e=>updateLine(line.id,"unitPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="0"/></div>
         <div className="field quoteLinePrice quoteLinePurchasePrice"><label>Innkjøpspris eks. MVA <small>(kun internt)</small></label><input type="number" min="0" step="0.01" value={line.purchaseUnitPriceOre===""||line.purchaseUnitPriceOre===undefined||line.purchaseUnitPriceOre===null?"":Number(line.purchaseUnitPriceOre)/100} onChange={e=>updateLine(line.id,"purchaseUnitPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="Ikke registrert"/></div>
+        <div className="quoteCatalogLookup">
+         <button type="button" className="btn alt quoteCatalogSearchButton" disabled={Boolean(catalogSearch[line.id]?.loading)} onClick={()=>searchMaterialCatalog(line)}>{catalogSearch[line.id]?.loading?"Søker …":"Søk i materialkatalog"}</button>
+         {catalogSearch[line.id]?.message&&<p className="quoteCatalogMessage">{catalogSearch[line.id].message}</p>}
+         {catalogSearch[line.id]?.error&&<p className="quoteCatalogError">{catalogSearch[line.id].error}</p>}
+         {catalogSearch[line.id]?.products?.length>0&&<div className="quoteCatalogResults">
+          {catalogSearch[line.id].products.map((product,index)=>{
+           const sameProduct=(line.purchaseSku&&product.sku&&line.purchaseSku===product.sku)||(line.purchaseSupplierId&&product.supplierId&&line.purchaseSupplierId===product.supplierId&&line.purchaseProductName===product.name);
+           const previous=Number(line.purchaseCatalogCostOre), fresh=Math.round(Number(product.costExVat||0)*100);
+           const changed=sameProduct&&Number.isFinite(previous)&&previous!==fresh;
+           return <div className="quoteCatalogResult" key={String(product.supplierId||"supplier")+"-"+String(product.sku||product.name||index)}>
+            <div><b>{product.name}</b><small>{product.supplierName||"Leverandør"}{product.sku?" · "+product.sku:""}{product.unit?" · "+product.unit:""}</small></div>
+            <div className="quoteCatalogResultPrice"><b>{nok(fresh)}</b>{changed&&<small className="quoteCatalogPriceWarning">Ny pris – sist {nok(previous)}</small>}</div>
+            <button type="button" className="btn alt" onClick={()=>selectCatalogProduct(line,product)}>{changed?"Oppdater pris":"Velg"}</button>
+           </div>;
+          })}
+         </div>}
+         {catalogSearch[line.id]&&!catalogSearch[line.id]?.loading&&!catalogSearch[line.id]?.error&&!catalogSearch[line.id]?.products?.length&&!catalogSearch[line.id]?.message&&<small>Ingen treff. Prøv et kortere søk eller produktnavn.</small>}
+        </div>
         <div className="quoteCatalogLookup">
          <button type="button" className="btn alt quoteCatalogSearchButton" disabled={Boolean(catalogSearch[line.id]?.loading)} onClick={()=>searchMaterialCatalog(line)}>{catalogSearch[line.id]?.loading?"Søker …":"Søk i materialkatalog"}</button>
          {catalogSearch[line.id]?.message&&<p className="quoteCatalogMessage">{catalogSearch[line.id].message}</p>}
