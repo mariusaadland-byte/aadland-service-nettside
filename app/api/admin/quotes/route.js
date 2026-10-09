@@ -81,6 +81,12 @@ function sanitizeLines(value){
    unit:clean(line.unit,40)||"stk",
    unitPriceOre:Number.isFinite(unitPriceOre)&&unitPriceOre>=0&&unitPriceOre<=100000000?Math.round(unitPriceOre):0,
    purchaseUnitPriceOre:purchaseUnitPriceOre!==null&&Number.isFinite(purchaseUnitPriceOre)&&purchaseUnitPriceOre>=0&&purchaseUnitPriceOre<=100000000?Math.round(purchaseUnitPriceOre):null,
+   purchaseSupplierId:clean(line.purchaseSupplierId,100),
+   purchaseSupplierName:clean(line.purchaseSupplierName,180),
+   purchaseSku:clean(line.purchaseSku,120),
+   purchaseProductName:clean(line.purchaseProductName,500),
+   purchaseCatalogCostOre:line.purchaseCatalogCostOre!==""&&line.purchaseCatalogCostOre!==null&&line.purchaseCatalogCostOre!==undefined&&Number.isFinite(Number(line.purchaseCatalogCostOre))&&Number(line.purchaseCatalogCostOre)>=0&&Number(line.purchaseCatalogCostOre)<=100000000?Math.round(Number(line.purchaseCatalogCostOre)):null,
+   purchasePriceCheckedAt:clean(line.purchasePriceCheckedAt,40),
    vatRate:Number.isFinite(vatRate)&&vatRate>=0&&vatRate<=100?vatRate:25
   };
  }).filter(line=>line.description&&line.quantity>0);
