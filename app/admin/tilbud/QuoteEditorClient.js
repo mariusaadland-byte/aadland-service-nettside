@@ -566,11 +566,15 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
           {catalogSearch[line.id].products.map((product,index)=>{
            const sameProduct=(line.purchaseSku&&product.sku&&line.purchaseSku===product.sku)||(line.purchaseSupplierId&&product.supplierId&&line.purchaseSupplierId===product.supplierId&&line.purchaseProductName===product.name);
            const previous=Number(line.purchaseCatalogCostOre), fresh=Math.round(Number(product.costExVat||0)*100);
-           const changed=sameProduct&&line.purchaseCatalogCostOre!==null&&line.purchaseCatalogCostOre!==undefined&&line.purchaseCatalogCostOre!==""&&Number.isFinite(previous)&&previous!==fresh;
+           const hasBaseline=line.purchaseCatalogCostOre!==null&&line.purchaseCatalogCostOre!==undefined&&line.purchaseCatalogCostOre!==""&&Number.isFinite(previous);
+           const catalogChanged=sameProduct&&hasBaseline&&previous!==fresh;
+           const enteredCost=line.purchaseUnitPriceOre===""||line.purchaseUnitPriceOre===null||line.purchaseUnitPriceOre===undefined?null:Number(line.purchaseUnitPriceOre);
+           const enteredDiffers=enteredCost!==null&&Number.isFinite(enteredCost)&&enteredCost!==fresh;
+           const priceWarning=catalogChanged||enteredDiffers;
            return <div className="quoteCatalogResult" key={String(product.supplierId||"supplier")+"-"+String(product.sku||product.name||index)}>
             <div><b>{product.name}</b><small>{product.supplierName||"Leverandør"}{product.sku?" · "+product.sku:""}{product.unit?" · "+product.unit:""}</small></div>
-            <div className="quoteCatalogResultPrice"><b>{nok(fresh)}</b>{changed&&<small className="quoteCatalogPriceWarning">Ny pris – sist {nok(previous)}</small>}</div>
-            <button type="button" className="btn alt" onClick={()=>selectCatalogProduct(line,product)}>{changed?"Oppdater pris":"Velg"}</button>
+            <div className="quoteCatalogResultPrice"><b>{nok(fresh)}</b>{catalogChanged&&<small className="quoteCatalogPriceWarning">Katalogpris endret: {nok(previous)}</small>}{enteredDiffers&&<small className="quoteCatalogPriceWarning">Registrert pris: {nok(enteredCost)}</small>}</div>
+            <button type="button" className="btn alt" onClick={()=>selectCatalogProduct(line,product)}>{priceWarning?"Bekreft/oppdater":"Velg"}</button>
            </div>;
           })}
          </div>}
