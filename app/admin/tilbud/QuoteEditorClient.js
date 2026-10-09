@@ -274,7 +274,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  }
  function selectCatalogProduct(line,product){
   const oldCost=Number(line.purchaseCatalogCostOre), newCost=Math.round(Number(product.costExVat||0)*100);
-  const hasOld=Number.isFinite(oldCost)&&oldCost>=0, changed=hasOld&&oldCost!==newCost;
+  const hasOld=line.purchaseCatalogCostOre!==null&&line.purchaseCatalogCostOre!==undefined&&line.purchaseCatalogCostOre!==""&&Number.isFinite(oldCost)&&oldCost>=0, changed=hasOld&&oldCost!==newCost;
   updateLine(line.id,"description",product.name||line.description);
   updateLine(line.id,"unit",product.unit||line.unit||"stk");
   updateLine(line.id,"purchaseUnitPriceOre",newCost);
@@ -566,7 +566,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
           {catalogSearch[line.id].products.map((product,index)=>{
            const sameProduct=(line.purchaseSku&&product.sku&&line.purchaseSku===product.sku)||(line.purchaseSupplierId&&product.supplierId&&line.purchaseSupplierId===product.supplierId&&line.purchaseProductName===product.name);
            const previous=Number(line.purchaseCatalogCostOre), fresh=Math.round(Number(product.costExVat||0)*100);
-           const changed=sameProduct&&Number.isFinite(previous)&&previous!==fresh;
+           const changed=sameProduct&&line.purchaseCatalogCostOre!==null&&line.purchaseCatalogCostOre!==undefined&&line.purchaseCatalogCostOre!==""&&Number.isFinite(previous)&&previous!==fresh;
            return <div className="quoteCatalogResult" key={String(product.supplierId||"supplier")+"-"+String(product.sku||product.name||index)}>
             <div><b>{product.name}</b><small>{product.supplierName||"Leverandør"}{product.sku?" · "+product.sku:""}{product.unit?" · "+product.unit:""}</small></div>
             <div className="quoteCatalogResultPrice"><b>{nok(fresh)}</b>{changed&&<small className="quoteCatalogPriceWarning">Ny pris – sist {nok(previous)}</small>}</div>
