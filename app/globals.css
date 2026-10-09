@@ -1834,8 +1834,9 @@ html{scroll-behavior:smooth}
  .quoteLineVat{grid-column:2/3;grid-row:3;min-width:0}
  .quoteLineQuantity{grid-column:1/2;grid-row:4;min-width:0}
  .quoteLineUnit{grid-column:2/3;grid-row:4}
- .quoteLinePrice{grid-column:1/2;grid-row:5}
- .quoteLineTotal{grid-column:2/3;grid-row:5;align-self:end}
+ .quoteLinePrice{grid-column:1/-1;grid-row:auto}
+ .quoteLinePurchasePrice{grid-row:6}
+ .quoteLineTotal{grid-column:2/3;grid-row:7;align-self:end}
  .quoteLineEditor .field input,.quoteLineEditor .field select{width:100%;min-width:0}
  .quotePaymentRow{grid-template-columns:1fr 100px}
  .quotePaymentRow .field:nth-child(3){grid-column:1/-1}
