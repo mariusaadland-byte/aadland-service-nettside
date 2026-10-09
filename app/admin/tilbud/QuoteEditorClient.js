@@ -72,6 +72,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [paperBusy,setPaperBusy]=useState(false);
  const [showAlternateEmail,setShowAlternateEmail]=useState(false);
  const [alternateEmail,setAlternateEmail]=useState("");
+ const [supplierSearch,setSupplierSearch]=useState({});
  const [availableDrawings,setAvailableDrawings]=useState([]);
  const [showAllDrawings,setShowAllDrawings]=useState(false);
  const calc=useMemo(()=>calculate(v.lineItems),[v.lineItems]);
@@ -297,6 +298,27 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  }
  function removeLine(id){
   setV(current=>({...current,lineItems:current.lineItems.length===1?current.lineItems:current.lineItems.filter(line=>line.id!==id)}));
+ }
+
+ async function searchSupplierCatalog(line){
+  const id=line.id,query=String(line.description||"").trim();
+  if(!query){setSupplierSearch(current=>({...current,[id]:{loading:false,products:[],error:"Skriv inn en materialbeskrivelse først."}}));return;}
+  setSupplierSearch(current=>({...current,[id]:{loading:true,products:[],error:"",message:""}}));
+  try{
+   const response=await fetch("/api/admin/material-catalog?q="+encodeURIComponent(query)+"&limit=12",{cache:"no-store"});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Kunne ikke søke i materialkatalogen.");
+   setSupplierSearch(current=>({...current,[id]:{loading:false,products:Array.isArray(data.products)?data.products:[],error:"",message:""}}));
+  }catch(error){
+   setSupplierSearch(current=>({...current,[id]:{loading:false,products:[],error:error.message||"Søket feilet.",message:""}}));
+  }
+ }
+ function selectSupplierProduct(line,product){
+  const newCost=Math.max(0,Math.round((Number(product.costExVat)||0)*100));
+  updateLine(line.id,"description",String(product.name||line.description||"").slice(0,500));
+  updateLine(line.id,"unit",String(product.unit||line.unit||"stk").slice(0,40));
+  updateLine(line.id,"internalUnitCostOre",newCost);
+  setSupplierSearch(current=>({...current,[line.id]:{loading:false,products:[],error:"",message:"Innkjøpskostnad oppdatert. Salgsprisen i tilbudet er ikke endret."}}));
  }
  function updatePlan(id,key,value){
   setV(current=>({...current,paymentPlan:current.paymentPlan.map(row=>row.id===id?{...row,[key]:value}:row)}));
@@ -554,6 +576,25 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
         <div className="field quoteLineUnit"><label>Enhet</label><input value={line.unit} onChange={e=>updateLine(line.id,"unit",e.target.value)} placeholder="time / stk"/></div>
         <div className="field quoteLinePrice"><label>Pris eks. MVA</label><input type="number" min="0" step="0.01" value={line.unitPriceOre===""?"":Number(line.unitPriceOre)/100} onChange={e=>updateLine(line.id,"unitPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="0"/></div>
         <div className="field quoteLineInternalCost"><label>Intern kostnad eks. MVA / enhet</label><input type="number" min="0" step="0.01" inputMode="decimal" value={line.internalUnitCostOre===""||line.internalUnitCostOre==null?"":Number(line.internalUnitCostOre)/100} onChange={e=>updateLine(line.id,"internalUnitCostOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="Ikke registrert" title="Kun intern kalkyle. Vises aldri for kunden."/><small className="muted">Kun internt</small></div>
+        {line.type==="material"&&<div className="quoteSupplierSearch">
+         <button type="button" className="btn alt" disabled={Boolean(supplierSearch[line.id]?.loading)} onClick={()=>searchSupplierCatalog(line)}>{supplierSearch[line.id]?.loading?"Søker …":"Søk innkjøpspris i materialkatalog"}</button>
+         {supplierSearch[line.id]?.message&&<p className="quoteSupplierMessage">{supplierSearch[line.id].message}</p>}
+         {supplierSearch[line.id]?.error&&<p className="quoteSupplierError">{supplierSearch[line.id].error}</p>}
+         {supplierSearch[line.id]?.products?.length>0&&<div className="quoteSupplierResults">
+          {supplierSearch[line.id].products.map((product,index)=>{
+           const fresh=Math.max(0,Math.round((Number(product.costExVat)||0)*100));
+           const entered=line.internalUnitCostOre===""||line.internalUnitCostOre==null?null:Number(line.internalUnitCostOre);
+           const changed=entered!==null&&Number.isFinite(entered)&&entered!==fresh;
+           return <div className="quoteSupplierResult" key={String(product.supplierId||"supplier")+"-"+String(product.sku||product.name||index)}>
+            <div><b>{product.name}</b><small>{product.supplierName||"Leverandør"}{product.sku?" · "+product.sku:""}{product.unit?" · "+product.unit:""}</small></div>
+            <div className="quoteSupplierPrice"><b>{nok(fresh)}</b>{changed&&<small>Registrert: {nok(entered)}</small>}</div>
+            <button type="button" className="btn alt" onClick={()=>selectSupplierProduct(line,product)}>{changed?"Oppdater kostnad":"Velg kostnad"}</button>
+           </div>;
+          })}
+         </div>}
+         {supplierSearch[line.id]&&!supplierSearch[line.id]?.loading&&!supplierSearch[line.id]?.error&&!supplierSearch[line.id]?.products?.length&&!supplierSearch[line.id]?.message&&<small>Ingen treff. Prøv et kortere søk.</small>}
+        </div>}
+
         <div className="field quoteLineVat"><label>MVA</label><select value={line.vatRate} onChange={e=>updateLine(line.id,"vatRate",Number(e.target.value))}><option value="25">25 %</option><option value="0">0 %</option></select></div>
         <div className="quoteLineTotal"><small>Linjesum eks.</small><b>{nok((Number(line.quantity)||0)*(Number(line.unitPriceOre)||0))}</b></div>
         <button type="button" className="quoteLineRemove" aria-label="Fjern linje" onClick={()=>removeLine(line.id)}>×</button>
