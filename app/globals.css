@@ -3107,3 +3107,26 @@ body:has(.customerPage) .customerPage{
 }
 .rentalTermsNotice b{font-size:12px;letter-spacing:.06em;text-transform:uppercase}
 .rentalTermsNotice span{font-size:13px;line-height:1.5;color:var(--muted,#aaa)}
+
+
+/* Internal supplier catalog lookup in quote editor */
+.quoteCatalogLookup{grid-column:2/-1;display:grid;gap:8px;min-width:0;padding-top:2px}
+.quoteCatalogSearchButton{justify-self:start;padding:8px 11px;font-size:11px}
+.quoteCatalogResults{display:grid;gap:7px;padding:9px;border:1px solid #e0d9ce;border-radius:11px;background:#fff}
+.quoteCatalogResult{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #eee8df}
+.quoteCatalogResult:last-child{border-bottom:0}
+.quoteCatalogResult>div:first-child{display:grid;gap:3px;min-width:0}
+.quoteCatalogResult>div:first-child b{overflow-wrap:anywhere;font-size:12px}
+.quoteCatalogResult small{color:#777;font-size:10px}
+.quoteCatalogResultPrice{display:grid;gap:3px;text-align:right;white-space:nowrap}
+.quoteCatalogPriceWarning{color:#9a3f2f!important;font-weight:800}
+.quoteCatalogResult .btn{padding:7px 10px;font-size:10px}
+.quoteCatalogMessage,.quoteCatalogError{margin:0;font-size:11px;line-height:1.5}
+.quoteCatalogMessage{color:#2f6737}
+.quoteCatalogError{color:#9a3f2f}
+@media(max-width:700px){
+ .quoteCatalogLookup{grid-column:1/-1}
+ .quoteCatalogResult{grid-template-columns:minmax(0,1fr) auto;gap:8px}
+ .quoteCatalogResultPrice{grid-column:1;text-align:left}
+ .quoteCatalogResult>.btn{grid-column:2;grid-row:1/3}
+}
