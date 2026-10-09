@@ -71,6 +71,7 @@ function sanitizeLines(value){
  return value.slice(0,120).map((line,index)=>{
   const quantity=Number(line.quantity);
   const unitPriceOre=Number(line.unitPriceOre);
+  const purchaseUnitPriceOre=line.purchaseUnitPriceOre===""||line.purchaseUnitPriceOre===null||line.purchaseUnitPriceOre===undefined?null:Number(line.purchaseUnitPriceOre);
   const vatRate=Number(line.vatRate);
   return {
    id:clean(line.id,100)||("line-"+index),
@@ -79,6 +80,7 @@ function sanitizeLines(value){
    quantity:Number.isFinite(quantity)&&quantity>0&&quantity<=100000?quantity:0,
    unit:clean(line.unit,40)||"stk",
    unitPriceOre:Number.isFinite(unitPriceOre)&&unitPriceOre>=0&&unitPriceOre<=100000000?Math.round(unitPriceOre):0,
+   purchaseUnitPriceOre:purchaseUnitPriceOre!==null&&Number.isFinite(purchaseUnitPriceOre)&&purchaseUnitPriceOre>=0&&purchaseUnitPriceOre<=100000000?Math.round(purchaseUnitPriceOre):null,
    vatRate:Number.isFinite(vatRate)&&vatRate>=0&&vatRate<=100?vatRate:25
   };
  }).filter(line=>line.description&&line.quantity>0);
