@@ -69,7 +69,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [showAlternateEmail,setShowAlternateEmail]=useState(false);
  const [alternateEmail,setAlternateEmail]=useState("");
  const [catalogSearch,setCatalogSearch]=useState({});
- const [catalogSearch,setCatalogSearch]=useState({});
+
  const calc=useMemo(()=>calculate(v.lineItems),[v.lineItems]);
  const costOverview=useMemo(()=>{
   const costLines=v.lineItems.filter(line=>line.purchaseUnitPriceOre!==""&&line.purchaseUnitPriceOre!==null&&line.purchaseUnitPriceOre!==undefined&&Number.isFinite(Number(line.purchaseUnitPriceOre))&&Number(line.purchaseUnitPriceOre)>=0);
