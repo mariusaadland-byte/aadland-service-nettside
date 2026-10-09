@@ -4269,3 +4269,26 @@ body:has(.customerPage) .customerPage{
  .quoteLineEditor .quoteLineInternalCost input{font-size:16px}
 }
 @media print{.quoteProfitPanel,.quoteLineInternalCost{display:none!important}}
+
+
+/* Internal supplier-cost lookup for quote material lines. Excluded from customer print/PDF. */
+.quoteSupplierSearch{grid-column:2/5;display:grid;gap:9px;min-width:0;padding:10px;border:1px solid #d7d0c5;border-radius:10px;background:#f8f6f1;color:#29251f}
+.quoteSupplierSearch>.btn{justify-self:start}
+.quoteSupplierMessage,.quoteSupplierError{font-size:12px;line-height:1.45;margin:0}
+.quoteSupplierMessage{color:#36583a}
+.quoteSupplierError{color:#9b2929}
+.quoteSupplierResults{display:grid;gap:7px}
+.quoteSupplierResult{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:9px;background:#fff;border:1px solid #e4ddd2;border-radius:8px}
+.quoteSupplierResult>div:first-child{display:grid;gap:3px;min-width:0}
+.quoteSupplierResult>div:first-child b{font-size:13px;overflow-wrap:anywhere}
+.quoteSupplierResult small{font-size:11px;color:#675e52;line-height:1.4}
+.quoteSupplierPrice{display:grid;gap:3px;text-align:right;white-space:nowrap}
+.quoteSupplierPrice b{font-size:13px}
+.quoteSupplierPrice small{color:#925018}
+@media(max-width:760px){
+ .quoteSupplierSearch{grid-column:1/-1}
+ .quoteSupplierResult{grid-template-columns:minmax(0,1fr) auto}
+ .quoteSupplierResult>button{grid-column:1/-1;justify-self:start}
+ .quoteSupplierPrice{text-align:left}
+}
+@media print{.quoteSupplierSearch{display:none!important}}
