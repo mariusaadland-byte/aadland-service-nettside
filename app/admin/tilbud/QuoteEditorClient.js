@@ -569,7 +569,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
            const hasBaseline=line.purchaseCatalogCostOre!==null&&line.purchaseCatalogCostOre!==undefined&&line.purchaseCatalogCostOre!==""&&Number.isFinite(previous);
            const catalogChanged=sameProduct&&hasBaseline&&previous!==fresh;
            const enteredCost=line.purchaseUnitPriceOre===""||line.purchaseUnitPriceOre===null||line.purchaseUnitPriceOre===undefined?null:Number(line.purchaseUnitPriceOre);
-           const enteredDiffers=enteredCost!==null&&Number.isFinite(enteredCost)&&enteredCost!==fresh;
+           const enteredDiffers=sameProduct&&enteredCost!==null&&Number.isFinite(enteredCost)&&enteredCost!==fresh;
            const priceWarning=catalogChanged||enteredDiffers;
            return <div className="quoteCatalogResult" key={String(product.supplierId||"supplier")+"-"+String(product.sku||product.name||index)}>
             <div><b>{product.name}</b><small>{product.supplierName||"Leverandør"}{product.sku?" · "+product.sku:""}{product.unit?" · "+product.unit:""}</small></div>
