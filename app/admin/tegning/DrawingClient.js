@@ -79,7 +79,7 @@ const sizePresets={
  walllight:[["Vegglampe",180,100]],outlet:[["Stikk",180,100]],doubleoutlet:[["Dobbel stikk",220,100]],
  switch:[["Bryter",120,100]],dimmer:[["Dimmer",120,100]],thermostat:[["Termostat",140,100]],junction:[["Koblingspunkt",140,140]]
 };
-const flat=catalog.flatMap(g=>g.items), labelFor=t=>t==="customwall"||t==="customfloor"?"Eget møbel":flat.find(x=>x[0]===t)?.[1]||t;
+const flat=catalog.flatMap(g=>g.items), labelFor=t=>t&&typeof t==="object"&&t.metodModuleLabel?t.metodModuleLabel:t==="customwall"||t==="customfloor"?"Eget møbel":flat.find(x=>x[0]===t)?.[1]||t;
 const uid=()=>globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2);
 function CommitNumberInput({value,onCommit,onKeyDown,...props}){
  const [draft,setDraft]=useState(value==null?"":String(value));
@@ -2202,7 +2202,7 @@ export default function DrawingClient(){
    {(doc.zones||[]).length? <div className={styles.mobileRoomPickerList}>{(doc.zones||[]).map(zone=>{const state=zoneSurveyState(zone,doc.walls,doc.items),active=selected?.kind==="zone"&&selected.id===zone.id,status=state.finished?"✓ Ferdig":state.stale?"↻ Må sjekkes":"Gjenstår";return <button type="button" key={zone.id} className={active?styles.mobileRoomPickerActive:styles.mobileRoomPickerItem} onClick={()=>openRoomFromPicker(zone)}><span><b>{zone.name||"Rom"}</b><small>{polygonAreaM2(roomInnerZone(zone,doc.walls,doc.defaultWallThickness).points).toFixed(2)} m² · {state.linked?state.done+"/"+state.total+" målt":"fri sone"}<br/>{zoneSurveyStatusText(state)}</small></span><strong className={state.finished?styles.mobileRoomDone:state.stale?styles.mobileRoomStale:styles.mobileRoomPending}>{status}</strong></button>})}</div>:<p className={styles.mobileRoomPickerEmpty}>Ingen rom ennå. Opprett et rektangulært rom, L-rom eller tegn en lukket veggkontur.</p>}
   </div>}
   {sel&&!quickAddOpen&&!roomPickerOpen&&<div className={styles.mobileSelection}>
-   <div><span>VALGT</span><strong>{selected.kind==="wall"?"Vegg · "+Math.round(wallFaceMetrics(sel,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98).L)+" mm innv. · "+angle(sel)+"°":selected.kind==="zone"?(sel.name||"Romsone")+" · "+polygonAreaM2(roomInnerZone(sel,doc.walls,doc.defaultWallThickness).points).toFixed(2)+" m²":selected.kind==="measurement"?(sel.label?sel.label+" · ":"Mål · ")+Math.round(Math.hypot(sel.x2-sel.x1,sel.y2-sel.y1))+" mm":labelFor(sel.type)+" · "+Math.round(sel.w)+" × "+Math.round(sel.h)+" mm"}</strong></div>
+   <div><span>VALGT</span><strong>{selected.kind==="wall"?"Vegg · "+Math.round(wallFaceMetrics(sel,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98).L)+" mm innv. · "+angle(sel)+"°":selected.kind==="zone"?(sel.name||"Romsone")+" · "+polygonAreaM2(roomInnerZone(sel,doc.walls,doc.defaultWallThickness).points).toFixed(2)+" m²":selected.kind==="measurement"?(sel.label?sel.label+" · ":"Mål · ")+Math.round(Math.hypot(sel.x2-sel.x1,sel.y2-sel.y1))+" mm":labelFor(sel)+" · "+Math.round(sel.w)+" × "+Math.round(sel.h)+" mm"}</strong></div>
    <button type="button" onClick={()=>setMobileEditOpen(value=>!value)}>{mobileEditOpen?"Lukk":"Rediger mål"}</button>
   </div>}
   {sel&&!quickAddOpen&&!roomPickerOpen&&mobileEditOpen&&<div className={styles.mobileInspector}>
@@ -2292,8 +2292,8 @@ export default function DrawingClient(){
      <button type="button" className={styles.wallAutoFitButton} onClick={()=>openGapShelfBuilder(wallForView.id)}>↔ Hylle mellom skap</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("base",600,600)}>+ Benkeskap</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("sinkcab",600,600)}>+ Vaskeskap</button>
-     <button type="button" onClick={()=>addWallWorkspaceItem("cornerbase",900,900)}>+ Hjørneskap</button>
-     <button type="button" onClick={()=>addWallWorkspaceItem("wallcab",600,350)}>+ Overskap</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("cornerbase",875,875)}>+ Hjørneskap</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("wallcab",600,370)}>+ Overskap</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("tallcab",600,600)}>+ Høyskap</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("fridge",600,600)}>+ Kjøleskap</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("integratedfridge",600,600)}>+ Integrert kjøl/frys</button>
@@ -2474,7 +2474,7 @@ export default function DrawingClient(){
      {multi&&<rect x="-34" y="-34" width={Math.max(68,o.w+68)} height={Math.max(68,o.h+68)} fill="none" stroke="#2c7bb6" strokeWidth="18" strokeDasharray="45 22" pointerEvents="none"/>}
      {hasCollision&&<rect x="-58" y="-58" width={Math.max(116,o.w+116)} height={Math.max(116,o.h+116)} fill="none" stroke="#b83b33" strokeWidth="20" strokeDasharray="32 20" pointerEvents="none"/>}
      {o.locked&&<g pointerEvents="none"><rect x="18" y="18" width="235" height="92" rx="22" fill="rgba(34,34,34,.88)"/><text x="135" y="82" textAnchor="middle" fontSize="55" fontWeight="900" fill="#fff">LÅST</text></g>}
-     {!electricalTypes.has(o.type)&&<><text x={o.w/2} y={o.h/2} textAnchor="middle" dominantBaseline="middle" fontSize="100">{o.customName||labelFor(o.type)}</text><text x={o.w/2} y={o.h/2+125} textAnchor="middle" fontSize="75">{o.w} × {o.h}</text></>}
+     {!electricalTypes.has(o.type)&&<><text x={o.w/2} y={o.h/2} textAnchor="middle" dominantBaseline="middle" fontSize="100">{o.customName||labelFor(o)}</text><text x={o.w/2} y={o.h/2+125} textAnchor="middle" fontSize="75">{o.w} × {o.h}</text></>}
      {electricalTypes.has(o.type)&&<><text x={o.w/2} y={o.h+95} textAnchor="middle" fontSize="70" fontWeight="800" fill="#765a20">{o.customName||labelFor(o.type)}</text>{o.circuit&&<text x={o.w/2} y={o.h+170} textAnchor="middle" fontSize="58" fill="#765a20">{o.circuit}</text>}</>}
     </g>})}
     {selected?.kind==="item"&&sel?.wallId&&openingTypes.has(sel.type)&&doc.walls.find(w=>w.id===sel.wallId)&&(()=>{const wall=doc.walls.find(w=>w.id===sel.wallId),g=wallFaceOffsets(sel,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),dx=wall.x2-wall.x1,dy=wall.y2-wall.y1,L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L,nx=-uy,ny=ux,off=360,sx=wall.x1+ux*g.start,sy=wall.y1+uy*g.start,ex=sx+ux*sel.w,ey=sy+uy*sel.w,a1={x:wall.x1+nx*off,y:wall.y1+ny*off},a2={x:sx+nx*off,y:sy+ny*off},a3={x:ex+nx*off,y:ey+ny*off},a4={x:wall.x2+nx*off,y:wall.y2+ny*off};return <g pointerEvents="none"><line x1={a1.x} y1={a1.y} x2={a4.x} y2={a4.y} stroke="#315c64" strokeWidth="12"/>{[a1,a2,a3,a4].map((p,i)=><line key={i} x1={p.x-nx*58} y1={p.y-ny*58} x2={p.x+nx*58} y2={p.y+ny*58} stroke="#315c64" strokeWidth="12"/>)}<text x={(a1.x+a2.x)/2} y={(a1.y+a2.y)/2-55} textAnchor="middle" fontSize="76" fontWeight="700" fill="#315c64">{g.start} mm</text><text x={(a2.x+a3.x)/2} y={(a2.y+a3.y)/2-55} textAnchor="middle" fontSize="82" fontWeight="800" fill="#9b7a39">{Math.round(sel.w)} mm</text><text x={(a3.x+a4.x)/2} y={(a3.y+a4.y)/2-55} textAnchor="middle" fontSize="76" fontWeight="700" fill="#315c64">{g.end} mm</text></g>})()}
