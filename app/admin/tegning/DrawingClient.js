@@ -5,12 +5,14 @@ import styles from "./drawing.module.css";
 import QuickCustomerPanel from "./QuickCustomerPanel";
 import KitchenWallBuilder from "./KitchenWallBuilder";
 import {createKitchenWalls,kitchenWallDefaults} from "../../../lib/kitchenWallPresets";
+import {IKEA_METOD_MODULES} from "../../../lib/ikeaMetodCatalog";
 
 const GRID=100, VIEW=8000, STORE="aadlandDrawingsV2", LAST_STORE="aadlandDrawingsV2:last", FURNITURE_TEMPLATE_STORE="aadlandFurnitureTemplatesV1", VERSION_STORE="aadlandDrawingVersionsV1";
 const catalog=[
  {group:"Bygg",items:[["door","Dør",900,100],["sliding","Skyvedør",1800,100],["window","Vindu",1200,100],["opening","Åpning",1000,100],["stairs","Trapp",900,2500],["post","Stolpe",98,98]]},
  {group:"Bad",items:[["toilet","Toalett",400,700],["walltoilet","Vegghengt toalett",400,600],["shower","Dusj",900,900],["bath","Badekar",750,1700],["sink","Servant",600,500],["washer","Vaskemaskin",600,600]]},
- {group:"Kjøkken",items:[["base","Benkeskap",600,600],["sinkcab","Vaskeskap",600,600],["cornerbase","Hjørneskap",900,900],["wallcab","Overskap",600,350],["tallcab","Høyskap",600,600],["fridge","Kjøleskap",600,600],["integratedfridge","Integrert kjøl/frys",600,600],["oven","Komfyr",600,600],["dishwasher","Oppvaskmaskin",600,600],["cooktop","Platetopp",600,600],["hood","Ventilator",600,350],["kitchensink","Kjøkkenvask",600,500],["countertop","Benkeplate",1200,600],["plinth","Sokkel",1200,100],["filler","Foring",100,600],["coverpanel","Dekkside",18,600],["island","Kjøkkenøy",1800,900]]},
+ {group:"Kjøkken",items:[["base","Benkeskap",600,600],["sinkcab","Vaskeskap",600,600],["cornerbase","Hjørneskap",875,875],["wallcab","Overskap",600,370],["tallcab","Høyskap",600,600],["fridge","Kjøleskap",600,600],["integratedfridge","Integrert kjøl/frys",600,600],["oven","Komfyr",600,600],["dishwasher","Oppvaskmaskin",600,600],["cooktop","Platetopp",600,600],["hood","Ventilator",600,370],["kitchensink","Kjøkkenvask",600,500],["countertop","Benkeplate",1200,600],["plinth","Sokkel",1200,100],["filler","Foring",100,600],["coverpanel","Dekkside",18,600],["island","Kjøkkenøy",1800,900]]},
+ {group:"IKEA METOD – faktiske modulmål",items:IKEA_METOD_MODULES.map(module=>[module.type,module.label,module.width,module.depth,module.id])},
  {group:"Møbler",items:[["sofa","Sofa",2200,900],["table","Spisebord",1800,900],["chair","Stol",500,500],["bed","Seng",1800,2000],["wardrobe","Garderobe",1200,600],["tv","TV",1200,120]]},
  {group:"Soverom",items:[["nightstand","Nattbord",500,450],["dresser","Kommode",1200,450],["desk","Skrivebord",1200,600],["bookshelf","Bokhylle",900,350],["vanity","Sminkebord",1000,450],["armchair","Lenestol",850,850],["ottoman","Puff",600,600],["headboard","Hodegavl",1800,120]]},
  {group:"Ute",items:[["deck","Terrassefelt",3000,3000],["railing","Rekkverk",2000,100],["screen","Levegg",1800,100],["bench","Benk",1800,500],["planter","Plantekasse",1200,450]]},
@@ -39,10 +41,10 @@ const sizePresets={
  bath:[["70 × 160 cm",700,1600],["75 × 170 cm",750,1700],["80 × 180 cm",800,1800]],
  sink:[["40 × 40 cm",400,400],["60 × 50 cm",600,500],["80 × 50 cm",800,500],["100 × 50 cm",1000,500],["120 × 50 cm",1200,500]],
  washer:[["60 × 60 cm",600,600]],
- base:[["40 cm benkeskap",400,600],["60 cm benkeskap",600,600],["80 cm benkeskap",800,600],["100 cm benkeskap",1000,600]],
- sinkcab:[["60 cm vaskeskap",600,600],["80 cm vaskeskap",800,600],["100 cm vaskeskap",1000,600]],
- cornerbase:[["90 × 90 cm hjørneskap",900,900],["100 × 100 cm hjørneskap",1000,1000]],
- wallcab:[["40 cm overskap",400,350],["60 cm overskap",600,350],["80 cm overskap",800,350],["100 cm overskap",1000,350]],
+ base:[["METOD 20 × 60 × 80 cm",200,600],["METOD 30 × 60 × 80 cm",300,600],["METOD 40 × 60 × 80 cm",400,600],["METOD 60 × 60 × 80 cm",600,600],["METOD 80 × 60 × 80 cm",800,600],["METOD 100 × 60 × 80 cm",1000,600],["METOD 120 × 60 × 80 cm",1200,600]],
+ sinkcab:[["40 cm vaskeskap",400,600],["60 cm vaskeskap",600,600],["80 cm vaskeskap",800,600],["100 cm vaskeskap",1000,600],["120 cm vaskeskap",1200,600]],
+ cornerbase:[["METOD hjørnebenkeskap 88 × 88 cm",875,875],["METOD benkehjørneskap 128 × 68 cm",1275,675]],
+ wallcab:[["METOD 40 × 37 cm overskap",400,370],["METOD 60 × 37 cm overskap",600,370],["METOD 80 × 37 cm overskap",800,370]],
  tallcab:[["40 cm høyskap",400,600],["60 cm høyskap",600,600]],
  fridge:[["60 × 60 cm",600,600],["90 × 70 cm",900,700]],
  integratedfridge:[["60 × 60 cm",600,600]],
@@ -77,7 +79,7 @@ const sizePresets={
  walllight:[["Vegglampe",180,100]],outlet:[["Stikk",180,100]],doubleoutlet:[["Dobbel stikk",220,100]],
  switch:[["Bryter",120,100]],dimmer:[["Dimmer",120,100]],thermostat:[["Termostat",140,100]],junction:[["Koblingspunkt",140,140]]
 };
-const flat=catalog.flatMap(g=>g.items), labelFor=t=>t==="customwall"||t==="customfloor"?"Eget møbel":flat.find(x=>x[0]===t)?.[1]||t;
+const flat=catalog.flatMap(g=>g.items), labelFor=t=>t&&typeof t==="object"&&t.metodModuleLabel?t.metodModuleLabel:t==="customwall"||t==="customfloor"?"Eget møbel":flat.find(x=>x[0]===t)?.[1]||t;
 const uid=()=>globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2);
 function CommitNumberInput({value,onCommit,onKeyDown,...props}){
  const [draft,setDraft]=useState(value==null?"":String(value));
@@ -1552,7 +1554,7 @@ export default function DrawingClient(){
   const candidates=[preferred,0,...intervals.flatMap(x=>[x.end,Math.max(0,x.start-W)])].filter(value=>value>=0&&value+W<=layout.L).sort((a,b)=>Math.abs(a-preferred)-Math.abs(b-preferred));
   return candidates.find(start=>!intervals.some(x=>start<x.end&&start+W>x.start))??null;
  };
- const addItemToWall=(type,w,h,wallId=null,returnZoneId=null)=>{
+ const addItemToWall=(type,w,h,wallId=null,returnZoneId=null,module=null)=>{
   const id=uid();
   let selectedWall=wallId?doc.walls.find(wall=>wall.id===wallId):selected?.kind==="wall"?doc.walls.find(wall=>wall.id===selected.id):null;
   if(!selectedWall&&wallElectricalTypes.has(type)){
@@ -1567,12 +1569,12 @@ export default function DrawingClient(){
    if(start==null){setMessage("Ikke nok ledig plass på veggen");setTimeout(()=>setMessage(""),2200);return}
    const faceStart=start,off=wallOffsetFromFaceStart(selectedWall,faceStart,w,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
    mutate(d=>{
-    const liveWall=d.walls.find(wall=>wall.id===selectedWall.id)||selectedWall,base={id,type,x:0,y:0,w,h,rot:0,wallId:liveWall.id,wallOffset:off,...openingDefaults(type),...itemDefaults(type,d)},placed=mountedItemCenter(base,liveWall,d.zones||[],d.walls||[],d.defaultWallThickness||98);
+    const liveWall=d.walls.find(wall=>wall.id===selectedWall.id)||selectedWall,base={id,type,x:0,y:0,w,h,rot:0,wallId:liveWall.id,wallOffset:off,...openingDefaults(type),...itemDefaults(type,d),...(module?{modelHeight:module.height,elevation:module.elevation,metodModuleId:module.id,metodModuleLabel:module.label,metodSource:module.source}: {})},placed=mountedItemCenter(base,liveWall,d.zones||[],d.walls||[],d.defaultWallThickness||98);
     return {...d,items:[...d.items,{...base,x:placed.cx-w/2,y:placed.cy-h/2,rot:placed.a*180/Math.PI,wallOffset:placed.off}]};
    });
   }else{
    const cx=pan.x+viewWidth/2,cy=pan.y+viewHeight/2,x=snapTo(cx-w/2,doc.snapSize||50),y=snapTo(cy-h/2,doc.snapSize||50);
-   const candidate={id,type,x:clamp(x,0,VIEW-w),y:clamp(y,0,VIEW-h),w,h,rot:0,...openingDefaults(type),...itemDefaults(type,doc)};
+   const candidate={id,type,x:clamp(x,0,VIEW-w),y:clamp(y,0,VIEW-h),w,h,rot:0,...openingDefaults(type),...itemDefaults(type,doc),...(module?{modelHeight:module.height,elevation:module.elevation,metodModuleId:module.id,metodModuleLabel:module.label,metodSource:module.source}: {})};
    const placementZones=roomPlacementZones(doc.zones,doc.walls,doc.defaultWallThickness||98);
    const placed=constrainFreeItemStrict(candidate,placementZones,{fallbackItem:candidate,fallbackCenter:{x:cx,y:cy},snapDistance:0});
    if(placementZones.length&&roomBoundedTypes.has(type)&&!itemFitsSomePlacementZone(placed,placementZones)){setMessage("Møbelet får ikke plass innenfor rommets innervegger");setTimeout(()=>setMessage(""),2200);return}
@@ -1580,7 +1582,7 @@ export default function DrawingClient(){
   }
   setFieldReturnZoneId(returnZoneId||null);setSelected({kind:"item",id});setTool("select");setQuickAddOpen(false);setTimeout(()=>setMobileEditOpen(true),0);
  };
- const addItem=(type,w,h)=>addItemToWall(type,w,h);
+ const addItem=(type,w,h,module=null)=>addItemToWall(type,w,h,null,null,module);
  const addWallWorkspaceItem=(type,w,h)=>{if(!wallForView)return;addItemToWall(type,w,h,wallForView.id);setTimeout(()=>setMobileEditOpen(false),0)};
  const sel=useMemo(()=>selected?.kind==="wall"?doc.walls.find(x=>x.id===selected.id):selected?.kind==="item"?doc.items.find(x=>x.id===selected.id):selected?.kind==="zone"?(doc.zones||[]).find(x=>x.id===selected.id):selected?.kind==="measurement"?(doc.measurements||[]).find(x=>x.id===selected.id):null,[selected,doc]);
  const roomFurnitureSnapContext=item=>{
@@ -2200,7 +2202,7 @@ export default function DrawingClient(){
    {(doc.zones||[]).length? <div className={styles.mobileRoomPickerList}>{(doc.zones||[]).map(zone=>{const state=zoneSurveyState(zone,doc.walls,doc.items),active=selected?.kind==="zone"&&selected.id===zone.id,status=state.finished?"✓ Ferdig":state.stale?"↻ Må sjekkes":"Gjenstår";return <button type="button" key={zone.id} className={active?styles.mobileRoomPickerActive:styles.mobileRoomPickerItem} onClick={()=>openRoomFromPicker(zone)}><span><b>{zone.name||"Rom"}</b><small>{polygonAreaM2(roomInnerZone(zone,doc.walls,doc.defaultWallThickness).points).toFixed(2)} m² · {state.linked?state.done+"/"+state.total+" målt":"fri sone"}<br/>{zoneSurveyStatusText(state)}</small></span><strong className={state.finished?styles.mobileRoomDone:state.stale?styles.mobileRoomStale:styles.mobileRoomPending}>{status}</strong></button>})}</div>:<p className={styles.mobileRoomPickerEmpty}>Ingen rom ennå. Opprett et rektangulært rom, L-rom eller tegn en lukket veggkontur.</p>}
   </div>}
   {sel&&!quickAddOpen&&!roomPickerOpen&&<div className={styles.mobileSelection}>
-   <div><span>VALGT</span><strong>{selected.kind==="wall"?"Vegg · "+Math.round(wallFaceMetrics(sel,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98).L)+" mm innv. · "+angle(sel)+"°":selected.kind==="zone"?(sel.name||"Romsone")+" · "+polygonAreaM2(roomInnerZone(sel,doc.walls,doc.defaultWallThickness).points).toFixed(2)+" m²":selected.kind==="measurement"?(sel.label?sel.label+" · ":"Mål · ")+Math.round(Math.hypot(sel.x2-sel.x1,sel.y2-sel.y1))+" mm":labelFor(sel.type)+" · "+Math.round(sel.w)+" × "+Math.round(sel.h)+" mm"}</strong></div>
+   <div><span>VALGT</span><strong>{selected.kind==="wall"?"Vegg · "+Math.round(wallFaceMetrics(sel,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98).L)+" mm innv. · "+angle(sel)+"°":selected.kind==="zone"?(sel.name||"Romsone")+" · "+polygonAreaM2(roomInnerZone(sel,doc.walls,doc.defaultWallThickness).points).toFixed(2)+" m²":selected.kind==="measurement"?(sel.label?sel.label+" · ":"Mål · ")+Math.round(Math.hypot(sel.x2-sel.x1,sel.y2-sel.y1))+" mm":labelFor(sel)+" · "+Math.round(sel.w)+" × "+Math.round(sel.h)+" mm"}</strong></div>
    <button type="button" onClick={()=>setMobileEditOpen(value=>!value)}>{mobileEditOpen?"Lukk":"Rediger mål"}</button>
   </div>}
   {sel&&!quickAddOpen&&!roomPickerOpen&&mobileEditOpen&&<div className={styles.mobileInspector}>
@@ -2290,8 +2292,8 @@ export default function DrawingClient(){
      <button type="button" className={styles.wallAutoFitButton} onClick={()=>openGapShelfBuilder(wallForView.id)}>↔ Hylle mellom skap</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("base",600,600)}>+ Benkeskap</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("sinkcab",600,600)}>+ Vaskeskap</button>
-     <button type="button" onClick={()=>addWallWorkspaceItem("cornerbase",900,900)}>+ Hjørneskap</button>
-     <button type="button" onClick={()=>addWallWorkspaceItem("wallcab",600,350)}>+ Overskap</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("cornerbase",875,875)}>+ Hjørneskap</button>
+     <button type="button" onClick={()=>addWallWorkspaceItem("wallcab",600,370)}>+ Overskap</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("tallcab",600,600)}>+ Høyskap</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("fridge",600,600)}>+ Kjøleskap</button>
      <button type="button" onClick={()=>addWallWorkspaceItem("integratedfridge",600,600)}>+ Integrert kjøl/frys</button>
@@ -2455,7 +2457,7 @@ export default function DrawingClient(){
      {collisionMap.size>0&&<p className={styles.collisionSummary}>⚠ {collisionMap.size} objekt{collisionMap.size===1?"":"er"} har plass-/kollisjonsvarsel.</p>}
     </div>
     <div className={styles.group}><h2>Rom og vegger</h2><div className={styles.row}><button className={tool==="wall"?styles.activeBtn:styles.btn} onClick={()=>{setTool("wall");setDraft(null);setWallChain(null);setSnapHint(null)}}>Tegn vegg</button><button className={styles.btn} onClick={makeRoom}>Rektangulært rom</button><button className={styles.btn} onClick={makeLRoom}>L-formet rom</button><button className={styles.btn} onClick={openKitchenBuilder}>Kjøkkenvegger: rett / L / U</button><button className={tool==="zone"?styles.activeBtn:styles.btn} onClick={()=>{setTool("zone");setDraft(null);setWallChain(null);setSnapHint(null);setMeasureDraft(null);setZoneDraft([])}}>Tegn romsone</button>{tool==="zone"&&<><button className={styles.btn} onClick={finishZone} disabled={zoneDraft.length<3}>Lukk romsone</button><button className={styles.btn} onClick={cancelZone}>Avbryt sone</button></>}<button className={tool==="measure"?styles.activeBtn:styles.btn} onClick={()=>{setTool("measure");setDraft(null);setWallChain(null);setSnapHint(null);setZoneDraft([]);setMeasureDraft(null)}}>Mål avstand</button><button className={styles.btn} onClick={clearMeasures}>Fjern mål</button></div><p className={styles.muted}>Nye vegger bruker standard tykkelse og høyde over. Med «Tegn romsone» klikker du rundt innsiden av et rom og avslutter med «Lukk romsone». Da beregnes gulv/tak, brutto listelengde og veggflate per rom.</p></div>
-    {catalog.map(g=><div className={styles.group} key={g.group}><h2>{g.group}</h2><div className={styles.library}>{g.items.map(([t,l,w,h])=><button key={t} onClick={()=>addItem(t,w,h)}>{l}<small>{w} × {h} mm</small></button>)}</div></div>)}
+    {catalog.map(g=><div className={styles.group} key={g.group}><h2>{g.group}</h2><div className={styles.library}>{g.items.map(([t,l,w,h,metodId])=><button key={metodId||`${t}-${w}-${h}-${l}`} onClick={()=>addItem(t,w,h,metodId?IKEA_METOD_MODULES.find(module=>module.id===metodId):null)}>{l}<small>{w} × {h} mm{metodId?` · høyde ${IKEA_METOD_MODULES.find(module=>module.id===metodId)?.height} mm`:""}</small></button>)}</div></div>)}
    </aside>
    <section className={styles.workspace}><div className={styles.printHead}><h1>{doc.name}</h1><p>{[doc.customer,doc.address].filter(Boolean).join(" · ")}</p><p>Oppdrag: {projectLabel}</p><p>Målestokk: {doc.scale||"1:50"} · Alle mål i mm · Aadland Service</p></div><div className={styles.printSummary}><div><span>Vegger</span><b>{summary.wallM.toFixed(2)} lm</b></div><div><span>Gulvareal</span><b>{summary.floorM2==null?"—":summary.floorM2.toFixed(2)+" m²"}</b></div><div><span>Brutto veggflate</span><b>{summary.wallM2.toFixed(2)} m²</b></div><div><span>Åpningsareal</span><b>{summary.openingM2.toFixed(2)} m²</b></div><div><span>Netto veggflate</span><b>{summary.netWallM2.toFixed(2)} m²</b></div><div><span>Dører / vinduer</span><b>{summary.doors} / {summary.windows}</b></div><div><span>EL-punkter</span><b>{summary.electrical}</b></div><div><span>LED-stripe</span><b>{summary.ledM.toFixed(2)} lm</b></div>{summary.zoneRows.length>0&&<><div><span>Romsone gulv/tak</span><b>{summary.zonedFloorM2.toFixed(2)} m²</b></div><div><span>Brutto listelengde</span><b>{summary.zonePerimeterM.toFixed(2)} lm</b></div><div><span>Netto listelengde</span><b>{summary.zoneNetSkirtingM.toFixed(2)} lm</b></div><div><span>Brutto rom-veggflate</span><b>{summary.zoneWallM2.toFixed(2)} m²</b></div><div><span>Rom-åpningsareal</span><b>{summary.zoneOpeningM2.toFixed(2)} m²</b></div><div><span>Netto rom-veggflate</span><b>{summary.zoneNetWallM2.toFixed(2)} m²</b></div></>}{overallSurveyProgress.total>0&&<div><span>Befaring</span><b>{overallSurveyProgress.complete?"Ferdig – "+overallSurveyProgress.done+"/"+overallSurveyProgress.total+" rom":"Ikke ferdig – "+overallSurveyProgress.done+"/"+overallSurveyProgress.total+" rom"+(overallSurveyProgress.stale?" · "+overallSurveyProgress.stale+" må sjekkes":"")}</b></div>}{doc.notes&&<div className={styles.printNotes}><span>Notater</span><b>{doc.notes}</b></div>}</div>{multiSelectedIds.length>0&&<div className={styles.multiToolbar}><div><b>{multiSelectedIds.length} valgt</b><button type="button" onClick={clearMulti}>Fjern valg</button></div><button type="button" onClick={()=>alignMulti("left")}>Venstre</button><button type="button" onClick={()=>alignMulti("center")}>Senter</button><button type="button" onClick={()=>alignMulti("right")}>Høyre</button><button type="button" onClick={()=>alignMulti("top")}>Topp</button><button type="button" onClick={()=>alignMulti("bottom")}>Bunn</button><button type="button" onClick={()=>alignMulti("sameWidth")}>Samme bredde</button><button type="button" onClick={()=>alignMulti("sameHeight")}>Samme høyde</button><button type="button" onClick={()=>alignMulti("pack")}>Sett inntil</button><button type="button" onClick={()=>alignMulti("distribute")}>Fordel jevnt</button><button type="button" onClick={duplicateMulti}>Kopier valgte</button><button type="button" className={styles.multiDanger} onClick={deleteMulti}>Slett valgte</button></div>}
    <div className={styles.canvasWrap}><div className={styles.mobileCanvasHint}>Én finger: tegn/velg · To fingre: zoom og flytt</div><svg ref={svg} className={styles.canvas} viewBox={printBounds?printBounds.x+" "+printBounds.y+" "+printBounds.w+" "+printBounds.h:pan.x+" "+pan.y+" "+viewWidth+" "+viewHeight} onPointerDownCapture={pointerDownCapture} onPointerMoveCapture={pointerMoveCapture} onPointerUpCapture={pointerUpCapture} onPointerCancelCapture={pointerUpCapture} onPointerDown={canvasDown} onPointerMove={move} onPointerUp={up} onPointerLeave={e=>{if(e.pointerType!=="touch")up(e)}} onWheel={e=>{e.preventDefault();zoomBy(e.deltaY<0?.15:-.15)}}>
@@ -2472,7 +2474,7 @@ export default function DrawingClient(){
      {multi&&<rect x="-34" y="-34" width={Math.max(68,o.w+68)} height={Math.max(68,o.h+68)} fill="none" stroke="#2c7bb6" strokeWidth="18" strokeDasharray="45 22" pointerEvents="none"/>}
      {hasCollision&&<rect x="-58" y="-58" width={Math.max(116,o.w+116)} height={Math.max(116,o.h+116)} fill="none" stroke="#b83b33" strokeWidth="20" strokeDasharray="32 20" pointerEvents="none"/>}
      {o.locked&&<g pointerEvents="none"><rect x="18" y="18" width="235" height="92" rx="22" fill="rgba(34,34,34,.88)"/><text x="135" y="82" textAnchor="middle" fontSize="55" fontWeight="900" fill="#fff">LÅST</text></g>}
-     {!electricalTypes.has(o.type)&&<><text x={o.w/2} y={o.h/2} textAnchor="middle" dominantBaseline="middle" fontSize="100">{o.customName||labelFor(o.type)}</text><text x={o.w/2} y={o.h/2+125} textAnchor="middle" fontSize="75">{o.w} × {o.h}</text></>}
+     {!electricalTypes.has(o.type)&&<><text x={o.w/2} y={o.h/2} textAnchor="middle" dominantBaseline="middle" fontSize="100">{o.customName||labelFor(o)}</text><text x={o.w/2} y={o.h/2+125} textAnchor="middle" fontSize="75">{o.w} × {o.h}</text></>}
      {electricalTypes.has(o.type)&&<><text x={o.w/2} y={o.h+95} textAnchor="middle" fontSize="70" fontWeight="800" fill="#765a20">{o.customName||labelFor(o.type)}</text>{o.circuit&&<text x={o.w/2} y={o.h+170} textAnchor="middle" fontSize="58" fill="#765a20">{o.circuit}</text>}</>}
     </g>})}
     {selected?.kind==="item"&&sel?.wallId&&openingTypes.has(sel.type)&&doc.walls.find(w=>w.id===sel.wallId)&&(()=>{const wall=doc.walls.find(w=>w.id===sel.wallId),g=wallFaceOffsets(sel,wall,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98),dx=wall.x2-wall.x1,dy=wall.y2-wall.y1,L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L,nx=-uy,ny=ux,off=360,sx=wall.x1+ux*g.start,sy=wall.y1+uy*g.start,ex=sx+ux*sel.w,ey=sy+uy*sel.w,a1={x:wall.x1+nx*off,y:wall.y1+ny*off},a2={x:sx+nx*off,y:sy+ny*off},a3={x:ex+nx*off,y:ey+ny*off},a4={x:wall.x2+nx*off,y:wall.y2+ny*off};return <g pointerEvents="none"><line x1={a1.x} y1={a1.y} x2={a4.x} y2={a4.y} stroke="#315c64" strokeWidth="12"/>{[a1,a2,a3,a4].map((p,i)=><line key={i} x1={p.x-nx*58} y1={p.y-ny*58} x2={p.x+nx*58} y2={p.y+ny*58} stroke="#315c64" strokeWidth="12"/>)}<text x={(a1.x+a2.x)/2} y={(a1.y+a2.y)/2-55} textAnchor="middle" fontSize="76" fontWeight="700" fill="#315c64">{g.start} mm</text><text x={(a2.x+a3.x)/2} y={(a2.y+a3.y)/2-55} textAnchor="middle" fontSize="82" fontWeight="800" fill="#9b7a39">{Math.round(sel.w)} mm</text><text x={(a3.x+a4.x)/2} y={(a3.y+a4.y)/2-55} textAnchor="middle" fontSize="76" fontWeight="700" fill="#315c64">{g.end} mm</text></g>})()}
