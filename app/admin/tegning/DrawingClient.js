@@ -641,6 +641,17 @@ function Drawing3DPreview({doc,onWallSelect,onItemSelect,camera}){
     return <g key={"el3d-"+item.id} onClick={e=>{e.stopPropagation();select()}} style={{cursor:onItemSelect?"pointer":"default"}}><polygon points={pointsAttr([{x:p.x,y:p.y-size},{x:p.x+size,y:p.y},{x:p.x,y:p.y+size},{x:p.x-size,y:p.y}])} fill="#ffe773" stroke="#89691e" strokeWidth="14"/><text x={p.x} y={p.y+28} textAnchor="middle" fontSize="80" fontWeight="900" fill="#5f4715">{electricalSymbol(item.type)}</text></g>;
    }
    if(["railing","screen"].includes(item.type))return null;
+   if(item.type==="cornerbase"){
+    const h=modelHeight(item),z0=Math.max(0,Number(item.elevation)||0),w=Math.max(1,Number(item.w)||875),d=Math.max(1,Number(item.h)||875),cut=Math.min(w,d)*.38,cx=item.x+w/2,cy=item.y+d/2,a=(Number(item.rot)||0)*Math.PI/180,cos=Math.cos(a),sin=Math.sin(a);
+    const footprint=[[0,0],[w,0],[w,d-cut],[w-cut,d],[0,d]].map(([lx,ly])=>({x:cx+(lx-w/2)*cos-(ly-d/2)*sin,y:cy+(lx-w/2)*sin+(ly-d/2)*cos}));
+    const bottom=footprint.map(p=>project(p.x,p.y,z0)),top=footprint.map(p=>project(p.x,p.y,z0+h));
+    return <g key={"obj3d-"+item.id} onClick={e=>{e.stopPropagation();select()}} style={{cursor:onItemSelect?"pointer":"default"}}>
+     {bottom.map((p,i)=>{const j=(i+1)%bottom.length;return <polygon key={"side-"+i} points={pointsAttr([bottom[i],bottom[j],top[j],top[i]])} fill={i===2?"#9b7a48":i===3?"#b08a51":"#80643d"} stroke="#675236" strokeWidth="11"/>})}
+     <polygon points={pointsAttr(top)} fill="url(#item3d)" stroke="#675236" strokeWidth="12" strokeLinejoin="round"/>
+     <line x1={top[2].x} y1={top[2].y} x2={top[3].x} y2={top[3].y} stroke="#675236" strokeWidth="15"/>
+     <circle cx={(top[2].x+top[3].x)/2} cy={(top[2].y+top[3].y)/2} r="10" fill="#4d3a23"/>
+    </g>;
+   }
    const corners=rotatedItemCorners(item),h=modelHeight(item),z0=Math.max(0,Number(item.elevation)||0),base=corners.map(p=>project(p.x,p.y,z0)),top=corners.map(p=>project(p.x,p.y,z0+h)),custom=["customfloor","customwall"].includes(item.type);
    let frontA=corners[3],frontB=corners[2];
    if(item.type==="customwall"&&item.wallId){
