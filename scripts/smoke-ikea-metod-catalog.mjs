@@ -6,6 +6,7 @@ const drawingSource=readFileSync("app/admin/tegning/DrawingClient.js","utf8");
 assert.ok(drawingSource.includes("const snapCornerCabinet="),"corner cabinets need a dedicated inner-corner placement action");
 assert.ok(drawingSource.includes("Plasser i nærmeste innerhjørne"),"corner placement must be accessible from the drawing editor");
 assert.ok(drawingSource.includes('if(o.type==="cornerbase")'),"corner cabinets need their own clipped-front plan glyph");
+assert.ok(drawingSource.includes("const footprint=[[0,0],[w,0],[w,d-cut],[w-cut,d],[0,d]]"),"3D corner cabinets must use the same clipped footprint as the plan view");
 const url="data:text/javascript;base64,"+Buffer.from(source).toString("base64");
 const {IKEA_METOD_MODULES, IKEA_METOD_SOURCES, validateIkeaMetodCatalog}=await import(url);
 assert.equal(validateIkeaMetodCatalog(),true,"METOD catalog must validate");
