@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 
 const source=readFileSync("lib/ikeaMetodCatalog.js","utf8");
+const drawingSource=readFileSync("app/admin/tegning/DrawingClient.js","utf8");
+assert.ok(drawingSource.includes("const snapCornerCabinet="),"corner cabinets need a dedicated inner-corner placement action");
+assert.ok(drawingSource.includes("Plasser i nærmeste innerhjørne"),"corner placement must be accessible from the drawing editor");
+assert.ok(drawingSource.includes('if(o.type==="cornerbase")'),"corner cabinets need their own clipped-front plan glyph");
 const url="data:text/javascript;base64,"+Buffer.from(source).toString("base64");
 const {IKEA_METOD_MODULES, IKEA_METOD_SOURCES, validateIkeaMetodCatalog}=await import(url);
 assert.equal(validateIkeaMetodCatalog(),true,"METOD catalog must validate");
@@ -16,4 +20,4 @@ assert.ok(IKEA_METOD_MODULES.every(item=>item.source&&item.source.startsWith("ht
 assert.ok(IKEA_METOD_SOURCES.tallCabinet.includes("60212565"));
 assert.ok(IKEA_METOD_SOURCES.corner88.includes("40596748"));
 assert.ok(IKEA_METOD_SOURCES.corner128.includes("40596753"));
-console.log(`IKEA METOD-katalog bestått: ${IKEA_METOD_MODULES.length} moduler, unike ID-er, benke-/veggskap, høyskap og begge hjørnevarianter.`);
+console.log(`IKEA METOD-katalog og hjørneplassering bestått: ${IKEA_METOD_MODULES.length} moduler, unike ID-er, skapmål, begge hjørnevarianter, egen hjørneglyph og hurtigplassering.`);
