@@ -527,6 +527,14 @@ function PlanItemGlyph({item,active}){
  if(o.type==="sliding")return <><rect width={o.w} height={Math.max(o.h,100)} fill="#f7f7f7" stroke="#51462f" strokeWidth="18"/><line x1="60" y1="20" x2={o.w*.62} y2="20" stroke="#51462f" strokeWidth="22"/><line x1={o.w*.38} y1={o.h-20} x2={o.w-60} y2={o.h-20} stroke="#51462f" strokeWidth="22"/></>;
  if(o.type==="opening")return <><line x1="0" y1={o.h/2} x2={o.w} y2={o.h/2} stroke="#fff" strokeWidth="100"/><line x1="0" y1="0" x2="0" y2={o.h} stroke="#777" strokeWidth="16"/><line x1={o.w} y1="0" x2={o.w} y2={o.h} stroke="#777" strokeWidth="16"/></>;
  if(o.type==="window")return <><rect width={o.w} height={Math.max(o.h,100)} fill="#dfeef1" stroke="#51462f" strokeWidth="18"/><line x1="0" y1={o.h/2} x2={o.w} y2={o.h/2} stroke="#64828a" strokeWidth="18"/></>;
+ if(o.type==="cornerbase"){
+  const cut=Math.min(o.w,o.h)*.38,fill=active?"#d9bc88":"#e9d7b4";
+  return <g>
+   <polygon points={"0,0 "+o.w+",0 "+o.w+","+(o.h-cut)+" "+(o.w-cut)+","+o.h+" 0,"+o.h} fill={fill} stroke="#51462f" strokeWidth="18" strokeLinejoin="round"/>
+   <line x1={o.w} y1={o.h-cut} x2={o.w-cut} y2={o.h} stroke="#8d7147" strokeWidth="24"/>
+   <circle cx={o.w-cut*.52} cy={o.h-cut*.52} r={Math.max(20,Math.min(o.w,o.h)*.035)} fill="#6a5336"/>
+  </g>;
+ }
  if(o.type==="customwall"||o.type==="customfloor"){
   const grid=furnitureGridMetrics(o);
   return <g>
