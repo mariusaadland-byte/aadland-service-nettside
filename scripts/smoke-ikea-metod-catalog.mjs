@@ -13,6 +13,7 @@ assert.deepEqual([find("metod-corner-88").width,find("metod-corner-88").depth],[
 assert.deepEqual([find("metod-corner-128").width,find("metod-corner-128").depth],[1275,675]);
 assert.ok(IKEA_METOD_MODULES.some(item=>item.type==="tallcab"&&item.height===2200));
 assert.ok(IKEA_METOD_MODULES.every(item=>item.source&&item.source.startsWith("https://www.ikea.com/")));
+assert.ok(IKEA_METOD_SOURCES.tallCabinet.includes("60212565"));
 assert.ok(IKEA_METOD_SOURCES.corner88.includes("40596748"));
 assert.ok(IKEA_METOD_SOURCES.corner128.includes("40596753"));
 console.log(`IKEA METOD-katalog bestått: ${IKEA_METOD_MODULES.length} moduler, unike ID-er, benke-/veggskap, høyskap og begge hjørnevarianter.`);
