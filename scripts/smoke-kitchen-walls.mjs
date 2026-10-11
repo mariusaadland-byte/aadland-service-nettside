@@ -3,7 +3,7 @@ import {readFileSync} from "node:fs";
 
 const source=readFileSync("lib/kitchenWallPresets.js","utf8");
 const builder=readFileSync("app/admin/tegning/KitchenWallBuilder.js","utf8");
-if(!builder.includes("const findCabinetFit=")||!builder.includes("Forslag til METOD-skaprekke"))throw new Error("Straight kitchen should suggest a fitting METOD cabinet row.");
+if(!builder.includes("const findCabinetFit=")||!builder.includes("Forslag til METOD-benkeskap"))throw new Error("Straight kitchen should suggest a fitting METOD cabinet row.");
 if(!builder.includes("METOD_WIDTHS=[200,300,400,600,800,1000,1200]")||!builder.includes("cabinetFit.used")||!builder.includes("cabinetFit.target"))throw new Error("METOD row fit should report exact selected width and target wall length.");
 if(!builder.includes("Plasser benkeskapene automatisk i tegningen"))throw new Error("Kitchen builder should offer automatic cabinet placement.");
 const drawing=readFileSync("app/admin/tegning/DrawingClient.js","utf8");
