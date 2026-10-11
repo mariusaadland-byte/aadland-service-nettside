@@ -6,7 +6,7 @@ import QuickCustomerPanel from "./QuickCustomerPanel";
 import KitchenWallBuilder from "./KitchenWallBuilder";
 import {createKitchenWalls,createKitchenCornerPlacements,kitchenWallDefaults} from "../../../lib/kitchenWallPresets";
 import {IKEA_METOD_MODULES} from "../../../lib/ikeaMetodCatalog";
-import {centerlinePointsFromInner,offsetPolygon,polygonSignedArea,infiniteLineIntersection} from "../../../lib/roomInnerGeometry";
+import {centerlinePointsFromInner,offsetPolygon,polygonSignedArea,infiniteLineIntersection} from "../../../lib/roomInnerGeometry.mjs";
 
 const GRID=100, VIEW=8000, STORE="aadlandDrawingsV2", LAST_STORE="aadlandDrawingsV2:last", FURNITURE_TEMPLATE_STORE="aadlandFurnitureTemplatesV1", VERSION_STORE="aadlandDrawingVersionsV1";
 const catalog=[
