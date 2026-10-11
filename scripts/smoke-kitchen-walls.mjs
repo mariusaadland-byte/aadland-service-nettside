@@ -57,10 +57,18 @@ assert.equal(rightCorners[0].rot,90,"right inner corner rotates the clipped face
 const uCorners=createKitchenCornerPlacements(u.walls,cornerModule,()=>String(++cornerId));
 assert.equal(uCorners.length,2,"U kitchen should have two corner cabinets");
 assert.deepEqual(uCorners.map(item=>item.rot).sort((a,b)=>a-b),[0,90],"U corners need opposite orientations");
-for(const item of [...leftCorners,...rightCorners,...uCorners]){
- const vertex={x:item.rot===90?item.x+item.w:item.x,y:item.y};
- assert.ok(Number.isFinite(item.x)&&Number.isFinite(item.y),"corner cabinet coordinates must be finite");
- assert.equal(item.w,875);assert.equal(item.h,875);
+for(const [placements,group] of [[leftCorners,leftL.walls],[rightCorners,l.walls],[uCorners,u.walls]]){
+ for(const item of placements){
+  const vertex=item.cornerVertex;
+  const connected=group.filter(w=>Math.hypot(w.x1-vertex.x,w.y1-vertex.y)<1||Math.hypot(w.x2-vertex.x,w.y2-vertex.y)<1);
+  assert.equal(connected.length,2,"corner cabinet must use a real shared wall vertex");
+  const inward=w=>{const length=lengths(w),side=w.insideSide==="right"?-1:1;return{x:-(w.y2-w.y1)/length*side,y:(w.x2-w.x1)/length*side}};
+  const a=inward(connected[0]),b=inward(connected[1]);
+  assert.equal(Math.round((item.x+item.w/2)*100)/100,Math.round((vertex.x+a.x*item.w/2+b.x*item.h/2)*100)/100,"cabinet center must offset inward from both wall faces");
+  assert.equal(Math.round((item.y+item.h/2)*100)/100,Math.round((vertex.y+a.y*item.w/2+b.y*item.h/2)*100)/100,"cabinet center must offset inward from both wall faces");
+  assert.ok(Number.isFinite(item.x)&&Number.isFinite(item.y),"corner cabinet coordinates must be finite");
+  assert.equal(item.w,875);assert.equal(item.h,875);
+ }
 }
 
 for(const group of [straight,l,leftL,u]){
