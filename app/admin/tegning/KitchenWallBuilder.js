@@ -16,6 +16,8 @@ export default function KitchenWallBuilder({value,onChange,onCancel,onCreate,sty
  const shape=KITCHEN_SHAPES.includes(value.shape)?value.shape:"straight";
  const back=Math.max(0,Number(value.backLength)||0),left=Math.max(0,Number(value.leftDepth)||0),right=Math.max(0,Number(value.rightDepth)||0),lSide=value.lSide==="left"?"left":"right";
  const activeLeft=shape==="u"||shape==="l"&&lSide==="left"?left:0,activeRight=shape==="u"||shape==="l"&&lSide==="right"?right:0,previewScale=Math.min(178/Math.max(1,back),82/Math.max(1,activeLeft,activeRight)),previewBack=Math.max(1,back)*previewScale,previewX1=160-previewBack/2,previewX2=160+previewBack/2,previewY=40,previewLeftY=previewY+activeLeft*previewScale,previewRightY=previewY+activeRight*previewScale;
+ const findCabinetFit=length=>{const target=Math.max(0,Math.floor(Number(length)||0)),dp=Array(target+1).fill(null);dp[0]=[];for(let sum=0;sum<=target;sum++){if(!dp[sum])continue;for(const width of [200,300,400,600,800,1000,1200]){const next=sum+width;if(next<=target&&(!dp[next]||dp[next].length>dp[sum].length+1))dp[next]=[...dp[sum],width]}}let used=target;while(used>0&&!dp[used])used--;return{widths:(dp[used]||[]).slice().sort((a,b)=>b-a),remainder:target-used}};
+ const cabinetFit=shape==="straight"&&back>=200?findCabinetFit(back):null;
  return <div className={styles.roomModalBackdrop} role="presentation" onPointerDown={event=>{if(event.target===event.currentTarget)onCancel()}}>
   <section className={styles.roomModal+" "+styles.kitchenWallModal} role="dialog" aria-modal="true" aria-label="Lag kjøkken med åpne vegger">
    <div className={styles.roomModalHead}><div><span>KJØKKENTEGNING</span><h2>Vegger uten helt rom</h2></div><button type="button" onClick={onCancel} aria-label="Lukk">×</button></div>
@@ -42,6 +44,7 @@ export default function KitchenWallBuilder({value,onChange,onCancel,onCreate,sty
      <label>Vegghøyde (mm)<input type="number" inputMode="numeric" min="300" max="6000" required value={value.height} onChange={e=>change("height",e.target.value)}/></label>
      <label>Veggtykkelse (mm)<input type="number" inputMode="numeric" min="40" max="600" required value={value.thickness} onChange={e=>change("thickness",e.target.value)}/></label>
     </div>
+    {cabinetFit&&<div className={styles.kitchenWallHelp}><strong>Forslag til METOD-skaprekke</strong><p>{cabinetFit.widths.length?cabinetFit.widths.map(width=>width+" mm").join(" + "):"Ingen standardmodul passer"}{cabinetFit.remainder>0?" · "+cabinetFit.remainder+" mm til foring/tilpasning":" · fyller vegglengden"}</p><small>Automatisk forslag med standardbredder 20, 30, 40, 60, 80, 100 og 120 cm. Kontroller hjørner, hvitevarer og monteringsmål før bestilling.</small></div>}
     <p className={styles.kitchenWallHelp}>Målene gjelder lengden langs hver kjøkkenvegg. Skap monteres på innsiden og kan plasseres helt mot veggens ender. Du kan endre målene på veggene etterpå.</p>
     {error&&<p role="alert" className={styles.kitchenWallError}>{error}</p>}
     <div className={styles.roomModalActions}><button type="button" onClick={onCancel}>Avbryt</button><button type="submit">Lag {shape==="straight"?"én vegg":shape==="l"?"L-kjøkken":"U-kjøkken"}</button></div>
