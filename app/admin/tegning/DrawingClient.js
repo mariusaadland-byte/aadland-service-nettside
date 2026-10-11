@@ -1385,9 +1385,19 @@ export default function DrawingClient(){
   const {walls,bounds,shape}=createKitchenWalls(config,{
    center:{x:pan.x+dimensions.w/2,y:pan.y+dimensions.h/2},canvasSize:VIEW,idFactory:uid
   });
-  mutate(d=>({...d,walls:[...d.walls,...walls]}));
   const main=walls.find(w=>w.kitchenLabel==="Bakvegg")||walls[0];
-  setSelected({kind:"wall",id:main.id});
+  const widths=shape==="straight"&&Array.isArray(config.cabinetWidths)?config.cabinetWidths.filter(width=>Number.isInteger(width)&&[200,300,400,600,800,1000,1200].includes(width)):[];
+  const cabinetItems=[];let cabinetStart=0;
+  for(const width of widths){
+   const module=IKEA_METOD_MODULES.find(row=>row.type==="base"&&row.width===width&&row.depth===600);
+   if(!module||cabinetStart+width>Number(config.backLength))continue;
+   const id=uid(),off=wallOffsetFromFaceStart(main,cabinetStart,width,doc.zones||[],doc.walls||[],doc.defaultWallThickness||98);
+   const base={id,type:module.type,x:0,y:0,w:module.width,h:module.depth,rot:0,wallId:main.id,wallOffset:off,...itemDefaults(module.type,doc),modelHeight:module.height,elevation:module.elevation,metodModuleId:module.id,metodModuleLabel:module.label,metodSource:module.source};
+   const placed=mountedItemCenter(base,main,doc.zones||[],[...(doc.walls||[]),...walls],doc.defaultWallThickness||98);
+   cabinetItems.push({...base,x:placed.cx-module.width/2,y:placed.cy-module.depth/2,rot:placed.a*180/Math.PI,wallOffset:placed.off});cabinetStart+=width;
+  }
+  mutate(d=>({...d,walls:[...d.walls,...walls],items:[...d.items,...cabinetItems]}));
+  if(cabinetItems.length){setSelected({kind:"item",id:cabinetItems[0].id});}else setSelected({kind:"wall",id:main.id});
   setTool("select");setDraft(null);setWallChain(null);setSnapHint(null);setQuickAddOpen(false);
   const width=Math.max(400,bounds.maxX-bounds.minX),height=Math.max(400,bounds.maxY-bounds.minY);
   const zoom=clamp(Math.min(VIEW/(width*1.45),VIEW/(height*1.75)),.65,4);
@@ -1395,7 +1405,7 @@ export default function DrawingClient(){
   setPan(clampPanForZoom({x:midX-span/2,y:midY-span/2},zoom));
   setDoc(d=>({...d,zoom}));
   setKitchenBuilder(null);
-  setMessage((shape==="straight"?"Én kjøkkenvegg":shape==="l"?"L-kjøkken":"U-kjøkken")+" opprettet uten lukket rom");
+  setMessage((shape==="straight"?"Én kjøkkenvegg":shape==="l"?"L-kjøkken":"U-kjøkken")+" opprettet"+(cabinetItems.length?" med "+cabinetItems.length+" METOD-benkeskap":"")+" uten lukket rom");
   setTimeout(()=>setMessage(""),2800);
  };
  const setStandaloneWallInside=(wallId,side)=>{
