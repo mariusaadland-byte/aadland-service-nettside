@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 
 const source=readFileSync("lib/kitchenWallPresets.js","utf8");
+const builder=readFileSync("app/admin/tegning/KitchenWallBuilder.js","utf8");
+if(!builder.includes("const findCabinetFit=")||!builder.includes("Forslag til METOD-skaprekke"))throw new Error("Straight kitchen should suggest a fitting METOD cabinet row.");
 const preview=readFileSync("app/admin/tegning/KitchenWallBuilder.js","utf8");
 if(!preview.includes("previewScale=Math.min("))throw new Error("Kitchen preview must use entered dimensions.");
 const url="data:text/javascript;base64,"+Buffer.from(source).toString("base64");
