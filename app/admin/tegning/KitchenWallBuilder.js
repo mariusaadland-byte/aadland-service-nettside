@@ -1,6 +1,6 @@
 "use client";
 import {useState} from "react";
-import {KITCHEN_SHAPES} from "../../../lib/kitchenWallPresets";
+import {KITCHEN_SHAPES,validateKitchenCornerFit} from "../../../lib/kitchenWallPresets";
 const presets=[
  {id:"straight",icon:"━",title:"Én vegg",help:"Rett kjøkken"},
  {id:"l",icon:"┓",title:"L-vegg",help:"Bakvegg + høyre side"},
@@ -12,7 +12,7 @@ export default function KitchenWallBuilder({value,onChange,onCancel,onCreate,sty
  const change=(key,next)=>{setError("");onChange(current=>({...current,[key]:next}))};
  const submit=event=>{
   event.preventDefault();setError("");
-  try{onCreate({...value,cabinetRuns:includeCabinets?cabinetRuns.map(run=>({wallLabel:run.wallLabel,start:run.start,widths:run.fit.widths})):[]})}catch(err){setError(err?.message||"Kunne ikke opprette veggene.")}
+  try{validateKitchenCornerFit(value,{includeCabinets});onCreate({...value,cabinetRuns:includeCabinets?cabinetRuns.map(run=>({wallLabel:run.wallLabel,start:run.start,widths:run.fit.widths})):[]})}catch(err){setError(err?.message||"Kunne ikke opprette veggene.")}
  };
  const shape=KITCHEN_SHAPES.includes(value.shape)?value.shape:"straight";
  const back=Math.max(0,Number(value.backLength)||0),left=Math.max(0,Number(value.leftDepth)||0),right=Math.max(0,Number(value.rightDepth)||0),lSide=value.lSide==="left"?"left":"right";
