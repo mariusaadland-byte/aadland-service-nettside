@@ -64,8 +64,8 @@ for(const [placements,group] of [[leftCorners,leftL.walls],[rightCorners,l.walls
   assert.equal(connected.length,2,"corner cabinet must use a real shared wall vertex");
   const inward=w=>{const length=lengths(w),side=w.insideSide==="right"?-1:1;return{x:-(w.y2-w.y1)/length*side,y:(w.x2-w.x1)/length*side}};
   const a=inward(connected[0]),b=inward(connected[1]);
-  assert.equal(Math.round((item.x+item.w/2)*100)/100,Math.round((vertex.x+a.x*item.w/2+b.x*item.h/2)*100)/100,"cabinet center must offset inward from both wall faces");
-  assert.equal(Math.round((item.y+item.h/2)*100)/100,Math.round((vertex.y+a.y*item.w/2+b.y*item.h/2)*100)/100,"cabinet center must offset inward from both wall faces");
+  assert.equal(Math.round((item.x+item.w/2)*100)/100,Math.round((vertex.x+a.x*(item.w/2+(connected[0].t||0)/2)+b.x*(item.h/2+(connected[1].t||0)/2))*100)/100,"cabinet center must include half-thickness of both finished wall faces");
+  assert.equal(Math.round((item.y+item.h/2)*100)/100,Math.round((vertex.y+a.y*(item.w/2+(connected[0].t||0)/2)+b.y*(item.h/2+(connected[1].t||0)/2))*100)/100,"cabinet center must include half-thickness of both finished wall faces");
   assert.ok(Number.isFinite(item.x)&&Number.isFinite(item.y),"corner cabinet coordinates must be finite");
   assert.equal(item.w,875);assert.equal(item.h,875);
  }
