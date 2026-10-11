@@ -8,7 +8,7 @@ if(!builder.includes("METOD_WIDTHS=[200,300,400,600,800,1000,1200]")||!builder.i
 if(!builder.includes("Plasser benkeskapene automatisk i tegningen"))throw new Error("Kitchen builder should offer automatic cabinet placement.");
 const drawing=readFileSync("app/admin/tegning/DrawingClient.js","utf8");
 if(!drawing.includes("config.cabinetRuns")||!drawing.includes("cabinetItems.push")||!drawing.includes("metodModuleId:module.id"))throw new Error("Suggested METOD modules should be created as placed catalog items.");
-if(!builder.includes("CORNER_RESERVE=875")||!builder.includes("WALL_FACE_OFFSET=Math.max(0,Number(value.thickness)||0)/2")||!builder.includes("CORNER_START=CORNER_RESERVE+WALL_FACE_OFFSET")||!builder.includes("Venstre sidevegg")||!builder.includes("Høyre sidevegg")||!builder.includes("holdes 875 mm fri fra ferdig innvendig veggflate"))throw new Error("L/U kitchen runs must reserve 875 mm from the finished inside corner face plus the wall centerline offset.");
+if(!builder.includes("CORNER_RESERVE=875")||!builder.includes("WALL_FACE_OFFSET=Math.max(0,Number(value.thickness)||0)/2")||!builder.includes("CORNER_START=CORNER_RESERVE+WALL_FACE_OFFSET")||!builder.includes("Venstre sidevegg")||!builder.includes("Høyre sidevegg")||!builder.includes("holdes 875 mm fri fra ferdig innvendig veggflate")||!builder.includes("Hjørneskap settes inn automatisk sammen med benkeskapene"))throw new Error("L/U kitchen runs must reserve 875 mm from the finished inside corner face and describe automatic corner placement accurately.");
 if(!builder.includes("start:hasLeft?CORNER_START:0")||!builder.includes("findCabinetFit(back-(hasLeft?CORNER_START:0)-(hasRight?CORNER_START:0))")||!builder.includes("findCabinetFit(left-CORNER_START)")||!builder.includes("findCabinetFit(right-CORNER_START)"))throw new Error("L/U cabinet suggestions must calculate usable back and side-wall runs from the finished inside faces.");
 if(!builder.includes('{wallLabel:"Venstre sidevegg",start:0,fit:findCabinetFit(left-CORNER_START)}'))throw new Error("Left-side cabinets must start at the open end and leave the reserve at the inner corner.");
 const preview=readFileSync("app/admin/tegning/KitchenWallBuilder.js","utf8");
@@ -103,8 +103,8 @@ for(const [placements,group] of [[leftCorners,leftL.walls],[rightCorners,l.walls
   const backUsable=back-(hasLeft?cornerStart:0)-(hasRight?cornerStart:0);
   assert.ok(backUsable>=0,label+" back row should have nonnegative usable length");
   assert.equal(backStart,hasLeft?924:0,label+" back row start accounts for half wall thickness");
-  if(hasLeft)assert.equal(left-cornerStart,left===1750?826:1276,label+" left side row leaves 875 mm clear from inside face");
-  if(hasRight)assert.equal(right-cornerStart,right===2600?1676:1976,label+" right side row leaves 875 mm clear from inside face");
+  if(hasLeft)assert.equal(left-cornerStart,left===1750?826:1276,label+" left side usable run is measured after the corner reserve");
+  if(hasRight)assert.equal(right-cornerStart,right===2600?1676:1976,label+" right side usable run is measured after the corner reserve");
   // Corner's wall-facing edge starts 49 mm past the centerline vertex and spans
   // 875 mm; the straight row's first/last edge must meet, not overlap, that edge.
   assert.equal(cornerStart-faceOffset,cornerReserve,label+" reserve is measured from finished face");
