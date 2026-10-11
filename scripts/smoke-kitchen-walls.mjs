@@ -9,6 +9,7 @@ if(!builder.includes("Plasser benkeskapene automatisk i tegningen"))throw new Er
 const drawing=readFileSync("app/admin/tegning/DrawingClient.js","utf8");
 if(!drawing.includes("config.cabinetRuns")||!drawing.includes("cabinetItems.push")||!drawing.includes("metodModuleId:module.id"))throw new Error("Suggested METOD modules should be created as placed catalog items.");
 if(!builder.includes("CORNER_RESERVE=875")||!builder.includes("Venstre sidevegg")||!builder.includes("Høyre sidevegg")||!builder.includes("holdes 875 mm fri"))throw new Error("L/U kitchen runs must reserve corner space and suggest cabinets for side walls.");
+if(!builder.includes("start:hasLeft?CORNER_RESERVE:0")||!builder.includes("findCabinetFit(left-CORNER_RESERVE)")||!builder.includes("findCabinetFit(right-CORNER_RESERVE)"))throw new Error("L/U cabinet suggestions must calculate usable back and side-wall runs.");
 const preview=readFileSync("app/admin/tegning/KitchenWallBuilder.js","utf8");
 if(!preview.includes("previewScale=Math.min("))throw new Error("Kitchen preview must use entered dimensions.");
 const url="data:text/javascript;base64,"+Buffer.from(source).toString("base64");
