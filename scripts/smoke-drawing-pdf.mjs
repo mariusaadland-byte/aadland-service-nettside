@@ -8,7 +8,7 @@ const reportCode=readFileSync("lib/drawingReportPdf.js","utf8")
  .replace('import "server-only";',"")
  .replace('from "./drawingPdfPages";','from "'+pageUrl+'";');
 const report=await import("data:text/javascript;base64,"+Buffer.from(reportCode).toString("base64"));
-import {centerlinePointsFromInner,offsetPolygon} from "../lib/roomInnerGeometry.js";
+import {centerlinePointsFromInner,offsetPolygon} from "../lib/roomInnerGeometry.mjs";
 
 const drawingSource=readFileSync("app/admin/tegning/DrawingClient.js","utf8");
 assert.ok(drawingSource.includes("const centerPoints=offsetPolygon(innerPoints,t/2,false)"),"entered inner room boundary must be offset outward to wall centerlines");
@@ -28,11 +28,11 @@ assert.deepEqual(centerlines,[
 ],"inner room dimensions must stay exact when each wall has its own thickness");
 const centerline=offsetPolygon(innerRect,49,false);
 assert.deepEqual(centerline,[
- {x:0,y:-49},
- {x:4049,y:0},
- {x:4000,y:3049},
- {x:-49,y:3000}
-].map((p,i)=>p),"wall centerline offset must be computed from the inner boundary");
+ {x:-49,y:-49},
+ {x:4049,y:-49},
+ {x:4049,y:3049},
+ {x:-49,y:3049}
+],"wall centerline offset must be computed from the inner boundary");
 const w=4000,h=3000;
 const points=[{x:300,y:300},{x:4300,y:300},{x:4300,y:3300},{x:300,y:3300}];
 const walls=points.map((p,i)=>({id:"wall-"+i,x1:p.x,y1:p.y,x2:points[(i+1)%4].x,y2:points[(i+1)%4].y,t:98,h:2400}));
