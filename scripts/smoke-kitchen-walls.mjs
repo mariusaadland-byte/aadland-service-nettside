@@ -89,33 +89,6 @@ for(const [placements,group] of [[leftCorners,leftL.walls],[rightCorners,l.walls
 }
 
 for(const group of [straight,l,leftL,u]){
- for(const item of placements){
-  const vertex=item.cornerVertex;
-  const connected=group.filter(w=>Math.hypot(w.x1-vertex.x,w.y1-vertex.y)<1||Math.hypot(w.x2-vertex.x,w.y2-vertex.y)<1);
-  const inward=w=>{const length=lengths(w),side=w.insideSide==="right"?-1:1;return{x:-(w.y2-w.y1)/length*side,y:(w.x2-w.x1)/length*side}};
-
-  // Validate the actual rotated clipped footprint, not only its center point.
-  const w=item.w,d=item.h,cx=item.x+w/2,cy=item.y+d/2,rad=(Number(item.rot)||0)*Math.PI/180;
-  const cut=Math.min(w,d)*.38;
-  const footprint=[[0,0],[w,0],[w,d-cut],[w-cut,d],[0,d]].map(([x,y])=>({
-   x:cx+(x-w/2)*Math.cos(rad)-(y-d/2)*Math.sin(rad),
-   y:cy+(x-w/2)*Math.sin(rad)+(y-d/2)*Math.cos(rad)
-  }));
-  for(const wall of connected){
-   const n=inward(wall),faceOffset=(Number(wall.t)||0)/2;
-   const faceEdge=footprint.some((p,k)=>{
-    const q=footprint[(k+1)%footprint.length];
-    const dp=(p.x-vertex.x)*n.x+(p.y-vertex.y)*n.y;
-    const dq=(q.x-vertex.x)*n.x+(q.y-vertex.y)*n.y;
-    return Math.abs(dp-faceOffset)<0.01&&Math.abs(dq-faceOffset)<0.01;
-   });
-   assert.ok(faceEdge,`rotated corner footprint must touch the finished inside face of ${wall.kitchenLabel}`);
-  }
-
- }
-}
-
-for(const group of [straight,l,leftL,u]){
  for(const wall of group.walls){
   assert.equal(wall.insideSide,"left");
   for(const number of [wall.x1,wall.x2,wall.y1,wall.y2])assert.ok(number>=0&&number<=8000,"wall outside canvas");
