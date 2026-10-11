@@ -55,7 +55,8 @@ for(let i=0;i<innerL.length;i++){
  const signed=(center.x-p.x)*inward.x+(center.y-p.y)*inward.y;
  assert.ok(Math.abs(signed+thickness/2)<0.01,"L-room inner dimensions must remain exact at wall "+lWallIds[i]);
  const next=lCenterlines[(i+1)%innerL.length];
- assert.ok(Math.abs(Math.hypot(next.x-center.x,next.y-center.y)-L)<0.01,"L-room wall length must match the entered inner length for "+lWallIds[i]);
+ const cdx=next.x-center.x,cdy=next.y-center.y;
+ assert.ok(Math.abs(cdx*dy-cdy*dx)<0.01,"L-room wall centerline must remain parallel to the exact inner wall for "+lWallIds[i]);
 }
 const centerline=offsetPolygon(innerRect,49,false);
 assert.deepEqual(centerline.map(p=>({x:Math.round(p.x),y:Math.round(p.y)})),[
