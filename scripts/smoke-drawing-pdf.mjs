@@ -14,6 +14,8 @@ const drawingSource=readFileSync("app/admin/tegning/DrawingClient.js","utf8");
 assert.ok(drawingSource.includes("const centerPoints=offsetPolygon(innerPoints,t/2,false)"),"entered inner room boundary must be offset outward to wall centerlines");
 assert.ok(drawingSource.includes('dimensionMode:"inner",enteredInnerWidth:w,enteredInnerHeight:h'),"room must retain the exact entered inner dimensions");
 assert.ok(drawingSource.includes("centerlinePointsFromInner(innerPoints,zone.wallIds"),"editing a room must preserve its inner face while updating wall centerlines");
+assert.ok(drawingSource.includes("updateRoomInnerWallLength"),"room wall-length edits must go through the inner-dimension update path");
+assert.ok(drawingSource.includes("rebuildLinkedRoomGeometry(d,zone,inner,{[wallId]:n})"),"wall thickness edits must rebuild centerlines from the existing inner boundary");
 const innerRect=[{x:0,y:0},{x:4000,y:0},{x:4000,y:3000},{x:0,y:3000}];
 const wallIds=["top","right","bottom","left"];
 const variedWalls=[
@@ -26,6 +28,19 @@ assert.deepEqual(centerlines.map(p=>({x:Math.round(p.x),y:Math.round(p.y)})),[
  {x:4060,y:3040},
  {x:-30,y:3040}
 ],"inner room dimensions must stay exact when each wall has its own thickness");
+// Editing a wall thickness must move its centerline, not its finished inner face.
+const thicknessChanged=centerlinePointsFromInner(innerRect,wallIds,variedWalls,98,{top:180});
+const assertInnerFace=(lines,wallSpecs,label)=>{
+ for(let i=0;i<lines.length;i++){
+  const a=lines[i],b=lines[(i+1)%lines.length],dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy);
+  const inward={x:-dy/L,y:dx/L},t=(wallSpecs.find(w=>w.id===wallIds[i])?.t??98);
+  const mid={x:(a.x+b.x)/2+inward.x*t/2,y:(a.y+b.y)/2+inward.y*t/2};
+  const p=innerRect[i],q=innerRect[(i+1)%innerRect.length],expected={x:(p.x+q.x)/2,y:(p.y+q.y)/2};
+  assert.ok(Math.abs(mid.x-expected.x)<0.01&&Math.abs(mid.y-expected.y)<0.01,label+" must preserve the exact inner face of wall "+wallIds[i]);
+ }
+};
+assertInnerFace(centerlines,variedWalls,"mixed wall thicknesses");
+assertInnerFace(thicknessChanged,variedWalls.map(w=>w.id==="top"?{...w,t:180}:w),"editing wall thickness");
 const centerline=offsetPolygon(innerRect,49,false);
 assert.deepEqual(centerline.map(p=>({x:Math.round(p.x),y:Math.round(p.y)})),[
  {x:-49,y:-49},
