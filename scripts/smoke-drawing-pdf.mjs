@@ -40,6 +40,23 @@ const assertInnerFace=(lines,wallSpecs,label)=>{
 };
 assertInnerFace(centerlines,variedWalls,"mixed wall thicknesses");
 assertInnerFace(thicknessChanged,variedWalls.map(w=>w.id==="top"?{...w,t:180}:w),"editing wall thickness");
+// L-shaped rooms are also entered by their finished inner faces. Test the
+// concave corner with mixed wall thicknesses, not just rectangular rooms.
+const innerL=[
+ {x:0,y:0},{x:5000,y:0},{x:5000,y:1600},
+ {x:3200,y:1600},{x:3200,y:4000},{x:0,y:4000}
+];
+const lWallIds=["l-top","l-right","l-notch","l-inner","l-bottom","l-left"];
+const lWallSpecs=lWallIds.map((id,i)=>({id,t:[98,120,80,140,98,60][i]}));
+const lCenterlines=centerlinePointsFromInner(innerL,lWallIds,lWallSpecs,98);
+for(let i=0;i<innerL.length;i++){
+ const p=innerL[i],q=innerL[(i+1)%innerL.length],dx=q.x-p.x,dy=q.y-p.y,L=Math.hypot(dx,dy);
+ const inward={x:-dy/L,y:dx/L},center=lCenterlines[i],thickness=lWallSpecs[i].t;
+ const signed=(center.x-p.x)*inward.x+(center.y-p.y)*inward.y;
+ assert.ok(Math.abs(signed+thickness/2)<0.01,"L-room inner dimensions must remain exact at wall "+lWallIds[i]);
+ const next=lCenterlines[(i+1)%innerL.length];
+ assert.ok(Math.abs(Math.hypot(next.x-center.x,next.y-center.y)-L)<0.01,"L-room wall length must match the entered inner length for "+lWallIds[i]);
+}
 const centerline=offsetPolygon(innerRect,49,false);
 assert.deepEqual(centerline.map(p=>({x:Math.round(p.x),y:Math.round(p.y)})),[
  {x:-49,y:-49},
