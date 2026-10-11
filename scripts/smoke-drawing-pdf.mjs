@@ -11,6 +11,7 @@ const report=await import("data:text/javascript;base64,"+Buffer.from(reportCode)
 import {centerlinePointsFromInner,offsetPolygon} from "../lib/roomInnerGeometry.mjs";
 
 const drawingSource=readFileSync("app/admin/tegning/DrawingClient.js","utf8");
+assert.ok(drawingSource.includes('style={{touchAction:"none",userSelect:"none"}}'),"wall elevation dragging must suppress browser touch scrolling and text selection on mobile");
 assert.ok(drawingSource.includes("const centerPoints=offsetPolygon(innerPoints,t/2,false)"),"entered inner room boundary must be offset outward to wall centerlines");
 assert.ok(drawingSource.includes('dimensionMode:"inner",enteredInnerWidth:w,enteredInnerHeight:h'),"room must retain the exact entered inner dimensions");
 assert.ok(drawingSource.includes("centerlinePointsFromInner(innerPoints,zone.wallIds"),"editing a room must preserve its inner face while updating wall centerlines");
