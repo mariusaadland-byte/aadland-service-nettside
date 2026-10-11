@@ -3,6 +3,7 @@ import {readFileSync} from "node:fs";
 
 const source=readFileSync("lib/ikeaMetodCatalog.js","utf8");
 const drawingSource=readFileSync("app/admin/tegning/DrawingClient.js","utf8");
+assert.ok(drawingSource.includes("const fillWallRight="),"kitchen rows must support automatic rightward fill");
 assert.ok(drawingSource.includes("const snapCornerCabinet="),"corner cabinets need a dedicated inner-corner placement action");
 assert.ok(drawingSource.includes("Plasser i nærmeste innerhjørne"),"corner placement must be accessible from the drawing editor");
 assert.ok(drawingSource.includes('if(o.type==="cornerbase")'),"corner cabinets need their own clipped-front plan glyph");
