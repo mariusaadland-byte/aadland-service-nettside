@@ -68,10 +68,27 @@ for(const [placements,group] of [[leftCorners,leftL.walls],[rightCorners,l.walls
   assert.equal(Math.round((item.y+item.h/2)*100)/100,Math.round((vertex.y+a.y*(item.w/2+(connected[0].t||0)/2)+b.y*(item.h/2+(connected[1].t||0)/2))*100)/100,"cabinet center must include half-thickness of both finished wall faces");
   assert.ok(Number.isFinite(item.x)&&Number.isFinite(item.y),"corner cabinet coordinates must be finite");
   assert.equal(item.w,875);assert.equal(item.h,875);
+  // Validate the actual rotated clipped footprint, not only its center point.
+  const w=item.w,d=item.h,cx=item.x+w/2,cy=item.y+d/2,rad=(Number(item.rot)||0)*Math.PI/180;
+  const cut=Math.min(w,d)*.38;
+  const footprint=[[0,0],[w,0],[w,d-cut],[w-cut,d],[0,d]].map(([x,y])=>({
+   x:cx+(x-w/2)*Math.cos(rad)-(y-d/2)*Math.sin(rad),
+   y:cy+(x-w/2)*Math.sin(rad)+(y-d/2)*Math.cos(rad)
+  }));
+  for(const wall of connected){
+   const n=inward(wall),faceOffset=(Number(wall.t)||0)/2;
+   const faceEdge=footprint.some((p,k)=>{
+    const q=footprint[(k+1)%footprint.length];
+    const dp=(p.x-vertex.x)*n.x+(p.y-vertex.y)*n.y;
+    const dq=(q.x-vertex.x)*n.x+(q.y-vertex.y)*n.y;
+    return Math.abs(dp-faceOffset)<0.01&&Math.abs(dq-faceOffset)<0.01;
+   });
+   assert.ok(faceEdge,`rotated corner footprint must touch the finished inside face of ${wall.kitchenLabel}`);
+  }
  }
 }
 
-for(const [placements,group] of [[leftCorners,leftL.walls],[rightCorners,l.walls],[uCorners,u.walls]]){
+for(const group of [straight,l,leftL,u]){
  for(const item of placements){
   const vertex=item.cornerVertex;
   const connected=group.filter(w=>Math.hypot(w.x1-vertex.x,w.y1-vertex.y)<1||Math.hypot(w.x2-vertex.x,w.y2-vertex.y)<1);
