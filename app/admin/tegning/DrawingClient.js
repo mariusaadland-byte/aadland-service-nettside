@@ -4,7 +4,7 @@ import Link from "next/link";
 import styles from "./drawing.module.css";
 import QuickCustomerPanel from "./QuickCustomerPanel";
 import KitchenWallBuilder from "./KitchenWallBuilder";
-import {createKitchenWalls,kitchenWallDefaults} from "../../../lib/kitchenWallPresets";
+import {createKitchenWalls,createKitchenCornerPlacements,kitchenWallDefaults} from "../../../lib/kitchenWallPresets";
 import {IKEA_METOD_MODULES} from "../../../lib/ikeaMetodCatalog";
 
 const GRID=100, VIEW=8000, STORE="aadlandDrawingsV2", LAST_STORE="aadlandDrawingsV2:last", FURNITURE_TEMPLATE_STORE="aadlandFurnitureTemplatesV1", VERSION_STORE="aadlandDrawingVersionsV1";
@@ -1403,20 +1403,13 @@ export default function DrawingClient(){
     cabinetItems.push({...base,x:placed.cx-module.width/2,y:placed.cy-module.depth/2,rot:placed.a*180/Math.PI,wallOffset:placed.off});cabinetStart+=width;
    }
   }
-  // Add one real catalog corner cabinet at each shared inner corner when automatic cabinet placement is enabled.
+  // Use the same tested geometry for plan view and 3D placement.
   if(runs.length&&shape!=="straight"){
    const corner=IKEA_METOD_MODULES.find(row=>row.id==="metod-corner-88");
    if(corner){
-    for(let i=0;i<walls.length;i++)for(let j=i+1;j<walls.length;j++){
-     const aWall=walls[i],bWall=walls[j];
-     const endsA=[{x:aWall.x1,y:aWall.y1},{x:aWall.x2,y:aWall.y2}],endsB=[{x:bWall.x1,y:bWall.y1},{x:bWall.x2,y:bWall.y2}];
-     const vertex=endsA.find(a=>endsB.some(b=>Math.hypot(a.x-b.x,a.y-b.y)<1));
-     if(!vertex)continue;
-     const na=wallInwardNormal(aWall,doc.zones||[]),nb=wallInwardNormal(bWall,doc.zones||[]);
-     const cx=vertex.x+na.x*corner.width/2+nb.x*corner.depth/2,cy=vertex.y+na.y*corner.width/2+nb.y*corner.depth/2;
-     const facesRight=aWall.kitchenLabel==="Høyre sidevegg"||bWall.kitchenLabel==="Høyre sidevegg";
-     const base={id:uid(),type:"cornerbase",x:cx-corner.width/2,y:cy-corner.depth/2,w:corner.width,h:corner.depth,rot:facesRight?90:0,wallId:null,...itemDefaults("cornerbase",doc),modelHeight:corner.height,elevation:0,metodModuleId:corner.id,metodModuleLabel:corner.label,metodSource:corner.source};
-     cabinetItems.push(base);
+    for(const placement of createKitchenCornerPlacements(walls,corner,uid)){
+     const {cornerVertex,...geometry}=placement;
+     cabinetItems.push({...geometry,...itemDefaults("cornerbase",doc),type:"cornerbase",w:corner.width,h:corner.depth,modelHeight:corner.height,elevation:0,metodModuleId:corner.id,metodModuleLabel:corner.label,metodSource:corner.source});
     }
    }
   }
