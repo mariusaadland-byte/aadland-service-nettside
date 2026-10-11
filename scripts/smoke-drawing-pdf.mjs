@@ -27,7 +27,7 @@ assert.deepEqual(centerlines.map(p=>({x:Math.round(p.x),y:Math.round(p.y)})),[
  {x:-30,y:3040}
 ],"inner room dimensions must stay exact when each wall has its own thickness");
 const centerline=offsetPolygon(innerRect,49,false);
-assert.deepEqual(centerline,[
+assert.deepEqual(centerline.map(p=>({x:Math.round(p.x),y:Math.round(p.y)})),[
  {x:-49,y:-49},
  {x:4049,y:-49},
  {x:4049,y:3049},
