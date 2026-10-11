@@ -8,10 +8,11 @@ const presets=[
 ];
 export default function KitchenWallBuilder({value,onChange,onCancel,onCreate,styles}){
  const [error,setError]=useState("");
+ const [includeCabinets,setIncludeCabinets]=useState(true);
  const change=(key,next)=>{setError("");onChange(current=>({...current,[key]:next}))};
  const submit=event=>{
   event.preventDefault();setError("");
-  try{onCreate(value)}catch(err){setError(err?.message||"Kunne ikke opprette veggene.")}
+  try{onCreate({...value,cabinetWidths:shape==="straight"&&includeCabinets?(cabinetFit?.widths||[]):[]})}catch(err){setError(err?.message||"Kunne ikke opprette veggene.")}
  };
  const shape=KITCHEN_SHAPES.includes(value.shape)?value.shape:"straight";
  const back=Math.max(0,Number(value.backLength)||0),left=Math.max(0,Number(value.leftDepth)||0),right=Math.max(0,Number(value.rightDepth)||0),lSide=value.lSide==="left"?"left":"right";
@@ -44,7 +45,7 @@ export default function KitchenWallBuilder({value,onChange,onCancel,onCreate,sty
      <label>Vegghøyde (mm)<input type="number" inputMode="numeric" min="300" max="6000" required value={value.height} onChange={e=>change("height",e.target.value)}/></label>
      <label>Veggtykkelse (mm)<input type="number" inputMode="numeric" min="40" max="600" required value={value.thickness} onChange={e=>change("thickness",e.target.value)}/></label>
     </div>
-    {cabinetFit&&<div className={styles.kitchenWallHelp}><strong>Forslag til METOD-skaprekke</strong><p>{cabinetFit.widths.length?cabinetFit.widths.map(width=>width+" mm").join(" + "):"Ingen standardmodul passer"}{cabinetFit.remainder>0?" · "+cabinetFit.remainder+" mm til foring/tilpasning":" · fyller vegglengden"}</p><small>Automatisk forslag med standardbredder 20, 30, 40, 60, 80, 100 og 120 cm. Kontroller hjørner, hvitevarer og monteringsmål før bestilling.</small></div>}
+    {cabinetFit&&<div className={styles.kitchenWallHelp}><strong>Forslag til METOD-skaprekke</strong><p>{cabinetFit.widths.length?cabinetFit.widths.map(width=>width+" mm").join(" + "):"Ingen standardmodul passer"}{cabinetFit.remainder>0?" · "+cabinetFit.remainder+" mm til foring/tilpasning":" · fyller vegglengden"}</p><label><input type="checkbox" checked={includeCabinets} onChange={e=>setIncludeCabinets(e.target.checked)}/> Plasser disse benkeskapene automatisk i tegningen</label><small>Skapene legges på innsiden av bakveggen fra venstre mot høyre. Dette er en grunnrekke; kontroller hjørner, hvitevarer, vask og monteringsmål før bestilling.</small></div>}
     <p className={styles.kitchenWallHelp}>Målene gjelder lengden langs hver kjøkkenvegg. Skap monteres på innsiden og kan plasseres helt mot veggens ender. Du kan endre målene på veggene etterpå.</p>
     {error&&<p role="alert" className={styles.kitchenWallError}>{error}</p>}
     <div className={styles.roomModalActions}><button type="button" onClick={onCancel}>Avbryt</button><button type="submit">Lag {shape==="straight"?"én vegg":shape==="l"?"L-kjøkken":"U-kjøkken"}</button></div>
