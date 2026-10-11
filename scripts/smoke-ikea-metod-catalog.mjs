@@ -6,7 +6,7 @@ const drawingSource=readFileSync("app/admin/tegning/DrawingClient.js","utf8");
 assert.ok(drawingSource.includes("const fillWallRight="),"kitchen rows must support automatic rightward fill");
 assert.ok(drawingSource.includes("const snapCornerCabinet="),"corner cabinets need a dedicated inner-corner placement action");
 assert.ok(drawingSource.includes('const corner=IKEA_METOD_MODULES.find(row=>row.id==="metod-corner-88")')&&drawingSource.includes("createKitchenCornerPlacements(walls,corner,uid)"),"L/U kitchen setup should use tested placement geometry and the real METOD corner module");
-assert.ok(drawingSource.includes("const facesRight=aWall.kitchenLabel===\"Høyre sidevegg\"||bWall.kitchenLabel===\"Høyre sidevegg\""),"corner cabinet orientation should follow the connected side wall");
+assert.ok(readFileSync("lib/kitchenWallPresets.js","utf8").includes('const isRightCorner=a.kitchenLabel==="Høyre sidevegg"||b.kitchenLabel==="Høyre sidevegg"'),"corner cabinet orientation should follow the connected side wall");
 assert.ok(drawingSource.includes('item.type!=="cornerbase"')&&drawingSource.includes('item.type==="cornerbase"'),"success feedback should report base cabinets and corner cabinets separately");
 assert.ok(drawingSource.includes("Plasser i nærmeste innerhjørne"),"corner placement must be accessible from the drawing editor");
 assert.ok(drawingSource.includes('if(o.type==="cornerbase")'),"corner cabinets need their own clipped-front plan glyph");
