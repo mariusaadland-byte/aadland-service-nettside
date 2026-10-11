@@ -718,7 +718,7 @@ function WallElevationPreview({wall,items,zones=[],walls=[],defaultWallThickness
   const height=Math.max(80,modelHeight(item)),z0=Math.max(0,Number(item.elevation)||0);
   return{x:start,y:H-(z0+height),w:width,h:height,z0};
  };
- return <svg ref={svgRef} viewBox={[-padX,-padY,L+padX*2,H+padY*2].join(" ")} role="img" aria-label={"Veggvisning "+L+" millimeter"} onPointerMove={moveItemDrag} onPointerUp={endItemDrag} onPointerCancel={endItemDrag}>
+ return <svg ref={svgRef} viewBox={[-padX,-padY,L+padX*2,H+padY*2].join(" ")} role="img" aria-label={"Veggvisning "+L+" millimeter"} style={{touchAction:"none",userSelect:"none"}} onPointerMove={moveItemDrag} onPointerUp={endItemDrag} onPointerCancel={endItemDrag}>
   <defs><pattern id={"wallgrid-"+wall.id} width="100" height="100" patternUnits="userSpaceOnUse"><path d="M100 0H0V100" fill="none" stroke="#e7e2d8" strokeWidth="4"/></pattern><clipPath id={"wall-xclip-"+wall.id}><rect x="0" y={-padY} width={L} height={H+padY*2}/></clipPath></defs>
   <rect x="0" y="0" width={L} height={H} fill={"url(#wallgrid-"+wall.id+")"} stroke="#5e5b55" strokeWidth="18"/>
   <line x1="0" y1={H} x2={L} y2={H} stroke="#2b2a27" strokeWidth="22"/>
