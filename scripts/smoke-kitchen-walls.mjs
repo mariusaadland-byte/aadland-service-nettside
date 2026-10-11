@@ -14,7 +14,7 @@ if(!builder.includes('{wallLabel:"Venstre sidevegg",start:0,fit:findCabinetFit(l
 const preview=readFileSync("app/admin/tegning/KitchenWallBuilder.js","utf8");
 if(!preview.includes("previewScale=Math.min("))throw new Error("Kitchen preview must use entered dimensions.");
 const url="data:text/javascript;base64,"+Buffer.from(source).toString("base64");
-const {createKitchenWalls,kitchenWallDefaults}=await import(url);
+const {createKitchenWalls,createKitchenCornerPlacements,kitchenWallDefaults}=await import(url);
 const lengths=wall=>Math.hypot(wall.x2-wall.x1,wall.y2-wall.y1);
 const normal=wall=>{const l=lengths(wall);return{x:-(wall.y2-wall.y1)/l,y:(wall.x2-wall.x1)/l}};
 let next=0;
@@ -46,6 +46,23 @@ assert.equal(u.walls[1].y2,u.walls[2].y1);
 assert.ok(normal(u.walls[0]).x>0);
 assert.ok(normal(u.walls[1]).y>0);
 assert.ok(normal(u.walls[2]).x<0);
+const cornerModule={id:"metod-corner-88",type:"cornerbase",width:875,depth:875,height:800};
+let cornerId=0;
+const leftCorners=createKitchenCornerPlacements(leftL.walls,cornerModule,()=>String(++cornerId));
+assert.equal(leftCorners.length,1,"left L should have one corner cabinet");
+assert.equal(leftCorners[0].rot,0,"left inner corner uses the unrotated cabinet footprint");
+const rightCorners=createKitchenCornerPlacements(l.walls,cornerModule,()=>String(++cornerId));
+assert.equal(rightCorners.length,1,"right L should have one corner cabinet");
+assert.equal(rightCorners[0].rot,90,"right inner corner rotates the clipped face toward the kitchen");
+const uCorners=createKitchenCornerPlacements(u.walls,cornerModule,()=>String(++cornerId));
+assert.equal(uCorners.length,2,"U kitchen should have two corner cabinets");
+assert.deepEqual(uCorners.map(item=>item.rot).sort((a,b)=>a-b),[0,90],"U corners need opposite orientations");
+for(const item of [...leftCorners,...rightCorners,...uCorners]){
+ const vertex={x:item.rot===90?item.x+item.w:item.x,y:item.y};
+ assert.ok(Number.isFinite(item.x)&&Number.isFinite(item.y),"corner cabinet coordinates must be finite");
+ assert.equal(item.w,875);assert.equal(item.h,875);
+}
+
 for(const group of [straight,l,leftL,u]){
  for(const wall of group.walls){
   assert.equal(wall.insideSide,"left");
