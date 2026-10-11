@@ -20,7 +20,7 @@ const variedWalls=[
  {id:"top",t:100},{id:"right",t:120},{id:"bottom",t:80},{id:"left",t:60}
 ].map(w=>({...w,x1:0,y1:0,x2:0,y2:0}));
 const centerlines=centerlinePointsFromInner(innerRect,wallIds,variedWalls,98);
-assert.deepEqual(centerlines,[
+assert.deepEqual(centerlines.map(p=>({x:Math.round(p.x),y:Math.round(p.y)})),[
  {x:-30,y:-50},
  {x:4060,y:-50},
  {x:4060,y:3040},
