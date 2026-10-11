@@ -3,6 +3,7 @@ import {readFileSync} from "node:fs";
 
 const source=readFileSync("lib/kitchenWallPresets.js","utf8");
 const builder=readFileSync("app/admin/tegning/KitchenWallBuilder.js","utf8");
+if(!builder.includes("validateKitchenCornerFit(value,{includeCabinets})"))throw new Error("Kitchen builder must reject corner cabinets that cannot fit within the entered wall runs.");
 if(!builder.includes("const findCabinetFit=")||!builder.includes("Forslag til METOD-benkeskap"))throw new Error("Straight kitchen should suggest a fitting METOD cabinet row.");
 if(!builder.includes("METOD_WIDTHS=[200,300,400,600,800,1000,1200]")||!builder.includes("run.fit.used")||!builder.includes("run.fit.target"))throw new Error("METOD row fit should report exact selected width and target wall length.");
 if(!builder.includes("Plasser benkeskapene automatisk i tegningen"))throw new Error("Kitchen builder should offer automatic cabinet placement.");
@@ -14,7 +15,15 @@ if(!builder.includes('{wallLabel:"Venstre sidevegg",start:0,fit:findCabinetFit(l
 const preview=readFileSync("app/admin/tegning/KitchenWallBuilder.js","utf8");
 if(!preview.includes("previewScale=Math.min("))throw new Error("Kitchen preview must use entered dimensions.");
 const url="data:text/javascript;base64,"+Buffer.from(source).toString("base64");
-const {createKitchenWalls,createKitchenCornerPlacements,kitchenWallDefaults}=await import(url);
+const {createKitchenWalls,createKitchenCornerPlacements,kitchenWallDefaults,validateKitchenCornerFit}=await import(url);
+// 875 mm corner cabinets must stay inside the entered wall lengths.
+// With 98 mm walls, the centerline reserve is 875 + 49 = 924 mm per corner.
+assert.throws(()=>validateKitchenCornerFit({shape:"l",lSide:"left",backLength:"3000",leftDepth:"923",thickness:"98"}),/Venstre sidevegg/);
+assert.equal(validateKitchenCornerFit({shape:"l",lSide:"left",backLength:"3000",leftDepth:"924",thickness:"98"}),true);
+assert.throws(()=>validateKitchenCornerFit({shape:"l",lSide:"right",backLength:"3000",rightDepth:"923",thickness:"98"}),/Høyre sidevegg/);
+assert.throws(()=>validateKitchenCornerFit({shape:"u",backLength:"1847",leftDepth:"924",rightDepth:"924",thickness:"98"}),/Bakveggen/);
+assert.equal(validateKitchenCornerFit({shape:"u",backLength:"1848",leftDepth:"924",rightDepth:"924",thickness:"98"}),true);
+assert.equal(validateKitchenCornerFit({shape:"u",backLength:"300",leftDepth:"300",rightDepth:"300",thickness:"98"},{includeCabinets:false}),true,"wall-only layouts may omit corner cabinets");
 const lengths=wall=>Math.hypot(wall.x2-wall.x1,wall.y2-wall.y1);
 const normal=wall=>{const l=lengths(wall);return{x:-(wall.y2-wall.y1)/l,y:(wall.x2-wall.x1)/l}};
 let next=0;
