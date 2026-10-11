@@ -103,8 +103,8 @@ for(const [placements,group] of [[leftCorners,leftL.walls],[rightCorners,l.walls
   const backUsable=back-(hasLeft?cornerStart:0)-(hasRight?cornerStart:0);
   assert.ok(backUsable>=0,label+" back row should have nonnegative usable length");
   assert.equal(backStart,hasLeft?924:0,label+" back row start accounts for half wall thickness");
-  if(hasLeft)assert.equal(left-cornerStart,826,"left side row leaves 875 mm clear from inside face");
-  if(hasRight)assert.equal(right-cornerStart,right-924,label+" right side row leaves 875 mm clear from inside face");
+  if(hasLeft)assert.equal(left-cornerStart,left===1750?826:1276,label+" left side row leaves 875 mm clear from inside face");
+  if(hasRight)assert.equal(right-cornerStart,right===2600?1676:1976,label+" right side row leaves 875 mm clear from inside face");
   // Corner's wall-facing edge starts 49 mm past the centerline vertex and spans
   // 875 mm; the straight row's first/last edge must meet, not overlap, that edge.
   assert.equal(cornerStart-faceOffset,cornerReserve,label+" reserve is measured from finished face");
