@@ -1544,3 +1544,26 @@
 .kitchenWallDirection>div{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .kitchenWallDirection button{min-height:42px;border:1px solid #d1c5ae;background:#fff;color:#30291f;border-radius:8px;font:800 13px Arial,sans-serif}
 .kitchenWallDirection button[aria-pressed="true"]{background:#eadcbf;color:#352713;border:2px solid #a5844c}
+
+/* Mobile/onsite usability: readable form controls, stable tap targets and visible keyboard focus. */
+@media(max-width:900px), (pointer:coarse) and (min-width:901px) and (max-width:1200px){
+ .panel input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+ .panel select,
+ .panel textarea,
+ .mobileMenuPanel input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+ .mobileMenuPanel select,
+ .mobileMenuPanel textarea{
+  box-sizing:border-box;
+  min-height:44px;
+  font-size:16px;
+ }
+ .panel button,.mobileMenuPanel button{touch-action:manipulation}
+ .panel input,.panel select,.panel textarea,.panel button,
+ .mobileMenuPanel input,.mobileMenuPanel select,.mobileMenuPanel textarea,.mobileMenuPanel button{
+  max-width:100%;
+ }
+}
+:where(button,a,input,select,textarea,[tabindex]):focus-visible{
+ outline:3px solid #b28a46;
+ outline-offset:2px;
+}
