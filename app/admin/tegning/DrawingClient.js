@@ -1403,6 +1403,23 @@ export default function DrawingClient(){
     cabinetItems.push({...base,x:placed.cx-module.width/2,y:placed.cy-module.depth/2,rot:placed.a*180/Math.PI,wallOffset:placed.off});cabinetStart+=width;
    }
   }
+  // Add one real catalog corner cabinet at each shared inner corner when automatic cabinet placement is enabled.
+  if(runs.length&&shape!=="straight"){
+   const corner=IKEA_METOD_MODULES.find(row=>row.id==="metod-corner-88");
+   if(corner){
+    for(let i=0;i<walls.length;i++)for(let j=i+1;j<walls.length;j++){
+     const aWall=walls[i],bWall=walls[j];
+     const endsA=[{x:aWall.x1,y:aWall.y1},{x:aWall.x2,y:aWall.y2}],endsB=[{x:bWall.x1,y:bWall.y1},{x:bWall.x2,y:bWall.y2}];
+     const vertex=endsA.find(a=>endsB.some(b=>Math.hypot(a.x-b.x,a.y-b.y)<1));
+     if(!vertex)continue;
+     const na=wallInwardNormal(aWall,doc.zones||[]),nb=wallInwardNormal(bWall,doc.zones||[]);
+     const cx=vertex.x+na.x*corner.width/2+nb.x*corner.depth/2,cy=vertex.y+na.y*corner.width/2+nb.y*corner.depth/2;
+     const facesRight=aWall.kitchenLabel==="Høyre sidevegg"||bWall.kitchenLabel==="Høyre sidevegg";
+     const base={id:uid(),type:"cornerbase",x:cx-corner.width/2,y:cy-corner.depth/2,w:corner.width,h:corner.depth,rot:facesRight?90:0,wallId:null,...itemDefaults("cornerbase",doc),modelHeight:corner.height,elevation:0,metodModuleId:corner.id,metodModuleLabel:corner.label,metodSource:corner.source};
+     cabinetItems.push(base);
+    }
+   }
+  }
   mutate(d=>({...d,walls:[...d.walls,...walls],items:[...d.items,...cabinetItems]}));
   if(cabinetItems.length){setSelected({kind:"item",id:cabinetItems[0].id});}else setSelected({kind:"wall",id:main.id});
   setTool("select");setDraft(null);setWallChain(null);setSnapHint(null);setQuickAddOpen(false);
@@ -1412,7 +1429,7 @@ export default function DrawingClient(){
   setPan(clampPanForZoom({x:midX-span/2,y:midY-span/2},zoom));
   setDoc(d=>({...d,zoom}));
   setKitchenBuilder(null);
-  setMessage((shape==="straight"?"Én kjøkkenvegg":shape==="l"?"L-kjøkken":"U-kjøkken")+" opprettet"+(cabinetItems.length?" med "+cabinetItems.length+" METOD-benkeskap":"")+" uten lukket rom");
+  setMessage((shape==="straight"?"Én kjøkkenvegg":shape==="l"?"L-kjøkken":"U-kjøkken")+" opprettet"+(cabinetItems.length?" med "+cabinetItems.filter(item=>item.type!=="cornerbase").length+" METOD-benkeskap og "+cabinetItems.filter(item=>item.type==="cornerbase").length+" hjørneskap":"")+" uten lukket rom");
   setTimeout(()=>setMessage(""),2800);
  };
  const setStandaloneWallInside=(wallId,side)=>{
