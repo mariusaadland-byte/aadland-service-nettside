@@ -32,11 +32,10 @@ assert.deepEqual(centerlines.map(p=>({x:Math.round(p.x),y:Math.round(p.y)})),[
 const thicknessChanged=centerlinePointsFromInner(innerRect,wallIds,variedWalls,98,{top:180});
 const assertInnerFace=(lines,wallSpecs,label)=>{
  for(let i=0;i<lines.length;i++){
-  const a=lines[i],b=lines[(i+1)%lines.length],dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy);
-  const inward={x:-dy/L,y:dx/L},t=(wallSpecs.find(w=>w.id===wallIds[i])?.t??98);
-  const mid={x:(a.x+b.x)/2+inward.x*t/2,y:(a.y+b.y)/2+inward.y*t/2};
-  const p=innerRect[i],q=innerRect[(i+1)%innerRect.length],expected={x:(p.x+q.x)/2,y:(p.y+q.y)/2};
-  assert.ok(Math.abs(mid.x-expected.x)<0.01&&Math.abs(mid.y-expected.y)<0.01,label+" must preserve the exact inner face of wall "+wallIds[i]);
+  const p=innerRect[i],q=innerRect[(i+1)%innerRect.length],dx=q.x-p.x,dy=q.y-p.y,L=Math.hypot(dx,dy);
+  const inward={x:-dy/L,y:dx/L},t=(wallSpecs.find(w=>w.id===wallIds[i])?.t??98),center=lines[i];
+  const signed=(center.x-p.x)*inward.x+(center.y-p.y)*inward.y;
+  assert.ok(Math.abs(signed+t/2)<0.01,label+" must preserve the exact inner face of wall "+wallIds[i]);
  }
 };
 assertInnerFace(centerlines,variedWalls,"mixed wall thicknesses");
