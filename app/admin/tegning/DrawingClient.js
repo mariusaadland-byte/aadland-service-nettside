@@ -1353,16 +1353,26 @@ export default function DrawingClient(){
   for(const run of runs){
    const targetWall=walls.find(w=>w.kitchenLabel===run.wallLabel);
    if(!targetWall||!Array.isArray(run.widths))continue;
+   const relatedWalls=[...(doc.walls||[]),...walls],defaultThickness=doc.defaultWallThickness||98;
+   const faceLength=wallFaceMetrics(targetWall,doc.zones||[],relatedWalls,defaultThickness).L;
    let cabinetStart=Math.max(0,Number(run.start)||0);
    for(const width of run.widths){
     if(!Number.isInteger(width)||![200,300,400,600,800,1000,1200].includes(width))continue;
     const module=IKEA_METOD_MODULES.find(row=>row.type==="base"&&row.width===width&&row.depth===600);
-    const faceLength=wallFaceMetrics(targetWall,doc.zones||[],[...(doc.walls||[]),...walls],doc.defaultWallThickness||98).L;
     if(!module||cabinetStart+width>faceLength)continue;
-    const id=uid(),off=wallOffsetFromFaceStart(targetWall,cabinetStart,width,doc.zones||[],[...(doc.walls||[]),...walls],doc.defaultWallThickness||98);
+    const id=uid(),off=wallOffsetFromFaceStart(targetWall,cabinetStart,width,doc.zones||[],relatedWalls,defaultThickness);
     const base={id,type:module.type,x:0,y:0,w:module.width,h:module.depth,rot:0,wallId:targetWall.id,wallOffset:off,...itemDefaults(module.type,doc),modelHeight:module.height,elevation:module.elevation,metodModuleId:module.id,metodModuleLabel:module.label,metodSource:module.source};
-    const placed=mountedItemCenter(base,targetWall,doc.zones||[],[...(doc.walls||[]),...walls],doc.defaultWallThickness||98);
+    const placed=mountedItemCenter(base,targetWall,doc.zones||[],relatedWalls,defaultThickness);
     cabinetItems.push({...base,x:placed.cx-module.width/2,y:placed.cy-module.depth/2,rot:placed.a*180/Math.PI,wallOffset:placed.off});cabinetStart+=width;
+   }
+   // If the back row ends at a corner cabinet, fill the small remainder instead
+   // of leaving a visible gap. Standard METOD widths stay unchanged.
+   const remainder=Math.max(0,Number(run.remainder)||0);
+   if(run.fillRemainder&&remainder>0&&cabinetStart+remainder<=faceLength){
+    const off=wallOffsetFromFaceStart(targetWall,cabinetStart,remainder,doc.zones||[],relatedWalls,defaultThickness);
+    const base={id:uid(),type:"filler",x:0,y:0,w:remainder,h:600,rot:0,wallId:targetWall.id,wallOffset:off,...itemDefaults("filler",doc)};
+    const placed=mountedItemCenter(base,targetWall,doc.zones||[],relatedWalls,defaultThickness);
+    cabinetItems.push({...base,x:placed.cx-remainder/2,y:placed.cy-base.h/2,rot:placed.a*180/Math.PI,wallOffset:placed.off});
    }
   }
   // Use the same tested geometry for plan view and 3D placement.
