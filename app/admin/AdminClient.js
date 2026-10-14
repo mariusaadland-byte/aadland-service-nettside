@@ -495,7 +495,7 @@ export default function AdminClient({ user }) {
   if (canUpdateOrders) tabs.push(["workClock", "Arbeidsklokke"],["calculator", "Kalkulator"],["materialAi", "Materialkalkulator"],["reminders", "Purring"],["vipps", "Vipps"]);
   if (canManageProducts) tabs.push(["projects", "Tidligere oppdrag"]);
   if (canManageProducts) tabs.push(["homepage", "Forside"]);
-  if (canViewOrders || canManageProducts) tabs.push(["drawing", "Tegning & visualisering"]);
+  tabs.push(["drawing", "Tegning & visualisering"]);
   if (canManageUsers) tabs.push(["users", "Brukere"]);
   if (canUpdateOrders || canManageProducts) tabs.push(["quotes", "Tilbud"]);
   if (user?.role === "owner") tabs.push(["roadmap", "Utviklingsplan"]);
