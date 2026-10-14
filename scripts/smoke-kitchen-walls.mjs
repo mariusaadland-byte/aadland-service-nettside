@@ -131,3 +131,31 @@ assert.throws(()=>createKitchenWalls({...kitchenWallDefaults,shape:"l",rightDept
 assert.throws(()=>createKitchenWalls({...kitchenWallDefaults,shape:"u",leftDepth:"-5"},options),/Vegglengder/);
 assert.throws(()=>createKitchenWalls({...kitchenWallDefaults,shape:"none"},options),/Velg/);
 console.log("Kjøkkenvegg-test bestått: 1 vegg, L høyre, L venstre, U, forskjellige sidelengder og innsider.");
+
+// Regression checks for automatic cabinet-run dimensions on finished inside faces.
+// Standard modules must never be stretched to absorb a remainder; only a separate
+// filler may occupy that remainder at the open end or beside the right corner.
+const fitWidthsForTest=length=>{
+ const widths=[200,300,400,600,800,1000,1200],target=Math.max(0,Math.floor(length)),dp=Array(target+1).fill(null);
+ dp[0]=[];
+ for(let sum=0;sum<=target;sum++){
+  if(!dp[sum])continue;
+  for(const width of widths){const next=sum+width;if(next<=target&&(!dp[next]||dp[next].length>dp[sum].length+1))dp[next]=[...dp[sum],width]}
+ }
+ let used=target;while(used>0&&!dp[used])used--;
+ const chosen=(dp[used]||[]).slice().sort((a,b)=>b-a);
+ return{widths:chosen,used:chosen.reduce((total,width)=>total+width,0),remainder:target-used,target};
+};
+for(const [label,length] of [["short open run",826],["typical side run",1676],["long back run",2352],["uneven U side",1976]]){
+ const fit=fitWidthsForTest(length);
+ assert.equal(fit.used+fit.remainder,fit.target,label+" must account for every millimetre");
+ assert.ok(fit.widths.every(width=>[200,300,400,600,800,1000,1200].includes(width)),label+" must use real standard widths");
+ assert.ok(fit.remainder>=0&&fit.remainder<200,label+" must leave only a small separate filler/remainder");
+}
+const rightCornerBack=fitWidthsForTest(3800-924);
+assert.equal(rightCornerBack.used+rightCornerBack.remainder,2876,"right-corner back run must account for the usable wall length");
+assert.equal(924-49,875,"corner reserve must be measured from the finished inside face");
+const leftOpenRun=fitWidthsForTest(1750-924);
+assert.equal(leftOpenRun.used+leftOpenRun.remainder,826,"left L side must account for its entire usable run");
+assert.equal(leftOpenRun.remainder,26,"open-end filler must close the remaining 26 mm without changing METOD widths");
+console.log("METOD-plassering bestått: innvendige mål, hjørnereserver, standardbredder og restmål.");
