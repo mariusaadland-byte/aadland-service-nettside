@@ -80,7 +80,17 @@ const sizePresets={
  walllight:[["Vegglampe",180,100]],outlet:[["Stikk",180,100]],doubleoutlet:[["Dobbel stikk",220,100]],
  switch:[["Bryter",120,100]],dimmer:[["Dimmer",120,100]],thermostat:[["Termostat",140,100]],junction:[["Koblingspunkt",140,140]]
 };
-const flat=catalog.flatMap(g=>g.items), labelFor=t=>t&&typeof t==="object"&&t.metodModuleLabel?t.metodModuleLabel:t==="customwall"||t==="customfloor"?"Eget møbel":flat.find(x=>x[0]===t)?.[1]||t;
+const flat=catalog.flatMap(g=>g.items);
+const labelFor=t=>{
+ if(t==null)return "";
+ if(typeof t==="string"||typeof t==="number"||typeof t==="boolean")return t==="customwall"||t==="customfloor"?"Eget møbel":flat.find(x=>x[0]===t)?.[1]||String(t);
+ if(typeof t==="object"){
+  const label=t.metodModuleLabel??t.label??t.name??t.title??t.type;
+  if(label!=null&&label!==t)return labelFor(label);
+  return "Objekt";
+ }
+ return String(t);
+};
 const uid=()=>globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2);
 function CommitNumberInput({value,onCommit,onKeyDown,...props}){
  const [draft,setDraft]=useState(value==null?"":String(value));
