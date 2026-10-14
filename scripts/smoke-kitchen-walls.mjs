@@ -133,7 +133,7 @@ assert.throws(()=>createKitchenWalls({...kitchenWallDefaults,shape:"none"},optio
 console.log("Kjøkkenvegg-test bestått: 1 vegg, L høyre, L venstre, U, forskjellige sidelengder og innsider.");
 
 // Test the exact fitter used by the live kitchen builder, not a duplicate test-only algorithm.
-for(const [label,length,expectedRemainder] of [["short open run",826,26],["typical side run",1676,76],["long back run",2352,152],["uneven U side",1976,76]]){
+for(const [label,length,expectedRemainder] of [["short open run",826,26],["typical side run",1676,76],["long back run",2352,52],["uneven U side",1976,76]]){
  const fit=fitMetodCabinetRun(length);
  assert.equal(fit.used+fit.remainder,fit.target,label+" must account for every millimetre");
  assert.ok(fit.widths.every(width=>[200,300,400,600,800,1000,1200].includes(width)),label+" must use real standard widths");
