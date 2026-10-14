@@ -1,6 +1,6 @@
 "use client";
 import {useState} from "react";
-import {KITCHEN_SHAPES,validateKitchenCornerFit} from "../../../lib/kitchenWallPresets";
+import {KITCHEN_SHAPES,validateKitchenCornerFit,fitMetodCabinetRun} from "../../../lib/kitchenWallPresets";
 const presets=[
  {id:"straight",icon:"━",title:"Én vegg",help:"Rett kjøkken"},
  {id:"l",icon:"┓",title:"L-vegg",help:"Bakvegg + høyre side"},
@@ -17,12 +17,11 @@ export default function KitchenWallBuilder({value,onChange,onCancel,onCreate,sty
  const shape=KITCHEN_SHAPES.includes(value.shape)?value.shape:"straight";
  const back=Math.max(0,Number(value.backLength)||0),left=Math.max(0,Number(value.leftDepth)||0),right=Math.max(0,Number(value.rightDepth)||0),lSide=value.lSide==="left"?"left":"right";
  const activeLeft=shape==="u"||shape==="l"&&lSide==="left"?left:0,activeRight=shape==="u"||shape==="l"&&lSide==="right"?right:0,previewScale=Math.min(178/Math.max(1,back),82/Math.max(1,activeLeft,activeRight)),previewBack=Math.max(1,back)*previewScale,previewX1=160-previewBack/2,previewX2=160+previewBack/2,previewY=40,previewLeftY=previewY+activeLeft*previewScale,previewRightY=previewY+activeRight*previewScale;
- const METOD_WIDTHS=[200,300,400,600,800,1000,1200],CORNER_RESERVE=875,WALL_FACE_OFFSET=Math.max(0,Number(value.thickness)||0)/2,CORNER_START=CORNER_RESERVE+WALL_FACE_OFFSET;
- const findCabinetFit=length=>{const target=Math.max(0,Math.floor(Number(length)||0)),dp=Array(target+1).fill(null);dp[0]=[];for(let sum=0;sum<=target;sum++){if(!dp[sum])continue;for(const width of METOD_WIDTHS){const next=sum+width;if(next<=target&&(!dp[next]||dp[next].length>dp[sum].length+1))dp[next]=[...dp[sum],width]}}let used=target;while(used>0&&!dp[used])used--;const widths=(dp[used]||[]).slice().sort((a,b)=>b-a);return{widths,remainder:target-used,used:widths.reduce((total,width)=>total+width,0),target}};
+ const CORNER_RESERVE=875,WALL_FACE_OFFSET=Math.max(0,Number(value.thickness)||0)/2,CORNER_START=CORNER_RESERVE+WALL_FACE_OFFSET;
  const hasLeft=shape==="u"||shape==="l"&&lSide==="left",hasRight=shape==="u"||shape==="l"&&lSide==="right";
- const leftFit=hasLeft?findCabinetFit(left-CORNER_START):null,rightFit=hasRight?findCabinetFit(right-CORNER_START):null;
- const cabinetRuns=[{wallLabel:"Bakvegg",start:hasLeft?CORNER_START:0,fit:findCabinetFit(back-(hasLeft?CORNER_START:0)-(hasRight?CORNER_START:0))},...(hasLeft?[{wallLabel:"Venstre sidevegg",start:leftFit.remainder,fit:leftFit}]:[]),...(hasRight?[{wallLabel:"Høyre sidevegg",start:CORNER_START,fit:rightFit}]:[])];
- const cabinetFit=shape==="straight"&&back>=200?findCabinetFit(back):null;
+ const leftFit=hasLeft?fitMetodCabinetRun(left-CORNER_START):null,rightFit=hasRight?fitMetodCabinetRun(right-CORNER_START):null;
+ const cabinetRuns=[{wallLabel:"Bakvegg",start:hasLeft?CORNER_START:0,fit:fitMetodCabinetRun(back-(hasLeft?CORNER_START:0)-(hasRight?CORNER_START:0))},...(hasLeft?[{wallLabel:"Venstre sidevegg",start:leftFit.remainder,fit:leftFit}]:[]),...(hasRight?[{wallLabel:"Høyre sidevegg",start:CORNER_START,fit:rightFit}]:[])];
+ const cabinetFit=shape==="straight"&&back>=200?fitMetodCabinetRun(back):null;
  return <div className={styles.roomModalBackdrop} role="presentation" onPointerDown={event=>{if(event.target===event.currentTarget)onCancel()}}>
   <section className={styles.roomModal+" "+styles.kitchenWallModal} role="dialog" aria-modal="true" aria-label="Lag kjøkken med åpne vegger">
    <div className={styles.roomModalHead}><div><span>KJØKKENTEGNING</span><h2>Vegger uten helt rom</h2></div><button type="button" onClick={onCancel} aria-label="Lukk">×</button></div>
