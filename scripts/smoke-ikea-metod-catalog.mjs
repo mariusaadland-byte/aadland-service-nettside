@@ -10,6 +10,10 @@ assert.ok(readFileSync("lib/kitchenWallPresets.js","utf8").includes('const isRig
 assert.ok(drawingSource.includes('item.type!=="cornerbase"')&&drawingSource.includes('item.type==="cornerbase"'),"success feedback should report base cabinets and corner cabinets separately");
 assert.ok(drawingSource.includes("Plasser i nærmeste innerhjørne"),"corner placement must be accessible from the drawing editor");
 assert.ok(drawingSource.includes('if(o.type==="cornerbase")'),"corner cabinets need their own clipped-front plan glyph");
+assert.ok(drawingSource.includes('labelFor(sel.type)+" · "+Math.round(sel.w)'),"mobile selection labels must pass the selected item type, not the item object");
+assert.ok(drawingSource.includes('o.customName||labelFor(o.type)}</text>'),"plan labels must pass the item type, not the item object");
+assert.ok(!drawingSource.includes('labelFor(sel)+" · "+Math.round(sel.w)'),"React error #31 regression: do not render selected item objects as labels");
+assert.ok(!drawingSource.includes('o.customName||labelFor(o)}</text>'),"React error #31 regression: do not render item objects as labels");
 assert.ok(drawingSource.includes("const footprint=[[0,0],[w,0],[w,d-cut],[w-cut,d],[0,d]]"),"3D corner cabinets must use the same clipped footprint as the plan view");
 const url="data:text/javascript;base64,"+Buffer.from(source).toString("base64");
 const {IKEA_METOD_MODULES, IKEA_METOD_SOURCES, validateIkeaMetodCatalog}=await import(url);
