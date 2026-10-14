@@ -949,6 +949,7 @@ export default function DrawingClient(){
    .then(async response=>{const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Kunne ikke åpne tegningen");return data.drawing})
    .then(row=>{
     if(!alive)return;
+    if(!row||!row.id)throw new Error("Serveren svarte uten selve tegningen.");
     const next=normalizeDrawingDocument({...initial(),...(row.drawingData||{}),serverId:row.id,
      orderId:row.orderId||"",projectId:row.projectId||"",
      customerUserId:row.customerUserId||"",customerContactId:row.customerContactId||"",
@@ -963,7 +964,24 @@ export default function DrawingClient(){
     try{localStorage.setItem(STORE,JSON.stringify(list));localStorage.setItem(LAST_STORE,next.id)}catch{}
     setMessage("Tegningen er hentet fra adminarkivet");
     setTimeout(()=>setMessage(""),2400);
-   }).catch(error=>{if(alive)setMessage(error.message||"Kunne ikke hente tegningen")});
+   }).catch(error=>{
+    if(!alive)return;
+    // If the server request fails, try a locally cached copy so the user can
+    // still open the drawing instead of being stranded on the editor.
+    try{
+     const cached=JSON.parse(localStorage.getItem(STORE)||"[]");
+     const saved=Array.isArray(cached)?cached.find(item=>item.serverId===drawingId||item.id===drawingId):null;
+     if(saved){
+      const next=normalizeDrawingDocument(saved),list=[next,...cached.filter(item=>item.id!==next.id)];
+      docRef.current=next;docsRef.current=list;setDocs(list);setDoc(next);
+      setSelected(null);setHistory([]);setFuture([]);setSaveState("local");
+      localStorage.setItem(LAST_STORE,next.id);
+      setMessage("Åpnet lokal kopi. Serveren kunne ikke hente siste versjon: "+(error.message||"ukjent feil"));
+      return;
+     }
+    }catch{}
+    setMessage((error.message||"Kunne ikke hente tegningen")+". Prøv å laste arkivet på nytt. Hvis feilen fortsetter, send feilmeldingen.");
+   });
   return()=>{alive=false};
  },[]);
  useEffect(()=>{
