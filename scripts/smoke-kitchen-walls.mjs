@@ -17,7 +17,7 @@ if(!drawing.includes("if(run.fillRemainder&&remainder>0&&cabinetStart+remainder<
 const preview=readFileSync("app/admin/tegning/KitchenWallBuilder.js","utf8");
 if(!preview.includes("previewScale=Math.min("))throw new Error("Kitchen preview must use entered dimensions.");
 const url="data:text/javascript;base64,"+Buffer.from(source).toString("base64");
-const {createKitchenWalls,createKitchenCornerPlacements,kitchenWallDefaults,validateKitchenCornerFit}=await import(url);
+const {createKitchenWalls,createKitchenCornerPlacements,kitchenWallDefaults,validateKitchenCornerFit,fitMetodCabinetRun}=await import(url);
 // 875 mm corner cabinets must stay inside the entered wall lengths.
 // With 98 mm walls, the centerline reserve is 875 + 49 = 924 mm per corner.
 assert.throws(()=>validateKitchenCornerFit({shape:"l",lSide:"left",backLength:"3000",leftDepth:"923",thickness:"98"}),/Venstre sidevegg/);
@@ -132,30 +132,18 @@ assert.throws(()=>createKitchenWalls({...kitchenWallDefaults,shape:"u",leftDepth
 assert.throws(()=>createKitchenWalls({...kitchenWallDefaults,shape:"none"},options),/Velg/);
 console.log("Kjøkkenvegg-test bestått: 1 vegg, L høyre, L venstre, U, forskjellige sidelengder og innsider.");
 
-// Regression checks for automatic cabinet-run dimensions on finished inside faces.
-// Standard modules must never be stretched to absorb a remainder; only a separate
-// filler may occupy that remainder at the open end or beside the right corner.
-const fitWidthsForTest=length=>{
- const widths=[200,300,400,600,800,1000,1200],target=Math.max(0,Math.floor(length)),dp=Array(target+1).fill(null);
- dp[0]=[];
- for(let sum=0;sum<=target;sum++){
-  if(!dp[sum])continue;
-  for(const width of widths){const next=sum+width;if(next<=target&&(!dp[next]||dp[next].length>dp[sum].length+1))dp[next]=[...dp[sum],width]}
- }
- let used=target;while(used>0&&!dp[used])used--;
- const chosen=(dp[used]||[]).slice().sort((a,b)=>b-a);
- return{widths:chosen,used:chosen.reduce((total,width)=>total+width,0),remainder:target-used,target};
-};
-for(const [label,length] of [["short open run",826],["typical side run",1676],["long back run",2352],["uneven U side",1976]]){
- const fit=fitWidthsForTest(length);
+// Test the exact fitter used by the live kitchen builder, not a duplicate test-only algorithm.
+for(const [label,length,expectedRemainder] of [["short open run",826,26],["typical side run",1676,76],["long back run",2352,152],["uneven U side",1976,76]]){
+ const fit=fitMetodCabinetRun(length);
  assert.equal(fit.used+fit.remainder,fit.target,label+" must account for every millimetre");
  assert.ok(fit.widths.every(width=>[200,300,400,600,800,1000,1200].includes(width)),label+" must use real standard widths");
- assert.ok(fit.remainder>=0&&fit.remainder<200,label+" must leave only a small separate filler/remainder");
+ assert.equal(fit.remainder,expectedRemainder,label+" must expose exact remainder for separate fitting");
 }
-const rightCornerBack=fitWidthsForTest(3800-924);
+const rightCornerBack=fitMetodCabinetRun(3800-924);
 assert.equal(rightCornerBack.used+rightCornerBack.remainder,2876,"right-corner back run must account for the usable wall length");
 assert.equal(924-49,875,"corner reserve must be measured from the finished inside face");
-const leftOpenRun=fitWidthsForTest(1750-924);
+const leftOpenRun=fitMetodCabinetRun(1750-924);
 assert.equal(leftOpenRun.used+leftOpenRun.remainder,826,"left L side must account for its entire usable run");
 assert.equal(leftOpenRun.remainder,26,"open-end filler must close the remaining 26 mm without changing METOD widths");
-console.log("METOD-plassering bestått: innvendige mål, hjørnereserver, standardbredder og restmål.");
+assert.deepEqual(fitMetodCabinetRun(0),{widths:[],remainder:0,used:0,target:0},"zero-length runs must not create cabinets or filler");
+console.log("METOD-plassering bestått: live fitter, innvendige mål, hjørnereserver, standardbredder og restmål.");
