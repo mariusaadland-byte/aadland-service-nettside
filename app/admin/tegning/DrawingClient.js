@@ -849,8 +849,19 @@ function zoneSurveyStatusText(state){
 }
 
 const initial=()=>({id:uid(),name:"Ny tegning",orderId:"",projectId:"",customerUserId:"",customerContactId:"",customerVisible:false,customer:"",customerEmail:"",customerPhone:"",address:"",notes:"",visualizationNotes:"",walls:[],items:[],zones:[],measurements:[],snapSize:50,showGrid:true,scale:"1:50",zoom:1,defaultWallThickness:98,defaultWallHeight:2400});
+function safeDrawingText(value,fallback=""){
+ if(value==null)return fallback;
+ if(typeof value==="string"||typeof value==="number"||typeof value==="boolean")return String(value);
+ // Old/local/server data may contain objects where a text field is expected.
+ // Never let malformed saved data crash React rendering with minified error #31.
+ try{return JSON.stringify(value)}catch{return fallback}
+}
 function normalizeDrawingDocument(raw){
- const base={...initial(),...(raw&&typeof raw==="object"?raw:{})},walls=Array.isArray(base.walls)?base.walls:[],zones=Array.isArray(base.zones)?base.zones:[],measurements=Array.isArray(base.measurements)?base.measurements:[],wallIds=new Set(walls.map(w=>w.id));
+ const base={...initial(),...(raw&&typeof raw==="object"?raw:{})};
+ for(const key of ["name","customer","customerEmail","customerPhone","address","notes","visualizationNotes","scale"]){
+  base[key]=safeDrawingText(base[key],key==="name"?"Ny tegning":key==="scale"?"1:50":"");
+ }
+ const walls=Array.isArray(base.walls)?base.walls:[],zones=Array.isArray(base.zones)?base.zones:[],measurements=Array.isArray(base.measurements)?base.measurements:[],wallIds=new Set(walls.map(w=>w.id));
  let items=(Array.isArray(base.items)?base.items:[]).map(item=>{
   let next={...item};
   if(next.wallId&&!wallIds.has(next.wallId))next={...next,wallId:null,wallOffset:null};
