@@ -14,6 +14,9 @@ assert.ok(drawingSource.includes('labelFor(sel.type)+" · "+Math.round(sel.w)'),
 assert.ok(drawingSource.includes('o.customName||labelFor(o.type)}</text>'),"plan labels must pass the item type, not the item object");
 assert.ok(!drawingSource.includes('labelFor(sel)+" · "+Math.round(sel.w)'),"React error #31 regression: do not render selected item objects as labels");
 assert.ok(!drawingSource.includes('o.customName||labelFor(o)}</text>'),"React error #31 regression: do not render item objects as labels");
+assert.ok(drawingSource.includes('const zones=(Array.isArray(base.zones)?base.zones:[]).filter('),"saved room zones must be sanitized before rendering");
+assert.ok(drawingSource.includes('const measurements=(Array.isArray(base.measurements)?base.measurements:[]).filter('),"saved measurement labels must be sanitized before rendering");
+assert.ok(drawingSource.includes('for(const key of ["customName","metodModuleLabel","itemNote","circuit","label","name","notes"])'),"saved item and IKEA module labels must be sanitized before rendering");
 assert.ok(drawingSource.includes("const footprint=[[0,0],[w,0],[w,d-cut],[w-cut,d],[0,d]]"),"3D corner cabinets must use the same clipped footprint as the plan view");
 const url="data:text/javascript;base64,"+Buffer.from(source).toString("base64");
 const {IKEA_METOD_MODULES, IKEA_METOD_SOURCES, validateIkeaMetodCatalog}=await import(url);
