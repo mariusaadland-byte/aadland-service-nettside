@@ -871,9 +871,13 @@ function normalizeDrawingDocument(raw){
  for(const key of ["name","customer","customerEmail","customerPhone","address","notes","visualizationNotes","scale"]){
   base[key]=safeDrawingText(base[key],key==="name"?"Ny tegning":key==="scale"?"1:50":"");
  }
- const walls=Array.isArray(base.walls)?base.walls:[],zones=Array.isArray(base.zones)?base.zones:[],measurements=Array.isArray(base.measurements)?base.measurements:[],wallIds=new Set(walls.map(w=>w.id));
- let items=(Array.isArray(base.items)?base.items:[]).map(item=>{
+ const walls=(Array.isArray(base.walls)?base.walls:[]).filter(w=>w&&typeof w==="object").map(w=>({...w,name:safeDrawingText(w.name),label:safeDrawingText(w.label),notes:safeDrawingText(w.notes)}));
+ const zones=(Array.isArray(base.zones)?base.zones:[]).filter(z=>z&&typeof z==="object").map(z=>({...z,name:safeDrawingText(z.name),notes:safeDrawingText(z.notes),roomSurveyNotes:safeDrawingText(z.roomSurveyNotes),floorFinish:safeDrawingText(z.floorFinish)}));
+ const measurements=(Array.isArray(base.measurements)?base.measurements:[]).filter(m=>m&&typeof m==="object").map(m=>({...m,label:safeDrawingText(m.label),notes:safeDrawingText(m.notes)}));
+ const wallIds=new Set(walls.map(w=>w.id));
+ let items=(Array.isArray(base.items)?base.items:[]).filter(item=>item&&typeof item==="object").map(item=>{
   let next={...item};
+  for(const key of ["customName","metodModuleLabel","itemNote","circuit","label","name","notes"])if(key in next)next[key]=safeDrawingText(next[key]);
   if(next.wallId&&!wallIds.has(next.wallId))next={...next,wallId:null,wallOffset:null};
   if(["customwall","customfloor"].includes(next.type)){
    const sectionsX=clamp(Math.round(Number(next.sectionsX)||1),1,8),sectionsY=clamp(Math.round(Number(next.sectionsY)||1),1,6),width=Math.max(100,Number(next.w)||1000),height=Math.max(50,Number(next.modelHeight)||item3DHeight[next.type]||900);
