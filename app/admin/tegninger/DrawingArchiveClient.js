@@ -3,9 +3,16 @@ import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import styles from "./archive.module.css";
 
-const canon=value=>String(value||"").trim().toLocaleLowerCase("nb-NO");
-const when=value=>value?new Date(value).toLocaleString("nb-NO",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}):"";
-const groupLabel=row=>row.customer||"Uten kunde";
+const safeText=(value,fallback="")=>{
+ if(value==null)return fallback;
+ if(typeof value==="string"||typeof value==="number"||typeof value==="boolean")return String(value);
+ try{return JSON.stringify(value)}catch{return fallback}
+};
+const canon=value=>safeText(value).trim().toLocaleLowerCase("nb-NO");
+const when=value=>{if(!value)return "";const date=new Date(value);return Number.isNaN(date.getTime())?"Ukjent dato":date.toLocaleString("nb-NO",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})};
+const groupLabel=row=>safeText(row.customer,"Uten kunde")||"Uten kunde";
+const normalizeArchiveRow=row=>({...row,name:safeText(row.name,"Uten navn"),customer:safeText(row.customer),address:safeText(row.address),notes:safeText(row.notes)});
+const normalizeContact=row=>({...row,name:safeText(row.name),email:safeText(row.email),phone:safeText(row.phone),address:safeText(row.address)});
 export default function DrawingArchiveClient(){
  const [drawings,setDrawings]=useState([]);
  const [contacts,setContacts]=useState([]);
@@ -27,9 +34,9 @@ export default function DrawingArchiveClient(){
    fetch("/api/admin/customer-contacts",{cache:"no-store"}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"Kunne ikke hente kunder");return d.contacts||[]})
   ]).then(([data,list])=>{
    if(!live)return;
-   setDrawings(data.drawings||[]);
-   setPublishedIds(data.publishedIds||[]);
-   setContacts(list);
+   setDrawings((Array.isArray(data.drawings)?data.drawings:[]).filter(row=>row&&typeof row==="object"&&row.id).map(normalizeArchiveRow));
+   setPublishedIds(Array.isArray(data.publishedIds)?data.publishedIds:[]);
+   setContacts((Array.isArray(list)?list:[]).filter(row=>row&&typeof row==="object").map(normalizeContact));
   }).catch(e=>{if(live)setError(e.message||"Arkivet kunne ikke lastes.")})
    .finally(()=>{if(live)setLoading(false)});
   return()=>{live=false};
