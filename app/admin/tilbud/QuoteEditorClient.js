@@ -318,7 +318,9 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   updateLine(line.id,"description",String(product.name||line.description||"").slice(0,500));
   updateLine(line.id,"unit",String(product.unit||line.unit||"stk").slice(0,40));
   updateLine(line.id,"internalUnitCostOre",newCost);
-  setSupplierSearch(current=>({...current,[line.id]:{loading:false,products:[],error:"",message:"Innkjøpskostnad oppdatert. Salgsprisen i tilbudet er ikke endret."}}));
+  const currentSale=Number(line.unitPriceOre);
+  const belowCost=line.unitPriceOre!==""&&Number.isFinite(currentSale)&&currentSale<newCost;
+  setSupplierSearch(current=>({...current,[line.id]:{loading:false,products:[],error:belowCost?"Advarsel: Innkjøpsprisen er høyere enn salgsprisen. Kontroller tilbudslinjen før du sender tilbudet.":"",message:belowCost?"":"Innkjøpskostnad oppdatert. Salgsprisen i tilbudet er ikke endret."}}));
  }
  function updatePlan(id,key,value){
   setV(current=>({...current,paymentPlan:current.paymentPlan.map(row=>row.id===id?{...row,[key]:value}:row)}));
