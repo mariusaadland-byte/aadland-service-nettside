@@ -392,6 +392,14 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    }
   }catch(error){setSupplierSearch(current=>({...current,[line.id]:{loading:false,products:[],error:error.message||"Katalogsøket feilet.",message:""}}));}
  }
+ function chooseMissingCost(line,product){
+  if(locked)return;
+  const cost=Number(product.costExVat);
+  if(!Number.isFinite(cost)||cost<0){setSupplierSearch(current=>({...current,[line.id]:{...current[line.id],error:"Denne varen har ingen gyldig innkjøpspris."}}));return;}
+  const costOre=Math.round(cost*100);
+  updateLine(line.id,"internalUnitCostOre",costOre);
+  setSupplierSearch(current=>({...current,[line.id]:{loading:false,products:[],error:"",message:"Valgt "+String(product.name||"vare")+": "+nok(costOre)+" per "+String(product.unit||"enhet")+". Kundens salgspris er uendret."}}));
+ }
  function updateSupplierSalePrice(line,product){
   if(locked)return;
   const savedRate=Number(product.defaultMarkupPercent);
@@ -792,6 +800,11 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
         <button type="button" className="btn alt" disabled={locked||Boolean(supplierSearch[line.id]?.loading)} onClick={()=>findMissingCost(line)}>{supplierSearch[line.id]?.loading?"Søker …":"Hent innkjøpspris fra katalog"}</button>
         {supplierSearch[line.id]?.message&&<small>{supplierSearch[line.id].message}</small>}
         {supplierSearch[line.id]?.error&&<small className="quoteProfitWarning">{supplierSearch[line.id].error}</small>}
+        {supplierSearch[line.id]?.products?.length>0&&<div style={{display:"grid",gap:8,marginTop:8}}>
+         {supplierSearch[line.id].products.map((product,index)=><button key={String(product.sku||product.name||index)+"-"+index} type="button" className="btn alt" disabled={locked||!Number.isFinite(Number(product.costExVat))||Number(product.costExVat)<0} onClick={()=>chooseMissingCost(line,product)} style={{textAlign:"left",whiteSpace:"normal"}}>
+          {String(product.name||"Ukjent vare")} {product.sku?"("+product.sku+")":""} — {Number.isFinite(Number(product.costExVat))?new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(Number(product.costExVat)):"Pris mangler"} eks. MVA / {String(product.unit||"enhet")}
+         </button>)}
+        </div>}
        </div>)}
       </div>}
       <h4>Materialer og forbruksmateriell</h4>
