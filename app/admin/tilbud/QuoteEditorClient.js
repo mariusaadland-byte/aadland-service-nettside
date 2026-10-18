@@ -350,7 +350,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   const rate=quoteMaterialMarkupOverride===""?Number(v.quoteMaterialMarkupPercent??defaultMaterialMarkup):Number(quoteMaterialMarkupOverride);
   if(!Number.isFinite(rate)||rate<0||rate>1000){setError("Ugyldig påslag. Velg en verdi mellom 0 og 1000 %.");return;}
   const sale=Math.round(cost*(1+rate/100));
-  updateLine(line.id,"unitPriceOre",sale);
+  setV(current=>({...current,quoteMaterialMarkupPercent:rate,lineItems:current.lineItems.map(item=>item.id===line.id?{...item,unitPriceOre:sale}:item)}));
   setError("");
   setSavedMessage("Salgspris for "+(cleanDescription(line.description)||"materialvaren")+" er satt til "+nok(sale)+" eks. MVA per enhet med "+rate+" % påslag. Husk å lagre tilbudet.");
  }
