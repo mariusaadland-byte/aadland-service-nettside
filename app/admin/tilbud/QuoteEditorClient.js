@@ -701,6 +701,14 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
         <div className="field quoteLineUnit"><label>Enhet</label><input value={line.unit} onChange={e=>updateLine(line.id,"unit",e.target.value)} placeholder="time / stk"/></div>
         <div className="field quoteLinePrice"><label>Pris eks. MVA</label><input type="number" min="0" step="0.01" value={line.unitPriceOre===""?"":Number(line.unitPriceOre)/100} onChange={e=>updateLine(line.id,"unitPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="0"/></div>
         <div className="field quoteLineInternalCost"><label>Intern kostnad eks. MVA / enhet</label><input type="number" min="0" step="0.01" inputMode="decimal" value={line.internalUnitCostOre===""||line.internalUnitCostOre==null?"":Number(line.internalUnitCostOre)/100} onChange={e=>updateLine(line.id,"internalUnitCostOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="Ikke registrert" title="Kun intern kalkyle. Vises aldri for kunden."/><small className="muted">Kun internt</small></div>
+        {line.type==="material"&&line.internalUnitCostOre!==""&&line.internalUnitCostOre!=null&&line.unitPriceOre!==""&&Number(line.internalUnitCostOre)>0&&(()=>{
+         const cost=Number(line.internalUnitCostOre),sale=Number(line.unitPriceOre),markup=(sale-cost)/cost*100;
+         const negative=sale<cost,low=markup<minimumMaterialMarkup;
+         return (negative||low)&&<div className="quoteProfitWarning" role="alert" style={{padding:"8px 10px",marginBottom:8}}>
+          <strong>{negative?"Negativt dekningsbidrag på denne varelinjen":"Lavt påslag på denne varelinjen"}</strong>
+          <small>Påslag: {new Intl.NumberFormat("nb-NO",{maximumFractionDigits:1}).format(markup)} % · Grense: {minimumMaterialMarkup} % · Dekningsbidrag per enhet: {nok(sale-cost)}.</small>
+         </div>;
+        })()}
         {line.type==="material"&&<div className="quoteSupplierSearch">
          <button type="button" className="btn alt" disabled={Boolean(supplierSearch[line.id]?.loading)} onClick={()=>searchSupplierCatalog(line)}>{supplierSearch[line.id]?.loading?"Søker …":"Søk innkjøpspris i materialkatalog"}</button>
          {supplierSearch[line.id]?.message&&<p className="quoteSupplierMessage">{supplierSearch[line.id].message}</p>}
