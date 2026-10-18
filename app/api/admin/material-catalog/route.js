@@ -1,3 +1,4 @@
+import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
@@ -62,4 +63,21 @@ export async function GET(req){
  });
  if(error)return NextResponse.json({error:"Kunne ikke søke i materialkatalogen."},{status:500});
  return NextResponse.json({suppliers,products:(data||[]).map(productRow)});
+}
+
+export async function PATCH(req){
+ const originError=sameOriginGuard(req);
+ if(originError)return originError;
+ const user=await getAdminUser();
+ if(!user||user.role!=="owner")return NextResponse.json({error:"Bare eier kan endre standardpåslag."},{status:403});
+ const body=await req.json().catch(()=>({}));
+ const supplierId=String(body.supplierId||"").trim().slice(0,80);
+ const markup=Number(body.markupPercent);
+ if(!supplierId||!Number.isFinite(markup)||markup<0||markup>1000)return NextResponse.json({error:"Ugyldig leverandør eller påslag."},{status:400});
+ const s=db();
+ if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+ const {data,error}=await s.from("material_suppliers").update({default_markup_percent:markup}).eq("id",supplierId).eq("active",true).select("id,default_markup_percent").maybeSingle();
+ if(error)return NextResponse.json({error:"Kunne ikke lagre standardpåslaget."},{status:500});
+ if(!data)return NextResponse.json({error:"Leverandøren ble ikke funnet."},{status:404});
+ return NextResponse.json({supplierId:data.id,markupPercent:Number(data.default_markup_percent)});
 }
