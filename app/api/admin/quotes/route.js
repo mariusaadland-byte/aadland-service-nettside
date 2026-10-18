@@ -299,11 +299,12 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
   const {data:target,error:lookupError}=await s.from("quotes").select("id").eq("id",id).maybeSingle();
   if(lookupError)return NextResponse.json({error:"Tilbudet kunne ikke kontrolleres."},{status:500});
   if(!target)return NextResponse.json({error:"Tilbudet ble ikke funnet."},{status:404});
-  const {error}=await s.from("quotes").update({
+  const {data:updated,error}=await s.from("quotes").update({
    archived_at:body.action==="archive"?new Date().toISOString():null,
    updated_at:new Date().toISOString()
-  }).eq("id",id);
+  }).eq("id",id).select("id").maybeSingle();
   if(error)return NextResponse.json({error:"Arkivstatus kunne ikke lagres."},{status:500});
+  if(!updated)return NextResponse.json({error:"Tilbudet ble ikke funnet eller kunne ikke oppdateres."},{status:404});
   return NextResponse.json({ok:true});
  }
 
