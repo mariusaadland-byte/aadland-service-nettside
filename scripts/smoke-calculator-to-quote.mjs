@@ -37,5 +37,10 @@ const quoteEditorSource=readFileSync("app/admin/tilbud/QuoteEditorClient.js","ut
 const quoteCatalogSource=readFileSync("app/admin/tilbud/QuoteCatalogSearch.js","utf8");
 assert.ok(quoteCatalogSource.includes("useState(initialMarkup)"),"Material markup must restore the saved preference");
 assert.ok(quoteCatalogSource.includes("localStorage.setItem(MARKUP_STORAGE_KEY,markup)"),"Material markup preference must persist");
+assert.ok(quoteCatalogSource.includes("defaultMarkupPercent??15"),"Quote search must load the shared supplier markup");
+assert.ok(quoteCatalogSource.includes("async function saveMarkup()"),"Quote search must allow saving supplier markup");
+const materialCatalogRoute=readFileSync("app/api/admin/material-catalog/route.js","utf8");
+assert.ok(materialCatalogRoute.includes("export async function PATCH(req)"),"Supplier markup must have a save endpoint");
+assert.ok(materialCatalogRoute.includes("user.role!==\"owner\""),"Only owner may update shared markup");
 assert.ok(quoteEditorSource.includes("Array.isArray(data.drawings)?data.drawings:[]"),"quote editor must validate drawing list");
 assert.ok(quoteEditorSource.includes("typeof row.name===\"string\"?row.name:\"Tegning\""),"quote editor must sanitize drawing labels");
