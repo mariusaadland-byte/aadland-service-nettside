@@ -474,8 +474,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   if(!v.customer.name.trim()){setError("Skriv inn kundenavn.");return;}
   if(!v.title.trim()){setError("Skriv inn hva tilbudet gjelder.");return;}
   if(v.lineItems.some(line=>!String(line.description||"").trim())){setError("Alle tilbudslinjer må ha beskrivelse.");return;}
-  if(v.lineItems.some(line=>Number(line.quantity)<=0)){setError("Antall må være større enn 0.");return;}
-  if(v.lineItems.some(line=>line.unitPriceOre===""||Number(line.unitPriceOre)<0)){setError("Fyll inn pris på alle tilbudslinjer.");return;}
+  if(v.lineItems.some(line=>!Number.isFinite(Number(line.quantity))||Number(line.quantity)<=0)){setError("Antall må være et gyldig tall større enn 0.");return;}
+  if(v.lineItems.some(line=>line.unitPriceOre===""||line.unitPriceOre==null||!Number.isFinite(Number(line.unitPriceOre))||Number(line.unitPriceOre)<0)){setError("Fyll inn en gyldig pris på alle tilbudslinjer.");return;}
   if(Math.abs(planSum-100)>0.01){setError("Betalingsplanen må til sammen være 100 %.");return;}
   const selectedMarkup=quoteMaterialMarkupOverride===""?v.quoteMaterialMarkupPercent:Number(quoteMaterialMarkupOverride);
   if(quoteMaterialMarkupOverride!==""&&(!Number.isFinite(selectedMarkup)||selectedMarkup<0||selectedMarkup>1000)){setError("Påslaget må være mellom 0 og 1000 %.");return;}
