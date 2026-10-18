@@ -126,6 +126,13 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   });
  },[v.lineItems]);
  const lowMarkupGroups=materialProfit.filter(group=>group.count>0&&group.missing===0&&group.markupPercent!==null&&group.markupPercent<minimumMaterialMarkup);
+ const missingMaterialCosts=v.lineItems.filter(line=>line.type==="material"&&(line.internalUnitCostOre==null||line.internalUnitCostOre===""));
+ const negativeMaterialContribution=materialProfit.filter(group=>group.count>0&&group.missing===0&&group.marginOre<0);
+ const quoteQualityIssues=[
+  ...(missingMaterialCosts.length?[missingMaterialCosts.length+" materialvare(r) mangler innkjøpspris"]:[]),
+  ...lowMarkupGroups.map(group=>group.label+" har for lavt påslag ("+new Intl.NumberFormat("nb-NO",{maximumFractionDigits:1}).format(group.markupPercent)+" %)"),
+  ...negativeMaterialContribution.map(group=>group.label+" har negativt dekningsbidrag ("+nok(group.marginOre)+")")
+ ];
  const planSum=useMemo(()=>v.paymentPlan.reduce((sum,row)=>sum+(Number(row.percent)||0),0),[v.paymentPlan]);
  const isDirty=useMemo(()=>Boolean(savedSnapshot)&&JSON.stringify(v)!==savedSnapshot,[v,savedSnapshot]);
  const locked=quoteId&&v.status!=="draft";
@@ -791,6 +798,11 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       <span><small>MVA</small><b>{nok(calc.vat)}</b></span>
       <span className="quoteSummaryTotal"><small>Total inkl. MVA</small><b>{nok(calc.total)}</b></span>
      </div>
+     <section aria-label="Kvalitetssjekk før sending" style={{padding:"12px 14px",border:"1px solid var(--border, #ccc)",borderRadius:8,marginBottom:16}}>
+      <strong>{quoteQualityIssues.length?"Kvalitetssjekk: "+quoteQualityIssues.length+" forhold å kontrollere":"Kvalitetssjekk: Ingen avvik funnet"}</strong>
+      {quoteQualityIssues.length?<ul style={{margin:"8px 0 0",paddingLeft:20}}>{quoteQualityIssues.map((issue,index)=><li key={index}>{issue}</li>)}</ul>:<p style={{margin:"6px 0 0"}}>Ingen manglende materialkostnader, lave materialpåslag eller negative materialdekningsbidrag er registrert.</p>}
+      <small>Kun synlig for admin. Sjekken gjelder registrerte materialkostnader og erstatter ikke full gjennomgang av tilbudet.</small>
+     </section>
      <section className="quoteProfitPanel" aria-label="Intern kostnad og dekningsbidrag">
       <div className="kicker">INTERN KALKYLE · KUN ADMIN</div>
       <h4>Estimert dekningsbidrag</h4>
