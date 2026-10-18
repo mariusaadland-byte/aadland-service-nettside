@@ -119,7 +119,8 @@ function sanitizePlan(value){
   {id:"completion",label:"Ferdigstillelse",percent:25,trigger:"Ved ferdigstillelse"}
  ];
  if(!Array.isArray(value)||!value.length)return fallback;
- const plan=value.slice(0,8).map((row,index)=>({
+ if(value.length>8||value.some(row=>!row||typeof row!=="object"||Array.isArray(row)))return null;
+ const plan=value.map((row,index)=>({
   id:clean(row.id,80)||("payment-"+index),
   label:clean(row.label,160)||("Delbetaling "+(index+1)),
   percent:Number(row.percent),
