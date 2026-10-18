@@ -3,6 +3,15 @@
 import {useEffect,useState} from "react";
 
 const nok=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",minimumFractionDigits:2,maximumFractionDigits:2}).format((Number(ore)||0)/100);
+function paymentAmounts(quote){
+ const plan=Array.isArray(quote.paymentPlan)?quote.paymentPlan:[];
+ let allocated=0;
+ return plan.map((row,index)=>{
+  const amount=index===plan.length-1?Number(quote.totalIncVatOre||0)-allocated:Math.round(Number(quote.totalIncVatOre||0)*(Number(row.percent)||0)/100);
+  allocated+=amount;
+  return amount;
+ });
+}
 const typeLabels={work:"Arbeid",material:"Materiale",other:"Annet"};
 const statusLabels={draft:"Kladd",sent:"Sendt",accepted:"Godkjent",declined:"Avslått",expired:"Utløpt",cancelled:"Avbrutt",superseded:"Erstattet"};
 
@@ -165,7 +174,7 @@ export default function QuoteCustomerClient({quoteId}){
       <span>{row.percent}%</span>
       <h3>{row.label}</h3>
       <p>{row.trigger}</p>
-      <b>{nok(quote.totalIncVatOre*(Number(row.percent)||0)/100)}</b>
+      <b>{nok(paymentAmounts(quote)[index])}</b>
      </div>)}
     </div>
    </section>
