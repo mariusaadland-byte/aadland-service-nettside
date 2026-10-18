@@ -153,6 +153,7 @@ function payload(body,user,existing){
  }
  const lines=sanitizeLines(body.lineItems);
  if(!lines.length)return {error:"Legg inn minst én tilbudslinje."};
+ if(Array.isArray(body.paymentPlan)&&body.paymentPlan.length>8)return {error:"Betalingsplanen kan ha maksimalt 8 delbetalinger."};
  const paymentPlan=sanitizePlan(body.paymentPlan);
  if(!paymentPlan)return {error:"Betalingsplanen må til sammen være 100 %."};
  const drawingIds=Array.isArray(body.drawingIds)?[...new Set(body.drawingIds.filter(id=>/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(id))))].slice(0,12):[];
