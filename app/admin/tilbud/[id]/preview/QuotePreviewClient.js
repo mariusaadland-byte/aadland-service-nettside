@@ -87,7 +87,15 @@ export default function QuotePreviewClient({quoteId}){
     <div className="quoteDocLine quoteDocLineHead">
      <span>Beskrivelse</span><span>Antall</span><span>Pris eks.</span><span>MVA</span><span>Sum eks.</span>
     </div>
-    {quote.lineItems.map((line,index)=>{
+    {(() => {
+     const items=Array.isArray(quote.lineItems)?quote.lineItems:[];
+     const main=items.filter(line=>line.type==="material"&&!/^forbruksmateriell\\s*:/i.test(String(line.description||"")));
+     const consumables=items.filter(line=>line.type==="material"&&/^forbruksmateriell\\s*:/i.test(String(line.description||"")));
+     const sum=rows=>rows.reduce((total,line)=>total+Math.round((Number(line.quantity)||0)*(Number(line.unitPriceOre)||0)),0);
+     const grouped=[...items.filter(line=>line.type!=="material")];
+     if(main.length)grouped.push({id:"grouped-materials",type:"material",description:"Materialer",quantity:1,unit:"samlet",unitPriceOre:sum(main),vatRate:25});
+     if(consumables.length)grouped.push({id:"grouped-consumables",type:"material",description:"Diverse forbruksmateriell",quantity:1,unit:"samlet",unitPriceOre:sum(consumables),vatRate:25});
+     return grouped.map((line,index)=>{
      const net=Math.round((Number(line.quantity)||0)*(Number(line.unitPriceOre)||0));
      return <div className="quoteDocLine" key={line.id||index}>
       <span><small>{typeLabels[line.type]||"Linje"}</small><b>{line.description}</b></span>
@@ -96,7 +104,7 @@ export default function QuotePreviewClient({quoteId}){
       <span>{line.vatRate}%</span>
       <span><b>{nok(net)}</b></span>
      </div>;
-    })}
+    });})()}
    </section>
 
    <section className="quoteDocTotals">
