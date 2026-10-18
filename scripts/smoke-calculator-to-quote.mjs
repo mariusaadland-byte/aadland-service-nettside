@@ -32,3 +32,7 @@ assert.equal(custom[0].unitPriceOre,2388,"Norwegian comma decimals");
 assert.equal(quoteLinesFromCalculator({materialItems:[{name:"",qty:"1"},{name:"Navn",qty:"0"}]}).length,0);
 assert.equal(quoteLinesFromCalculator({materialItems:[]}).length,0);
 console.log("Tilbudsoverføring bestått: søkte varer, mengder, 20 % påslag, manuelle priser og valgfritt arbeid/reise.");
+
+const quoteEditorSource=readFileSync("app/admin/tilbud/QuoteEditorClient.js","utf8");
+assert.ok(quoteEditorSource.includes("Array.isArray(data.drawings)?data.drawings:[]"),"quote editor must validate drawing list");
+assert.ok(quoteEditorSource.includes("typeof row.name===\"string\"?row.name:\"Tegning\""),"quote editor must sanitize drawing labels");
