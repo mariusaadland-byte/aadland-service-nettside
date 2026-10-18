@@ -77,6 +77,26 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [showAllDrawings,setShowAllDrawings]=useState(false);
  const calc=useMemo(()=>calculate(v.lineItems),[v.lineItems]);
  const contribution=useMemo(()=>calculateContribution(v.lineItems),[v.lineItems]);
+ const materialProfit=useMemo(()=>{
+  const groups={material:[],consumable:[]};
+  for(const line of v.lineItems||[]){
+   if(line.type!=="material")continue;
+   const category=/^Forbruksmateriell:\\s*/i.test(String(line.description||""))?"consumable":"material";
+   groups[category].push(line);
+  }
+  return Object.entries(groups).map(([key,lines])=>{
+   let saleOre=0,costOre=0,coveredSaleOre=0,missing=0;
+   for(const line of lines){
+    const qty=Math.max(0,Number(line.quantity)||0);
+    const sale=Math.round(qty*(Number(line.unitPriceOre)||0));
+    saleOre+=sale;
+    if(line.internalUnitCostOre==null||line.internalUnitCostOre===""){missing++;continue;}
+    costOre+=Math.round(qty*(Number(line.internalUnitCostOre)||0));
+    coveredSaleOre+=sale;
+   }
+   return {key,label:key==="material"?"Materialer":"Diverse forbruksmateriell",count:lines.length,saleOre,costOre,coveredSaleOre,missing,marginOre:coveredSaleOre-costOre};
+  });
+ },[v.lineItems]);
  const planSum=useMemo(()=>v.paymentPlan.reduce((sum,row)=>sum+(Number(row.percent)||0),0),[v.paymentPlan]);
  const isDirty=useMemo(()=>Boolean(savedSnapshot)&&JSON.stringify(v)!==savedSnapshot,[v,savedSnapshot]);
  const locked=quoteId&&v.status!=="draft";
@@ -713,6 +733,14 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       </div>:<p className="quoteProfitHelp">Legg inn intern kostnad per enhet på prislinjene for å se hva oppdraget er beregnet å gi.</p>}
       {contribution.missing>0&&<p className="quoteProfitWarning">{contribution.missing} linje(r) mangler kostnadsgrunnlag. Tallene er derfor bare et delestimat, ikke samlet fortjeneste for tilbudet.</p>}
       {contribution.complete&&contribution.known>0&&<p className="quoteProfitHelp">Alle linjer har kostnad. Dette er dekningsbidrag før faste driftsutgifter, eventuelle tillegg og skatt – ikke nettofortjeneste.</p>}
+      <h4>Materialer og forbruksmateriell</h4>
+      {materialProfit.filter(group=>group.count>0).map(group=><div className="quoteProfitNumbers" key={group.key} style={{marginBottom:12}}>
+       <strong>{group.label} ({group.count} varelinjer)</strong>
+       <span><small>Salgspris eks. MVA</small><b>{nok(group.saleOre)}</b></span>
+       <span><small>Registrert innkjøpskostnad eks. MVA</small><b>{nok(group.costOre)}</b></span>
+       <span><small>Dekningsbidrag på linjer med kjent kostnad</small><b>{nok(group.marginOre)}</b></span>
+       {group.missing>0&&<small className="quoteProfitWarning">{group.missing} linje(r) mangler innkjøpskostnad. Dekningsbidraget er ikke fullstendig.</small>}
+      </div>)}
       <small>Innkjøpspriser og denne oversikten lagres separat fra kundetilbudet og vises ikke i PDF, e-post eller på Min side.</small>
      </section>
      <p className="muted">{v.drawingIds.length? v.drawingIds.length+" plantegning(er) med veggvisninger vedlagt PDF":"Ingen tegninger valgt"}</p>
