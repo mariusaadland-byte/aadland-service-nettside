@@ -273,7 +273,14 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  function set(key,value){setV(current=>({...current,[key]:value}))}
  function setCustomer(key,value){setV(current=>({...current,customer:{...current.customer,[key]:value}}))}
  function chooseDrawing(row,checked){if(checked&&row.customer&&v.customer.name&&String(row.customer).trim().toLowerCase()!==String(v.customer.name).trim().toLowerCase()){if(!window.confirm("Denne tegningen er registrert på «"+row.customer+"», men tilbudet gjelder «"+v.customer.name+"». Er du sikker på at riktig tegning skal sendes?"))return;}setV(current=>({...current,drawingIds:checked?[...current.drawingIds,row.id].slice(0,8):current.drawingIds.filter(id=>id!==row.id)}))}
- function updateLine(id,key,value){setV(current=>({...current,lineItems:current.lineItems.map(line=>line.id===id?{...line,[key]:value}:line)}))}
+ const consumablePrefix="Forbruksmateriell: ";
+ const isConsumable=line=>line?.type==="material"&&String(line.description||"").startsWith(consumablePrefix);
+ const cleanDescription=value=>String(value||"").replace(/^Forbruksmateriell:\\s*/i,"");
+ const setCategory=(line,category)=>{
+  const description=cleanDescription(line.description);
+  setV(current=>({...current,lineItems:current.lineItems.map(item=>item.id===line.id?{...item,type:category==="work"?"work":category==="other"?"other":"material",description:category==="consumable"?consumablePrefix+description:description}:item)}));
+ };
+ function updateLine(id,key,value){setV(current=>({...current,lineItems:current.lineItems.map(line=>line.id===id?{...line,[key]:key==="description"&&isConsumable(line)?consumablePrefix+cleanDescription(value):value}:line)}))}
  function addCatalogProduct(product,markup){
   if(locked||v.lineItems.length>=120){setError("Tilbudet er låst, eller har nådd maksimum 120 linjer.");return false;}
   const description=[String(product.name||"").trim(),product.sku?"Varenr. "+String(product.sku).trim():""].filter(Boolean).join(" · ");
@@ -323,7 +330,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   if(!Number.isFinite(rate)||rate<0||rate>1000){setError("Skriv et gyldig materialpåslag mellom 0 og 1000 %.");return;}
   const cost=Math.max(0,Math.round((Number(product.costExVat)||0)*100));
   const sale=Math.round(cost*(1+rate/100));
-  setV(current=>({...current,lineItems:current.lineItems.map(item=>item.id===line.id?{...item,description:String(product.name||item.description||"").slice(0,500),unit:String(product.unit||item.unit||"stk").slice(0,40),internalUnitCostOre:cost,unitPriceOre:sale}:item)}));
+  setV(current=>({...current,lineItems:current.lineItems.map(item=>item.id===line.id?{...item,description:(isConsumable(item)?consumablePrefix:"")+cleanDescription(String(product.name||item.description||"")).slice(0,470),unit:String(product.unit||item.unit||"stk").slice(0,40),internalUnitCostOre:cost,unitPriceOre:sale}:item)}));
   setSupplierSearch(current=>({...current,[line.id]:{loading:false,products:[],error:"",message:"Innkjøpspris og salgspris er oppdatert med "+rate+" % påslag. Ny salgspris eks. MVA: "+nok(sale)+"."}}));
   setError("");
  }
@@ -582,7 +589,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      <section id="quote-material-search" className="card quoteEditorSection">
       <div className="quoteSectionHead">
        <div><div className="kicker">PRISLINJER</div><h3>Arbeid og materialer</h3></div>
-       <div><button type="button" className="btn alt" onClick={()=>addLine("work")}>+ Arbeid</button><button type="button" className="btn alt" onClick={()=>addLine("material")}>+ Materiale</button><button type="button" className="btn alt" onClick={()=>setV(current=>({...current,lineItems:[...current.lineItems,{id:lineId(),type:"material",description:"Forbruksmateriell: ",quantity:1,unit:"stk",unitPriceOre:"",vatRate:25,internalUnitCostOre:""}]}))}>+ Forbruksmateriell</button></div>
+       <div><button type="button" className="btn alt" onClick={()=>addLine("work")}>+ Arbeid</button><button type="button" className="btn alt" onClick={()=>addLine("material")}>+ Materiale</button><button type="button" className="btn alt" onClick={()=>setV(current=>({...current,lineItems:[...current.lineItems,{id:lineId(),type:"material",description:consumablePrefix,quantity:1,unit:"stk",unitPriceOre:"",vatRate:25,internalUnitCostOre:""}]}))}>+ Forbruksmateriell</button></div>
       </div>
 
       {!locked&&<QuoteCatalogSearch onChoose={addCatalogProduct}/>}
@@ -590,8 +597,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       <div className="quoteLines">
        {v.lineItems.map((line,index)=><div className="quoteLineEditor" key={line.id}>
         <div className="quoteLineNumber">{index+1}</div>
-        <div className="field quoteLineDescription"><label>Beskrivelse</label><input value={line.description} onChange={e=>updateLine(line.id,"description",e.target.value)} placeholder={line.type==="work"?"F.eks. Tømrerarbeid":"F.eks. Gipsplater og stendere"}/></div>
-        <div className="field quoteLineType"><label>Type</label><select value={line.type} onChange={e=>updateLine(line.id,"type",e.target.value)}><option value="work">Arbeid</option><option value="material">Materiale</option><option value="other">Annet</option></select></div>
+        <div className="field quoteLineDescription"><label>Beskrivelse</label><input value={isConsumable(line)?cleanDescription(line.description):line.description} onChange={e=>updateLine(line.id,"description",e.target.value)} placeholder={line.type==="work"?"F.eks. Tømrerarbeid":"F.eks. Gipsplater og stendere"}/></div>
+        <div className="field quoteLineType"><label>Type</label><select value={isConsumable(line)?"consumable":line.type} onChange={e=>setCategory(line,e.target.value)}><option value="work">Arbeid</option><option value="material">Materiale</option><option value="consumable">Forbruksmateriell</option><option value="other">Annet</option></select></div>
         <div className="field quoteLineQuantity"><label>Antall</label><input type="number" min="0.01" step="0.01" value={line.quantity} onChange={e=>updateLine(line.id,"quantity",e.target.value)}/></div>
         <div className="field quoteLineUnit"><label>Enhet</label><input value={line.unit} onChange={e=>updateLine(line.id,"unit",e.target.value)} placeholder="time / stk"/></div>
         <div className="field quoteLinePrice"><label>Pris eks. MVA</label><input type="number" min="0" step="0.01" value={line.unitPriceOre===""?"":Number(line.unitPriceOre)/100} onChange={e=>updateLine(line.id,"unitPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="0"/></div>
