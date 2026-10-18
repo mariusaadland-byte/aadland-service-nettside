@@ -5,6 +5,15 @@ import Link from "next/link";
 import {osloDateKey} from "../../lib/osloTime";
 import CustomerDrawingViewer from "./CustomerDrawingViewer";
 
+function paymentAmounts(plan,total){
+ const rows=Array.isArray(plan)?plan:[];
+ let allocated=0;
+ return rows.map((row,index)=>{
+  const amount=index===rows.length-1?Number(total||0)-allocated:Math.round(Number(total||0)*(Number(row.percent)||0)/100);
+  allocated+=amount;
+  return amount;
+ });
+}
 const orderStatus={new:"Mottatt",confirmed:"Bekreftet",processing:"Under behandling",in_progress:"Under arbeid",ready:"Klar",completed:"Fullført",cancelled:"Kansellert"};
 const enquiryStatus={new:"Mottatt",confirmed:"Befaring avtalt",processing:"Under behandling",in_progress:"Under arbeid",ready:"Klar for oppfølging",completed:"Ferdig",cancelled:"Avbrutt"};
 const rentalStatus={new:"Mottatt",confirmed:"Bekreftet",active:"Pågående",returned:"Returnert",completed:"Fullført",cancelled:"Kansellert"};
@@ -632,7 +641,7 @@ export default function MinSide(){
          </div>
          {Array.isArray(q?.paymentPlan)&&q.paymentPlan.length>0&&<div className="customerJobPaymentPlan">
           <h4>Betalingsplan</h4>
-          {q.paymentPlan.map((row,index)=><div key={row.id||index}><span><b>{row.label||("Delbetaling "+(index+1))}</b><small>{row.trigger||""}</small></span><strong>{row.percent}% · {kr((q.totalIncVatOre||o.total_ore)*(Number(row.percent)||0)/100)}</strong></div>)}
+          {q.paymentPlan.map((row,index)=><div key={row.id||index}><span><b>{row.label||("Delbetaling "+(index+1))}</b><small>{row.trigger||""}</small></span><strong>{row.percent}% · {kr(paymentAmounts(q.paymentPlan,q.totalIncVatOre??o.total_ore)[index])}</strong></div>)}
          </div>}
          {q?.href&&<Link className="btn alt" href={q.href}>Åpne godkjent tilbud</Link>}
         </div>
