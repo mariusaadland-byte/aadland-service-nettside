@@ -497,7 +497,12 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   const recipient=String(recipientOverride||v.customer.email||"").trim().toLowerCase();
   if(!recipient){setError("Legg inn kundens e-postadresse før tilbudet sendes.");return false;}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)){setError("E-postadressen er ugyldig.");return false;}
-  if(!window.confirm("Sende tilbudet til "+recipient+"?"))return false;
+  const missingCostLines=v.lineItems.filter(line=>line.type==="material"&&(line.internalUnitCostOre==null||line.internalUnitCostOre===""));
+  if(missingCostLines.length){
+   const names=missingCostLines.slice(0,5).map(line=>"• "+(cleanDescription(line.description)||"Materiale uten beskrivelse")).join("\\n");
+   const extra=missingCostLines.length>5?"\\n… og "+(missingCostLines.length-5)+" flere.":"";
+   if(!window.confirm("ADVARSEL: "+missingCostLines.length+" materialvare(r) mangler innkjøpspris. Fortjenesteberegningen kan være feil.\\n\\n"+names+extra+"\\n\\nVil du likevel sende tilbudet til "+recipient+"?"))return false;
+  }else if(!window.confirm("Sende tilbudet til "+recipient+"?"))return false;
   setSending(true);setError("");setSavedMessage("");
   if(v.status==="draft"){
    const saved=await save();
