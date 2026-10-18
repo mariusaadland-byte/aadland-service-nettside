@@ -1,10 +1,13 @@
 "use client";
 import {useEffect,useState} from "react";
 import styles from "./quoteCatalog.module.css";
+const MARKUP_STORAGE_KEY="aadland:quote:material-markup";
 const fmt=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(Number(n)||0);
 export default function QuoteCatalogSearch({onChoose}){
  const [query,setQuery]=useState(""),[supplier,setSupplier]=useState("byggern"),[suppliers,setSuppliers]=useState([]);
  const [markup,setMarkup]=useState("15"),[results,setResults]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
+ useEffect(()=>{try{const saved=window.localStorage.getItem(MARKUP_STORAGE_KEY);if(saved!==null&&saved.trim()!==""&&Number.isFinite(Number(saved.replace(",","."))))setMarkup(saved)}catch{}},[]);
+ useEffect(()=>{try{window.localStorage.setItem(MARKUP_STORAGE_KEY,markup)}catch{}},[markup]);
  useEffect(()=>{
   let active=true;
   fetch("/api/admin/material-catalog",{cache:"no-store"}).then(async r=>{
