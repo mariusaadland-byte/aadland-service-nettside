@@ -274,8 +274,9 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  function setCustomer(key,value){setV(current=>({...current,customer:{...current.customer,[key]:value}}))}
  function chooseDrawing(row,checked){if(checked&&row.customer&&v.customer.name&&String(row.customer).trim().toLowerCase()!==String(v.customer.name).trim().toLowerCase()){if(!window.confirm("Denne tegningen er registrert på «"+row.customer+"», men tilbudet gjelder «"+v.customer.name+"». Er du sikker på at riktig tegning skal sendes?"))return;}setV(current=>({...current,drawingIds:checked?[...current.drawingIds,row.id].slice(0,8):current.drawingIds.filter(id=>id!==row.id)}))}
  const consumablePrefix="Forbruksmateriell: ";
- const isConsumable=line=>line?.type==="material"&&String(line.description||"").startsWith(consumablePrefix);
- const cleanDescription=value=>String(value||"").replace(/^Forbruksmateriell:\\s*/i,"");
+ const isConsumable=line=>line?.type==="material"&&/^Forbruksmateriell:\s*/i.test(String(line.description||""));
+ const cleanDescription=value=>String(value||"").replace(/^Forbruksmateriell:\s*/i,"");
+ const suggestConsumable=name=>/\b(skrue(?:r|ne|pakke)?|treskrue|gipsskrue|spiker|dykkert|byggskum|fugemasse|silikon|akryl|monteringslim|trelim|maskeringstape|byggtape|fugeskum|patron|slip(?:epapir|eskive)|bits|bor(?:sett)?|plugg(?:er)?|klammer)\b/i.test(String(name||""));
  const setCategory=(line,category)=>{
   const description=cleanDescription(line.description);
   setV(current=>({...current,lineItems:current.lineItems.map(item=>item.id===line.id?{...item,type:category==="work"?"work":category==="other"?"other":"material",description:category==="consumable"?consumablePrefix+description:description}:item)}));
@@ -283,8 +284,9 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  function updateLine(id,key,value){setV(current=>({...current,lineItems:current.lineItems.map(line=>line.id===id?{...line,[key]:key==="description"&&isConsumable(line)?consumablePrefix+cleanDescription(value):value}:line)}))}
  function addCatalogProduct(product,markup){
   if(locked||v.lineItems.length>=120){setError("Tilbudet er låst, eller har nådd maksimum 120 linjer.");return false;}
-  const description=[String(product.name||"").trim(),product.sku?"Varenr. "+String(product.sku).trim():""].filter(Boolean).join(" · ");
-  if(!description)return false;
+  const rawDescription=[String(product.name||"").trim(),product.sku?"Varenr. "+String(product.sku).trim():""].filter(Boolean).join(" · ");
+  if(!rawDescription)return false;
+  const description=(suggestConsumable(product.name)?consumablePrefix:"")+rawDescription;
   const quantity=1,unit=String(product.unit||"stk").trim().slice(0,40)||"stk";
   const unitPriceOre=Math.max(0,Math.round((Number(product.costExVat)||0)*(1+Math.max(0,markup)/100)*100));
   setV(current=>{
@@ -308,7 +310,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  }
 
  async function searchSupplierCatalog(line){
-  const id=line.id,query=String(line.description||"").trim();
+  const id=line.id,query=cleanDescription(line.description).trim();
   if(!query){setSupplierSearch(current=>({...current,[id]:{loading:false,products:[],error:"Skriv inn en materialbeskrivelse først."}}));return;}
   setSupplierSearch(current=>({...current,[id]:{loading:true,products:[],error:"",message:""}}));
   try{
@@ -330,13 +332,13 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   if(!Number.isFinite(rate)||rate<0||rate>1000){setError("Skriv et gyldig materialpåslag mellom 0 og 1000 %.");return;}
   const cost=Math.max(0,Math.round((Number(product.costExVat)||0)*100));
   const sale=Math.round(cost*(1+rate/100));
-  setV(current=>({...current,lineItems:current.lineItems.map(item=>item.id===line.id?{...item,description:(isConsumable(item)?consumablePrefix:"")+cleanDescription(String(product.name||item.description||"")).slice(0,470),unit:String(product.unit||item.unit||"stk").slice(0,40),internalUnitCostOre:cost,unitPriceOre:sale}:item)}));
+  setV(current=>({...current,lineItems:current.lineItems.map(item=>item.id===line.id?{...item,description:((isConsumable(item)||suggestConsumable(product.name))?consumablePrefix:"")+cleanDescription(String(product.name||item.description||"")).slice(0,470),unit:String(product.unit||item.unit||"stk").slice(0,40),internalUnitCostOre:cost,unitPriceOre:sale}:item)}));
   setSupplierSearch(current=>({...current,[line.id]:{loading:false,products:[],error:"",message:"Innkjøpspris og salgspris er oppdatert med "+rate+" % påslag. Ny salgspris eks. MVA: "+nok(sale)+"."}}));
   setError("");
  }
  function selectSupplierProduct(line,product){
   const newCost=Math.max(0,Math.round((Number(product.costExVat)||0)*100));
-  updateLine(line.id,"description",String(product.name||line.description||"").slice(0,500));
+  updateLine(line.id,"description",((isConsumable(line)||suggestConsumable(product.name))?consumablePrefix:"")+cleanDescription(String(product.name||line.description||"")).slice(0,470));
   updateLine(line.id,"unit",String(product.unit||line.unit||"stk").slice(0,40));
   updateLine(line.id,"internalUnitCostOre",newCost);
   const currentSale=Number(line.unitPriceOre);
