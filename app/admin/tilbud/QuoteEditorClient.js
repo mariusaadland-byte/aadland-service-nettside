@@ -371,6 +371,27 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    setSupplierSearch(current=>({...current,[id]:{loading:false,products:[],error:error.message||"Søket feilet.",message:""}}));
   }
  }
+ async function findMissingCost(line){
+  const query=cleanDescription(line.description).replace(/\\s*[·-]\\s*Varenr\\.\\s*/i," ").trim();
+  if(!query){setSupplierSearch(current=>({...current,[line.id]:{loading:false,products:[],error:"Legg inn varenavn eller varenummer først.",message:""}}));return;}
+  setSupplierSearch(current=>({...current,[line.id]:{loading:true,products:[],error:"",message:""}}));
+  try{
+   const response=await fetch("/api/admin/material-catalog?q="+encodeURIComponent(query)+"&limit=12",{cache:"no-store"});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Kunne ikke hente katalogpris.");
+   const products=Array.isArray(data.products)?data.products:[];
+   const normalized=value=>String(value||"").toLowerCase().replace(/[^a-zæøå0-9]/g,"");
+   const skuMatch=String(line.description||"").match(/Varenr\\.\\s*([a-z0-9-]+)/i);
+   const exact=products.filter(product=>skuMatch?normalized(product.sku)===normalized(skuMatch[1]):normalized(product.name)===normalized(cleanDescription(line.description)));
+   if(exact.length===1&&Number.isFinite(Number(exact[0].costExVat))&&Number(exact[0].costExVat)>=0){
+    const cost=Math.round(Number(exact[0].costExVat)*100);
+    updateLine(line.id,"internalUnitCostOre",cost);
+    setSupplierSearch(current=>({...current,[line.id]:{loading:false,products:[],error:"",message:"Innkjøpspris hentet fra katalogen: "+nok(cost)+" per "+String(exact[0].unit||"enhet")+". Salgsprisen er uendret."}}));
+   }else{
+    setSupplierSearch(current=>({...current,[line.id]:{loading:false,products,error:products.length?"Ingen entydig varematch. Velg riktig vare manuelt i varelinjens katalogsøk.":"Ingen treff i materialkatalogen.",message:""}}));
+   }
+  }catch(error){setSupplierSearch(current=>({...current,[line.id]:{loading:false,products:[],error:error.message||"Katalogsøket feilet.",message:""}}));}
+ }
  function updateSupplierSalePrice(line,product){
   if(locked)return;
   const savedRate=Number(product.defaultMarkupPercent);
@@ -768,6 +789,9 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
        {v.lineItems.filter(line=>line.type==="material"&&(line.internalUnitCostOre==null||line.internalUnitCostOre==="")).map(line=><div key={line.id} style={{marginBottom:10}}>
         <label htmlFor={"missing-cost-"+line.id}>{cleanDescription(line.description)||"Materiale uten beskrivelse"}</label>
         <input id={"missing-cost-"+line.id} type="number" min="0" step="0.01" inputMode="decimal" placeholder="Innkjøpspris per enhet eks. MVA" value="" onChange={e=>updateLine(line.id,"internalUnitCostOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))}/>
+        <button type="button" className="btn alt" disabled={locked||Boolean(supplierSearch[line.id]?.loading)} onClick={()=>findMissingCost(line)}>{supplierSearch[line.id]?.loading?"Søker …":"Hent innkjøpspris fra katalog"}</button>
+        {supplierSearch[line.id]?.message&&<small>{supplierSearch[line.id].message}</small>}
+        {supplierSearch[line.id]?.error&&<small className="quoteProfitWarning">{supplierSearch[line.id].error}</small>}
        </div>)}
       </div>}
       <h4>Materialer og forbruksmateriell</h4>
