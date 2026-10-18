@@ -4,7 +4,7 @@ import styles from "./quoteCatalog.module.css";
 const fmt=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(Number(n)||0);
 export default function QuoteCatalogSearch({onChoose}){
  const [query,setQuery]=useState(""),[supplier,setSupplier]=useState("byggern"),[suppliers,setSuppliers]=useState([]);
- const [markup,setMarkup]=useState("20"),[results,setResults]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
+ const [markup,setMarkup]=useState("15"),[results,setResults]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
  useEffect(()=>{
   let active=true;
   fetch("/api/admin/material-catalog",{cache:"no-store"}).then(async r=>{
@@ -29,7 +29,7 @@ export default function QuoteCatalogSearch({onChoose}){
   return()=>{clearTimeout(timer);controller.abort()};
  },[query,supplier]);
  const add=product=>{
-  const rate=Number(String(markup).replace(",",".")),safeRate=Number.isFinite(rate)?Math.min(1000,Math.max(0,rate)):20;
+  const rate=Number(String(markup).replace(",",".")),safeRate=Number.isFinite(rate)?Math.min(1000,Math.max(0,rate)):15;
   const ok=onChoose(product,safeRate);
   if(ok===false)return;
   setQuery("");setResults([]);
