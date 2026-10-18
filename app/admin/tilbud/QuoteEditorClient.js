@@ -762,6 +762,14 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       </div>:<p className="quoteProfitHelp">Legg inn intern kostnad per enhet på prislinjene for å se hva oppdraget er beregnet å gi.</p>}
       {contribution.missing>0&&<p className="quoteProfitWarning">{contribution.missing} linje(r) mangler kostnadsgrunnlag. Tallene er derfor bare et delestimat, ikke samlet fortjeneste for tilbudet.</p>}
       {contribution.complete&&contribution.known>0&&<p className="quoteProfitHelp">Alle linjer har kostnad. Dette er dekningsbidrag før faste driftsutgifter, eventuelle tillegg og skatt – ikke nettofortjeneste.</p>}
+      {v.lineItems.some(line=>line.type==="material"&&(line.internalUnitCostOre==null||line.internalUnitCostOre===""))&&<div className="quoteProfitWarning" role="alert" style={{marginBottom:16}}>
+       <strong>Materialvarer uten innkjøpspris</strong>
+       <p>Fyll inn kostnadene nedenfor for å få riktig dekningsbidrag. Du kan også søke i materialkatalogen på den aktuelle varelinjen.</p>
+       {v.lineItems.filter(line=>line.type==="material"&&(line.internalUnitCostOre==null||line.internalUnitCostOre==="")).map(line=><div key={line.id} style={{marginBottom:10}}>
+        <label htmlFor={"missing-cost-"+line.id}>{cleanDescription(line.description)||"Materiale uten beskrivelse"}</label>
+        <input id={"missing-cost-"+line.id} type="number" min="0" step="0.01" inputMode="decimal" placeholder="Innkjøpspris per enhet eks. MVA" value="" onChange={e=>updateLine(line.id,"internalUnitCostOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))}/>
+       </div>)}
+      </div>}
       <h4>Materialer og forbruksmateriell</h4>
       <p><Link href="/admin/tilbud/innstillinger">Administrer kalkyleinnstillinger for bedriften →</Link></p>
       <div className="field"><label>Varselgrense for påslag (%)</label><input type="number" min="0" max="1000" step="1" value={minimumMaterialMarkup} onChange={e=>changeMinimumMaterialMarkup(e.target.value)} onBlur={saveMinimumMaterialMarkup}/><small>{markupPreferenceStatus||"Endre grensen og gå ut av feltet for å lagre på bedriftskontoen."}</small></div>
