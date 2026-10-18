@@ -94,7 +94,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     costOre+=Math.round(qty*(Number(line.internalUnitCostOre)||0));
     coveredSaleOre+=sale;
    }
-   return {key,label:key==="material"?"Materialer":"Diverse forbruksmateriell",count:lines.length,saleOre,costOre,coveredSaleOre,missing,marginOre:coveredSaleOre-costOre};
+   return {key,label:key==="material"?"Materialer":"Diverse forbruksmateriell",count:lines.length,saleOre,costOre,coveredSaleOre,missing,marginOre:coveredSaleOre-costOre,markupPercent:costOre>0?(coveredSaleOre-costOre)/costOre*100:null,marginPercent:coveredSaleOre>0?(coveredSaleOre-costOre)/coveredSaleOre*100:null};
   });
  },[v.lineItems]);
  const planSum=useMemo(()=>v.paymentPlan.reduce((sum,row)=>sum+(Number(row.percent)||0),0),[v.paymentPlan]);
@@ -739,6 +739,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
        <span><small>Salgspris eks. MVA</small><b>{nok(group.saleOre)}</b></span>
        <span><small>Registrert innkjøpskostnad eks. MVA</small><b>{nok(group.costOre)}</b></span>
        <span><small>Dekningsbidrag på linjer med kjent kostnad</small><b>{nok(group.marginOre)}</b></span>
+       <span><small>Påslag på innkjøpskostnad</small><b>{group.markupPercent==null?"Ikke beregnbart":new Intl.NumberFormat("nb-NO",{maximumFractionDigits:1}).format(group.markupPercent)+" %"}</b></span>
+       <span><small>Dekningsgrad</small><b>{group.marginPercent==null?"Ikke beregnbart":new Intl.NumberFormat("nb-NO",{maximumFractionDigits:1}).format(group.marginPercent)+" %"}</b></span>
        {group.missing>0&&<small className="quoteProfitWarning">{group.missing} linje(r) mangler innkjøpskostnad. Dekningsbidraget er ikke fullstendig.</small>}
       </div>)}
       <small>Innkjøpspriser og denne oversikten lagres separat fra kundetilbudet og vises ikke i PDF, e-post eller på Min side.</small>
