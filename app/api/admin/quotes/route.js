@@ -148,7 +148,7 @@ function payload(body,user,existing){
   if(!line||typeof line!=="object")return {error:"Ugyldig tilbudslinje."};
   if(!clean(line.description,1000))return {error:"Alle tilbudslinjer må ha beskrivelse."};
   if(line.quantity==null||line.quantity===""||!Number.isFinite(quantity)||quantity<=0||quantity>100000)return {error:"Ugyldig antall på en tilbudslinje."};
-  if(line?.unitPriceOre==null||line.unitPriceOre===""||!Number.isFinite(price)||price<0||price>100000000)return {error:"Ugyldig salgspris på en tilbudslinje."};
+  if(line.unitPriceOre==null||line.unitPriceOre===""||!Number.isFinite(price)||price<0||price>100000000||!Number.isInteger(price))return {error:"Ugyldig salgspris på en tilbudslinje. Pris må oppgis i hele øre."};
   if(line.vatRate==null||line.vatRate===""||!Number.isFinite(vat)||vat<0||vat>100)return {error:"Ugyldig MVA-sats på en tilbudslinje."};
  }
  const lines=sanitizeLines(body.lineItems);
