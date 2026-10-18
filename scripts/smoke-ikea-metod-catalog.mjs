@@ -3,6 +3,9 @@ import {readFileSync} from "node:fs";
 
 const source=readFileSync("lib/ikeaMetodCatalog.js","utf8");
 const drawingSource=readFileSync("app/admin/tegning/DrawingClient.js","utf8");
+const archiveSource=readFileSync("app/admin/tegninger/DrawingArchiveClient.js","utf8");
+assert.ok(drawingSource.includes('(Array.isArray(parsed)?parsed:[]).filter('),"local drawing cache must be validated before restoring");
+assert.ok(archiveSource.includes('fetch("/api/admin/customer-contacts",{cache:"no-store"})')&&archiveSource.includes('.catch(()=>[])'),"drawing archive must remain available when contact lookup fails");
 assert.ok(drawingSource.includes("const fillWallRight="),"kitchen rows must support automatic rightward fill");
 assert.ok(drawingSource.includes("const snapCornerCabinet="),"corner cabinets need a dedicated inner-corner placement action");
 assert.ok(drawingSource.includes('const corner=IKEA_METOD_MODULES.find(row=>row.id==="metod-corner-88")')&&drawingSource.includes("createKitchenCornerPlacements(walls,corner,uid)"),"L/U kitchen setup should use tested placement geometry and the real METOD corner module");
