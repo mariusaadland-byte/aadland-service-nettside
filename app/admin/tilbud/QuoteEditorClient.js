@@ -313,6 +313,18 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    setSupplierSearch(current=>({...current,[id]:{loading:false,products:[],error:error.message||"Søket feilet.",message:""}}));
   }
  }
+ function updateSupplierSalePrice(line,product){
+  if(locked)return;
+  const rateText=window.prompt("Påslag i prosent på denne varen (salgspris eks. MVA):","15");
+  if(rateText===null)return;
+  const rate=Number(rateText.replace(",","."));
+  if(!Number.isFinite(rate)||rate<0||rate>1000){setError("Skriv et gyldig materialpåslag mellom 0 og 1000 %.");return;}
+  const cost=Math.max(0,Math.round((Number(product.costExVat)||0)*100));
+  const sale=Math.round(cost*(1+rate/100));
+  setV(current=>({...current,lineItems:current.lineItems.map(item=>item.id===line.id?{...item,description:String(product.name||item.description||"").slice(0,500),unit:String(product.unit||item.unit||"stk").slice(0,40),internalUnitCostOre:cost,unitPriceOre:sale}:item)}));
+  setSupplierSearch(current=>({...current,[line.id]:{loading:false,products:[],error:"",message:"Innkjøpspris og salgspris er oppdatert med "+rate+" % påslag. Ny salgspris eks. MVA: "+nok(sale)+"."}}));
+  setError("");
+ }
  function selectSupplierProduct(line,product){
   const newCost=Math.max(0,Math.round((Number(product.costExVat)||0)*100));
   updateLine(line.id,"description",String(product.name||line.description||"").slice(0,500));
@@ -595,6 +607,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
             <div><b>{product.name}</b><small>{product.supplierName||"Leverandør"}{product.sku?" · "+product.sku:""}{product.unit?" · "+product.unit:""}</small></div>
             <div className="quoteSupplierPrice"><b>{nok(fresh)}</b>{changed&&<small>Registrert: {nok(entered)}</small>}</div>
             <button type="button" className="btn alt" onClick={()=>selectSupplierProduct(line,product)}>{changed?"Oppdater kostnad":"Velg kostnad"}</button>
+            <button type="button" className="btn alt" disabled={Boolean(locked)} onClick={()=>updateSupplierSalePrice(line,product)}>Oppdater kostnad + salgspris</button>
            </div>;
           })}
          </div>}
