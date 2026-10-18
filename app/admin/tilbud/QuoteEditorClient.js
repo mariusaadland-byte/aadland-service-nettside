@@ -385,7 +385,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   setSavedMessage("Oppdrag "+(data.orderNumber||"")+" er opprettet i backoffice.");
  }
 
- async function sendQuote(recipientOverride=""){
+ async async function sendQuote(recipientOverride=""){
   if(!quoteId)return false;
   const recipient=String(recipientOverride||v.customer.email||"").trim().toLowerCase();
   if(!recipient){setError("Legg inn kundens e-postadresse før tilbudet sendes.");return false;}
@@ -438,7 +438,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   if(ok){setShowAlternateEmail(false);setAlternateEmail("");}
  }
 
- async function openPaperCopy(){
+ async async function openPaperCopy(){
   if(!quoteId)return;
   setError("");setSavedMessage("");
   if(v.status==="draft"){
