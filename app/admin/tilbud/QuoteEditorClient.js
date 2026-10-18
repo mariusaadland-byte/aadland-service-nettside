@@ -74,22 +74,30 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [alternateEmail,setAlternateEmail]=useState("");
  const [supplierSearch,setSupplierSearch]=useState({});
  const [minimumMaterialMarkup,setMinimumMaterialMarkup]=useState(15);
- const markupStorageKey="aadland-quote-minimum-material-markup";
+ const [markupPreferenceStatus,setMarkupPreferenceStatus]=useState("");
  useEffect(()=>{
-  try{
-   const stored=window.localStorage.getItem(markupStorageKey);
-   if(stored!==null&&stored!==""){
-    const parsed=Number(stored);
-    if(Number.isFinite(parsed)&&parsed>=0&&parsed<=1000)setMinimumMaterialMarkup(parsed);
-   }
-  }catch{}
+  let active=true;
+  fetch("/api/admin/quote-preferences",{cache:"no-store"}).then(async response=>{
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Kunne ikke hente innstillingen.");
+   const value=Number(data.minimumMaterialMarkup);
+   if(active&&Number.isFinite(value)&&value>=0&&value<=1000)setMinimumMaterialMarkup(value);
+  }).catch(error=>{if(active)setMarkupPreferenceStatus(error.message||"Kunne ikke hente innstillingen.");});
+  return()=>{active=false;};
  },[]);
  function changeMinimumMaterialMarkup(value){
-  const next=Math.max(0,Math.min(1000,Number(value)||0));
-  setMinimumMaterialMarkup(next);
-  try{window.localStorage.setItem(markupStorageKey,String(next));}catch{}
+  setMinimumMaterialMarkup(Math.max(0,Math.min(1000,Number(value)||0)));
+  setMarkupPreferenceStatus("Ikke lagret");
  }
-
+ async function saveMinimumMaterialMarkup(){
+  setMarkupPreferenceStatus("Lagrer …");
+  try{
+   const response=await fetch("/api/admin/quote-preferences",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({minimumMaterialMarkup})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Kunne ikke lagre innstillingen.");
+   setMarkupPreferenceStatus("Lagret for bedriften – gjelder på PC og mobil.");
+  }catch(error){setMarkupPreferenceStatus(error.message||"Kunne ikke lagre innstillingen.");}
+ }
  const [availableDrawings,setAvailableDrawings]=useState([]);
  const [showAllDrawings,setShowAllDrawings]=useState(false);
  const calc=useMemo(()=>calculate(v.lineItems),[v.lineItems]);
@@ -752,7 +760,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       {contribution.missing>0&&<p className="quoteProfitWarning">{contribution.missing} linje(r) mangler kostnadsgrunnlag. Tallene er derfor bare et delestimat, ikke samlet fortjeneste for tilbudet.</p>}
       {contribution.complete&&contribution.known>0&&<p className="quoteProfitHelp">Alle linjer har kostnad. Dette er dekningsbidrag før faste driftsutgifter, eventuelle tillegg og skatt – ikke nettofortjeneste.</p>}
       <h4>Materialer og forbruksmateriell</h4>
-      <div className="field"><label>Varselgrense for påslag (%)</label><input type="number" min="0" max="1000" step="1" value={minimumMaterialMarkup} onChange={e=>changeMinimumMaterialMarkup(e.target.value)}/></div>
+      <div className="field"><label>Varselgrense for påslag (%)</label><input type="number" min="0" max="1000" step="1" value={minimumMaterialMarkup} onChange={e=>changeMinimumMaterialMarkup(e.target.value)} onBlur={saveMinimumMaterialMarkup}/><small>{markupPreferenceStatus||"Endre grensen og gå ut av feltet for å lagre på bedriftskontoen."}</small></div>
       {lowMarkupGroups.length>0&&<p className="quoteProfitWarning" role="alert">Lavt påslag: {lowMarkupGroups.map(group=>group.label+" ("+new Intl.NumberFormat("nb-NO",{maximumFractionDigits:1}).format(group.markupPercent)+" %)").join(", ")}. Under valgt grense på {minimumMaterialMarkup} %. Kontroller prisene før tilbudet sendes.</p>}
 
       {materialProfit.filter(group=>group.count>0).map(group=><div className="quoteProfitNumbers" key={group.key} style={{marginBottom:12}}>
