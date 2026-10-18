@@ -1056,10 +1056,12 @@ export default function DrawingClient(){
   try{
    const r=await fetch("/api/admin/project-drawings",{method:next.serverId?"PATCH":"POST",headers:{"content-type":"application/json"},body:JSON.stringify(serverPayload(next))}),x=await r.json();
    if(r.ok&&x.drawing){
-    const serverSnapshot={...next,serverId:x.drawing.id},latest=docRef.current,saved=latest.id===next.id?{...latest,serverId:x.drawing.id}:serverSnapshot;
-    serverSyncedSignature.current=serverSignature(serverSnapshot);docRef.current=saved;setDoc(saved);writeLocalSnapshot(saved);
-    const fullySynced=serverSignature(saved)===serverSyncedSignature.current;
-    setSaveState(fullySynced?"server":"local");setLastSavedAt(Date.now());
+    const serverSnapshot={...next,serverId:x.drawing.id},latest=docRef.current,sameDrawing=latest.id===next.id,saved=sameDrawing?{...latest,serverId:x.drawing.id}:serverSnapshot;
+    // A response for an earlier drawing must never replace the drawing currently open.
+    if(sameDrawing){serverSyncedSignature.current=serverSignature(serverSnapshot);docRef.current=saved;setDoc(saved)}
+    writeLocalSnapshot(saved);
+    const fullySynced=sameDrawing&&serverSignature(saved)===serverSyncedSignature.current;
+    if(sameDrawing){setSaveState(fullySynced?"server":"local");setLastSavedAt(Date.now())}
     if(!fullySynced)serverSyncQueued.current=true;
     if(!quiet){setMessage(fullySynced?"Lagret på server":"Lagret · synkroniserer siste endringer");setTimeout(()=>setMessage(""),1800)}
     return true;
