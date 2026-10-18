@@ -5,6 +5,7 @@ const source=readFileSync("lib/ikeaMetodCatalog.js","utf8");
 const drawingSource=readFileSync("app/admin/tegning/DrawingClient.js","utf8");
 const archiveSource=readFileSync("app/admin/tegninger/DrawingArchiveClient.js","utf8");
 assert.ok(drawingSource.includes('(Array.isArray(parsed)?parsed:[]).filter('),"local drawing cache must be validated before restoring");
+assert.ok(drawingSource.includes("if(sameDrawing){serverSyncedSignature.current=serverSignature(serverSnapshot);docRef.current=saved;setDoc(saved)}"),"late server saves must not replace the currently open drawing");
 assert.ok(archiveSource.includes('fetch("/api/admin/customer-contacts",{cache:"no-store"})')&&archiveSource.includes('.catch(()=>[])'),"drawing archive must remain available when contact lookup fails");
 assert.ok(drawingSource.includes("const fillWallRight="),"kitchen rows must support automatic rightward fill");
 assert.ok(drawingSource.includes("const snapCornerCabinet="),"corner cabinets need a dedicated inner-corner placement action");
