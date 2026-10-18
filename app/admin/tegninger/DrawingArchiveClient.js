@@ -31,7 +31,7 @@ export default function DrawingArchiveClient(){
   let live=true;
   Promise.all([
    fetch("/api/admin/project-drawings?summary=1",{cache:"no-store"}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"Kunne ikke hente tegninger");return d}),
-   fetch("/api/admin/customer-contacts",{cache:"no-store"}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"Kunne ikke hente kunder");return d.contacts||[]})
+   fetch("/api/admin/customer-contacts",{cache:"no-store"}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"Kunne ikke hente kunder");return d.contacts||[]}).catch(()=>[])
   ]).then(([data,list])=>{
    if(!live)return;
    setDrawings((Array.isArray(data.drawings)?data.drawings:[]).filter(row=>row&&typeof row==="object"&&row.id).map(normalizeArchiveRow));
