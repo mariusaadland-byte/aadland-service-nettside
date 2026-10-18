@@ -13,6 +13,8 @@ assert.ok(quoteEditorSource.includes("async function sendQuote("),"Sending a quo
 assert.ok(quoteEditorSource.includes("async function openPaperCopy("),"PDF preview must use an async handler");
 assert.ok(!quoteEditorSource.includes("async async function"),"Quote editor must not contain duplicate async keywords");
 assert.ok(quoteEditorSource.includes("const belowCost=line.unitPriceOre"),"Supplier prices above sale prices must trigger a warning");
+assert.ok(quoteEditorSource.includes("Math.round((oldCost-newCost)*qty)"),"Supplier cost changes must calculate margin impact for the line quantity");
+assert.ok(quoteEditorSource.includes("Salgsprisen til kunden er uendret."),"Supplier cost updates must not silently alter the customer price");
 const {costMapFromLines,withPrivateCosts,calculateContribution}=await import("data:text/javascript;base64,"+Buffer.from(costSource).toString("base64"));
 const priced=[{id:"a",type:"material",description:"Bord",quantity:2,unitPriceOre:12500,internalUnitCostOre:10000},{id:"b",type:"work",description:"Arbeid",quantity:3,unitPriceOre:40000,internalUnitCostOre:""}];
 const mapped=costMapFromLines(priced);
