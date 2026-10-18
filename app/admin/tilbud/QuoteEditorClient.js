@@ -582,7 +582,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      <section id="quote-material-search" className="card quoteEditorSection">
       <div className="quoteSectionHead">
        <div><div className="kicker">PRISLINJER</div><h3>Arbeid og materialer</h3></div>
-       <div><button type="button" className="btn alt" onClick={()=>addLine("work")}>+ Arbeid</button><button type="button" className="btn alt" onClick={()=>addLine("material")}>+ Materiale</button></div>
+       <div><button type="button" className="btn alt" onClick={()=>addLine("work")}>+ Arbeid</button><button type="button" className="btn alt" onClick={()=>addLine("material")}>+ Materiale</button><button type="button" className="btn alt" onClick={()=>setV(current=>({...current,lineItems:[...current.lineItems,{id:lineId(),type:"material",description:"Forbruksmateriell: ",quantity:1,unit:"stk",unitPriceOre:"",vatRate:25,internalUnitCostOre:""}]}))}>+ Forbruksmateriell</button></div>
       </div>
 
       {!locked&&<QuoteCatalogSearch onChoose={addCatalogProduct}/>}
