@@ -73,6 +73,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [showAlternateEmail,setShowAlternateEmail]=useState(false);
  const [alternateEmail,setAlternateEmail]=useState("");
  const [supplierSearch,setSupplierSearch]=useState({});
+ const [minimumMaterialMarkup,setMinimumMaterialMarkup]=useState(15);
  const [availableDrawings,setAvailableDrawings]=useState([]);
  const [showAllDrawings,setShowAllDrawings]=useState(false);
  const calc=useMemo(()=>calculate(v.lineItems),[v.lineItems]);
@@ -97,6 +98,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    return {key,label:key==="material"?"Materialer":"Diverse forbruksmateriell",count:lines.length,saleOre,costOre,coveredSaleOre,missing,marginOre:coveredSaleOre-costOre,markupPercent:costOre>0?(coveredSaleOre-costOre)/costOre*100:null,marginPercent:coveredSaleOre>0?(coveredSaleOre-costOre)/coveredSaleOre*100:null};
   });
  },[v.lineItems]);
+ const lowMarkupGroups=materialProfit.filter(group=>group.count>0&&group.missing===0&&group.markupPercent!==null&&group.markupPercent<minimumMaterialMarkup);
  const planSum=useMemo(()=>v.paymentPlan.reduce((sum,row)=>sum+(Number(row.percent)||0),0),[v.paymentPlan]);
  const isDirty=useMemo(()=>Boolean(savedSnapshot)&&JSON.stringify(v)!==savedSnapshot,[v,savedSnapshot]);
  const locked=quoteId&&v.status!=="draft";
@@ -734,6 +736,9 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       {contribution.missing>0&&<p className="quoteProfitWarning">{contribution.missing} linje(r) mangler kostnadsgrunnlag. Tallene er derfor bare et delestimat, ikke samlet fortjeneste for tilbudet.</p>}
       {contribution.complete&&contribution.known>0&&<p className="quoteProfitHelp">Alle linjer har kostnad. Dette er dekningsbidrag før faste driftsutgifter, eventuelle tillegg og skatt – ikke nettofortjeneste.</p>}
       <h4>Materialer og forbruksmateriell</h4>
+      <div className="field"><label>Varselgrense for påslag (%)</label><input type="number" min="0" max="1000" step="1" value={minimumMaterialMarkup} onChange={e=>setMinimumMaterialMarkup(Math.max(0,Math.min(1000,Number(e.target.value)||0)))}/></div>
+      {lowMarkupGroups.length>0&&<p className="quoteProfitWarning" role="alert">Lavt påslag: {lowMarkupGroups.map(group=>group.label+" ("+new Intl.NumberFormat("nb-NO",{maximumFractionDigits:1}).format(group.markupPercent)+" %)").join(", ")}. Under valgt grense på {minimumMaterialMarkup} %. Kontroller prisene før tilbudet sendes.</p>}
+
       {materialProfit.filter(group=>group.count>0).map(group=><div className="quoteProfitNumbers" key={group.key} style={{marginBottom:12}}>
        <strong>{group.label} ({group.count} varelinjer)</strong>
        <span><small>Salgspris eks. MVA</small><b>{nok(group.saleOre)}</b></span>
