@@ -6,13 +6,13 @@ const initialMarkup=()=>{try{const saved=window.localStorage.getItem(MARKUP_STOR
 const fmt=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(Number(n)||0);
 export default function QuoteCatalogSearch({onChoose}){
  const [query,setQuery]=useState(""),[supplier,setSupplier]=useState("byggern"),[suppliers,setSuppliers]=useState([]);
- const [markup,setMarkup]=useState(initialMarkup),[results,setResults]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
+ const [markup,setMarkup]=useState(initialMarkup),[savingMarkup,setSavingMarkup]=useState(false),[results,setResults]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
  useEffect(()=>{try{window.localStorage.setItem(MARKUP_STORAGE_KEY,markup)}catch{}},[markup]);
  useEffect(()=>{
   let active=true;
   fetch("/api/admin/material-catalog",{cache:"no-store"}).then(async r=>{
    const data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.error||"Kunne ikke hente leverandører.");return data.suppliers||[];
-  }).then(rows=>{if(active){setSuppliers(rows);setSupplier(rows.find(s=>s.isPrimary)?.id||rows[0]?.id||"")}}).catch(e=>{if(active)setError(e.message)});return()=>{active=false};
+  }).then(rows=>{if(active){setSuppliers(rows);const chosen=rows.find(s=>s.isPrimary)||rows[0];setSupplier(chosen?.id||"");if(chosen)setMarkup(String(chosen.defaultMarkupPercent??15))}}).catch(e=>{if(active)setError(e.message)});return()=>{active=false};
  },[]);
  useEffect(()=>{
   const q=query.trim();
@@ -31,6 +31,19 @@ export default function QuoteCatalogSearch({onChoose}){
   },230);
   return()=>{clearTimeout(timer);controller.abort()};
  },[query,supplier]);
+ async function saveMarkup(){
+  const rate=Number(String(markup).replace(",","."));
+  if(!supplier||!Number.isFinite(rate)||rate<0||rate>1000){setError("Velg en leverandør og et gyldig påslag (0–1000 %).");return;}
+  setSavingMarkup(true);setError("");setMessage("");
+  try{
+   const response=await fetch("/api/admin/material-catalog",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({supplierId:supplier,markupPercent:rate})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(data.error||"Kunne ikke lagre påslaget.");
+   setSuppliers(rows=>rows.map(row=>row.id===supplier?{...row,defaultMarkupPercent:rate}:row));
+   setMessage("Standardpåslag på "+rate+" % er lagret for denne leverandøren og brukes på mobil og PC.");
+  }catch(e){setError(e.message||"Lagring feilet.");}
+  finally{setSavingMarkup(false);}
+ }
  const add=product=>{
   const rate=Number(String(markup).replace(",",".")),safeRate=Number.isFinite(rate)?Math.min(1000,Math.max(0,rate)):15;
   const ok=onChoose(product,safeRate);
@@ -42,9 +55,10 @@ export default function QuoteCatalogSearch({onChoose}){
  return <div className={styles.box}>
   <label className={styles.search}><span>Søk varer direkte fra Bygger’n og andre leverandører</span><input id="offer-catalog-search" type="search" value={query} autoComplete="off" onChange={e=>{setQuery(e.target.value);setMessage("")}} placeholder="Skriv navn, varenummer eller EAN …"/></label>
   <div className={styles.options}>
-   <label>Leverandør<select value={supplier} onChange={e=>setSupplier(e.target.value)}><option value="">Alle</option>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+   <label>Leverandør<select value={supplier} onChange={e=>{const id=e.target.value;setSupplier(id);const selected=suppliers.find(row=>row.id===id);if(selected)setMarkup(String(selected.defaultMarkupPercent??15))}}><option value="">Alle</option>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
    <label>Materialpåslag (%)<input inputMode="decimal" value={markup} onChange={e=>setMarkup(e.target.value)} aria-label="Påslag for varer du legger til"/></label>
   </div>
+  <button type="button" disabled={savingMarkup||!supplier} onClick={saveMarkup}>{savingMarkup?"Lagrer …":"Lagre standardpåslag for leverandør"}</button>
   {message&&<p className={styles.notice} role="status">{message}</p>}
   {error&&<p className={styles.error} role="alert">{error}</p>}
   {query.trim().length>=2&&<div className={styles.results}>
