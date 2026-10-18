@@ -693,7 +693,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       {!locked&&<QuoteCatalogSearch onChoose={addCatalogProduct}/>}
 
       <div className="quoteLines">
-       {v.lineItems.map((line,index)=><div className="quoteLineEditor" key={line.id}>
+       {v.lineItems.map((line,index)=><div className="quoteLineEditor" key={line.id} id={"quote-line-"+line.id}>
         <div className="quoteLineNumber">{index+1}</div>
         <div className="field quoteLineDescription"><label>Beskrivelse</label><input value={isConsumable(line)?cleanDescription(line.description):line.description} onChange={e=>updateLine(line.id,"description",e.target.value)} placeholder={line.type==="work"?"F.eks. Tømrerarbeid":"F.eks. Gipsplater og stendere"}/></div>
         <div className="field quoteLineType"><label>Type</label><select value={isConsumable(line)?"consumable":line.type} onChange={e=>setCategory(line,e.target.value)}><option value="work">Arbeid</option><option value="material">Materiale</option><option value="consumable">Forbruksmateriell</option><option value="other">Annet</option></select></div>
@@ -800,6 +800,10 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      </div>
      <section aria-label="Kvalitetssjekk før sending" style={{padding:"12px 14px",border:"1px solid var(--border, #ccc)",borderRadius:8,marginBottom:16}}>
       <strong>{quoteQualityIssues.length?"Kvalitetssjekk: "+quoteQualityIssues.length+" forhold å kontrollere":"Kvalitetssjekk: Ingen avvik funnet"}</strong>
+      {missingMaterialCosts.length>0&&<div style={{marginTop:10}}>
+       <strong>Varelinjer som mangler innkjøpspris</strong>
+       <ul style={{margin:"6px 0",paddingLeft:20}}>{missingMaterialCosts.map(line=><li key={line.id}><a href={"#quote-line-"+line.id}>{cleanDescription(line.description)||"Materiale uten beskrivelse"} – gå til varelinje</a></li>)}</ul>
+      </div>}
       {quoteQualityIssues.length?<ul style={{margin:"8px 0 0",paddingLeft:20}}>{quoteQualityIssues.map((issue,index)=><li key={index}>{issue}</li>)}</ul>:<p style={{margin:"6px 0 0"}}>Ingen manglende materialkostnader, lave materialpåslag eller negative materialdekningsbidrag er registrert.</p>}
       <small>Kun synlig for admin. Sjekken gjelder registrerte materialkostnader og erstatter ikke full gjennomgang av tilbudet.</small>
      </section>
