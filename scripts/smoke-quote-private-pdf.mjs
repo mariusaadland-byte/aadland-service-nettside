@@ -7,6 +7,8 @@ const costSource=readFileSync("lib/quotePrivateCosts.js","utf8");
 const quoteEditorSource=readFileSync("app/admin/tilbud/QuoteEditorClient.js","utf8");
 assert.ok(quoteEditorSource.includes("async function sendQuote("),"Sending a quote must use an async handler");
 assert.ok(quoteEditorSource.includes("async function openPaperCopy("),"PDF preview must use an async handler");
+assert.ok(!quoteEditorSource.includes("async async function"),"Quote editor must not contain duplicate async keywords");
+assert.ok(quoteEditorSource.includes("const belowCost=line.unitPriceOre"),"Supplier prices above sale prices must trigger a warning");
 const {costMapFromLines,withPrivateCosts,calculateContribution}=await import("data:text/javascript;base64,"+Buffer.from(costSource).toString("base64"));
 const priced=[{id:"a",type:"material",description:"Bord",quantity:2,unitPriceOre:12500,internalUnitCostOre:10000},{id:"b",type:"work",description:"Arbeid",quantity:3,unitPriceOre:40000,internalUnitCostOre:""}];
 const mapped=costMapFromLines(priced);
