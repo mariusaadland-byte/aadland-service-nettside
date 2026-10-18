@@ -320,7 +320,11 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   updateLine(line.id,"internalUnitCostOre",newCost);
   const currentSale=Number(line.unitPriceOre);
   const belowCost=line.unitPriceOre!==""&&Number.isFinite(currentSale)&&currentSale<newCost;
-  setSupplierSearch(current=>({...current,[line.id]:{loading:false,products:[],error:belowCost?"Advarsel: Innkjøpsprisen er høyere enn salgsprisen. Kontroller tilbudslinjen før du sender tilbudet.":"",message:belowCost?"":"Innkjøpskostnad oppdatert. Salgsprisen i tilbudet er ikke endret."}}));
+  const oldCost=line.internalUnitCostOre===""||line.internalUnitCostOre==null?null:Number(line.internalUnitCostOre);
+  const qty=Math.max(0,Number(line.quantity)||0);
+  const difference=oldCost!==null&&Number.isFinite(oldCost)?Math.round((oldCost-newCost)*qty):null;
+  const impact=difference===null?"Innkjøpskostnad registrert.":"Endring i beregnet dekningsbidrag for denne linjen: "+(difference>0?"+":"")+nok(difference)+".";
+  setSupplierSearch(current=>({...current,[line.id]:{loading:false,products:[],error:belowCost?"Advarsel: Innkjøpsprisen er høyere enn salgsprisen. Kontroller tilbudslinjen før du sender tilbudet.":"",message:impact+" Salgsprisen til kunden er uendret."}}));
  }
  function updatePlan(id,key,value){
   setV(current=>({...current,paymentPlan:current.paymentPlan.map(row=>row.id===id?{...row,[key]:value}:row)}));
