@@ -117,8 +117,9 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   return Object.entries(groups).map(([key,lines])=>{
    let saleOre=0,costOre=0,coveredSaleOre=0,missing=0;
    for(const line of lines){
-    const qty=Math.max(0,Number(line.quantity)||0);
-    const sale=Math.round(qty*(Number(line.unitPriceOre)||0));
+    const rawQty=Number(line.quantity),rawPrice=Number(line.unitPriceOre);
+    const qty=Number.isFinite(rawQty)&&rawQty>0?rawQty:0;
+    const sale=Math.round(qty*(Number.isFinite(rawPrice)&&rawPrice>=0?rawPrice:0));
     saleOre+=sale;
     const unitCost=Number(line.internalUnitCostOre);
     if(line.internalUnitCostOre==null||line.internalUnitCostOre===""||!Number.isFinite(unitCost)||unitCost<0){missing++;continue;}
