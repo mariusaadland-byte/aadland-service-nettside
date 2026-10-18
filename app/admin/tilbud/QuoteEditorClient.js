@@ -122,7 +122,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     const sale=Math.round(qty*(Number.isFinite(rawPrice)&&rawPrice>=0?rawPrice:0));
     saleOre+=sale;
     const unitCost=Number(line.internalUnitCostOre);
-    if(line.internalUnitCostOre==null||line.internalUnitCostOre===""||!Number.isFinite(unitCost)||unitCost<0){missing++;continue;}
+    if(line.internalUnitCostOre==null||line.internalUnitCostOre===""||!Number.isFinite(unitCost)||unitCost<0||unitCost>100000000){missing++;continue;}
     costOre+=Math.round(qty*unitCost);
     coveredSaleOre+=sale;
    }
