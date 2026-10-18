@@ -24,6 +24,7 @@ function productRow(row){
   supplierId:row.supplier_id,
   supplierName:row.supplier_name,
   supplierIsPrimary:row.supplier_is_primary===true,
+  defaultMarkupPercent:Number(row.default_markup_percent??15),
   sku:row.supplier_sku,
   name:row.product_name,
   unit:row.unit||"STK",
@@ -62,7 +63,8 @@ export async function GET(req){
   result_limit:limit
  });
  if(error)return NextResponse.json({error:"Kunne ikke søke i materialkatalogen."},{status:500});
- return NextResponse.json({suppliers,products:(data||[]).map(productRow)});
+ const markupBySupplier=new Map(suppliers.map(row=>[row.id,row.defaultMarkupPercent]));
+ return NextResponse.json({suppliers,products:(data||[]).map(row=>({...productRow(row),defaultMarkupPercent:markupBySupplier.get(row.supplier_id)??15}))});
 }
 
 export async function PATCH(req){
