@@ -540,7 +540,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   const recipient=String(recipientOverride||v.customer.email||"").trim().toLowerCase();
   if(!recipient){setError("Legg inn kundens e-postadresse før tilbudet sendes.");return false;}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)){setError("E-postadressen er ugyldig.");return false;}
-  const missingCostLines=v.lineItems.filter(line=>line.type==="material"&&(line.internalUnitCostOre==null||line.internalUnitCostOre===""));
+  const missingCostLines=v.lineItems.filter(line=>line.type==="material"&&(line.internalUnitCostOre==null||line.internalUnitCostOre===""||!Number.isFinite(Number(line.internalUnitCostOre))||Number(line.internalUnitCostOre)<0||Number(line.internalUnitCostOre)>100000000));
   const warnings=[];
   if(missingCostLines.length){
    warnings.push(missingCostLines.length+" materialvare(r) mangler innkjøpspris:\\n"+missingCostLines.slice(0,5).map(line=>"• "+(cleanDescription(line.description)||"Materiale uten beskrivelse")).join("\\n")+(missingCostLines.length>5?"\\n… og "+(missingCostLines.length-5)+" flere.":""));
