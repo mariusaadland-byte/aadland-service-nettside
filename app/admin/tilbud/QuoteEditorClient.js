@@ -477,6 +477,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   if(v.lineItems.some(line=>Number(line.quantity)<=0)){setError("Antall må være større enn 0.");return;}
   if(v.lineItems.some(line=>line.unitPriceOre===""||Number(line.unitPriceOre)<0)){setError("Fyll inn pris på alle tilbudslinjer.");return;}
   if(Math.abs(planSum-100)>0.01){setError("Betalingsplanen må til sammen være 100 %.");return;}
+  const selectedMarkup=quoteMaterialMarkupOverride===""?v.quoteMaterialMarkupPercent:Number(quoteMaterialMarkupOverride);
+  if(quoteMaterialMarkupOverride!==""&&(!Number.isFinite(selectedMarkup)||selectedMarkup<0||selectedMarkup>1000)){setError("Påslaget må være mellom 0 og 1000 %.");return;}
 
   setSaving(true);
   const response=await fetch("/api/admin/quotes",{
@@ -485,6 +487,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    body:JSON.stringify({
     ...(quoteId?{id:quoteId}:{}),
     ...v,
+    quoteMaterialMarkupPercent:selectedMarkup,
     ...(sourceOrderId?{sourceOrderId}:{}),
     lineItems:v.lineItems.map(line=>({...line,unitPriceOre:Number(line.unitPriceOre)||0}))
    })
@@ -503,7 +506,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    return data.quote;
   }
   setQuoteNumber(data.quote.quoteNumber||quoteNumber);
-  setSavedSnapshot(JSON.stringify(v));
+  setV(current=>({...current,quoteMaterialMarkupPercent:selectedMarkup}));
+  setSavedSnapshot(JSON.stringify({...v,quoteMaterialMarkupPercent:selectedMarkup}));
   setSavedMessage("Tilbudet er lagret.");
   window.setTimeout(()=>setSavedMessage(""),1800);
   return data.quote;
