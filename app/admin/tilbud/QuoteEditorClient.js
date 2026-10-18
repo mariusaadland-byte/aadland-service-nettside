@@ -498,11 +498,17 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   if(!recipient){setError("Legg inn kundens e-postadresse før tilbudet sendes.");return false;}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)){setError("E-postadressen er ugyldig.");return false;}
   const missingCostLines=v.lineItems.filter(line=>line.type==="material"&&(line.internalUnitCostOre==null||line.internalUnitCostOre===""));
+  const warnings=[];
   if(missingCostLines.length){
-   const names=missingCostLines.slice(0,5).map(line=>"• "+(cleanDescription(line.description)||"Materiale uten beskrivelse")).join("\n");
-   const extra=missingCostLines.length>5?"\n… og "+(missingCostLines.length-5)+" flere.":"";
-   if(!window.confirm("ADVARSEL: "+missingCostLines.length+" materialvare(r) mangler innkjøpspris. Fortjenesteberegningen kan være feil.\n\n"+names+extra+"\n\nVil du likevel sende tilbudet til "+recipient+"?"))return false;
-  }else if(!window.confirm("Sende tilbudet til "+recipient+"?"))return false;
+   warnings.push(missingCostLines.length+" materialvare(r) mangler innkjøpspris:\\n"+missingCostLines.slice(0,5).map(line=>"• "+(cleanDescription(line.description)||"Materiale uten beskrivelse")).join("\\n")+(missingCostLines.length>5?"\\n… og "+(missingCostLines.length-5)+" flere.":""));
+  }
+  if(lowMarkupGroups.length)warnings.push("Materialpåslag under varselgrensen ("+minimumMaterialMarkup+" %):\\n"+lowMarkupGroups.map(group=>"• "+group.label+": "+new Intl.NumberFormat("nb-NO",{maximumFractionDigits:1}).format(group.markupPercent)+" %").join("\\n"));
+  const knownCost=materialProfit.reduce((sum,group)=>sum+group.costOre,0);
+  const knownMargin=materialProfit.reduce((sum,group)=>sum+group.marginOre,0);
+  if(knownCost>0&&knownMargin<0)warnings.push("Negativt dekningsbidrag på materiallinjer med kjent innkjøpspris: "+nok(knownMargin)+".");
+  if(warnings.length){
+   if(!window.confirm("KVALITETSSJEKK FØR SENDING\\n\\n"+warnings.join("\\n\\n")+"\\n\\nFortjenesteberegningen kan være ufullstendig. Vil du likevel sende tilbudet til "+recipient+"?"))return false;
+  }else if(!window.confirm("Kvalitetssjekk OK: Ingen manglende materialkostnader, for lavt materialpåslag eller negativt materialdekningsbidrag registrert.\\n\\nSende tilbudet til "+recipient+"?"))return false;
   setSending(true);setError("");setSavedMessage("");
   if(v.status==="draft"){
    const saved=await save();
