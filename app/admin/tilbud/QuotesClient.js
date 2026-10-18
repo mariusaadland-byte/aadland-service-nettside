@@ -3,6 +3,7 @@
 import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import {osloDateKey,shiftDateKey} from "../../../lib/osloTime";
+const lineId=()=>Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,9);
 
 const statusLabels={
  draft:"Kladd",
@@ -21,6 +22,7 @@ export default function QuotesClient(){
  const [setupRequired,setSetupRequired]=useState(false);
  const [followUpSetupRequired,setFollowUpSetupRequired]=useState(false);
  const [error,setError]=useState("");
+ const [copyingId,setCopyingId]=useState(null);
  const [filter,setFilter]=useState("all");
  const [showArchived,setShowArchived]=useState(false);
 
@@ -51,28 +53,34 @@ export default function QuotesClient(){
  }),[quotes]);
 
  async function duplicate(quote){
-  setError("");
-  const valid=shiftDateKey(osloDateKey(new Date()),30);
-  const response=await fetch("/api/admin/quotes",{
-   method:"POST",
-   headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({
-    title:quote.title,
-    status:"draft",
-    customer:quote.customer,
-    lineItems:quote.lineItems,
-    paymentPlan:quote.paymentPlan,
-    introText:quote.introText,
-    notes:quote.notes,
-    terms:quote.terms,
-    validUntil:valid,
-    plannedStartDate:quote.plannedStartDate||"",
-    autoFollowUp:quote.autoFollowUp!==false
-   })
-  });
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok){setError(data.error||"Tilbudet kunne ikke kopieres.");return;}
-  window.location.href="/admin/tilbud/"+data.quote.id;
+  if(copyingId)return;
+  setCopyingId(quote.id);setError("");
+  try{
+   const originalResponse=await fetch("/api/admin/quotes?id="+encodeURIComponent(quote.id),{cache:"no-store"});
+   const originalData=await originalResponse.json().catch(()=>({}));
+   if(!originalResponse.ok||!originalData.quote)throw new Error(originalData.error||"Kunne ikke hente originaltilbudet.");
+   const original=originalData.quote;
+   if(original.privateCostsUnavailable)throw new Error("Intern kostnad kunne ikke hentes. Kopiering er stoppet for å unngå at kalkylen går tapt.");
+   const costs=original.internalCosts||{};
+   const lines=(Array.isArray(original.lineItems)?original.lineItems:[]).map(line=>({
+    ...line,id:"copy-"+lineId(),
+    internalUnitCostOre:Object.prototype.hasOwnProperty.call(costs,line.id)?costs[line.id]:""
+   }));
+   const response=await fetch("/api/admin/quotes",{
+    method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+     title:original.title,status:"draft",customer:original.customer,
+     lineItems:lines,paymentPlan:original.paymentPlan,introText:original.introText,
+     notes:original.notes,terms:original.terms,
+     validUntil:shiftDateKey(osloDateKey(new Date()),30),
+     plannedStartDate:"",autoFollowUp:original.autoFollowUp!==false
+    })
+   });
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok||!data.quote?.id)throw new Error(data.error||"Tilbudet kunne ikke kopieres.");
+   window.location.href="/admin/tilbud/"+data.quote.id;
+  }catch(error){setError(error.message||"Tilbudet kunne ikke kopieres.");}
+  finally{setCopyingId(null);}
  }
 
  async function archive(id,restore=false){
@@ -155,7 +163,7 @@ export default function QuotesClient(){
        <div className="quoteListActions">
         <Link className="btn" href={"/admin/tilbud/"+quote.id}>Åpne</Link>
         <Link className="btn alt" href={"/admin/tilbud/"+quote.id+"/preview"}>Forhåndsvis</Link>
-        <button type="button" className="btn alt" onClick={()=>duplicate(quote)}>Kopier</button>
+        <button type="button" className="btn alt" disabled={Boolean(copyingId)} onClick={()=>duplicate(quote)}>{copyingId===quote.id?"Kopierer …":"Kopier"}</button>
         {showArchived?<button type="button" className="btn alt" onClick={()=>archive(quote.id,true)}>Gjenopprett</button>:<button type="button" className="btn alt" onClick={()=>archive(quote.id)}>Arkiver</button>}
        </div>
       </article>)}
