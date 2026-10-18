@@ -1020,7 +1020,7 @@ export default function DrawingClient(){
  const writeLocalSnapshot=(next=docRef.current,{silent=false}={})=>{
   try{
    const savedAt=Date.now(),storedNext={...next,_localSavedAt:savedAt},current=docsRef.current||[],list=[storedNext,...current.filter(x=>x.id!==next.id)];
-   localStorage.setItem(STORE,JSON.stringify(list));localStorage.setItem(LAST_STORE,next.id);
+   localStorage.setItem(STORE,JSON.stringify(list));if(docRef.current?.id===next.id)localStorage.setItem(LAST_STORE,next.id);
    docsRef.current=list;
    if(!silent){
     setDocs(list);
@@ -1062,8 +1062,8 @@ export default function DrawingClient(){
     writeLocalSnapshot(saved);
     const fullySynced=sameDrawing&&serverSignature(saved)===serverSyncedSignature.current;
     if(sameDrawing){setSaveState(fullySynced?"server":"local");setLastSavedAt(Date.now())}
-    if(!fullySynced)serverSyncQueued.current=true;
-    if(!quiet){setMessage(fullySynced?"Lagret på server":"Lagret · synkroniserer siste endringer");setTimeout(()=>setMessage(""),1800)}
+    if(sameDrawing&&!fullySynced)serverSyncQueued.current=true;
+    if(!quiet&&sameDrawing){setMessage(fullySynced?"Lagret på server":"Lagret · synkroniserer siste endringer");setTimeout(()=>setMessage(""),1800)}
     return true;
    }
    setSaveState("local");
