@@ -137,7 +137,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   ...negativeMaterialContribution.map(group=>group.label+" har negativt dekningsbidrag ("+nok(group.marginOre)+")")
  ];
  const planSum=useMemo(()=>v.paymentPlan.reduce((sum,row)=>sum+(Number(row.percent)||0),0),[v.paymentPlan]);
- const isDirty=useMemo(()=>Boolean(savedSnapshot)&&JSON.stringify(v)!==savedSnapshot,[v,savedSnapshot]);
+ const isDirty=useMemo(()=>Boolean(savedSnapshot)&&(JSON.stringify(v)!==savedSnapshot||(quoteMaterialMarkupOverride!==""&&Number(quoteMaterialMarkupOverride)!==Number(v.quoteMaterialMarkupPercent??defaultMaterialMarkup))),[v,savedSnapshot,quoteMaterialMarkupOverride,defaultMaterialMarkup]);
  const locked=quoteId&&v.status!=="draft";
 
  useEffect(()=>{
