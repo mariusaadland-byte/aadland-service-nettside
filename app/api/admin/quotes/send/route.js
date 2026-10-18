@@ -97,7 +97,7 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
 <tr><td style="padding:30px">
  <div style="color:#b5863b;font-size:11px;font-weight:800;letter-spacing:.12em">TILBUD ${number}${revisionLabel?" · "+revisionLabel:""}</div>
  <h1 style="font-size:28px;line-height:1.1;margin:9px 0 14px">${title}</h1>
- <p style="margin:0 0 20px;color:#625d55;line-height:1.65">Hei ${customerName}. Vi har laget et tilbud til deg fra Aadland Service.</p>
+ <p style="margin:0 0 20px;color:#625d55;line-height:1.65">Hei ${customerName}! Takk for henvendelsen og for at du vurderer Aadland Service. Vi har utarbeidet et tilbud på ${title}, og håper det svarer til dine ønsker.</p>
  <table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #ece7df">${rows}</table>
  <div style="margin:22px 0;padding:18px;background:#f7f3ec">
   <div style="font-size:11px;color:#777;text-transform:uppercase;font-weight:800">Total inkl. MVA</div>
@@ -105,10 +105,10 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
   ${valid?`<div style="margin-top:6px;color:#777;font-size:12px">Gyldig til ${esc(valid)}</div>`:""}
   ${plannedStart?`<div style="margin-top:6px;color:#777;font-size:12px"><b>Tidligst oppstart:</b> ${esc(plannedStart)}</div><div style="margin-top:4px;color:#777;font-size:11px">Endelig oppstart avtales etter godkjenning.</div>`:""}
  </div>
- <p style="margin:0 0 20px;color:#625d55;line-height:1.65">Du finner en PDF-kopi av hele tilbudet vedlagt denne e-posten. Åpne lenken nedenfor for å se tilbudet på nettsiden og godkjenne eller avslå det.</p>
- <a href="${link}" style="display:inline-block;background:#cfa153;color:#111;text-decoration:none;font-weight:900;padding:14px 22px">Åpne tilbud →</a>
+ <p style="margin:0 0 20px;color:#625d55;line-height:1.65">Du finner hele tilbudet som PDF-vedlegg, med beskrivelse, priser, betalingsplan, betingelser og eventuelle forbehold. Bruk lenken nedenfor for å gjennomgå tilbudet og godkjenne eller avslå det digitalt. Ta gjerne kontakt før du bestemmer deg dersom du har spørsmål eller ønsker endringer.</p>
+ <a href="${link}" style="display:inline-block;background:#cfa153;color:#111;text-decoration:none;font-weight:900;padding:14px 22px">Se og godkjenn tilbud →</a>
  ${hasCustomerAccount?`<a href="${esc(minSideUrl)}" style="display:inline-block;margin-left:8px;border:1px solid #cfa153;color:#8a6326;text-decoration:none;font-weight:900;padding:13px 18px">Min side →</a>`:`<p style="margin:18px 0 0;color:#8a847a;font-size:11px;line-height:1.55">Vil du samle tilbud og oppdrag på ett sted? <a href="${esc(minSideUrl)}" style="color:#8a6326;font-weight:800">Opprett Min side med samme e-postadresse.</a></p>`}
- <p style="margin:26px 0 0;color:#8a847a;font-size:11px;line-height:1.55">Har du spørsmål kan du svare direkte på denne e-posten eller kontakte oss på 471 54 898.</p>
+ <p style="margin:26px 0 0;color:#8a847a;font-size:11px;line-height:1.55">Vi ser frem til muligheten til å hjelpe deg med prosjektet!<br/><br/>Med vennlig hilsen<br/><b>Aadland Service</b><br/>Telefon: 471 54 898<br/>E-post: post@aadland-service.no</p>
 </td></tr>
 <tr><td style="padding:18px 30px;border-top:1px solid #ece7df;color:#777;font-size:11px">
  Aadland Service · Org.nr. 937 781 873 MVA · post@aadland-service.no
