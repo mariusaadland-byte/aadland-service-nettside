@@ -120,15 +120,16 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     const qty=Math.max(0,Number(line.quantity)||0);
     const sale=Math.round(qty*(Number(line.unitPriceOre)||0));
     saleOre+=sale;
-    if(line.internalUnitCostOre==null||line.internalUnitCostOre===""){missing++;continue;}
-    costOre+=Math.round(qty*(Number(line.internalUnitCostOre)||0));
+    const unitCost=Number(line.internalUnitCostOre);
+    if(line.internalUnitCostOre==null||line.internalUnitCostOre===""||!Number.isFinite(unitCost)||unitCost<0){missing++;continue;}
+    costOre+=Math.round(qty*unitCost);
     coveredSaleOre+=sale;
    }
    return {key,label:key==="material"?"Materialer":"Diverse forbruksmateriell",count:lines.length,saleOre,costOre,coveredSaleOre,missing,marginOre:coveredSaleOre-costOre,markupPercent:costOre>0?(coveredSaleOre-costOre)/costOre*100:null,marginPercent:coveredSaleOre>0?(coveredSaleOre-costOre)/coveredSaleOre*100:null};
   });
  },[v.lineItems]);
  const lowMarkupGroups=materialProfit.filter(group=>group.count>0&&group.missing===0&&group.markupPercent!==null&&group.markupPercent<minimumMaterialMarkup);
- const missingMaterialCosts=v.lineItems.filter(line=>line.type==="material"&&(line.internalUnitCostOre==null||line.internalUnitCostOre===""));
+ const missingMaterialCosts=v.lineItems.filter(line=>line.type==="material"&&(line.internalUnitCostOre==null||line.internalUnitCostOre===""||!Number.isFinite(Number(line.internalUnitCostOre))||Number(line.internalUnitCostOre)<0));
  const negativeMaterialContribution=materialProfit.filter(group=>group.count>0&&group.missing===0&&group.marginOre<0);
  const quoteQualityIssues=[
   ...(missingMaterialCosts.length?[missingMaterialCosts.length+" materialvare(r) mangler innkjøpspris"]:[]),
