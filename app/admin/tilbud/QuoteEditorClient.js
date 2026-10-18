@@ -351,6 +351,19 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   setError("");
   setSavedMessage("Salgspris for "+(cleanDescription(line.description)||"materialvaren")+" er satt til "+nok(sale)+" eks. MVA per enhet med "+rate+" % påslag. Husk å lagre tilbudet.");
  }
+ function applyDefaultMarkupToAllMaterials(){
+  if(locked)return;
+  const eligible=v.lineItems.filter(line=>line.type==="material"&&line.internalUnitCostOre!==""&&line.internalUnitCostOre!=null&&Number.isFinite(Number(line.internalUnitCostOre))&&Number(line.internalUnitCostOre)>=0);
+  if(!eligible.length){setError("Ingen materialvarer med registrert innkjøpspris å beregne.");return;}
+  const rate=Number(defaultMaterialMarkup);
+  if(!Number.isFinite(rate)||rate<0||rate>1000){setError("Ugyldig standardpåslag i kalkyleinnstillingene.");return;}
+  const missing=v.lineItems.filter(line=>line.type==="material").length-eligible.length;
+  if(!window.confirm("Beregne salgspris på "+eligible.length+" materialvare(r) med "+rate+" % påslag? Dette erstatter eksisterende salgspriser på disse varene."+(missing?" "+missing+" vare(r) uten innkjøpspris blir ikke endret.":"")))return;
+  const ids=new Set(eligible.map(line=>line.id));
+  setV(current=>({...current,lineItems:current.lineItems.map(line=>ids.has(line.id)?{...line,unitPriceOre:Math.round(Number(line.internalUnitCostOre)*(1+rate/100))}:line)}));
+  setError("");
+  setSavedMessage("Salgspris beregnet for "+eligible.length+" materialvare(r). Kontroller totalsummen og lagre tilbudet.");
+ }
  function addCatalogProduct(product,markup){
   if(locked||v.lineItems.length>=120){setError("Tilbudet er låst, eller har nådd maksimum 120 linjer.");return false;}
   const rawDescription=[String(product.name||"").trim(),product.sku?"Varenr. "+String(product.sku).trim():""].filter(Boolean).join(" · ");
@@ -859,6 +872,10 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
         </div>}
        </div>)}
       </div>}
+      <div style={{margin:"12px 0"}}>
+       <button type="button" className="btn alt" disabled={Boolean(locked)||!v.lineItems.some(line=>line.type==="material"&&line.internalUnitCostOre!==""&&line.internalUnitCostOre!=null)} onClick={applyDefaultMarkupToAllMaterials}>Beregn salgspris for alle materialvarer ({defaultMaterialMarkup} % påslag)</button>
+       <small className="muted">Bruker standardpåslaget på alle materialvarer med registrert innkjøpspris. Eksisterende salgspriser erstattes etter bekreftelse. Arbeidslinjer endres ikke.</small>
+      </div>
       <h4>Materialer og forbruksmateriell</h4>
       <p><Link href="/admin/tilbud/innstillinger">Administrer kalkyleinnstillinger for bedriften →</Link></p>
       <div className="field"><label>Varselgrense for påslag (%)</label><input type="number" min="0" max="1000" step="1" value={minimumMaterialMarkup} onChange={e=>changeMinimumMaterialMarkup(e.target.value)} onBlur={saveMinimumMaterialMarkup}/><small>{markupPreferenceStatus||"Endre grensen og gå ut av feltet for å lagre på bedriftskontoen."}</small></div>
