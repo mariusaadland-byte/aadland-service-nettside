@@ -74,6 +74,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [alternateEmail,setAlternateEmail]=useState("");
  const [supplierSearch,setSupplierSearch]=useState({});
  const [minimumMaterialMarkup,setMinimumMaterialMarkup]=useState(15);
+ const [defaultMaterialMarkup,setDefaultMaterialMarkup]=useState(15);
  const [markupPreferenceStatus,setMarkupPreferenceStatus]=useState("");
  useEffect(()=>{
   let active=true;
@@ -82,6 +83,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    if(!response.ok)throw new Error(data.error||"Kunne ikke hente innstillingen.");
    const value=Number(data.minimumMaterialMarkup);
    if(active&&Number.isFinite(value)&&value>=0&&value<=1000)setMinimumMaterialMarkup(value);
+   const defaultValue=Number(data.defaultMaterialMarkup);
+   if(active&&Number.isFinite(defaultValue)&&defaultValue>=0&&defaultValue<=1000)setDefaultMaterialMarkup(defaultValue);
   }).catch(error=>{if(active)setMarkupPreferenceStatus(error.message||"Kunne ikke hente innstillingen.");});
   return()=>{active=false;};
  },[]);
@@ -371,7 +374,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  function updateSupplierSalePrice(line,product){
   if(locked)return;
   const savedRate=Number(product.defaultMarkupPercent);
-  const defaultRate=Number.isFinite(savedRate)&&savedRate>=0&&savedRate<=1000?savedRate:15;
+  const defaultRate=Number.isFinite(savedRate)&&savedRate>=0&&savedRate<=1000?savedRate:defaultMaterialMarkup;
   const rateText=window.prompt("Påslag i prosent på denne varen (salgspris eks. MVA):",String(defaultRate));
   if(rateText===null)return;
   const rate=Number(rateText.replace(",","."));
@@ -760,6 +763,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       {contribution.missing>0&&<p className="quoteProfitWarning">{contribution.missing} linje(r) mangler kostnadsgrunnlag. Tallene er derfor bare et delestimat, ikke samlet fortjeneste for tilbudet.</p>}
       {contribution.complete&&contribution.known>0&&<p className="quoteProfitHelp">Alle linjer har kostnad. Dette er dekningsbidrag før faste driftsutgifter, eventuelle tillegg og skatt – ikke nettofortjeneste.</p>}
       <h4>Materialer og forbruksmateriell</h4>
+      <p><Link href="/admin/tilbud/innstillinger">Administrer kalkyleinnstillinger for bedriften →</Link></p>
       <div className="field"><label>Varselgrense for påslag (%)</label><input type="number" min="0" max="1000" step="1" value={minimumMaterialMarkup} onChange={e=>changeMinimumMaterialMarkup(e.target.value)} onBlur={saveMinimumMaterialMarkup}/><small>{markupPreferenceStatus||"Endre grensen og gå ut av feltet for å lagre på bedriftskontoen."}</small></div>
       {lowMarkupGroups.length>0&&<p className="quoteProfitWarning" role="alert">Lavt påslag: {lowMarkupGroups.map(group=>group.label+" ("+new Intl.NumberFormat("nb-NO",{maximumFractionDigits:1}).format(group.markupPercent)+" %)").join(", ")}. Under valgt grense på {minimumMaterialMarkup} %. Kontroller prisene før tilbudet sendes.</p>}
 
