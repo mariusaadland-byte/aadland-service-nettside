@@ -792,6 +792,24 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       <div className="kicker">TILBUDET</div>
       <h3>Hva gjelder tilbudet?</h3>
       <div className="field"><label>Tittel *</label><input value={v.title} onChange={e=>set("title",e.target.value)} placeholder="F.eks. Oppbygging av bad og montering av kjøkken"/></div>
+      <div className="field"><label>Avtaleform – velg og tilpass teksten før utsending</label>
+       <select defaultValue="" disabled={locked} onChange={e=>{
+        const variants={
+         fixed:"PRISFORM: FASTPRIS. Oppgitt totalsum gjelder som fastpris for det arbeidet og de leveransene som er uttrykkelig beskrevet i tilbudet. Endringer og tilleggsarbeid avtales særskilt før utførelse.",
+         hourly:"PRISFORM: TIMEARBEID. Arbeidet faktureres etter faktisk medgått tid til timeprisen som fremgår av tilbudslinjene. Eventuelle oppgitte timer og summer er anslag, ikke fastpris. Materialer og øvrige kostnader faktureres slik det er spesifisert i tilbudet. Avtal eventuelt et pristak særskilt.",
+         estimate:"PRISFORM: PRISOVERSLAG. Oppgitt totalsum er et prisoverslag, ikke en fastpris. For forbrukerkunder gjelder håndverkertjenestelovens regler om prisoverslag, herunder den normale grensen på 15 prosent med lovens unntak."
+        };
+        const prefix=/^PRISFORM: (?:FASTPRIS|TIMEARBEID|PRISOVERSLAG)\\.[^\\n]*\\n*/;
+        setV(current=>({...current,introText:variants[e.target.value]+"\\n\\n"+String(current.introText||"").replace(prefix,"")}));
+        e.target.value="";
+       }}>
+        <option value="">Velg avtaleform og sett inn tydelig prisinformasjon …</option>
+        <option value="fixed">Fastpris</option>
+        <option value="hourly">Timepris / medgått tid</option>
+        <option value="estimate">Prisoverslag</option>
+       </select>
+       <small className="muted">Teksten legges i innledningen og følger tilbud, PDF og digital visning. Ved timepris er totalsummen i systemet kun et anslag; tilpass antall timer og betalingsplan. Denne funksjonen endrer ikke faktureringen automatisk.</small>
+      </div>
       <div className="field"><label>Innledning</label><textarea rows="3" value={v.introText} onChange={e=>set("introText",e.target.value)}/></div>
       <div className="quoteFormGrid">
        <div className="field"><label>Gyldig til</label><input type="date" value={v.validUntil||""} onChange={e=>set("validUntil",e.target.value)}/></div>
