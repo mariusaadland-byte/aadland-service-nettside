@@ -346,7 +346,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  function applyDefaultMaterialMarkup(line){
   if(locked||line.type!=="material")return;
   const cost=Number(line.internalUnitCostOre);
-  if(line.internalUnitCostOre==null||line.internalUnitCostOre===""||!Number.isFinite(cost)||cost<0){
+  if(line.internalUnitCostOre==null||line.internalUnitCostOre===""||!Number.isFinite(cost)||cost<0||cost>100000000){
    setError("Legg inn en gyldig innkjøpspris før salgsprisen beregnes.");return;
   }
   const rate=quoteMaterialMarkupOverride===""?Number(v.quoteMaterialMarkupPercent??defaultMaterialMarkup):Number(quoteMaterialMarkupOverride);
@@ -358,7 +358,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  }
  function applyDefaultMarkupToAllMaterials(){
   if(locked)return;
-  const eligible=v.lineItems.filter(line=>line.type==="material"&&line.internalUnitCostOre!==""&&line.internalUnitCostOre!=null&&Number.isFinite(Number(line.internalUnitCostOre))&&Number(line.internalUnitCostOre)>=0);
+  const eligible=v.lineItems.filter(line=>line.type==="material"&&line.internalUnitCostOre!==""&&line.internalUnitCostOre!=null&&Number.isFinite(Number(line.internalUnitCostOre))&&Number(line.internalUnitCostOre)>=0&&Number(line.internalUnitCostOre)<=100000000);
   if(!eligible.length){setError("Ingen materialvarer med registrert innkjøpspris å beregne.");return;}
   const rate=quoteMaterialMarkupOverride===""?Number(v.quoteMaterialMarkupPercent??defaultMaterialMarkup):Number(quoteMaterialMarkupOverride);
   if(!Number.isFinite(rate)||rate<0||rate>1000){setError("Skriv et gyldig påslag mellom 0 og 1000 %.");return;}
