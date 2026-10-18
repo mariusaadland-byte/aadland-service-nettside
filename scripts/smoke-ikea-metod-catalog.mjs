@@ -6,6 +6,8 @@ const drawingSource=readFileSync("app/admin/tegning/DrawingClient.js","utf8");
 const archiveSource=readFileSync("app/admin/tegninger/DrawingArchiveClient.js","utf8");
 assert.ok(drawingSource.includes('(Array.isArray(parsed)?parsed:[]).filter('),"local drawing cache must be validated before restoring");
 assert.ok(drawingSource.includes("if(sameDrawing){serverSyncedSignature.current=serverSignature(serverSnapshot);docRef.current=saved;setDoc(saved)}"),"late server saves must not replace the currently open drawing");
+assert.ok(drawingSource.includes("if(docRef.current?.id===next.id)localStorage.setItem(LAST_STORE,next.id)"),"background saves must not replace the last opened drawing");
+assert.ok(drawingSource.includes("if(sameDrawing&&!fullySynced)serverSyncQueued.current=true"),"stale drawing saves must not queue another save for the active drawing");
 assert.ok(archiveSource.includes('fetch("/api/admin/customer-contacts",{cache:"no-store"})')&&archiveSource.includes('.catch(()=>[])'),"drawing archive must remain available when contact lookup fails");
 assert.ok(drawingSource.includes("const fillWallRight="),"kitchen rows must support automatic rightward fill");
 assert.ok(drawingSource.includes("const snapCornerCabinet="),"corner cabinets need a dedicated inner-corner placement action");
