@@ -118,7 +118,8 @@ function sanitizePlan(value){
   {id:"halfway",label:"Halvført arbeid",percent:50,trigger:"Når omtrent halvparten av arbeidet er utført"},
   {id:"completion",label:"Ferdigstillelse",percent:25,trigger:"Ved ferdigstillelse"}
  ];
- if(!Array.isArray(value)||!value.length)return fallback;
+ if(value===undefined||value===null)return fallback;
+ if(!Array.isArray(value)||!value.length)return null;
  if(value.length>8||value.some(row=>!row||typeof row!=="object"||Array.isArray(row)))return null;
  const plan=value.map((row,index)=>({
   id:clean(row.id,80)||("payment-"+index),
