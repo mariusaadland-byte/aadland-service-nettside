@@ -34,5 +34,8 @@ assert.equal(quoteLinesFromCalculator({materialItems:[]}).length,0);
 console.log("Tilbudsoverføring bestått: søkte varer, mengder, 20 % påslag, manuelle priser og valgfritt arbeid/reise.");
 
 const quoteEditorSource=readFileSync("app/admin/tilbud/QuoteEditorClient.js","utf8");
+const quoteCatalogSource=readFileSync("app/admin/tilbud/QuoteCatalogSearch.js","utf8");
+assert.ok(quoteCatalogSource.includes("useState(initialMarkup)"),"Material markup must restore the saved preference");
+assert.ok(quoteCatalogSource.includes("localStorage.setItem(MARKUP_STORAGE_KEY,markup)"),"Material markup preference must persist");
 assert.ok(quoteEditorSource.includes("Array.isArray(data.drawings)?data.drawings:[]"),"quote editor must validate drawing list");
 assert.ok(quoteEditorSource.includes("typeof row.name===\"string\"?row.name:\"Tegning\""),"quote editor must sanitize drawing labels");
