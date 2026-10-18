@@ -35,9 +35,8 @@ console.log("Tilbudsoverføring bestått: søkte varer, mengder, 20 % påslag, m
 
 const quoteEditorSource=readFileSync("app/admin/tilbud/QuoteEditorClient.js","utf8");
 const quoteCatalogSource=readFileSync("app/admin/tilbud/QuoteCatalogSearch.js","utf8");
-assert.ok(quoteCatalogSource.includes("useState(initialMarkup)"),"Material markup must restore the saved preference");
-assert.ok(quoteCatalogSource.includes("localStorage.setItem(MARKUP_STORAGE_KEY,markup)"),"Material markup preference must persist");
 assert.ok(quoteCatalogSource.includes("defaultMarkupPercent??15"),"Quote search must load the shared supplier markup");
+assert.ok(!quoteCatalogSource.includes("localStorage"),"Shared supplier markup must not be overridden by browser-local values");
 assert.ok(quoteCatalogSource.includes("async function saveMarkup()"),"Quote search must allow saving supplier markup");
 const materialCatalogRoute=readFileSync("app/api/admin/material-catalog/route.js","utf8");
 assert.ok(materialCatalogRoute.includes("export async function PATCH(req)"),"Supplier markup must have a save endpoint");
