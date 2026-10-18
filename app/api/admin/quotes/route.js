@@ -155,6 +155,7 @@ function payload(body,user,existing){
  }
  const lines=sanitizeLines(body.lineItems);
  if(!lines.length)return {error:"Legg inn minst én tilbudslinje."};
+ if(new Set(lines.map(line=>line.id)).size!==lines.length)return {error:"Tilbudslinjene har dupliserte ID-er. Last inn tilbudet på nytt før du lagrer."};
  if(Array.isArray(body.paymentPlan)&&body.paymentPlan.length>8)return {error:"Betalingsplanen kan ha maksimalt 8 delbetalinger."};
  const paymentPlan=sanitizePlan(body.paymentPlan);
  if(!paymentPlan)return {error:"Betalingsplanen må til sammen være 100 %."};
