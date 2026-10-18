@@ -799,8 +799,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
          hourly:"PRISFORM: TIMEARBEID. Arbeidet faktureres etter faktisk medgått tid til timeprisen som fremgår av tilbudslinjene. Eventuelle oppgitte timer og summer er anslag, ikke fastpris. Materialer og øvrige kostnader faktureres slik det er spesifisert i tilbudet. Avtal eventuelt et pristak særskilt.",
          estimate:"PRISFORM: PRISOVERSLAG. Oppgitt totalsum er et prisoverslag, ikke en fastpris. For forbrukerkunder gjelder håndverkertjenestelovens regler om prisoverslag, herunder den normale grensen på 15 prosent med lovens unntak."
         };
-        const prefix=/^PRISFORM: (?:FASTPRIS|TIMEARBEID|PRISOVERSLAG)\\.[^\\n]*\\n*/;
-        setV(current=>({...current,introText:variants[e.target.value]+"\\n\\n"+String(current.introText||"").replace(prefix,"")}));
+        const prefix=/^PRISFORM: (?:FASTPRIS|TIMEARBEID|PRISOVERSLAG)\.[^\n]*\n*/;
+        setV(current=>({...current,introText:variants[e.target.value]+"\n\n"+String(current.introText||"").replace(prefix,"")}));
         e.target.value="";
        }}>
         <option value="">Velg avtaleform og sett inn tydelig prisinformasjon …</option>
