@@ -507,6 +507,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   }
   setQuoteNumber(data.quote.quoteNumber||quoteNumber);
   setV(current=>({...current,quoteMaterialMarkupPercent:selectedMarkup}));
+  setQuoteMaterialMarkupOverride("");
   setSavedSnapshot(JSON.stringify({...v,quoteMaterialMarkupPercent:selectedMarkup}));
   setSavedMessage("Tilbudet er lagret.");
   window.setTimeout(()=>setSavedMessage(""),1800);
