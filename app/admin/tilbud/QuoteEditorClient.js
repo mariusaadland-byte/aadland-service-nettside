@@ -130,7 +130,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   });
  },[v.lineItems]);
  const lowMarkupGroups=materialProfit.filter(group=>group.count>0&&group.missing===0&&group.markupPercent!==null&&group.markupPercent<minimumMaterialMarkup);
- const missingMaterialCosts=v.lineItems.filter(line=>line.type==="material"&&(line.internalUnitCostOre==null||line.internalUnitCostOre===""||!Number.isFinite(Number(line.internalUnitCostOre))||Number(line.internalUnitCostOre)<0));
+ const missingMaterialCosts=v.lineItems.filter(line=>line.type==="material"&&(line.internalUnitCostOre==null||line.internalUnitCostOre===""||!Number.isFinite(Number(line.internalUnitCostOre))||Number(line.internalUnitCostOre)<0||Number(line.internalUnitCostOre)>100000000));
  const negativeMaterialContribution=materialProfit.filter(group=>group.count>0&&group.missing===0&&group.marginOre<0);
  const quoteQualityIssues=[
   ...(missingMaterialCosts.length?[missingMaterialCosts.length+" materialvare(r) mangler innkjøpspris"]:[]),
