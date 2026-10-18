@@ -75,6 +75,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [supplierSearch,setSupplierSearch]=useState({});
  const [minimumMaterialMarkup,setMinimumMaterialMarkup]=useState(15);
  const [defaultMaterialMarkup,setDefaultMaterialMarkup]=useState(15);
+ const [quoteMaterialMarkupOverride,setQuoteMaterialMarkupOverride]=useState("");
  const [markupPreferenceStatus,setMarkupPreferenceStatus]=useState("");
  useEffect(()=>{
   let active=true;
@@ -355,8 +356,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   if(locked)return;
   const eligible=v.lineItems.filter(line=>line.type==="material"&&line.internalUnitCostOre!==""&&line.internalUnitCostOre!=null&&Number.isFinite(Number(line.internalUnitCostOre))&&Number(line.internalUnitCostOre)>=0);
   if(!eligible.length){setError("Ingen materialvarer med registrert innkjøpspris å beregne.");return;}
-  const rate=Number(defaultMaterialMarkup);
-  if(!Number.isFinite(rate)||rate<0||rate>1000){setError("Ugyldig standardpåslag i kalkyleinnstillingene.");return;}
+  const rate=quoteMaterialMarkupOverride===""?Number(defaultMaterialMarkup):Number(quoteMaterialMarkupOverride);
+  if(!Number.isFinite(rate)||rate<0||rate>1000){setError("Skriv et gyldig påslag mellom 0 og 1000 %.");return;}
   const missing=v.lineItems.filter(line=>line.type==="material").length-eligible.length;
   if(!window.confirm("Beregne salgspris på "+eligible.length+" materialvare(r) med "+rate+" % påslag? Dette erstatter eksisterende salgspriser på disse varene."+(missing?" "+missing+" vare(r) uten innkjøpspris blir ikke endret.":"")))return;
   const ids=new Set(eligible.map(line=>line.id));
@@ -873,8 +874,9 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
        </div>)}
       </div>}
       <div style={{margin:"12px 0"}}>
-       <button type="button" className="btn alt" disabled={Boolean(locked)||!v.lineItems.some(line=>line.type==="material"&&line.internalUnitCostOre!==""&&line.internalUnitCostOre!=null)} onClick={applyDefaultMarkupToAllMaterials}>Beregn salgspris for alle materialvarer ({defaultMaterialMarkup} % påslag)</button>
-       <small className="muted">Bruker standardpåslaget på alle materialvarer med registrert innkjøpspris. Eksisterende salgspriser erstattes etter bekreftelse. Arbeidslinjer endres ikke.</small>
+       <div className="field"><label htmlFor="quote-material-markup">Påslag for denne beregningen (%)</label><input id="quote-material-markup" type="number" min="0" max="1000" step="0.1" inputMode="decimal" value={quoteMaterialMarkupOverride===""?defaultMaterialMarkup:quoteMaterialMarkupOverride} disabled={Boolean(locked)} onChange={e=>setQuoteMaterialMarkupOverride(e.target.value)} /></div>
+       <button type="button" className="btn alt" disabled={Boolean(locked)||!v.lineItems.some(line=>line.type==="material"&&line.internalUnitCostOre!==""&&line.internalUnitCostOre!=null)} onClick={applyDefaultMarkupToAllMaterials}>Beregn salgspris for alle materialvarer ({quoteMaterialMarkupOverride===""?defaultMaterialMarkup:quoteMaterialMarkupOverride} % påslag)</button>
+       <small className="muted">Du kan endre påslaget kun for denne beregningen uten å endre bedriftens standard. Eksisterende salgspriser erstattes etter bekreftelse. Arbeidslinjer endres ikke.</small>
       </div>
       <h4>Materialer og forbruksmateriell</h4>
       <p><Link href="/admin/tilbud/innstillinger">Administrer kalkyleinnstillinger for bedriften →</Link></p>
