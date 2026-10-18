@@ -31,7 +31,8 @@ function blankState(){
   terms:defaultTerms,
   validUntil:defaultValidUntil(),
   plannedStartDate:"",
-  autoFollowUp:true
+  autoFollowUp:true,
+  quoteMaterialMarkupPercent:null
  };
 }
 function calculate(lines){
@@ -280,7 +281,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      terms:quote.terms||defaultTerms,
      validUntil:quote.validUntil||"",
      plannedStartDate:quote.plannedStartDate||"",
-     autoFollowUp:quote.autoFollowUp!==false
+     autoFollowUp:quote.autoFollowUp!==false,
+     quoteMaterialMarkupPercent:quote.quoteMaterialMarkupPercent??null
     };
     // Add selected supplier goods to an EXISTING draft only after we have loaded
     // its persisted lines. Never replace the customer's existing offer content.
@@ -356,12 +358,12 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   if(locked)return;
   const eligible=v.lineItems.filter(line=>line.type==="material"&&line.internalUnitCostOre!==""&&line.internalUnitCostOre!=null&&Number.isFinite(Number(line.internalUnitCostOre))&&Number(line.internalUnitCostOre)>=0);
   if(!eligible.length){setError("Ingen materialvarer med registrert innkjøpspris å beregne.");return;}
-  const rate=quoteMaterialMarkupOverride===""?Number(defaultMaterialMarkup):Number(quoteMaterialMarkupOverride);
+  const rate=quoteMaterialMarkupOverride===""?Number(v.quoteMaterialMarkupPercent??defaultMaterialMarkup):Number(quoteMaterialMarkupOverride);
   if(!Number.isFinite(rate)||rate<0||rate>1000){setError("Skriv et gyldig påslag mellom 0 og 1000 %.");return;}
   const missing=v.lineItems.filter(line=>line.type==="material").length-eligible.length;
   if(!window.confirm("Beregne salgspris på "+eligible.length+" materialvare(r) med "+rate+" % påslag? Dette erstatter eksisterende salgspriser på disse varene."+(missing?" "+missing+" vare(r) uten innkjøpspris blir ikke endret.":"")))return;
   const ids=new Set(eligible.map(line=>line.id));
-  setV(current=>({...current,lineItems:current.lineItems.map(line=>ids.has(line.id)?{...line,unitPriceOre:Math.round(Number(line.internalUnitCostOre)*(1+rate/100))}:line)}));
+  setV(current=>({...current,quoteMaterialMarkupPercent:rate,lineItems:current.lineItems.map(line=>ids.has(line.id)?{...line,unitPriceOre:Math.round(Number(line.internalUnitCostOre)*(1+rate/100))}:line)}));
   setError("");
   setSavedMessage("Salgspris beregnet for "+eligible.length+" materialvare(r). Kontroller totalsummen og lagre tilbudet.");
  }
@@ -874,9 +876,9 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
        </div>)}
       </div>}
       <div style={{margin:"12px 0"}}>
-       <div className="field"><label htmlFor="quote-material-markup">Påslag for denne beregningen (%)</label><input id="quote-material-markup" type="number" min="0" max="1000" step="0.1" inputMode="decimal" value={quoteMaterialMarkupOverride===""?defaultMaterialMarkup:quoteMaterialMarkupOverride} disabled={Boolean(locked)} onChange={e=>setQuoteMaterialMarkupOverride(e.target.value)} /></div>
-       <button type="button" className="btn alt" disabled={Boolean(locked)||!v.lineItems.some(line=>line.type==="material"&&line.internalUnitCostOre!==""&&line.internalUnitCostOre!=null)} onClick={applyDefaultMarkupToAllMaterials}>Beregn salgspris for alle materialvarer ({quoteMaterialMarkupOverride===""?defaultMaterialMarkup:quoteMaterialMarkupOverride} % påslag)</button>
-       <small className="muted">Du kan endre påslaget kun for denne beregningen uten å endre bedriftens standard. Eksisterende salgspriser erstattes etter bekreftelse. Arbeidslinjer endres ikke.</small>
+       <div className="field"><label htmlFor="quote-material-markup">Påslag for denne beregningen (%)</label><input id="quote-material-markup" type="number" min="0" max="1000" step="0.1" inputMode="decimal" value={quoteMaterialMarkupOverride===""?(v.quoteMaterialMarkupPercent??defaultMaterialMarkup):quoteMaterialMarkupOverride} disabled={Boolean(locked)} onChange={e=>setQuoteMaterialMarkupOverride(e.target.value)} /></div>
+       <button type="button" className="btn alt" disabled={Boolean(locked)||!v.lineItems.some(line=>line.type==="material"&&line.internalUnitCostOre!==""&&line.internalUnitCostOre!=null)} onClick={applyDefaultMarkupToAllMaterials}>Beregn salgspris for alle materialvarer ({quoteMaterialMarkupOverride===""?(v.quoteMaterialMarkupPercent??defaultMaterialMarkup):quoteMaterialMarkupOverride} % påslag)</button>
+       <small className="muted">Valgt påslag lagres på tilbudet når du lagrer, og brukes neste gang tilbudet åpnes. Bedriftens standard endres ikke. Eksisterende salgspriser erstattes etter bekreftelse. Arbeidslinjer endres ikke.</small>
       </div>
       <h4>Materialer og forbruksmateriell</h4>
       <p><Link href="/admin/tilbud/innstillinger">Administrer kalkyleinnstillinger for bedriften →</Link></p>
