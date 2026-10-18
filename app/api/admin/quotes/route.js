@@ -141,6 +141,15 @@ function payload(body,user,existing){
  if(!customer.name)return {error:"Kunden må ha navn."};
  const title=clean(body.title,240);
  if(!title)return {error:"Tilbudet må ha en tittel."};
+ if(!Array.isArray(body.lineItems)||!body.lineItems.length)return {error:"Legg inn minst én tilbudslinje."};
+ if(body.lineItems.length>120)return {error:"Tilbudet kan ha maksimalt 120 linjer."};
+ for(const line of body.lineItems){
+  const quantity=Number(line?.quantity),price=Number(line?.unitPriceOre),vat=Number(line?.vatRate);
+  if(!clean(line?.description,1000))return {error:"Alle tilbudslinjer må ha beskrivelse."};
+  if(!Number.isFinite(quantity)||quantity<=0||quantity>100000)return {error:"Ugyldig antall på en tilbudslinje."};
+  if(line?.unitPriceOre==null||line.unitPriceOre===""||!Number.isFinite(price)||price<0||price>100000000)return {error:"Ugyldig salgspris på en tilbudslinje."};
+  if(!Number.isFinite(vat)||vat<0||vat>100)return {error:"Ugyldig MVA-sats på en tilbudslinje."};
+ }
  const lines=sanitizeLines(body.lineItems);
  if(!lines.length)return {error:"Legg inn minst én tilbudslinje."};
  const paymentPlan=sanitizePlan(body.paymentPlan);
