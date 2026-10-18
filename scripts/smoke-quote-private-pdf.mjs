@@ -5,6 +5,10 @@ import path from "node:path";
 
 const costSource=readFileSync("lib/quotePrivateCosts.js","utf8");
 const quoteEditorSource=readFileSync("app/admin/tilbud/QuoteEditorClient.js","utf8");
+const quoteListSource=readFileSync("app/admin/tilbud/QuotesClient.js","utf8");
+assert.ok(quoteListSource.includes("original.internalCosts||{}"),"Quote copying must retain private cost data");
+assert.ok(quoteListSource.includes("original.privateCostsUnavailable"),"Quote copying must not silently lose private cost data");
+assert.ok(quoteListSource.includes("if(copyingId)return"),"Quote copying must guard against duplicate submissions");
 assert.ok(quoteEditorSource.includes("async function sendQuote("),"Sending a quote must use an async handler");
 assert.ok(quoteEditorSource.includes("async function openPaperCopy("),"PDF preview must use an async handler");
 assert.ok(!quoteEditorSource.includes("async async function"),"Quote editor must not contain duplicate async keywords");
