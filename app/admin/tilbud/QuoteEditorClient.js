@@ -86,8 +86,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   fetch("/api/admin/project-drawings",{cache:"no-store"}).then(async response=>{
    const data=await response.json().catch(()=>({}));
    if(!response.ok)throw new Error("Kunne ikke hente tegninger");
-   return data.drawings||[];
-  }).then(drawings=>{if(active)setAvailableDrawings(drawings)}).catch(()=>{});
+   return Array.isArray(data.drawings)?data.drawings:[];
+  }).then(drawings=>{if(active)setAvailableDrawings(drawings.filter(row=>row&&typeof row==="object"&&typeof row.id==="string").map(row=>({...row,name:typeof row.name==="string"?row.name:"Tegning",customer:typeof row.customer==="string"?row.customer:"",address:typeof row.address==="string"?row.address:""})))}).catch(()=>{});
   return()=>{active=false};
  },[]);
 
