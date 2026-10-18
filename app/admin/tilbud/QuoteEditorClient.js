@@ -16,7 +16,7 @@ const defaultPlan=[
  {id:"halfway",label:"Halvført arbeid",percent:50,trigger:"Når omtrent halvparten av arbeidet er utført"},
  {id:"completion",label:"Ferdigstillelse",percent:25,trigger:"Ved ferdigstillelse"}
 ];
-const defaultTerms="Tilbudet gjelder arbeid og leveranser som er beskrevet i tilbudet. Endringer eller tilleggsarbeid avtales særskilt og kan faktureres i tillegg. Eventuelle forhold som ikke var synlige eller kjent ved tilbudstidspunktet kan medføre endring i pris eller fremdrift.";
+const defaultTerms="TILBUDETS OMFANG\nTilbudet omfatter arbeid, materialer og leveranser som er spesifisert i tilbudet. Arbeid som ikke er beskrevet, er ikke inkludert i tilbudssummen.\n\nENDRINGER OG TILLEGGSARBEID\nEndringer og eventuelle tilleggsarbeider avklares med kunden før de utføres. Omfang, pris og eventuell betydning for fremdriften avtales særskilt.\n\nUFORUTSETTE FORHOLD\nHvis det avdekkes skjulte skader eller andre forhold som ikke kunne vurderes ved tilbudstidspunktet, informeres kunden før nødvendige endringer eller tilleggsarbeider avtales.\n\nOPPSTART OG FREMDRIFT\nOppgitt oppstartsdato er foreløpig med mindre annet er uttrykkelig avtalt. Endelig oppstart og fremdrift avklares med kunden.\n\nBETALING\nBetaling følger betalingsplanen og betalingsbetingelsene som er avtalt for oppdraget, innenfor gjeldende regelverk.\n\nGYLDIGHET OG GODKJENNING\nTilbudet gjelder til angitt utløpsdato. Kunden kan gjennomgå og godkjenne tilbudet digitalt. Eventuelle særskilte forbehold i tilbudet gjelder i tillegg. For forbrukerkunder gjelder ufravikelige rettigheter etter gjeldende lovgivning.";
 
 function blankState(){
  return {
@@ -24,7 +24,7 @@ function blankState(){
   status:"draft",
   customer:{name:"",email:"",phone:"",address:""},
   drawingIds:[],
-  introText:"Takk for forespørselen. Vi tilbyr følgende arbeid og leveranser:",
+  introText:"Takk for henvendelsen og interessen for Aadland Service. Vi har gleden av å presentere vårt tilbud på arbeidet som er beskrevet nedenfor. Tilbudet viser arbeid, materialer og øvrige leveranser med tilhørende priser og betingelser.",
   lineItems:[{id:lineId(),type:"work",description:"",quantity:1,unit:"time",unitPriceOre:"",vatRate:25}],
   paymentPlan:defaultPlan,
   notes:"",
