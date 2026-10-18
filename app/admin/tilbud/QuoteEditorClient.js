@@ -338,6 +338,19 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   setV(current=>({...current,lineItems:current.lineItems.map(item=>item.id===line.id?{...item,type:category==="work"?"work":category==="other"?"other":"material",description:category==="consumable"?consumablePrefix+description:description}:item)}));
  };
  function updateLine(id,key,value){setV(current=>({...current,lineItems:current.lineItems.map(line=>line.id===id?{...line,[key]:key==="description"&&isConsumable(line)?consumablePrefix+cleanDescription(value):value}:line)}))}
+ function applyDefaultMaterialMarkup(line){
+  if(locked||line.type!=="material")return;
+  const cost=Number(line.internalUnitCostOre);
+  if(line.internalUnitCostOre==null||line.internalUnitCostOre===""||!Number.isFinite(cost)||cost<0){
+   setError("Legg inn en gyldig innkjøpspris før salgsprisen beregnes.");return;
+  }
+  const rate=Number(defaultMaterialMarkup);
+  if(!Number.isFinite(rate)||rate<0||rate>1000){setError("Ugyldig standardpåslag i kalkyleinnstillingene.");return;}
+  const sale=Math.round(cost*(1+rate/100));
+  updateLine(line.id,"unitPriceOre",sale);
+  setError("");
+  setSavedMessage("Salgspris for "+(cleanDescription(line.description)||"materialvaren")+" er satt til "+nok(sale)+" eks. MVA per enhet med "+rate+" % påslag. Husk å lagre tilbudet.");
+ }
  function addCatalogProduct(product,markup){
   if(locked||v.lineItems.length>=120){setError("Tilbudet er låst, eller har nådd maksimum 120 linjer.");return false;}
   const rawDescription=[String(product.name||"").trim(),product.sku?"Varenr. "+String(product.sku).trim():""].filter(Boolean).join(" · ");
@@ -701,6 +714,10 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
         <div className="field quoteLineUnit"><label>Enhet</label><input value={line.unit} onChange={e=>updateLine(line.id,"unit",e.target.value)} placeholder="time / stk"/></div>
         <div className="field quoteLinePrice"><label>Pris eks. MVA</label><input type="number" min="0" step="0.01" value={line.unitPriceOre===""?"":Number(line.unitPriceOre)/100} onChange={e=>updateLine(line.id,"unitPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="0"/></div>
         <div className="field quoteLineInternalCost"><label>Intern kostnad eks. MVA / enhet</label><input type="number" min="0" step="0.01" inputMode="decimal" value={line.internalUnitCostOre===""||line.internalUnitCostOre==null?"":Number(line.internalUnitCostOre)/100} onChange={e=>updateLine(line.id,"internalUnitCostOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="Ikke registrert" title="Kun intern kalkyle. Vises aldri for kunden."/><small className="muted">Kun internt</small></div>
+        {line.type==="material"&&<div style={{marginBottom:8}}>
+         <button type="button" className="btn alt" disabled={Boolean(locked)||line.internalUnitCostOre==null||line.internalUnitCostOre===""||!Number.isFinite(Number(line.internalUnitCostOre))||Number(line.internalUnitCostOre)<0} onClick={()=>applyDefaultMaterialMarkup(line)}>Beregn salgspris med {defaultMaterialMarkup} % påslag</button>
+         <small className="muted">Bruker bedriftens standardpåslag. Endrer bare denne varelinjens salgspris eks. MVA.</small>
+        </div>}
         {line.type==="material"&&line.internalUnitCostOre!==""&&line.internalUnitCostOre!=null&&line.unitPriceOre!==""&&Number(line.internalUnitCostOre)>0&&(()=>{
          const cost=Number(line.internalUnitCostOre),sale=Number(line.unitPriceOre),markup=(sale-cost)/cost*100;
          const negative=sale<cost,low=markup<minimumMaterialMarkup;
