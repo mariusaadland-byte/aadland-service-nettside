@@ -296,6 +296,9 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
 
  if(body.action==="archive"||body.action==="restore"){
+  const {data:target,error:lookupError}=await s.from("quotes").select("id").eq("id",id).maybeSingle();
+  if(lookupError)return NextResponse.json({error:"Tilbudet kunne ikke kontrolleres."},{status:500});
+  if(!target)return NextResponse.json({error:"Tilbudet ble ikke funnet."},{status:404});
   const {error}=await s.from("quotes").update({
    archived_at:body.action==="archive"?new Date().toISOString():null,
    updated_at:new Date().toISOString()
