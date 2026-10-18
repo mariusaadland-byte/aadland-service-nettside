@@ -315,7 +315,9 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  }
  function updateSupplierSalePrice(line,product){
   if(locked)return;
-  const rateText=window.prompt("Påslag i prosent på denne varen (salgspris eks. MVA):","15");
+  const savedRate=Number(product.defaultMarkupPercent);
+  const defaultRate=Number.isFinite(savedRate)&&savedRate>=0&&savedRate<=1000?savedRate:15;
+  const rateText=window.prompt("Påslag i prosent på denne varen (salgspris eks. MVA):",String(defaultRate));
   if(rateText===null)return;
   const rate=Number(rateText.replace(",","."));
   if(!Number.isFinite(rate)||rate<0||rate>1000){setError("Skriv et gyldig materialpåslag mellom 0 og 1000 %.");return;}
