@@ -11,7 +11,7 @@ function InvoicePreview({invoice,example=false}){
  const fmt=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(ore)||0)/100);
  return <article style={{background:"#fff",color:"#201d18",border:"1px solid #ddd4c5",boxShadow:"0 8px 32px #00000013",padding:"clamp(18px,4vw,48px)",marginTop:16,maxWidth:850}}>
   <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"start",borderBottom:"3px solid #c99a49",paddingBottom:25,flexWrap:"wrap"}}>
-   <div><div style={{fontSize:23,fontWeight:900,letterSpacing:2}}>AADLAND SERVICE</div><div style={{fontSize:11,letterSpacing:2,color:"#8a6b35",marginTop:6}}>HÅNDVERK · VEDLIKEHOLD · UTLEIE</div></div>
+   <div><img src="/aadland-service-logo.webp" alt="Aadland Service sin originale logo" style={{width:185,maxWidth:"100%",height:"auto",objectFit:"contain"}}/></div>
    <div style={{textAlign:"right"}}><div style={{fontSize:28,fontWeight:900}}>FAKTURA</div><div style={{fontSize:12,color:"#8c342c",fontWeight:700}}>FORHÅNDSVISNING – IKKE UTSTEDT</div></div>
   </div>
   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:25,margin:"30px 0"}}>
