@@ -106,6 +106,7 @@ export default function QuotesClient(){
     </div>
     <div className="quoteAdminHeaderActions">
      <button type="button" className="btn alt" onClick={()=>{setFilter("all");setShowArchived(value=>!value)}}>{showArchived?"Aktive tilbud":"Arkiv"}</button>
+     <Link className="btn alt" href="/admin/faktura">Fakturakladder</Link>
      <Link className="btn" href="/admin/tilbud/ny">Nytt tilbud</Link>
     </div>
    </div>
