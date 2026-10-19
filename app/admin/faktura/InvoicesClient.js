@@ -3,6 +3,29 @@ import {useEffect,useState} from "react";
 import Link from "next/link";
 const money=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(ore)||0)/100);
 const total=lines=>(lines||[]).reduce((sum,l)=>{const net=Math.round(Number(l.quantity||0)*Number(l.unitPriceOre||0));return sum+net+Math.round(net*Number(l.vatRate||0)/100)},0);
+const sample={title:"Eksempel – montering og vedlikehold",customer:{name:"Ola Nordmann",address:"Eksempelveien 12, 5000 Bergen"},pricing_model:"fixed",line_items:[{description:"Tømrerarbeid",quantity:8,unit:"time",unitPriceOre:65000,vatRate:25},{description:"Materialer og festemidler",quantity:1,unit:"stk",unitPriceOre:189000,vatRate:25}],due_date:"2026-11-03",notes:"Takk for oppdraget!"};
+function InvoicePreview({invoice,example=false}){
+ const lines=invoice.line_items||[];
+ const subtotal=lines.reduce((sum,l)=>sum+Math.round(Number(l.quantity||0)*Number(l.unitPriceOre||0)),0);
+ const vat=lines.reduce((sum,l)=>{const net=Math.round(Number(l.quantity||0)*Number(l.unitPriceOre||0));return sum+Math.round(net*Number(l.vatRate||0)/100)},0);
+ const fmt=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(ore)||0)/100);
+ return <article style={{background:"#fff",color:"#201d18",border:"1px solid #ddd4c5",boxShadow:"0 8px 32px #00000013",padding:"clamp(18px,4vw,48px)",marginTop:16,maxWidth:850}}>
+  <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"start",borderBottom:"3px solid #c99a49",paddingBottom:25,flexWrap:"wrap"}}>
+   <div><div style={{fontSize:23,fontWeight:900,letterSpacing:2}}>AADLAND SERVICE</div><div style={{fontSize:11,letterSpacing:2,color:"#8a6b35",marginTop:6}}>HÅNDVERK · VEDLIKEHOLD · UTLEIE</div></div>
+   <div style={{textAlign:"right"}}><div style={{fontSize:28,fontWeight:900}}>FAKTURA</div><div style={{fontSize:12,color:"#8c342c",fontWeight:700}}>FORHÅNDSVISNING – IKKE UTSTEDT</div></div>
+  </div>
+  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:25,margin:"30px 0"}}>
+   <div><div style={{fontSize:11,fontWeight:800,color:"#8a6b35"}}>FAKTURAMOTTAKER</div><strong>{invoice.customer?.name||"Kundenavn"}</strong><div style={{whiteSpace:"pre-line",marginTop:5}}>{invoice.customer?.address||"Kundeadresse"}</div></div>
+   <div><div style={{fontSize:11,fontWeight:800,color:"#8a6b35"}}>FAKTURADETALJER</div><div>Fakturanummer: <b>{example?"EKSEMPEL":"Tildeles ved utstedelse"}</b></div><div>Forfallsdato: <b>{invoice.due_date||"Ikke valgt"}</b></div><div>Referanse: <b>{example?"EKSEMPEL":"Tildeles ved utstedelse"}</b></div></div>
+  </div>
+  <h3 style={{marginBottom:18}}>{invoice.title||"Oppdrag"}</h3>
+  <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}><thead><tr style={{background:"#171511",color:"#fff"}}>{["Beskrivelse","Antall","Pris eks. MVA","MVA","Sum eks. MVA"].map(x=><th key={x} style={{padding:"12px 9px",textAlign:x==="Beskrivelse"?"left":"right"}}>{x}</th>)}</tr></thead><tbody>{lines.map((l,i)=><tr key={i} style={{borderBottom:"1px solid #e7e1d6"}}><td style={{padding:"12px 9px"}}>{l.description}</td><td style={{textAlign:"right",padding:9}}>{l.quantity} {l.unit}</td><td style={{textAlign:"right",padding:9}}>{fmt(l.unitPriceOre)}</td><td style={{textAlign:"right",padding:9}}>{l.vatRate}%</td><td style={{textAlign:"right",padding:9}}>{fmt(Math.round(Number(l.quantity||0)*Number(l.unitPriceOre||0)))}</td></tr>)}</tbody></table></div>
+  <div style={{marginLeft:"auto",maxWidth:330,marginTop:22}}><div style={{display:"flex",justifyContent:"space-between",padding:"6px 0"}}><span>Sum eks. MVA</span><b>{fmt(subtotal)}</b></div><div style={{display:"flex",justifyContent:"space-between",padding:"6px 0"}}><span>MVA</span><b>{fmt(vat)}</b></div><div style={{display:"flex",justifyContent:"space-between",padding:"14px 10px",background:"#f3eee5",fontSize:19,fontWeight:900}}><span>Å betale</span><span>{fmt(subtotal+vat)}</span></div></div>
+  <div style={{background:"#f8f5ef",padding:20,marginTop:35,borderLeft:"4px solid #c99a49"}}><b>Betalingsinformasjon</b><p style={{margin:"8px 0 0"}}>Kontonummer: <b>8450 46 22699</b><br/>Forfall: <b>{invoice.due_date||"Velges før utstedelse"}</b><br/>Betalingsreferanse: <b>{example?"EKSEMPEL":"Fakturanummer tildeles ved utstedelse"}</b></p></div>
+  {invoice.notes&&<p style={{marginTop:24,whiteSpace:"pre-line"}}>{invoice.notes}</p>}
+  <div style={{borderTop:"1px solid #ddd4c5",marginTop:30,paddingTop:16,fontSize:12,color:"#686056"}}>Aadland Service · Org.nr. 937 781 873 MVA<br/>faktura@aadland-service.no · Telefon 471 54 898</div>
+ </article>;
+}
 export default function InvoicesClient(){
  const [items,setItems]=useState([]),[quotes,setQuotes]=useState([]),[active,setActive]=useState(null),[error,setError]=useState(""),[busy,setBusy]=useState(false),[saved,setSaved]=useState("");
  async function load(){try{const [a,b]=await Promise.all([fetch("/api/admin/invoices"),fetch("/api/admin/quotes")]);const x=await a.json(),y=await b.json();if(!a.ok)throw Error(x.error);setItems(x.invoices||[]);setQuotes((y.quotes||[]).filter(q=>q.status==="accepted"));}catch(e){setError(e.message||"Kunne ikke laste fakturaer.");}}
@@ -10,6 +33,7 @@ export default function InvoicesClient(){
  async function create(quoteId){setBusy(true);setError("");try{const res=await fetch("/api/admin/invoices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(quoteId?{quoteId}:{})});const data=await res.json();if(!res.ok)throw Error(data.error);await load();setActive(data.id);setSaved("");}catch(e){setError(e.message)}finally{setBusy(false)}}
  const draft=items.find(x=>x.id===active);
  const [form,setForm]=useState(null);
+ const [showPreview,setShowPreview]=useState(false);
  useEffect(()=>{setForm(draft?{...draft,customer:{...draft.customer},line_items:draft.line_items.map(x=>({...x}))}:null)},[active,items]);
  const change=(key,value)=>setForm(x=>({...x,[key]:value}));
  const changeLine=(i,key,value)=>setForm(x=>({...x,line_items:x.line_items.map((l,j)=>j===i?{...l,[key]:value}:l)}));
@@ -32,6 +56,6 @@ export default function InvoicesClient(){
  <h3>Sum inkl. MVA: {money(total(form.line_items))}</h3>
  <label>Notater <textarea value={form.notes||""} onChange={e=>change("notes",e.target.value)}/></label>
  <p>Kontonummer: <b>8450 46 22699</b> · Avsender ved senere utsending: faktura@aadland-service.no</p>
- <button disabled={busy} onClick={save}>Lagre kladd</button> <button onClick={exportCsv}>Eksporter linjer (CSV)</button> {saved&&<span>{saved}</span>}
- </>:<p>Velg en kladd til venstre.</p>}</section></div></main>;
+ <button type="button" onClick={()=>setShowPreview(x=>!x)}>{showPreview?"Skjul forhåndsvisning":"Se ferdig fakturadesign"}</button> <button disabled={busy} onClick={save}>Lagre kladd</button> <button onClick={exportCsv}>Eksporter linjer (CSV)</button> {saved&&<span>{saved}</span>}
+ </>:<p>Velg en kladd til venstre.</p>}</section></div>\n <section style={{marginTop:25}}><h2>Slik vil fakturaen se ut</h2><p>Visningen er en designforhåndsvisning, ikke en gyldig faktura eller PDF.</p><InvoicePreview invoice={showPreview&&form?form:sample} example={!(showPreview&&form)}/></section></main>;
 }
