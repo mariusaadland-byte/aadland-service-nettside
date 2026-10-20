@@ -24,7 +24,7 @@ function InvoicePreview({invoice,example=false}){
   <div style={{marginLeft:"auto",maxWidth:330,marginTop:22}}><div style={{display:"flex",justifyContent:"space-between",padding:"6px 0"}}><span>Sum eks. MVA</span><b>{fmt(subtotal)}</b></div><div style={{display:"flex",justifyContent:"space-between",padding:"6px 0"}}><span>MVA</span><b>{fmt(vat)}</b></div><div style={{display:"flex",justifyContent:"space-between",padding:"14px 10px",background:"#f3eee5",fontSize:19,fontWeight:900}}><span>Å betale</span><span>{fmt(subtotal+vat)}</span></div></div>
   <div style={{background:"#f8f5ef",padding:20,marginTop:35,borderLeft:"4px solid #c99a49"}}><b>Betalingsinformasjon</b><p style={{margin:"8px 0 0"}}>Kontonummer: <b>8450 46 22699</b><br/>Forfall: <b>{invoice.due_date||"Velges før utstedelse"}</b><br/>Betalingsreferanse: <b>{example?"EKSEMPEL":"Fakturanummer tildeles ved utstedelse"}</b></p></div>
   {invoice.notes&&<p style={{marginTop:24,whiteSpace:"pre-line"}}>{invoice.notes}</p>}
-  <div style={{borderTop:"1px solid #ddd4c5",marginTop:30,paddingTop:16,fontSize:12,color:"#686056"}}>{COMPANY_INFO.name} · Org.nr. {COMPANY_INFO.orgNumber}<br/>{COMPANY_ADDRESS}<br/>faktura@aadland-service.no · Telefon {COMPANY_INFO.phone}</div>
+  <div style={{borderTop:"1px solid #ddd4c5",marginTop:30,paddingTop:16,fontSize:12,color:"#686056"}}>{COMPANY_INFO.name} · Org.nr. {COMPANY_INFO.orgNumber}<br/>{COMPANY_ADDRESS}<br/>noreply@aadland-service.no · Telefon {COMPANY_INFO.phone}</div>
  </article>;
 }
 export default function InvoicesClient(){
@@ -56,7 +56,7 @@ export default function InvoicesClient(){
  <button onClick={()=>change("line_items",[...form.line_items,{description:"",quantity:1,unit:"stk",unitPriceOre:0,vatRate:25,type:"work"}])}>Legg til linje</button>
  <h3>Sum inkl. MVA: {money(total(form.line_items))}</h3>
  <label>Notater <textarea value={form.notes||""} onChange={e=>change("notes",e.target.value)}/></label>
- <p>Kontonummer: <b>8450 46 22699</b> · Avsender ved senere utsending: faktura@aadland-service.no</p>
+ <p>Kontonummer: <b>8450 46 22699</b> · Avsender ved senere utsending: noreply@aadland-service.no</p>
  <button type="button" onClick={()=>setShowPreview(x=>!x)}>{showPreview?"Skjul forhåndsvisning":"Se ferdig fakturadesign"}</button> <button disabled={busy} onClick={save}>Lagre kladd</button> <button onClick={exportCsv}>Eksporter linjer (CSV)</button> {saved&&<span>{saved}</span>}
  </>:<p>Velg en kladd til venstre.</p>}</section></div>\n <section className="invoicePreviewSection" style={{marginTop:25}}><h2>Slik vil fakturaen se ut</h2><p>Dette er en fakturakladd, ikke en utstedt faktura. Velg «Skriv ut / lagre PDF» og deretter «Lagre som PDF» i utskriftsvinduet.</p><button type="button" onClick={()=>window.print()}>Skriv ut / lagre PDF</button><InvoicePreview invoice={showPreview&&form?form:sample} example={!(showPreview&&form)}/></section></main>;
 }
