@@ -35,6 +35,7 @@ export default function InvoicesClient(){
  const draft=items.find(x=>x.id===active);
  const [form,setForm]=useState(null);
  const [showPreview,setShowPreview]=useState(false);
+ async function downloadPdf(){setBusy(true);setError("");try{const id=showPreview&&form?form.id:"example";const response=await fetch("/api/admin/invoices/pdf?id="+encodeURIComponent(id));if(!response.ok){const data=await response.json().catch(()=>({}));throw Error(data.error||"Kunne ikke lage PDF.");}const blob=await response.blob();const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="Aadland-Service-"+(id==="example"?"TESTFAKTURA":id)+".pdf";a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}catch(e){setError(e.message)}finally{setBusy(false)}}
  useEffect(()=>{setForm(draft?{...draft,customer:{...draft.customer},line_items:draft.line_items.map(x=>({...x}))}:null)},[active,items]);
  const change=(key,value)=>setForm(x=>({...x,[key]:value}));
  const changeLine=(i,key,value)=>setForm(x=>({...x,line_items:x.line_items.map((l,j)=>j===i?{...l,[key]:value}:l)}));
@@ -58,5 +59,5 @@ export default function InvoicesClient(){
  <label>Notater <textarea value={form.notes||""} onChange={e=>change("notes",e.target.value)}/></label>
  <p>Kontonummer: <b>8450 46 22699</b> · Avsender ved senere utsending: noreply@aadland-service.no</p>
  <button type="button" onClick={()=>setShowPreview(x=>!x)}>{showPreview?"Skjul forhåndsvisning":"Se ferdig fakturadesign"}</button> <button disabled={busy} onClick={save}>Lagre kladd</button> <button onClick={exportCsv}>Eksporter linjer (CSV)</button> {saved&&<span>{saved}</span>}
- </>:<p>Velg en kladd til venstre.</p>}</section></div>\n <section className="invoicePreviewSection" style={{marginTop:25}}><h2>Slik vil fakturaen se ut</h2><p>Dette er en fakturakladd, ikke en utstedt faktura. Velg «Skriv ut / lagre PDF» og deretter «Lagre som PDF» i utskriftsvinduet.</p><button type="button" onClick={()=>window.print()}>Skriv ut / lagre PDF</button><InvoicePreview invoice={showPreview&&form?form:sample} example={!(showPreview&&form)}/></section></main>;
+ </>:<p>Velg en kladd til venstre.</p>}</section></div>\n <section className="invoicePreviewSection" style={{marginTop:25}}><h2>Slik vil fakturaen se ut</h2><p>Dette er en fakturakladd, ikke en utstedt faktura. Velg «Skriv ut / lagre PDF» og deretter «Lagre som PDF» i utskriftsvinduet.</p><button type="button" disabled={busy} onClick={downloadPdf}>Last ned faktura som PDF</button> <button type="button" onClick={()=>window.print()}>Skriv ut</button><InvoicePreview invoice={showPreview&&form?form:sample} example={!(showPreview&&form)}/></section></main>;
 }
