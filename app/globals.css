@@ -4292,3 +4292,14 @@ body:has(.customerPage) .customerPage{
  .quoteSupplierPrice{text-align:left}
 }
 @media print{.quoteSupplierSearch{display:none!important}}
+
+/* Print only the branded invoice preview; drafts are not issued invoices. */
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+  body * { visibility: hidden !important; }
+  .invoicePrintable, .invoicePrintable * { visibility: visible !important; }
+  .invoicePrintable { position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 12mm !important; box-sizing: border-box !important; box-shadow: none !important; border: 0 !important; font-size: 11px !important; }
+  .invoicePrintable table { width: 100% !important; }
+  .invoicePrintable tr { break-inside: avoid; }
+  .invoicePrintable, .invoicePrintable * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+}
