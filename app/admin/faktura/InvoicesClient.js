@@ -10,7 +10,7 @@ function InvoicePreview({invoice,example=false}){
  const subtotal=lines.reduce((sum,l)=>sum+Math.round(Number(l.quantity||0)*Number(l.unitPriceOre||0)),0);
  const vat=lines.reduce((sum,l)=>{const net=Math.round(Number(l.quantity||0)*Number(l.unitPriceOre||0));return sum+Math.round(net*Number(l.vatRate||0)/100)},0);
  const fmt=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(ore)||0)/100);
- return <article style={{background:"#fff",color:"#201d18",border:"1px solid #ddd4c5",boxShadow:"0 8px 32px #00000013",padding:"clamp(18px,4vw,48px)",marginTop:16,maxWidth:850}}>
+ return <article className="invoicePrintable" style={{background:"#fff",color:"#201d18",border:"1px solid #ddd4c5",boxShadow:"0 8px 32px #00000013",padding:"clamp(18px,4vw,48px)",marginTop:16,maxWidth:850}}>
   <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"start",borderBottom:"3px solid #c99a49",paddingBottom:25,flexWrap:"wrap"}}>
    <div><img src="/aadland-service-logo.webp" alt="Aadland Service sin originale logo" style={{width:185,maxWidth:"100%",height:"auto",objectFit:"contain"}}/></div>
    <div style={{textAlign:"right"}}><div style={{fontSize:28,fontWeight:900}}>FAKTURA</div><div style={{fontSize:12,color:"#8c342c",fontWeight:700}}>FORHÅNDSVISNING – IKKE UTSTEDT</div></div>
@@ -58,5 +58,5 @@ export default function InvoicesClient(){
  <label>Notater <textarea value={form.notes||""} onChange={e=>change("notes",e.target.value)}/></label>
  <p>Kontonummer: <b>8450 46 22699</b> · Avsender ved senere utsending: faktura@aadland-service.no</p>
  <button type="button" onClick={()=>setShowPreview(x=>!x)}>{showPreview?"Skjul forhåndsvisning":"Se ferdig fakturadesign"}</button> <button disabled={busy} onClick={save}>Lagre kladd</button> <button onClick={exportCsv}>Eksporter linjer (CSV)</button> {saved&&<span>{saved}</span>}
- </>:<p>Velg en kladd til venstre.</p>}</section></div>\n <section style={{marginTop:25}}><h2>Slik vil fakturaen se ut</h2><p>Visningen er en designforhåndsvisning, ikke en gyldig faktura eller PDF.</p><InvoicePreview invoice={showPreview&&form?form:sample} example={!(showPreview&&form)}/></section></main>;
+ </>:<p>Velg en kladd til venstre.</p>}</section></div>\n <section className="invoicePreviewSection" style={{marginTop:25}}><h2>Slik vil fakturaen se ut</h2><p>Dette er en fakturakladd, ikke en utstedt faktura. Velg «Skriv ut / lagre PDF» og deretter «Lagre som PDF» i utskriftsvinduet.</p><button type="button" onClick={()=>window.print()}>Skriv ut / lagre PDF</button><InvoicePreview invoice={showPreview&&form?form:sample} example={!(showPreview&&form)}/></section></main>;
 }
