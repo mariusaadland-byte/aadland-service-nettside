@@ -23,6 +23,13 @@ const nextConfig={
         headers:securityHeaders
       },
       {
+        source:"/api/admin/invoices/pdf",
+        headers:[
+          {key:"X-Frame-Options",value:"SAMEORIGIN"},
+          {key:"Content-Security-Policy",value:"base-uri 'self'; form-action 'self'; frame-ancestors 'self'; object-src 'none'"}
+        ]
+      },
+      {
         source:"/admin/:path*",
         headers:privateHeaders
       },
