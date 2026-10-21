@@ -1,6 +1,7 @@
 import {NextResponse} from "next/server";
 import {db,fromDbRentalItem} from "../../../lib/supabase";
 import {withSupabaseRetry} from "../../../lib/supabaseRetry";
+import {peakRentalBookings} from "../../../lib/rentalAvailability";
 
 function valid(a,b){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(a||"")||!/^\d{4}-\d{2}-\d{2}$/.test(b||"")||b<a)return false;
@@ -106,14 +107,14 @@ export async function GET(req){
 
   const [{data:blocks,error:blockError},{data:bookings,error:bookingError}]=await Promise.all([
    s.from("rental_blocks").select("id").eq("rental_item_id",item.id).lte("start_date",to).gte("end_date",from),
-   s.from("rental_bookings").select("id").eq("rental_item_id",item.id).in("status",["new","confirmed","active"]).lte("start_date",to).gte("end_date",from)
+   s.from("rental_bookings").select("id,start_date,end_date").eq("rental_item_id",item.id).in("status",["new","confirmed","active"]).lte("start_date",to).gte("end_date",from)
   ]);
   if(blockError||bookingError){
    console.error("RENTAL AVAILABILITY ERROR",blockError||bookingError);
    return NextResponse.json({error:"Tilgjengelighet kunne ikke kontrolleres."},{status:500});
   }
   const manuallyBlocked=(blocks?.length||0)>0;
-  const booked=bookings?.length||0;
+  const booked=peakRentalBookings(bookings,start,end,buffer);
   out.push({
    ...item,
    available:item.status==="available"&&!manuallyBlocked&&booked<Math.max(1,Number(item.quantity)||1),
