@@ -63,6 +63,8 @@ export async function GET(req){
    .update({job_reminder_sent_at:claimedAt,updated_at:claimedAt})
    .eq("id",order.id)
    .eq("status","confirmed")
+   .eq("job_confirmation_sent_at",order.job_confirmation_sent_at)
+   .eq("job_start_at",order.job_start_at)
    .is("job_reminder_sent_at",null)
    .select("id")
    .maybeSingle();
