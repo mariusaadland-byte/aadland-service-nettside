@@ -10,8 +10,14 @@ const validLines=lines=>Array.isArray(lines)&&lines.length>0&&lines.length<=120&
 export async function GET(){
  const user=await getAdminUser();if(!allowed(user))return fail("Ingen tilgang.",403);
  const s=db();if(!s)return fail("Database utilgjengelig.",503);
- const {data,error}=await s.from("invoice_drafts").select("id,source_quote_id,customer,title,pricing_model,line_items,due_date,notes,status,created_at,updated_at,installment_index,installment_label,installment_percent,installment_trigger,invoice_number,issued_date,issued_at,sent_at,resend_id,delivery_error").order("created_at",{ascending:false}).limit(150);
- return error?fail("Kunne ikke hente fakturakladder.",500):NextResponse.json({invoices:data});
+ const invoices=[];
+ for(let offset=0;;offset+=500){
+  const {data,error}=await s.from("invoice_drafts").select("id,source_quote_id,customer,title,pricing_model,line_items,due_date,notes,status,created_at,updated_at,installment_index,installment_label,installment_percent,installment_trigger,invoice_number,issued_date,issued_at,sent_at,resend_id,delivery_error,paid_ore,paid_date,payment_updated_at").order("created_at",{ascending:false}).order("id",{ascending:false}).range(offset,offset+499);
+  if(error)return fail("Kunne ikke hente fakturaer.",500);
+  invoices.push(...data);
+  if(data.length<500)break;
+ }
+ return NextResponse.json({invoices});
 }
 export async function POST(req){
  const origin=sameOriginGuard(req);if(origin)return origin;
