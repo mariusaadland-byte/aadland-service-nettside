@@ -188,6 +188,11 @@ export default function InvoicesClient({archiveMode=false}){
  <p style={{fontSize:13}}>{form?.invoice_number?"Utstedt faktura "+form.invoice_number:"Forhåndsvisning – ikke utstedt."}</p>
  <button type="button" disabled={busy} onClick={downloadPdf}>Last ned faktura som PDF</button>{" "}
  <button type="button" onClick={()=>window.print()}>Skriv ut forhåndsvisning</button>
+ {form&&<div style={{display:"flex",flexWrap:"wrap",gap:10,margin:"14px 0",alignItems:"center"}}>
+  <button type="button" disabled={busy||Boolean(form.sent_at)} onClick={sendInvoice}>{busy?"Behandler …":"Fakturer og send på e-post"}</button>
+  <button type="button" onClick={()=>document.getElementById("invoice-vipps-payment")?.scrollIntoView({behavior:"smooth",block:"start"})}>Vipps – åpne betalingsvalg</button>
+  <small>Kontroller kunde, leveringsdato og beløp før du sender eller starter betaling.</small>
+ </div>}
  <InvoicePreview invoice={form||sample} example={!form}/>
  </div>}
  </section></main>;
