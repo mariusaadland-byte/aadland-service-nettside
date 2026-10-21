@@ -56,12 +56,15 @@ export async function PATCH(req){
  if(!validLines(body.lineItems))return fail("Kontroller fakturalinjer, antall og priser.");
  if(!["fixed","hourly","estimate"].includes(body.pricingModel))return fail("Ugyldig prismodell.");
  if(!clean(body.customer?.name))return fail("Kundenavn mangler.");
+ if(typeof body.expectedUpdatedAt!=="string"||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(body.expectedUpdatedAt))return fail("Hent fakturakladden på nytt før lagring.",409);
  const mode=body.dueDateMode??"auto";if(!["auto","manual"].includes(mode))return fail("Ugyldig valg av betalingsfrist.");
  const due=body.dueDate?clean(body.dueDate,10):null;
  if(due&&!/^\d{4}-\d{2}-\d{2}$/.test(due))return fail("Ugyldig forfallsdato.");
  const s=db();if(!s)return fail("Database utilgjengelig.",503);
  const update={title:clean(body.title),customer:{name:clean(body.customer.name),email:clean(body.customer.email),address:clean(body.customer.address,500),phone:clean(body.customer.phone,70),contactId:clean(body.customer.contactId,36),workDescription:clean(body.customer.workDescription,3000),workDate:clean(body.customer.workDate,10),workAddress:clean(body.customer.workAddress,500),paymentMethod:body.customer.paymentMethod==="vipps"?"vipps":"bank"},pricing_model:body.pricingModel,line_items:body.lineItems.map(x=>({description:clean(x.description,500),type:clean(x.type,20),quantity:Number(x.quantity),unit:clean(x.unit,30),unitPriceOre:Number(x.unitPriceOre),vatRate:Number(x.vatRate)})),notes:clean(body.notes,4000),due_date:due,due_date_mode:mode,updated_at:new Date().toISOString()};
- const {data,error}=await s.from("invoice_drafts").update(update).eq("id",body.id).eq("status","draft").select("id").maybeSingle();
- if(error||!data)return fail("Fakturakladden kunne ikke lagres.",500);
- return NextResponse.json({ok:true});
+ const {data,error}=await s.from("invoice_drafts").update(update).eq("id",body.id).eq("status","draft")
+  .eq("updated_at",body.expectedUpdatedAt).select("id,updated_at").maybeSingle();
+ if(error)return fail("Fakturakladden kunne ikke lagres.",500);
+ if(!data)return fail("Kladden er endret eller allerede utstedt i en annen fane. Last inn fakturaen på nytt for å unngå å overskrive nye kundeopplysninger eller priser.",409);
+ return NextResponse.json({ok:true,updatedAt:data.updated_at});
 }
