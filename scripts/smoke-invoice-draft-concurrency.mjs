@@ -66,5 +66,5 @@ assert.ok(ui.includes("Hent siste fakturakladd"),"Offer explicit reload of confl
 assert.ok(ui.includes("Leveringsdato / dato for utført arbeid"),"Offer required work date next to invoice preview");
 assert.ok(ui.includes("Utstede faktura på "), "Confirm irreversible issue for printing");
 assert.ok(ui.includes('if(!window.confirm("Sende faktura"'),"Explicit approval before sending email");
-assert.ok(ui.includes(String.raw`/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/`),"Validate recipient email without accidental double regex escaping");
+assert.ok(ui.includes(String.raw`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`),"Validate recipient email without accidental double regex escaping");
 console.log("Fakturakladd samtidighet bestått: rett revisjon, foreldet kundekort, ingen overskriving, låst faktura og eksplisitt oppdatering.");
