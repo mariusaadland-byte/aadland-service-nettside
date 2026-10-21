@@ -5,6 +5,7 @@ import { nok } from "../../lib/catalog";
 import {osloDateKey,osloDateTimeLocal,osloLocalDateTimeToIso} from "../../lib/osloTime";
 import { useRouter } from "next/navigation";
 import navStyles from "./adminNav.module.css";
+import VippsFeePreview from "./VippsFeePreview";
 
 const ADMIN_IMAGE_TYPES=new Set(["image/jpeg","image/png","image/webp"]);
 const ADMIN_IMAGE_MAX_BYTES=4*1024*1024;
@@ -4397,8 +4398,11 @@ function RentalEditor({item,categories=[],reload,setError,close}){
  <div className="field"><label>Status</label><select value={v.status} onChange={e=>set("status",e.target.value)}><option value="available">Tilgjengelig</option><option value="unavailable">Midlertidig utilgjengelig</option><option value="maintenance">Service/vedlikehold</option><option value="hidden">Skjult</option></select></div>
  <div className="field"><label>Antall</label><input type="number" min="1" value={v.quantity} onChange={e=>set("quantity",e.target.value)}/></div>
  <div className="field"><label>Døgnpris (kr)</label><input type="number" min="0" value={(Number(v.dailyPriceOre)||0)/100} onChange={e=>set("dailyPriceOre",Math.round(Number(e.target.value||0)*100))}/></div>
+ <VippsFeePreview amountOre={Number(v.dailyPriceOre)||0} title="Vipps – døgnpris" note="Eksempel for én betaling av denne prisen. På en flerdagers leie beregnes gebyret av hele leiebeløpet én gang. Depositum er separat." onApply={price=>set("dailyPriceOre",price)} applyLabel="Bruk beregnet døgnpris" disabled={saving}/>
  <div className="field"><label>Helgepris (kr)</label><input type="number" min="0" value={v.weekendPriceOre===""?"":Number(v.weekendPriceOre)/100} onChange={e=>set("weekendPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))}/></div>
+ {v.weekendPriceOre!==""&&<VippsFeePreview amountOre={Number(v.weekendPriceOre)||0} title="Vipps – helgepris" note="Eksempel for én betaling av denne prisen. På en flerdagers leie beregnes gebyret av hele leiebeløpet én gang. Depositum er separat." onApply={price=>set("weekendPriceOre",price)} applyLabel="Bruk beregnet helgepris" disabled={saving}/>}
  <div className="field"><label>Ukepris (kr)</label><input type="number" min="0" value={v.weeklyPriceOre===""?"":Number(v.weeklyPriceOre)/100} onChange={e=>set("weeklyPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))}/></div>
+ {v.weeklyPriceOre!==""&&<VippsFeePreview amountOre={Number(v.weeklyPriceOre)||0} title="Vipps – ukepris" note="Eksempel for én betaling av denne prisen. På en flerdagers leie beregnes gebyret av hele leiebeløpet én gang. Depositum er separat." onApply={price=>set("weeklyPriceOre",price)} applyLabel="Bruk beregnet ukepris" disabled={saving}/>}
  <div className="field"><label>Depositum (kr)</label><input type="number" min="0" value={(Number(v.depositOre)||0)/100} onChange={e=>set("depositOre",Math.round(Number(e.target.value||0)*100))}/></div>
  <div className="field"><label>Buffer mellom utleier (dager)</label><input type="number" min="0" value={v.bufferDays} onChange={e=>set("bufferDays",e.target.value)}/></div><div className="field"><label>Langtidsgrense (dager)</label><input type="number" min="1" value={v.longTermDays} onChange={e=>set("longTermDays",e.target.value)}/></div><div className="field"><label>Langtidsrabatt (%)</label><input type="number" min="0" max="100" value={v.longTermDiscountPercent} onChange={e=>set("longTermDiscountPercent",e.target.value)}/></div>
  <label><input type="checkbox" checked={v.pickupAvailable} onChange={e=>set("pickupAvailable",e.target.checked)}/> Henting mulig</label><br/><label><input type="checkbox" checked={v.deliveryAvailable} onChange={e=>set("deliveryAvailable",e.target.checked)}/> Levering mulig</label><br/><label><input type="checkbox" checked={v.active} onChange={e=>set("active",e.target.checked)}/> Publisert</label>
@@ -4728,6 +4732,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
 
    <section className="orderPaymentPanel rentalPaymentPanel">
     <h4>Leiebetaling</h4>
+    <VippsFeePreview amountOre={Number(b.totalOre)||0} title="Vipps – hele leiebeløpet" note="Depositum inngår ikke i denne beregningen." disabled={savingId===b.id}/>
     {canUpdate&&b.status==="returned"&&!["authorized","paid","refunded"].includes(b.paymentStatus)&&Number(b.paymentCapturedOre||0)===0&&Number(b.totalOre)>=100&&<div className="rentalBookingActions">
      {b.vippsPushEnabled&&<label><input type="checkbox" id={"rental-vipps-consent-"+b.id}/> Kunden har avtalt å motta betalingskrav i Vipps.</label>}
      <button className="btn" type="button" disabled={savingId===b.id||paymentSetupRequired||!b.vippsPushEnabled||!b.customer?.phone} onClick={()=>requestRentalVippsPayment(b)}>{savingId===b.id?"Sender …":"Send betalingskrav med Vipps"}</button>
