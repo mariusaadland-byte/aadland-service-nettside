@@ -64,7 +64,14 @@ export async function GET(req){
  });
  if(error)return NextResponse.json({error:"Kunne ikke søke i materialkatalogen."},{status:500});
  const markupBySupplier=new Map(suppliers.map(row=>[row.id,row.defaultMarkupPercent]));
- return NextResponse.json({suppliers,products:(data||[]).map(row=>({...productRow(row),defaultMarkupPercent:markupBySupplier.get(row.supplier_id)??15}))});
+ const manualSkus=(data||[]).filter(row=>row.supplier_id==="egne-varer").map(row=>row.supplier_sku);
+ const manualPrices=new Map();
+ if(manualSkus.length){
+  const {data:prices,error:priceError}=await s.from("material_supplier_products").select("supplier_sku,sale_ex_vat_ore").eq("supplier_id","egne-varer").in("supplier_sku",manualSkus);
+  if(priceError)return NextResponse.json({error:"Kunne ikke hente lagrede salgspriser."},{status:500});
+  for(const price of prices||[])if(price.sale_ex_vat_ore!=null)manualPrices.set(price.supplier_sku,Number(price.sale_ex_vat_ore)/100);
+ }
+ return NextResponse.json({suppliers,products:(data||[]).map(row=>({...productRow(row),defaultMarkupPercent:markupBySupplier.get(row.supplier_id)??15,...(row.supplier_id==="egne-varer"&&manualPrices.has(row.supplier_sku)?{saleExVat:manualPrices.get(row.supplier_sku)}:{})}))});
 }
 
 export async function PATCH(req){
