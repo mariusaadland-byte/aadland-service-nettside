@@ -9,7 +9,7 @@ export async function GET(req){
  const id=new URL(req.url).searchParams.get("id");
  if(!id)return NextResponse.json({error:"Velg en fakturakladd."},{status:400});
  let invoice;
- if(id==="example")invoice={id:"example",title:"Eksempel - montering og vedlikehold",customer:{name:"Ola Nordmann",address:"Eksempelveien 12, 5000 Bergen"},line_items:[{description:"Tømrerarbeid",quantity:8,unit:"time",unitPriceOre:65000,vatRate:25},{description:"Materialer og festemidler",quantity:1,unit:"stk",unitPriceOre:189000,vatRate:25}],due_date:"2026-11-03"};
+ if(id==="example")invoice={id:"example",title:"Eksempel - montering og vedlikehold",customer:{name:"Ola Nordmann",address:"Eksempelveien 12, 5000 Bergen",workDescription:"Utført montering og tilpasning som avtalt med kunden.\nFakturaen omfatter 8 timer tømrerarbeid samt materialer og festemidler."},line_items:[{description:"Tømrerarbeid",quantity:8,unit:"time",unitPriceOre:65000,vatRate:25},{description:"Materialer og festemidler",quantity:1,unit:"stk",unitPriceOre:189000,vatRate:25}],due_date:"2026-11-03"};
  else{
   const s=db();if(!s)return NextResponse.json({error:"Database utilgjengelig."},{status:503});
   const {data,error}=await s.from("invoice_drafts").select("*").eq("id",id).eq("status","draft").maybeSingle();
