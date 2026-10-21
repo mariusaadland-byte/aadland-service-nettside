@@ -7,9 +7,11 @@ import {costMapFromLines} from "../../../../lib/quotePrivateCosts";
 
 const STATUSES=["draft","sent","accepted","declined","expired","cancelled","superseded"];
 const SETUP_CODES=["42P01","42883","42703"];
-async function savePrivateCosts(s,id,lines,markup,paymentMethod){
+async function savePrivateCosts(s,id,lines,markup,paymentMethod,directInvoice,skipQuoteApproval){
  const costs=costMapFromLines(lines);
  costs.__pricingPaymentMethod=paymentMethod==="vipps"?"vipps":"bank";
+ costs.__directInvoice=directInvoice===true;
+ costs.__skipQuoteApproval=directInvoice===true&&skipQuoteApproval===true;
  if(markup!==""&&markup!=null&&Number.isFinite(Number(markup))&&Number(markup)>=0&&Number(markup)<=1000)costs.__quoteMaterialMarkupPercent=Number(markup);
  const {error}=await s.from("quote_internal_costs").upsert({
   quote_id:id,line_costs:costs,updated_at:new Date().toISOString()
@@ -80,7 +82,8 @@ function sanitizeCustomer(value){
   name:clean(c.name,180),
   email:clean(c.email,240).toLowerCase(),
   phone:clean(c.phone,80),
-  address:clean(c.address,500)
+  address:clean(c.address,500),
+  contactId:/^[0-9a-f-]{36}$/i.test(String(c.contactId||""))?String(c.contactId):""
  };
 }
 function sanitizeLines(value){
@@ -253,7 +256,12 @@ export async function GET(req){
    }catch{}
   }
   const privateData=await readPrivateCosts(s,id);
-  return NextResponse.json({quote:{...mapQuote(data),internalCosts:privateData.costs,quoteMaterialMarkupPercent:privateData.costs.__quoteMaterialMarkupPercent??null,pricingPaymentMethod:privateData.costs.__pricingPaymentMethod==="vipps"?"vipps":"bank",privateCostsUnavailable:privateData.error,sendHistory,revisionHistory},followUpSetupRequired});
+  let directInvoiceId=null;
+  if(privateData.costs.__directInvoice===true){
+   const linked=await s.from("invoice_drafts").select("id").eq("source_quote_id",id).eq("installment_index",0).maybeSingle();
+   if(!linked.error)directInvoiceId=linked.data?.id||null;
+  }
+  return NextResponse.json({quote:{...mapQuote(data),internalCosts:privateData.costs,quoteMaterialMarkupPercent:privateData.costs.__quoteMaterialMarkupPercent??null,pricingPaymentMethod:privateData.costs.__pricingPaymentMethod==="vipps"?"vipps":"bank",directInvoice:privateData.costs.__directInvoice===true,skipQuoteApproval:privateData.costs.__skipQuoteApproval===true,directInvoiceId,privateCostsUnavailable:privateData.error,sendHistory,revisionHistory},followUpSetupRequired});
  }
  return NextResponse.json({quotes:(data||[]).map(mapQuote),followUpSetupRequired});
 }
@@ -286,7 +294,7 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
   if(SETUP_CODES.includes(error.code))return NextResponse.json({error:"Databaseoppdatering mangler for tilbudssystemet.",setupRequired:true},{status:503});
   return NextResponse.json({error:"Tilbudet kunne ikke lagres."},{status:500});
  }
- const privateError=await savePrivateCosts(s,data.id,body.lineItems,body.quoteMaterialMarkupPercent,body.pricingPaymentMethod);
+ const privateError=await savePrivateCosts(s,data.id,body.lineItems,body.quoteMaterialMarkupPercent,body.pricingPaymentMethod,body.directInvoice,body.skipQuoteApproval);
  if(privateError)return NextResponse.json({error:"Tilbudet ble lagret, men interne kostnader kunne ikke lagres. Åpne tilbudet igjen og kontroller kostnadene.",quoteId:data.id},{status:500});
  return NextResponse.json({quote:mapQuote(data)});
 }
@@ -315,6 +323,11 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
 
  const {data:existing,error:findError}=await s.from("quotes").select("*").eq("id",id).maybeSingle();
  if(findError||!existing)return NextResponse.json({error:"Tilbudet ble ikke funnet."},{status:404});
+ if(existing.status==="draft"){
+  const invoiced=await s.from("invoice_drafts").select("id").eq("source_quote_id",id).eq("installment_index",0).maybeSingle();
+  if(invoiced.error)return NextResponse.json({error:"Tilknyttede fakturaer kunne ikke kontrolleres."},{status:500});
+  if(invoiced.data)return NextResponse.json({error:"Det er allerede laget faktura fra dette tilbudet. Åpne og rediger fakturakladden i stedet.",invoiceId:invoiced.data.id},{status:409});
+ }
  if(existing.status!=="draft"){
   return NextResponse.json({
    error:existing.status==="sent"?"Sendte tilbud er låst. Opprett en revisjon for å gjøre endringer.":"Dette tilbudet er låst og kan ikke redigeres.",
@@ -344,7 +357,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
  }
  const {data,error}=updateResult;
  if(error)return NextResponse.json({error:"Tilbudet kunne ikke lagres."},{status:500});
- const privateError=await savePrivateCosts(s,id,body.lineItems,body.quoteMaterialMarkupPercent,body.pricingPaymentMethod);
+ const privateError=await savePrivateCosts(s,id,body.lineItems,body.quoteMaterialMarkupPercent,body.pricingPaymentMethod,body.directInvoice,body.skipQuoteApproval);
  if(privateError)return NextResponse.json({error:"Tilbudslinjene er lagret, men interne kostnader ble ikke lagret. Prøv igjen.",quoteId:id},{status:500});
  return NextResponse.json({quote:mapQuote(data)});
 }
