@@ -23,7 +23,7 @@ export default function VippsFeePreview({amountOre,title="Vipps – intern prisb
    {allowPriceAdjustment&&<label htmlFor={id+"-target"}>Ønsket utbetaling før mva-oppgjør (kr)<input id={id+"-target"} type="text" inputMode="decimal" value={target} disabled={disabled} onChange={e=>setTarget(e.target.value)}/></label>}
    {suggestion&&<div aria-live="polite"><p>Ordinær kundepris inkl. mva.: <b>{money(suggestion.amountOre)}</b><br/>Anslått Vipps-kostnad: {money(suggestion.feeOre)}<br/>Anslått utbetaling: <b>{money(suggestion.payoutOre)}</b></p>{onApply&&<button type="button" disabled={disabled} onClick={()=>onApply(suggestion.amountOre)}>{applyLabel}</button>}</div>}
    {allowPriceAdjustment&&target&&!suggestion&&<p role="status">Oppgi et gyldig beløp og en sats under 100 %.</p>}
-   {!allowPriceAdjustment&&<p style={{fontSize:12}}>Ingen materialer eller andre varelinjer å justere. Timeprisen endres aldri; Vipps-kostnaden dekkes av bedriften.</p>}
+   {!allowPriceAdjustment&&<p style={{fontSize:12}}>{noPriceAdjustmentText}</p>}
    <p style={{fontSize:12}}>Beregningen er intern. Kunden ser den ordinære prisen, som må være avtalt før bestilling. Beregningssatsen lagres ikke i Vipps-avtalen.</p>
   </details>
  </section>;
