@@ -546,7 +546,6 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   setError("");setSavedMessage("");
   if(!v.directInvoice||!v.skipQuoteApproval){setError("Huk av begge valgene for direkte fakturering øverst.");return;}
   if(!v.customer.contactId){setError("Velg en eksisterende kunde eller opprett et kundekort før fakturering.");return;}
-  if(!v.customer.address.trim()){setError("Fyll inn kundens adresse på kundekortet før fakturering.");return;}
   if(calc.total<=0){setError("Fakturaen må ha en sum over null.");return;}
   if(directInvoiceId){router.push("/admin/faktura?id="+encodeURIComponent(directInvoiceId)+"&preview=1");return;}
   if(!window.confirm("Bekrefter du at arbeidet og prisen er avtalt med kunden? Det opprettes én fakturakladd uten tilbudsgodkjenning. Ingenting blir sendt eller belastet nå."))return;
