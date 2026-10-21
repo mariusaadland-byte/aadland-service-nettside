@@ -10,7 +10,7 @@ const validLines=lines=>Array.isArray(lines)&&lines.length>0&&lines.length<=120&
 export async function GET(){
  const user=await getAdminUser();if(!allowed(user))return fail("Ingen tilgang.",403);
  const s=db();if(!s)return fail("Database utilgjengelig.",503);
- const {data,error}=await s.from("invoice_drafts").select("*").order("created_at",{ascending:false}).limit(150);
+ const {data,error}=await s.from("invoice_drafts").select("id,source_quote_id,customer,title,pricing_model,line_items,due_date,notes,status,created_at,updated_at,installment_index,installment_label,installment_percent,installment_trigger,invoice_number,issued_date,issued_at,sent_at,resend_id,delivery_error").order("created_at",{ascending:false}).limit(150);
  return error?fail("Kunne ikke hente fakturakladder.",500):NextResponse.json({invoices:data});
 }
 export async function POST(req){
@@ -42,7 +42,7 @@ export async function PATCH(req){
  const due=body.dueDate?clean(body.dueDate,10):null;
  if(due&&!/^\d{4}-\d{2}-\d{2}$/.test(due))return fail("Ugyldig forfallsdato.");
  const s=db();if(!s)return fail("Database utilgjengelig.",503);
- const update={title:clean(body.title),customer:{name:clean(body.customer.name),email:clean(body.customer.email),address:clean(body.customer.address,500),workDescription:clean(body.customer.workDescription,3000)},pricing_model:body.pricingModel,line_items:body.lineItems.map(x=>({description:clean(x.description,500),type:clean(x.type,20),quantity:Number(x.quantity),unit:clean(x.unit,30),unitPriceOre:Number(x.unitPriceOre),vatRate:Number(x.vatRate)})),notes:clean(body.notes,4000),due_date:due,updated_at:new Date().toISOString()};
+ const update={title:clean(body.title),customer:{name:clean(body.customer.name),email:clean(body.customer.email),address:clean(body.customer.address,500),phone:clean(body.customer.phone,70),contactId:clean(body.customer.contactId,36),workDescription:clean(body.customer.workDescription,3000),workDate:clean(body.customer.workDate,10),workAddress:clean(body.customer.workAddress,500)},pricing_model:body.pricingModel,line_items:body.lineItems.map(x=>({description:clean(x.description,500),type:clean(x.type,20),quantity:Number(x.quantity),unit:clean(x.unit,30),unitPriceOre:Number(x.unitPriceOre),vatRate:Number(x.vatRate)})),notes:clean(body.notes,4000),due_date:due,updated_at:new Date().toISOString()};
  const {data,error}=await s.from("invoice_drafts").update(update).eq("id",body.id).eq("status","draft").select("id").maybeSingle();
  if(error||!data)return fail("Fakturakladden kunne ikke lagres.",500);
  return NextResponse.json({ok:true});
