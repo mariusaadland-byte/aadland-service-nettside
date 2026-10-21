@@ -749,7 +749,6 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     <div className="quoteEditorHeaderActions">
      {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Forhåndsvis / last ned PDF</button>}
      {quoteId&&["draft","sent"].includes(v.status)&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
-}
      {quoteId&&v.status==="draft"&&!paperIssuedAt&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
      {quoteId&&v.status==="sent"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy} onClick={registerPaperIssue}>Registrer utlevert på papir</button>}
      {quoteId&&v.status==="sent"&&<button type="button" className="btn alt" disabled={paperBusy} onClick={openPaperAcceptance}>Registrer papirgodkjenning</button>}
@@ -994,7 +993,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
        <small>Fakturaen åpnes for kontroll. Du velger selv når du sender den. Fakturaforfall hentes fra kundekortet.</small>
        {directInvoiceId?<Link href={"/admin/faktura?id="+directInvoiceId+"&preview=1"} className="btn">Åpne faktura →</Link>:
        <button type="button" className="btn" disabled={saving||billing||Boolean(locked)} onClick={makeDirectInvoice}>{billing?"Klargjør faktura …":"Fakturer →"}</button>}
-      </section>
+      </section>}
      {quoteId&&v.status==="draft"&&!paperIssuedAt&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
      {quoteId&&v.status==="sent"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy} onClick={registerPaperIssue}>Registrer utlevert på papir</button>}
      {quoteId&&v.status==="sent"&&<button type="button" className="btn alt" disabled={paperBusy} onClick={openPaperAcceptance}>Registrer papirgodkjenning</button>}
