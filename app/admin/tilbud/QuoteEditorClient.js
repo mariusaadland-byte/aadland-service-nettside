@@ -375,7 +375,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   if(!rawDescription)return false;
   const description=(suggestConsumable(product.name)?consumablePrefix:"")+rawDescription;
   const quantity=1,unit=String(product.unit||"stk").trim().slice(0,40)||"stk";
-  const unitPriceOre=Math.max(0,Math.round((Number(product.costExVat)||0)*(1+Math.max(0,markup)/100)*100));
+  const unitPriceOre=product.saleExVat!=null?Math.max(0,Math.round(Number(product.saleExVat)*100)):Math.max(0,Math.round((Number(product.costExVat)||0)*(1+Math.max(0,markup)/100)*100));
   setV(current=>{
    const old=current.lineItems;
    const blank=old.length===1&&!String(old[0].description||"").trim()&&old[0].unitPriceOre==="";
