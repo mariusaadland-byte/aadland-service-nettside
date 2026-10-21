@@ -1005,7 +1005,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      {quoteId&&["draft","sent"].includes(v.status)&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={()=>sendQuote()}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
      {!locked&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn" disabled={saving||sending||converting} onClick={()=>save()}>{saving?"Lagrer …":"Lagre tilbud"}</button>}
      {quoteId&&["draft","sent"].includes(v.status)&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
-     {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Forhåndsvis / last ned PDF</button>}
+     {quoteId&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Forhåndsvis / last ned PDF</button>}
      {quoteId&&<div className="quoteHistory">
       <div className="kicker">HISTORIKK</div>
       {revisionHistory.length>1&&<div className="quoteRevisionHistory">
