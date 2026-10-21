@@ -8,6 +8,7 @@ import {rentalBookingSiteUrl,rentalEmailFrom,rentalReplyTo,rentalResendApiKey} f
 import {sendManualRentalRefundNotice} from "../../../../lib/rentalRefundNotice";
 import {sendRentalConfirmation} from "../../../../lib/rentalConfirmationEmail";
 import {peakRentalBookings} from "../../../../lib/rentalAvailability";
+import {startRentalVippsPayment} from "../../../../lib/startRentalVippsPayment";
 
 async function canView(){
  return Boolean(await getAdminUser())&&Boolean(await hasPermission("canViewOrders"));
@@ -33,6 +34,7 @@ const map=b=>({
  itemId:b.rental_item_id,
  itemName:b.rental_items?.name||"",
  customer:b.customer||{},
+ vippsPushEnabled:process.env.VIPPS_RENTAL_PUSH_ENABLED==="true",
  customerUserId:b.customer_user_id||null,
  startDate:b.start_date,
  endDate:b.end_date,
@@ -215,6 +217,10 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
  if(currentError||!current)return NextResponse.json({error:"Bookingen ble ikke funnet."},{status:404});
 
  const action=String(b.action||"");
+ if(action==="request-vipps-payment"){
+  const result=await startRentalVippsPayment({s,booking:current,req,logContext:"admin-rental-push",userFlow:"PUSH_MESSAGE",customerConsent:b.customerConsent===true});
+  return NextResponse.json(result.body,{status:result.status});
+ }
  let item=current.rental_items||null;
 
  if(action==="confirm-and-send"&&!["new","confirmed"].includes(current.status)){
