@@ -36,6 +36,7 @@ export async function GET(){
  if(!s)return NextResponse.json({error:"Kundekonto er ikke tilgjengelig akkurat nå."},{status:503});
 
  const customerEmail=String(customer.email||"").trim().toLowerCase();
+ if(!customerEmail)return NextResponse.json({error:"Kundekontoen mangler e-postadresse. Kontakt oss for hjelp."},{status:403});
  if(customerEmail){
   const [orderLink,rentalLink]=await Promise.all([
    s.from("orders").update({customer_user_id:customer.id})
@@ -102,11 +103,13 @@ export async function GET(){
  if(customOrderIds.length){
   const {data:linkedQuotes,error:linkedQuoteError}=await s.from("quotes")
    .select("id,quote_number,title,total_inc_vat_ore,payment_plan,planned_start_date,converted_order_id,customer")
-   .in("converted_order_id",customOrderIds);
+   .in("converted_order_id",customOrderIds)
+   .contains("customer",{email:customerEmail})
+   .in("status",["sent","accepted","declined","expired","cancelled","superseded"]);
 
   if(!linkedQuoteError){
    for(const quote of linkedQuotes||[]){
-    if(!quote.converted_order_id)continue;
+    if(!quote.converted_order_id||String(quote.customer?.email||"").trim().toLowerCase()!==customerEmail)continue;
     let href=null;
     try{
      const token=createQuoteToken(quote);
@@ -221,5 +224,5 @@ export async function GET(){
   quotes,
   drawings,
   quoteSetupRequired
- });
+ },{headers:{"Cache-Control":"private, no-store, max-age=0","Vary":"Cookie"}});
 }
