@@ -1,0 +1,10 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('lib/invoicePaymentStatus.js','utf8').replaceAll('export function ','function ');
+const context={};vm.createContext(context);vm.runInContext(source,context);
+const invoice={status:'sent',due_date:'2026-10-28',paid_ore:0,line_items:[{quantity:8,unitPriceOre:35000,vatRate:25},{quantity:1,unitPriceOre:78300,vatRate:25},{quantity:1,unitPriceOre:290320,vatRate:25},{quantity:1,unitPriceOre:68930,vatRate:25}]};
+const state=(x,today='2026-10-21')=>context.invoicePaymentState({...invoice,...x},today);
+assert.equal(state({}).total,896938);assert.equal(state({}).key,'unpaid');assert.equal(state({},'2026-10-28').key,'unpaid');assert.equal(state({},'2026-10-29').key,'overdue');
+assert.equal(state({paid_ore:10000}).key,'partial');assert.equal(state({paid_ore:10000}).outstanding,886938);assert.equal(state({paid_ore:10000},'2026-10-29').key,'overdue');
+assert.equal(state({paid_ore:896938}).key,'paid');assert.equal(state({paid_ore:896938}).outstanding,0);assert.equal(state({status:'draft'},'2026-10-29').key,'draft');
+assert.equal(state({paid_ore:0}).outstanding,896938);
+console.log('PASS: VAT totals; unpaid; due today; overdue; partial; paid; reversed balance; draft excluded from debt status.');
