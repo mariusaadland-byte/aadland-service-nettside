@@ -4767,10 +4767,10 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
     <div className="field"><label>Depositumreferanse</label><input id={"rental-deposit-reference-"+b.id} defaultValue={b.depositReference||""} maxLength={120} placeholder="F.eks. Vipps-ref. eller bank"/></div>
     {canUpdate&&<div className="rentalBookingActions">
      <button className="btn alt" type="button" disabled={savingId===b.id||paymentSetupRequired||b.depositStatus!=="not_paid"} onClick={()=>holdDeposit(b)}>Registrer mottatt/holdt</button>
-     <button className="btn alt" type="button" disabled={savingId===b.id||paymentSetupRequired||!["held","partially_charged"].includes(b.depositStatus)} onClick={()=>releaseDeposit(b)}>Frigi depositum</button>
+     <button className="btn alt" type="button" disabled={savingId===b.id||paymentSetupRequired||Boolean(b.depositReleasedAt)||!["held","partially_charged"].includes(b.depositStatus)} onClick={()=>releaseDeposit(b)}>Frigi depositum</button>
     </div>}
     <div className="field"><label>Beløp brukt av depositum (kr)</label><input id={"rental-deposit-charge-"+b.id} type="number" min="0" step="0.01" max={(Number(b.depositOre)||0)/100} defaultValue={b.depositChargedOre?((Number(b.depositChargedOre)||0)/100).toFixed(2):""} placeholder="0,00"/></div>
-    {canUpdate&&<button className="btn alt" type="button" disabled={savingId===b.id||paymentSetupRequired||!["held","partially_charged","charged"].includes(b.depositStatus)} onClick={()=>chargeDeposit(b)}>Registrer brukt beløp</button>}
+    {canUpdate&&<button className="btn alt" type="button" disabled={savingId===b.id||paymentSetupRequired||Boolean(b.depositReleasedAt)||!["held","partially_charged","charged"].includes(b.depositStatus)} onClick={()=>chargeDeposit(b)}>Registrer brukt beløp</button>}
     {(b.depositReceivedAt||b.depositReleasedAt)&&<div className="rentalNotificationState">
      {b.depositReceivedAt&&<span>Mottatt/holdt {new Date(b.depositReceivedAt).toLocaleString("nb-NO")}</span>}
      {b.depositReleasedAt&&<span>Frigitt {new Date(b.depositReleasedAt).toLocaleString("nb-NO")}</span>}
