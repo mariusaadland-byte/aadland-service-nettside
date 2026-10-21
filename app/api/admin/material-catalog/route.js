@@ -14,7 +14,7 @@ function supplierRow(row){
   id:row.id,
   name:row.name,
   isPrimary:row.is_primary===true,
-  defaultMarkupPercent:Number(row.default_markup_percent)||15,
+  defaultMarkupPercent:Number(row.default_markup_percent??15),
   lastImportAt:row.last_import_at||null,
   lastSourceFilename:row.last_source_filename||""
  };
