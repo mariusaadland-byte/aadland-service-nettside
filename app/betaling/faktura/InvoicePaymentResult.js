@@ -1,20 +1,48 @@
 "use client";
 import {useEffect,useState} from "react";
+
+const terminalWithReceipt=(status,receipt)=>status==="cancelled"||status==="refunded"||(status==="paid"&&receipt);
 export default function InvoicePaymentResult(){
- const [status,setStatus]=useState("pending"),[error,setError]=useState(""),[receipt,setReceipt]=useState(false),[retry,setRetry]=useState(0);
+ const [status,setStatus]=useState("pending");
+ const [error,setError]=useState("");
+ const [receipt,setReceipt]=useState(false);
+ const [retry,setRetry]=useState(0);
+ const [checking,setChecking]=useState(true);
  useEffect(()=>{
   let stopped=false,timer,attempts=0;
   const reference=new URLSearchParams(window.location.search).get("reference");
   async function check(){
+   if(!reference){
+    setChecking(false);setError("Betalingsreferansen mangler. Bruk lenken du fikk fra Aadland Service.");return;
+   }
    try{
-    const r=await fetch("/api/invoice-vipps-status",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reference})});
-    const d=await r.json();if(stopped)return;if(!r.ok)throw Error(d.error);
-    setStatus(d.status);setReceipt(d.receiptSent);setError("");
-    if(["paid","cancelled","refunded"].includes(d.status))return;
+    const r=await fetch("/api/invoice-vipps-status",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reference}),cache:"no-store"});
+    const d=await r.json();if(stopped)return;
+    if(!r.ok)throw Error(d.error||"Status kunne ikke hentes.");
+    setStatus(d.status);setReceipt(Boolean(d.receiptSent));setError("");
+    // A successful payment can be registered before the receipt email is confirmed.
+    // Keep checking that receipt separately, without suggesting the user pay again.
+    if(terminalWithReceipt(d.status,Boolean(d.receiptSent))){setChecking(false);return;}
    }catch(e){if(stopped)return;setError(e.message||"Status kunne ikke hentes.");}
    if(++attempts<20)timer=setTimeout(check,5000);
+   else setChecking(false);
   }
-  check();return ()=>{stopped=true;clearTimeout(timer)};
+  setChecking(true);check();
+  return ()=>{stopped=true;clearTimeout(timer)};
  },[retry]);
- return <main className="container" style={{maxWidth:650,padding:"48px 20px"}}><h1>{status==="paid"?"Takk for betalingen!":status==="cancelled"?"Betalingen ble ikke fullført":status==="refunded"?"Betalingen er refundert":"Vi kontrollerer betalingen"}</h1><p>{status==="paid"?(receipt?"Fakturaen er registrert som betalt. Kvittering er sendt på e-post.":"Fakturaen er registrert som betalt. Kvitteringen sendes på e-post."):status==="cancelled"?"Kontakt Aadland Service for en ny betalingslenke.":"Du får bekreftelse her når betalingen er kontrollert hos Vipps."}</p>{error&&<p role="status">{error}</p>}{status!=="paid"&&<button onClick={()=>setRetry(x=>x+1)}>Kontroller status igjen</button>}<p><a href="/">Til Aadland Service</a></p></main>;
+ const paid=status==="paid",refunded=status==="refunded",cancelled=status==="cancelled",partial=status==="partial";
+ const title=paid?"Takk for betalingen!":refunded?"Betalingen er refundert":cancelled?"Betalingen ble ikke fullført":partial?"Delbetaling registrert":"Vi kontrollerer betalingen";
+ const message=paid?(receipt?"Fakturaen er registrert som betalt. Kvittering er sendt på e-post.":"Fakturaen er registrert som betalt. Vi kontrollerer at kvitteringen er sendt til e-posten din. Du trenger ikke betale på nytt.")
+  :refunded?"Betalingen er refundert. Kontakt Aadland Service ved spørsmål."
+  :cancelled?"Kontakt Aadland Service for en ny betalingslenke."
+  :partial?"Vi har registrert en delbetaling. Aadland Service kan hjelpe deg med eventuelt restbeløp."
+  :"Du får bekreftelse her når betalingen er kontrollert hos Vipps.";
+ return <main className="container" style={{maxWidth:650,padding:"48px 20px"}}>
+  <h1>{title}</h1><p>{message}</p>
+  {checking&&<p role="status">{paid&&!receipt?"Kontrollerer kvitteringen …":"Kontrollerer betalingsstatus …"}</p>}
+  {error&&<p role="status">{error}</p>}
+  {!checking&&paid&&!receipt&&<p>Kvitteringen er ikke bekreftet sendt ennå. Betalingen er registrert, så ikke betal på nytt. Du kan kontrollere kvitteringsstatus igjen eller kontakte Aadland Service.</p>}
+  {!checking&&!terminalWithReceipt(status,receipt)&&<button type="button" onClick={()=>{setError("");setRetry(n=>n+1)}}>Kontroller status igjen</button>}
+  <p><a href="/">Til Aadland Service</a></p>
+ </main>;
 }

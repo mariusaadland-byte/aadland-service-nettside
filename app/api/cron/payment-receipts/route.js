@@ -110,15 +110,30 @@ export async function GET(req){
  }
 
  // Recover missed callbacks and retry frozen invoice receipts without duplicate payments.
+ // Report invoice receipt errors too: reconcileInvoiceVipps may correctly record the
+ // payment while leaving a retryable receipt error, which must not look like success.
  const invoiceRows=await s.from("invoice_vipps_payments").select("reference").or("state.in.(pending,authorized),and(captured_ore.gt.0,receipt_sent_at.is.null,refunded_ore.eq.0)").order("updated_at",{ascending:true}).limit(LIMIT_PER_TYPE);
  if(invoiceRows.error)failures.push({type:"invoice-query",error:"Fakturaer kunne ikke hentes."});
- for(const p of invoiceRows.data||[]){try{await reconcileInvoiceVipps(s,p.reference);}catch(e){failures.push({type:"invoice",reference:p.reference,error:String(e.message).slice(0,180)});}}
+ let invoiceChecked=0,invoicePaid=0,invoiceReceiptSent=0,invoiceReceiptPending=0;
+ for(const row of invoiceRows.data||[]){
+  invoiceChecked++;
+  try{
+   const result=await reconcileInvoiceVipps(s,row.reference);
+   if(result.state==="paid"||result.state==="partial")invoicePaid++;
+   if(result.receipt_sent_at)invoiceReceiptSent++;
+   else if(Number(result.captured_ore)>Number(result.refunded_ore)&&Number(result.captured_ore)>0){
+    invoiceReceiptPending++;
+    if(result.receipt_error)failures.push({type:"invoice-receipt",reference:row.reference,error:String(result.receipt_error).slice(0,180)});
+   }
+  }catch(e){failures.push({type:"invoice",reference:row.reference,error:String(e.message).slice(0,180)});}
+ }
  return NextResponse.json({
   ok:true,
-  checked:serviceIds.length+rentalIds.length+rentalConfirmationIds.length+serviceRefundIds.length+rentalRefundIds.length,
+  checked:serviceIds.length+rentalIds.length+rentalConfirmationIds.length+serviceRefundIds.length+rentalRefundIds.length+invoiceChecked,
   receipt:{checked:serviceIds.length+rentalIds.length,sent,skipped},
   rentalConfirmation:{checked:rentalConfirmationIds.length,sent:confirmationSent,skipped:confirmationSkipped},
   refund:{checked:serviceRefundIds.length+rentalRefundIds.length,sent:refundSent,skipped:refundSkipped},
+  invoice:{checked:invoiceChecked,paidOrPartial:invoicePaid,receiptConfirmed:invoiceReceiptSent,receiptPending:invoiceReceiptPending},
   failed:failures.length,
   failures
  });
