@@ -20,16 +20,13 @@ export default function PlanJobClient({jobId}){
 
  async function load(){
   setLoading(true);setError("");
-  const r=await fetch("/api/admin/jobs/plan?id="+encodeURIComponent(jobId));
-  const d=await r.json().catch(()=>({}));
-  setLoading(false);
-  if(!r.ok){
-   setError(d.setupRequired?"Databaseoppdatering mangler for planlegging av oppdrag.":(d.error||"Oppdraget kunne ikke lastes."));
-   return;
-  }
-  setJob(d.job);
-  setStartAt(osloDateTimeLocal(d.job.startAt));
-  setAgreement(d.job.agreement||"");
+  try{
+   const r=await fetch("/api/admin/jobs/plan?id="+encodeURIComponent(jobId),{cache:"no-store"});
+   const d=await r.json().catch(()=>({}));
+   if(!r.ok)throw new Error(d.setupRequired?"Databaseoppdatering mangler for planlegging av oppdrag.":(d.error||"Oppdraget kunne ikke lastes."));
+   setJob(d.job);setStartAt(osloDateTimeLocal(d.job.startAt));setAgreement(d.job.agreement||"");
+  }catch(err){setError(err.message||"Oppdraget kunne ikke lastes. Kontroller nettet og prøv igjen.");}
+  finally{setLoading(false);}
  }
 
  useEffect(()=>{load()},[jobId]);
@@ -43,40 +40,38 @@ export default function PlanJobClient({jobId}){
  }
 
  async function save(){
+  if(saving||sending)return false;
   setSaving(true);setError("");setMessage("");
-  let body;
-  try{body=payload();if(startAt&&!body.startAt)throw new Error()}catch{setSaving(false);setError("Velg gyldig oppstartstid i Oslo-tid.");return false}
-  const r=await fetch("/api/admin/jobs/plan",{
-   method:"PATCH",
-   headers:{"Content-Type":"application/json"},
-   body:JSON.stringify(body)
-  });
-  const d=await r.json().catch(()=>({}));
-  setSaving(false);
-  if(!r.ok){setError(d.error||"Planen kunne ikke lagres.");return false}
-  setJob(current=>({...current,...d.job}));
-  setMessage("Planen er lagret.");
-  return true;
+  try{
+   const body=payload();
+   if(startAt&&!body.startAt)throw new Error("Velg gyldig oppstartstid i Oslo-tid.");
+   const r=await fetch("/api/admin/jobs/plan",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+   const d=await r.json().catch(()=>({}));
+   if(!r.ok)throw new Error(d.error||"Planen kunne ikke lagres.");
+   setJob(current=>({...current,...d.job}));
+   setMessage(d.job.confirmationSentAt?"Planen er lagret.":"Planen er lagret. Send bekreftelse slik at kunden får gjeldende avtale.");
+   return true;
+  }catch(err){setError(err.message||"Planen kunne ikke lagres. Kontroller nettet og prøv igjen.");return false;}
+  finally{setSaving(false);}
  }
 
  async function send(){
+  if(saving||sending)return;
   if(!startAt){setError("Velg avtalt oppstart først.");return}
   if(!agreement.trim()){setError("Skriv hva som er avtalt videre med kunden.");return}
   const email=job?.customer?.email||"kunden";
   if(!window.confirm("Lagre planen og sende bekreftelse til "+email+"?"))return;
   setSending(true);setError("");setMessage("");
-  let body;
-  try{body=payload();if(startAt&&!body.startAt)throw new Error()}catch{setSending(false);setError("Velg gyldig oppstartstid i Oslo-tid.");return}
-  const r=await fetch("/api/admin/jobs/plan",{
-   method:"POST",
-   headers:{"Content-Type":"application/json"},
-   body:JSON.stringify(body)
-  });
-  const d=await r.json().catch(()=>({}));
-  setSending(false);
-  if(!r.ok){setError(d.error||"Bekreftelsen kunne ikke sendes.");return}
-  setJob(current=>({...current,startAt:body.startAt,agreement:body.agreement,confirmationSentAt:d.sentAt||new Date().toISOString()}));
-  setMessage("Bekreftelse er sendt til "+(d.sentTo||email)+".");
+  try{
+   const body=payload();
+   if(startAt&&!body.startAt)throw new Error("Velg gyldig oppstartstid i Oslo-tid.");
+   const r=await fetch("/api/admin/jobs/plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+   const d=await r.json().catch(()=>({}));
+   if(!r.ok){await load();throw new Error(d.error||"Bekreftelsen kunne ikke sendes.");}
+   setJob(current=>({...current,startAt:body.startAt,agreement:body.agreement,confirmationSentAt:d.sentAt||new Date().toISOString()}));
+   setMessage("Bekreftelse er sendt til "+(d.sentTo||email)+".");
+  }catch(err){setError(err.message||"Bekreftelsen kunne ikke bekreftes sendt. Last inn planen før du prøver igjen.");}
+  finally{setSending(false);}
  }
 
  if(loading)return <main className="jobPlanningPage"><div className="card">Laster oppdrag …</div></main>;
