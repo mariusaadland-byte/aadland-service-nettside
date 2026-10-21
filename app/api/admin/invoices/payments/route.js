@@ -10,7 +10,7 @@ export async function GET(req){
  if(!allowed(await getAdminUser()))return fail("Ingen tilgang.",403);
  const invoiceId=new URL(req.url).searchParams.get("invoiceId");if(!uuid(invoiceId))return fail("Velg en faktura.");
  const s=db();if(!s)return fail("Database utilgjengelig.",503);
- const {data,error}=await s.from("invoice_payments").select("id,invoice_id,amount_ore,paid_on,note,recorded_at,reversed_at").eq("invoice_id",invoiceId).order("recorded_at",{ascending:false});
+ const {data,error}=await s.from("invoice_payments").select("id,invoice_id,amount_ore,paid_on,note,recorded_at,reversed_at,vipps_reference").eq("invoice_id",invoiceId).order("recorded_at",{ascending:false});
  if(error)return fail("Betalingshistorikken kunne ikke hentes.",500);
  return NextResponse.json({payments:data});
 }
