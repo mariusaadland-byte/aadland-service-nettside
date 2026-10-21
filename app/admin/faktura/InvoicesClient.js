@@ -162,7 +162,7 @@ export default function InvoicesClient({archiveMode=false}){
   if(!form||busy)return;
   const recipient=String(form.customer?.email||"").trim();
   if(!recipient){setError("Fyll inn kundens e-postadresse på kundekortet før sending.");return;}
-  if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(recipient)){setError("Fyll inn en gyldig e-postadresse.");return;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)){setError("Fyll inn en gyldig e-postadresse.");return;}
   if(form.status==="draft"){
    if(!form.customer?.name?.trim()||!form.customer?.address?.trim()){setError("Fyll inn kundenavn og fakturaadresse før du sender.");return;}
    if(!form.customer?.workDate){setError("Velg leveringsdato før fakturering. Du finner feltet ved fakturaforhåndsvisningen.");return;}
