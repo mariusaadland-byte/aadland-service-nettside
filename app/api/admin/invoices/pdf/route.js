@@ -2,6 +2,8 @@ import {NextResponse} from "next/server";
 import {getAdminUser} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
 import {buildInvoiceDraftPdf} from "../../../../../lib/invoiceDraftPdf";
+import {invoiceDueDate} from "../../../../../lib/invoicePaymentTerms";
+import {osloDateKey} from "../../../../../lib/osloTime";
 export const runtime="nodejs";
 export async function GET(req){
  const user=await getAdminUser();
@@ -15,6 +17,11 @@ export async function GET(req){
   const {data,error}=await s.from("invoice_drafts").select("*").eq("id",id).maybeSingle();
   if(error||!data)return NextResponse.json({error:"Fakturakladden ble ikke funnet."},{status:404});
   invoice=data;
+  if(invoice.status==="draft"&&invoice.due_date_mode!=="manual"){
+   const terms=await s.rpc("invoice_customer_terms",{p_customer:invoice.customer});
+   if(terms.error)return NextResponse.json({error:"Kundens betalingsfrist kunne ikke hentes."},{status:500});
+   invoice={...invoice,due_date:invoiceDueDate(osloDateKey(new Date()),Number(terms.data.days))};
+  }
  }
  try{const pdf=invoice.pdf_base64?Buffer.from(invoice.pdf_base64,"base64"):await buildInvoiceDraftPdf(invoice);return new NextResponse(new Uint8Array(pdf),{headers:{"Content-Type":"application/pdf","Content-Disposition":(new URL(req.url).searchParams.get("inline")==="1"?"inline":"attachment")+'; filename="Aadland-Service-'+(invoice.invoice_number||"FAKTURAKLADD")+'.pdf"',"Cache-Control":"no-store","X-Frame-Options":"SAMEORIGIN","Content-Security-Policy":"base-uri 'self'; form-action 'self'; frame-ancestors 'self'; object-src 'none'"}});}
  catch{return NextResponse.json({error:"Kunne ikke lage PDF."},{status:500});}
