@@ -35,6 +35,7 @@ export default function InvoicesClient(){
  const draft=items.find(x=>x.id===active);
  const [form,setForm]=useState(null);
  const [showPreview,setShowPreview]=useState(false);
+ const [previewOpen,setPreviewOpen]=useState(false);
  async function downloadPdf(){setBusy(true);setError("");try{const id=showPreview&&form?form.id:"example";const response=await fetch("/api/admin/invoices/pdf?id="+encodeURIComponent(id));if(!response.ok){const data=await response.json().catch(()=>({}));throw Error(data.error||"Kunne ikke lage PDF.");}const blob=await response.blob();const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="Aadland-Service-"+(id==="example"?"TESTFAKTURA":id)+".pdf";a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}catch(e){setError(e.message)}finally{setBusy(false)}}
  useEffect(()=>{setForm(draft?{...draft,customer:{...draft.customer},line_items:draft.line_items.map(x=>({...x}))}:null)},[active,items]);
  const change=(key,value)=>setForm(x=>({...x,[key]:value}));
@@ -58,7 +59,18 @@ export default function InvoicesClient(){
  <h3>Sum inkl. MVA: {money(total(form.line_items))}</h3>
  <label>Notater <textarea value={form.notes||""} onChange={e=>change("notes",e.target.value)}/></label>
  <p>Kontonummer: <b>8450 46 22699</b> · Avsender ved senere utsending: noreply@aadland-service.no</p>
- <button type="button" onClick={()=>setShowPreview(x=>!x)}>{showPreview?"Skjul forhåndsvisning":"Se ferdig fakturadesign"}</button> <button disabled={busy} onClick={save}>Lagre kladd</button> <button onClick={exportCsv}>Eksporter linjer (CSV)</button> {saved&&<span>{saved}</span>}
+ <button type="button" onClick={()=>{setShowPreview(true);setPreviewOpen(true)}}>Vis fakturakladd</button> <button disabled={busy} onClick={save}>Lagre kladd</button> <button onClick={exportCsv}>Eksporter linjer (CSV)</button> {saved&&<span>{saved}</span>}
  </>:<p>Velg en kladd til venstre.</p>}</section></div>
- <section className="invoicePreviewSection" style={{marginTop:25}}><h2>Slik vil fakturaen se ut</h2><p>Dette er en fakturakladd, ikke en utstedt faktura. Velg «Last ned faktura som PDF» for å hente en fakturakladd.</p><button type="button" disabled={busy} onClick={downloadPdf}>Last ned faktura som PDF</button> <button type="button" onClick={()=>window.print()}>Skriv ut</button><InvoicePreview invoice={showPreview&&form?form:sample} example={!(showPreview&&form)}/></section></main>;
+ <section className="invoicePreviewSection" style={{marginTop:20,border:"1px solid #d8c9ae",borderRadius:14,padding:"16px 18px",background:"#fff",maxWidth:850}}>
+ <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+ <div><h2 style={{margin:"0 0 4px",fontSize:20}}>Fakturaforhåndsvisning</h2><p style={{margin:0,fontSize:13,color:"#655e54"}}>{form?"Se fakturakladden i full størrelse.":"Se et eksempel på fakturadesignet."}</p></div>
+ <button type="button" aria-expanded={previewOpen} onClick={()=>setPreviewOpen(x=>!x)}>{previewOpen?"Lukk faktura":"Vis faktura ›"}</button>
+ </div>
+ {previewOpen&&<div style={{marginTop:16}}>
+ <p style={{fontSize:13}}>Forhåndsvisning – ikke utstedt.</p>
+ <button type="button" disabled={busy} onClick={downloadPdf}>Last ned faktura som PDF</button>{" "}
+ <button type="button" onClick={()=>window.print()}>Skriv ut</button>
+ <InvoicePreview invoice={showPreview&&form?form:sample} example={!(showPreview&&form)}/>
+ </div>}
+ </section></main>;
 }
