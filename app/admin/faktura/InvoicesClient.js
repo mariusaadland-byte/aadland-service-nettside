@@ -58,7 +58,7 @@ export default function InvoicesClient({archiveMode=false}){
  const draft=items.find(x=>x.id===active);
  const [form,setForm]=useState(null);
  const paymentInfo=form?invoicePaymentState(form,today):null;
- const [previewOpen,setPreviewOpen]=useState(false);
+ const [previewOpen,setPreviewOpen]=useState(()=>typeof window!=="undefined"&&new URLSearchParams(window.location.search).get("preview")==="1");
  const [printHref,setPrintHref]=useState("");
  useEffect(()=>{
   if(draft&&((archiveMode&&draft.status==="draft")||(!archiveMode&&draft.status!=="draft")))window.location.replace((draft.status==="draft"?"/admin/faktura":"/admin/faktura/arkiv")+"?id="+encodeURIComponent(draft.id));
