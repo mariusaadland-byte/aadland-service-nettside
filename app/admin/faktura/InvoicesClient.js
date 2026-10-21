@@ -59,6 +59,11 @@ export default function InvoicesClient({archiveMode=false}){
  const [form,setForm]=useState(null);
  const paymentInfo=form?invoicePaymentState(form,today):null;
  const [previewOpen,setPreviewOpen]=useState(()=>typeof window!=="undefined"&&new URLSearchParams(window.location.search).get("preview")==="1");
+ useEffect(()=>{
+  if(!form?.id||!previewOpen||new URLSearchParams(window.location.search).get("preview")!=="1")return;
+  const handle=window.setTimeout(()=>document.getElementById("invoice-draft-preview")?.scrollIntoView({behavior:"smooth",block:"start"}),150);
+  return()=>window.clearTimeout(handle);
+ },[form?.id,previewOpen]);
  const [printHref,setPrintHref]=useState("");
  useEffect(()=>{
   if(draft&&((archiveMode&&draft.status==="draft")||(!archiveMode&&draft.status!=="draft")))window.location.replace((draft.status==="draft"?"/admin/faktura":"/admin/faktura/arkiv")+"?id="+encodeURIComponent(draft.id));
@@ -174,7 +179,7 @@ export default function InvoicesClient({archiveMode=false}){
  <p>Kontonummer: <b>8450 46 22699</b> · Avsender: noreply@aadland-service.no</p>
  <button type="button" onClick={()=>{setPreviewOpen(true)}}>Vis fakturakladd</button> <button disabled={busy} onClick={save}>Lagre kladd</button> <button onClick={exportCsv}>Eksporter linjer (CSV)</button> {saved&&<span>{saved}</span>}
  </fieldset>}{!archiveMode&&<div style={{borderTop:"1px solid #d8c9ae",marginTop:18,paddingTop:12}}><strong>Til betaling: {money(total(form.line_items))}</strong><button type="button" disabled={busy||Boolean(form.sent_at)} onClick={sendInvoice} style={{display:"block",width:"100%",minHeight:50,margin:"12px 0",padding:"14px 18px",background:"#d5a75a",color:"#171511",border:"1px solid #b88c43",borderRadius:10,fontSize:16,fontWeight:800,whiteSpace:"normal"}}>{busy?"Behandler …":form.sent_at?"Sendt på e-post":form.status==="draft"?"Fakturer og send på e-post":"Prøv e-postsending igjen"}</button><button type="button" disabled={busy} onClick={printInvoice} style={{display:"block",width:"100%",minHeight:50,margin:"12px 0",padding:"14px 18px",background:"#fff",color:"#171511",border:"2px solid #b88c43",borderRadius:10,fontSize:16,fontWeight:800,whiteSpace:"normal"}}>{busy?"Behandler …":form.status==="draft"?"Fakturer og skriv ut":"Skriv ut faktura"}</button></div>}</>:<p>Velg en {archiveMode?"faktura":"kladd"} i listen.</p>}</section></div>
- <section className="invoicePreviewSection" style={{marginTop:20,border:"1px solid #d8c9ae",borderRadius:14,padding:"16px 18px",background:"#fff",maxWidth:850}}>
+ <section id="invoice-draft-preview" className="invoicePreviewSection" style={{marginTop:20,border:"1px solid #d8c9ae",borderRadius:14,padding:"16px 18px",background:"#fff",maxWidth:850}}>
  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
  <div><h2 style={{margin:"0 0 4px",fontSize:20}}>Fakturaforhåndsvisning</h2><p style={{margin:0,fontSize:13,color:"#655e54"}}>{form?"Se fakturakladden i full størrelse.":"Se et eksempel på fakturadesignet."}</p></div>
  <button type="button" aria-expanded={previewOpen} onClick={()=>setPreviewOpen(x=>!x)}>{previewOpen?"Lukk faktura":"Vis faktura ›"}</button>
