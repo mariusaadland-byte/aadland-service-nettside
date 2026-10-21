@@ -39,6 +39,14 @@ assert.ok(quoteCatalogSource.includes("defaultMarkupPercent??15"),"Quote search 
 assert.ok(!quoteCatalogSource.includes("localStorage"),"Shared supplier markup must not be overridden by browser-local values");
 assert.ok(quoteCatalogSource.includes("async function saveMarkup()"),"Quote search must allow saving supplier markup");
 const materialCatalogRoute=readFileSync("app/api/admin/material-catalog/route.js","utf8");
+const supplierRow=new Function(materialCatalogRoute.slice(materialCatalogRoute.indexOf("function supplierRow("),materialCatalogRoute.indexOf("function productRow("))+"return supplierRow;")();
+for(const [markup,expected] of [[0,0],[null,15],[undefined,15],[15,15],[20,20]]){
+ assert.equal(supplierRow({default_markup_percent:markup}).defaultMarkupPercent,expected,"Supplier markup must preserve zero and use the default only when missing");
+}
+const noMarkup=quoteLinesFromCalculator({materialMarkup:"0",materialItems:[{name:"Nullpåslag",costExVat:"19,90",qty:"2",saleExVat:""}]});
+assert.equal(noMarkup[0].unitPriceOre,1990,"Zero markup must retain the purchase price");
+assert.equal(noMarkup[0].internalUnitCostOre,1990,"Purchase cost must survive calculator transfer");
+assert.equal(unitSaleExVat({costExVat:100,saleExVat:"0"},20),0,"An explicit zero sale price must remain an override");
 assert.ok(materialCatalogRoute.includes("export async function PATCH(req)"),"Supplier markup must have a save endpoint");
 assert.ok(materialCatalogRoute.includes("user.role!==\"owner\""),"Only owner may update shared markup");
 assert.ok(quoteEditorSource.includes("Array.isArray(data.drawings)?data.drawings:[]"),"quote editor must validate drawing list");
