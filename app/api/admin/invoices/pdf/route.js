@@ -16,6 +16,6 @@ export async function GET(req){
   if(error||!data)return NextResponse.json({error:"Fakturakladden ble ikke funnet."},{status:404});
   invoice=data;
  }
- try{const pdf=invoice.pdf_base64?Buffer.from(invoice.pdf_base64,"base64"):await buildInvoiceDraftPdf(invoice);return new NextResponse(new Uint8Array(pdf),{headers:{"Content-Type":"application/pdf","Content-Disposition":'attachment; filename="Aadland-Service-'+(invoice.invoice_number||"FAKTURAKLADD")+'.pdf"',"Cache-Control":"no-store"}});}
+ try{const pdf=invoice.pdf_base64?Buffer.from(invoice.pdf_base64,"base64"):await buildInvoiceDraftPdf(invoice);return new NextResponse(new Uint8Array(pdf),{headers:{"Content-Type":"application/pdf","Content-Disposition":(new URL(req.url).searchParams.get("inline")==="1"?"inline":"attachment")+'; filename="Aadland-Service-'+(invoice.invoice_number||"FAKTURAKLADD")+'.pdf"',"Cache-Control":"no-store","X-Frame-Options":"SAMEORIGIN","Content-Security-Policy":"base-uri 'self'; form-action 'self'; frame-ancestors 'self'; object-src 'none'"}});}
  catch{return NextResponse.json({error:"Kunne ikke lage PDF."},{status:500});}
 }
