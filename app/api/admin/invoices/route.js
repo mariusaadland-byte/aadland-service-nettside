@@ -1,6 +1,8 @@
 import {NextResponse} from "next/server";
 import {getAdminUser} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
+import {withInvoicePaymentTerms} from "../../../../lib/invoicePaymentTerms";
+import {osloDateKey} from "../../../../lib/osloTime";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 
 const allowed=user=>user&&(user.role==="owner"||user.canUpdateOrders||user.canManageProducts);
@@ -12,12 +14,21 @@ export async function GET(){
  const s=db();if(!s)return fail("Database utilgjengelig.",503);
  const invoices=[];
  for(let offset=0;;offset+=500){
-  const {data,error}=await s.from("invoice_drafts").select("id,source_quote_id,customer,title,pricing_model,line_items,due_date,notes,status,created_at,updated_at,installment_index,installment_label,installment_percent,installment_trigger,invoice_number,issued_date,issued_at,sent_at,resend_id,delivery_error,paid_ore,paid_date,payment_updated_at").order("created_at",{ascending:false}).order("id",{ascending:false}).range(offset,offset+499);
+  const {data,error}=await s.from("invoice_drafts").select("id,source_quote_id,customer,title,pricing_model,line_items,due_date,due_date_mode,notes,status,created_at,updated_at,installment_index,installment_label,installment_percent,installment_trigger,invoice_number,issued_date,issued_at,sent_at,resend_id,delivery_error,paid_ore,paid_date,payment_updated_at").order("created_at",{ascending:false}).order("id",{ascending:false}).range(offset,offset+499);
   if(error)return fail("Kunne ikke hente fakturaer.",500);
   invoices.push(...data);
   if(data.length<500)break;
  }
- return NextResponse.json({invoices});
+ const contacts=[];
+ if(invoices.some(x=>x.status==="draft")){
+  for(let offset=0;;offset+=500){
+   const {data,error}=await s.from("admin_customer_contacts").select("id,email,payment_terms_days").order("id").range(offset,offset+499);
+   if(error)return fail("Kundenes betalingsfrister kunne ikke hentes.",500);
+   contacts.push(...data);if(data.length<500)break;
+  }
+ }
+ const today=osloDateKey(new Date());
+ return NextResponse.json({invoices:invoices.map(x=>withInvoicePaymentTerms(x,contacts,today))});
 }
 export async function POST(req){
  const origin=sameOriginGuard(req);if(origin)return origin;
@@ -45,10 +56,11 @@ export async function PATCH(req){
  if(!validLines(body.lineItems))return fail("Kontroller fakturalinjer, antall og priser.");
  if(!["fixed","hourly","estimate"].includes(body.pricingModel))return fail("Ugyldig prismodell.");
  if(!clean(body.customer?.name))return fail("Kundenavn mangler.");
+ const mode=body.dueDateMode??"auto";if(!["auto","manual"].includes(mode))return fail("Ugyldig valg av betalingsfrist.");
  const due=body.dueDate?clean(body.dueDate,10):null;
  if(due&&!/^\d{4}-\d{2}-\d{2}$/.test(due))return fail("Ugyldig forfallsdato.");
  const s=db();if(!s)return fail("Database utilgjengelig.",503);
- const update={title:clean(body.title),customer:{name:clean(body.customer.name),email:clean(body.customer.email),address:clean(body.customer.address,500),phone:clean(body.customer.phone,70),contactId:clean(body.customer.contactId,36),workDescription:clean(body.customer.workDescription,3000),workDate:clean(body.customer.workDate,10),workAddress:clean(body.customer.workAddress,500)},pricing_model:body.pricingModel,line_items:body.lineItems.map(x=>({description:clean(x.description,500),type:clean(x.type,20),quantity:Number(x.quantity),unit:clean(x.unit,30),unitPriceOre:Number(x.unitPriceOre),vatRate:Number(x.vatRate)})),notes:clean(body.notes,4000),due_date:due,updated_at:new Date().toISOString()};
+ const update={title:clean(body.title),customer:{name:clean(body.customer.name),email:clean(body.customer.email),address:clean(body.customer.address,500),phone:clean(body.customer.phone,70),contactId:clean(body.customer.contactId,36),workDescription:clean(body.customer.workDescription,3000),workDate:clean(body.customer.workDate,10),workAddress:clean(body.customer.workAddress,500)},pricing_model:body.pricingModel,line_items:body.lineItems.map(x=>({description:clean(x.description,500),type:clean(x.type,20),quantity:Number(x.quantity),unit:clean(x.unit,30),unitPriceOre:Number(x.unitPriceOre),vatRate:Number(x.vatRate)})),notes:clean(body.notes,4000),due_date:due,due_date_mode:mode,updated_at:new Date().toISOString()};
  const {data,error}=await s.from("invoice_drafts").update(update).eq("id",body.id).eq("status","draft").select("id").maybeSingle();
  if(error||!data)return fail("Fakturakladden kunne ikke lagres.",500);
  return NextResponse.json({ok:true});
