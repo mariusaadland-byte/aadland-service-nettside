@@ -144,7 +144,7 @@ export default function CalculatorClient(){
     :[...items,{
       key,supplierId:product.supplierId,supplierName:product.supplierName||product.supplierId,
       sku:product.sku,name:product.name||"",unit:product.unit||"STK",
-      costExVat:number(product.costExVat),qty:"1",saleExVat:""
+      costExVat:number(product.costExVat),qty:"1",saleExVat:product.saleExVat==null?"":String(product.saleExVat)
      }];
    return {...current,materialItems:next};
   });
@@ -268,6 +268,7 @@ export default function CalculatorClient(){
      <p>Søk varer, legg dem inn som tilbudslinjer og overfør til en valgt kunde. Arbeid, kjøring og bom kan tas med ved behov.</p>
     </div>
     <div className={styles.topActions}>
+     <Link href="/admin/prisliste" className={styles.secondary}>Egen prisliste / legg til vare</Link>
      <button type="button" className={styles.secondary} onClick={reset}>Nullstill</button>
      <button type="button" className={styles.secondary} onClick={copySummary}>{copied?"Kopiert ✓":"Kopier sammendrag"}</button>
      <button type="button" className={styles.primary} onClick={()=>window.print()}>Skriv ut</button>
