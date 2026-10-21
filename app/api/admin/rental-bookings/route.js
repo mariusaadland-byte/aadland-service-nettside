@@ -7,6 +7,7 @@ import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
 import {rentalBookingSiteUrl,rentalEmailFrom,rentalReplyTo,rentalResendApiKey} from "../../../../lib/rentalEmailConfig";
 import {sendManualRentalRefundNotice} from "../../../../lib/rentalRefundNotice";
 import {sendRentalConfirmation} from "../../../../lib/rentalConfirmationEmail";
+import {peakRentalBookings} from "../../../../lib/rentalAvailability";
 
 async function canView(){
  return Boolean(await getAdminUser())&&Boolean(await hasPermission("canViewOrders"));
@@ -92,7 +93,7 @@ async function checkAvailability(s,booking){
  const to=end.toISOString().slice(0,10);
 
  const [{data:conflicts,error:conflictError},{data:blocks,error:blockError}]=await Promise.all([
-  s.from("rental_bookings").select("id")
+  s.from("rental_bookings").select("id,start_date,end_date")
    .eq("rental_item_id",booking.rental_item_id)
    .neq("id",booking.id)
    .in("status",["new","confirmed","active"])
@@ -104,7 +105,7 @@ async function checkAvailability(s,booking){
    .gte("end_date",from)
  ]);
  if(conflictError||blockError)return {error:"Tilgjengelighet kunne ikke kontrolleres.",status:500};
- if((blocks?.length||0)>0||(conflicts?.length||0)>=Math.max(1,Number(item.quantity)||1)){
+ if((blocks?.length||0)>0||peakRentalBookings(conflicts,booking.start_date,booking.end_date,buffer)>=Math.max(1,Number(item.quantity)||1)){
   return {error:"Kan ikke bekrefte: utstyret er opptatt eller manuelt blokkert i perioden.",status:409};
  }
  return {item};
