@@ -8,10 +8,10 @@ function memoryDb(initial){
   then(resolve){chain.maybeSingle().then(resolve)}
  };return chain;}};
 }
-let creates=0,amounts=[],failCreate=false,existingState="CREATED";
+let creates=0,amounts=[],failCreate=false,existingState="CREATED",lastInput;
 const code=readFileSync("lib/startRentalVippsPayment.js","utf8").replace(/^import .*;\n/gm,"").replace(/export /g,"");
 const startPayment=new Function("crypto","createVippsPayment","getVippsPayment","vippsUnitReadiness","syncVippsPaymentSnapshot","rentalBookingSiteUrl",code+"return startRentalVippsPayment;")(
- crypto,async input=>{creates++;amounts.push(input.amountOre);if(failCreate)throw Error("Timeout");return {redirectUrl:"https://example.invalid/pay",pspReference:"PSP-TEST"}},
+ crypto,async input=>{lastInput=input;creates++;amounts.push(input.amountOre);if(failCreate)throw Error("Timeout");return {redirectUrl:input.userFlow==="PUSH_MESSAGE"?undefined:"https://example.invalid/pay",pspReference:"PSP-TEST"}},
  async()=>({state:existingState,redirectUrl:"https://example.invalid/pay"}),async()=>({ready:true}),async()=>({db:{status:"pending"}}),()=>"https://example.invalid"
 );
 const booking={id:"booking-a",booking_number:"AS-U-TEST",status:"confirmed",total_ore:12500,deposit_ore:50000,payment_status:"unpaid",payment_reference:null,payment_captured_ore:0,payment_refunded_ore:0,customer:{}};
@@ -24,6 +24,40 @@ assert.equal(fail.status,502);assert.ok(failedDb.row.payment_reference,"Keep the
 failCreate=false;const createsBefore=creates;
 const reuse=await startPayment({s:failedDb,booking:{...failedDb.row}});assert.equal(reuse.body.reused,true);assert.equal(creates,createsBefore);
 assert.equal((await startPayment({s:db,booking:{...booking,payment_captured_ore:12500}})).status,409);
+const client=readFileSync("lib/vippsClient.js","utf8");
+const phoneCode=client.slice(client.indexOf("function normalizedPhone"),client.indexOf("export function vippsPaymentsEnabled"));
+const createCode=client.slice(client.indexOf("export async function createVippsPayment"),client.indexOf("export async function getVippsPayment")).replace("export ","");
+let wire;
+const createPayment=new Function("vippsFetch","vippsIdempotencyKey",phoneCode+createCode+"return createVippsPayment;")(async(unit,path,options)=>{wire={unit,path,...options};return {};},()=>"test-idempotency");
+const previousPush=process.env.VIPPS_RENTAL_PUSH_ENABLED;
+try{
+ const returned={...booking,id:"returned-test",status:"returned",customer:{phone:"95891437"}};
+ const pushDb=memoryDb(returned);
+ const input={s:pushDb,booking:{...returned},userFlow:"PUSH_MESSAGE",customerConsent:true};
+ delete process.env.VIPPS_RENTAL_PUSH_ENABLED;
+ assert.equal((await startPayment(input)).status,409,"Provider approval is mandatory");
+ process.env.VIPPS_RENTAL_PUSH_ENABLED="true";
+ await createPayment({unit:"rental",reference:"request-test",amountOre:12500,phone:"95891437",userFlow:"PUSH_MESSAGE"});
+ assert.equal(wire.body.userFlow,"PUSH_MESSAGE");assert.equal(wire.body.customer.phoneNumber,"4795891437");
+ assert.equal(wire.body.returnUrl,undefined,"Push needs no browser redirect");
+ await assert.rejects(createPayment({unit:"service",reference:"request-test",amountOre:12500,phone:"95891437",userFlow:"PUSH_MESSAGE"}),/NOT_APPROVED/);
+
+ assert.equal((await startPayment({...input,customerConsent:false})).status,400);
+ assert.equal((await startPayment({...input,booking:{...returned,customer:{}}})).status,400);
+ assert.equal((await startPayment({...input,booking:{...returned,status:"active"}})).status,409);
+ assert.equal((await startPayment({...input,booking:{...returned,payment_status:"paid"}})).status,409);
+ const before=creates;
+ const results=await Promise.all([startPayment(input),startPayment(input)]);
+ assert.deepEqual(results.map(r=>r.status).sort(),[200,409]);
+ assert.equal(creates,before+1);assert.equal(lastInput.userFlow,"PUSH_MESSAGE");
+ assert.equal(lastInput.amountOre,12500,"Deposit must never enter the payment request");
+ assert.equal(lastInput.phone,"95891437");
+ assert.equal(pushDb.row.payment_status,"pending","Sending is not payment");
+ const reusePush=await startPayment({...input,booking:{...pushDb.row}});
+ assert.equal(reusePush.body.reused,true);assert.equal(creates,before+1,"No duplicate push for a pending payment");
+}finally{
+ if(previousPush===undefined)delete process.env.VIPPS_RENTAL_PUSH_ENABLED;else process.env.VIPPS_RENTAL_PUSH_ENABLED=previousPush;
+}
 const admin=readFileSync("app/api/admin/rental-bookings/route.js","utf8");
 const block=admin.slice(admin.indexOf(' if(action==="record-deposit-held")'),admin.indexOf(' if(action==="confirm-and-send"||'));
 const deposit=new Function("NextResponse",`return async function(s,b,current){const action=b.action;${block}}`)({json:(body,options={})=>({body,status:options.status||200})});
