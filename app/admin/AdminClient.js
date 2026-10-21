@@ -4544,6 +4544,16 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
   return d;
  }
 
+ async function requestRentalVippsPayment(booking){
+  const customerConsent=document.getElementById("rental-vipps-consent-"+booking.id)?.checked===true;
+  if(!customerConsent){setError("Bekreft at kunden har avtalt betalingskrav i Vipps.");return;}
+  try{
+   const d=await runAction(booking,"request-vipps-payment",{customerConsent},"Sende betalingsforespørsel på "+nok(booking.totalOre)+" til "+booking.customer?.name+" ("+booking.customer?.phone+") i Vipps? Depositum inngår ikke.");
+   if(d)setMessage(d.message||"Betalingsforespørselen er sendt til Vipps.");
+  }catch{setError("Kunne ikke bekrefte utsendingen. Last inn bookingen og kontroller Vipps-status før du prøver igjen.");}
+  finally{setSavingId("");}
+ }
+
  async function notify(booking,action){
   const verb=action==="confirm-and-send"?"bekrefte bookingen og sende e-post til":"avbryte bookingen og sende e-post til";
   const d=await runAction(booking,action,{},"Vil du "+verb+" "+booking.customer?.email+"?");
@@ -4718,6 +4728,11 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
 
    <section className="orderPaymentPanel rentalPaymentPanel">
     <h4>Leiebetaling</h4>
+    {canUpdate&&b.status==="returned"&&!["authorized","paid","refunded"].includes(b.paymentStatus)&&Number(b.paymentCapturedOre||0)===0&&Number(b.totalOre)>=100&&<div className="rentalBookingActions">
+     {b.vippsPushEnabled&&<label><input type="checkbox" id={"rental-vipps-consent-"+b.id}/> Kunden har avtalt å motta betalingskrav i Vipps.</label>}
+     <button className="btn" type="button" disabled={savingId===b.id||paymentSetupRequired||!b.vippsPushEnabled||!b.customer?.phone} onClick={()=>requestRentalVippsPayment(b)}>{savingId===b.id?"Sender …":"Send betalingskrav med Vipps"}</button>
+     <p className="muted">{!b.vippsPushEnabled?"Klargjort. Krever Vipps-avtale for Aadland Utleie og godkjenning for direkte betalingskrav.":!b.customer?.phone?"Legg inn kundens telefonnummer først.":"Sender forespørsel om leiebeløpet til kundens Vipps. Depositum håndteres separat. Synk Vipps-status etter kundens godkjenning og fullfør betalingen med Capture Vipps."}</p>
+    </div>}
     <div className="orderPaymentFacts">
      <span><small>Status</small><b>{paymentLabels[b.paymentStatus]||b.paymentStatus}</b></span>
      {String(b.paymentProvider||"").toLowerCase()==="vipps"&&<span><small>Betalingsmåte</small><b>Vipps</b></span>}
