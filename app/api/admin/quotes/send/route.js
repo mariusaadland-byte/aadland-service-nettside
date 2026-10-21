@@ -29,6 +29,20 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
  const {data:quote,error}=await s.from("quotes").select("*").eq("id",id).maybeSingle();
  if(error||!quote)return NextResponse.json({error:"Tilbudet ble ikke funnet."},{status:404});
+ if(quote.status==="draft"){
+  // A draft used for direct invoicing must never accidentally be sent as a
+  // standard quote for acceptance. A linked invoice also freezes the source.
+  const {data:linked,error:linkedError}=await s.from("invoice_drafts").select("id")
+   .eq("source_quote_id",quote.id).eq("installment_index",0).maybeSingle();
+  if(linkedError)return NextResponse.json({error:"Faktureringsstatus kunne ikke kontrolleres."},{status:500});
+  if(linked)return NextResponse.json({error:"Det er opprettet faktura fra dette tilbudet. Åpne fakturaen i stedet."},{status:409});
+  const {data:internal,error:internalError}=await s.from("quote_internal_costs").select("line_costs").eq("quote_id",quote.id).maybeSingle();
+  if(internalError)return NextResponse.json({error:"Tilbudsvalgene kunne ikke kontrolleres."},{status:500});
+  if(internal?.line_costs?.__directInvoice===true&&internal?.line_costs?.__skipQuoteApproval===true){
+   return NextResponse.json({error:"Direkte fakturering er valgt. Bruk Fakturer nederst i tilbudet, ikke Send tilbud."},{status:409});
+  }
+ }
+
 
  if(["accepted","declined","cancelled","superseded"].includes(quote.status))return NextResponse.json({error:"Dette tilbudet er ferdigbehandlet og kan ikke sendes på nytt."},{status:409});
  if(quote.revised_from_id){

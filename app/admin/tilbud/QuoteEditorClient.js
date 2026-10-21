@@ -6,6 +6,7 @@ import {useRouter} from "next/navigation";
 import {osloDateKey,shiftDateKey} from "../../../lib/osloTime";
 import {CATALOG_QUOTE_TRANSFER_KEY} from "../../../lib/calculatorQuoteLines";
 import QuoteCatalogSearch from "./QuoteCatalogSearch";
+import QuoteCustomerPicker from "./QuoteCustomerPicker";
 import VippsFeePreview from "../VippsFeePreview";
 import {hasAdjustableVippsPriceLine,linesForCustomerTotal} from "../../../lib/vippsPriceLines";
 import {calculateContribution,withPrivateCosts} from "../../../lib/quotePrivateCosts";
@@ -24,7 +25,7 @@ function blankState(){
  return {
   title:"",
   status:"draft",
-  customer:{name:"",email:"",phone:"",address:""},
+  customer:{contactId:"",name:"",email:"",phone:"",address:"",paymentTermsDays:14},
   drawingIds:[],
   introText:"Takk for henvendelsen og interessen for Aadland Service. Vi har gleden av å presentere vårt tilbud på arbeidet som er beskrevet nedenfor. Tilbudet viser arbeid, materialer og øvrige leveranser med tilhørende priser og betingelser.",
   lineItems:[{id:lineId(),type:"work",description:"",quantity:1,unit:"time",unitPriceOre:"",vatRate:25}],
@@ -35,7 +36,9 @@ function blankState(){
   plannedStartDate:"",
   autoFollowUp:true,
   quoteMaterialMarkupPercent:null,
-  pricingPaymentMethod:"bank"
+  pricingPaymentMethod:"bank",
+  directInvoice:false,
+  skipQuoteApproval:false
  };
 }
 function calculate(lines){
@@ -60,6 +63,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [converting,setConverting]=useState(false);
  const [loading,setLoading]=useState(Boolean(quoteId));
  const [saving,setSaving]=useState(false);
+ const [billing,setBilling]=useState(false),[directInvoiceId,setDirectInvoiceId]=useState(null),[invoiceMode,setInvoiceMode]=useState("bank");
  const [sending,setSending]=useState(false);
  const [error,setError]=useState("");
  const [savedMessage,setSavedMessage]=useState("");
@@ -142,7 +146,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  ];
  const planSum=useMemo(()=>v.paymentPlan.reduce((sum,row)=>sum+(Number(row.percent)||0),0),[v.paymentPlan]);
  const isDirty=useMemo(()=>Boolean(savedSnapshot)&&(JSON.stringify(v)!==savedSnapshot||(quoteMaterialMarkupOverride!==""&&Number(quoteMaterialMarkupOverride)!==Number(v.quoteMaterialMarkupPercent??defaultMaterialMarkup))),[v,savedSnapshot,quoteMaterialMarkupOverride,defaultMaterialMarkup]);
- const locked=quoteId&&v.status!=="draft";
+ const locked=Boolean((quoteId&&v.status!=="draft")||directInvoiceId);
 
  useEffect(()=>{
   let active=true;
@@ -269,10 +273,14 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     setAcceptanceMethod(quote.acceptanceMethod||null);
     setPaperSignedDate(quote.paperSignedDate||"");
     setConvertedOrderId(quote.convertedOrderId||null);
+    setDirectInvoiceId(quote.directInvoiceId||null);
+    setInvoiceMode(quote.pricingPaymentMethod==="vipps"?"vipps":"bank");
     const loadedState={
      title:quote.title||"",
      status:quote.status||"draft",
      customer:{
+      contactId:quote.customer?.contactId||"",
+      paymentTermsDays:quote.customer?.paymentTermsDays??14,
       name:quote.customer?.name||"",
       email:quote.customer?.email||"",
       phone:quote.customer?.phone||"",
@@ -288,7 +296,9 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      plannedStartDate:quote.plannedStartDate||"",
      autoFollowUp:quote.autoFollowUp!==false,
      quoteMaterialMarkupPercent:quote.quoteMaterialMarkupPercent??null,
-     pricingPaymentMethod:quote.pricingPaymentMethod==="vipps"?"vipps":"bank"
+     pricingPaymentMethod:quote.pricingPaymentMethod==="vipps"?"vipps":"bank",
+     directInvoice:quote.directInvoice===true,
+     skipQuoteApproval:quote.skipQuoteApproval===true
     };
     // Add selected supplier goods to an EXISTING draft only after we have loaded
     // its persisted lines. Never replace the customer's existing offer content.
@@ -485,7 +495,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   setSavedMessage("Vipps-prisen er lagt inn i tilbudslinjene. Kontroller linjen, eventuell delbetalingsplan og lagre tilbudet.");
  }
 
- async function save(){
+ async function save({forDirectInvoice=false}={}){
   setError("");setSavedMessage("");
   if(locked){setError(v.status==="sent"?"Sendte tilbud er låst. Opprett en revisjon for å gjøre endringer.":"Denne tilbudsversjonen er låst.");return null;}
   if(!v.customer.name.trim()){setError("Skriv inn kundenavn.");return;}
@@ -519,7 +529,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    setError(data.error||"Tilbudet kunne ikke lagres.");return null;
   }
   if(!quoteId){
-   router.push("/admin/tilbud/"+data.quote.id);
+   if(!forDirectInvoice)router.push("/admin/tilbud/"+data.quote.id);
    return data.quote;
   }
   setQuoteNumber(data.quote.quoteNumber||quoteNumber);
@@ -529,6 +539,29 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   setSavedMessage("Tilbudet er lagret.");
   window.setTimeout(()=>setSavedMessage(""),1800);
   return data.quote;
+ }
+
+ async function makeDirectInvoice(){
+  if(billing||saving)return;
+  setError("");setSavedMessage("");
+  if(!v.directInvoice||!v.skipQuoteApproval){setError("Huk av begge valgene for direkte fakturering øverst.");return;}
+  if(!v.customer.contactId){setError("Velg en eksisterende kunde eller opprett et kundekort før fakturering.");return;}
+  if(calc.total<=0){setError("Fakturaen må ha en sum over null.");return;}
+  if(directInvoiceId){router.push("/admin/faktura?id="+encodeURIComponent(directInvoiceId)+"&preview=1");return;}
+  if(!window.confirm("Bekrefter du at arbeidet og prisen er avtalt med kunden? Det opprettes én fakturakladd uten tilbudsgodkjenning. Ingenting blir sendt eller belastet nå."))return;
+  setBilling(true);
+  try{
+   const saved=await save({forDirectInvoice:true});
+   if(!saved?.id)return;
+   const response=await fetch("/api/admin/quotes/direct-invoice",{
+    method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({quoteId:saved.id,paymentMethod:invoiceMode})
+   });
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok){if(!quoteId)router.replace("/admin/tilbud/"+encodeURIComponent(saved.id));throw Error(data.error||"Fakturaen kunne ikke opprettes.");}
+   router.push("/admin/faktura?id="+encodeURIComponent(data.id)+"&preview=1");
+  }catch(e){setError(e.message||"Fakturakladden kunne ikke opprettes.");}
+  finally{setBilling(false);}
  }
 
  async function createJob(){
@@ -716,18 +749,39 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     </div>
     <div className="quoteEditorHeaderActions">
      {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Forhåndsvis / last ned PDF</button>}
-     {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
-     {quoteId&&v.status==="draft"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
+     {quoteId&&["draft","sent"].includes(v.status)&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
+      {v.directInvoice&&v.skipQuoteApproval&&<section style={{border:"1px solid #b8a27d",borderRadius:10,padding:14,margin:"12px 0",display:"grid",gap:10}}>
+       <div className="kicker">FAKTURER DIREKTE</div>
+       <label style={{display:"grid",gap:5}}>Hvordan skal kunden betale?
+        <select disabled={billing||Boolean(directInvoiceId)} value={invoiceMode} onChange={e=>setInvoiceMode(e.target.value)}>
+         <option value="bank">Faktura på e-post / bankbetaling</option>
+         <option value="vipps">Vipps-betaling</option>
+        </select>
+       </label>
+       <small>Fakturaen åpnes for kontroll. Du velger selv når du sender den. Fakturaforfall hentes fra kundekortet.</small>
+       {directInvoiceId?<Link href={"/admin/faktura?id="+directInvoiceId+"&preview=1"} className="btn">Åpne faktura →</Link>:
+       <button type="button" className="btn" disabled={saving||billing||Boolean(locked)} onClick={makeDirectInvoice}>{billing?"Klargjør faktura …":"Fakturer →"}</button>}
+      </section>}
+     {quoteId&&v.status==="draft"&&!paperIssuedAt&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
      {quoteId&&v.status==="sent"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy} onClick={registerPaperIssue}>Registrer utlevert på papir</button>}
      {quoteId&&v.status==="sent"&&<button type="button" className="btn alt" disabled={paperBusy} onClick={openPaperAcceptance}>Registrer papirgodkjenning</button>}
      {quoteId&&["sent","expired"].includes(v.status)&&<button type="button" className="btn quoteRevisionButton" disabled={revising} onClick={createRevision}>{revising?"Oppretter …":"Opprett revisjon"}</button>}
      {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
      {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href={"/admin/oppdrag/"+convertedOrderId+"/planlegg"}>Planlegg oppdrag</Link><Link href="/admin">Åpne backoffice</Link></div>}
-     {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={()=>sendQuote()}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
-     {!locked&&<button type="button" className="btn" disabled={saving||sending||converting} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>}
+     {quoteId&&["draft","sent"].includes(v.status)&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={()=>sendQuote()}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
+     {!locked&&<button type="button" className="btn" disabled={saving||sending||converting} onClick={()=>save()}>{saving?"Lagrer …":"Lagre tilbud"}</button>}
     </div>
    </div>
 
+   <section className="card" style={{margin:"12px 0",padding:18}}>
+    <div className="kicker">HURTIGVALG</div><h3>Tilbud eller direkte faktura?</h3>
+    <div style={{display:"grid",gap:12,marginTop:10}}>
+     <label style={{display:"flex",alignItems:"flex-start",gap:10}}><input type="checkbox" style={{marginTop:3}} checked={v.directInvoice===true} disabled={locked} onChange={e=>{const checked=e.target.checked;setV(current=>({...current,directInvoice:checked,skipQuoteApproval:checked?current.skipQuoteApproval:false,paymentPlan:checked?[{id:"full",label:"Hele beløpet",percent:100,trigger:"Ved fakturering"}]:current.paymentPlan.length===1&&current.paymentPlan[0].id==="full"?defaultPlan:current.paymentPlan}));}}/><span><strong>Direkte betaling / fakturering</strong><small style={{display:"block"}}>Brukes når du skal fakturere et oppdrag uten vanlig tilbudsprosess.</small></span></label>
+     <label style={{display:"flex",alignItems:"flex-start",gap:10}}><input type="checkbox" style={{marginTop:3}} checked={v.skipQuoteApproval===true} disabled={locked||!v.directInvoice} onChange={e=>set("skipQuoteApproval",e.target.checked)}/><span><strong>Trenger ikke godkjenning av tilbudet</strong><small style={{display:"block"}}>Du bekrefter at arbeidet og prisen allerede er avtalt med kunden. Tilbudet sendes ikke til signering.</small></span></label>
+    </div>
+    {v.directInvoice&&v.skipQuoteApproval&&<p className="muted">Nederst får du «Fakturer». Fakturaen åpnes som kladd for kontroll og sending via e-post eller Vipps. Ingenting sendes eller belastes automatisk.</p>}
+   </section>
+   {directInvoiceId&&<div className="quoteRevisionNotice"><strong>Faktura er opprettet.</strong><span>Tilbudet er låst for å unngå ulik pris på tilbud og faktura.</span><Link className="btn" href={"/admin/faktura?id="+directInvoiceId+"&preview=1"}>Åpne faktura</Link></div>}
    {v.status==="sent"&&<div className="quoteRevisionNotice"><b>Sendt versjon er låst</b><span>Opprett en revisjon dersom pris, innhold eller vilkår skal endres. Denne versjonen beholdes som dokumentasjon.</span><button type="button" className="btn" disabled={revising} onClick={createRevision}>{revising?"Oppretter …":"Opprett revisjon"}</button></div>}
    {v.status==="superseded"&&<div className="quoteRevisionNotice quoteRevisionSuperseded"><b>Denne versjonen er erstattet</b><span>Versjonen beholdes urørt i historikken. Åpne den nyeste revisjonen nedenfor.</span></div>}
    {v.status==="expired"&&<div className="quoteRevisionNotice"><b>Tilbudet er utløpt</b><span>Lag en ny revisjon for å oppdatere pris, gyldighet eller innhold.</span><button type="button" className="btn" disabled={revising} onClick={createRevision}>{revising?"Oppretter …":"Opprett revisjon"}</button></div>}
@@ -793,16 +847,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      </section>
 
 
-     <section className="card quoteEditorSection">
-      <div className="kicker">KUNDE</div>
-      <h3>Kundeopplysninger</h3>
-      <div className="quoteFormGrid">
-       <div className="field"><label>Navn *</label><input value={v.customer.name} onChange={e=>setCustomer("name",e.target.value)} placeholder="Kundens navn" autoComplete="name"/></div>
-       <div className="field"><label>Telefon</label><input type="tel" inputMode="tel" value={v.customer.phone} onChange={e=>setCustomer("phone",e.target.value)} placeholder="Telefonnummer" autoComplete="tel"/></div>
-       <div className="field"><label>E-post</label><input type="email" inputMode="email" value={v.customer.email} onChange={e=>setCustomer("email",e.target.value)} placeholder="E-postadresse" autoComplete="email" autoCapitalize="none" spellCheck="false"/></div>
-       <div className="field"><label>Adresse</label><input value={v.customer.address} onChange={e=>setCustomer("address",e.target.value)} placeholder="Adresse / arbeidssted" autoComplete="street-address"/></div>
-      </div>
-     </section>
+     <QuoteCustomerPicker customer={v.customer} disabled={Boolean(locked)} onChoose={customer=>set("customer",customer)}/>
 
      <section className="card quoteEditorSection">
       <div className="kicker">TILBUDET</div>
@@ -950,16 +995,16 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      <div className="quoteSummaryPlan">
       {v.paymentPlan.map(row=><span key={row.id}><small>{row.label} · {row.percent}%</small><b>{nok(calc.total*(Number(row.percent)||0)/100)}</b></span>)}
      </div>
-     {quoteId&&v.status==="draft"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
+     {quoteId&&v.status==="draft"&&!paperIssuedAt&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
      {quoteId&&v.status==="sent"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy} onClick={registerPaperIssue}>Registrer utlevert på papir</button>}
      {quoteId&&v.status==="sent"&&<button type="button" className="btn alt" disabled={paperBusy} onClick={openPaperAcceptance}>Registrer papirgodkjenning</button>}
      {quoteId&&["sent","expired"].includes(v.status)&&<button type="button" className="btn quoteRevisionButton" disabled={revising} onClick={createRevision}>{revising?"Oppretter …":"Opprett revisjon"}</button>}
      {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
      {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href="/admin">Åpne backoffice</Link></div>}
-     {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={()=>sendQuote()}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
-     {!locked&&<button type="button" className="btn" disabled={saving||sending||converting} onClick={save}>{saving?"Lagrer …":"Lagre tilbud"}</button>}
-     {quoteId&&["draft","sent"].includes(v.status)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
-     {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Forhåndsvis / last ned PDF</button>}
+     {quoteId&&["draft","sent"].includes(v.status)&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={()=>sendQuote()}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
+     {!locked&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn" disabled={saving||sending||converting} onClick={()=>save()}>{saving?"Lagrer …":"Lagre tilbud"}</button>}
+     {quoteId&&["draft","sent"].includes(v.status)&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
+     {quoteId&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Forhåndsvis / last ned PDF</button>}
      {quoteId&&<div className="quoteHistory">
       <div className="kicker">HISTORIKK</div>
       {revisionHistory.length>1&&<div className="quoteRevisionHistory">
