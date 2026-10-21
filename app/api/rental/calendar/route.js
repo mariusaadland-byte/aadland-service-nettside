@@ -2,7 +2,10 @@ import {NextResponse} from "next/server";
 import {db,fromDbRentalItem} from "../../../../lib/supabase";
 
 function validMonth(value){
- return /^\d{4}-\d{2}$/.test(String(value||""));
+ const input=String(value||"");
+ if(!/^\d{4}-\d{2}$/.test(input))return false;
+ const [year,month]=input.split("-").map(Number);
+ return year>=1000&&year<=9998&&month>=1&&month<=12;
 }
 function shiftDate(iso,days){
  const d=new Date(iso+"T12:00:00Z");
