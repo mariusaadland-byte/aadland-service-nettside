@@ -32,6 +32,7 @@ assert.equal(eligible({description:'Materialer og festemidler',unit:'stk',unitPr
 assert.equal(eligible({description:'Arbeid og materialer',unit:'stk',unitPriceOre:1,vatRate:25,quantity:1}),false,'Do not mark up combined work lines');
 assert.equal(eligible({type:'other',description:'Montering',unit:'stk'}),false,'Other-labelled labor is still protected');
 assert.equal(eligible({type:'material',description:'Materialer',unit:'timer'}),false,'Any hourly unit is protected');
+assert.equal(eligible({type:'material',description:'Montering',unit:'stk'}),false,'Work disguised as material is protected');
 assert.equal(adjust([],1000),null);
 assert.equal(adjust([{type:'work',quantity:1,unitPriceOre:'',vatRate:25}],1000),null);
 assert.equal(adjust(lines,1).totalOre,100000,'Do not reduce line price when requested payout is below current price');
