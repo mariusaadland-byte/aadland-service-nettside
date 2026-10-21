@@ -1,5 +1,6 @@
 "use client";
 import {useEffect,useState} from "react";
+import Link from "next/link";
 import styles from "./quoteCatalog.module.css";
 const fmt=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(Number(n)||0);
 export default function QuoteCatalogSearch({onChoose}){
@@ -50,6 +51,7 @@ export default function QuoteCatalogSearch({onChoose}){
   document.getElementById("offer-catalog-search")?.focus();
  };
  return <div className={styles.box}>
+  <p><Link href="/admin/prisliste">Egen prisliste / legg til vare →</Link></p>
   <label className={styles.search}><span>Søk varer direkte fra Bygger’n og andre leverandører</span><input id="offer-catalog-search" type="search" value={query} autoComplete="off" onChange={e=>{setQuery(e.target.value);setMessage("")}} placeholder="Skriv navn, varenummer eller EAN …"/></label>
   <div className={styles.options}>
    <label>Leverandør<select value={supplier} onChange={e=>{const id=e.target.value;setSupplier(id);const selected=suppliers.find(row=>row.id===id);if(selected)setMarkup(String(selected.defaultMarkupPercent??15))}}><option value="">Alle</option>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
