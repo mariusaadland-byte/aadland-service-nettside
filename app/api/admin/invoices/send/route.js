@@ -16,6 +16,7 @@ export async function POST(req){
  const s=db();if(!s)return fail("Database utilgjengelig.",503);
  let {data:invoice,error}=await s.from("invoice_drafts").select("*").eq("id",id).maybeSingle();
  if(error||!invoice)return fail("Fakturaen ble ikke funnet.",404);
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invoice.customer?.email||""))return fail("Fyll inn en gyldig e-postadresse før e-postsending.");
  if(invoice.sent_at)return NextResponse.json({ok:true,alreadySent:true,invoiceNumber:invoice.invoice_number,sentTo:invoice.customer.email});
  if(invoice.status==="draft"){
   const result=await s.rpc("issue_invoice_draft",{p_id:id,p_expected_updated_at:invoice.updated_at});
