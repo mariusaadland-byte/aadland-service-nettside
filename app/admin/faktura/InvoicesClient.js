@@ -34,13 +34,13 @@ export default function InvoicesClient(){
  async function create(quoteId){setBusy(true);setError("");try{const res=await fetch("/api/admin/invoices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(quoteId?{quoteId}:{})});const data=await res.json();if(!res.ok)throw Error(data.error);await load();setActive(data.id);setSaved("");}catch(e){setError(e.message)}finally{setBusy(false)}}
  const draft=items.find(x=>x.id===active);
  const [form,setForm]=useState(null);
- const [showPreview,setShowPreview]=useState(false);
  const [previewOpen,setPreviewOpen]=useState(false);
- async function downloadPdf(){setBusy(true);setError("");try{const id=showPreview&&form?form.id:"example";const response=await fetch("/api/admin/invoices/pdf?id="+encodeURIComponent(id));if(!response.ok){const data=await response.json().catch(()=>({}));throw Error(data.error||"Kunne ikke lage PDF.");}const blob=await response.blob();const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="Aadland-Service-"+(id==="example"?"TESTFAKTURA":id)+".pdf";a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}catch(e){setError(e.message)}finally{setBusy(false)}}
+ async function downloadPdf(){setBusy(true);setError("");setSaved("");try{const id=form?form.id:"example";if(form){await persist(form);setSaved("Kladden er lagret.");}const response=await fetch("/api/admin/invoices/pdf?id="+encodeURIComponent(id));if(!response.ok){const data=await response.json().catch(()=>({}));throw Error(data.error||"Kunne ikke lage PDF.");}const blob=await response.blob();const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="Aadland-Service-"+(id==="example"?"TESTFAKTURA":id)+".pdf";a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}catch(e){setError(e.message)}finally{setBusy(false)}}
  useEffect(()=>{setForm(draft?{...draft,customer:{...draft.customer},line_items:draft.line_items.map(x=>({...x}))}:null)},[active,items]);
- const change=(key,value)=>setForm(x=>({...x,[key]:value}));
- const changeLine=(i,key,value)=>setForm(x=>({...x,line_items:x.line_items.map((l,j)=>j===i?{...l,[key]:value}:l)}));
- async function save(){setBusy(true);setError("");setSaved("");try{const res=await fetch("/api/admin/invoices",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:form.id,title:form.title,customer:form.customer,pricingModel:form.pricing_model,lineItems:form.line_items,notes:form.notes,dueDate:form.due_date})});const data=await res.json();if(!res.ok)throw Error(data.error);setSaved("Kladden er lagret.");await load();}catch(e){setError(e.message)}finally{setBusy(false)}}
+ const change=(key,value)=>{setSaved("");setForm(x=>({...x,[key]:value}));};
+ const changeLine=(i,key,value)=>{setSaved("");setForm(x=>({...x,line_items:x.line_items.map((l,j)=>j===i?{...l,[key]:value}:l)}));};
+ async function persist(snapshot){const res=await fetch("/api/admin/invoices",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:snapshot.id,title:snapshot.title,customer:snapshot.customer,pricingModel:snapshot.pricing_model,lineItems:snapshot.line_items,notes:snapshot.notes,dueDate:snapshot.due_date})});const data=await res.json();if(!res.ok)throw Error(data.error||"Fakturakladden kunne ikke lagres.");}
+ async function save(){setBusy(true);setError("");setSaved("");try{await persist(form);setSaved("Kladden er lagret.");await load();}catch(e){setError(e.message)}finally{setBusy(false)}}
  function exportCsv(){if(!form)return;const esc=v=>'"'+String(v??"").replaceAll('"','""')+'"';const rows=[["Beskrivelse","Antall","Enhet","Enhetspris eks MVA (kr)","MVA %"],...form.line_items.map(l=>[l.description,l.quantity,l.unit,(Number(l.unitPriceOre)/100).toFixed(2),l.vatRate])];const csv="\uFEFF"+rows.map(row=>row.map(esc).join(";")).join("\r\n");const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download="fakturakladd-"+form.id+".csv";a.click();URL.revokeObjectURL(url);}
  return <main className="admin" style={{maxWidth:1100,margin:"auto",padding:24}}><Link href="/admin">← Admin</Link><h1>Faktura</h1><p>Opprett og rediger fakturakladder. Kladdene er ikke utstedte fakturaer og kan ikke sendes ennå.</p>
  {error&&<p role="alert" style={{color:"crimson"}}>{error}</p>}
@@ -60,7 +60,7 @@ export default function InvoicesClient(){
  <h3>Sum inkl. MVA: {money(total(form.line_items))}</h3>
  <label>Notater <textarea value={form.notes||""} onChange={e=>change("notes",e.target.value)}/></label>
  <p>Kontonummer: <b>8450 46 22699</b> · Avsender ved senere utsending: noreply@aadland-service.no</p>
- <button type="button" onClick={()=>{setShowPreview(true);setPreviewOpen(true)}}>Vis fakturakladd</button> <button disabled={busy} onClick={save}>Lagre kladd</button> <button onClick={exportCsv}>Eksporter linjer (CSV)</button> {saved&&<span>{saved}</span>}
+ <button type="button" onClick={()=>{setPreviewOpen(true)}}>Vis fakturakladd</button> <button disabled={busy} onClick={save}>Lagre kladd</button> <button onClick={exportCsv}>Eksporter linjer (CSV)</button> {saved&&<span>{saved}</span>}
  </>:<p>Velg en kladd til venstre.</p>}</section></div>
  <section className="invoicePreviewSection" style={{marginTop:20,border:"1px solid #d8c9ae",borderRadius:14,padding:"16px 18px",background:"#fff",maxWidth:850}}>
  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
@@ -71,7 +71,7 @@ export default function InvoicesClient(){
  <p style={{fontSize:13}}>Forhåndsvisning – ikke utstedt.</p>
  <button type="button" disabled={busy} onClick={downloadPdf}>Last ned faktura som PDF</button>{" "}
  <button type="button" onClick={()=>window.print()}>Skriv ut</button>
- <InvoicePreview invoice={showPreview&&form?form:sample} example={!(showPreview&&form)}/>
+ <InvoicePreview invoice={form||sample} example={!form}/>
  </div>}
  </section></main>;
 }
