@@ -139,6 +139,9 @@ export default function InvoicesClient({archiveMode=false}){
  }
  async function sendInvoice(){
   if(!form||busy)return;
+  const recipient=String(form.customer?.email||"").trim();
+  if(!recipient){setError("Fyll inn kundens e-postadresse på kundekortet før sending.");return;}
+  if(!window.confirm("Sende faktura"+(form.invoice_number?" "+form.invoice_number:"")+" til "+recipient+"?\\n\\nBeløp inkl. MVA: "+money(total(form.line_items))+". Ved bekreftelse blir fakturaen utstedt hvis den er kladd, og deretter sendt til kunden."))return;
   setBusy(true);setError("");setSaved("");
   try{
    if(form.status==="draft"){

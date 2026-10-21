@@ -57,14 +57,14 @@ export async function POST(req){
   name:contact.name,email:contact.email||"",phone:contact.phone||"",
   address:contact.address||"",paymentTermsDays:contact.payment_terms_days??14,
   paymentMethod:input.paymentMethod,
-  workDescription:[title,String(quote.intro_text||"").slice(0,1800)].filter(Boolean).join("\n\n").slice(0,3000),
+  workDescription:title,
   workDate:""
  };
  const payload={
   source_quote_id:id,installment_index:0,
   title,customer,pricing_model:pricingModel,
   line_items:lines.map(l=>({description:String(l.description).slice(0,500),type:l.type||"work",quantity:Number(l.quantity),unit:String(l.unit||"stk"),unitPriceOre:Number(l.unitPriceOre),vatRate:Number(l.vatRate)})),
-  notes:["Opprettet fra tilbud "+quote.quote_number+" uten egen tilbudsgodkjenning.",String(quote.notes||"")].filter(Boolean).join("\n\n").slice(0,4000),
+  notes:String(quote.notes||"").slice(0,4000),
   due_date_mode:"auto",status:"draft"
  };
  const {data:created,error:insertError}=await s.from("invoice_drafts").insert(payload).select("id").single();

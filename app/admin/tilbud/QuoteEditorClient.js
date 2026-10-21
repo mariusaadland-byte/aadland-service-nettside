@@ -63,7 +63,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [converting,setConverting]=useState(false);
  const [loading,setLoading]=useState(Boolean(quoteId));
  const [saving,setSaving]=useState(false);
- const [billing,setBilling]=useState(false),[directInvoiceId,setDirectInvoiceId]=useState(null),[invoiceMode,setInvoiceMode]=useState("bank");
+ const [billing,setBilling]=useState(false),[directInvoiceId,setDirectInvoiceId]=useState(null);
  const [sending,setSending]=useState(false);
  const [error,setError]=useState("");
  const [savedMessage,setSavedMessage]=useState("");
@@ -274,7 +274,6 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     setPaperSignedDate(quote.paperSignedDate||"");
     setConvertedOrderId(quote.convertedOrderId||null);
     setDirectInvoiceId(quote.directInvoiceId||null);
-    setInvoiceMode(quote.pricingPaymentMethod==="vipps"?"vipps":"bank");
     const loadedState={
      title:quote.title||"",
      status:quote.status||"draft",
@@ -555,7 +554,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    if(!saved?.id)return;
    const response=await fetch("/api/admin/quotes/direct-invoice",{
     method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({quoteId:saved.id,paymentMethod:invoiceMode})
+    body:JSON.stringify({quoteId:saved.id,paymentMethod:v.pricingPaymentMethod==="vipps"?"vipps":"bank"})
    });
    const data=await response.json().catch(()=>({}));
    if(!response.ok){if(!quoteId)router.replace("/admin/tilbud/"+encodeURIComponent(saved.id));throw Error(data.error||"Fakturaen kunne ikke opprettes.");}
@@ -750,18 +749,6 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     <div className="quoteEditorHeaderActions">
      {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Forhåndsvis / last ned PDF</button>}
      {quoteId&&["draft","sent"].includes(v.status)&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
-      {v.directInvoice&&v.skipQuoteApproval&&<section style={{border:"1px solid #b8a27d",borderRadius:10,padding:14,margin:"12px 0",display:"grid",gap:10}}>
-       <div className="kicker">FAKTURER DIREKTE</div>
-       <label style={{display:"grid",gap:5}}>Hvordan skal kunden betale?
-        <select disabled={billing||Boolean(directInvoiceId)} value={invoiceMode} onChange={e=>setInvoiceMode(e.target.value)}>
-         <option value="bank">Faktura på e-post / bankbetaling</option>
-         <option value="vipps">Vipps-betaling</option>
-        </select>
-       </label>
-       <small>Fakturaen åpnes for kontroll. Du velger selv når du sender den. Fakturaforfall hentes fra kundekortet.</small>
-       {directInvoiceId?<Link href={"/admin/faktura?id="+directInvoiceId+"&preview=1"} className="btn">Åpne faktura →</Link>:
-       <button type="button" className="btn" disabled={saving||billing||Boolean(locked)} onClick={makeDirectInvoice}>{billing?"Klargjør faktura …":"Fakturer →"}</button>}
-      </section>}
      {quoteId&&v.status==="draft"&&!paperIssuedAt&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
      {quoteId&&v.status==="sent"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy} onClick={registerPaperIssue}>Registrer utlevert på papir</button>}
      {quoteId&&v.status==="sent"&&<button type="button" className="btn alt" disabled={paperBusy} onClick={openPaperAcceptance}>Registrer papirgodkjenning</button>}
@@ -769,7 +756,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
      {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href={"/admin/oppdrag/"+convertedOrderId+"/planlegg"}>Planlegg oppdrag</Link><Link href="/admin">Åpne backoffice</Link></div>}
      {quoteId&&["draft","sent"].includes(v.status)&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={()=>sendQuote()}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
-     {!locked&&<button type="button" className="btn" disabled={saving||sending||converting} onClick={()=>save()}>{saving?"Lagrer …":"Lagre tilbud"}</button>}
+     {!locked&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn" disabled={saving||sending||converting} onClick={()=>save()}>{saving?"Lagrer …":"Lagre tilbud"}</button>}
     </div>
    </div>
 
@@ -995,6 +982,18 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      <div className="quoteSummaryPlan">
       {v.paymentPlan.map(row=><span key={row.id}><small>{row.label} · {row.percent}%</small><b>{nok(calc.total*(Number(row.percent)||0)/100)}</b></span>)}
      </div>
+      {v.directInvoice&&v.skipQuoteApproval&&<section style={{border:"1px solid #b8a27d",borderRadius:10,padding:14,margin:"12px 0",display:"grid",gap:10}}>
+       <div className="kicker">FAKTURER DIREKTE</div>
+       <label style={{display:"grid",gap:5}}>Hvordan skal kunden betale?
+        <select disabled={billing||Boolean(directInvoiceId)} value={v.pricingPaymentMethod==="vipps"?"vipps":"bank"} onChange={e=>set("pricingPaymentMethod",e.target.value)}>
+         <option value="bank">Faktura på e-post / bankbetaling</option>
+         <option value="vipps">Vipps-betaling</option>
+        </select>
+       </label>
+       <small>Fakturaen åpnes for kontroll. Du velger selv når du sender den. Fakturaforfall hentes fra kundekortet.</small>
+       {directInvoiceId?<Link href={"/admin/faktura?id="+directInvoiceId+"&preview=1"} className="btn">Åpne faktura →</Link>:
+       <button type="button" className="btn" disabled={saving||billing||Boolean(locked)} onClick={makeDirectInvoice}>{billing?"Klargjør faktura …":"Fakturer →"}</button>}
+      </section>}
      {quoteId&&v.status==="draft"&&!paperIssuedAt&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
      {quoteId&&v.status==="sent"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy} onClick={registerPaperIssue}>Registrer utlevert på papir</button>}
      {quoteId&&v.status==="sent"&&<button type="button" className="btn alt" disabled={paperBusy} onClick={openPaperAcceptance}>Registrer papirgodkjenning</button>}
