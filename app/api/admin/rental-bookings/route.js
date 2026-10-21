@@ -406,7 +406,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
   }
   const reference=String(b.depositReference??current.deposit_reference??"").trim()||"Manuelt registrert";
   const now=new Date().toISOString();
-  const {error}=await s.from("rental_bookings").update({
+  const {data:changed,error}=await s.from("rental_bookings").update({
    deposit_status:"held",
    deposit_reference:reference,
    deposit_held_ore:amount,
@@ -414,16 +414,20 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
    deposit_released_at:null,
    deposit_charged_ore:0,
    updated_at:now
-  }).eq("id",b.id);
+  }).eq("id",b.id).eq("deposit_status",current.deposit_status)
+   .eq("deposit_charged_ore",Number(current.deposit_charged_ore)||0)
+   .is("deposit_released_at",null).select("id").maybeSingle();
   if(error){
    if(String(error.code||"")==="42703")return NextResponse.json({error:"Databaseoppdateringen for depositum mangler.",setupRequired:true},{status:409});
    console.error("RENTAL DEPOSIT HOLD",error);
    return NextResponse.json({error:"Depositumet kunne ikke registreres."},{status:500});
   }
+  if(!changed)return NextResponse.json({error:"Depositumet er endret eller allerede avsluttet. Last inn bookingen på nytt."},{status:409});
   return NextResponse.json({ok:true,depositStatus:"held",depositReference:reference});
  }
 
  if(action==="release-deposit"){
+  if(current.deposit_released_at)return NextResponse.json({error:"Depositumet er allerede avsluttet."},{status:409});
   const maximum=Math.max(0,Number(current.deposit_ore)||0);
   if(maximum<=0)return NextResponse.json({error:"Denne bookingen har ikke depositum."},{status:400});
   if(!["held","partially_charged"].includes(current.deposit_status)){
@@ -432,40 +436,47 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
   const charged=Math.max(0,Math.min(maximum,Number(current.deposit_charged_ore)||0));
   const status=charged>0?"partially_charged":"released";
   const now=new Date().toISOString();
-  const {error}=await s.from("rental_bookings").update({
+  const {data:changed,error}=await s.from("rental_bookings").update({
    deposit_status:status,
    deposit_released_at:now,
    updated_at:now
-  }).eq("id",b.id);
+  }).eq("id",b.id).eq("deposit_status",current.deposit_status)
+   .eq("deposit_charged_ore",Number(current.deposit_charged_ore)||0)
+   .is("deposit_released_at",null).select("id").maybeSingle();
   if(error){
    if(String(error.code||"")==="42703")return NextResponse.json({error:"Databaseoppdateringen for depositum mangler.",setupRequired:true},{status:409});
    console.error("RENTAL DEPOSIT RELEASE",error);
    return NextResponse.json({error:"Depositumet kunne ikke frigis."},{status:500});
   }
+  if(!changed)return NextResponse.json({error:"Depositumet er endret eller allerede avsluttet. Last inn bookingen på nytt."},{status:409});
   return NextResponse.json({ok:true,depositStatus:status,depositChargedOre:charged,depositReleasedAt:now});
  }
 
  if(action==="record-deposit-charge"){
+  if(current.deposit_released_at)return NextResponse.json({error:"Depositumet er allerede avsluttet og kan ikke belastes på nytt."},{status:409});
   const maximum=Math.max(0,Number(current.deposit_ore)||0);
-  const amount=Math.max(0,Math.round(Number(b.depositChargedOre)||0));
+  const amount=Number(b.depositChargedOre);
   if(maximum<=0)return NextResponse.json({error:"Denne bookingen har ikke depositum."},{status:400});
   if(!["held","partially_charged","charged"].includes(current.deposit_status)){
    return NextResponse.json({error:"Registrer depositumet som mottatt/holdt før et beløp brukes."},{status:409});
   }
-  if(amount<=0||amount>maximum)return NextResponse.json({error:"Beløpet som brukes av depositumet må være større enn 0 og ikke høyere enn depositumet."},{status:400});
+  if(!Number.isSafeInteger(amount)||amount<=0||amount>maximum)return NextResponse.json({error:"Beløpet som brukes av depositumet må være større enn 0 og ikke høyere enn depositumet."},{status:400});
   const status=amount>=maximum?"charged":"partially_charged";
   const now=new Date().toISOString();
-  const {error}=await s.from("rental_bookings").update({
+  const {data:changed,error}=await s.from("rental_bookings").update({
    deposit_status:status,
    deposit_charged_ore:amount,
    deposit_released_at:status==="charged"?now:null,
    updated_at:now
-  }).eq("id",b.id);
+  }).eq("id",b.id).eq("deposit_status",current.deposit_status)
+   .eq("deposit_charged_ore",Number(current.deposit_charged_ore)||0)
+   .is("deposit_released_at",null).select("id").maybeSingle();
   if(error){
    if(String(error.code||"")==="42703")return NextResponse.json({error:"Databaseoppdateringen for depositum mangler.",setupRequired:true},{status:409});
    console.error("RENTAL DEPOSIT CHARGE",error);
    return NextResponse.json({error:"Bruken av depositumet kunne ikke registreres."},{status:500});
   }
+  if(!changed)return NextResponse.json({error:"Depositumet er endret eller allerede avsluttet. Last inn bookingen på nytt."},{status:409});
   return NextResponse.json({ok:true,depositStatus:status,depositChargedOre:amount});
  }
 
