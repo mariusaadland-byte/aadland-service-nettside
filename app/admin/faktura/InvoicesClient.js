@@ -139,6 +139,7 @@ export default function InvoicesClient({archiveMode=false}){
  }
  async function printInvoice(){
   if(!form||busy)return;
+  if(form.status==="draft"&&!window.confirm("Utstede faktura på "+money(total(form.line_items))+" inkl. MVA? Fakturaen får nummer og låses for videre endringer. Den sendes ikke på e-post automatisk."))return;
   let printWindow=null;setBusy(true);setError("");setSaved("");
   try{
    if(form.status==="draft"){
@@ -161,6 +162,12 @@ export default function InvoicesClient({archiveMode=false}){
   if(!form||busy)return;
   const recipient=String(form.customer?.email||"").trim();
   if(!recipient){setError("Fyll inn kundens e-postadresse på kundekortet før sending.");return;}
+  if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(recipient)){setError("Fyll inn en gyldig e-postadresse.");return;}
+  if(form.status==="draft"){
+   if(!form.customer?.name?.trim()||!form.customer?.address?.trim()){setError("Fyll inn kundenavn og fakturaadresse før du sender.");return;}
+   if(!form.customer?.workDate){setError("Velg leveringsdato før fakturering. Du finner feltet ved fakturaforhåndsvisningen.");return;}
+   if(form.due_date_mode==="manual"&&!form.due_date){setError("Velg forfallsdato før du sender.");return;}
+  }
   if(!window.confirm("Sende faktura"+(form.invoice_number?" "+form.invoice_number:"")+" til "+recipient+"?\\n\\nBeløp inkl. MVA: "+money(total(form.line_items))+". Ved bekreftelse blir fakturaen utstedt hvis den er kladd, og deretter sendt til kunden."))return;
   setBusy(true);setError("");setSaved("");
   try{
@@ -208,6 +215,12 @@ export default function InvoicesClient({archiveMode=false}){
  <button type="button" aria-expanded={previewOpen} onClick={()=>setPreviewOpen(x=>!x)}>{previewOpen?"Lukk faktura":"Vis faktura ›"}</button>
  </div>
  {previewOpen&&<div style={{marginTop:16}}>
+ {form?.status==="draft"&&<label style={{display:"grid",gap:5,marginBottom:12,maxWidth:310}}>
+  <strong>Leveringsdato / dato for utført arbeid</strong>
+  <input type="date" value={form.customer?.workDate||""} disabled={busy} onChange={event=>change("customer",{...form.customer,workDate:event.target.value})}/>
+  <small>Dato må velges før fakturaen utstedes. Den blir lagret når du sender eller lagrer kladden.</small>
+ </label>}
+ {error&&<p role="alert" style={{color:"crimson"}}>{error}</p>}
  <p style={{fontSize:13}}>{form?.invoice_number?"Utstedt faktura "+form.invoice_number:"Forhåndsvisning – ikke utstedt."}</p>
  <button type="button" disabled={busy} onClick={downloadPdf}>Last ned faktura som PDF</button>{" "}
  <button type="button" onClick={()=>window.print()}>Skriv ut forhåndsvisning</button>
