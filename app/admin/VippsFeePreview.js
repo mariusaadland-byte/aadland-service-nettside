@@ -3,7 +3,7 @@ import {useId,useState} from "react";
 import {vippsFeeEstimateForPayments,vippsPriceForPayoutWithPayments} from "../../lib/vippsFeeEstimate";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(n/100);
 const parse=value=>{const s=String(value).trim().replace(",",".");return s?Number(s):NaN};
-export default function VippsFeePreview({amountOre,title="Vipps – intern prisberegning",note="",onApply,applyLabel="Bruk beregnet pris",disabled=false,paymentPercentages=[100],allowPriceAdjustment=true}){
+export default function VippsFeePreview({amountOre,title="Vipps – intern prisberegning",note="",onApply,applyLabel="Bruk beregnet pris",disabled=false,paymentPercentages=[100],allowPriceAdjustment=true,noPriceAdjustmentText="Ingen materialer eller andre varelinjer å justere. Timeprisen endres aldri; Vipps-kostnaden dekkes av bedriften."}){
  const id=useId(),[percent,setPercent]=useState("2.99"),[fixed,setFixed]=useState("1"),[target,setTarget]=useState("");
  const rawRate=parse(percent)*100,rawFixed=parse(fixed)*100;
  const terms={rateBps:Math.round(rawRate),fixedOre:Math.round(rawFixed)};
