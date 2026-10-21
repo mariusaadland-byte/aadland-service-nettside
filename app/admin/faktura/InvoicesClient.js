@@ -100,7 +100,21 @@ export default function InvoicesClient({archiveMode=false}){
  useEffect(()=>{setForm(draft?{...draft,customer:{...draft.customer},line_items:draft.line_items.map(x=>({...x}))}:null)},[active,items]);
  const change=(key,value)=>{setSaved("");setForm(x=>({...x,[key]:value,...(key==="due_date_mode"&&value==="auto"?{due_date:invoiceDueDate(today,x.customer?.paymentTermsDays??14)}:{})}));};
  const changeLine=(i,key,value)=>{setSaved("");setForm(x=>({...x,line_items:x.line_items.map((l,j)=>j===i?{...l,[key]:value}:l)}));};
- async function persist(snapshot){const res=await fetch("/api/admin/invoices",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:snapshot.id,title:snapshot.title,customer:snapshot.customer,pricingModel:snapshot.pricing_model,lineItems:snapshot.line_items,notes:snapshot.notes,dueDate:snapshot.due_date,dueDateMode:snapshot.due_date_mode||"auto"})});const data=await res.json();if(!res.ok)throw Error(data.error||"Fakturakladden kunne ikke lagres.");}
+ async function persist(snapshot){
+  if(!snapshot?.id||!snapshot.updated_at)throw Error("Fakturakladden må lastes inn på nytt før lagring.");
+  const res=await fetch("/api/admin/invoices",{
+   method:"PATCH",headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({id:snapshot.id,expectedUpdatedAt:snapshot.updated_at,title:snapshot.title,
+    customer:snapshot.customer,pricingModel:snapshot.pricing_model,lineItems:snapshot.line_items,
+    notes:snapshot.notes,dueDate:snapshot.due_date,dueDateMode:snapshot.due_date_mode||"auto"})
+  });
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok)throw Error(data.error||"Fakturakladden kunne ikke lagres.");
+  if(!data.updatedAt)throw Error("Lagring ble ikke bekreftet. Last inn kladden på nytt.");
+  // Refresh the local revision without throwing away the saved edits.
+  setItems(current=>current.map(item=>item.id===snapshot.id?{...item,...snapshot,updated_at:data.updatedAt}:item));
+  return data.updatedAt;
+ }
  function applyVippsPrice(quotedGrossOre){
   if(!form||form.status!=="draft")return;
   const result=linesForCustomerTotal(form.line_items,quotedGrossOre);
@@ -112,6 +126,12 @@ export default function InvoicesClient({archiveMode=false}){
   setError("");
  }
  async function save(){setBusy(true);setError("");setSaved("");try{await persist(form);setSaved("Kladden er lagret.");await load();}catch(e){setError(e.message)}finally{setBusy(false)}}
+ async function reloadAfterConflict(){
+  if(busy||!window.confirm("Hente siste lagrede faktura? Endringer du ikke har lagret i dette vinduet blir erstattet av den nyeste kladden."))return;
+  setBusy(true);setError("");setSaved("");
+  try{await load();setSaved("Siste lagrede versjon er hentet. Kontroller kunde, forfall, timer og beløp før du fortsetter.");}
+  finally{setBusy(false);}
+ }
  async function openCustomerCard(){
   if(!form||busy)return;setBusy(true);setError("");
   try{if(form.status==="draft")await persist(form);const r=await fetch("/api/admin/invoices/customer",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:form.id})});const data=await r.json();if(!r.ok)throw Error(data.error);window.location.assign(data.url);}
@@ -160,7 +180,7 @@ export default function InvoicesClient({archiveMode=false}){
  }
  function exportCsv(){if(!form)return;const esc=v=>'"'+String(v??"").replaceAll('"','""')+'"';const rows=[["Beskrivelse","Antall","Enhet","Enhetspris eks MVA (kr)","MVA %"],...form.line_items.map(l=>[l.description,l.quantity,l.unit,(Number(l.unitPriceOre)/100).toFixed(2),l.vatRate])];const csv="\uFEFF"+rows.map(row=>row.map(esc).join(";")).join("\r\n");const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download="fakturakladd-"+form.id+".csv";a.click();URL.revokeObjectURL(url);}
  return <main className="admin" style={{maxWidth:1100,margin:"auto",padding:24}}><Link href="/admin">← Admin</Link><h1>{archiveMode?"Fakturaarkiv":"Fakturakladder"}</h1><nav aria-label="Fakturaoversikt" style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:18}}><Link href="/admin/faktura" aria-current={!archiveMode?"page":undefined}>Kladder</Link><Link href="/admin/faktura/arkiv" aria-current={archiveMode?"page":undefined}>Fakturaarkiv – betalinger</Link></nav><p>{archiveMode?"Her finner du alle utstedte fakturaer. Registrer innbetalinger og se hva som gjenstår. Oversikten bygger på betalingene du registrerer her.":"Opprett og kontroller fakturakladder. Utstedte fakturaer flyttes automatisk til fakturaarkivet."}</p>
- {error&&<p role="alert" style={{color:"crimson"}}>{error}</p>}{printHref&&<p><a href={printHref} target="_blank" rel="noreferrer">Åpne faktura for utskrift →</a></p>}
+ {error&&<p role="alert" style={{color:"crimson"}}>{error} {error.includes("en annen fane")&&<button type="button" disabled={busy} onClick={reloadAfterConflict}>Hent siste fakturakladd</button>}</p>}{printHref&&<p><a href={printHref} target="_blank" rel="noreferrer">Åpne faktura for utskrift →</a></p>}
  {!archiveMode&&<section className="card" style={{padding:18,marginBottom:20}}><h2>Opprett fakturakladd</h2><p>Godkjente tilbud får egne kladder for forskudd, delbetaling og sluttoppgjør etter tilbudets betalingsplan. Faktura- og forfallsdato beregnes automatisk når du fakturerer, etter betalingsfristen på kundekortet.</p><button disabled={busy} onClick={()=>create(null)}>Ny tom kladd</button> <select id="invoiceQuote" defaultValue=""><option value="">Velg godkjent tilbud</option>{quotes.map(q=><option key={q.id} value={q.id}>{q.quoteNumber} – {q.title}</option>)}</select> <button disabled={busy} onClick={()=>{const id=document.getElementById("invoiceQuote").value;if(id)create(id);else setError("Velg et godkjent tilbud.");}}>Hent betalingsplan fra tilbud</button></section>}
  {archiveMode&&<section className="card" style={{padding:18,marginBottom:20}}><h2>Betalingsoversikt</h2><div style={{display:"flex",gap:20,flexWrap:"wrap"}}><div>Utestående<br/><strong>{money(summary.outstanding)}</strong></div><div>Herav forfalt<br/><strong style={{color:"#a52a21"}}>{money(summary.overdue)}</strong></div><div>Registrert innbetalt<br/><strong>{money(summary.paid)}</strong></div></div></section>}
  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,330px),1fr))",gap:20,alignItems:"start"}}>
