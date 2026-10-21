@@ -7,7 +7,7 @@ import {osloDateKey,shiftDateKey} from "../../../lib/osloTime";
 import {CATALOG_QUOTE_TRANSFER_KEY} from "../../../lib/calculatorQuoteLines";
 import QuoteCatalogSearch from "./QuoteCatalogSearch";
 import VippsFeePreview from "../VippsFeePreview";
-import {linesForCustomerTotal} from "../../../lib/vippsPriceLines";
+import {hasAdjustableVippsPriceLine,linesForCustomerTotal} from "../../../lib/vippsPriceLines";
 import {calculateContribution,withPrivateCosts} from "../../../lib/quotePrivateCosts";
 
 const nok=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",maximumFractionDigits:2}).format((Number(ore)||0)/100);
@@ -476,10 +476,10 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  function applyVippsPrice(quotedGrossOre){
   if(locked||v.status!=="draft")return;
   const result=linesForCustomerTotal(v.lineItems,quotedGrossOre);
-  if(!result){setError("Kontroller at alle prislinjene er fylt ut. Denne totalsummen kan ikke legges inn på én eksisterende linje.");return;}
+  if(!result){setError("Ingen gyldig material- eller annen varelinje kan justeres. Timeprisen skal alltid være uendret. Kontroller prislinjene.");return;}
   const line=result.lineItems[result.adjustedLineIndex];
   const previous=nok(calc.total),next=nok(result.totalOre);
-  if(!window.confirm("Bruke "+next+" som ordinær avtalt kundepris (tidligere "+previous+")?\\n\\nEnhetsprisen på «"+(line.description||"prislinje")+"» blir justert. Det opprettes ingen separat Vipps-gebyrlinje. Kunden må godkjenne prisen før bestilling."))return;
+  if(!window.confirm("Bruke "+next+" som ordinær avtalt kundepris (tidligere "+previous+")?\\n\\nBare prislinjen «"+(line.description||"varelinje")+"» kan justeres. Timeprisen endres ikke. Det opprettes ingen separat Vipps-gebyrlinje. Kunden må godkjenne prisen før bestilling."))return;
   setV(current=>({...current,lineItems:result.lineItems,pricingPaymentMethod:"vipps"}));
   setError("");
   setSavedMessage("Vipps-prisen er lagt inn i tilbudslinjene. Kontroller linjen, eventuell delbetalingsplan og lagre tilbudet.");
@@ -887,7 +887,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
         <option value="vipps">Vipps – beregn avtalt pris ut fra ønsket utbetaling</option>
        </select>
       </label>
-      {v.pricingPaymentMethod==="vipps"&&<VippsFeePreview amountOre={calc.total} paymentPercentages={v.paymentPlan.map(p=>Number(p.percent))} disabled={Boolean(locked)} title="Vipps – pris for tilbudet" onApply={!locked?applyVippsPrice:undefined} applyLabel="Bruk ordinær kundepris i tilbudslinjene" note="Dette er et anslag for antallet delbetalinger i betalingsplanen. Når prisen er avtalt, skal den ikke økes i etterkant på grunn av betalingsmåten."/>}
+      {v.pricingPaymentMethod==="vipps"&&<VippsFeePreview amountOre={calc.total} paymentPercentages={v.paymentPlan.map(p=>Number(p.percent))} disabled={Boolean(locked)} allowPriceAdjustment={hasAdjustableVippsPriceLine(v.lineItems)} title="Vipps – pris for tilbudet" onApply={!locked&&hasAdjustableVippsPriceLine(v.lineItems)?applyVippsPrice:undefined} applyLabel="Legg beregnet pris på materialer / andre varer" note="Dette er et anslag for antallet delbetalinger i betalingsplanen. Timesatsen skal alltid være uendret. Når prisen er avtalt, skal den ikke økes i etterkant på grunn av betalingsmåten."/>}
      </section>
      <section aria-label="Kvalitetssjekk før sending" style={{padding:"12px 14px",border:"1px solid var(--border, #ccc)",borderRadius:8,marginBottom:16}}>
       <strong>{quoteQualityIssues.length?"Kvalitetssjekk: "+quoteQualityIssues.length+" forhold å kontrollere":"Kvalitetssjekk: Ingen avvik funnet"}</strong>
