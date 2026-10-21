@@ -1,20 +1,20 @@
 "use client";
 import {useId,useState} from "react";
-import {vippsFeeEstimate,vippsPriceForPayout} from "../../lib/vippsFeeEstimate";
+import {vippsFeeEstimateForPayments,vippsPriceForPayoutWithPayments} from "../../lib/vippsFeeEstimate";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(n/100);
 const parse=value=>{const s=String(value).trim().replace(",",".");return s?Number(s):NaN};
-export default function VippsFeePreview({amountOre,title="Vipps – intern prisberegning",note="",onApply,applyLabel="Bruk beregnet pris",disabled=false}){
+export default function VippsFeePreview({amountOre,title="Vipps – intern prisberegning",note="",onApply,applyLabel="Bruk beregnet pris",disabled=false,paymentPercentages=[100]}){
  const id=useId(),[percent,setPercent]=useState("2.99"),[fixed,setFixed]=useState("1"),[target,setTarget]=useState("");
  const rawRate=parse(percent)*100,rawFixed=parse(fixed)*100;
  const terms={rateBps:Math.round(rawRate),fixedOre:Math.round(rawFixed)};
  const valid=Number.isFinite(rawRate)&&Number.isFinite(rawFixed);
- const estimate=valid?vippsFeeEstimate(Number(amountOre),terms):null;
+ const estimate=valid?vippsFeeEstimateForPayments(Number(amountOre),paymentPercentages,terms):null;
  const desired=target.trim()?Math.round(parse(target)*100):null;
- const suggestion=valid&&desired!==null?vippsPriceForPayout(desired,terms):null;
+ const suggestion=valid&&desired!==null?vippsPriceForPayoutWithPayments(desired,paymentPercentages,terms):null;
  return <section aria-label={title} style={{padding:14,margin:"12px 0",background:"#f8f5ee",border:"1px solid #ddd0b9",borderRadius:10}}>
   <h4 style={{margin:"0 0 8px"}}>{title}</h4>
   {estimate?<div aria-live="polite"><div>Kundepris inkl. mva.: <b>{money(estimate.amountOre)}</b></div><div>Anslått Vipps-kostnad: <b>{money(estimate.feeOre)}</b></div><div>Anslått utbetalt etter Vipps: <b>{money(estimate.payoutOre)}</b></div></div>:<p>Kontroller beløp og gebyrsats.</p>}
-  <p style={{fontSize:12,margin:"8px 0"}}>Utbetalingen er før øvrige kostnader og mva-oppgjør. Standardsats for Integrert betaling: 2,99 % + 1 kr per betaling. Faktisk avtale og oppgjør kan avvike.{note?" "+note:""}</p>
+  <p style={{fontSize:12,margin:"8px 0"}}>{estimate?.paymentCount>1?"Det er regnet "+estimate.paymentCount+" Vipps-betalinger etter betalingsplanen, med fastgebyr per betaling. ":""}Utbetalingen er før øvrige kostnader og mva-oppgjør. Standardsats for Integrert betaling: 2,99 % + 1 kr per betaling. Faktisk avtale og oppgjør kan avvike.{note?" "+note:""}</p>
   <details><summary>Beregn pris fra ønsket utbetaling / endre beregningssats</summary>
    <div style={{display:"flex",flexWrap:"wrap",gap:12,marginTop:10}}>
     <label htmlFor={id+"-percent"}>Vipps-sats (%)<input id={id+"-percent"} type="text" inputMode="decimal" value={percent} disabled={disabled} onChange={e=>setPercent(e.target.value)}/></label>
