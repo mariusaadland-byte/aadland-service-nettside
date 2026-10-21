@@ -7,8 +7,8 @@ export default async function CustomerCardPage({params,searchParams}){
  if(!(user.role==="owner"||user.canUpdateOrders||user.canManageProducts))redirect("/admin");
  const {id}=await params;const query=await searchParams;
  const s=db();if(!s)notFound();
- const {data,error}=await s.from("admin_customer_contacts").select("id,name,email,phone,address,updated_at").eq("id",id).maybeSingle();
+ const {data,error}=await s.from("admin_customer_contacts").select("id,name,email,phone,address,payment_terms_days,updated_at").eq("id",id).maybeSingle();
  if(error||!data)notFound();
  const invoiceId=/^[0-9a-f-]{36}$/i.test(query?.invoiceId||"")?query.invoiceId:null;
- return <CustomerCardClient contact={{...data,updatedAt:data.updated_at}} invoiceId={invoiceId}/>;
+ return <CustomerCardClient contact={{...data,paymentTermsDays:data.payment_terms_days,updatedAt:data.updated_at}} invoiceId={invoiceId}/>;
 }
