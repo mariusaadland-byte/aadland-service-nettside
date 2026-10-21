@@ -9,6 +9,7 @@ import {sendRentalConfirmation} from "../../../lib/rentalConfirmationEmail";
 import {rentalBillingDecision} from "../../../lib/rentalBilling";
 import {vippsUnitReadiness} from "../../../lib/vippsReadiness";
 import {createRentalPaymentLinkToken} from "../../../lib/rentalPaymentLink";
+import {peakRentalBookings} from "../../../lib/rentalAvailability";
 
 const RENTAL_TERMS_VERSION="2026-10";
 
@@ -143,10 +144,10 @@ export async function POST(req){
 
   const [{data:blocks,error:blockError},{data:bookings,error:bookingError}]=await Promise.all([
    s.from("rental_blocks").select("id").eq("rental_item_id",item.id).lte("start_date",to).gte("end_date",from),
-   s.from("rental_bookings").select("id").eq("rental_item_id",item.id).in("status",["new","confirmed","active"]).lte("start_date",to).gte("end_date",from)
+   s.from("rental_bookings").select("id,start_date,end_date").eq("rental_item_id",item.id).in("status",["new","confirmed","active"]).lte("start_date",to).gte("end_date",from)
   ]);
   if(blockError||bookingError)throw blockError||bookingError;
-  if((blocks?.length||0)>0||(bookings?.length||0)>=Math.max(1,Number(item.quantity)||1)){
+  if((blocks?.length||0)>0||peakRentalBookings(bookings,b.startDate,b.endDate,buffer)>=Math.max(1,Number(item.quantity)||1)){
    return NextResponse.json({error:"Utstyret er allerede opptatt i denne perioden."},{status:409});
   }
 
