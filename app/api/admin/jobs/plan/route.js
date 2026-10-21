@@ -18,7 +18,9 @@ function validDate(value){
  const input=String(value||"").trim();
  if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(input))return null;
  const d=new Date(input);
- return Number.isNaN(d.getTime())?null:d.toISOString();
+ if(Number.isNaN(d.getTime()))return null;
+ const iso=d.toISOString();
+ return iso.slice(0,19)===input.slice(0,19)?iso:null;
 }
 async function loadJob(s,id){
  const {data:order,error}=await s.from("orders")
@@ -67,18 +69,19 @@ export async function GET(req){
  }});
 }
 
-async function savePlan(s,id,startAt,agreement,currentStartAt=null){
+async function savePlan(s,id,startAt,agreement,currentStartAt=null,currentAgreement=""){
  const start=validDate(startAt);
  if(!start)return {error:"Velg gyldig dato og klokkeslett for oppstart.",status:400};
  if(!agreement)return {error:"Skriv kort hva som er avtalt videre med kunden.",status:400};
  const now=new Date().toISOString();
  const oldStart=currentStartAt?new Date(currentStartAt).toISOString():null;
  const startChanged=oldStart!==start;
+ const planChanged=startChanged||clean(currentAgreement,8000)!==agreement;
  const {data,error}=await s.from("orders").update({
   job_start_at:start,
   job_customer_agreement:agreement,
   job_planning_updated_at:now,
-  ...(startChanged?{job_reminder_sent_at:null}:{}),
+  ...(planChanged?{job_confirmation_sent_at:null,job_reminder_sent_at:null}:{}),
   updated_at:now
  }).eq("id",id).select("id,order_number,order_type,status,customer,customer_user_id,total_ore,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at,job_reminder_sent_at").single();
  if(error){
@@ -100,7 +103,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
  const loaded=await loadJob(s,id);
  if(loaded.setupRequired)return NextResponse.json({error:loaded.error,setupRequired:true},{status:409});
  if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status||500});
- const saved=await savePlan(s,id,body.startAt,agreement,loaded.order.job_start_at);
+ const saved=await savePlan(s,id,body.startAt,agreement,loaded.order.job_start_at,loaded.order.job_customer_agreement);
  if(saved.error)return NextResponse.json({error:saved.error,setupRequired:saved.setupRequired===true},{status:saved.status||500});
  return NextResponse.json({ok:true,job:{
   startAt:saved.data.job_start_at,
@@ -124,7 +127,7 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  if(loaded.setupRequired)return NextResponse.json({error:loaded.error,setupRequired:true},{status:409});
  if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status||500});
 
- const saved=await savePlan(s,id,body.startAt,agreement,loaded.order.job_start_at);
+ const saved=await savePlan(s,id,body.startAt,agreement,loaded.order.job_start_at,loaded.order.job_customer_agreement);
  if(saved.error)return NextResponse.json({error:saved.error,setupRequired:saved.setupRequired===true},{status:saved.status||500});
 
  const email=clean(saved.data.customer?.email,254).toLowerCase();
@@ -179,6 +182,11 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  }
 
  const sentAt=new Date().toISOString();
- await s.from("orders").update({job_confirmation_sent_at:sentAt,job_reminder_sent_at:null,updated_at:sentAt}).eq("id",id);
+ const {data:stamped,error:stampError}=await s.from("orders")
+  .update({job_confirmation_sent_at:sentAt,job_reminder_sent_at:null,updated_at:sentAt})
+  .eq("id",id).eq("job_start_at",saved.data.job_start_at)
+  .eq("job_customer_agreement",saved.data.job_customer_agreement)
+  .select("id").maybeSingle();
+ if(stampError||!stamped)return NextResponse.json({error:"Bekreftelsen ble sendt, men planen kan ha blitt endret eller sendestatus kunne ikke lagres. Last inn planen og kontroller den før du sender på nytt.",emailSent:true,sentTo:email},{status:409});
  return NextResponse.json({ok:true,sentTo:email,sentAt});
 }
