@@ -20,14 +20,11 @@ export async function POST(req){
  const body=await req.json().catch(()=>null);if(!body||typeof body!=="object")return fail("Ugyldig data.");
  let draft;
  if(body.quoteId){
-  const {data:q,error}=await s.from("quotes").select("id,status,title,customer,line_items,intro_text,quote_number").eq("id",body.quoteId).maybeSingle();
-  if(error||!q)return fail("Tilbudet ble ikke funnet.",404);
-  if(q.status!=="accepted")return fail("Bare godkjente tilbud kan gjøres om til fakturakladd.");
-  const {data:existing}=await s.from("invoice_drafts").select("id").eq("source_quote_id",q.id).maybeSingle();
-  if(existing)return NextResponse.json({id:existing.id,alreadyExists:true});
-  const model=/^PRISFORM: TIMEARBEID/.test(q.intro_text||"")?"hourly":/^PRISFORM: PRISOVERSLAG/.test(q.intro_text||"")?"estimate":"fixed";
-  draft={source_quote_id:q.id,title:clean(q.title),customer:q.customer||{},pricing_model:model,line_items:(q.line_items||[]).map(x=>({description:clean(x.description,500),type:x.type,quantity:Number(x.quantity)||0,unit:clean(x.unit,30),unitPriceOre:Number(x.unitPriceOre)||0,vatRate:Number(x.vatRate)===0?0:Number(x.vatRate)||25})),notes:"Basert på tilbud "+clean(q.quote_number,40)};
-  if(model!=="fixed")draft.notes+=". Kontroller faktisk medgåtte timer og materialforbruk før utstedelse.";
+  const {data,error}=await s.rpc("ensure_quote_invoice_drafts",{quote_id:body.quoteId});
+  if(error)return fail(error.message||"Kunne ikke hente betalingsplan.",400);
+  const drafts=Array.isArray(data)?data:[];
+  if(!drafts.length)return fail("Ingen fakturakladder ble opprettet.",500);
+  return NextResponse.json({id:drafts[0].id,ids:drafts.map(x=>x.id),count:drafts.length});
  }else{
   draft={title:clean(body.title)||"Ny faktura",customer:{name:clean(body.customerName),email:clean(body.customerEmail),address:clean(body.customerAddress)},pricing_model:"fixed",line_items:[{description:"Arbeid",type:"work",quantity:1,unit:"stk",unitPriceOre:0,vatRate:25}]};
  }
