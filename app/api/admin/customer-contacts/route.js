@@ -7,16 +7,18 @@ async function allowed(){
  const user=await getAdminUser();
  return Boolean(user&&(user.role==="owner"||user.canViewOrders||user.canUpdateOrders||user.canManageProducts));
 }
-const fields="id,name,email,phone,address,created_at,updated_at";
-const map=r=>({id:r.id,name:r.name,email:r.email||"",phone:r.phone||"",address:r.address||"",createdAt:r.created_at,updatedAt:r.updated_at});
+const fields="id,name,email,phone,address,payment_terms_days,created_at,updated_at";
+const map=r=>({id:r.id,name:r.name,email:r.email||"",phone:r.phone||"",address:r.address||"",paymentTermsDays:r.payment_terms_days??14,createdAt:r.created_at,updatedAt:r.updated_at});
 function sanitize(body){
  const name=String(body.name||"").trim().slice(0,180);
  const email=String(body.email||"").trim().toLowerCase().slice(0,240);
  const phone=String(body.phone||"").trim().slice(0,70);
  const address=String(body.address||"").trim().slice(0,500);
+ const days=Number(body.paymentTermsDays??14);
+ if(!Number.isInteger(days)||days<0||days>365)return {error:"Betalingsfrist må være fra 0 til 365 dager."};
  if(!name)return {error:"Skriv inn kundens navn."};
  if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return {error:"Ugyldig e-postadresse."};
- return {data:{name,email:email||null,phone:phone||null,address:address||null,updated_at:new Date().toISOString()}};
+ return {data:{payment_terms_days:days,name,email:email||null,phone:phone||null,address:address||null,updated_at:new Date().toISOString()}};
 }
 export async function GET(){
  if(!await allowed())return NextResponse.json({error:"Ingen tilgang."},{status:403});
@@ -48,7 +50,7 @@ export async function PATCH(request){
  const input=sanitize(body);if(input.error)return NextResponse.json({error:input.error},{status:400});
  if(!/^[0-9a-f-]{36}$/i.test(body.id||""))return NextResponse.json({error:"Velg en kunde."},{status:400});
  const s=db();if(!s)return NextResponse.json({error:"Databasen er utilgjengelig."},{status:503});
- const {data,error}=await s.rpc("update_invoice_customer_contact",{p_id:body.id,p_expected_updated_at:body.updatedAt,p_name:input.data.name,p_email:input.data.email||"",p_phone:input.data.phone||"",p_address:input.data.address||""});
+ const {data,error}=await s.rpc("update_invoice_customer_contact_terms",{p_id:body.id,p_expected_updated_at:body.updatedAt,p_name:input.data.name,p_email:input.data.email||"",p_phone:input.data.phone||"",p_address:input.data.address||"",p_payment_terms_days:input.data.payment_terms_days});
  if(error)return NextResponse.json({error:error.code==="23505"?"E-postadressen er knyttet til et annet kundekort.":error.message||"Kundekortet kunne ikke lagres."},{status:400});
  return NextResponse.json({contact:map(data)});
 }
