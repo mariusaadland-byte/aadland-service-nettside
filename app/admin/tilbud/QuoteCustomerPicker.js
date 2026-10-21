@@ -14,7 +14,7 @@ export default function QuoteCustomerPicker({customer,onChoose,disabled=false}){
  const [search,setSearch]=useState("");
  const [creating,setCreating]=useState(false);
  const [newCustomer,setNewCustomer]=useState(blank);
- const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState("");
+ const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[refreshing,setRefreshing]=useState(false),[error,setError]=useState("");
  useEffect(()=>{
   let live=true;
   fetch("/api/admin/customer-contacts",{cache:"no-store"}).then(async r=>{
@@ -26,13 +26,26 @@ export default function QuoteCustomerPicker({customer,onChoose,disabled=false}){
   return()=>{live=false};
  },[]);
  const selected=useMemo(()=>contacts.find(item=>item.id===customer.contactId)||null,[contacts,customer.contactId]);
- const matches=useMemo(()=>contacts.filter(item=>[item.name,item.email,item.phone,item.address].some(value=>normalize(value).includes(normalize(search)))).slice(0,30),[contacts,search]);
+ const matches=useMemo(()=>normalize(search)?contacts.filter(item=>[item.name,item.email,item.phone,item.address].some(value=>normalize(value).includes(normalize(search)))).slice(0,30):[],[contacts,search]);
  // Older quotes may only contain a customer snapshot, so allow one-click
  // association with the central customer card without changing it automatically.
  const possibleMatch=!customer.contactId&&customer.name?contacts.find(item=>{
   if(customer.email&&item.email)return normalize(customer.email)===normalize(item.email);
   return normalize(item.name)===normalize(customer.name)&&Boolean(normalize(item.name));
  }):null;
+ async function refreshSelected(){
+  if(!customer.contactId||refreshing)return;
+  setRefreshing(true);setError("");
+  try{
+   const response=await fetch("/api/admin/customer-contacts",{cache:"no-store"});
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(result.error||"Kunderegisteret kunne ikke oppdateres.");
+   const updated=(result.contacts||[]).find(item=>item.id===customer.contactId);
+   if(!updated)throw Error("Kunden finnes ikke lenger i kunderegisteret.");
+   setContacts(result.contacts);onChoose(customerSnapshot(updated));
+  }catch(e){setError(e.message||"Kunden kunne ikke oppdateres.");}
+  finally{setRefreshing(false);}
+ }
  async function create(event){
   event.preventDefault();if(busy)return;
   setBusy(true);setError("");
@@ -58,6 +71,7 @@ export default function QuoteCustomerPicker({customer,onChoose,disabled=false}){
    <small>Betalingsfrist: {customer.paymentTermsDays??selected?.paymentTermsDays??14} dager</small>
    <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:8}}>
     {customer.contactId&&<Link href={"/admin/kunder/"+encodeURIComponent(customer.contactId)} target="_blank" rel="noopener noreferrer">Åpne / rediger kundekort ↗</Link>}
+    {customer.contactId&&!disabled&&<button type="button" className="btn alt" disabled={refreshing} onClick={refreshSelected}>{refreshing?"Oppdaterer …":"Hent siste endringer"}</button>}
     {!disabled&&<button type="button" className="btn alt" onClick={()=>{onChoose({contactId:"",name:"",email:"",phone:"",address:"",paymentTermsDays:14});setSearch("");}}>Bytt kunde</button>}
    </div>
   </div>:customer.name&&<div style={{padding:12,background:"#fff7eb",borderRadius:8,marginBottom:10}}>
@@ -67,12 +81,12 @@ export default function QuoteCustomerPicker({customer,onChoose,disabled=false}){
   {!disabled&&<><label style={field}>Søk etter eksisterende kunde
    <input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Navn, e-post, telefon eller adresse" aria-label="Søk etter kunde"/>
   </label>
-  {loading?<p>Laster kunder …</p>:<div style={{maxHeight:210,overflowY:"auto",margin:"10px 0",display:"grid",gap:6}}>
+  {loading?<p>Laster kunder …</p>:normalize(search)?<div style={{maxHeight:210,overflowY:"auto",margin:"10px 0",display:"grid",gap:6}}>
    {matches.map(item=><button type="button" className="btn alt" key={item.id} onClick={()=>{onChoose(customerSnapshot(item));setSearch("");setCreating(false);}} style={{textAlign:"left",whiteSpace:"normal"}}>
     <strong>{item.name}</strong><small style={{display:"block"}}>{[item.email,item.phone,item.address].filter(Boolean).join(" · ")} · {item.paymentTermsDays??14} dager</small>
    </button>)}
    {matches.length===0&&<p className="muted">Ingen treff. Opprett en ny kunde nedenfor.</p>}
-  </div>}
+  </div>:<p className="muted" style={{fontSize:13,margin:"8px 0"}}>Skriv et navn, telefonnummer eller e-post for å finne kunden.</p>}
   <button type="button" className="btn alt" onClick={()=>setCreating(value=>!value)} aria-expanded={creating}>{creating?"Lukk ny kunde":"＋ Opprett ny kunde"}</button>
   {creating&&<form onSubmit={create} style={{padding:"16px 0",display:"grid",gap:12}}>
    <h4>Opprett kundekort</h4>
