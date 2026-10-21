@@ -1,0 +1,33 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const route=readFileSync("app/api/admin/jobs/plan/route.js","utf8").replace(/^import .*;\n/gm,"").replace(/export /g,"");
+const {validDate,savePlan}=new Function("NextResponse","getAdminUser","db","sameOriginGuard",route+"return {validDate,savePlan};")({},()=>null,()=>null,()=>null);
+assert.equal(validDate("2026-02-30T10:00:00Z"),null);
+assert.equal(validDate("2026-10-21T10:00:00Z"),"2026-10-21T10:00:00.000Z");
+assert.equal(validDate("2026-10-21T10:00:00+02:00"),null);
+let writes=[];
+const db={from(){const chain={update(record){writes.push(record);return chain},eq(){return chain},select(){return chain},async single(){return {data:writes.at(-1),error:null}}};return chain;}};
+const start="2026-10-23T08:00:00.000Z";
+await savePlan(db,"test",start,"Klargjør rommet",start,"Klargjør rommet");
+assert.equal(Object.hasOwn(writes.at(-1),"job_confirmation_sent_at"),false,"An unchanged plan must retain confirmation history");
+await savePlan(db,"test","2026-10-24T08:00:00.000Z","Klargjør rommet",start,"Klargjør rommet");
+assert.equal(writes.at(-1).job_confirmation_sent_at,null,"A new start needs a new customer confirmation");
+assert.equal(writes.at(-1).job_reminder_sent_at,null);
+await savePlan(db,"test",start,"Ny avtale",start,"Klargjør rommet");
+assert.equal(writes.at(-1).job_confirmation_sent_at,null,"Changed agreement text needs a new confirmation");
+const before=writes.length;
+assert.equal((await savePlan(db,"test","2026-02-30T10:00:00Z","Avtale")).status,400);
+assert.equal((await savePlan(db,"test",start,"")).status,400);assert.equal(writes.length,before);
+const ui=readFileSync("app/admin/oppdrag/[id]/planlegg/PlanJobClient.js","utf8");
+const actions=ui.slice(ui.indexOf(" async function save(){"),ui.indexOf("\n if(loading)"));
+const state={};
+const handlers=new Function("fetch","window","state",`
+ const saving=false,sending=false,startAt="2026-10-23T10:00",agreement="Avtale",job={customer:{email:"test@example.invalid"}};
+ const payload=()=>({startAt:"2026-10-23T08:00:00.000Z",agreement});
+ const setSaving=v=>state.saving=v,setSending=v=>state.sending=v,setError=v=>state.error=v,setMessage=v=>state.message=v,setJob=()=>{},load=async()=>{};
+ ${actions}
+ return {save,send};
+`)(async()=>{throw new Error("Nettverket falt ut")},{confirm:()=>true},state);
+await handlers.save();assert.equal(state.saving,false);assert.match(state.error,/Nettverket/);
+await handlers.send();assert.equal(state.sending,false);assert.match(state.error,/Nettverket/);
+console.log("Oppdragsplanlegging bestått: gyldige datoer, bekreftelse ved endret plan og knapper etter nettfeil.");
