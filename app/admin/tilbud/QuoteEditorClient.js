@@ -6,6 +6,8 @@ import {useRouter} from "next/navigation";
 import {osloDateKey,shiftDateKey} from "../../../lib/osloTime";
 import {CATALOG_QUOTE_TRANSFER_KEY} from "../../../lib/calculatorQuoteLines";
 import QuoteCatalogSearch from "./QuoteCatalogSearch";
+import VippsFeePreview from "../VippsFeePreview";
+import {linesForCustomerTotal} from "../../../lib/vippsPriceLines";
 import {calculateContribution,withPrivateCosts} from "../../../lib/quotePrivateCosts";
 
 const nok=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",maximumFractionDigits:2}).format((Number(ore)||0)/100);
@@ -32,7 +34,8 @@ function blankState(){
   validUntil:defaultValidUntil(),
   plannedStartDate:"",
   autoFollowUp:true,
-  quoteMaterialMarkupPercent:null
+  quoteMaterialMarkupPercent:null,
+  pricingPaymentMethod:"bank"
  };
 }
 function calculate(lines){
@@ -284,7 +287,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      validUntil:quote.validUntil||"",
      plannedStartDate:quote.plannedStartDate||"",
      autoFollowUp:quote.autoFollowUp!==false,
-     quoteMaterialMarkupPercent:quote.quoteMaterialMarkupPercent??null
+     quoteMaterialMarkupPercent:quote.quoteMaterialMarkupPercent??null,
+     pricingPaymentMethod:quote.pricingPaymentMethod==="vipps"?"vipps":"bank"
     };
     // Add selected supplier goods to an EXISTING draft only after we have loaded
     // its persisted lines. Never replace the customer's existing offer content.
@@ -467,6 +471,18 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  }
  function updatePlan(id,key,value){
   setV(current=>({...current,paymentPlan:current.paymentPlan.map(row=>row.id===id?{...row,[key]:value}:row)}));
+ }
+
+ function applyVippsPrice(quotedGrossOre){
+  if(locked||v.status!=="draft")return;
+  const result=linesForCustomerTotal(v.lineItems,quotedGrossOre);
+  if(!result){setError("Kontroller at alle prislinjene er fylt ut. Denne totalsummen kan ikke legges inn på én eksisterende linje.");return;}
+  const line=result.lineItems[result.adjustedLineIndex];
+  const previous=nok(calc.total),next=nok(result.totalOre);
+  if(!window.confirm("Bruke "+next+" som ordinær avtalt kundepris (tidligere "+previous+")?\\n\\nEnhetsprisen på «"+(line.description||"prislinje")+"» blir justert. Det opprettes ingen separat Vipps-gebyrlinje. Kunden må godkjenne prisen før bestilling."))return;
+  setV(current=>({...current,lineItems:result.lineItems,pricingPaymentMethod:"vipps"}));
+  setError("");
+  setSavedMessage("Vipps-prisen er lagt inn i tilbudslinjene. Kontroller linjen, eventuell delbetalingsplan og lagre tilbudet.");
  }
 
  async function save(){
@@ -864,6 +880,15 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       <span><small>MVA</small><b>{nok(calc.vat)}</b></span>
       <span className="quoteSummaryTotal"><small>Total inkl. MVA</small><b>{nok(calc.total)}</b></span>
      </div>
+     <section aria-label="Betalingsmåte og prisberegning" style={{marginBottom:14}}>
+      <label style={{display:"block",marginBottom:8}}>Betalingsmåte som tilbudsprisen beregnes for
+       <select value={v.pricingPaymentMethod||"bank"} disabled={Boolean(locked)} onChange={e=>set("pricingPaymentMethod",e.target.value)}>
+        <option value="bank">Bank / ordinær pris</option>
+        <option value="vipps">Vipps – beregn avtalt pris ut fra ønsket utbetaling</option>
+       </select>
+      </label>
+      {v.pricingPaymentMethod==="vipps"&&<VippsFeePreview amountOre={calc.total} paymentPercentages={v.paymentPlan.map(p=>Number(p.percent))} disabled={Boolean(locked)} title="Vipps – pris for tilbudet" onApply={!locked?applyVippsPrice:undefined} applyLabel="Bruk ordinær kundepris i tilbudslinjene" note="Dette er et anslag for antallet delbetalinger i betalingsplanen. Når prisen er avtalt, skal den ikke økes i etterkant på grunn av betalingsmåten."/>}
+     </section>
      <section aria-label="Kvalitetssjekk før sending" style={{padding:"12px 14px",border:"1px solid var(--border, #ccc)",borderRadius:8,marginBottom:16}}>
       <strong>{quoteQualityIssues.length?"Kvalitetssjekk: "+quoteQualityIssues.length+" forhold å kontrollere":"Kvalitetssjekk: Ingen avvik funnet"}</strong>
       {missingMaterialCosts.length>0&&<div style={{marginTop:10}}>

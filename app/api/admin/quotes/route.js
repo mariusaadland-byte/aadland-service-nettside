@@ -7,8 +7,9 @@ import {costMapFromLines} from "../../../../lib/quotePrivateCosts";
 
 const STATUSES=["draft","sent","accepted","declined","expired","cancelled","superseded"];
 const SETUP_CODES=["42P01","42883","42703"];
-async function savePrivateCosts(s,id,lines,markup){
+async function savePrivateCosts(s,id,lines,markup,paymentMethod){
  const costs=costMapFromLines(lines);
+ costs.__pricingPaymentMethod=paymentMethod==="vipps"?"vipps":"bank";
  if(markup!==""&&markup!=null&&Number.isFinite(Number(markup))&&Number(markup)>=0&&Number(markup)<=1000)costs.__quoteMaterialMarkupPercent=Number(markup);
  const {error}=await s.from("quote_internal_costs").upsert({
   quote_id:id,line_costs:costs,updated_at:new Date().toISOString()
@@ -252,7 +253,7 @@ export async function GET(req){
    }catch{}
   }
   const privateData=await readPrivateCosts(s,id);
-  return NextResponse.json({quote:{...mapQuote(data),internalCosts:privateData.costs,quoteMaterialMarkupPercent:privateData.costs.__quoteMaterialMarkupPercent??null,privateCostsUnavailable:privateData.error,sendHistory,revisionHistory},followUpSetupRequired});
+  return NextResponse.json({quote:{...mapQuote(data),internalCosts:privateData.costs,quoteMaterialMarkupPercent:privateData.costs.__quoteMaterialMarkupPercent??null,pricingPaymentMethod:privateData.costs.__pricingPaymentMethod==="vipps"?"vipps":"bank",privateCostsUnavailable:privateData.error,sendHistory,revisionHistory},followUpSetupRequired});
  }
  return NextResponse.json({quotes:(data||[]).map(mapQuote),followUpSetupRequired});
 }
@@ -285,7 +286,7 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
   if(SETUP_CODES.includes(error.code))return NextResponse.json({error:"Databaseoppdatering mangler for tilbudssystemet.",setupRequired:true},{status:503});
   return NextResponse.json({error:"Tilbudet kunne ikke lagres."},{status:500});
  }
- const privateError=await savePrivateCosts(s,data.id,body.lineItems,body.quoteMaterialMarkupPercent);
+ const privateError=await savePrivateCosts(s,data.id,body.lineItems,body.quoteMaterialMarkupPercent,body.pricingPaymentMethod);
  if(privateError)return NextResponse.json({error:"Tilbudet ble lagret, men interne kostnader kunne ikke lagres. Åpne tilbudet igjen og kontroller kostnadene.",quoteId:data.id},{status:500});
  return NextResponse.json({quote:mapQuote(data)});
 }
@@ -343,7 +344,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
  }
  const {data,error}=updateResult;
  if(error)return NextResponse.json({error:"Tilbudet kunne ikke lagres."},{status:500});
- const privateError=await savePrivateCosts(s,id,body.lineItems,body.quoteMaterialMarkupPercent);
+ const privateError=await savePrivateCosts(s,id,body.lineItems,body.quoteMaterialMarkupPercent,body.pricingPaymentMethod);
  if(privateError)return NextResponse.json({error:"Tilbudslinjene er lagret, men interne kostnader ble ikke lagret. Prøv igjen.",quoteId:id},{status:500});
  return NextResponse.json({quote:mapQuote(data)});
 }
