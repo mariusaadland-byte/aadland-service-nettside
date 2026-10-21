@@ -1,4 +1,5 @@
 import {NextResponse} from "next/server";
+import {invoiceVippsReference,reconcileInvoiceVipps} from "../../../../lib/invoiceVipps";
 import {db} from "../../../../lib/supabase";
 import {vippsPaymentsEnabled} from "../../../../lib/vippsClient";
 import {verifyVippsWebhookRequest} from "../../../../lib/vippsWebhook";
@@ -78,6 +79,15 @@ export async function POST(req){
  if(payload?.success===false){
   console.warn("VIPPS WEBHOOK UNSUCCESSFUL EVENT",{webhookId,unit,reference,eventName,pspReference});
   return NextResponse.json({ok:true,ignored:true});
+ }
+
+ if(unit==="service"&&invoiceVippsReference(reference)){
+  if(payload?.amount?.currency!=="NOK")return NextResponse.json({error:"Invalid currency."},{status:400});
+  try{
+   const p=await reconcileInvoiceVipps(s,reference);
+   if(p.receipt_error)return NextResponse.json({error:"Receipt retry required."},{status:503});
+   return NextResponse.json({ok:true});
+  }catch(e){console.error("INVOICE VIPPS WEBHOOK",{reference,message:e.message});return NextResponse.json({error:"Invoice payment processing failed."},{status:503});}
  }
 
  const {data:processed,error:processError}=await s.rpc("process_vipps_payment_event_once",{
