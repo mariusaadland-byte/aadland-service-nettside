@@ -14,3 +14,13 @@ assert.equal(price(0),null);assert.equal(price(Infinity),null);assert.equal(pric
 assert.equal(fee(200000).feeOre,6080,'Fixed fee applies once to the whole booking');
 assert.notEqual(fee(200000).feeOre,fee(100000).feeOre*2);
 console.log('Vipps-prisberegning bestått: gebyr, anslått utbetaling, ønsket utbetaling, avrunding og ett fastgebyr per betaling.');
+
+const {planFee,planPrice}=new Function(source+';return {planFee:vippsFeeEstimateForPayments,planPrice:vippsPriceForPayoutWithPayments};')();
+assert.deepEqual(planFee(200000,[100]),{amountOre:200000,feeOre:6080,payoutOre:193920,paymentCount:1});
+assert.deepEqual(planFee(200000,[25,50,25]),{amountOre:200000,feeOre:6280,payoutOre:193720,paymentCount:3});
+const target=100000,shares=[25,50,25];
+const quoted=planPrice(target,shares);
+assert.ok(quoted.payoutOre>=target);
+assert.ok(planFee(quoted.amountOre-1,shares).payoutOre<target);
+assert.equal(planFee(0,[25,50,25]).feeOre,0);
+assert.equal(planFee(100000,[20,20]),null,'Invalid payment split rejected');
