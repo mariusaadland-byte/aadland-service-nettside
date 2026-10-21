@@ -39,3 +39,16 @@ export async function POST(request){
  if(error){console.error("ADMIN CUSTOMER CONTACT CREATE",error);return NextResponse.json({error:"Kunden kunne ikke opprettes. Sjekk om e-posten er i bruk."},{status:500})}
  return NextResponse.json({contact:map(data),existing:false},{status:201});
 }
+
+export async function PATCH(request){
+ const guard=sameOriginGuard(request);if(guard)return guard;
+ const user=await getAdminUser();
+ if(!user||!(user.role==="owner"||user.canUpdateOrders||user.canManageProducts))return NextResponse.json({error:"Ingen tilgang."},{status:403});
+ const body=await request.json().catch(()=>({}));
+ const input=sanitize(body);if(input.error)return NextResponse.json({error:input.error},{status:400});
+ if(!/^[0-9a-f-]{36}$/i.test(body.id||""))return NextResponse.json({error:"Velg en kunde."},{status:400});
+ const s=db();if(!s)return NextResponse.json({error:"Databasen er utilgjengelig."},{status:503});
+ const {data,error}=await s.rpc("update_invoice_customer_contact",{p_id:body.id,p_expected_updated_at:body.updatedAt,p_name:input.data.name,p_email:input.data.email||"",p_phone:input.data.phone||"",p_address:input.data.address||""});
+ if(error)return NextResponse.json({error:error.code==="23505"?"E-postadressen er knyttet til et annet kundekort.":error.message||"Kundekortet kunne ikke lagres."},{status:400});
+ return NextResponse.json({contact:map(data)});
+}
