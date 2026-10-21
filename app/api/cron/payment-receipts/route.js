@@ -1,5 +1,6 @@
 import {NextResponse} from "next/server";
 import {cronGuard} from "../../../../lib/cronAuth";
+import {reconcileInvoiceVipps} from "../../../../lib/invoiceVipps";
 import {db} from "../../../../lib/supabase";
 import {sendVippsPaymentReceiptIfNeeded} from "../../../../lib/vippsPaymentReceipt";
 import {sendVippsRefundNoticeIfNeeded} from "../../../../lib/vippsRefundNotice";
@@ -108,6 +109,10 @@ export async function GET(req){
   }
  }
 
+ // Recover missed callbacks and retry frozen invoice receipts without duplicate payments.
+ const invoiceRows=await s.from("invoice_vipps_payments").select("reference").or("state.in.(pending,authorized),and(captured_ore.gt.0,receipt_sent_at.is.null,refunded_ore.eq.0)").order("updated_at",{ascending:true}).limit(LIMIT_PER_TYPE);
+ if(invoiceRows.error)failures.push({type:"invoice-query",error:"Fakturaer kunne ikke hentes."});
+ for(const p of invoiceRows.data||[]){try{await reconcileInvoiceVipps(s,p.reference);}catch(e){failures.push({type:"invoice",reference:p.reference,error:String(e.message).slice(0,180)});}}
  return NextResponse.json({
   ok:true,
   checked:serviceIds.length+rentalIds.length+rentalConfirmationIds.length+serviceRefundIds.length+rentalRefundIds.length,
