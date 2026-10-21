@@ -31,7 +31,7 @@ const labels = {
 
 
 const ADMIN_NAV_GROUPS=[
-  {id:"sales",title:"Salg og kunder",icon:"◎",ids:["orders","surveys","customers","drawings","quotes","invoices","reminders","archive"]},
+  {id:"sales",title:"Salg og kunder",icon:"◎",ids:["orders","surveys","customers","drawings","quotes","invoices","invoiceArchive","reminders","archive"]},
   {id:"jobs",title:"Oppdrag og planlegging",icon:"▤",ids:["jobs","jobCalendar","workClock","drawing"]},
   {id:"shop",title:"Produkter og tjenester",icon:"◫",ids:["products","categories","services"]},
   {id:"rental",title:"Utleie",icon:"▣",ids:["rental","rentalCalendar","rentalBookings"]},
@@ -497,7 +497,7 @@ export default function AdminClient({ user }) {
   if (canManageProducts) tabs.push(["homepage", "Forside"]);
   tabs.push(["drawing", "Tegning & visualisering"]);
   if (canManageUsers) tabs.push(["users", "Brukere"]);
-  if (canUpdateOrders || canManageProducts) tabs.push(["quotes", "Tilbud"],["invoices", "Faktura"]);
+  if (canUpdateOrders || canManageProducts) tabs.push(["quotes", "Tilbud"],["invoices", "Fakturakladder"],["invoiceArchive", "Fakturaoversikt"]);
   if (user?.role === "owner") tabs.push(["roadmap", "Utviklingsplan"]);
   const navLabels=new Map(tabs);
   const searchText=menuSearch.trim().toLocaleLowerCase("nb-NO");
@@ -512,6 +512,7 @@ export default function AdminClient({ user }) {
     setMenuSearch("");
     if (id === "quotes") {setMenuOpen(false);router.push("/admin/tilbud");return;}
     if (id === "invoices") {setMenuOpen(false);router.push("/admin/faktura");return;}
+    if (id === "invoiceArchive") {setMenuOpen(false);router.push("/admin/faktura/arkiv");return;}
     if (id === "roadmap") {setMenuOpen(false);router.push("/admin/utviklingsplan");return;}
     if (id === "drawing") { setMenuOpen(false); router.push("/admin/tegning"); return; }
     if (id === "drawings") { setMenuOpen(false); router.push("/admin/tegninger"); return; }
