@@ -510,7 +510,8 @@ export default function AdminClient({ user }) {
     const parent=ADMIN_NAV_GROUPS.find(group=>group.ids.includes(id));
     if(parent)setMenuGroupId(parent.id);
     setMenuSearch("");
-    if (id === "quotes") {setMenuOpen(false);router.push("/admin/tilbud");return;}\n    if (id === "invoices") {setMenuOpen(false);router.push("/admin/faktura");return;}
+    if (id === "quotes") {setMenuOpen(false);router.push("/admin/tilbud");return;}
+    if (id === "invoices") {setMenuOpen(false);router.push("/admin/faktura");return;}
     if (id === "roadmap") {setMenuOpen(false);router.push("/admin/utviklingsplan");return;}
     if (id === "drawing") { setMenuOpen(false); router.push("/admin/tegning"); return; }
     if (id === "drawings") { setMenuOpen(false); router.push("/admin/tegninger"); return; }
