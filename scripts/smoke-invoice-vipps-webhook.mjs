@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
+import crypto from "node:crypto";
 
 const ref="INV-12345678-1234-1234-1234-123456789abc";
 const request={
@@ -84,4 +85,28 @@ response=await statusHandler({json:async()=>({reference:ref})});
 assert.equal(response.status,200);assert.deepEqual(response.body,{status:"paid",receiptSent:true});
 assert.equal(response.headers["Cache-Control"],"no-store");
 assert.ok(!JSON.stringify(response.body).includes("private@example.invalid"));
+// Verify real HMAC signature checks as a separate, fully local cryptographic
+// test. No provider network call or real payment is performed.
+const verifySource=readFileSync("lib/vippsWebhook.js","utf8")
+ .replace(/^import .*;\n/gm,"")
+ .replace("export function verifyVippsWebhookRequest","function verifyVippsWebhookRequest");
+const verifySignature=new Function("crypto",verifySource+";return verifyVippsWebhookRequest;")(crypto);
+const body=JSON.stringify(request);
+const url="https://www.aadland-service.no/api/vipps/webhook";
+const host="www.aadland-service.no",date="Thu, 22 Oct 2026 10:00:00 GMT",secret="unit-test-secret";
+const hash=crypto.createHash("sha256").update(body,"utf8").digest("base64");
+const signed="POST\\n/api/vipps/webhook\\n"+date+";"+host+";"+hash;
+const hmac=crypto.createHmac("sha256",secret).update(signed,"utf8").digest("base64");
+const auth="HMAC-SHA256 SignedHeaders=x-ms-date;host;x-ms-content-sha256&Signature="+hmac;
+const headers={
+ "x-ms-date":date,"x-ms-content-sha256":hash,"authorization":auth,"host":host,
+ "x-vipps-authorization":auth
+};
+const signedReq={url,headers:{get:key=>headers[key]||null}};
+assert.equal(verifySignature(signedReq,body,secret).ok,true,"Correct HMAC signature accepted");
+assert.equal(verifySignature(signedReq,body+" ",secret).ok,false,"Tampered body rejected");
+assert.equal(verifySignature(signedReq,body,secret+"-wrong").ok,false,"Incorrect unit secret rejected");
+assert.equal(verifySignature({...signedReq,url:url+"?foo=bar"},body,secret).ok,false,"Unexpected URL or query rejected");
+assert.equal(verifySignature({url,headers:{get:key=>key==="x-vipps-authorization"?"forged":headers[key]}},body,secret).ok,false,"Conflicting auth headers rejected");
+assert.equal(verifySignature({url,headers:{get:key=>key==="x-ms-date"?null:headers[key]}},body,secret).ok,false,"Unsigned requests rejected");
 console.log("Vipps webhook og kundestatus bestått: signatur, MSN, NOK, korrekt enhet, kvitteringsretry uten dobbel betaling og personvern.");
