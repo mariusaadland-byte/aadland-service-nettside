@@ -5,12 +5,15 @@ import {invoiceTotalOre} from "../../../lib/invoicePaymentStatus";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(n/100);
 export default function InvoiceVippsPanel({invoice,persist,onRefresh,disabled,onBusyChange,onApplyPrice,onPaymentMethodChange,allowPriceAdjustment=false}){
  const [payment,setPayment]=useState(null),[error,setError]=useState(""),[busy,setBusy]=useState(false),[completed,setCompleted]=useState(false);
+ const [statusLoading,setStatusLoading]=useState(true),[statusLoaded,setStatusLoaded]=useState(false),[statusRetry,setStatusRetry]=useState(0);
  const refreshing=useRef(false);
  useEffect(()=>{
-  let ignore=false;setPayment(null);setError("");setCompleted(false);
-  fetch("/api/admin/invoices/vipps?id="+invoice.id).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error);if(!ignore)setPayment(d.payment)}).catch(e=>{if(!ignore)setError(e.message)});
+  let ignore=false;setPayment(null);setError("");setCompleted(false);setStatusLoading(true);setStatusLoaded(false);
+  fetch("/api/admin/invoices/vipps?id="+invoice.id,{cache:"no-store"}).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error||"Vipps-status er utilgjengelig.");if(!ignore){setPayment(d.payment);setStatusLoaded(true);}})
+   .catch(e=>{if(!ignore)setError("Vipps-status kunne ikke hentes. "+(e.message||"Prøv igjen."));})
+   .finally(()=>{if(!ignore)setStatusLoading(false);});
   return ()=>{ignore=true};
- },[invoice.id]);
+ },[invoice.id,statusRetry]);
  async function sync(){
   if(refreshing.current)return;refreshing.current=true;
   try{
@@ -25,6 +28,16 @@ export default function InvoiceVippsPanel({invoice,persist,onRefresh,disabled,on
   return ()=>clearInterval(timer);
  },[payment?.reference,payment?.state,invoice.id]);
  async function start(){
+  if(busy||disabled||statusLoading||!statusLoaded||!completed)return;
+  const to=String(invoice.customer?.email||"").trim();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)){setError("Fyll inn en gyldig e-postadresse til kunden før Vipps-betaling.");return;}
+  const outstanding=Math.max(0,invoiceTotalOre(invoice)-Number(invoice.paid_ore||0));
+  if(outstanding<100){setError("Fakturaen er allerede betalt, eller restbeløpet er under 1 krone.");return;}
+  const reusing=payment&&["pending","authorized"].includes(payment.state);
+  const details=reusing
+   ?"Kontrollere den eksisterende Vipps-betalingen og eventuelt sende samme betalingslenke igjen til "+to+"? Det opprettes ikke et nytt Vipps-krav."
+   :"Bekrefter du at kunden skal få en Vipps-betalingslenke på "+money(outstanding)+" til "+to+"?\n\n"+(invoice.status==="draft"?"Dette utsteder fakturaen og låser prisene. ":"")+"En betalingsforespørsel kan bli sendt på e-post når du bekrefter. Kontroller at beløpet er avtalt med kunden.";
+  if(!window.confirm(details))return;
   setError("");setBusy(true);onBusyChange?.(true);
   try{
    if(invoice.status==="draft")await persist(invoice);
@@ -45,5 +58,5 @@ export default function InvoiceVippsPanel({invoice,persist,onRefresh,disabled,on
  </dl>
  {payment.receiptSentAt&&<p style={{marginBottom:0}}>{payment.refundedOre>0?"Kvittering for opprinnelig betaling er sendt. Refusjonen kan ha endret sluttbeløpet.":"Kvittering for betalingen er sendt på e-post."}</p>}
  {payment.receiptError&&payment.refundedOre===0&&<p role="alert" style={{marginBottom:0}}>Kvitteringen er ikke bekreftet sendt: {payment.receiptError}. Bruk «Kontroller Vipps-status» for å prøve igjen; kunden skal ikke betale på nytt.</p>}
- </div>}{waiting&&payment.redirectUrl&&<div><a href={payment.redirectUrl} target="_blank" rel="noreferrer">Åpne betalingslenken på kundens enhet</a><button type="button" onClick={async()=>{try{if(navigator.share)await navigator.share({title:"Betal faktura med Vipps",url:payment.redirectUrl});else {await navigator.clipboard.writeText(payment.redirectUrl);setError("Betalingslenken er kopiert.")}}catch(e){if(e.name!=="AbortError")setError("Bruk knappen Kopier betalingslenke.")}}}>Del betalingslenke</button><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(payment.redirectUrl);setError("Betalingslenken er kopiert.")}catch{setError("Kopier betalingslenken fra lenken over.")}}}>Kopier betalingslenke</button>{payment.emailSentAt&&<p>Betalingslenken er sendt til {invoice.customer?.email}.</p>}{!payment.emailSentAt&&<p>Utsending av betalingslenken er ikke bekreftet. Bruk knappen for samme betalingslenke igjen, eller kopier lenken til kunden.</p>}{payment.emailError&&<p role="alert">{payment.emailError}</p>}</div>}{payment&&<button type="button" disabled={busy||disabled} onClick={sync}>{payment.receiptError?"Prøv kvittering på nytt / kontroller status":"Kontroller Vipps-status"}</button>}{(invoiceTotalOre(invoice)>Number(invoice.paid_ore||0))&&(!payment||["cancelled","pending","partial","refunded"].includes(payment.state))&&<><label style={{display:"block",margin:"12px 0"}}><input type="checkbox" checked={completed} onChange={e=>setCompleted(e.target.checked)} disabled={busy||disabled}/> Arbeidet er ferdig, og kunden vil betale nå.</label><button type="button" disabled={busy||disabled||!completed} onClick={start}>{busy?"Klargjør …":waiting?"Hent / send samme betalingslenke igjen":invoice.status==="draft"?"Fakturer og ta betalt med Vipps":"Ta betalt med Vipps"}</button></>}{error&&<p role="status">{error}</p>}</section>;
+ </div>}{waiting&&payment.redirectUrl&&<div><a href={payment.redirectUrl} target="_blank" rel="noreferrer">Åpne betalingslenken på kundens enhet</a><button type="button" onClick={async()=>{try{if(navigator.share)await navigator.share({title:"Betal faktura med Vipps",url:payment.redirectUrl});else {await navigator.clipboard.writeText(payment.redirectUrl);setError("Betalingslenken er kopiert.")}}catch(e){if(e.name!=="AbortError")setError("Bruk knappen Kopier betalingslenke.")}}}>Del betalingslenke</button><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(payment.redirectUrl);setError("Betalingslenken er kopiert.")}catch{setError("Kopier betalingslenken fra lenken over.")}}}>Kopier betalingslenke</button>{payment.emailSentAt&&<p>Betalingslenken er sendt til {invoice.customer?.email}.</p>}{!payment.emailSentAt&&<p>Utsending av betalingslenken er ikke bekreftet. Bruk knappen for samme betalingslenke igjen, eller kopier lenken til kunden.</p>}{payment.emailError&&<p role="alert">{payment.emailError}</p>}</div>}{payment&&<button type="button" disabled={busy||disabled} onClick={sync}>{payment.receiptError?"Prøv kvittering på nytt / kontroller status":"Kontroller Vipps-status"}</button>}{statusLoading&&<p role="status">Kontrollerer tidligere Vipps-betalinger før du kan opprette en betalingslenke …</p>}{!statusLoading&&!statusLoaded&&<button type="button" disabled={busy||disabled} onClick={()=>setStatusRetry(x=>x+1)}>Prøv Vipps-status på nytt</button>}{statusLoaded&&(invoiceTotalOre(invoice)>Number(invoice.paid_ore||0))&&(!payment||["cancelled","pending","partial","refunded"].includes(payment.state))&&<><label style={{display:"block",margin:"12px 0"}}><input type="checkbox" checked={completed} onChange={e=>setCompleted(e.target.checked)} disabled={busy||disabled}/> Arbeidet er ferdig, og kunden vil betale nå.</label><button type="button" disabled={busy||disabled||statusLoading||!statusLoaded||!completed} onClick={start}>{busy?"Klargjør …":waiting?"Hent / send samme betalingslenke igjen":invoice.status==="draft"?"Fakturer og ta betalt med Vipps":"Ta betalt med Vipps"}</button></>}{error&&<p role="status">{error}</p>}</section>;
 }
