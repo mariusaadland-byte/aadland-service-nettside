@@ -8,6 +8,7 @@ import {sendPaidRentalConfirmationIfNeeded} from "../../../../lib/rentalConfirma
 
 export const runtime="nodejs";
 const LIMIT_PER_TYPE=25;
+const SETTLEMENT_RECHECK_DAYS=180;
 
 async function pendingReceiptIds(s,table){
  const {data,error}=await s.from(table)
@@ -109,16 +110,39 @@ export async function GET(req){
   }
  }
 
- // Recover missed callbacks and retry frozen invoice receipts without duplicate payments.
- // Report invoice receipt errors too: reconcileInvoiceVipps may correctly record the
- // payment while leaving a retryable receipt error, which must not look like success.
- const invoiceRows=await s.from("invoice_vipps_payments").select("reference").or("state.in.(pending,authorized),and(captured_ore.gt.0,receipt_sent_at.is.null,refunded_ore.eq.0)").order("updated_at",{ascending:true}).limit(LIMIT_PER_TYPE);
- if(invoiceRows.error)failures.push({type:"invoice-query",error:"Fakturaer kunne ikke hentes."});
+ // Recover missed callbacks and retry frozen receipts. Also recheck recently
+ // settled payments: a refund can occur AFTER a paid receipt was already sent,
+ // and a delayed/missed webhook must not leave the invoice incorrectly marked paid.
+ // Sort oldest last-checked first. sync_invoice_vipps updates updated_at on each
+ // successful provider check, rotating the bounded batch fairly across days.
+ const settledSince=new Date(Date.now()-SETTLEMENT_RECHECK_DAYS*86400000).toISOString();
+ const [invoiceRows,settledRows]=await Promise.all([
+  s.from("invoice_vipps_payments").select("reference,state,captured_ore,refunded_ore")
+   .or("state.in.(pending,authorized),and(captured_ore.gt.0,receipt_sent_at.is.null,refunded_ore.eq.0)")
+   .order("updated_at",{ascending:true}).limit(LIMIT_PER_TYPE),
+  s.from("invoice_vipps_payments").select("reference,state,captured_ore,refunded_ore")
+   .in("state",["paid","partial","refunded","cancelled"])
+   .gte("created_at",settledSince)
+   .order("updated_at",{ascending:true}).limit(LIMIT_PER_TYPE)
+ ]);
+ if(invoiceRows.error)failures.push({type:"invoice-query",error:"Ventende fakturaer kunne ikke hentes."});
+ if(settledRows.error)failures.push({type:"invoice-settled-query",error:"Tidligere fullførte fakturabetalinger kunne ikke kontrolleres."});
+ // A record may appear in both queries (e.g. a captured payment awaiting its
+ // receipt). Process it just once to avoid extra provider calls/receipt retries.
+ const references=new Map();
+ for(const row of invoiceRows.data||[])if(row.reference)references.set(row.reference,{...row,checkSource:"pending"});
+ for(const row of settledRows.data||[])if(row.reference&&!references.has(row.reference))references.set(row.reference,{...row,checkSource:"settled"});
  let invoiceChecked=0,invoicePaid=0,invoiceReceiptSent=0,invoiceReceiptPending=0;
- for(const row of invoiceRows.data||[]){
+ let settledChecked=0,settlementChanges=0,refundsDetected=0;
+ for(const row of references.values()){
   invoiceChecked++;
   try{
    const result=await reconcileInvoiceVipps(s,row.reference);
+   if(row.checkSource==="settled"){
+    settledChecked++;
+    if(Number(result.captured_ore)!==Number(row.captured_ore)||Number(result.refunded_ore)!==Number(row.refunded_ore))settlementChanges++;
+    if(Number(result.refunded_ore)>Number(row.refunded_ore))refundsDetected++;
+   }
    if(result.state==="paid"||result.state==="partial")invoicePaid++;
    if(result.receipt_sent_at)invoiceReceiptSent++;
    else if(Number(result.captured_ore)>Number(result.refunded_ore)&&Number(result.captured_ore)>0){
@@ -134,7 +158,7 @@ export async function GET(req){
   receipt:{checked:serviceIds.length+rentalIds.length,sent,skipped},
   rentalConfirmation:{checked:rentalConfirmationIds.length,sent:confirmationSent,skipped:confirmationSkipped},
   refund:{checked:serviceRefundIds.length+rentalRefundIds.length,sent:refundSent,skipped:refundSkipped},
-  invoice:{checked:invoiceChecked,paidOrPartial:invoicePaid,receiptConfirmed:invoiceReceiptSent,receiptPending:invoiceReceiptPending},
+  invoice:{checked:invoiceChecked,paidOrPartial:invoicePaid,receiptConfirmed:invoiceReceiptSent,receiptPending:invoiceReceiptPending,settledRechecked:settledChecked,settlementChanges,refundsDetected},
   failed:failures.length,
   failures
  },{status:failures.length?503:200});

@@ -30,7 +30,7 @@ const NextResponse={json:(body,options={})=>({status:options.status||200,body})}
 let errorMode=false;
 const s={from(table){
  let q={
-  select(){return q},eq(){return q},gt(){return q},is(){return q},neq(){return q},order(){return q},
+  select(){return q},eq(){return q},gt(){return q},is(){return q},neq(){return q},order(){return q},in(){return q},gte(){return q},
   or(){return q},limit(){return q},then(resolve,reject){
    return Promise.resolve(table==="invoice_vipps_payments"?{data:[{reference:payment.reference}],error:null}:{data:[],error:null}).then(resolve,reject);
   }
