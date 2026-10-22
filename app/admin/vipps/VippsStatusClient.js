@@ -75,7 +75,7 @@ export default function VippsStatusClient(){
     <h1>Vipps-oppsett</h1>
     <p className="muted">Kontrollside for de to salgsstedene. Ingen API-nøkler eller hemmeligheter vises her.</p>
    </div>
-   <Link className="btn alt" href="/admin">← Backoffice</Link>
+   <div style={{display:"flex",flexWrap:"wrap",gap:8}}><Link className="btn" href="/admin/vipps/test">Prøvekjør Vipps uten betaling</Link><Link className="btn alt" href="/admin">← Backoffice</Link></div>
   </div>
 
   {error&&<p className="notice">{error}</p>}
