@@ -127,8 +127,9 @@ export async function GET(req){
    }
   }catch(e){failures.push({type:"invoice",reference:row.reference,error:String(e.message).slice(0,180)});}
  }
+ if(failures.length)console.error("VIPPS RECEIPT RECOVERY INCOMPLETE",{failed:failures.length,types:failures.map(f=>f.type)});
  return NextResponse.json({
-  ok:true,
+  ok:failures.length===0,
   checked:serviceIds.length+rentalIds.length+rentalConfirmationIds.length+serviceRefundIds.length+rentalRefundIds.length+invoiceChecked,
   receipt:{checked:serviceIds.length+rentalIds.length,sent,skipped},
   rentalConfirmation:{checked:rentalConfirmationIds.length,sent:confirmationSent,skipped:confirmationSkipped},
@@ -136,5 +137,5 @@ export async function GET(req){
   invoice:{checked:invoiceChecked,paidOrPartial:invoicePaid,receiptConfirmed:invoiceReceiptSent,receiptPending:invoiceReceiptPending},
   failed:failures.length,
   failures
- });
+ },{status:failures.length?503:200});
 }
