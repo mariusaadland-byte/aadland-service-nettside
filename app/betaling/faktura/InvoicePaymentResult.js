@@ -32,7 +32,7 @@ export default function InvoicePaymentResult(){
  },[retry]);
  const paid=status==="paid",refunded=status==="refunded",cancelled=status==="cancelled",partial=status==="partial";
  const title=paid?"Takk for betalingen!":refunded?"Betalingen er refundert":cancelled?"Betalingen ble ikke fullført":partial?"Delbetaling registrert":"Vi kontrollerer betalingen";
- const message=paid?(receipt?"Fakturaen er registrert som betalt. Kvittering er sendt på e-post.":"Fakturaen er registrert som betalt. Vi kontrollerer at kvitteringen er sendt til e-posten din. Du trenger ikke betale på nytt.")
+ const message=paid?(receipt?"Vipps-betalingen er registrert. Kvittering for betalingen er sendt på e-post. Du får informasjon om eventuelt restbeløp fra Aadland Service.":"Vipps-betalingen er registrert. Vi kontrollerer at kvitteringen er sendt til e-posten din. Du skal ikke betale denne betalingsforespørselen på nytt.")
   :refunded?"Betalingen er refundert. Kontakt Aadland Service ved spørsmål."
   :cancelled?"Kontakt Aadland Service for en ny betalingslenke."
   :partial?"Vi har registrert en delbetaling. Aadland Service kan hjelpe deg med eventuelt restbeløp."
@@ -41,7 +41,7 @@ export default function InvoicePaymentResult(){
   <h1>{title}</h1><p>{message}</p>
   {checking&&<p role="status">{paid&&!receipt?"Kontrollerer kvitteringen …":"Kontrollerer betalingsstatus …"}</p>}
   {error&&<p role="status">{error}</p>}
-  {!checking&&paid&&!receipt&&<p>Kvitteringen er ikke bekreftet sendt ennå. Betalingen er registrert, så ikke betal på nytt. Du kan kontrollere kvitteringsstatus igjen eller kontakte Aadland Service.</p>}
+  {!checking&&paid&&!receipt&&<p>Kvitteringen er ikke bekreftet sendt ennå. Vipps-betalingen er registrert, så ikke betal denne betalingsforespørselen på nytt. Du kan kontrollere kvitteringsstatus igjen eller kontakte Aadland Service.</p>}
   {!checking&&!terminalWithReceipt(status,receipt)&&<button type="button" onClick={()=>{setError("");setRetry(n=>n+1)}}>Kontroller status igjen</button>}
   <p><a href="/">Til Aadland Service</a></p>
  </main>;
