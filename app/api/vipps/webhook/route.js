@@ -81,7 +81,11 @@ export async function POST(req){
   return NextResponse.json({ok:true,ignored:true});
  }
 
- if(unit==="service"&&invoiceVippsReference(reference)){
+ // Invoice payments belong to the service sales unit only. Never pass an invoice
+ // reference to the ordinary rental/order webhook handler, even if it is signed
+ // by another valid unit's webhook secret.
+ if(invoiceVippsReference(reference)){
+  if(unit!=="service")return NextResponse.json({error:"Invoice payment belongs to service unit."},{status:409});
   if(payload?.amount?.currency!=="NOK")return NextResponse.json({error:"Invalid currency."},{status:400});
   try{
    const p=await reconcileInvoiceVipps(s,reference);
