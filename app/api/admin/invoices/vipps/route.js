@@ -27,7 +27,7 @@ export async function POST(req){
   let p;
   if(b.action==="start"){
    if(b.workCompleted!==true)return NextResponse.json({error:"Bekreft at arbeidet er ferdig før direkte betaling."},{status:400});
-   p=await startInvoiceVipps(s,found.data);
+   p=await startInvoiceVipps(s,found.data,b.confirmedInvoice);
   }else{
    const latest=await s.from("invoice_vipps_payments").select("reference").eq("invoice_id",b.id).order("created_at",{ascending:false}).limit(1).maybeSingle();
    if(latest.error||!latest.data)throw Error("Ingen Vipps-betaling er startet.");
