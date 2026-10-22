@@ -20,6 +20,15 @@ export default async function VippsInvoiceDemoPage(){
     <Link className="btn alt" href="/admin/faktura">Til fakturaer</Link>
    </div>
   </div>
+  <section className="card" style={{padding:22,marginBottom:18}}>
+   <div className="kicker">PDF FRA DEN EKTE FAKTURAMALEN</div>
+   <h2>Se profesjonelle eksempelkvitteringer</h2>
+   <p>Begge dokumentene lages av den samme PDF-motoren som kundekvitteringer, men inneholder bare fiktive opplysninger og tydelig TEST-merking. Ingen betaling eller e-post blir sendt.</p>
+   <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+    <a className="btn alt" href="/api/demo/vipps-receipt-pdf?type=partial" target="_blank" rel="noreferrer">Åpne delbetalingskvittering (PDF)</a>
+    <a className="btn alt" href="/api/demo/vipps-receipt-pdf?type=full" target="_blank" rel="noreferrer">Åpne fullt betalt kvittering (PDF)</a>
+   </div>
+  </section>
   <VippsInvoiceDemoClient/>
  </main>;
 }
