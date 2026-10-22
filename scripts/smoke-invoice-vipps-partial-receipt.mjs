@@ -18,7 +18,7 @@ const partialPdf=(await buildPdf({...baseInvoice,paymentReceipt:partialData})).t
 assert.ok(partialPdf.includes("KVITTERING - DELBETALING"),"Partial receipt PDF title");
 assert.ok(partialPdf.includes("DELBETALING REGISTRERT"),"Explicit partial payment label");
 assert.ok(partialPdf.includes("Dette er en delbetaling, ikke en fullt betalt faktura."),"Warn that payment was not full");
-assert.ok(partialPdf.includes("Gjenst"),"Partial receipt shows outstanding amount");
+assert.ok(partialPdf.includes("GJENST"),"Partial receipt shows outstanding amount");
 const fullPdf=(await buildPdf({...baseInvoice,paymentReceipt:{...partialData,amountOre:12500,outstandingOre:0}})).toString("latin1");
 assert.ok(fullPdf.includes("KVITTERING"),"Full payment receipt title");
 assert.ok(!fullPdf.includes("KVITTERING - DELBETALING"),"Full payment must not be mislabelled");
