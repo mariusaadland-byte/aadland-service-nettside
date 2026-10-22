@@ -1,7 +1,7 @@
 "use client";
 import {useEffect,useState,useRef} from "react";
 import VippsFeePreview from "../VippsFeePreview";
-import {invoiceTotalOre} from "../../../lib/invoicePaymentStatus";
+import {invoiceTotalOre,invoiceVippsConfirmationSnapshot} from "../../../lib/invoicePaymentStatus";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(n/100);
 export default function InvoiceVippsPanel({invoice,persist,onRefresh,disabled,onBusyChange,onApplyPrice,onPaymentMethodChange,allowPriceAdjustment=false}){
  const [payment,setPayment]=useState(null),[error,setError]=useState(""),[busy,setBusy]=useState(false),[completed,setCompleted]=useState(false);
@@ -41,9 +41,9 @@ export default function InvoiceVippsPanel({invoice,persist,onRefresh,disabled,on
   setError("");setBusy(true);onBusyChange?.(true);
   try{
    if(invoice.status==="draft")await persist(invoice);
-   const r=await fetch("/api/admin/invoices/vipps",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:invoice.id,action:"start",workCompleted:completed})});
+   const r=await fetch("/api/admin/invoices/vipps",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:invoice.id,action:"start",workCompleted:completed,confirmedInvoice:invoiceVippsConfirmationSnapshot(invoice)})});
    const d=await r.json();if(!r.ok)throw Error(d.error);setPayment(d.payment);await onRefresh();
-  }catch(e){setError(e.message)}finally{setBusy(false);onBusyChange?.(false)}
+  }catch(e){setError(e.message);if(/etter bekreftelsen|på nytt før Vipps-betaling|Last inn fakturaen på nytt/.test(e.message||""))setStatusLoaded(false);}finally{setBusy(false);onBusyChange?.(false)}
  }
  const waiting=payment&&["pending","authorized"].includes(payment.state);
  return <section id="invoice-vipps-payment" style={{padding:18,marginBottom:18,border:"1px solid #c99a49",borderRadius:12}}><h2>Ta betalt med Vipps</h2>{invoice.status==="draft"&&<label style={{display:"block",marginBottom:12}}>Betalingsmåte ved prisberegningen<select value={invoice.customer?.paymentMethod==="vipps"?"vipps":"bank"} onChange={e=>onPaymentMethodChange?.(e.target.value)} disabled={busy||disabled} style={{display:"block",width:"100%",padding:10,marginTop:5}}><option value="bank">Bank / ordinær pris</option><option value="vipps">Vipps – beregn pris ut fra ønsket utbetaling</option></select></label>}<p>For ferdig utført arbeid: Kunden får betalingslenke på e-post. Når betalingen er trukket hos Vipps, registreres beløpet automatisk på fakturaen og kvittering sendes.</p>{invoiceTotalOre(invoice)>Number(invoice.paid_ore||0)&&(invoice.status!=="draft"||invoice.customer?.paymentMethod==="vipps")&&<VippsFeePreview amountOre={Math.max(0,invoiceTotalOre(invoice)-Number(invoice.paid_ore||0))} allowPriceAdjustment={allowPriceAdjustment&&invoice.status==="draft"} noPriceAdjustmentText={invoice.status==="draft"?"Kun timearbeid: ingen materialer eller andre varelinjer å justere. Vipps-gebyret dekkes av bedriften.":"Fakturaen er utstedt og låst. Ingen priser kan endres."} title={invoice.status==="draft"?"Vipps – pris for fakturakladd":"Vipps – fakturaens restbeløp"} disabled={busy||disabled} onApply={invoice.status==="draft"&&allowPriceAdjustment?onApplyPrice:undefined} applyLabel="Legg beregnet pris på materialer / andre varer" note={invoice.status==="draft"?"Timeprisen endres aldri. Dersom det ikke finnes materialer eller andre varelinjer, dekkes Vipps-kostnaden av bedriften. Avtal eventuell ny totalpris med kunden før fakturaen utstedes.":"Utstedt faktura er låst, og prisen kan ikke etterjusteres."}/>}{payment&&["partial","refunded","paid"].includes(payment.state)&&invoiceTotalOre(invoice)>Number(invoice.paid_ore||0)&&<p>Det gjenstår et beløp på fakturaen. Du kan kontrollere status og opprette en ny Vipps-lenke for restbeløpet dersom forrige betaling er avsluttet.</p>}{payment&&<div role="status" style={{padding:"12px 14px",border:"1px solid #d8c9ae",borderRadius:9,margin:"12px 0"}}>
