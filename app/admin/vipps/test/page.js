@@ -1,0 +1,25 @@
+import Link from "next/link";
+import {redirect} from "next/navigation";
+import {getAdminUser} from "../../../../lib/auth";
+import VippsInvoiceDemoClient from "./VippsInvoiceDemoClient";
+
+export const metadata={title:"Vipps prøvekjøring – Aadland Service",robots:{index:false,follow:false}};
+export default async function VippsInvoiceDemoPage(){
+ const user=await getAdminUser();
+ if(!user)redirect("/admin/login");
+ if(!(user.role==="owner"||user.canUpdateOrders))redirect("/admin");
+ return <main className="admin adminStandalonePage">
+  <div className="adminPageTop">
+   <div>
+    <div className="kicker">SIMULERING – IKKE EKTE BETALING</div>
+    <h1>Prøvekjør Vipps-faktura</h1>
+    <p className="muted">Se hvordan betaling, delbetaling, refusjon og kvitteringer virker. Dette er en lokal demonstrasjon med oppdiktede beløp – ingen faktura blir utstedt, ingen kunde blir kontaktet og ingen betaling blir startet.</p>
+   </div>
+   <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+    <Link className="btn alt" href="/admin/vipps">Vipps-oppsett</Link>
+    <Link className="btn alt" href="/admin/faktura">Til fakturaer</Link>
+   </div>
+  </div>
+  <VippsInvoiceDemoClient/>
+ </main>;
+}
