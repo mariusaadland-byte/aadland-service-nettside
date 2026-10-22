@@ -11,6 +11,7 @@ assert.ok(panel.includes('String(invoice.customer?.email||"").trim()'),"Show cus
 assert.ok(panel.includes("Dette utsteder fakturaen og låser prisene."),"Warn owner when invoice draft will be issued");
 assert.ok(panel.includes("Det opprettes ikke et nytt Vipps-krav."),"Distinguish reusing a request from a new request");
 assert.ok(panel.includes("Prøv Vipps-status på nytt"),"Status load failures must be retryable, not silently ignored");
+assert.ok(panel.includes('["cancelled","pending","partial","refunded","paid"].includes(payment.state)'),"Allow new confirmed payment on an invoice with outstanding balance after an earlier attempt was paid");
 assert.ok(customer.includes("Vipps-betalingen er registrert"),"A captured attempt does not imply that the whole invoice was settled");
 assert.ok(!customer.includes("Fakturaen er registrert som betalt."),"Never claim full settlement from payment-attempt state");
 
