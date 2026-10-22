@@ -16,14 +16,19 @@ const baseInvoice={
 const partialData={amountOre:5000,outstandingOre:7500,reference:"INV-12345678-1234-1234-1234-123456789abc",paidAt:"2026-10-22T14:00:00Z"};
 const partialPdf=(await buildPdf({...baseInvoice,paymentReceipt:partialData})).toString("latin1");
 assert.ok(partialPdf.includes("KVITTERING - DELBETALING"),"Partial receipt PDF title");
-assert.ok(partialPdf.includes("DELBETALT MED VIPPS:"),"Explicit partial payment label");
+assert.ok(partialPdf.includes("DELBETALING REGISTRERT"),"Explicit partial payment label");
 assert.ok(partialPdf.includes("Dette er en delbetaling, ikke en fullt betalt faktura."),"Warn that payment was not full");
 assert.ok(partialPdf.includes("Gjenst"),"Partial receipt shows outstanding amount");
 const fullPdf=(await buildPdf({...baseInvoice,paymentReceipt:{...partialData,amountOre:12500,outstandingOre:0}})).toString("latin1");
 assert.ok(fullPdf.includes("KVITTERING"),"Full payment receipt title");
 assert.ok(!fullPdf.includes("KVITTERING - DELBETALING"),"Full payment must not be mislabelled");
-assert.ok(fullPdf.includes("BETALT MED VIPPS:"));
+assert.ok(fullPdf.includes("BETALING REGISTRERT"));
 assert.ok(!fullPdf.includes("Dette er en delbetaling, ikke en fullt betalt faktura."));
+assert.ok(fullPdf.includes("Fakturaen er fullt oppgjort - takk for oppdraget!"));
+assert.ok(partialPdf.includes("BETALT TIDLIGERE"));
+assert.ok(partialPdf.includes("BETALT MED VIPPS N"));
+assert.ok(partialPdf.includes("Vipps-referanse:"));
+assert.ok(partialPdf.includes("Dette dokumentet bekrefter registrert betaling, ikke et nytt betalingskrav."));
 
 const rawVipps=readFileSync("lib/invoiceVipps.js","utf8")
  .replace(/^import .*;\n/gm,"").replace(/^export /gm,"")
