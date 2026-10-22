@@ -7,7 +7,6 @@ import {sendVippsRefundNoticeIfNeeded} from "../../../../lib/vippsRefundNotice";
 import {sendPaidRentalConfirmationIfNeeded} from "../../../../lib/rentalConfirmationEmail";
 
 export const runtime="nodejs";
-export const maxDuration=60;
 const LIMIT_PER_TYPE=25;
 const SETTLEMENT_RECHECK_DAYS=180;
 
