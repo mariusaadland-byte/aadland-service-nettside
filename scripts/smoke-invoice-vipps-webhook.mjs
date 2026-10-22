@@ -95,7 +95,7 @@ const body=JSON.stringify(request);
 const url="https://www.aadland-service.no/api/vipps/webhook";
 const host="www.aadland-service.no",date="Thu, 22 Oct 2026 10:00:00 GMT",secret="unit-test-secret";
 const hash=crypto.createHash("sha256").update(body,"utf8").digest("base64");
-const signed="POST\\n/api/vipps/webhook\\n"+date+";"+host+";"+hash;
+const signed="POST\n/api/vipps/webhook\n"+date+";"+host+";"+hash;
 const hmac=crypto.createHmac("sha256",secret).update(signed,"utf8").digest("base64");
 const auth="HMAC-SHA256 SignedHeaders=x-ms-date;host;x-ms-content-sha256&Signature="+hmac;
 const headers={
