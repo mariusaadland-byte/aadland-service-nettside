@@ -42,7 +42,7 @@ const refund=new Function("createHash","getVippsPayment","refundVippsPayment","i
  },value=>value===reference,process
 );
 const request={reference,confirmedInvoiceNumber:"AS-WEB-TEST",amountOre:5000,expectedCapturedOre:12500,expectedRefundedOre:0};
-assert.rejects(refund(s,invoice,{...request,confirmedInvoiceNumber:"OTHER"}),/Bekreft riktig/);
+await assert.rejects(refund(s,invoice,{...request,confirmedInvoiceNumber:"OTHER"}),/Bekreft riktig/);
 await assert.rejects(refund(s,invoice,{...request,amountOre:15000}),/høyere enn tilgjengelig/);
 await assert.rejects(refund(s,invoice,{...request,expectedCapturedOre:12000}),/har endret seg/);
 assert.equal(calls.length,0,"Never refund for wrong amounts or invoice");
