@@ -18,7 +18,7 @@ const partialPdf=(await buildPdf({...baseInvoice,paymentReceipt:partialData})).t
 assert.ok(partialPdf.includes("KVITTERING - DELBETALING"),"Partial receipt PDF title");
 assert.ok(partialPdf.includes("DELBETALING REGISTRERT"),"Explicit partial payment label");
 assert.ok(partialPdf.includes("Dette er en delbetaling, ikke en fullt betalt faktura."),"Warn that payment was not full");
-assert.ok(partialPdf.includes("GJENSTÅR"),"Partial receipt shows outstanding amount");
+assert.ok(partialPdf.includes("GJENST"),"Partial receipt shows outstanding amount");
 const fullPdf=(await buildPdf({...baseInvoice,paymentReceipt:{...partialData,amountOre:12500,outstandingOre:0}})).toString("latin1");
 const oneKrInvoice={...baseInvoice,invoice_number:"AS-WEB-2026-000002",
  title:"Test av Vipps",customer:{...baseInvoice.customer,workDate:"2026-10-23"},
@@ -33,12 +33,12 @@ assert.ok(oneKrReceipt.includes("FAKTURABEL"),"Receipt shows the original invoic
 assert.ok(oneKrReceipt.includes("BETALING REGISTRERT"));
 assert.ok(oneKrReceipt.includes("Dette dokumentet bekrefter registrert betaling, ikke et nytt betalingskrav."));
 assert.ok(fullPdf.includes("KVITTERING"),"Full payment receipt title");
-assert.ok(!fullPdf.includes("GJENSTÅR"),"Full payment receipt hides zero remaining");
-assert.ok(!oneKrReceipt.includes("GJENSTÅR"),"1 NOK pilot receipt hides zero remaining");
+assert.ok(!fullPdf.includes("GJENST"),"Full payment receipt hides zero remaining");
+assert.ok(!oneKrReceipt.includes("GJENST"),"1 NOK pilot receipt hides zero remaining");
 assert.ok(!oneKrReceipt.includes("BETALT TIDLIGERE"),"1 NOK pilot receipt hides zero previous payments");
 const finalInstallment=(await buildPdf({...baseInvoice,paid_ore:12500,paymentReceipt:{...partialData,amountOre:7500,outstandingOre:0}})).toString("latin1");
 assert.ok(finalInstallment.includes("BETALT TIDLIGERE"),"Final installment shows real prior payments");
-assert.ok(!finalInstallment.includes("GJENSTÅR"),"Final installment has no outstanding balance");
+assert.ok(!finalInstallment.includes("GJENST"),"Final installment has no outstanding balance");
 assert.ok(!fullPdf.includes("KVITTERING - DELBETALING"),"Full payment must not be mislabelled");
 assert.ok(fullPdf.includes("BETALING REGISTRERT"));
 assert.ok(!fullPdf.includes("Dette er en delbetaling, ikke en fullt betalt faktura."));
