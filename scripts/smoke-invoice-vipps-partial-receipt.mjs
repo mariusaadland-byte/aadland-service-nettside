@@ -20,6 +20,18 @@ assert.ok(partialPdf.includes("DELBETALING REGISTRERT"),"Explicit partial paymen
 assert.ok(partialPdf.includes("Dette er en delbetaling, ikke en fullt betalt faktura."),"Warn that payment was not full");
 assert.ok(partialPdf.includes("GJENST"),"Partial receipt shows outstanding amount");
 const fullPdf=(await buildPdf({...baseInvoice,paymentReceipt:{...partialData,amountOre:12500,outstandingOre:0}})).toString("latin1");
+const oneKrInvoice={...baseInvoice,invoice_number:"AS-WEB-2026-000002",
+ title:"Test av Vipps",customer:{...baseInvoice.customer,workDate:"2026-10-23"},
+ line_items:[{description:"Arbeid",quantity:1,unit:"stk",unitPriceOre:80,vatRate:25}],paid_ore:100};
+const oneKrReceipt=(await buildPdf({...oneKrInvoice,paymentReceipt:{amountOre:100,outstandingOre:0,reference:"INV-12345678-1234-4234-8234-123456789abc",paidAt:"2026-10-23T21:35:19Z"}})).toString("latin1");
+assert.ok(oneKrReceipt.includes("0,80 kr"),"Correct taxable subtotal for the real 1 NOK case");
+assert.ok(oneKrReceipt.includes("0,20 kr"),"Correct 25 percent VAT of 0.80 NOK");
+assert.ok(oneKrReceipt.includes("1,00 kr"),"Correct gross/paid amount");
+assert.ok(oneKrReceipt.includes("AS-WEB-2026-000002"));
+assert.ok(oneKrReceipt.includes("2026-10-23"));
+assert.ok(oneKrReceipt.includes("FAKTURABEL"),"Receipt shows the original invoice gross total");
+assert.ok(oneKrReceipt.includes("BETALING REGISTRERT"));
+assert.ok(oneKrReceipt.includes("Dette dokumentet bekrefter registrert betaling, ikke et nytt betalingskrav."));
 assert.ok(fullPdf.includes("KVITTERING"),"Full payment receipt title");
 assert.ok(!fullPdf.includes("KVITTERING - DELBETALING"),"Full payment must not be mislabelled");
 assert.ok(fullPdf.includes("BETALING REGISTRERT"));
@@ -76,6 +88,15 @@ try{
  assert.match(mailLog[0].payload.text,/Dette er en delbetaling/);
  assert.match(mailLog[0].payload.text,/Gjenstående på fakturaen/);
  assert.equal(mailLog[0].payload.attachments.length,2);
+ assert.ok(mailLog[0].payload.attachments.every(a=>a.contentType==="application/pdf"),"Both invoice and receipt must advertise proper PDF MIME");
+ assert.ok(mailLog[0].payload.attachments[0].filename.startsWith("Kvittering-"));
+ assert.ok(mailLog[0].payload.attachments[1].filename.startsWith("Faktura-"));
+ assert.match(mailLog[0].payload.html,/Delbetaling registrert/);
+ assert.match(mailLog[0].payload.html,/MOTTATT MED VIPPS/);
+ assert.match(mailLog[0].payload.html,/Gjenstår på fakturaen/);
+ assert.match(mailLog[0].payload.html,/ikke et nytt betalingskrav/);
+ assert.ok(!mailLog[0].payload.html.includes("Å betale"),"Receipt HTML should not look like an unpaid invoice");
+ assert.match(mailLog[0].payload.text,/ikke et nytt betalingskrav/);
  assert.equal(mailLog[0].payload.attachments[1].content,"frozen-original");
  await sendReceipt(part.db,part.payment);
  assert.equal(mailLog.length,1,"Do not duplicate partial receipt on retry");
@@ -85,6 +106,12 @@ try{
  assert.match(mailLog[1].payload.subject,/Kvittering for faktura/);
  assert.doesNotMatch(mailLog[1].payload.subject,/delbetaling/);
  assert.match(mailLog[1].payload.text,/registrert som fullt betalt/);
+ assert.ok(mailLog[1].payload.attachments.every(a=>a.contentType==="application/pdf"));
+ assert.match(mailLog[1].payload.html,/Fakturaen er betalt/);
+ assert.match(mailLog[1].payload.html,/Betalingsreferanse/);
+ assert.match(mailLog[1].payload.html,/Gjenstår på fakturaen/);
+ assert.doesNotMatch(mailLog[1].payload.html,/Delbetaling registrert/);
+ assert.match(mailLog[1].payload.html,/Dette er en kvittering/);
  assert.doesNotMatch(mailLog[1].payload.text,/Dette er en delbetaling/);
  assert.notEqual(mailLog[0].opts.idempotencyKey,mailLog[1].opts.idempotencyKey);
 }finally{
