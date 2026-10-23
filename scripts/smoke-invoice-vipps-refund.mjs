@@ -39,7 +39,7 @@ const refund=new Function("createHash","getVippsPayment","refundVippsPayment","i
   assert.ok(amount>0&&amount<=12500);
   calls.push({amount,idempotencyKey});
   provider.aggregate.refundedAmount.value+=amount;
- },value=>value===reference,process
+ },value=>value===reference,{env:{VERCEL_ENV:"production"}}
 );
 const request={reference,confirmedInvoiceNumber:"AS-WEB-TEST",amountOre:5000,expectedCapturedOre:12500,expectedRefundedOre:0};
 await assert.rejects(refund(s,invoice,{...request,confirmedInvoiceNumber:"OTHER"}),/Bekreft riktig/);
