@@ -7,7 +7,7 @@ const source=readFileSync("lib/invoiceVipps.js","utf8").replace(/^import .*;\n/g
 const client=readFileSync("lib/vippsClient.js","utf8");
 const enabledSource=client.slice(client.indexOf("function enabled(unit){"),client.indexOf("async function parseResponse"));
 const exportSource=client.slice(client.indexOf("export function vippsPaymentsEnabled("),client.indexOf("export function vippsIdempotencyKey(")).replace(/^export /gm,"");
-const env={VIPPS_SERVICE_PILOT_EMAIL:"marius@aadland-service.no",VERCEL_ENV:"production"};
+const env={VIPPS_SERVICE_PILOT_EMAIL:"marius@aadland-service.no",RESEND_API_KEY:"mock-never-sends",VERCEL_ENV:"production"};
 const fakeProcess={env};
 const {vippsPaymentsEnabled,vippsPublicPaymentsEnabled}=new Function("process",enabledSource+exportSource+";return {vippsPaymentsEnabled,vippsPublicPaymentsEnabled};")(fakeProcess);
 assert.equal(vippsPublicPaymentsEnabled("service"),false,"Public checkout must be disabled by default");
