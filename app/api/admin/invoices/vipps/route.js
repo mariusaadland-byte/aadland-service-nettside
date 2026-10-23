@@ -2,6 +2,7 @@ import {NextResponse} from "next/server";
 import {getAdminUser} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
 import {sameOriginGuard} from "../../../../../lib/requestGuard";
+import {vippsPublicPaymentsEnabled} from "../../../../../lib/vippsClient";
 import {startInvoiceVipps,reconcileInvoiceVipps,invoiceVippsView} from "../../../../../lib/invoiceVipps";
 export const runtime="nodejs";
 export const maxDuration=60;
@@ -17,9 +18,12 @@ export async function GET(req){
 }
 export async function POST(req){
  const guard=sameOriginGuard(req);if(guard)return guard;
- if(!allowed(await getAdminUser()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
+ const user=await getAdminUser();
+ if(!allowed(user))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const b=await req.json().catch(()=>({}));
  if(!uuid(b.id)||!["start","sync"].includes(b.action))return NextResponse.json({error:"Ugyldig handling."},{status:400});
+ if(b.action==="start"&&!vippsPublicPaymentsEnabled("service")&&user.role!=="owner")
+  return NextResponse.json({error:"Bare eieren kan starte en kontrollert Vipps-pilot."},{status:403});
  const s=db();if(!s)return NextResponse.json({error:"Database utilgjengelig."},{status:503});
  const found=await s.from("invoice_drafts").select("*").eq("id",b.id).maybeSingle();
  if(found.error||!found.data)return NextResponse.json({error:"Fakturaen ble ikke funnet."},{status:404});
