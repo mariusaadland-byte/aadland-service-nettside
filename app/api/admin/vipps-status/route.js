@@ -85,6 +85,7 @@ export async function GET(){
    enabled:vippsPaymentsEnabled(unit.unit),
    publicEnabled:vippsPublicPaymentsEnabled(unit.unit),
    pilotEmailConfigured:unit.unit==="service"&&Boolean(String(process.env.VIPPS_SERVICE_PILOT_EMAIL||"").trim()),
+   pushApproved:unit.unit==="service"&&process.env.VIPPS_SERVICE_PUSH_ENABLED==="true",
    webhook:webhooks.find(item=>item?.unit===unit.unit)||null
   })),
   paymentIntegrationFoundation:true,
