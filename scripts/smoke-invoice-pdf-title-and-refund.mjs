@@ -39,6 +39,12 @@ assert.ok(original.includes("MVA 25 %"),"Preserve 25 percent VAT");
 assert.ok(original.includes("0,80 kr"),"Preserve ex VAT amount");
 assert.ok(original.includes("0,20 kr"),"Preserve VAT amount");
 assert.ok(original.includes("1,00 kr"),"Preserve payable total");
+assert.ok(original.includes("Kontonummer: 8450 46 22699"),"Ordinary bank invoices keep bank details");
+const vippsDocument=(await buildInvoiceDraftPdf({...record,customer:{...record.customer,paymentMethod:"vipps"}})).toString("latin1");
+assert.ok(vippsDocument.includes("Betalingsm"),"Vipps invoice identifies the correct payment method");
+assert.ok(vippsDocument.includes("Vipps-lenken"),"Vipps invoice explains the payment link");
+assert.ok(!vippsDocument.includes("Kontonummer: 8450 46 22699"),"Vipps invoice must not offer a competing bank payment route");
+assert.ok(vippsDocument.includes("MVA 25 %")&&vippsDocument.includes("1,00 kr"),"Vipps payment instructions must preserve original VAT and total");
 const receipt=(await buildInvoiceDraftPdf({...record,paymentReceipt:{
  amountOre:100,outstandingOre:0,reference:"INV-12345678-1234-4234-8234-123456789abc",
  paidAt:"2026-10-23T21:35:19Z"
