@@ -45,7 +45,8 @@ const providerDb={
  from(table){
   dbReads++;
   return {select(){return this;},eq(){return this;},order(){return this;},limit(){return this;},
-   async maybeSingle(){return {data:table==="invoice_vipps_payments"?null:invoice,error:null};}};
+   async maybeSingle(){return {data:table==="invoice_vipps_payments"?null:invoice,error:null};},
+   async single(){return {data:invoice,error:null};}};
  },
  async rpc(name){
   if(name==="get_vipps_webhook_status")return {data:[{unit:"service",active:true}],error:null};
