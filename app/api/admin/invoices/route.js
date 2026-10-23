@@ -55,13 +55,26 @@ export async function PATCH(req){
  const body=await req.json().catch(()=>null);if(!body||typeof body.id!=="string")return fail("Ugyldig faktura.");
  if(!validLines(body.lineItems))return fail("Kontroller fakturalinjer, antall og priser.");
  if(!["fixed","hourly","estimate"].includes(body.pricingModel))return fail("Ugyldig prismodell.");
- if(!clean(body.customer?.name))return fail("Kundenavn mangler.");
+ // An unfinished draft may be saved before a customer is registered.
+ // The issue/send paths still require a name and billing address.
  if(typeof body.expectedUpdatedAt!=="string"||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(body.expectedUpdatedAt))return fail("Hent fakturakladden på nytt før lagring.",409);
  const mode=body.dueDateMode??"auto";if(!["auto","manual"].includes(mode))return fail("Ugyldig valg av betalingsfrist.");
  const due=body.dueDate?clean(body.dueDate,10):null;
  if(due&&!/^\d{4}-\d{2}-\d{2}$/.test(due))return fail("Ugyldig forfallsdato.");
  const s=db();if(!s)return fail("Database utilgjengelig.",503);
- const update={title:clean(body.title),customer:{name:clean(body.customer.name),email:clean(body.customer.email),address:clean(body.customer.address,500),phone:clean(body.customer.phone,70),contactId:clean(body.customer.contactId,36),workDescription:clean(body.customer.workDescription,3000),workDate:clean(body.customer.workDate,10),workAddress:clean(body.customer.workAddress,500),paymentMethod:body.customer.paymentMethod==="vipps"?"vipps":"bank"},pricing_model:body.pricingModel,line_items:body.lineItems.map(x=>({description:clean(x.description,500),type:clean(x.type,20),quantity:Number(x.quantity),unit:clean(x.unit,30),unitPriceOre:Number(x.unitPriceOre),vatRate:Number(x.vatRate)})),notes:clean(body.notes,4000),due_date:due,due_date_mode:mode,updated_at:new Date().toISOString()};
+ let selected=null;
+ const requestedId=clean(body.customer?.contactId,36);
+ if(requestedId){
+  if(!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(requestedId))return fail("Kundekortet er ugyldig.");
+  const {data:contact,error:contactError}=await s.from("admin_customer_contacts")
+   .select("id,name,email,phone,address,payment_terms_days,customer_type,organization_number,preferred_payment_method").eq("id",requestedId).maybeSingle();
+  if(contactError||!contact)return fail("Kundekortet finnes ikke. Velg kunden på nytt.",409);
+  selected=contact;
+ }
+ const chosen=selected?{name:selected.name,email:selected.email||"",address:selected.address||"",phone:selected.phone||"",contactId:selected.id,paymentTermsDays:selected.payment_terms_days??14,customerType:selected.customer_type||"private",organizationNumber:selected.organization_number||""}:
+ {name:clean(body.customer?.name),email:clean(body.customer?.email),address:clean(body.customer?.address,500),phone:clean(body.customer?.phone,70),contactId:"",paymentTermsDays:Number(body.customer?.paymentTermsDays??14),customerType:body.customer?.customerType||"private",organizationNumber:clean(body.customer?.organizationNumber,9)};
+ const chosenPaymentMethod=body.customer?.paymentMethod==="vipps"?"vipps":body.customer?.paymentMethod==="bank"?"bank":selected?.preferred_payment_method==="vipps"?"vipps":"bank";
+ const update={title:clean(body.title),customer:{...chosen,workDescription:clean(body.customer?.workDescription,3000),workDate:clean(body.customer?.workDate,10),workAddress:clean(body.customer?.workAddress,500),paymentMethod:chosenPaymentMethod},pricing_model:body.pricingModel,line_items:body.lineItems.map(x=>({description:clean(x.description,500),type:clean(x.type,20),quantity:Number(x.quantity),unit:clean(x.unit,30),unitPriceOre:Number(x.unitPriceOre),vatRate:Number(x.vatRate)})),notes:clean(body.notes,4000),due_date:due,due_date_mode:mode,updated_at:new Date().toISOString()};
  const {data,error}=await s.from("invoice_drafts").update(update).eq("id",body.id).eq("status","draft")
   .eq("updated_at",body.expectedUpdatedAt).select("id,updated_at").maybeSingle();
  if(error)return fail("Fakturakladden kunne ikke lagres.",500);
