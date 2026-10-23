@@ -26,7 +26,7 @@ function sanitize(body){
  if(organizationNumber&&!/^[0-9]{9}$/.test(organizationNumber))return {error:"Organisasjonsnummer må være nøyaktig 9 sifre."};
  if(!["bank","vipps"].includes(preferredPaymentMethod))return {error:"Velg en gyldig standard betalingsmåte."};
  if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return {error:"Ugyldig e-postadresse."};
- return {data:{payment_terms_days:days,name,email:email||null,phone:phone||null,address:address||null,customer_type:customerType,organization_number:organizationNumber||null,contact_person:contactPerson||null,internal_note:internalNote||null,preferred_payment_method:preferredPaymentMethod,updated_at:new Date().toISOString()}};
+ return {data:{payment_terms_days:days,name,email:email||null,phone:phone||null,address:address||null,customer_type:customerType,organization_number:customerType==="business"?(organizationNumber||null):null,contact_person:customerType==="business"?(contactPerson||null):null,internal_note:internalNote||null,preferred_payment_method:preferredPaymentMethod,updated_at:new Date().toISOString()}};
 }
 export async function GET(){
  if(!await allowed())return NextResponse.json({error:"Ingen tilgang."},{status:403});
@@ -37,7 +37,8 @@ export async function GET(){
 }
 export async function POST(request){
  const guard=sameOriginGuard(request);if(guard)return guard;
- if(!await allowed())return NextResponse.json({error:"Ingen tilgang."},{status:403});
+ const user=await getAdminUser();
+ if(!user||!(user.role==="owner"||user.canUpdateOrders||user.canManageProducts))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const input=sanitize(await request.json().catch(()=>({})));if(input.error)return NextResponse.json({error:input.error},{status:400});
  const s=db();if(!s)return NextResponse.json({error:"Databasen er utilgjengelig."},{status:503});
  if(input.data.email){
