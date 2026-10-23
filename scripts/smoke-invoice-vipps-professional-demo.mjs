@@ -25,6 +25,7 @@ for(const [type,partial] of [["partial",true],["full",false]]){
  assert.match(r.headers["X-Robots-Tag"],/noindex/);
  const pdf=Buffer.from(r.value).toString("latin1");
  assert.ok(pdf.startsWith("%PDF-1.4"));
+ assert.match(pdf,/\/Count 1\b/,"Short demo receipts must fit on one professionally laid-out A4 page");
  assert.ok(pdf.includes("TESTDOKUMENT - IKKE GYLDIG"));
  assert.ok(pdf.includes("DEMO - INGEN FAKTURA UTSTEDT - INGEN BETALING UTFORT"));
  assert.ok(pdf.includes("Eksempelkunde"));
