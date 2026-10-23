@@ -4,24 +4,30 @@ import {db} from "../../../../../lib/supabase";
 import {sameOriginGuard} from "../../../../../lib/requestGuard";
 import {vippsPublicPaymentsEnabled} from "../../../../../lib/vippsClient";
 import {startInvoiceVipps,reconcileInvoiceVipps,invoiceVippsView} from "../../../../../lib/invoiceVipps";
+import {refundInvoiceVipps} from "../../../../../lib/invoiceVippsRefund";
 export const runtime="nodejs";
 export const maxDuration=60;
 const allowed=u=>u&&(u.role==="owner"||u.canUpdateOrders||u.canManageProducts);
 const uuid=v=>typeof v==="string"&&/^[0-9a-f-]{36}$/i.test(v);
 export async function GET(req){
- if(!allowed(await getAdminUser()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
+ const user=await getAdminUser();
+ if(!allowed(user))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const id=new URL(req.url).searchParams.get("id");if(!uuid(id))return NextResponse.json({error:"Velg en faktura."},{status:400});
  const s=db();if(!s)return NextResponse.json({error:"Database utilgjengelig."},{status:503});
- const r=await s.from("invoice_vipps_payments").select("*").eq("invoice_id",id).order("created_at",{ascending:false}).limit(1).maybeSingle();
+ const r=await s.from("invoice_vipps_payments").select("*").eq("invoice_id",id).order("created_at",{ascending:false}).limit(100);
  if(r.error)return NextResponse.json({error:"Vipps-status kunne ikke hentes."},{status:500});
- return NextResponse.json({payment:invoiceVippsView(r.data),pushApproved:process.env.VIPPS_SERVICE_PUSH_ENABLED==="true"},{headers:{"Cache-Control":"private, no-store"}});
+ const attempts=r.data||[];
+ const refundablePayments=user.role==="owner"?attempts.filter(p=>Number(p.captured_ore)>Number(p.refunded_ore)).map(invoiceVippsView):[];
+ return NextResponse.json({payment:invoiceVippsView(attempts[0]),refundablePayments,refundAllowed:user.role==="owner",pushApproved:process.env.VIPPS_SERVICE_PUSH_ENABLED==="true"},{headers:{"Cache-Control":"private, no-store"}});
 }
 export async function POST(req){
  const guard=sameOriginGuard(req);if(guard)return guard;
  const user=await getAdminUser();
  if(!allowed(user))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const b=await req.json().catch(()=>({}));
- if(!uuid(b.id)||!["start","sync"].includes(b.action))return NextResponse.json({error:"Ugyldig handling."},{status:400});
+ if(!uuid(b.id)||!["start","sync","refund"].includes(b.action))return NextResponse.json({error:"Ugyldig handling."},{status:400});
+ if(b.action==="refund"&&user.role!=="owner")
+  return NextResponse.json({error:"Bare eieren kan refundere en Vipps-faktura."},{status:403});
  if(b.action==="start"&&!vippsPublicPaymentsEnabled("service")&&user.role!=="owner")
   return NextResponse.json({error:"Bare eieren kan starte en kontrollert Vipps-pilot."},{status:403});
  const s=db();if(!s)return NextResponse.json({error:"Database utilgjengelig."},{status:503});
@@ -34,6 +40,13 @@ export async function POST(req){
    p=await startInvoiceVipps(s,found.data,b.confirmedInvoice,{
     deliveryMethod:b.deliveryMethod,phone:b.phone,
     customerPresent:b.customerPresent===true,customerConsent:b.customerConsent===true
+   });
+  }else if(b.action==="refund"){
+   p=await refundInvoiceVipps(s,found.data,{
+    reference:b.reference,amountOre:b.amountOre,
+    expectedCapturedOre:b.expectedCapturedOre,
+    expectedRefundedOre:b.expectedRefundedOre,
+    confirmedInvoiceNumber:b.confirmedInvoiceNumber
    });
   }else{
    const latest=await s.from("invoice_vipps_payments").select("reference").eq("invoice_id",b.id).order("created_at",{ascending:false}).limit(1).maybeSingle();
