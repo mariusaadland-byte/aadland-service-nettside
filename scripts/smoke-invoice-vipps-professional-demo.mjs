@@ -37,9 +37,11 @@ for(const [type,partial] of [["partial",true],["full",false]]){
  if(partial){
   assert.ok(pdf.includes("DELBETALING REGISTRERT"));
   assert.ok(pdf.includes("Dette er en delbetaling"));
+  assert.ok(pdf.includes("GJENSTÅR"),"Partial demo receipt must show remaining balance");
   assert.ok(!pdf.includes("Fakturaen er fullt oppgjort"));
  }else{
   assert.ok(pdf.includes("Fakturaen er fullt oppgjort"));
+  assert.ok(!pdf.includes("GJENSTÅR"),"Fully paid demo receipt must hide remaining balance");
   assert.ok(!pdf.includes("DELBETALING REGISTRERT"));
  }
 }
