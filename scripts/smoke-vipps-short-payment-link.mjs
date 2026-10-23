@@ -1,0 +1,46 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+
+const code=readFileSync("lib/invoiceVippsLinks.js","utf8").replace(/^export /gm,"");
+const api=new Function(code+";return {invoiceVippsShortUrl,vippsCustomerOpenLink};")();
+const ref="INV-12345678-1234-4234-8234-123456789abc";
+const link=api.invoiceVippsShortUrl(ref);
+assert.equal(link,"https://www.aadland-service.no/betaling/faktura/start?reference="+ref);
+assert.ok(link.length<110);
+assert.throws(()=>api.invoiceVippsShortUrl("https://evil.example/?hi"),/Ugyldig/);
+const jwt=expires=>["eyJhbGciOiJSUzUxMiJ9",Buffer.from(JSON.stringify({app:"ePayment",exp:expires})).toString("base64url"),"sig"].join(".");
+const now=1_800_000_000_000;
+const raw="https://api.vipps.no/dwo-api-application/v1/deeplink/vippsgateway?v=2&token="+jwt(Math.floor(now/1000)+600);
+assert.ok(raw.length>100);
+const checked=api.vippsCustomerOpenLink(raw,now);
+assert.equal(checked.available,true);
+assert.equal(checked.href,raw,"Never re-encode, shorten or redirect Vipps' signed URL");
+assert.equal(api.vippsCustomerOpenLink(raw,now+590000).reason,"expired","Reject expired Vipps session without initiating another payment");
+assert.equal(api.vippsCustomerOpenLink("https://not-vipps.example/pay").reason,"invalid");
+assert.equal(api.vippsCustomerOpenLink("https://api.vipps.no.evil.example/pay").reason,"invalid");
+assert.equal(api.vippsCustomerOpenLink("http://api.vipps.no/pay").reason,"invalid");
+assert.equal(api.vippsCustomerOpenLink("https://user:password@api.vipps.no/pay").reason,"invalid");
+assert.equal(api.vippsCustomerOpenLink("https://api.vipps.no/pay?token=x.y.z").reason,"invalid");
+
+const page=readFileSync("app/betaling/faktura/start/page.js","utf8");
+assert.ok(page.includes('dynamic="force-dynamic"'));
+assert.ok(page.includes("invoiceVippsReference(reference)"),"Unknown payment references must be rejected");
+assert.ok(page.includes(".eq(\"reference\",reference)"),"Look up only the opaque payment reference");
+assert.ok(page.includes('r.data.delivery_method==="email_link"'),"Cannot convert push requests into redirect payment links");
+assert.ok(page.includes('["pending","authorized"]'),"Finished requests never show a payment button");
+assert.ok(page.includes('href={link}'),"The customer's user click opens the exact Vipps URL");
+assert.ok(page.includes('referrerPolicy="no-referrer"'),"Do not share payment referrer with Vipps");
+assert.ok(!page.includes('redirect(link)'),"Do not HTTP-redirect to Vipps; requires direct OS link opening");
+assert.ok(page.includes('robots:{index:false,follow:false}'));
+assert.ok(page.includes("utløpt"),"Expired sessions need explicit guidance");
+
+const invoice=readFileSync("lib/invoiceVipps.js","utf8");
+assert.ok(invoice.includes('const paymentLink=shortPaymentUrl(p.reference)'));
+assert.ok(invoice.includes('href="'+ "'+paymentLink+'" +'"'),"HTML email must include a short clickable button");
+assert.ok(invoice.includes('text:["Hei "+invoice.customer.name'),"Maintain plain text version");
+assert.ok(invoice.includes("shareUrl:p.delivery_method"),"Admin receives the short URL for sharing");
+assert.ok(!invoice.includes('Vipps her:",redirectUrl'),"Never email the raw JWT deeplink");
+const admin=readFileSync("app/admin/faktura/InvoiceVippsPanel.js","utf8");
+assert.ok(admin.includes("payment.shareUrl"),"Admin should share the short link, not a raw Vipps JWT");
+assert.ok(!admin.includes("navigator.share({title:\"Betal faktura med Vipps\",url:payment.redirectUrl})"));
+console.log("Vipps kort betalingslenke bestått: 1-klikk HTML, hel Vipps-token, trygt domene, utløpssperre, kort admin-lenke og ingen ekstra betalingsforsøk.");
