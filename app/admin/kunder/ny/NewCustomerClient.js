@@ -14,7 +14,7 @@ export default function NewCustomerClient({invoiceId=""}){
    const res=await fetch("/api/admin/customer-contacts",{
     method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)
    });
-   const data=await res.json().catch(()=>({});
+   const data=await res.json().catch(()=>({}));
    if(!res.ok)throw Error(data.error||"Kunden kunne ikke lagres.");
    if(!data.contact?.id)throw Error("Kundekortet ble ikke bekreftet lagret.");
    const target=invoiceId?"/admin/faktura?id="+encodeURIComponent(invoiceId)+"&customerId="+encodeURIComponent(data.contact.id):"/admin/kunder/"+encodeURIComponent(data.contact.id);
