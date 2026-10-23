@@ -107,6 +107,6 @@ assert.ok(route.includes("customerConsent:b.customerConsent===true"));
 const ui=readFileSync("app/admin/faktura/InvoiceVippsPanel.js","utf8");
 assert.ok(ui.includes("Kunden er her"));
 assert.ok(ui.includes("Kunden har samtykket"));
-assert.ok(ui.includes("send Vipps-varsel"));
+assert.ok(ui.includes("Send Vipps-varsel"));
 assert.ok(ui.includes("!pushApproved"));
 console.log("Vipps-varsling bestått: særskilt godkjenning, kunden til stede, samtykke, mobil, CUSTOMER_PRESENT, én forespørsel, ingen e-post ved push.");
