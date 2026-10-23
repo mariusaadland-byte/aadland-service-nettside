@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 
-const invoiceTerms=readFileSync("lib/invoicePaymentTerms.js","utf8").replace(/^export /gm,"");
+const invoiceTerms=readFileSync("lib/invoicePaymentTerms.js","utf8").replace(/^import .*;\n/gm,"").replace(/^export /gm,"");
+const vippsDate=readFileSync("lib/invoiceVippsDate.js","utf8").replace(/^export /gm,"");
 const helper=readFileSync("lib/invoiceCustomerSelection.js","utf8")
  .replace(/^import .*;\n/gm,"").replace(/^export /gm,"");
-const select=new Function(invoiceTerms+";"+helper+";return invoiceWithSelectedCustomer;")();
+const select=new Function(vippsDate+";"+invoiceTerms+";"+helper+";return invoiceWithSelectedCustomer;")();
 const today="2026-10-23";
 const base={
  id:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",status:"draft",
