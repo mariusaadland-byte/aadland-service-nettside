@@ -113,6 +113,7 @@ export default function VippsStatusClient(){
       {unit.webhook&&<button className="btn alt" type="button" disabled={savingUnit===unit.unit} onClick={()=>registerWebhook(unit,true)}>{savingUnit===unit.unit?"Registrerer …":"Registrer webhook på nytt"}</button>}
      </div>}
      {unit.configured&&!unit.enabled&&<p className="muted">Du kan teste API-nøkler og webhook mens dette salgsstedet er AV. Aktiver bare når «Test oppsett» er grønn for {unit.label}, og full betalingsflyt er godkjent. Det andre salgsstedet trenger ikke være klart.</p>}
+     {unit.unit==="service"&&<p className="muted"><strong>Direkte Vipps-varsel hos kunden: {unit.pushApproved?"AKTIVERT":"AV – venter på særskilt godkjenning hos Vipps"}</strong>. Når kunden er fysisk til stede, må du få kundens samtykke før varsel sendes. Betalingslenke på e-post fungerer uavhengig av dette.</p>}
      {unit.unit==="service"&&!unit.publicEnabled&&<div className="notice" style={{marginTop:14}}>
        <strong>Kontrollert prøvebetaling: 1,00 kr</strong>
        <p style={{margin:"8px 0"}}>{unit.pilotEmailConfigured?"Testmottaker er lagret sikkert på serveren.":"Testmottaker mangler på serveren; ingen pilotbetaling kan startes."} Mens vanlig kunde-Vipps er AV, tillater systemet kun en admin-bekreftet Vipps-faktura på nøyaktig 1 kr til den registrerte testadressen, og bare når Vipps-motoren senere er slått på for Service.</p>

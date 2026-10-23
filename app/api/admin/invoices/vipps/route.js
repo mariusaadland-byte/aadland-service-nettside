@@ -14,7 +14,7 @@ export async function GET(req){
  const s=db();if(!s)return NextResponse.json({error:"Database utilgjengelig."},{status:503});
  const r=await s.from("invoice_vipps_payments").select("*").eq("invoice_id",id).order("created_at",{ascending:false}).limit(1).maybeSingle();
  if(r.error)return NextResponse.json({error:"Vipps-status kunne ikke hentes."},{status:500});
- return NextResponse.json({payment:invoiceVippsView(r.data)},{headers:{"Cache-Control":"private, no-store"}});
+ return NextResponse.json({payment:invoiceVippsView(r.data),pushApproved:process.env.VIPPS_SERVICE_PUSH_ENABLED==="true"},{headers:{"Cache-Control":"private, no-store"}});
 }
 export async function POST(req){
  const guard=sameOriginGuard(req);if(guard)return guard;
@@ -31,7 +31,10 @@ export async function POST(req){
   let p;
   if(b.action==="start"){
    if(b.workCompleted!==true)return NextResponse.json({error:"Bekreft at arbeidet er ferdig før direkte betaling."},{status:400});
-   p=await startInvoiceVipps(s,found.data,b.confirmedInvoice);
+   p=await startInvoiceVipps(s,found.data,b.confirmedInvoice,{
+    deliveryMethod:b.deliveryMethod,phone:b.phone,
+    customerPresent:b.customerPresent===true,customerConsent:b.customerConsent===true
+   });
   }else{
    const latest=await s.from("invoice_vipps_payments").select("reference").eq("invoice_id",b.id).order("created_at",{ascending:false}).limit(1).maybeSingle();
    if(latest.error||!latest.data)throw Error("Ingen Vipps-betaling er startet.");

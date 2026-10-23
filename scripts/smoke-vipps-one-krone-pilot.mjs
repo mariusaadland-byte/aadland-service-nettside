@@ -50,8 +50,8 @@ const providerDb={
  },
  async rpc(name){
   if(name==="get_vipps_webhook_status")return {data:[{unit:"service",active:true}],error:null};
-  assert.equal(name,"prepare_invoice_vipps");prepared++;
-  return {data:{id:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",reference:"INV-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",amount_ore:200},error:null};
+  assert.equal(name,"prepare_invoice_vipps_v2");prepared++;
+  return {data:{id:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",reference:"INV-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",amount_ore:200,delivery_method:"email_link",push_phone:null},error:null};
  }
 };
 const getters=new Function(
