@@ -51,7 +51,8 @@ const receipt=(await buildInvoiceDraftPdf({...record,paymentReceipt:{
 }})).toString("latin1");
 assert.ok(receipt.includes("KVITTERING"));
 assert.ok(receipt.includes("BETALING REGISTRERT"));
-assert.ok(receipt.includes("0,00 kr"),"Show no outstanding amount");
+assert.ok(!receipt.includes("GJENSTÅR"),"Fully paid PDF receipt must omit remaining balance");
+assert.ok(!receipt.includes("BETALT TIDLIGERE"),"Do not show zero previous payments on fully paid receipt");
 assert.ok(receipt.includes("BETALT MED VIPPS N"));
 assert.ok(receipt.includes("Fakturaen er fullt oppgjort"));
 assert.ok(receipt.includes("Reparasjon av d"),"Receipt uses same meaningful title");
