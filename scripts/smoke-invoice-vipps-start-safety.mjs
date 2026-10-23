@@ -28,16 +28,18 @@ const route=readFileSync("app/api/admin/invoices/vipps/route.js","utf8")
  .replace(/^export const .*;\n/gm,"")
  .replace("export async function GET","async function GET")
  .replace("export async function POST","async function POST");
-const api=new Function("NextResponse","getAdminUser","db","sameOriginGuard","startInvoiceVipps","reconcileInvoiceVipps","invoiceVippsView",
+const api=new Function("NextResponse","getAdminUser","db","sameOriginGuard","startInvoiceVipps","reconcileInvoiceVipps","invoiceVippsView","vippsPublicPaymentsEnabled",
 route+";return {POST};")(
  NextResponse,async()=>admin,()=>s,()=>forbidden?{status:403,body:{error:"origin"}}:null,
  async()=>{starts++;return result;},async()=>{syncs++;return result;},
- p=>({state:p.state,reference:p.reference})
+ p=>({state:p.state,reference:p.reference}),()=>false
 );
 const call=async(body)=>api.POST({json:async()=>({id:uuid,...body})});
 admin=null;let r=await call({action:"start",workCompleted:true});assert.equal(r.status,403);assert.equal(starts,0);
 admin={role:"owner"};forbidden=true;r=await call({action:"start",workCompleted:true});assert.equal(r.status,403);assert.equal(starts,0);
-forbidden=false;r=await call({action:"start",workCompleted:false});assert.equal(r.status,400);assert.equal(starts,0);
+forbidden=false;admin={role:"staff",canUpdateOrders:true};
+ r=await call({action:"start",workCompleted:true});assert.equal(r.status,403);assert.equal(starts,0,"Non-owner cannot start pilot");
+ admin={role:"owner"};r=await call({action:"start",workCompleted:false});assert.equal(r.status,400);assert.equal(starts,0);
 r=await call({action:"start",workCompleted:true});assert.equal(r.status,200);assert.equal(starts,1);assert.equal(r.body.payment.state,"pending");
 r=await call({action:"unknown",workCompleted:true});assert.equal(r.status,400);assert.equal(starts,1);
 assert.equal(syncs,0,"No status update or payment requested by accidental admin call");
