@@ -7,6 +7,8 @@ import {invoiceArchiveOverview,invoiceArchiveVisible,invoiceArchiveDueInfo} from
 import Link from "next/link";
 import InvoiceReminderPanel from "./InvoiceReminderPanel";
 import InvoiceVippsPanel from "./InvoiceVippsPanel";
+import InvoiceCustomerPicker from "./InvoiceCustomerPicker";
+import {invoiceWithSelectedCustomer} from "../../../lib/invoiceCustomerSelection";
 import {hasAdjustableVippsPriceLine,linesForCustomerTotal} from "../../../lib/vippsPriceLines";
 import {COMPANY_INFO,COMPANY_ADDRESS} from "../../../lib/companyInfo";
 const money=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(ore)||0)/100);
@@ -124,11 +126,56 @@ export default function InvoicesClient({archiveMode=false}){
   try{await load();setSaved("Siste lagrede versjon er hentet. Kontroller kunde, forfall, timer og beløp før du fortsetter.");}
   finally{setBusy(false);}
  }
- async function openCustomerCard(){
-  if(!form||busy)return;setBusy(true);setError("");
-  try{if(form.status==="draft")await persist(form);const r=await fetch("/api/admin/invoices/customer",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:form.id})});const data=await r.json();if(!r.ok)throw Error(data.error);window.location.assign(data.url);}
-  catch(e){setError(e.message);setBusy(false)}
+ async function selectCustomer(contact,base=form){
+  if(!base||base.status!=="draft")throw Error("Velg en fakturakladd først.");
+  if(busy)throw Error("Fakturaen behandles. Prøv igjen.");
+  setBusy(true);setError("");setSaved("");
+  try{
+   const next=invoiceWithSelectedCustomer(base,contact,today);
+   await persist(next);
+   setForm(next);
+   await load();
+   setSaved("Kundekortet er valgt og lagret på fakturaen. Betalingsfrist og kontaktopplysninger er oppdatert.");
+  }catch(e){setError(e.message||"Kunden kunne ikke velges.");throw e;}
+  finally{setBusy(false)}
  }
+ async function openNewCustomer(){
+  if(!form||busy)return;
+  setBusy(true);setError("");
+  try{
+   await persist(form);
+   window.location.assign("/admin/kunder/ny?invoiceId="+encodeURIComponent(form.id));
+  }catch(e){setError(e.message||"Lagre fakturakladden før du oppretter kunden.");setBusy(false);}
+ }
+ async function openCustomerCard(){
+  if(!form||busy)return;
+  if(!form.customer?.contactId){await openNewCustomer();return;}
+  setBusy(true);setError("");
+  try{
+   if(form.status==="draft")await persist(form);
+   window.location.assign("/admin/kunder/"+encodeURIComponent(form.customer.contactId)+"?invoiceId="+encodeURIComponent(form.id));
+  }catch(e){setError(e.message||"Kundekortet kunne ikke åpnes.");setBusy(false)}
+ }
+ useEffect(()=>{
+  if(archiveMode||!draft?.id||draft.status!=="draft")return;
+  const params=new URLSearchParams(window.location.search);
+  const contactId=params.get("customerId");
+  if(!contactId||!/^[0-9a-f-]{36}$/i.test(contactId))return;
+  let live=true;
+  (async()=>{
+   try{
+    const response=await fetch("/api/admin/customer-contacts",{cache:"no-store"});
+    const data=await response.json().catch(()=>({});
+    if(!response.ok)throw Error(data.error||"Kunne ikke hente kundekortet etter registrering.");
+    const selected=(data.contacts||[]).find(item=>item.id===contactId);
+    if(!selected)throw Error("Kunden finnes ikke i kunderegisteret. Søk opp kunden nedenfor.");
+    if(!live)return;
+    await selectCustomer(selected,draft);
+    if(live)window.history.replaceState(null,"","/admin/faktura?id="+encodeURIComponent(draft.id));
+   }catch(e){if(live)setError(e.message||"Kunden kunne ikke kobles til fakturaen.");}
+  })();
+  return()=>{live=false;};
+ },[archiveMode,draft?.id]);
  async function printInvoice(){
   if(!form||busy)return;
   if(form.status==="draft"&&!window.confirm("Utstede faktura på "+money(total(form.line_items))+" inkl. MVA? Fakturaen får nummer og låses for videre endringer. Den sendes ikke på e-post automatisk."))return;
@@ -217,12 +264,12 @@ export default function InvoicesClient({archiveMode=false}){
   <option value="amount">Høyest restbeløp først</option>
   <option value="newest">Nyeste faktura først</option>
  </select></label></>}{!loadingInvoices&&<p className="muted" style={{fontSize:13}}>{visibleItems.length} {visibleItems.length===1?"faktura":"fakturaer"} i utvalget</p>}{loadingInvoices&&<p role="status">Oppdaterer fakturaene …</p>}{!loadingInvoices&&visibleItems.length===0&&<p>Ingen {archiveMode?"fakturaer":"kladder"} i dette utvalget.</p>}{visibleItems.map(x=>{const p=invoicePaymentState(x,today);return <button key={x.id} disabled={busy} aria-pressed={active===x.id} onClick={()=>{setActive(x.id);window.history.replaceState(null,"",(archiveMode?"/admin/faktura/arkiv":"/admin/faktura")+"?id="+encodeURIComponent(x.id));setSaved("");}} style={{display:"block",marginBottom:10,width:"100%",textAlign:"left",padding:12,whiteSpace:"normal",border:active===x.id?"2px solid #b58b47":undefined}}><b>{x.invoice_number||x.title||"Faktura"}</b><br/>{x.customer?.name} · {money(p.total)}<br/><small>{x.installment_index>0?"Del "+x.installment_index+" · "+x.installment_percent+" %":"Samlet faktura"} · Forfall: {x.due_date||"Ikke valgt"}</small>{archiveMode&&<><br/><strong>{p.label}</strong> · Gjenstår: {money(p.outstanding)}{p.outstanding>0&&<><br/><small style={{fontWeight:700,color:invoiceArchiveDueInfo(x,today).kind==="oldOverdue"?"#a52a21":"inherit"}}>{invoiceArchiveDueInfo(x,today).label}</small></>}<br/><small>{x.sent_at?"Sendt på e-post":"Utstedt for utskrift / ikke sendt på e-post"}</small></>}</button>})}</section>
- <section className="card" style={{padding:18}}>{form?<><section style={{borderBottom:"1px solid #d8c9ae",paddingBottom:16,marginBottom:18}}><h2>{form.invoice_number?"Faktura "+form.invoice_number:"Send faktura"}</h2><button type="button" disabled={busy} onClick={openCustomerCard}>Åpne kundekort / rett kundeopplysninger</button><p><strong>{form.customer?.name}</strong> · {money(total(form.line_items))}<br/>Til: {form.customer?.email||"Fyll inn e-postadressen nedenfor"}</p>{form.status==="draft"?<p>Kontroller navn, adresse, leveringsdato og forfall. Ved sending tildeles fakturanummer, og fakturaen låses for endringer.</p>:<p>Utstedt {form.issued_date}. Fakturaen er låst for endringer.</p>}<button type="button" disabled={busy||Boolean(form.sent_at)} onClick={sendInvoice} style={{display:"block",width:"100%",minHeight:50,margin:"12px 0",padding:"14px 18px",background:"#d5a75a",color:"#171511",border:"1px solid #b88c43",borderRadius:10,fontSize:16,fontWeight:800,whiteSpace:"normal"}}>{busy?"Behandler …":form.sent_at?"Sendt på e-post":form.status==="draft"?"Fakturer og send på e-post" :form.delivery_error?"Prøv e-postsending igjen":"Send faktura på e-post"}</button><button type="button" disabled={busy} onClick={printInvoice} style={{display:"block",width:"100%",minHeight:50,margin:"12px 0",padding:"14px 18px",background:"#fff",color:"#171511",border:"2px solid #b88c43",borderRadius:10,fontSize:16,fontWeight:800,whiteSpace:"normal"}}>{busy?"Behandler …":form.status==="draft"?"Fakturer og skriv ut":"Skriv ut faktura"}</button>{form.sent_at&&<p role="status">Sendt til {form.customer?.email}.</p>}{form.delivery_error&&!form.sent_at&&<p role="alert">{form.delivery_error}</p>}{saved&&<p role="status">{saved}</p>}</section>{<InvoiceVippsPanel key={form.id} invoice={form} persist={persist} onRefresh={load} disabled={busy} onBusyChange={setBusy} onApplyPrice={applyVippsPrice} allowPriceAdjustment={hasAdjustableVippsPriceLine(form.line_items)} onPaymentMethodChange={method=>change("customer",{...form.customer,paymentMethod:method})}/>}{archiveMode&&paymentInfo&&<section style={{padding:"16px 0",borderBottom:"1px solid #d8c9ae",marginBottom:18}}><h2>Betaling – {paymentInfo.label}</h2><p>Fakturabeløp: <b>{money(paymentInfo.total)}</b><br/>Registrert betalt: <b>{money(paymentInfo.paid)}</b><br/>Gjenstående: <b>{money(paymentInfo.outstanding)}</b><br/>Forfallsdato: <b>{form.due_date}</b>{form.paid_date&&<><br/>Betalt dato: <b>{form.paid_date}</b></>}</p>{paymentInfo.outstanding>0&&<fieldset disabled={busy} style={{border:0,padding:0,minWidth:0}}><label>Betalingsdato <input type="date" max={today} value={paymentDate} onChange={e=>setPaymentDate(e.target.value)}/></label><button type="button" onClick={()=>registerPayment(true)}>Merk hele restbeløpet som betalt</button><label>Innbetalt beløp (kr) <input type="number" min="0.01" step="0.01" value={paymentAmount} onChange={e=>setPaymentAmount(e.target.value)}/></label><label>Betalingsnotat (valgfritt) <input maxLength={500} value={paymentNote} onChange={e=>setPaymentNote(e.target.value)}/></label><button type="button" onClick={()=>registerPayment(false)}>Registrer innbetaling</button></fieldset>}<h3>Betalingshistorikk</h3>{payments.length===0&&<p>Ingen innbetalinger registrert.</p>}{payments.map(p=><div key={p.id} style={{padding:"10px 0",borderBottom:"1px solid #ddd"}}><b>{money(p.amount_ore)}</b> · {p.paid_on}{p.reversed_at?<span> · Angret</span>:p.vipps_reference?<span> · Vipps</span>:<button type="button" disabled={busy} onClick={()=>reversePayment(p.id)} style={{marginLeft:12}}>Angre registrering</button>}{p.note&&<p>{p.note}</p>}</div>)}</section>}{archiveMode&&<InvoiceReminderPanel key={form.id} invoice={form} disabled={busy} onRefresh={load}/>}{!archiveMode&&<fieldset disabled={busy||form.status!=="draft"} style={{border:0,padding:0,minWidth:0}}><h2>{form.status==="draft"?"Rediger fakturakladd":"Fakturadetaljer"}</h2><p><strong>{form.customer?.name}</strong> · {money(total(form.line_items))}</p>{form.installment_index>0&&<p><b>{form.installment_label} – {form.installment_percent} %</b><br/>{form.installment_trigger}</p>}<label>Betalingsfrist<select value={form.due_date_mode||"auto"} onChange={e=>change("due_date_mode",e.target.value)}><option value="auto">Automatisk fra kundekortet</option><option value="manual">Egen forfallsdato for denne fakturaen</option></select></label>{form.due_date_mode!=="manual"?<p>Betalingsfrist: <b>{form.customer?.paymentTermsDays??14} dager</b>. Hvis du fakturerer i dag: fakturadato <b>{today}</b>, forfall <b>{form.due_date}</b>. Datoene beregnes på nytt når du trykker fakturer. Endre antall dager på kundekortet.</p>:<label htmlFor="invoiceDueDate"><b>Forfallsdato</b><input id="invoiceDueDate" type="date" value={form.due_date||""} onChange={e=>change("due_date",e.target.value)}/></label>}<button type="button" disabled={busy} onClick={save}>{busy?"Lagrer …":"Lagre forfallsdato og kladd"}</button>{form.status==="draft"&&<p>Fakturanummer tildeles når du fakturerer med e-post eller utskrift.</p>}
+ <section className="card" style={{padding:18}}>{form?<><section style={{borderBottom:"1px solid #d8c9ae",paddingBottom:16,marginBottom:18}}><h2>{form.invoice_number?"Faktura "+form.invoice_number:"Send faktura"}</h2>
+ {!archiveMode&&form.status==="draft"&&<InvoiceCustomerPicker key={form.id} customer={form.customer||{}} onChoose={selectCustomer} onCreate={openNewCustomer} disabled={busy} busy={busy} invoiceId={form.id}/>}
+ {form.customer?.contactId&&<button type="button" disabled={busy} onClick={openCustomerCard}>Åpne / rediger kundekort</button>}
+ <p><strong>{form.customer?.name}</strong> · {money(total(form.line_items))}<br/>Til: {form.customer?.email||"Fyll inn e-postadressen nedenfor"}</p>{form.status==="draft"?<p>Kontroller navn, adresse, leveringsdato og forfall. Ved sending tildeles fakturanummer, og fakturaen låses for endringer.</p>:<p>Utstedt {form.issued_date}. Fakturaen er låst for endringer.</p>}<button type="button" disabled={busy||Boolean(form.sent_at)} onClick={sendInvoice} style={{display:"block",width:"100%",minHeight:50,margin:"12px 0",padding:"14px 18px",background:"#d5a75a",color:"#171511",border:"1px solid #b88c43",borderRadius:10,fontSize:16,fontWeight:800,whiteSpace:"normal"}}>{busy?"Behandler …":form.sent_at?"Sendt på e-post":form.status==="draft"?"Fakturer og send på e-post" :form.delivery_error?"Prøv e-postsending igjen":"Send faktura på e-post"}</button><button type="button" disabled={busy} onClick={printInvoice} style={{display:"block",width:"100%",minHeight:50,margin:"12px 0",padding:"14px 18px",background:"#fff",color:"#171511",border:"2px solid #b88c43",borderRadius:10,fontSize:16,fontWeight:800,whiteSpace:"normal"}}>{busy?"Behandler …":form.status==="draft"?"Fakturer og skriv ut":"Skriv ut faktura"}</button>{form.sent_at&&<p role="status">Sendt til {form.customer?.email}.</p>}{form.delivery_error&&!form.sent_at&&<p role="alert">{form.delivery_error}</p>}{saved&&<p role="status">{saved}</p>}</section>{<InvoiceVippsPanel key={form.id} invoice={form} persist={persist} onRefresh={load} disabled={busy} onBusyChange={setBusy} onApplyPrice={applyVippsPrice} allowPriceAdjustment={hasAdjustableVippsPriceLine(form.line_items)} onPaymentMethodChange={method=>change("customer",{...form.customer,paymentMethod:method})}/>}{archiveMode&&paymentInfo&&<section style={{padding:"16px 0",borderBottom:"1px solid #d8c9ae",marginBottom:18}}><h2>Betaling – {paymentInfo.label}</h2><p>Fakturabeløp: <b>{money(paymentInfo.total)}</b><br/>Registrert betalt: <b>{money(paymentInfo.paid)}</b><br/>Gjenstående: <b>{money(paymentInfo.outstanding)}</b><br/>Forfallsdato: <b>{form.due_date}</b>{form.paid_date&&<><br/>Betalt dato: <b>{form.paid_date}</b></>}</p>{paymentInfo.outstanding>0&&<fieldset disabled={busy} style={{border:0,padding:0,minWidth:0}}><label>Betalingsdato <input type="date" max={today} value={paymentDate} onChange={e=>setPaymentDate(e.target.value)}/></label><button type="button" onClick={()=>registerPayment(true)}>Merk hele restbeløpet som betalt</button><label>Innbetalt beløp (kr) <input type="number" min="0.01" step="0.01" value={paymentAmount} onChange={e=>setPaymentAmount(e.target.value)}/></label><label>Betalingsnotat (valgfritt) <input maxLength={500} value={paymentNote} onChange={e=>setPaymentNote(e.target.value)}/></label><button type="button" onClick={()=>registerPayment(false)}>Registrer innbetaling</button></fieldset>}<h3>Betalingshistorikk</h3>{payments.length===0&&<p>Ingen innbetalinger registrert.</p>}{payments.map(p=><div key={p.id} style={{padding:"10px 0",borderBottom:"1px solid #ddd"}}><b>{money(p.amount_ore)}</b> · {p.paid_on}{p.reversed_at?<span> · Angret</span>:p.vipps_reference?<span> · Vipps</span>:<button type="button" disabled={busy} onClick={()=>reversePayment(p.id)} style={{marginLeft:12}}>Angre registrering</button>}{p.note&&<p>{p.note}</p>}</div>)}</section>}{archiveMode&&<InvoiceReminderPanel key={form.id} invoice={form} disabled={busy} onRefresh={load}/>}{!archiveMode&&<fieldset disabled={busy||form.status!=="draft"} style={{border:0,padding:0,minWidth:0}}><h2>{form.status==="draft"?"Rediger fakturakladd":"Fakturadetaljer"}</h2><p><strong>{form.customer?.name}</strong> · {money(total(form.line_items))}</p>{form.installment_index>0&&<p><b>{form.installment_label} – {form.installment_percent} %</b><br/>{form.installment_trigger}</p>}<label>Betalingsfrist<select value={form.due_date_mode||"auto"} onChange={e=>change("due_date_mode",e.target.value)}><option value="auto">Automatisk fra kundekortet</option><option value="manual">Egen forfallsdato for denne fakturaen</option></select></label>{form.due_date_mode!=="manual"?<p>Betalingsfrist: <b>{form.customer?.paymentTermsDays??14} dager</b>. Hvis du fakturerer i dag: fakturadato <b>{today}</b>, forfall <b>{form.due_date}</b>. Datoene beregnes på nytt når du trykker fakturer. Endre antall dager på kundekortet.</p>:<label htmlFor="invoiceDueDate"><b>Forfallsdato</b><input id="invoiceDueDate" type="date" value={form.due_date||""} onChange={e=>change("due_date",e.target.value)}/></label>}<button type="button" disabled={busy} onClick={save}>{busy?"Lagrer …":"Lagre forfallsdato og kladd"}</button>{form.status==="draft"&&<p>Fakturanummer tildeles når du fakturerer med e-post eller utskrift.</p>}
  <label>Oppdrag <input value={form.title||""} onChange={e=>change("title",e.target.value)}/></label>
- <label>Kundenavn <input value={form.customer?.name||""} onChange={e=>change("customer",{...form.customer,name:e.target.value})}/></label>
- <label>Telefonnummer <input type="tel" value={form.customer?.phone||""} onChange={e=>change("customer",{...form.customer,phone:e.target.value})}/></label>
- <label>Kundens e-post <input type="email" value={form.customer?.email||""} onChange={e=>change("customer",{...form.customer,email:e.target.value})}/></label>
- <label>Adresse <input value={form.customer?.address||""} onChange={e=>change("customer",{...form.customer,address:e.target.value})}/></label>
+ <p className="muted">Kundenavn, telefon, e-post og fakturaadresse styres fra kunderegisteret ovenfor. Rediger kundekortet hvis noe skal endres.</p>
  <label>Leveringsdato / avtalt leveringsdato <input type="date" value={form.customer?.workDate||""} onChange={e=>change("customer",{...form.customer,workDate:e.target.value})}/></label>
  <label>Arbeidssted (hvis forskjellig fra kundens adresse) <input value={form.customer?.workAddress||""} onChange={e=>change("customer",{...form.customer,workAddress:e.target.value})}/></label>
  <label>Prismodell <select value={form.pricing_model} onChange={e=>change("pricing_model",e.target.value)}><option value="fixed">Fastpris</option><option value="hourly">Timepris – kontroller faktiske timer</option><option value="estimate">Prisoverslag</option></select></label>
