@@ -50,6 +50,6 @@ assert.throws(()=>verify(paid,snapshot(paid)),/betalt eller beløpet er ugyldig/
 const client=readFileSync("app/admin/faktura/InvoiceVippsPanel.js","utf8");
 const route=readFileSync("app/api/admin/invoices/vipps/route.js","utf8");
 assert.ok(client.includes("confirmedInvoice:invoiceVippsConfirmationSnapshot(invoice)"),"Client sends owner-reviewed invoice details");
-assert.ok(route.includes("startInvoiceVipps(s,found.data,b.confirmedInvoice)"),"Server passes reviewed details to payment start");
+assert.ok(route.includes("startInvoiceVipps(s,found.data,b.confirmedInvoice,{"),"Server passes reviewed details to payment start");
 assert.ok(source.split("verifyVippsConfirmation(invoice,confirmation)").length===3,"Validate before invoice issue and after provider reconciliation");
 console.log("Vipps-fakturabekreftelse bestått: kunde, e-post, adresse, alle prislinjer, MVA, tidligere innbetaling, serverkontroll og oppdatert fakturanummer.");
