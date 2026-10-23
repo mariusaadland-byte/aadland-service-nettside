@@ -34,22 +34,22 @@ if(siteUrl.protocol!=="https:"){
  process.exit(1);
 }
 
-const vippsEnabled=String(process.env.VIPPS_PAYMENTS_ENABLED||"").trim().toLowerCase()==="true";
-if(vippsEnabled){
+const enabledUnits=["SERVICE","RENTAL"].filter(unit=>
+ String(process.env["VIPPS_"+unit+"_PAYMENTS_ENABLED"]||"").trim().toLowerCase()==="true"
+);
+if(enabledUnits.length){
  const vippsRequired=[
   "VIPPS_WEBHOOK_URL",
-  "VIPPS_SERVICE_CLIENT_ID",
-  "VIPPS_SERVICE_CLIENT_SECRET",
-  "VIPPS_SERVICE_SUBSCRIPTION_KEY",
-  "VIPPS_SERVICE_MSN",
-  "VIPPS_RENTAL_CLIENT_ID",
-  "VIPPS_RENTAL_CLIENT_SECRET",
-  "VIPPS_RENTAL_SUBSCRIPTION_KEY",
-  "VIPPS_RENTAL_MSN"
+  ...enabledUnits.flatMap(unit=>[
+   "VIPPS_"+unit+"_CLIENT_ID",
+   "VIPPS_"+unit+"_CLIENT_SECRET",
+   "VIPPS_"+unit+"_SUBSCRIPTION_KEY",
+   "VIPPS_"+unit+"_MSN"
+  ])
  ];
  const vippsMissing=vippsRequired.filter(name=>!String(process.env[name]||"").trim());
  if(vippsMissing.length){
-  console.error("Vipps is enabled, but required production variables are missing:",vippsMissing.join(", "));
+  console.error("An enabled Vipps sales unit is missing required production variables:",vippsMissing.join(", "));
   process.exit(1);
  }
 
