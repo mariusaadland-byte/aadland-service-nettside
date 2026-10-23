@@ -52,6 +52,9 @@ export async function POST(req){
  if(!["service","rental"].includes(unit)){
   return NextResponse.json({error:"Invalid webhook unit."},{status:409});
  }
+ if(!vippsPaymentsEnabled(unit)){
+  return NextResponse.json({error:"Vipps handling is disabled for this sales unit."},{status:503});
+ }
 
  const payloadMsn=String(payload?.msn||"").trim();
  const registeredMsn=String(auth.msn||"").trim();

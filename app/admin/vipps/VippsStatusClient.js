@@ -84,14 +84,15 @@ export default function VippsStatusClient(){
 
   {data&&<>
    <div className="notice">
-    <b>Miljø: {data.environment==="test"?"TEST":"PRODUKSJON"} · Betalingsmotor: {data.enabled?"PÅ":"AV"}</b><br/>
-    <span>ePayment-grunnmuren er {data.paymentIntegrationFoundation?"bygget":"ikke ferdig"}, mens kundebetalingen er {data.paymentIntegrationImplemented?"koblet inn":"fortsatt deaktivert"}. Betalingsmotoren må være AV til testnøkler/webhooks er kontrollert.</span>
+    <b>Miljø: {data.environment==="test"?"TEST":"PRODUKSJON"} · Aktivert: {(data.units||[]).filter(unit=>unit.enabled).length} av 2 salgssteder</b><br/>
+    <span>Hvert salgssted kan aktiveres uavhengig. Lagrede API-nøkler betyr ikke at Vipps er aktivert. Test API-tilkobling og webhook for hvert salgssted før ekte betalinger slås på.</span>
    </div>
 
    <div className="grid" style={{alignItems:"start"}}>
     {data.units.map(unit=><section className="card" key={unit.unit}>
      <div className="kicker">{unit.unit==="rental"?"UTLEIE":"SERVICE"}</div>
      <h3>{unit.label}</h3>
+     <p><b>Betalinger: {unit.enabled?"AKTIVERT":"AV"}</b> · {unit.enabled?"Produksjonsbetalinger kan mottas når webhook og konfigurasjon er klare.":"Ingen nye Vipps-betalinger kan startes fra dette salgsstedet."}</p>
      <p><b>{unit.configured&&unit.webhook?"✓ Teknisk konfigurasjon komplett":unit.configured?"API-nøkler klare · webhook mangler":"Ikke ferdig konfigurert"}</b></p>
      <div className="customerCardMeta">
       <span><small>client_id</small><b>{unit.clientIdConfigured?"✓ satt":"mangler"}</b></span>
@@ -110,7 +111,7 @@ export default function VippsStatusClient(){
       {!unit.webhook&&<button className="btn" type="button" disabled={savingUnit===unit.unit} onClick={()=>registerWebhook(unit)}>{savingUnit===unit.unit?"Registrerer …":"Registrer webhook"}</button>}
       {unit.webhook&&<button className="btn alt" type="button" disabled={savingUnit===unit.unit} onClick={()=>registerWebhook(unit,true)}>{savingUnit===unit.unit?"Registrerer …":"Registrer webhook på nytt"}</button>}
      </div>}
-     {unit.configured&&!data.enabled&&<p className="muted">Betalingsmotoren kan stå AV mens API-nøkler og webhook testes. Slå den først på når «Test oppsett» er grønn for begge salgssteder.</p>}
+     {unit.configured&&!unit.enabled&&<p className="muted">Du kan teste API-nøkler og webhook mens dette salgsstedet er AV. Aktiver bare når «Test oppsett» er grønn for {unit.label}, og full betalingsflyt er godkjent. Det andre salgsstedet trenger ikke være klart.</p>}
      {diagnostics[unit.unit]&&<div className="customerPaymentConfirmation" style={{marginTop:14}}>
       <b>{diagnostics[unit.unit].readyForEnable?"✓ Klar for aktivering":"Oppsett må fullføres"}</b>
       <span>API-tilkobling: {diagnostics[unit.unit].apiConnection?"✓":"mangler"}</span>
@@ -155,12 +156,12 @@ export default function VippsStatusClient(){
     <div className="kicker">AKTIVERINGSREKKEFØLGE</div>
     <h3>Trygg vei fra test til live</h3>
     <div className="adminList">
-     <div className="adminListItem"><div><b>1. Legg inn testnøkler</b><div className="muted">Service og Utleie får hvert sitt client_id, client_secret, subscription key og MSN.</div></div></div>
+     <div className="adminListItem"><div><b>1. Legg inn nøklene for ønsket salgssted</b><div className="muted">Aadland Service og Aadland Utleie bruker hver sine produksjonsnøkler og MSN. Ikke legg hemmelige nøkler i denne adminsiden.</div></div></div>
      <div className="adminListItem"><div><b>2. Hold betalingsmotoren AV</b><div className="muted">Webhook kan registreres og API-et kan testes uten at kundene får Vipps-knapper.</div></div></div>
-     <div className="adminListItem"><div><b>3. Kjør «Test oppsett»</b><div className="muted">Begge salgssteder skal være grønne: API, webhook-ID, callback, hendelser og MSN må samsvare.</div></div></div>
+     <div className="adminListItem"><div><b>3. Kjør «Test oppsett» for ønsket salgssted</b><div className="muted">API, webhook-ID, callback, hendelser og MSN må samsvare for salgsstedet du vil aktivere.</div></div></div>
      <div className="adminListItem"><div><b>4. Kjør Vipps testbetaling</b><div className="muted">Test reserve, retur, capture, kvittering, cancel og refund før produksjon.</div></div></div>
-     <div className="adminListItem"><div><b>5. Bytt til produksjonsnøkler og test oppsett på nytt</b><div className="muted">Produksjonsbuild stopper automatisk dersom Vipps er slått på med ufullstendige variabler eller ugyldig webhook-URL.</div></div></div>
-     <div className="adminListItem"><div><b>6. Slå på kundebetaling</b><div className="muted">Sett <code>VIPPS_PAYMENTS_ENABLED=true</code> først når begge salgssteder er kontrollert.</div></div></div>
+     <div className="adminListItem"><div><b>5. Bekreft produksjonsoppsett</b><div className="muted">Før aktivering skal produksjonsnøklene være lagt i Vercel og tilkobling/webhook testet. Produksjonsbuild krever komplett oppsett for salgsstedet som aktiveres.</div></div></div>
+     <div className="adminListItem"><div><b>6. Slå på bare det godkjente salgsstedet</b><div className="muted">Bruk <code>VIPPS_SERVICE_PAYMENTS_ENABLED=true</code> for Service eller <code>VIPPS_RENTAL_PAYMENTS_ENABLED=true</code> for Utleie. Eldre <code>VIPPS_PAYMENTS_ENABLED</code> aktiverer ikke noe. Hold bryterne AV til testene er fullført; ny produksjonsdeploy kreves ved endring.</div></div></div>
     </div>
    </section>
 
