@@ -52,3 +52,4 @@ export default function InvoiceCustomerPicker({customer={},onChoose,onCreate,dis
   {choosing&&<p role="status">Lagrer valgt kunde på fakturaen …</p>}
   {error&&<p role="alert" style={{color:"#a52a21"}}>{error} <button type="button" onClick={()=>{setLoading(true);setError("");fetch("/api/admin/customer-contacts",{cache:"no-store"}).then(r=>r.json().then(d=>{if(!r.ok)throw Error(d.error);setContacts(d.contacts||[]);})).catch(e=>setError(e.message)).finally(()=>setLoading(false));}}>Prøv på nytt</button></p>}
  </section>;
+}
