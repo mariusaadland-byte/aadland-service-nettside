@@ -48,6 +48,7 @@ const providerDb={
    async maybeSingle(){return {data:table==="invoice_vipps_payments"?null:invoice,error:null};}};
  },
  async rpc(name){
+  if(name==="get_vipps_webhook_status")return {data:[{unit:"service",active:true}],error:null};
   assert.equal(name,"prepare_invoice_vipps");prepared++;
   return {data:{id:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",reference:"INV-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",amount_ore:200},error:null};
  }
