@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 
-const invoiceTerms=readFileSync("lib/invoicePaymentTerms.js","utf8").replace(/^export /gm,"");
+const invoiceTerms=readFileSync("lib/invoicePaymentTerms.js","utf8").replace(/^import .*;\n/gm,"").replace(/^export /gm,"");
+const vippsDate=readFileSync("lib/invoiceVippsDate.js","utf8").replace(/^export /gm,"");
 const helper=readFileSync("lib/invoiceCustomerSelection.js","utf8")
  .replace(/^import .*;\n/gm,"").replace(/^export /gm,"");
-const select=new Function(invoiceTerms+";"+helper+";return invoiceWithSelectedCustomer;")();
+const select=new Function(vippsDate+";"+invoiceTerms+";"+helper+";return invoiceWithSelectedCustomer;")();
 const today="2026-10-23";
 const base={
  id:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",status:"draft",
@@ -27,9 +28,10 @@ assert.equal(changed.customer.paymentMethod,"vipps");
 assert.equal(changed.customer.internalNote,undefined,"Internal customer notes must never appear on invoice");
 assert.equal(changed.due_date,"2026-11-22");
 assert.equal(changed.customer.paymentMethod,"vipps","Preserve payment method already selected on draft");
-assert.equal(changed.customer.workDate,base.customer.workDate);
+assert.equal(changed.customer.workDate,today,"Vipps invoicing uses the current Oslo delivery day, even when a customer is selected");
 assert.equal(changed.customer.workAddress,base.customer.workAddress);
 assert.equal(changed.customer.workDescription,base.customer.workDescription);
+assert.equal(select({...base,customer:{...base.customer,paymentMethod:"bank"}},contact,today).customer.workDate,base.customer.workDate,"Bank invoices keep chosen delivery date");
 assert.deepEqual(changed.line_items,base.line_items);
 assert.deepEqual(base.customer,{name:"Gammelt navn",email:"old@example.invalid",paymentMethod:"vipps",workDate:"2026-10-20",workAddress:"Arbeidssted 3",workDescription:"Behold denne jobbbeskrivelsen"},"Do not mutate invoice until saved");
 const manual=select({...base,due_date_mode:"manual",due_date:"2026-12-03"},contact,today);
