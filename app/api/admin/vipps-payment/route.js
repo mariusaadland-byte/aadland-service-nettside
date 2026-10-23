@@ -59,8 +59,6 @@ function ensureNok(obj){
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;
  if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
- if(!vippsPaymentsEnabled())return NextResponse.json({error:"Vipps-betalingsmotoren er AV."},{status:409});
-
  const body=await req.json().catch(()=>({}));
  const unit=body.unit==="rental"?"rental":body.unit==="service"?"service":"";
  const action=String(body.action||"sync").toLowerCase();
@@ -68,6 +66,7 @@ export async function POST(req){
  const amountOre=Math.round(Number(body.amountOre)||0);
 
  if(!unit||!reference)return NextResponse.json({error:"Salgssted eller betalingsreferanse mangler."},{status:400});
+ if(!vippsPaymentsEnabled(unit))return NextResponse.json({error:"Vipps-betalingsmotoren er AV for dette salgsstedet."},{status:409});
  if(!["sync","capture","cancel","refund"].includes(action))return NextResponse.json({error:"Ugyldig Vipps-handling."},{status:400});
 
  const s=db();
