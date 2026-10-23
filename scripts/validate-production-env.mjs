@@ -39,7 +39,7 @@ const enabledUnits=["SERVICE","RENTAL"].filter(unit=>
 );
 const serviceLive=enabledUnits.includes("SERVICE");
 const servicePublic=String(process.env.VIPPS_SERVICE_PUBLIC_PAYMENTS_ENABLED||"").trim().toLowerCase()==="true";
-if(serviceLive&&!servicePublic&&!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(String(process.env.VIPPS_SERVICE_PILOT_EMAIL||"").trim())){
+if(serviceLive&&!servicePublic&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(process.env.VIPPS_SERVICE_PILOT_EMAIL||"").trim())){
  console.error("Service pilot requires a valid VIPPS_SERVICE_PILOT_EMAIL while public checkout is disabled.");
  process.exit(1);
 }
