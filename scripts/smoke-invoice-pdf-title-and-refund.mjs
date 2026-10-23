@@ -25,7 +25,7 @@ assert.equal(invoicePdfHeading(record),"Reparasjon av dør og utskifting av besl
 assert.equal(invoicePdfHeading({...record,title:"Vedlikehold av inngangsdør"}),"Vedlikehold av inngangsdør");
 assert.equal(invoicePdfHeading({...record,title:"Faktura",customer:{},line_items:[{description:"Ny terrasse"}]}),"Ny terrasse");
 assert.equal(invoicePdfHeading({...record,title:"Oppdrag",customer:{},line_items:[{description:"Arbeid"}]}),"Utført arbeid");
-assert.equal(invoicePdfHeading({...record,title:"Ny faktura",customer:{workDescription:"  \\nMontering av skuffeskinner\\nMaling av dør"}}),"Montering av skuffeskinner");
+assert.equal(invoicePdfHeading({...record,title:"Ny faktura",customer:{workDescription:["  ","Montering av skuffeskinner","Maling av dør"].join(String.fromCharCode(10))}}),"Montering av skuffeskinner");
 assert.equal(invoicePdfHeading({...record,title:"X".repeat(100)}).length,64,"Keep headings within printable line length");
 assert.equal(record.title,"Ny faktura","Never rewrite already issued invoice data");
 
