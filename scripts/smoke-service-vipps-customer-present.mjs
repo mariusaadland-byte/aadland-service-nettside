@@ -109,4 +109,5 @@ assert.ok(ui.includes("Kunden er her"));
 assert.ok(ui.includes("Kunden har samtykket"));
 assert.ok(ui.includes("Send Vipps-varsel"));
 assert.ok(ui.includes("!pushApproved"));
+assert.ok(ui.includes('onClick={waiting&&payment?.deliveryMethod==="vipps_push"?sync:start}'),"Existing notification should only check status, never submit a second push");
 console.log("Vipps-varsling bestått: særskilt godkjenning, kunden til stede, samtykke, mobil, CUSTOMER_PRESENT, én forespørsel, ingen e-post ved push.");
