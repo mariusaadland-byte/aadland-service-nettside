@@ -31,7 +31,7 @@ export default function InvoiceVippsPanel({invoice,persist,onRefresh,disabled,on
   if(!/^\\d+(?:[,.]\\d{1,2})?$/.test(cleaned)){setError("Bruk kroner og maks to desimaler, for eksempel 125,50.");return;}
   const amountOre=Math.round(Number(cleaned.replace(",","."))*100);
   if(!Number.isSafeInteger(amountOre)||amountOre<=0||amountOre>available){setError("Beløpet må være større enn null og kan ikke overstige "+money(available)+".");return;}
-  if(!window.confirm("Du er i ferd med å REFUNDERE "+money(amountOre)+" til kunden via Vipps.\\nFaktura: "+invoice.invoice_number+"\\nVipps-referanse: "+item.reference+"\\nDette flytter ekte penger. Er beløpet riktig?"))return;
+  if(!window.confirm("Du er i ferd med å REFUNDERE "+money(amountOre)+" til kunden via Vipps.\\nFaktura: "+invoice.invoice_number+"\\nVipps-referanse: "+item.reference+"\\nDette flytter ekte penger og gjør beløpet utestående på fakturaen inntil det eventuelt krediteres. Er beløpet riktig?"))return;
   if(window.prompt("Skriv REFUNDER for å godkjenne den ekte tilbakebetalingen:")!=="REFUNDER")return;
   setBusy(true);onBusyChange?.(true);setError("");setRefundMessage("");
   try{
@@ -117,7 +117,7 @@ export default function InvoiceVippsPanel({invoice,persist,onRefresh,disabled,on
  {payment.receiptError&&payment.refundedOre===0&&<p role="alert" style={{marginBottom:0}}>Kvitteringen er ikke bekreftet sendt: {payment.receiptError}. Bruk «Kontroller Vipps-status» for å prøve igjen; kunden skal ikke betale på nytt.</p>}
  </div>}{refundAllowed&&refundablePayments.length>0&&invoice.status!=="draft"&&<section aria-label="Refunder Vipps" style={{background:"#fffaf3",padding:16,border:"1px solid #cfb584",borderRadius:10,margin:"14px 0"}}>
  <h3 style={{margin:"0 0 8px"}}>Refunder Vipps-betaling</h3>
- <p style={{fontSize:13}}>Kun eier kan tilbakebetale. Velg betalingen og beløpet. Bekreftelsen gjennomfører en ekte refusjon hos Vipps.</p>
+ <p style={{fontSize:13}}>Kun eier kan tilbakebetale. Velg betalingen og beløpet. Bekreftelsen gjennomfører en ekte refusjon hos Vipps.</p><p style={{fontSize:12}}>Viktig: Refusjon reverserer en innbetaling, men utsteder ikke kreditnota. Dersom fakturabeløpet skal reduseres eller oppheves, må dette håndteres med korrekt kreditnota før videre betalingsoppfølging.</p>
  {refundablePayments.map(item=><div key={item.reference} style={{borderTop:"1px solid #e3d7c5",padding:"12px 0",display:"flex",gap:12,flexWrap:"wrap",alignItems:"center",justifyContent:"space-between"}}>
   <div><strong>{money(Math.max(0,item.capturedOre-item.refundedOre))} kan refunderes</strong><div style={{fontSize:12}}>Vipps: {item.reference.slice(-12)} · Trukket {money(item.capturedOre)} · Tidligere refundert {money(item.refundedOre)}</div></div>
   <button type="button" disabled={busy||disabled||statusLoading} onClick={()=>refundNow(item)}>{busy?"Behandler …":"Refunder …"}</button>
