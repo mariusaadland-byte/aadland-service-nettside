@@ -33,6 +33,12 @@ assert.ok(oneKrReceipt.includes("FAKTURABEL"),"Receipt shows the original invoic
 assert.ok(oneKrReceipt.includes("BETALING REGISTRERT"));
 assert.ok(oneKrReceipt.includes("Dette dokumentet bekrefter registrert betaling, ikke et nytt betalingskrav."));
 assert.ok(fullPdf.includes("KVITTERING"),"Full payment receipt title");
+assert.ok(!fullPdf.includes("GJENST"),"Full payment receipt hides zero remaining");
+assert.ok(!oneKrReceipt.includes("GJENST"),"1 NOK pilot receipt hides zero remaining");
+assert.ok(!oneKrReceipt.includes("BETALT TIDLIGERE"),"1 NOK pilot receipt hides zero previous payments");
+const finalInstallment=(await buildPdf({...baseInvoice,paid_ore:12500,paymentReceipt:{...partialData,amountOre:7500,outstandingOre:0}})).toString("latin1");
+assert.ok(finalInstallment.includes("BETALT TIDLIGERE"),"Final installment shows real prior payments");
+assert.ok(!finalInstallment.includes("GJENST"),"Final installment has no outstanding balance");
 assert.ok(!fullPdf.includes("KVITTERING - DELBETALING"),"Full payment must not be mislabelled");
 assert.ok(fullPdf.includes("BETALING REGISTRERT"));
 assert.ok(!fullPdf.includes("Dette er en delbetaling, ikke en fullt betalt faktura."));
@@ -109,7 +115,8 @@ try{
  assert.ok(mailLog[1].payload.attachments.every(a=>a.contentType==="application/pdf"));
  assert.match(mailLog[1].payload.html,/Fakturaen er betalt/);
  assert.match(mailLog[1].payload.html,/Betalingsreferanse/);
- assert.match(mailLog[1].payload.html,/Gjenstår på fakturaen/);
+ assert.doesNotMatch(mailLog[1].payload.html,/Gjenstår på fakturaen/);
+ assert.doesNotMatch(mailLog[1].payload.text,/Gjenstående på fakturaen/);
  assert.doesNotMatch(mailLog[1].payload.html,/Delbetaling registrert/);
  assert.match(mailLog[1].payload.html,/Dette er en kvittering/);
  assert.doesNotMatch(mailLog[1].payload.text,/Dette er en delbetaling/);
