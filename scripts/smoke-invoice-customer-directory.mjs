@@ -1,0 +1,102 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+
+const invoiceTerms=readFileSync("lib/invoicePaymentTerms.js","utf8").replace(/^export /gm,"");
+const helper=readFileSync("lib/invoiceCustomerSelection.js","utf8")
+ .replace(/^import .*;\n/gm,"").replace(/^export /gm,"");
+const select=new Function(invoiceTerms+";"+helper+";return invoiceWithSelectedCustomer;")();
+const today="2026-10-23";
+const base={
+ id:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",status:"draft",
+ title:"Arbeid allerede skrevet",customer:{name:"Gammelt navn",email:"old@example.invalid",paymentMethod:"vipps",workDate:"2026-10-20",workAddress:"Arbeidssted 3",workDescription:"Behold denne jobbbeskrivelsen"},
+ line_items:[{description:"Tømrerarbeid",quantity:7,unit:"timer",unitPriceOre:40000,vatRate:25}],
+ due_date_mode:"auto",due_date:"2026-10-30",updated_at:"2026-10-23T11:01:01Z"
+};
+const contact={id:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",name:"Registrert Kunde AS",email:"faktura@example.invalid",
+ phone:"98765432",address:"Gate 12, 5000 Bergen",paymentTermsDays:30};
+const changed=select(base,contact,today);
+assert.equal(changed.customer.contactId,contact.id);
+assert.equal(changed.customer.name,contact.name);
+assert.equal(changed.customer.email,contact.email);
+assert.equal(changed.customer.phone,contact.phone);
+assert.equal(changed.customer.address,contact.address);
+assert.equal(changed.customer.paymentTermsDays,30);
+assert.equal(changed.due_date,"2026-11-22");
+assert.equal(changed.customer.paymentMethod,"vipps","Preserve payment method already selected on draft");
+assert.equal(changed.customer.workDate,base.customer.workDate);
+assert.equal(changed.customer.workAddress,base.customer.workAddress);
+assert.equal(changed.customer.workDescription,base.customer.workDescription);
+assert.deepEqual(changed.line_items,base.line_items);
+assert.deepEqual(base.customer,{name:"Gammelt navn",email:"old@example.invalid",paymentMethod:"vipps",workDate:"2026-10-20",workAddress:"Arbeidssted 3",workDescription:"Behold denne jobbbeskrivelsen"},"Do not mutate invoice until saved");
+const manual=select({...base,due_date_mode:"manual",due_date:"2026-12-03"},contact,today);
+assert.equal(manual.due_date,"2026-12-03","Do not override custom invoice due dates");
+assert.throws(()=>select({...base,status:"issued"},contact,today),/Bare fakturakladder/);
+assert.throws(()=>select(base,{name:"Not persisted"},today),/Velg en lagret kunde/);
+const source=readFileSync("app/api/admin/invoices/route.js","utf8")
+ .replace(/^import .*;\n/gm,"").replaceAll("export async function ","async function ");
+const rev="2026-10-23T09:00:00.000Z";
+const registered={...contact,payment_terms_days:30};
+let saved=null,writes=0;
+const db=()=>({
+ from(table){
+  const q={select(){return q},eq(){return q},update(data){assert.equal(table,"invoice_drafts");saved=data;return q},
+   async maybeSingle(){
+    if(table==="admin_customer_contacts")return {data:registered,error:null};
+    if(table==="invoice_drafts"){writes++;return {data:{id:base.id,updated_at:"2026-10-23T09:01:01.000Z"},error:null};}
+    throw Error("Unexpected table "+table);
+   }};
+  return q;
+ }
+});
+const api=new Function("NextResponse","getAdminUser","db","sameOriginGuard","withInvoicePaymentTerms","osloDateKey",
+ source+";return PATCH;")(
+ {json(body,opts={}){return {status:opts.status||200,body}}},
+ async()=>({role:"owner"}),db,()=>null,()=>{},()=>today
+);
+const input=customer=>({
+ id:base.id,expectedUpdatedAt:rev,customer,pricingModel:"fixed",title:"Fakturakladd",
+ lineItems:[{description:"Arbeid",quantity:1,unit:"stk",unitPriceOre:10000,vatRate:25}],
+ notes:"",dueDate:"2026-11-22",dueDateMode:"auto"
+});
+let r=await api({json:async()=>input({})});
+assert.equal(r.status,200,"Allow saving unfinished invoice before customer registration");
+assert.equal(writes,1);assert.equal(saved.customer.name,"");
+r=await api({json:async()=>input({...changed.customer,name:"Falsk navn",email:"falsk@example.invalid"})});
+assert.equal(r.status,200);
+assert.equal(saved.customer.name,registered.name,"Billing information must come from central customer record");
+assert.equal(saved.customer.email,registered.email);
+assert.equal(saved.customer.phone,registered.phone);
+assert.equal(saved.customer.address,registered.address);
+assert.equal(saved.customer.paymentTermsDays,registered.payment_terms_days);
+assert.equal(saved.customer.contactId,registered.id);
+assert.equal(saved.customer.workDescription,base.customer.workDescription);
+const oldWrites=writes;
+r=await api({json:async()=>input({...changed.customer,contactId:"cccccccc-cccc-4ccc-8ccc-cccccccccccc"})});
+assert.equal(r.status,200,"Mock returns registered contact for any contact ID"); // record-specific check occurs in DB, tested separately
+assert.equal(writes,oldWrites+1);
+r=await api({json:async()=>input({...changed.customer,contactId:"not-a-uuid"})});
+assert.equal(r.status,400);
+
+const ui=readFileSync("app/admin/faktura/InvoicesClient.js","utf8");
+const picker=readFileSync("app/admin/faktura/InvoiceCustomerPicker.js","utf8");
+const registerPage=readFileSync("app/admin/kunder/ny/page.js","utf8");
+const registerClient=readFileSync("app/admin/kunder/ny/NewCustomerClient.js","utf8");
+const existingCard=readFileSync("app/admin/kunder/[id]/CustomerCardClient.js","utf8");
+assert.ok(ui.includes("<InvoiceCustomerPicker"),"Invoice editor must display central customer chooser");
+assert.ok(ui.includes('window.location.assign("/admin/kunder/ny?invoiceId="'),"Dedicated registration page from invoice");
+assert.ok(ui.includes("await persist(form);"),"Save draft before leaving editor");
+assert.ok(ui.includes("await persist(next);"),"Choosing customer persists assignment");
+assert.ok(ui.includes('params.get("customerId")'),"Return from registration automatically selects customer");
+assert.ok(ui.includes("await selectCustomer(selected,draft)"));
+assert.ok(!ui.includes("<label>Kundenavn <input"),"Remove retyping customer name in invoice editor");
+assert.ok(!ui.includes("<label>Adresse <input"),"Remove retyping customer address in invoice editor");
+assert.ok(picker.includes('fetch("/api/admin/customer-contacts",{cache:"no-store"})'));
+assert.ok(picker.includes('aria-label="Velg fakturakunde"'));
+assert.ok(picker.includes("＋ Ny kunde – åpne kunderegistrering"));
+assert.ok(picker.includes("Åpne og rediger kundekortet"));
+assert.ok(registerPage.includes("getAdminUser"),"Only authorized admins access registration page");
+assert.ok(registerClient.includes('method:"POST"'));
+assert.ok(registerClient.includes("paymentTermsDays:14"));
+assert.ok(registerClient.includes('+"&customerId="+encodeURIComponent(data.contact.id)'),"Registration return links selected saved customer");
+assert.ok(existingCard.includes('"&customerId="+encodeURIComponent(contact.id)'),"Updated customer returns to invoice");
+console.log("Fakturakunde bestått: søk, kundekort, ny kunde, lagring/tilbakekomst, standard forfall, manuell frist, autoritativ DB og oppdragsdata bevart.");
