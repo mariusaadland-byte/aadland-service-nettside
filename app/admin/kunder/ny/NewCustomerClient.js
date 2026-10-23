@@ -2,7 +2,7 @@
 import {useState} from "react";
 import Link from "next/link";
 
-const initial={name:"",email:"",phone:"",address:"",paymentTermsDays:14};
+const initial={customerType:"private",name:"",organizationNumber:"",contactPerson:"",email:"",phone:"",address:"",paymentTermsDays:14,preferredPaymentMethod:"bank",internalNote:""};
 const labelStyle={display:"grid",gap:5,margin:"8px 0"};
 export default function NewCustomerClient({invoiceId=""}){
  const [form,setForm]=useState(initial),[busy,setBusy]=useState(false),[error,setError]=useState("");
@@ -31,7 +31,14 @@ export default function NewCustomerClient({invoiceId=""}){
    <fieldset disabled={busy} style={{border:0,padding:0,minWidth:0,display:"grid",gap:13}}>
     <section>
      <h2>1. Kundeopplysninger</h2>
+     <label style={labelStyle}>Kundetype
+      <select value={form.customerType} onChange={e=>set("customerType",e.target.value)}><option value="private">Privatkunde</option><option value="business">Bedrift</option></select>
+     </label>
      <label style={labelStyle}>Kundenavn / firmanavn *<input required autoFocus maxLength={180} value={form.name} onChange={e=>set("name",e.target.value)} autoComplete="name" placeholder="Navn på kunden"/></label>
+     {form.customerType==="business"&&<>
+      <label style={labelStyle}>Organisasjonsnummer (9 sifre)<input inputMode="numeric" maxLength={9} pattern="[0-9]{9}" value={form.organizationNumber} onChange={e=>set("organizationNumber",e.target.value)} placeholder="9 sifre"/></label>
+      <label style={labelStyle}>Kontaktperson<input maxLength={180} value={form.contactPerson} onChange={e=>set("contactPerson",e.target.value)}/></label>
+     </>}
      <label style={labelStyle}>Adresse, postnummer og poststed<textarea rows={3} maxLength={500} value={form.address} onChange={e=>set("address",e.target.value)} autoComplete="street-address" placeholder="Gateadresse\nPostnummer og poststed"/></label>
     </section>
     <section>
@@ -42,6 +49,10 @@ export default function NewCustomerClient({invoiceId=""}){
     <section>
      <h2>3. Fakturainnstillinger</h2>
      <label style={labelStyle}>Standard betalingsfrist (dager)<input type="number" min={0} max={365} step={1} required value={form.paymentTermsDays} onChange={e=>set("paymentTermsDays",e.target.value)}/></label>
+     <label style={labelStyle}>Foretrukket betalingsmåte
+      <select value={form.preferredPaymentMethod} onChange={e=>set("preferredPaymentMethod",e.target.value)}><option value="bank">Vanlig faktura / bank</option><option value="vipps">Vipps – når godkjent og tilgjengelig</option></select>
+     </label>
+     <label style={labelStyle}>Internt kundenotat (vises ikke på faktura)<textarea rows={3} maxLength={1000} value={form.internalNote} onChange={e=>set("internalNote",e.target.value)} placeholder="F.eks. avtaler eller praktisk informasjon"/></label>
      <p className="muted" style={{fontSize:13}}>Når du bruker kunden på en ny faktura, fylles navn, adresse, kontaktopplysninger og betalingsfrist inn automatisk. Du kan overstyre forfallsdato for en enkelt faktura.</p>
     </section>
     <p style={{fontSize:13,margin:0}}>Du kan endre disse opplysningene senere på kundekortet. Opprettelse av kundekort sender ingen e-post eller faktura til kunden.</p>
