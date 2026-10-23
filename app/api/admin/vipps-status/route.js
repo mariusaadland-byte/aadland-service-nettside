@@ -2,7 +2,7 @@ import {NextResponse} from "next/server";
 import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {vippsPublicStatus} from "../../../../lib/vippsConfig";
 import {db} from "../../../../lib/supabase";
-import {vippsPaymentsEnabled} from "../../../../lib/vippsClient";
+import {vippsPaymentsEnabled,vippsPublicPaymentsEnabled} from "../../../../lib/vippsClient";
 
 export const runtime="nodejs";
 
@@ -83,6 +83,8 @@ export async function GET(){
   units:vippsPublicStatus().map(unit=>({
    ...unit,
    enabled:vippsPaymentsEnabled(unit.unit),
+   publicEnabled:vippsPublicPaymentsEnabled(unit.unit),
+   pilotEmailConfigured:unit.unit==="service"&&Boolean(String(process.env.VIPPS_SERVICE_PILOT_EMAIL||"").trim()),
    webhook:webhooks.find(item=>item?.unit===unit.unit)||null
   })),
   paymentIntegrationFoundation:true,
