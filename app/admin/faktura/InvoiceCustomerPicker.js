@@ -16,7 +16,7 @@ export default function InvoiceCustomerPicker({customer={},onChoose,onCreate,dis
  },[invoiceId]);
  const chosen=useMemo(()=>contacts.find(c=>c.id===customer.contactId),[contacts,customer.contactId]);
  const matches=useMemo(()=>{
-  const q=norm(search);return (q?contacts.filter(c=>[c.name,c.email,c.phone,c.address].some(x=>norm(x).includes(q))):contacts).slice(0,q?30:10);
+  const q=norm(search);return (q?contacts.filter(c=>[c.name,c.email,c.phone,c.address,c.organizationNumber,c.contactPerson].some(x=>norm(x).includes(q))):contacts).slice(0,q?30:10);
  },[contacts,search]);
  async function choose(item){
   if(disabled||busy||choosing)return;
@@ -43,8 +43,8 @@ export default function InvoiceCustomerPicker({customer={},onChoose,onCreate,dis
   {loading?<p role="status">Laster kunderegisteret …</p>:<div style={{margin:"12px 0",display:"grid",gap:8,maxHeight:260,overflowY:"auto"}}>
    {matches.map(item=><button key={item.id} type="button" disabled={locked} onClick={()=>choose(item)} aria-pressed={customer.contactId===item.id}
     style={{padding:12,textAlign:"left",whiteSpace:"normal",borderRadius:8,border:customer.contactId===item.id?"2px solid #b58b47":"1px solid #ddd1bd",background:customer.contactId===item.id?"#fff5e4":"#fff"}}>
-    <strong>{item.name}</strong>{customer.contactId===item.id?" ✓":""}
-    <small style={{display:"block",marginTop:4}}>{[item.email,item.phone,item.address].filter(Boolean).join(" · ")||"Ingen ekstra opplysninger"} · {item.paymentTermsDays??14} dager</small>
+    <strong>{item.name}</strong>{item.customerType==="business"?" · Bedrift":""}{customer.contactId===item.id?" ✓":""}
+    <small style={{display:"block",marginTop:4}}>{[item.organizationNumber?"Org.nr. "+item.organizationNumber:null,item.email,item.phone,item.address].filter(Boolean).join(" · ")||"Ingen ekstra opplysninger"} · {item.paymentTermsDays??14} dager</small>
    </button>)}
    {!matches.length&&<p className="muted">Ingen kunder funnet. Opprett et nytt kundekort nedenfor.</p>}
   </div>}
