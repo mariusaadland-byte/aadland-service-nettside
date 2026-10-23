@@ -82,6 +82,7 @@ export async function GET(){
   enabled:vippsPaymentsEnabled(),
   units:vippsPublicStatus().map(unit=>({
    ...unit,
+   enabled:vippsPaymentsEnabled(unit.unit),
    webhook:webhooks.find(item=>item?.unit===unit.unit)||null
   })),
   paymentIntegrationFoundation:true,
