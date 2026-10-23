@@ -165,7 +165,7 @@ export default function InvoicesClient({archiveMode=false}){
   (async()=>{
    try{
     const response=await fetch("/api/admin/customer-contacts",{cache:"no-store"});
-    const data=await response.json().catch(()=>({});
+    const data=await response.json().catch(()=>({}));
     if(!response.ok)throw Error(data.error||"Kunne ikke hente kundekortet etter registrering.");
     const selected=(data.contacts||[]).find(item=>item.id===contactId);
     if(!selected)throw Error("Kunden finnes ikke i kunderegisteret. Søk opp kunden nedenfor.");
