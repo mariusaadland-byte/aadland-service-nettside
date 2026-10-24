@@ -1,8 +1,8 @@
 -- Originalbilag are stored privately, never made public or exposed by direct URLs.
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
-values('aadland-vat-documents','aadland-vat-documents',false,8388608,
+values('aadland-vat-documents','aadland-vat-documents',false,4194304,
  array['application/pdf','image/jpeg','image/png','image/webp']::text[])
-on conflict(id) do update set public=false,file_size_limit=8388608,
+on conflict(id) do update set public=false,file_size_limit=4194304,
  allowed_mime_types=excluded.allowed_mime_types;
 
 create table if not exists public.vat_purchase_document_files(
@@ -11,7 +11,7 @@ create table if not exists public.vat_purchase_document_files(
  storage_path text not null unique,
  original_filename text not null check(length(original_filename) between 1 and 160),
  mime_type text not null check(mime_type in ('application/pdf','image/jpeg','image/png','image/webp')),
- file_size bigint not null check(file_size between 1 and 8388608),
+ file_size bigint not null check(file_size between 1 and 4194304),
  sha256 text not null check(sha256 ~ '^[0-9a-f]{64}$'),
  uploaded_by uuid not null,
  uploaded_at timestamptz not null default now(),
