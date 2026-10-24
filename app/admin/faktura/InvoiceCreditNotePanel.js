@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
-import {invoiceGrossOre,invoiceTotalOre} from "../../../lib/invoicePaymentStatus";
+import {invoiceTotalOre} from "../../../lib/invoicePaymentStatus";
+import {invoiceCreditRemainingQuantities} from "../../../lib/invoiceCreditRemaining";
 const money=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(ore/100);
 export default function InvoiceCreditNotePanel({invoice,disabled=false,onRefresh}){
  const [notes,setNotes]=useState([]),[qty,setQty]=useState({}),[reason,setReason]=useState("");
@@ -19,11 +20,7 @@ export default function InvoiceCreditNotePanel({invoice,disabled=false,onRefresh
    .catch(e=>{if(active)setError(e.message||"Kunne ikke hente kreditnotaer.");});
   return()=>{active=false};
  },[invoiceId]);
- const remaining=(invoice.line_items||[]).map((line,index)=>{
-  const credited=notes.reduce((sum,note)=>sum+(note.lines||[]).filter(item=>Number(item.sourceIndex)===index)
-   .reduce((n,item)=>n+Number(item.quantity||0),0),0);
-  return Math.max(0,Math.round((Number(line.quantity||0)-credited)*1000)/1000);
- });
+ const remaining=invoiceCreditRemainingQuantities(invoice.line_items,notes);
  const lines=(invoice.line_items||[]).flatMap((line,index)=>{
   const n=Number(String(qty[index]||"").replace(",","."));
   if(!Number.isFinite(n)||n<=0)return [];
@@ -73,7 +70,7 @@ export default function InvoiceCreditNotePanel({invoice,disabled=false,onRefresh
   }catch(e){setError(e.message||"Kreditnotaen kunne ikke behandles. Kontroller historikken før du forsøker på nytt.");}
   finally{setBusy(false);}
  }
- return <section style={{borderBottom:"1px solid #d8c9ae",padding:"16px 0",marginBottom:18}}>
+ return <section id="invoice-credit-note" style={{borderBottom:"1px solid #d8c9ae",padding:"16px 0",marginBottom:18}}>
   <h2>Kreditnota</h2>
   <p>Originalfakturaen beholdes. En kreditnota får eget nummer, minusbeløp og MVA, og reduserer betalingskravet. Tilbakebetaling via Vipps gjøres separat.</p>
   {!loaded&&<p>Henter kreditnotahistorikken …</p>}
@@ -81,6 +78,7 @@ export default function InvoiceCreditNotePanel({invoice,disabled=false,onRefresh
    {notes.map(n=><div key={n.id} style={{padding:"10px 0",borderBottom:"1px solid #ddd"}}>
     <strong>{n.credit_number}</strong> · {n.credit_date} · Kreditert {money(n.total_ore)}
     <div style={{fontSize:13}}>{n.reason}</div>
+    {(n.lines||[]).map((item,index)=><div key={index} style={{fontSize:12,color:"#575047",marginTop:3}}>{item.description} · {item.quantity} {item.unit||"stk"} · {money(item.totalOre||0)} inkl. MVA</div>)}
     <a target="_blank" rel="noreferrer" href={"/api/admin/invoices/credit-notes?invoiceId="+encodeURIComponent(invoiceId)+"&documentId="+encodeURIComponent(n.id)}>Åpne kreditnota som PDF</a>
     <div style={{marginTop:8}}>{n.sent_at?<span>Sendt til kunden</span>:canIssue?<button type="button" disabled={busy||disabled} onClick={()=>sendCredit(n)}>Send kreditnota på e-post</button>:<span>Ikke sendt til kunden</span>}
      {n.delivery_error&&<p role="alert" style={{fontSize:12}}>Siste sendeforsøk: {n.delivery_error}</p>}
@@ -88,7 +86,9 @@ export default function InvoiceCreditNotePanel({invoice,disabled=false,onRefresh
    </div>)}
   </>}
   {loaded&&canIssue&&netOutstanding>0&&<button type="button" disabled={busy||disabled} onClick={()=>setOpen(v=>!v)}>{open?"Lukk":"Opprett kreditnota"}</button>}
-  {loaded&&canIssue&&netOutstanding===0&&<p>Det finnes ikke et utestående beløp å kreditere. Er fakturaen betalt, må tilbakebetaling avklares før kreditnota kan utstedes i denne løsningen.</p>}
+  {loaded&&canIssue&&netOutstanding===0&&<p>{Number(invoice.paid_ore||0)>0
+    ?"Fakturaen er oppgjort. Hvis kunden skal ha prisavslag, må den aktuelle innbetalingen først tilbakebetales eller tilbakeføres. Vipps-refusjon finner du lenger opp på fakturaen. Når refusjonen er bekreftet, kan du opprette kreditnota her."
+    :"Denne fakturaen har ingen utestående beløp. Se kreditnotahistorikken over."}</p>}
   {open&&<div style={{border:"1px solid #d8c9ae",borderRadius:10,padding:16,marginTop:12}}>
    <h3>Velg fakturalinjer og antall</h3>
    <p>Fyll inn antallet som skal krediteres. Original pris og MVA-sats hentes fra den utstedte fakturaen.</p>
