@@ -1,6 +1,6 @@
 "use client";
 import {useState} from "react";
-import {parseVatImportCsv,vatCsvTemplate,MAX_VAT_CSV_BYTES,MAX_VAT_IMPORT_ROWS} from "../../../lib/vatPurchaseCsvImport";
+import {parseVatImportCsv,vatCsvTemplate,MAX_VAT_CSV_BYTES,MAX_VAT_IMPORT_ROWS} from "../../../../lib/vatPurchaseCsvImport";
 
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const label={
