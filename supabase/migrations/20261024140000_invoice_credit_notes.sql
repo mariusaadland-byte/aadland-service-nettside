@@ -181,4 +181,15 @@ begin
   if revised=ddl then raise exception 'No payable balance expression found in %',fname; end if;
   execute revised;
  end loop;
+ -- The reminder RPC must use the same credited balance as the archive.
+ select p.oid::regprocedure into signature
+  from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+  where n.nspname='public' and p.proname='prepare_invoice_notice' limit 1;
+ if signature is null then raise exception 'Reminder function not found'; end if;
+ select pg_get_functiondef(signature::oid) into ddl;
+ revised=replace(ddl,
+   'remaining-coalesce(inv.paid_ore,0)',
+   'remaining-coalesce(inv.credited_ore,0)-coalesce(inv.paid_ore,0)');
+ if revised=ddl then raise exception 'Reminder credit adjustment failed'; end if;
+ execute revised;
 end $adjust$;
