@@ -16,6 +16,7 @@ export default function InvoiceFollowUpPanel({invoice,today}){
   {follow.href&&<a href={follow.href} style={{fontSize:13}}>
    {follow.key==="overdue"?"Se purring og oppfølging":
     follow.key==="ready"?"Kontroller oppgjør og dokumentasjon":
+    follow.key==="closed"?"Se avslutningshistorikk":
     follow.key==="review"?"Gå til kontrollgrunnlaget":"Se innbetalinger"}
   </a>}
   {follow.key==="ready"&&<p style={{fontSize:12,margin:"10px 0 0",color:"#625747"}}>
