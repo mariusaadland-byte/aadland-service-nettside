@@ -134,7 +134,12 @@ export default function InvoicesClient({archiveMode=false}){
   finally{setBusy(false);}
  }
  async function reversePayment(paymentId){
-  if(busy)return;setBusy(true);setError("");setSaved("");
+  if(busy)return;
+  const payment=payments.find(p=>p.id===paymentId);
+  if(!payment||!window.confirm(payment.receipt_sent_at?
+   "Kvittering for denne innbetalingen er sendt til kunden. Hvis du angrer betalingen, må du også informere kunden om at kvitteringen ikke lenger er gyldig. Fortsette?":
+   "Angre denne manuelle betalingsregistreringen? Den blir bevart i historikken, men teller ikke lenger som innbetalt."))return;
+  setBusy(true);setError("");setSaved("");
   try{const r=await fetch("/api/admin/invoices/payments",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({paymentId})});const data=await r.json();if(!r.ok)throw Error(data.error);await load();setSaved("Betalingsregistreringen er angret.");}
   catch(e){setError(e.message)}finally{setBusy(false)}
  }
