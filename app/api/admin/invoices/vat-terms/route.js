@@ -1,0 +1,55 @@
+import {NextResponse} from "next/server";
+import {getAdminUser} from "../../../../../lib/auth";
+import {db} from "../../../../../lib/supabase";
+import {buildInvoiceVatTermReport,invoiceVatTermCsv,vatTermBounds} from "../../../../../lib/invoiceVatTermReport";
+export const runtime="nodejs";
+const json=(body,status=200)=>NextResponse.json(body,{status,headers:{"Cache-Control":"private, no-store"}});
+async function collect(query,max=5000){
+ const rows=[];
+ for(let start=0;start<max;start+=500){
+  const result=await query().range(start,start+499);
+  if(result.error||!Array.isArray(result.data))
+   throw Error("Kunne ikke hente hele dokumentgrunnlaget. Rapporten er ikke fullstendig.");
+  rows.push(...result.data);
+  if(result.data.length<500)return rows;
+ }
+ throw Error("For mange dokumenter i valgt termin. Kontakt administrator.");
+}
+export async function GET(req){
+ const user=await getAdminUser();
+ if(user?.role!=="owner")return json({error:"Bare eieren kan se MVA-avstemmingen."},403);
+ const url=new URL(req.url);
+ const year=url.searchParams.get("year")||"2026",term=url.searchParams.get("term")||"5";
+ const format=url.searchParams.get("format")||"json";
+ let bounds;
+ try{bounds=vatTermBounds(year,term);}catch(e){return json({error:e.message},400);}
+ if(!["json","csv"].includes(format))return json({error:"Velg gyldig rapportformat."},400);
+ const s=db();if(!s)return json({error:"Databasen er utilgjengelig."},503);
+ try{
+  // Both sides of the VAT report use original document dates, regardless
+  // of payment/closing time. Never join on administrative closure.
+  const [invoices,credits]=await Promise.all([
+   collect(()=>s.from("invoice_drafts")
+    .select("id,status,invoice_number,issued_date,customer,line_items")
+    .gte("issued_date",bounds.from).lte("issued_date",bounds.to)
+    .neq("status","draft")
+    .order("issued_date",{ascending:true}).order("id",{ascending:true})),
+   collect(()=>s.from("invoice_credit_notes")
+    .select("id,invoice_id,credit_number,credit_date,original_invoice_number,customer,lines,subtotal_ore,vat_ore,total_ore")
+    .gte("credit_date",bounds.from).lte("credit_date",bounds.to)
+    .order("credit_date",{ascending:true}).order("id",{ascending:true}))
+  ]);
+  const report=buildInvoiceVatTermReport(invoices,credits,bounds);
+  if(format==="csv"){
+   const data=Buffer.from(invoiceVatTermCsv(report),"utf8");
+   return new NextResponse(data,{headers:{
+    "Content-Type":"text/csv; charset=utf-8",
+    "Content-Disposition":'attachment; filename="mva-avstemming-'+bounds.year+'-termin-'+bounds.term+'.csv"',
+    "Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff"
+   }});
+  }
+  return json(report);
+ }catch(e){
+  return json({error:e.message||"MVA-grunnlaget kunne ikke kontrolleres."},503);
+ }
+}
