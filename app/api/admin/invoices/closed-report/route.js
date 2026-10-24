@@ -5,7 +5,8 @@ import {buildClosedInvoiceReport,closedInvoiceReportCsv} from "../../../../../li
 export const runtime="nodejs";
 const json=(body,status=200)=>NextResponse.json(body,{status,headers:{"Cache-Control":"private, no-store"}});
 const dateOk=v=>v===""||(/^\d{4}-\d{2}-\d{2}$/.test(v)&&
- Number.isFinite(Date.parse(v+"T00:00:00Z")));
+ Number.isFinite(Date.parse(v+"T00:00:00Z"))&&
+ new Date(v+"T00:00:00Z").toISOString().slice(0,10)===v);
 async function allRows(builder,max=5000){
  const records=[];
  for(let start=0;start<max;start+=500){
