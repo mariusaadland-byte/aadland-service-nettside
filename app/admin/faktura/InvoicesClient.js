@@ -86,10 +86,10 @@ export default function InvoicesClient({archiveMode=false}){
    if(paymentDate<form.issued_date||paymentDate>today)throw Error("Velg en betalingsdato mellom fakturadato og i dag.");
   }catch(e){setError(e.message||"Kontroller beløp og dato.");return;}
   const confirmation="Er "+money(amountOre)+" faktisk mottatt fra kunden på bankkonto eller kontant?"+
-   "\\nFaktura: "+form.invoice_number+
-   "\\nBetalingsdato: "+paymentDate+
-   "\\nEtter registrering gjenstår "+money(paymentInfo.outstanding-amountOre)+
-   "\\n\\nIkke registrer Vipps-betalinger manuelt. De registreres automatisk når Vipps bekrefter betalingen.";
+   "\nFaktura: "+form.invoice_number+
+   "\nBetalingsdato: "+paymentDate+
+   "\nEtter registrering gjenstår "+money(paymentInfo.outstanding-amountOre)+
+   "\n\nIkke registrer Vipps-betalinger manuelt. De registreres automatisk når Vipps bekrefter betalingen.";
   if(!window.confirm(confirmation))return;
   setBusy(true);setError("");setSaved("");
   try{
@@ -309,7 +309,7 @@ export default function InvoicesClient({archiveMode=false}){
    </div>
   </div>
   <label>Innbetalt beløp (kr)
-   <input type="text" inputMode="decimal" autoComplete="off" placeholder="For eksempel 1 250,50" value={paymentAmount}
+   <input type="text" inputMode="decimal" autoComplete="off" placeholder="For eksempel 1250,50" value={paymentAmount}
     onChange={e=>{setPaymentAmount(e.target.value);paymentRequest.current=null}}/>
   </label>
   <label>Betalingsnotat (valgfritt)
