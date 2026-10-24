@@ -40,7 +40,7 @@ const raw=readFileSync("app/api/admin/invoices/closures/route.js","utf8")
  .replace(/^export async function /gm,"async function ");
 const f=new Function("NextResponse","getAdminUser","db","sameOriginGuard","process",
  raw+";return {GET,POST};");
-const {GET,POST}=f(NextResponse,async()=>({role,id:"owner-test-id"}),
+const {GET,POST}=f(NextResponse,async()=>({role,id:"owner-test-id",canUpdateOrders:role==="staff"}),
  invoiceDb,()=>guarded?{status:403}:null,{env:{VERCEL_ENV:"production"}});
 const get=()=>GET({url:"https://localhost/api/admin/invoices/closures?invoiceId="+original});
 const send=(action="close",payload={})=>POST({
