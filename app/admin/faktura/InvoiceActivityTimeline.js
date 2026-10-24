@@ -27,7 +27,8 @@ export default function InvoiceActivityTimeline({invoice}){
    .finally(()=>{if(active)setLoading(false);});
   return()=>{active=false};
  },[invoiceId,invoice.payment_updated_at,invoice.credited_ore,invoice.sent_at,retry]);
- const sorted=ascending?[...items].reverse():items;
+ const dated=items.filter(e=>Boolean(e.occurredAt)),undated=items.filter(e=>!e.occurredAt);
+ const sorted=[...(ascending?dated.reverse():dated),...undated];
  const shown=expanded?sorted:sorted.slice(0,5);
  return <section id="invoice-activity-timeline" style={{padding:"16px 0",borderBottom:"1px solid #d8c9ae",marginBottom:18}}>
   <div style={{display:"flex",gap:12,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap"}}>
@@ -36,7 +37,7 @@ export default function InvoiceActivityTimeline({invoice}){
   </div>
   <p className="muted" style={{fontSize:13}}>Innbetalinger, Vipps-refusjoner, kreditnotaer og varsler samlet etter dato. Bare visning – ingen betalinger eller e-poster sendes her.</p>
   {loading&&<p role="status">Henter hendelseshistorikk …</p>}
-  {error&&<p role="alert" style={{color:"#a52a21"}}>{error} Ingen hendelser skjules som nullbetaling ved feil. Prøv Oppdater hendelser.</p>}
+  {error&&<p role="alert" style={{color:"#a52a21"}}>{error} Historikken vises ikke delvis ved feil. Prøv «Oppdater hendelser».</p>}
   {!loading&&!error&&items.length===0&&<p>Ingen daterte hendelser registrert.</p>}
   {!loading&&!error&&items.length>0&&<>
    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,fontSize:13,margin:"12px 0"}}>
