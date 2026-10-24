@@ -17,6 +17,7 @@ const db=()=>({from(table){
   async range(){
    accessed.push({table,ids});
    if(table==="invoice_drafts")return {data:[authInvoice,draftInvoice],error:null};
+   if(table==="admin_customer_contacts")return {data:[],error:null};
    if(table==="invoice_vipps_payments"){
     if(readError)return {data:null,error:{message:"temporary unavailable"}};
     assert.deepEqual(ids,[authInvoice.id],"Draft is never used for settlement aggregation");
