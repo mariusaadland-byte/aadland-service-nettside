@@ -70,6 +70,8 @@ const bank=inspectVatImportRows([{
 }],[]);
 assert.equal(bank[0].status,"new");
 assert.equal(bank[0].requiresBankCheck,true);
+assert.equal(inspectVatImportRows([{...parsed[5],deductionPercent:""}],[])[0].status,"invalid",
+ "Missing deduction percentage must not silently become 0");
 assert.throws(()=>parseVatImportCsv('wrong;headers\r\nx;y'),/kolonnene/);
 assert.throws(()=>parseVatImportCsv(header+"\n"+make("A","B").join(";").replace(/^faktura/,'"faktura')),/anførselstegn/);
 assert.throws(()=>parseVatImportCsv(header+"\r\n"+Array(51).fill(line(make("A","B"))).join("\r\n")) ,/Maks 50/);
