@@ -4,6 +4,7 @@ import {getAdminUser} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {systimaSetupStatus,SYSTIMA_AUTHORIZATION_URL} from "../../../../lib/systimaIntegrationStatus";
+import {systimaPublicTokenHealth} from "../../../../lib/systimaTokenLifecycle";
 export const runtime="nodejs";
 const cookieName="aadland_systima_oauth_state";
 const respond=(data,status=200)=>NextResponse.json(data,{status,headers:{"Cache-Control":"private, no-store"}});
@@ -13,10 +14,13 @@ export async function GET(){
  const status=systimaSetupStatus();
  const s=db();if(!s)return respond({error:"Databasen er utilgjengelig."},503);
  const result=await s.from("systima_oauth_connections")
-  .select("authorized_at,connection_state,updated_at")
+  .select("authorized_at,connection_state,updated_at,encrypted_credentials")
   .eq("integration_key","systima").maybeSingle();
  if(result.error)return respond({error:"Tilkoblingsstatus kunne ikke hentes."},503);
- return respond({...status,hasAuthorization:Boolean(result.data),
+ const tokenHealth=systimaPublicTokenHealth(
+  result.data?.encrypted_credentials,process.env.SYSTIMA_TOKEN_ENCRYPTION_KEY
+ );
+ return respond({...status,tokenHealth,hasAuthorization:Boolean(result.data),
   authorizedAt:result.data?.authorized_at||null,
   accessToSupplierDocuments:false,
   connectionState:result.data?.connection_state||"not_connected"});
