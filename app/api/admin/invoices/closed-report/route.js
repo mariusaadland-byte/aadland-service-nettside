@@ -58,6 +58,19 @@ export async function GET(req){
    invoices.push(...invoiceBatch);
    credits.push(...creditBatch);
   }
+  // Detect a manual reopening or automatic balance-triggered reopening while
+  // the report was being assembled. Never export an outdated closure snapshot.
+  const latestClosures=[];
+  for(let start=0;start<ids.length;start+=100){
+   const batch=ids.slice(start,start+100);
+   const current=await allRows(()=>s.from("invoice_admin_closures")
+    .select("invoice_id,closed_at").in("invoice_id",batch)
+    .order("invoice_id",{ascending:true}),500);
+   latestClosures.push(...current);
+  }
+  const latest=new Map(latestClosures.map(c=>[c.invoice_id,c.closed_at]));
+  if(closures.some(c=>latest.get(c.invoice_id)!==c.closed_at))
+   throw Error("En faktura er åpnet eller endret under rapporthentingen. Oppdater rapporten.");
   const report=buildClosedInvoiceReport(closures,invoices,credits,{from,to});
   if(format==="csv"){
    const bytes=Buffer.from(closedInvoiceReportCsv(report),"utf8");
