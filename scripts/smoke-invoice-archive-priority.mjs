@@ -4,8 +4,9 @@ import {readFileSync} from "node:fs";
 const paymentSource=readFileSync("lib/invoicePaymentStatus.js","utf8").replace(/^export /gm,"");
 const osloSource=readFileSync("lib/osloTime.js","utf8").replace(/^export /gm,"");
 const overviewSource=readFileSync("lib/invoiceArchiveOverview.js","utf8").replace(/^import .*;\n/gm,"").replace(/^export /gm,"");
-const methods=new Function(paymentSource+"\n"+osloSource+"\n"+overviewSource+"\nreturn {invoiceArchiveOverview,invoiceArchiveVisible,invoiceArchiveDueInfo};")();
-const {invoiceArchiveOverview,invoiceArchiveVisible,invoiceArchiveDueInfo}=methods;
+const settlementSource=readFileSync("lib/invoiceSettlementInfo.js","utf8").replace(/^import .*;\n/gm,"").replace(/^export /gm,"");
+const methods=new Function(paymentSource+"\n"+osloSource+"\n"+settlementSource+"\n"+overviewSource+"\nreturn {invoiceArchiveOverview,invoiceArchiveVisible,invoiceArchiveDueInfo,invoiceSettlementInfo,summarizeInvoiceActivity};")();
+const {invoiceArchiveOverview,invoiceArchiveVisible,invoiceArchiveDueInfo,invoiceSettlementInfo,summarizeInvoiceActivity}=methods;
 const today="2026-10-23";
 const invoice=(id,due,paid=0,status="issued",customer="Kunde "+id)=>({
  id,invoice_number:"AS-TEST-"+id,customer:{name:customer,email:id+"@example.invalid"},
@@ -75,6 +76,36 @@ assert.equal(monthStats.overdueCount,2,"Month boundary based on Oslo calendar da
 assert.equal(monthStats.dueSoonCount,1,"Seven days ahead across month boundary");
 assert.equal(invoiceArchiveDueInfo(crossing[0],november).label,"14 dager forfalt");
 
+const creditInvoice=invoice("refund","2026-10-23",80000);
+creditInvoice.line_items=[{description:"Arbeid",quantity:1,unitPriceOre:80000,vatRate:25}];
+creditInvoice.credited_ore=20000;
+const reconciled=summarizeInvoiceActivity([creditInvoice],[
+ {invoice_id:creditInvoice.id,captured_ore:100000,refunded_ore:20000,state:"partial"}
+],[
+ {invoice_id:creditInvoice.id,total_ore:20000,sent_at:"2026-10-24T10:00:00Z"}
+]);
+assert.equal(reconciled[0].activity.vippsCapturedOre,100000);
+assert.equal(reconciled[0].activity.vippsRefundedOre,20000);
+assert.equal(reconciled[0].activity.creditNoteCount,1);
+assert.equal(reconciled[0].activity.creditNoteSentCount,1);
+assert.equal(invoiceSettlementInfo(reconciled[0],today).label,"Oppgjort med refusjon og kreditnota");
+assert.equal(invoiceSettlementInfo(reconciled[0],today).outstanding,0);
+assert.equal(invoiceSettlementInfo(reconciled[0],today).netVipps,80000);
+const refundedOutstanding={...reconciled[0],credited_ore:0};
+refundedOutstanding.activity={...reconciled[0].activity,creditDocumentsOre:0};
+assert.equal(invoiceSettlementInfo(refundedOutstanding,today).kind,"refundedOutstanding");
+assert.equal(invoiceSettlementInfo(refundedOutstanding,today).outstanding,20000);
+assert.equal(invoiceArchiveOverview([refundedOutstanding],today).needsReviewCount,1);
+assert.equal(invoiceArchiveVisible([refundedOutstanding],today,{filter:"review"}).length,1);
+assert.equal(invoiceArchiveVisible([refundedOutstanding],today,{filter:"refunded"}).length,1);
+const wrongCredits={...reconciled[0],activity:{...reconciled[0].activity,creditDocumentsOre:10000}};
+assert.equal(invoiceSettlementInfo(wrongCredits,today).kind,"mismatch");
+const activeVipps={...creditInvoice,activity:{...reconciled[0].activity,vippsActiveCount:1}};
+assert.equal(invoiceSettlementInfo(activeVipps,today).kind,"activeVipps");
+const regular=invoice("normal","2026-11-05",12500);
+assert.equal(invoiceSettlementInfo(regular,today).label,"Betalt");
+assert.equal(invoiceArchiveOverview([regular],today).needsReviewCount,0);
+
 const ui=readFileSync("app/admin/faktura/InvoicesClient.js","utf8");
 assert.ok(ui.includes("invoiceArchiveOverview(items,today)"));
 assert.ok(ui.includes("invoiceArchiveVisible(items,today,{archiveMode,filter,query:search,sort:sortMode})"));
@@ -83,6 +114,15 @@ assert.ok(ui.includes("Forfaller innen 7 dager"));
 assert.ok(ui.includes("Høyest restbeløp først"));
 assert.ok(ui.includes("Oppdater oversikten"));
 assert.ok(ui.includes("invoiceArchiveDueInfo(x,today).label"));
+assert.ok(ui.includes("invoiceSettlementInfo(x,today)"));
+assert.ok(ui.includes("Må kontrolleres"));
+assert.ok(ui.includes("Med Vipps-refusjon"));
+assert.ok(ui.includes("<InvoiceSettlementPanel"));
+const listApi=readFileSync("app/api/admin/invoices/route.js","utf8");
+assert.ok(listApi.includes("summarizeInvoiceActivity(invoices,payments,credits)"));
+assert.ok(listApi.includes('invoice_vipps_payments'));
+assert.ok(listApi.includes('invoice_credit_notes'));
+assert.ok(listApi.includes('"Cache-Control":"private, no-store"'));
 assert.ok(ui.includes('cache:"no-store"'),"Refresh should bypass cached invoice data");
 assert.doesNotMatch(overviewSource,/\bfetch\s*\(|\.insert\s*\(|\.update\s*\(/,"Archive presentation must have no payment or reminder writes");
 console.log("Fakturaarkiv bestått: restbeløp, forfalte 14+, neste 7 dager, delbetalt, betalt, prioritet, søk, DST-uavhengige datoer og ingen sending.");
