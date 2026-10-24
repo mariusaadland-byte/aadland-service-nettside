@@ -5,6 +5,7 @@ import {invoiceDueDate} from "../../../lib/invoicePaymentTerms";
 import {invoicePaymentState} from "../../../lib/invoicePaymentStatus";
 import {invoiceArchiveOverview,invoiceArchiveVisible,invoiceArchiveDueInfo} from "../../../lib/invoiceArchiveOverview";
 import {invoiceSettlementInfo} from "../../../lib/invoiceSettlementInfo";
+import {parseInvoicePaymentAmountOre,invoicePaymentSuggestionOre,invoicePaymentAmountInput} from "../../../lib/invoicePartialPayments";
 import Link from "next/link";
 import InvoiceReminderPanel from "./InvoiceReminderPanel";
 import InvoiceVippsPanel from "./InvoiceVippsPanel";
@@ -56,6 +57,8 @@ export default function InvoicesClient({archiveMode=false}){
  const draft=items.find(x=>x.id===active);
  const [form,setForm]=useState(null);
  const paymentInfo=form?invoicePaymentState(form,today):null;
+ const paymentSafety=form?invoiceSettlementInfo(form,today):null;
+ const manualPaymentBlocked=["activeVipps","mismatch"].includes(paymentSafety?.kind);
  const [previewOpen,setPreviewOpen]=useState(()=>typeof window!=="undefined"&&new URLSearchParams(window.location.search).get("preview")==="1");
  useEffect(()=>{
   if(!form?.id||!previewOpen||new URLSearchParams(window.location.search).get("preview")!=="1")return;
@@ -67,7 +70,7 @@ export default function InvoicesClient({archiveMode=false}){
   if(draft&&((archiveMode&&draft.status==="draft")||(!archiveMode&&draft.status!=="draft")))window.location.replace((draft.status==="draft"?"/admin/faktura":"/admin/faktura/arkiv")+"?id="+encodeURIComponent(draft.id));
  },[archiveMode,draft?.id,draft?.status]);
  useEffect(()=>{
-  paymentRequest.current=null;setPaymentAmount(form?String(invoicePaymentState(form,today).outstanding/100):"");setPaymentDate(today);setPaymentNote("");
+  paymentRequest.current=null;setPaymentAmount("");setPaymentDate(today);setPaymentNote("");
  },[form?.id,form?.paid_ore,form?.credited_ore]);
  useEffect(()=>{
   if(!archiveMode||!form?.id)return;
@@ -76,17 +79,30 @@ export default function InvoicesClient({archiveMode=false}){
   return ()=>{ignore=true};
  },[archiveMode,form?.id,form?.payment_updated_at]);
  async function registerPayment(full=false){
-  if(!form||busy||!paymentInfo?.outstanding)return;setBusy(true);setError("");setSaved("");
+  if(!form||busy||!paymentInfo?.outstanding||manualPaymentBlocked)return;
+  let amountOre;
   try{
-   const amountOre=full?null:Math.round(Number(String(paymentAmount).replace(",","."))*100);
-   if(amountOre!==null&&(!Number.isSafeInteger(amountOre)||amountOre<=0))throw Error("Oppgi et gyldig innbetalt beløp.");
+   amountOre=full?paymentInfo.outstanding:parseInvoicePaymentAmountOre(paymentAmount,paymentInfo.outstanding);
+   if(paymentDate<form.issued_date||paymentDate>today)throw Error("Velg en betalingsdato mellom fakturadato og i dag.");
+  }catch(e){setError(e.message||"Kontroller beløp og dato.");return;}
+  const confirmation="Er "+money(amountOre)+" faktisk mottatt fra kunden på bankkonto eller kontant?"+
+   "\\nFaktura: "+form.invoice_number+
+   "\\nBetalingsdato: "+paymentDate+
+   "\\nEtter registrering gjenstår "+money(paymentInfo.outstanding-amountOre)+
+   "\\n\\nIkke registrer Vipps-betalinger manuelt. De registreres automatisk når Vipps bekrefter betalingen.";
+  if(!window.confirm(confirmation))return;
+  setBusy(true);setError("");setSaved("");
+  try{
    const body={invoiceId:form.id,amountOre,paidOn:paymentDate,note:paymentNote};
    const signature=JSON.stringify(body);
    if(paymentRequest.current?.signature!==signature)paymentRequest.current={signature,id:crypto.randomUUID()};
    const response=await fetch("/api/admin/invoices/payments",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...body,requestId:paymentRequest.current.id})});
-   const data=await response.json();if(!response.ok)throw Error(data.error);
-   await load();paymentRequest.current=null;setSaved(data.outstandingOre===0?"Fakturaen er merket som betalt.":"Betalingen er registrert.");
-  }catch(e){await load();setError(e.message)}finally{setBusy(false)}
+   const data=await response.json();if(!response.ok)throw Error(data.error||"Innbetalingen kunne ikke registreres.");
+   await load();paymentRequest.current=null;setPaymentAmount("");
+   setSaved(data.alreadyRecorded?"Denne innbetalingen er allerede registrert. Ingen ny registrering ble opprettet.":
+    data.outstandingOre===0?"Hele fakturabeløpet er registrert som betalt.":
+    "Delbetaling på "+money(amountOre)+" er registrert. Gjenstående beløp: "+money(data.outstandingOre)+".");
+  }catch(e){await load();setError(e.message||"Betalingen kunne ikke bekreftes.")}finally{setBusy(false)}
  }
  async function reversePayment(paymentId){
   if(busy)return;setBusy(true);setError("");setSaved("");
@@ -274,7 +290,35 @@ export default function InvoicesClient({archiveMode=false}){
  <section className="card" style={{padding:18}}>{form?<><section style={{borderBottom:"1px solid #d8c9ae",paddingBottom:16,marginBottom:18}}><h2>{form.invoice_number?"Faktura "+form.invoice_number:"Send faktura"}</h2>
  {!archiveMode&&form.status==="draft"&&<InvoiceCustomerPicker key={form.id} customer={form.customer||{}} onChoose={selectCustomer} onCreate={openNewCustomer} disabled={busy} busy={busy} invoiceId={form.id}/>}
  {form.customer?.contactId&&<button type="button" disabled={busy} onClick={openCustomerCard}>Åpne / rediger kundekort</button>}
- <p><strong>{form.customer?.name}</strong> · {money(total(form.line_items))}<br/>Til: {form.customer?.email||"Fyll inn e-postadressen nedenfor"}</p>{form.status==="draft"?<p>Kontroller navn, adresse, leveringsdato og forfall. Ved sending tildeles fakturanummer, og fakturaen låses for endringer.</p>:<p>Utstedt {form.issued_date}. Fakturaen er låst for endringer.</p>}<button type="button" disabled={busy||Boolean(form.sent_at)} onClick={sendInvoice} style={{display:"block",width:"100%",minHeight:50,margin:"12px 0",padding:"14px 18px",background:"#d5a75a",color:"#171511",border:"1px solid #b88c43",borderRadius:10,fontSize:16,fontWeight:800,whiteSpace:"normal"}}>{busy?"Behandler …":form.sent_at?"Sendt på e-post":form.status==="draft"?"Fakturer og send på e-post" :form.delivery_error?"Prøv e-postsending igjen":"Send faktura på e-post"}</button><button type="button" disabled={busy} onClick={printInvoice} style={{display:"block",width:"100%",minHeight:50,margin:"12px 0",padding:"14px 18px",background:"#fff",color:"#171511",border:"2px solid #b88c43",borderRadius:10,fontSize:16,fontWeight:800,whiteSpace:"normal"}}>{busy?"Behandler …":form.status==="draft"?"Fakturer og skriv ut":"Skriv ut faktura"}</button>{form.sent_at&&<p role="status">Sendt til {form.customer?.email}.</p>}{form.delivery_error&&!form.sent_at&&<p role="alert">{form.delivery_error}</p>}{saved&&<p role="status">{saved}</p>}</section>{archiveMode&&<InvoiceSettlementPanel key={form.id} invoice={form} today={today}/>}{archiveMode&&<InvoiceActivityTimeline key={form.id} invoice={form}/>}{<InvoiceVippsPanel key={form.id} invoice={form} persist={persist} onRefresh={load} disabled={busy} onBusyChange={setBusy} onApplyPrice={applyVippsPrice} allowPriceAdjustment={hasAdjustableVippsPriceLine(form.line_items)} onPaymentMethodChange={method=>change("customer",{...form.customer,paymentMethod:method,workDate:method==="vipps"?today:form.customer?.workDate||""})}/>}{archiveMode&&paymentInfo&&<section style={{padding:"16px 0",borderBottom:"1px solid #d8c9ae",marginBottom:18}}><h2>Innbetalinger</h2><p>Forfallsdato: <b>{form.due_date}</b>{form.paid_date&&<><br/>Siste betalingsdato: <b>{form.paid_date}</b></>}</p>{paymentInfo.outstanding>0&&<fieldset disabled={busy} style={{border:0,padding:0,minWidth:0}}><label>Betalingsdato <input type="date" max={today} value={paymentDate} onChange={e=>setPaymentDate(e.target.value)}/></label><button type="button" onClick={()=>registerPayment(true)}>Merk hele restbeløpet som betalt</button><label>Innbetalt beløp (kr) <input type="number" min="0.01" step="0.01" value={paymentAmount} onChange={e=>setPaymentAmount(e.target.value)}/></label><label>Betalingsnotat (valgfritt) <input maxLength={500} value={paymentNote} onChange={e=>setPaymentNote(e.target.value)}/></label><button type="button" onClick={()=>registerPayment(false)}>Registrer innbetaling</button></fieldset>}<h3>Betalingshistorikk</h3>{payments.length===0&&<p>Ingen innbetalinger registrert.</p>}{payments.map(p=><div key={p.id} style={{padding:"10px 0",borderBottom:"1px solid #ddd"}}><b>{money(p.amount_ore)}</b> · {p.paid_on}{p.reversed_at?<span> · Angret</span>:p.vipps_reference?<span> · Vipps</span>:<button type="button" disabled={busy} onClick={()=>reversePayment(p.id)} style={{marginLeft:12}}>Angre registrering</button>}{p.note&&<p>{p.note}</p>}</div>)}</section>}{archiveMode&&<InvoiceCreditNotePanel key={form.id} invoice={form} disabled={busy} onRefresh={load}/>}{archiveMode&&<InvoiceReminderPanel key={form.id} invoice={form} disabled={busy} onRefresh={load}/>}{!archiveMode&&<fieldset disabled={busy||form.status!=="draft"} style={{border:0,padding:0,minWidth:0}}><h2>{form.status==="draft"?"Rediger fakturakladd":"Fakturadetaljer"}</h2><p><strong>{form.customer?.name}</strong> · {money(total(form.line_items))}</p>{form.installment_index>0&&<p><b>{form.installment_label} – {form.installment_percent} %</b><br/>{form.installment_trigger}</p>}<label>Betalingsfrist<select value={form.due_date_mode||"auto"} onChange={e=>change("due_date_mode",e.target.value)}><option value="auto">Automatisk fra kundekortet</option><option value="manual">Egen forfallsdato for denne fakturaen</option></select></label>{form.due_date_mode!=="manual"?<p>Betalingsfrist: <b>{form.customer?.paymentTermsDays??14} dager</b>. Hvis du fakturerer i dag: fakturadato <b>{today}</b>, forfall <b>{form.due_date}</b>. Datoene beregnes på nytt når du trykker fakturer. Endre antall dager på kundekortet.</p>:<label htmlFor="invoiceDueDate"><b>Forfallsdato</b><input id="invoiceDueDate" type="date" value={form.due_date||""} onChange={e=>change("due_date",e.target.value)}/></label>}<button type="button" disabled={busy} onClick={save}>{busy?"Lagrer …":"Lagre forfallsdato og kladd"}</button>{form.status==="draft"&&<p>Fakturanummer tildeles når du fakturerer med e-post eller utskrift.</p>}
+ <p><strong>{form.customer?.name}</strong> · {money(total(form.line_items))}<br/>Til: {form.customer?.email||"Fyll inn e-postadressen nedenfor"}</p>{form.status==="draft"?<p>Kontroller navn, adresse, leveringsdato og forfall. Ved sending tildeles fakturanummer, og fakturaen låses for endringer.</p>:<p>Utstedt {form.issued_date}. Fakturaen er låst for endringer.</p>}<button type="button" disabled={busy||Boolean(form.sent_at)} onClick={sendInvoice} style={{display:"block",width:"100%",minHeight:50,margin:"12px 0",padding:"14px 18px",background:"#d5a75a",color:"#171511",border:"1px solid #b88c43",borderRadius:10,fontSize:16,fontWeight:800,whiteSpace:"normal"}}>{busy?"Behandler …":form.sent_at?"Sendt på e-post":form.status==="draft"?"Fakturer og send på e-post" :form.delivery_error?"Prøv e-postsending igjen":"Send faktura på e-post"}</button><button type="button" disabled={busy} onClick={printInvoice} style={{display:"block",width:"100%",minHeight:50,margin:"12px 0",padding:"14px 18px",background:"#fff",color:"#171511",border:"2px solid #b88c43",borderRadius:10,fontSize:16,fontWeight:800,whiteSpace:"normal"}}>{busy?"Behandler …":form.status==="draft"?"Fakturer og skriv ut":"Skriv ut faktura"}</button>{form.sent_at&&<p role="status">Sendt til {form.customer?.email}.</p>}{form.delivery_error&&!form.sent_at&&<p role="alert">{form.delivery_error}</p>}{saved&&<p role="status">{saved}</p>}</section>{archiveMode&&<InvoiceSettlementPanel key={form.id} invoice={form} today={today}/>}{archiveMode&&<InvoiceActivityTimeline key={form.id} invoice={form}/>}{<InvoiceVippsPanel key={form.id} invoice={form} persist={persist} onRefresh={load} disabled={busy} onBusyChange={setBusy} onApplyPrice={applyVippsPrice} allowPriceAdjustment={hasAdjustableVippsPriceLine(form.line_items)} onPaymentMethodChange={method=>change("customer",{...form.customer,paymentMethod:method,workDate:method==="vipps"?today:form.customer?.workDate||""})}/>}{archiveMode&&paymentInfo&&<section style={{padding:"16px 0",borderBottom:"1px solid #d8c9ae",marginBottom:18}}><h2>Innbetalinger</h2><p>Forfallsdato: <b>{form.due_date}</b>{form.paid_date&&<><br/>Siste betalingsdato: <b>{form.paid_date}</b></>}</p>{paymentInfo.outstanding>0&&<>
+ {manualPaymentBlocked&&<p role="alert" style={{padding:12,background:"#fff4e6",borderRadius:8}}>
+  Manuell betalingsregistrering er midlertidig sperret: {paymentSafety?.guidance||"Kontroller Vipps-status og betalingshistorikken før ny innbetaling."}
+ </p>}
+ <fieldset disabled={busy||manualPaymentBlocked} style={{border:"1px solid #dfd3bd",borderRadius:10,padding:14,minWidth:0}}>
+  <legend><strong>Registrer mottatt delbetaling</strong></legend>
+  <p style={{fontSize:13,marginTop:4}}>Brukes bare når kunden faktisk har betalt direkte til bankkonto eller kontant. Vipps-innbetalinger registreres automatisk.</p>
+  <p><strong>Restbeløp før registrering: {money(paymentInfo.outstanding)}</strong></p>
+  <label>Betalingsdato <input type="date" min={form.issued_date} max={today} value={paymentDate} onChange={e=>{setPaymentDate(e.target.value);paymentRequest.current=null}}/></label>
+  <div style={{margin:"12px 0"}}>
+   <strong style={{display:"block",marginBottom:7,fontSize:13}}>Fyll inn beløp</strong>
+   <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+    {[25,50,100].map(percent=><button type="button" key={percent} onClick={()=>{
+     setPaymentAmount(invoicePaymentAmountInput(invoicePaymentSuggestionOre(paymentInfo.outstanding,percent)));
+     paymentRequest.current=null;
+    }}>{percent===100?"Hele restbeløpet":percent+" % av restbeløpet"}</button>)}
+   </div>
+  </div>
+  <label>Innbetalt beløp (kr)
+   <input type="text" inputMode="decimal" autoComplete="off" placeholder="For eksempel 1 250,50" value={paymentAmount}
+    onChange={e=>{setPaymentAmount(e.target.value);paymentRequest.current=null}}/>
+  </label>
+  <label>Betalingsnotat (valgfritt)
+   <input maxLength={500} placeholder="For eksempel bankoverføring" value={paymentNote}
+    onChange={e=>{setPaymentNote(e.target.value);paymentRequest.current=null}}/>
+  </label>
+  <button type="button" onClick={()=>registerPayment(false)} disabled={!paymentAmount.trim()}>Registrer mottatt beløp</button>
+ </fieldset>
+ </>}<h3>Betalingshistorikk</h3>{payments.length===0&&<p>Ingen innbetalinger registrert.</p>}{payments.map(p=><div key={p.id} style={{padding:"10px 0",borderBottom:"1px solid #ddd"}}><b>{money(p.amount_ore)}</b> · {p.paid_on}{p.reversed_at?<span> · Angret</span>:p.vipps_reference?<span> · Vipps</span>:<button type="button" disabled={busy} onClick={()=>reversePayment(p.id)} style={{marginLeft:12}}>Angre registrering</button>}{p.note&&<p>{p.note}</p>}</div>)}</section>}{archiveMode&&<InvoiceCreditNotePanel key={form.id} invoice={form} disabled={busy} onRefresh={load}/>}{archiveMode&&<InvoiceReminderPanel key={form.id} invoice={form} disabled={busy} onRefresh={load}/>}{!archiveMode&&<fieldset disabled={busy||form.status!=="draft"} style={{border:0,padding:0,minWidth:0}}><h2>{form.status==="draft"?"Rediger fakturakladd":"Fakturadetaljer"}</h2><p><strong>{form.customer?.name}</strong> · {money(total(form.line_items))}</p>{form.installment_index>0&&<p><b>{form.installment_label} – {form.installment_percent} %</b><br/>{form.installment_trigger}</p>}<label>Betalingsfrist<select value={form.due_date_mode||"auto"} onChange={e=>change("due_date_mode",e.target.value)}><option value="auto">Automatisk fra kundekortet</option><option value="manual">Egen forfallsdato for denne fakturaen</option></select></label>{form.due_date_mode!=="manual"?<p>Betalingsfrist: <b>{form.customer?.paymentTermsDays??14} dager</b>. Hvis du fakturerer i dag: fakturadato <b>{today}</b>, forfall <b>{form.due_date}</b>. Datoene beregnes på nytt når du trykker fakturer. Endre antall dager på kundekortet.</p>:<label htmlFor="invoiceDueDate"><b>Forfallsdato</b><input id="invoiceDueDate" type="date" value={form.due_date||""} onChange={e=>change("due_date",e.target.value)}/></label>}<button type="button" disabled={busy} onClick={save}>{busy?"Lagrer …":"Lagre forfallsdato og kladd"}</button>{form.status==="draft"&&<p>Fakturanummer tildeles når du fakturerer med e-post eller utskrift.</p>}
  <label>Oppdrag <input value={form.title||""} onChange={e=>change("title",e.target.value)}/></label>
  <p className="muted">Kundenavn, telefon, e-post og fakturaadresse styres fra kunderegisteret ovenfor. Rediger kundekortet hvis noe skal endres.</p>
  {form.customer?.paymentMethod==="vipps"
