@@ -25,6 +25,7 @@ const db=()=>({from(table){
    }
    if(table==="invoice_credit_notes")
     return {data:[{id:"b",invoice_id:authInvoice.id,total_ore:20000,sent_at:"2026-10-24T10:00:00Z"}],error:null};
+   if(table==="invoice_admin_closures")return {data:[{invoice_id:authInvoice.id,closed_at:"2026-10-24T15:00:00Z",revision:1}],error:null};
    throw Error("Unexpected table "+table);
   },
   insert(){writes.push("insert");throw Error("Read-only API must not write");},
@@ -51,6 +52,8 @@ assert.equal(item.activity.vippsRefundedOre,20000);
 assert.equal(item.activity.creditDocumentsOre,20000);
 assert.equal(item.activity.creditNoteCount,1);
 assert.equal(item.activity.creditNoteSentCount,1);
+assert.equal(item.adminClosure.closedAt,"2026-10-24T15:00:00Z");
+assert.equal(result.body.invoices.find(i=>i.status==="draft").adminClosure,null);
 assert.equal(writes.length,0,"Archive API only reads");
 readError=true;
 result=await GET();
