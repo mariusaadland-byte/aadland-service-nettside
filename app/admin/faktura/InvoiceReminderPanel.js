@@ -48,7 +48,7 @@ export default function InvoiceReminderPanel({invoice,disabled=false,onRefresh})
    try{await refreshHistory()}catch{}
   }finally{sendingRef.current=false;setSending(false)}
  }
- return <section style={{padding:"16px 0",borderBottom:"1px solid #d8c9ae",marginBottom:18}}>
+ return <section id="invoice-reminder-actions" style={{padding:"16px 0",borderBottom:"1px solid #d8c9ae",marginBottom:18}}>
   <h2>Purring og inkassovarsel</h2>
   {settlement.needsReview&&<p role="status" style={{padding:12,background:"#fff4e6",border:"1px solid #dec08d",borderRadius:8}}>
    <strong>Kontroll før purring:</strong> {settlement.guidance}
