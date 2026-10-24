@@ -32,6 +32,7 @@ export default function InvoiceVatTermClient(){
  const total=report?.total;
  return <main className="admin" style={{maxWidth:1200,margin:"0 auto",padding:24}}>
   <p><Link href="/admin/faktura/arkiv">← Tilbake til fakturaarkivet</Link></p>
+  <p><Link href="/admin/faktura/systima">Systima: tilkoblingsstatus og API-oppsett</Link></p>
   <h1>MVA-avstemming – salgsdokumenter</h1>
   <p>Oversikt over <strong>utgående MVA</strong> fra salgsdokumenter og <strong>manuelt bekreftet inngående MVA</strong> fra leverandørbilag,
    fordelt etter dokumentdato. Innbetalingsdato og administrativ avslutning påvirker ikke terminen.</p>
