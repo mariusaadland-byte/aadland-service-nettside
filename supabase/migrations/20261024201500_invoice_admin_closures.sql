@@ -59,7 +59,7 @@ declare
  outstanding bigint;
 begin
  if p_invoice_id is null or p_request_id is null or p_actor_id is null
-  or p_action not in ('close','reopen') then
+  or p_action is null or p_action not in ('close','reopen') then
   raise exception 'Ugyldig faktura, handling eller forespørsel.';
  end if;
  reason=btrim(coalesce(p_reason,''));
@@ -102,17 +102,17 @@ begin
   and vipps_reference is not null;
  outstanding=greatest(0,gross-credit_issued-ledger_paid);
 
- if ledger_paid<>inv.paid_ore or credit_issued<>inv.credited_ore
+ if p_action='close' then
+  if ledger_paid<>inv.paid_ore or credit_issued<>inv.credited_ore
    or gross<credit_issued+ledger_paid or bad_refunds>0
    or vipps_net<>vipps_in_ledger then
-  raise exception 'Betalinger eller kreditnotaer stemmer ikke. Kontroller før du endrer avslutningsstatus.';
- end if;
- if inv.paid_ore is distinct from p_expected_paid_ore
+   raise exception 'Betalinger eller kreditnotaer stemmer ikke. Kontroller før avslutning.';
+  end if;
+  if inv.paid_ore is distinct from p_expected_paid_ore
    or inv.credited_ore is distinct from p_expected_credited_ore
    or outstanding is distinct from p_expected_outstanding_ore then
-  raise exception 'Saldoen er oppdatert. Hent fakturaen på nytt før du fortsetter.';
- end if;
- if p_action='close' then
+   raise exception 'Saldoen er oppdatert. Hent fakturaen på nytt før du avslutter.';
+  end if;
   if current_row.closed_at is not null then raise exception 'Fakturaen er allerede avsluttet.'; end if;
   if gross<=0 or outstanding<>0 or active_vipps>0 then
    raise exception 'Fakturaen kan bare avsluttes ved fullt oppgjør og uten åpne Vipps-betalinger.';
