@@ -36,6 +36,7 @@ assert.equal(systimaPublicTokenHealth(secureSystimaSeal({...credentials,
 assert.equal(systimaPublicTokenHealth(secureSystimaSeal({...credentials,
  refreshTokenExpiresAt:"2026-10-20T12:00:00Z"},key),key,now).status,"reauthorize");
 assert.equal(systimaTokenDates({...credentials,expiresAt:"n/a"},now).access.status,"unknown");
+assert.equal(systimaPublicTokenHealth(secureSystimaSeal({...credentials,expiresAt:"n/a"},key),key,now).status,"unknown_expiry");
 let calls=0;
 const mockFetch=async(url,opts)=>{
  calls++;assert.equal(url,env.SYSTIMA_TOKEN_URL);assert.equal(opts.method,"POST");
