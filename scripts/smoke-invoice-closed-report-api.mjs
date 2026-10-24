@@ -5,7 +5,7 @@ import {readFileSync} from "node:fs";
 const reportSource=readFileSync("lib/invoiceClosedReport.js","utf8").replace(/^export /gm,"");
 const {buildClosedInvoiceReport,closedInvoiceReportCsv}=new Function(reportSource+";return {buildClosedInvoiceReport,closedInvoiceReportCsv};")();
 const id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaa0411";
-let role="owner",failedTable="",queryCount=0,writes=0,truncate=false;
+let role="owner",failedTable="",queryCount=0,writes=0,truncate=false,reopenDuringReport=false,closureReadCount=0;
 const data={
  invoice_admin_closures:[{invoice_id:id,closed_at:"2026-10-24T18:00:00Z"}],
  invoice_drafts:[{
@@ -26,6 +26,10 @@ const db=()=>({from(table){
    queryCount++;
    assert.ok(!fields.includes("pdf_base64"),"Never fetch frozen PDF blobs for VAT report");
    if(table===failedTable)return {error:{message:"Database down"},data:null};
+   if(table==="invoice_admin_closures"){
+    closureReadCount++;
+    if(reopenDuringReport&&closureReadCount%2===0)return {data:[],error:null};
+   }
    if(truncate&&table==="invoice_admin_closures")return {data:Array(500).fill(data[table][0]),error:null};
    return {data:(data[table]||[]).filter(x=>!ids||ids.includes(x.id??x.invoice_id)).slice(start,end+1),error:null};
   },
@@ -63,6 +67,8 @@ assert.ok(result.body.toString("utf8").startsWith("\uFEFF"));
 assert.ok(result.body.toString("utf8").includes("AS-WEB-2026-000411"));
 result=await get("from=2026-11-10&to=2026-01-01");
 assert.equal(result.status,400);
+result=await get("from=2026-02-31");
+assert.equal(result.status,400,"Impossible calendar dates must be rejected");
 role="staff";result=await get("");
 assert.equal(result.status,403,"Report is owner-only");
 role="owner";failedTable="invoice_credit_notes";
@@ -72,6 +78,10 @@ failedTable="";truncate=true;
 result=await get("");
 assert.equal(result.status,503,"Overlong closure pagination must fail closed");
 truncate=false;
+reopenDuringReport=true;closureReadCount=0;
+result=await get("");
+assert.equal(result.status,503,"Concurrent reopening must prevent a stale export");
+reopenDuringReport=false;
 data.invoice_drafts[0].paid_ore=12499;
 result=await get("");
 assert.equal(result.status,503,"A closed invoice with stale payment balance must not be included silently");
