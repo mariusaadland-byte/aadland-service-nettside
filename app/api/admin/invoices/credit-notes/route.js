@@ -8,8 +8,9 @@ export const maxDuration=60;
 const uuid=v=>typeof v==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 const fail=(error,status=400)=>NextResponse.json({error},{status,headers:{"Cache-Control":"private, no-store"}});
 const owner=u=>u?.role==="owner";
+const allowed=u=>u&&(owner(u)||u.canUpdateOrders||u.canManageProducts);
 export async function GET(req){
- if(!owner(await getAdminUser()))return fail("Bare eieren har tilgang til kreditnotaer.",403);
+ const user=await getAdminUser();if(!allowed(user))return fail("Ingen tilgang.",403);
  const url=new URL(req.url),id=url.searchParams.get("invoiceId");
  if(!uuid(id))return fail("Velg en faktura.");
  const s=db();if(!s)return fail("Databasen er utilgjengelig.",503);
@@ -31,7 +32,7 @@ export async function GET(req){
   .select("id,credit_number,credit_date,reason,subtotal_ore,vat_ore,total_ore,issued_at,pdf_base64")
   .eq("invoice_id",id).order("issued_at",{ascending:false}).limit(100);
  if(error)return fail("Kreditnotahistorikken kunne ikke hentes.",500);
- return NextResponse.json({creditNotes:(data||[]).map(({pdf_base64,...row})=>({...row,hasPdf:Boolean(pdf_base64)}))},
+ return NextResponse.json({canIssue:owner(user),creditNotes:(data||[]).map(({pdf_base64,...row})=>({...row,hasPdf:Boolean(pdf_base64)}))},
   {headers:{"Cache-Control":"private, no-store"}});
 }
 export async function POST(req){
