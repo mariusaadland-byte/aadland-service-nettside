@@ -49,7 +49,7 @@ const api=new Function("NextResponse","crypto","getAdminUser","db","sameOriginGu
  "systimaSetupStatus","SYSTIMA_AUTHORIZATION_URL","process",
  apiRaw+";return {GET,POST};")(
  FakeResponse,crypto,async()=>({role,id:"user-id"}),fakeDb,
- ()=>guarded?{status:403}:null,systimaSetupStatus,SYSTIMA_AUTHORIZATION_URL,{env}
+ ()=>guarded?{status:403}:null,()=>systimaSetupStatus(env),SYSTIMA_AUTHORIZATION_URL,{env}
 );
 let r=await api.GET();
 assert.equal(r.status,200);
@@ -98,7 +98,7 @@ const mockedFetch=async(url,options)=>{
 const callback=new Function("NextResponse","crypto","getAdminUser","db","systimaSetupStatus",
  "secureSystimaSeal","process","fetch",callbackRaw+";return {GET};")(
  FakeResponse,crypto,async()=>({role,id:"user-id"}),fakeDb,
- systimaSetupStatus,secureSystimaSeal,{env},mockedFetch
+ ()=>systimaSetupStatus(env),secureSystimaSeal,{env},mockedFetch
 );
 const req=(code="mock-authorization-code",givenState=state,client="only-mock-client")=>({
  url:"https://www.aadland-service.no/api/admin/systima/callback?"+
