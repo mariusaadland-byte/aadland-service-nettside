@@ -66,7 +66,7 @@ assert.ok(csv.includes('"244,50"'));
 assert.ok(csv.includes('"-50,00"'));
 assert.ok(csv.includes('"AS-2026-000001"'));
 assert.ok(csv.includes('"MVA 25 % (kr)"'));
-assert.ok(csv.includes("Inngående MVA inngår ikke"));
+assert.ok(csv.includes("Inngående MVA vises separat"));
 assert.ok(csv.includes("\r\n"));
 assert.ok(csv.includes('"SUM"'));
 assert.throws(()=>buildInvoiceVatTermReport([{...inv1,issued_date:"2026-11-01"}],[],{year:2026,term:5}),/utenfor valgt termin/);
