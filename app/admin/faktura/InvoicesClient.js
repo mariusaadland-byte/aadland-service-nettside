@@ -95,7 +95,7 @@ export default function InvoicesClient({archiveMode=false}){
   const confirmation="Er "+money(amountOre)+" faktisk mottatt fra kunden på bankkonto eller kontant?"+
    "\nFaktura: "+form.invoice_number+
    "\nBetalingsdato: "+paymentDate+
-   "\nEtter registrering gjenstår "+money(paymentInfo.outstanding-amountOre)+
+   "\n"+(paymentInfo.outstanding===amountOre?"Fakturaen blir fullt oppgjort.":"Etter registrering gjenstår "+money(paymentInfo.outstanding-amountOre))+
    "\n\nIkke registrer Vipps-betalinger manuelt. De registreres automatisk når Vipps bekrefter betalingen.";
   if(!window.confirm(confirmation))return;
   setBusy(true);setError("");setSaved("");
@@ -321,8 +321,8 @@ export default function InvoicesClient({archiveMode=false}){
   </label>
   {paymentDraft?.error&&<p role="alert" style={{color:"#a52a21",fontSize:13}}>{paymentDraft.error}</p>}
   {paymentDraft&&paymentDraft.amountOre!==null&&<p style={{fontSize:13}}>
-   Etter denne innbetalingen gjenstår <strong>{money(paymentDraft.outstandingAfterOre)}</strong>.
-   {paymentDraft.outstandingAfterOre===0&&" Fakturaen blir fullt oppgjort."}
+   {paymentDraft.outstandingAfterOre===0?<strong>Fakturaen blir fullt oppgjort.</strong>:
+    <>Etter denne innbetalingen gjenstår <strong>{money(paymentDraft.outstandingAfterOre)}</strong>.</>}
   </p>}
   <label>Betalingsnotat (valgfritt)
    <input maxLength={500} placeholder="For eksempel bankoverføring" value={paymentNote}
