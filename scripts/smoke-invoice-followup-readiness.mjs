@@ -47,6 +47,16 @@ assert.equal(invoiceFollowUpState(mismatch,today).key,"review","Credit-note mism
 assert.equal(invoiceFollowUpState(noDue,today).key,"review","Missing due date needs human review");
 assert.equal(invoiceFollowUpState(zero,today).key,"review","Zero-priced invoice not automatically complete");
 assert.equal(invoiceFollowUpState(draft,today).key,"draft");
+const closedInvoice={...ready,adminClosure:{closedAt:"2026-10-24T16:00:00Z",revision:1}};
+assert.equal(invoiceFollowUpState(closedInvoice,today).key,"closed","Closed is distinct from financially ready");
+assert.equal(invoiceFollowUpState({...activeVipps,adminClosure:closedInvoice.adminClosure},today).key,"review",
+ "Closed invoice with active Vipps is marked for review");
+assert.equal(invoiceFollowUpState({...overdue,adminClosure:closedInvoice.adminClosure},today).key,"review",
+ "A closed invoice with new debt must be reviewed");
+assert.equal(invoiceFollowUpSummary([closedInvoice],today).closedCount,1);
+assert.equal(invoiceArchiveVisible([closedInvoice],today,{filter:"ready"}).length,0);
+assert.equal(invoiceArchiveVisible([closedInvoice],today,{filter:"closed"}).length,1);
+
 assert.ok(invoiceFollowUpState(credited,today).detail.includes("kreditnotaer"));
 assert.equal(invoiceFollowUpState(overdue,"2026-11-02").daysOverdue,24,
  "Oslo calendar day comparison cannot depend on DST time hours");
@@ -71,6 +81,7 @@ assert.equal(selected("ready").some(x=>x==="active"),false);
 assert.equal(invoiceFollowUpSummary(rows.filter(x=>x.status==="draft"),today).readyCount,0);
 assert.equal(JSON.stringify(rows),saved,"Classification must never mutate invoice data");
 
+assert.equal(invoiceArchiveVisible([ready,closedInvoice],today,{filter:"closed"}).length,1);
 const client=readFileSync("app/admin/faktura/InvoicesClient.js","utf8");
 const dash=readFileSync("app/admin/faktura/InvoiceFollowUpDashboard.js","utf8");
 const detail=readFileSync("app/admin/faktura/InvoiceFollowUpPanel.js","utf8");
