@@ -52,7 +52,7 @@ let result=await send({s:mockDb(),paymentId:"payment-1"});
 assert.equal(result.sent,true);
 assert.equal(result.amountOre,5000);
 assert.equal(sends.length,1);
-assert.match(sends[0].message.subject,/Tilbakebetaling/);
+assert.match(sends[0].message.subject,/tilbakebetaling/i);
 assert.match(sends[0].message.text,/ikke en kreditnota/);
 assert.match(sends[0].message.text,/50,00/);
 assert.match(sends[0].message.html,/Ola &amp; Kari/,"Escape HTML names");
