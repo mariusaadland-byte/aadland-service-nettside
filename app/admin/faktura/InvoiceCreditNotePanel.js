@@ -36,6 +36,21 @@ export default function InvoiceCreditNotePanel({invoice,disabled=false,onRefresh
  const valid=loaded&&lines.length>0&&lines.every(x=>x.quantity<=remaining[x.sourceIndex]&&
   Math.round(x.quantity*1000)===x.quantity*1000&&x.gross>0)
   &&total<=netOutstanding&&reason.trim().length>=5&&reason.trim().length<=500;
+ async function sendCredit(note){
+  if(busy||disabled||!canIssue||!note?.id||note.sent_at)return;
+  const recipient=String(invoice.customer?.email||"").trim();
+  if(!recipient||!window.confirm("Sende kreditnota "+note.credit_number+" som PDF til "+recipient+
+   "?\\n\\nKreditert beløp: "+money(note.total_ore)+". Dette er en ekte e-post til kunden."))return;
+  setBusy(true);setError("");setNotice("");
+  try{
+   const r=await fetch("/api/admin/invoices/credit-notes",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({action:"send",invoiceId,documentId:note.id,confirmed:true})});
+   const d=await r.json();if(!r.ok)throw Error(d.error||"Kreditnotaen kunne ikke sendes.");
+   setNotice(d.alreadySent?"Kreditnotaen var allerede sendt.":"Kreditnota "+note.credit_number+" er sendt til "+d.sentTo+".");
+   await refresh();
+  }catch(e){setError(e.message||"E-postsendingen kunne ikke bekreftes. Kontroller loggen før du sender på nytt.");}
+  finally{setBusy(false)}
+ }
  async function issue(){
   if(busy||disabled||!canIssue||!valid)return;
   const summary="Utstede en EKTE, nummerert kreditnota for faktura "+invoice.invoice_number+
@@ -67,6 +82,9 @@ export default function InvoiceCreditNotePanel({invoice,disabled=false,onRefresh
     <strong>{n.credit_number}</strong> · {n.credit_date} · Kreditert {money(n.total_ore)}
     <div style={{fontSize:13}}>{n.reason}</div>
     <a target="_blank" rel="noreferrer" href={"/api/admin/invoices/credit-notes?invoiceId="+encodeURIComponent(invoiceId)+"&documentId="+encodeURIComponent(n.id)}>Åpne kreditnota som PDF</a>
+    <div style={{marginTop:8}}>{n.sent_at?<span>Sendt til kunden</span>:canIssue?<button type="button" disabled={busy||disabled} onClick={()=>sendCredit(n)}>Send kreditnota på e-post</button>:<span>Ikke sendt til kunden</span>}
+     {n.delivery_error&&<p role="alert" style={{fontSize:12}}>Siste sendeforsøk: {n.delivery_error}</p>}
+    </div>
    </div>)}
   </>}
   {loaded&&canIssue&&netOutstanding>0&&<button type="button" disabled={busy||disabled} onClick={()=>setOpen(v=>!v)}>{open?"Lukk":"Opprett kreditnota"}</button>}
