@@ -23,7 +23,7 @@ export async function GET(req){
   ["invoice_vipps_payments","id,created_at,refunded_ore,delivery_method,receipt_sent_at"],
   ["invoice_vipps_refund_notices","id,payment_id,refunded_delta_ore,created_at,sent_at"],
   ["invoice_credit_notes","id,credit_number,issued_at,credit_date,total_ore,reason,sent_at"],
-  ["invoice_reminder_sends","id,kind,status,created_at,sent_at,pdf_base64"]
+  ["invoice_reminder_sends","id,kind,status,created_at,sent_at"]
  ];
  const responses=await Promise.all(sources.map(async([table,columns])=>{
   const r=await s.from(table).select(columns).eq("invoice_id",invoiceId).limit(HISTORY_LIMIT);
@@ -34,7 +34,7 @@ export async function GET(req){
  const [payments,vipps,refundNotices,creditNotes,reminders]=responses.map(x=>x.data);
  const events=buildInvoiceActivityTimeline({
   invoice:found.data,payments,vipps,refundNotices,creditNotes,
-  reminders:reminders.map(({pdf_base64,...r})=>({...r,hasPdf:Boolean(pdf_base64)}))
+  reminders:reminders.map(r=>({...r,hasPdf:r.status==="sent"}))
  });
  return reply({invoiceNumber:found.data.invoice_number,events});
 }
