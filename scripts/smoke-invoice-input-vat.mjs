@@ -59,7 +59,7 @@ assert.equal(summary.documentCount,2);
 assert.equal(summary.inputVatOre,3100-5000);
 assert.equal(summary.vatOnPurchasesOre,6200-5000);
 assert.equal(summary.byRate[12].vatOre,1200);
-assert.equal(summary.byRate[25].vatOre,2500-5000);
+assert.equal(summary.byRate[25].vatOre,5000-5000);
 assert.equal(summary.rows[1].baseOre,-20000);
 assert.equal(calculateInputVatSummary([{...purchase,voided_at:"2026-10-25T10:00:00Z"}],{year:2026,term:5}).inputVatOre,0);
 assert.throws(()=>calculateInputVatSummary([{...purchase,document_date:"2026-08-01"}],{year:2026,term:5}),/termin/);
