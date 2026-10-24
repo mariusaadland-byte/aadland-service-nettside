@@ -109,7 +109,7 @@ export default function VatPurchaseCsvImport({onChanged}){
    ha de samme kolonnene som malen. Systemet gjetter ikke MVA-koder eller fradragsrett.
    Ingenting blir importert før du velger og godkjenner bilagene.
   </p>
-  <p><a download="aadland-leverandorbilag-mal.csv" href={template}>Last ned CSV-mal med eksempel</a></p>
+  <p><a download="aadland-leverandorbilag-mal.csv" href={template}>Last ned CSV-mal med eksempel</a> <small>– slett eksempelet og fyll inn ekte bilag før import.</small></p>
   <label style={{display:"block",marginBottom:10}}>
    Velg CSV-fil (UTF-8, semikolon, maks {MAX_VAT_IMPORT_ROWS} bilag og 256 KB)
    <input type="file" accept=".csv,text/csv" disabled={busy} onChange={pick}/>
