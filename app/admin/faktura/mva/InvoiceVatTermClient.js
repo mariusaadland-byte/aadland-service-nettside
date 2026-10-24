@@ -32,7 +32,7 @@ export default function InvoiceVatTermClient(){
  return <main className="admin" style={{maxWidth:1200,margin:"0 auto",padding:24}}>
   <p><Link href="/admin/faktura/arkiv">← Tilbake til fakturaarkivet</Link></p>
   <h1>MVA-avstemming – salgsdokumenter</h1>
-  <p>Oversikt over <strong>utgående MVA</strong> fra fakturaer og kreditnotaer i Aadland Service,
+  <p>Oversikt over <strong>utgående MVA</strong> fra salgsdokumenter og <strong>manuelt bekreftet inngående MVA</strong> fra leverandørbilag,
    fordelt etter dokumentdato. Innbetalingsdato og administrativ avslutning påvirker ikke terminen.</p>
   <section className="card" style={{padding:18,marginBottom:18}}>
    <h2>Velg MVA-termin</h2>
