@@ -2,6 +2,7 @@ import {NextResponse} from "next/server";
 import {getAdminUser} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
 import {withInvoicePaymentTerms} from "../../../../lib/invoicePaymentTerms";
+import {summarizeInvoiceActivity} from "../../../../lib/invoiceSettlementInfo";
 import {osloDateKey} from "../../../../lib/osloTime";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 
@@ -19,6 +20,26 @@ export async function GET(){
   invoices.push(...data);
   if(data.length<500)break;
  }
+ // Read-only reconciliation: include confirmed Vipps captures/refunds and
+ // signed credit note totals, without revealing raw provider references.
+ const invoiceIds=invoices.filter(x=>x.status!=="draft").map(x=>x.id);
+ const payments=[],credits=[];
+ for(let start=0;start<invoiceIds.length;start+=100){
+  const ids=invoiceIds.slice(start,start+100);
+  for(const [table,columns,target] of [
+   ["invoice_vipps_payments","id,invoice_id,state,captured_ore,refunded_ore",payments],
+   ["invoice_credit_notes","id,invoice_id,total_ore,sent_at",credits]
+  ]){
+   for(let offset=0;;offset+=500){
+    const result=await s.from(table).select(columns).in("invoice_id",ids)
+     .order("id",{ascending:true}).range(offset,offset+499);
+    if(result.error)return fail("Betalings- og kreditnotahistorikk kunne ikke hentes. Prøv å oppdatere.",503);
+    target.push(...(result.data||[]));
+    if((result.data||[]).length<500)break;
+   }
+  }
+ }
+ const invoicesWithActivity=summarizeInvoiceActivity(invoices,payments,credits);
  const contacts=[];
  if(invoices.some(x=>x.status==="draft")){
   for(let offset=0;;offset+=500){
@@ -28,7 +49,7 @@ export async function GET(){
   }
  }
  const today=osloDateKey(new Date());
- return NextResponse.json({invoices:invoices.map(x=>withInvoicePaymentTerms(x,contacts,today))});
+ return NextResponse.json({invoices:invoicesWithActivity.map(x=>withInvoicePaymentTerms(x,contacts,today))},{headers:{"Cache-Control":"private, no-store"}});
 }
 export async function POST(req){
  const origin=sameOriginGuard(req);if(origin)return origin;
