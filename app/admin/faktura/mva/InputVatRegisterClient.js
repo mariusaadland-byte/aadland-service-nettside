@@ -1,5 +1,6 @@
 "use client";
 import {useState} from "react";
+import VatOriginalAttachment from "./VatOriginalAttachment";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const today=()=>new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe/Oslo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 const blank=()=>({0:{base:"",vat:""},12:{base:"",vat:""},15:{base:"",vat:""},25:{base:"",vat:""}});
@@ -161,11 +162,12 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
     <div style={{fontSize:13}}>{doc.kind==="credit"?"Leverandørkreditnota":"Kjøpsfaktura"}
      {" · "}{money(doc.baseOre+doc.vatOre)} inkl. MVA · Inngående fradrag {money(doc.deductibleVatOre)}</div>
     <small>Originalbilag: {doc.evidenceReference}</small>
+    <VatOriginalAttachment documentId={doc.id}/>
     <div><button type="button" disabled={busy} onClick={()=>voidDoc({
      id:doc.id,documentNumber:doc.documentNumber})}>Opphev registrering</button></div>
    </div>)}</div>}
   <p style={{fontSize:12,marginTop:15}}>
-   <strong>Viktig:</strong> Originalbilaget må fortsatt oppbevares i regnskapssystemet.
+   <strong>Viktig:</strong> Du kan laste opp PDF eller bilde etter at bilaget er registrert. Filen lagres privat og kan ikke overskrives. Originalbilaget må fortsatt oppbevares i regnskapssystemet.
    Denne oversikten garanterer ikke fradragsrett og erstatter ikke bokføring eller MVA-melding.
   </p>
  </section>;
