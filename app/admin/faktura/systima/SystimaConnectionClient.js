@@ -101,7 +101,7 @@ export default function SystimaConnectionClient(){
      }</p>}
     {status.hasAuthorization&&<div style={{display:"flex",gap:10,flexWrap:"wrap",margin:"12px 0"}}>
      <button type="button" onClick={()=>manage("refresh")}
-      disabled={busy||!status.connectionAvailable||status.tokenHealth?.status==="cannot_read"}>
+      disabled={busy||!status.connectionAvailable||["cannot_read","reauthorize"].includes(status.tokenHealth?.status)}>
       {busy?"Oppdaterer …":"Forny tilgangstoken"}
      </button>
      <button type="button" onClick={()=>manage("disconnect")} disabled={busy}>
