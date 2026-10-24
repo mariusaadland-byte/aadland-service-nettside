@@ -46,6 +46,9 @@ assert.ok(client.includes("setPaymentAmount(\"\")"),"Do not preload the full bal
 assert.ok(client.includes("window.confirm(confirmation)"),"Ask whether bank/cash payment is actually received");
 assert.ok(client.includes("Ikke registrer Vipps-betalinger manuelt"));
 assert.ok(client.includes("manualPaymentBlocked"),"Never offer manual payment during active Vipps or mismatch");
+assert.ok(client.includes("paymentDraft.outstandingAfterOre"),"Show remaining debt before owner confirms a partial payment");
+assert.ok(client.includes("Fakturaen blir fullt oppgjort."),"Do not display Gjenstående: 0,00 kr for full payment");
+assert.ok(client.includes("paymentDraft.amountOre===null"),"Invalid amounts must disable the submit button");
 assert.ok(client.includes('inputMode="decimal"'));
 assert.ok(client.includes("Angret/korrigert – teller ikke med"));
 assert.ok(client.includes("Manuelt registrert betaling"));
