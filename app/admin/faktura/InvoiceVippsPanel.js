@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useState,useRef} from "react";
 import VippsFeePreview from "../VippsFeePreview";
+import {parseRefundAmountOre} from "../../../lib/invoiceRefundAmount";
 import {invoiceTotalOre,invoiceVippsConfirmationSnapshot} from "../../../lib/invoicePaymentStatus";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(n/100);
 export default function InvoiceVippsPanel({invoice,persist,onRefresh,disabled,onBusyChange,onApplyPrice,onPaymentMethodChange,allowPriceAdjustment=false}){
@@ -25,13 +26,12 @@ export default function InvoiceVippsPanel({invoice,persist,onRefresh,disabled,on
   if(busy||disabled||!refundAllowed||!item?.reference)return;
   const available=Math.max(0,Number(item.capturedOre||0)-Number(item.refundedOre||0));
   if(available<=0){setError("Ingen beløp tilgjengelig for refusjon. Oppdater status.");return;}
-  const entered=window.prompt("Vipps-refusjon for faktura "+invoice.invoice_number+"\\nMaksimalt tilgjengelig: "+money(available)+"\\nSkriv beløpet i kroner:",(available/100).toFixed(2).replace(".",","));
+  const entered=window.prompt("Vipps-refusjon for faktura "+invoice.invoice_number+"\nMaksimalt tilgjengelig: "+money(available)+"\nSkriv beløpet i kroner:",(available/100).toFixed(2).replace(".",","));
   if(entered===null)return;
-  const cleaned=entered.trim();
-  if(!/^\\d+(?:[,.]\\d{1,2})?$/.test(cleaned)){setError("Bruk kroner og maks to desimaler, for eksempel 125,50.");return;}
-  const amountOre=Math.round(Number(cleaned.replace(",","."))*100);
-  if(!Number.isSafeInteger(amountOre)||amountOre<=0||amountOre>available){setError("Beløpet må være større enn null og kan ikke overstige "+money(available)+".");return;}
-  if(!window.confirm("Du er i ferd med å REFUNDERE "+money(amountOre)+" til kunden via Vipps.\\nFaktura: "+invoice.invoice_number+"\\nVipps-referanse: "+item.reference+"\\nDette flytter ekte penger og gjør beløpet utestående på fakturaen inntil det eventuelt krediteres. Er beløpet riktig?"))return;
+  let amountOre;
+  try{amountOre=parseRefundAmountOre(entered,available)}
+  catch(e){setError((e.message||"Ugyldig refusjonsbeløp.")+" Maksimalt tilgjengelig: "+money(available)+".");return;}
+  if(!window.confirm("Du er i ferd med å REFUNDERE "+money(amountOre)+" til kunden via Vipps.\nFaktura: "+invoice.invoice_number+"\nVipps-referanse: "+item.reference+"\nDette flytter ekte penger og gjør beløpet utestående på fakturaen inntil det eventuelt krediteres. Er beløpet riktig?"))return;
   if(window.prompt("Skriv REFUNDER for å godkjenne den ekte tilbakebetalingen:")!=="REFUNDER")return;
   setBusy(true);onBusyChange?.(true);setError("");setRefundMessage("");
   try{
@@ -43,7 +43,7 @@ export default function InvoiceVippsPanel({invoice,persist,onRefresh,disabled,on
    });
    const data=await response.json();if(!response.ok)throw Error(data.error||"Refusjonen kunne ikke bekreftes.");
    await reloadPaymentHistory();await onRefresh();
-   setRefundMessage("Vipps har bekreftet refusjon på "+money(amountOre)+". Fakturaens innbetaling er oppdatert. "+(data.refundNotice?.sent?"E-postbekreftelse er sendt til kunden.":"E-postbekreftelsen er ennå ikke bekreftet sendt; systemet forsøker automatisk igjen."));
+   setRefundMessage("Vipps har bekreftet refusjon på "+money(amountOre)+". Fakturaens innbetaling er oppdatert. Hvis fakturabeløpet skal reduseres, må du også utstede kreditnota under Kreditnota. "+(data.refundNotice?.sent?"E-postbekreftelse er sendt til kunden.":"E-postbekreftelsen er ennå ikke bekreftet sendt; systemet forsøker automatisk igjen."));
   }catch(e){
    setError((e.message||"Refusjonen kunne ikke bekreftes.")+" Ikke send et nytt krav eller en ny refusjon før Vipps-status er kontrollert.");
    try{await reloadPaymentHistory();await onRefresh();}catch{}
