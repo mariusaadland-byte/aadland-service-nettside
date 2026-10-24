@@ -16,7 +16,7 @@ const pdf=(buffer,invoiceNumber,date)=>{
   "Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff"}});
 };
 export async function GET(req){
- if(!allowed(await getAdminUser()))return fail("Ingen tilgang.",403);
+ const user=await getAdminUser();if(!allowed(user))return fail("Ingen tilgang.",403);
  const url=new URL(req.url),invoiceId=url.searchParams.get("invoiceId");
  if(!uuid(invoiceId))return fail("Velg en utstedt faktura.");
  const s=db();if(!s)return fail("Databasen er utilgjengelig.",503);
@@ -36,7 +36,7 @@ export async function GET(req){
    .select("id,created_at,sent_at,delivery_error,snapshot")
    .eq("invoice_id",invoiceId).order("created_at",{ascending:false}).limit(100);
   if(result.error)return fail("Historikken kunne ikke hentes.",503);
-  return NextResponse.json({statements:(result.data||[]).map(({snapshot,...row})=>({
+  return NextResponse.json({canSend:user.role==="owner",statements:(result.data||[]).map(({snapshot,...row})=>({
    ...row,asOfDate:snapshot?.asOfDate,paidOre:snapshot?.paidOre,
    outstandingOre:snapshot?.outstandingOre,creditedOre:snapshot?.creditedOre
   }))},{headers:{"Cache-Control":"private, no-store"}});
