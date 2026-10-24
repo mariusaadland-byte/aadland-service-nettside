@@ -46,10 +46,10 @@ const apiRaw=readFileSync("app/api/admin/systima/route.js","utf8")
  .replace(/^import .*;\n/gm,"").replace(/^export const .*;\n/gm,"")
  .replace(/^export async function /gm,"async function ");
 const api=new Function("NextResponse","crypto","getAdminUser","db","sameOriginGuard",
- "systimaSetupStatus","SYSTIMA_AUTHORIZATION_URL","process",
+ "systimaSetupStatus","SYSTIMA_AUTHORIZATION_URL","systimaPublicTokenHealth","process",
  apiRaw+";return {GET,POST};")(
  FakeResponse,crypto,async()=>({role,id:"user-id"}),fakeDb,
- ()=>guarded?{status:403}:null,()=>systimaSetupStatus(env),SYSTIMA_AUTHORIZATION_URL,{env}
+ ()=>guarded?{status:403}:null,()=>systimaSetupStatus(env),SYSTIMA_AUTHORIZATION_URL,()=>({status:"not_connected"}),{env}
 );
 let r=await api.GET();
 assert.equal(r.status,200);
