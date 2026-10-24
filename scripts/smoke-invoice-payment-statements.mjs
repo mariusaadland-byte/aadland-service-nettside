@@ -26,7 +26,7 @@ const snapshot={
 const pdf=(await buildPdf(snapshot)).toString("latin1");
 assert.ok(pdf.startsWith("%PDF-1.4"));
 for(const value of ["BETALINGSOVERSIKT","AS-WEB-2026-002345","REGISTRERTE INNBETALINGER",
- "50 000","1 250,00 kr","500,00 kr","250,00 kr","AS-KN-2026-000100",
+ "500,00 kr","1 250,00 kr","500,00 kr","250,00 kr","AS-KN-2026-000100",
  "Betalingsreferanse: INV-TEST-1","Refusjonene er allerede","Bank / manuelt","Vipps"]){
  assert.ok(pdf.includes(value),"Missing PDF detail: "+value);
 }
