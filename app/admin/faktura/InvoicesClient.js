@@ -44,7 +44,7 @@ function InvoicePreview({invoice,example=false}){
 }
 export default function InvoicesClient({archiveMode=false}){
  const [items,setItems]=useState([]),[quotes,setQuotes]=useState([]),[active,setActive]=useState(null),[error,setError]=useState(""),[busy,setBusy]=useState(false),[saved,setSaved]=useState("");
- const [filter,setFilter]=useState("unpaid"),[search,setSearch]=useState(""),[sortMode,setSortMode]=useState("priority"),[loadingInvoices,setLoadingInvoices]=useState(true),[payments,setPayments]=useState([]);
+ const [filter,setFilter]=useState("unpaid"),[search,setSearch]=useState(""),[sortMode,setSortMode]=useState("priority"),[loadingInvoices,setLoadingInvoices]=useState(true),[payments,setPayments]=useState([]),[canSendManualReceipts,setCanSendManualReceipts]=useState(false);
  const [paymentAmount,setPaymentAmount]=useState(""),[paymentDate,setPaymentDate]=useState(()=>osloDateKey(new Date())),[paymentNote,setPaymentNote]=useState("");
  const paymentRequest=useRef(null);
  const today=osloDateKey(new Date());
@@ -81,8 +81,8 @@ export default function InvoicesClient({archiveMode=false}){
  },[form?.id,form?.paid_ore,form?.credited_ore]);
  useEffect(()=>{
   if(!archiveMode||!form?.id)return;
-  let ignore=false;setPayments([]);
-  fetch("/api/admin/invoices/payments?invoiceId="+encodeURIComponent(form.id)).then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error);if(!ignore)setPayments(data.payments||[])}).catch(e=>{if(!ignore)setError(e.message)});
+  let ignore=false;setPayments([]);setCanSendManualReceipts(false);
+  fetch("/api/admin/invoices/payments?invoiceId="+encodeURIComponent(form.id)).then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error);if(!ignore){setPayments(data.payments||[]);setCanSendManualReceipts(data.canSendManualReceipts===true)}}).catch(e=>{if(!ignore)setError(e.message)});
   return ()=>{ignore=true};
  },[archiveMode,form?.id,form?.payment_updated_at]);
  async function registerPayment(full=false){
@@ -111,8 +111,35 @@ export default function InvoicesClient({archiveMode=false}){
     "Delbetaling på "+money(amountOre)+" er registrert. Gjenstående beløp: "+money(data.outstandingOre)+".");
   }catch(e){await load();setError(e.message||"Betalingen kunne ikke bekreftes.")}finally{setBusy(false)}
  }
+ async function sendManualReceipt(payment){
+  if(busy||!form||!canSendManualReceipts||payment.reversed_at||payment.vipps_reference||payment.receipt_sent_at)return;
+  const email=String(form.customer?.email||"").trim();
+  if(!email){setError("Kunden mangler e-postadresse. Oppdater kundekortet før du sender.");return;}
+  if(!window.confirm("Sende ekte betalingskvittering for "+money(payment.amount_ore)+
+   " til "+email+"?\nFaktura: "+form.invoice_number+
+   "\nDette sender e-post med kvitterings-PDF. Ingen ny faktura opprettes."))return;
+  setBusy(true);setError("");setSaved("");
+  try{
+   const response=await fetch("/api/admin/invoices/manual-receipts",{
+    method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({action:"send",invoiceId:form.id,paymentId:payment.id,confirmed:true})
+   });
+   const data=await response.json();if(!response.ok)throw Error(data.error||"Kvitteringen kunne ikke sendes.");
+   setSaved(data.alreadySent?"Kvitteringen var allerede sendt til kunden.":
+    "Kvittering for "+money(payment.amount_ore)+" er sendt til "+data.email+".");
+   const r=await fetch("/api/admin/invoices/payments?invoiceId="+encodeURIComponent(form.id),{cache:"no-store"});
+   const p=await r.json();if(r.ok)setPayments(p.payments||[]);
+  }catch(e){setError((e.message||"Kvitteringen kunne ikke bekreftes.")+
+   " Kontroller sendestatus før du forsøker igjen.")}
+  finally{setBusy(false);}
+ }
  async function reversePayment(paymentId){
-  if(busy)return;setBusy(true);setError("");setSaved("");
+  if(busy)return;
+  const payment=payments.find(p=>p.id===paymentId);
+  if(!payment||!window.confirm(payment.receipt_sent_at?
+   "Kvittering for denne innbetalingen er sendt til kunden. Hvis du angrer betalingen, må du også informere kunden om at kvitteringen ikke lenger er gyldig. Fortsette?":
+   "Angre denne manuelle betalingsregistreringen? Den blir bevart i historikken, men teller ikke lenger som innbetalt."))return;
+  setBusy(true);setError("");setSaved("");
   try{const r=await fetch("/api/admin/invoices/payments",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({paymentId})});const data=await r.json();if(!r.ok)throw Error(data.error);await load();setSaved("Betalingsregistreringen er angret.");}
   catch(e){setError(e.message)}finally{setBusy(false)}
  }
@@ -339,8 +366,18 @@ export default function InvoicesClient({archiveMode=false}){
   {p.vipps_reference?"Vipps-betaling":"Manuelt registrert betaling"}
   {p.reversed_at?" · Angret/korrigert – teller ikke med i registrert innbetalt beløp":""}
  </div>
- {!p.reversed_at&&!p.vipps_reference&&<button type="button" disabled={busy}
-  onClick={()=>reversePayment(p.id)} style={{marginTop:8}}>Angre denne registreringen</button>}
+ {!p.vipps_reference&&!p.reversed_at&&<div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:8}}>
+  <a target="_blank" rel="noreferrer" href={"/api/admin/invoices/manual-receipts?invoiceId="+
+    encodeURIComponent(form.id)+"&paymentId="+encodeURIComponent(p.id)}>Åpne kvittering (PDF)</a>
+  {p.receipt_sent_at?<span style={{fontSize:13}}>Kvittering sendt til kunden</span>:
+    canSendManualReceipts&&<button type="button" disabled={busy} onClick={()=>sendManualReceipt(p)}>
+     Send kvittering på e-post
+    </button>}
+  <button type="button" disabled={busy} onClick={()=>reversePayment(p.id)}>Angre denne registreringen</button>
+ </div>}
+ {p.receipt_delivery_error&&!p.receipt_sent_at&&<p role="alert" style={{fontSize:12}}>
+  Siste sendeforsøk: {p.receipt_delivery_error}
+ </p>}
  {p.note&&<p style={{fontSize:13,margin:"6px 0 0"}}>{p.note}</p>}
  </div>)}</section>}{archiveMode&&<InvoiceCreditNotePanel key={form.id} invoice={form} disabled={busy} onRefresh={load}/>}{archiveMode&&<InvoiceReminderPanel key={form.id} invoice={form} disabled={busy} onRefresh={load}/>}{!archiveMode&&<fieldset disabled={busy||form.status!=="draft"} style={{border:0,padding:0,minWidth:0}}><h2>{form.status==="draft"?"Rediger fakturakladd":"Fakturadetaljer"}</h2><p><strong>{form.customer?.name}</strong> · {money(total(form.line_items))}</p>{form.installment_index>0&&<p><b>{form.installment_label} – {form.installment_percent} %</b><br/>{form.installment_trigger}</p>}<label>Betalingsfrist<select value={form.due_date_mode||"auto"} onChange={e=>change("due_date_mode",e.target.value)}><option value="auto">Automatisk fra kundekortet</option><option value="manual">Egen forfallsdato for denne fakturaen</option></select></label>{form.due_date_mode!=="manual"?<p>Betalingsfrist: <b>{form.customer?.paymentTermsDays??14} dager</b>. Hvis du fakturerer i dag: fakturadato <b>{today}</b>, forfall <b>{form.due_date}</b>. Datoene beregnes på nytt når du trykker fakturer. Endre antall dager på kundekortet.</p>:<label htmlFor="invoiceDueDate"><b>Forfallsdato</b><input id="invoiceDueDate" type="date" value={form.due_date||""} onChange={e=>change("due_date",e.target.value)}/></label>}<button type="button" disabled={busy} onClick={save}>{busy?"Lagrer …":"Lagre forfallsdato og kladd"}</button>{form.status==="draft"&&<p>Fakturanummer tildeles når du fakturerer med e-post eller utskrift.</p>}
  <label>Oppdrag <input value={form.title||""} onChange={e=>change("title",e.target.value)}/></label>

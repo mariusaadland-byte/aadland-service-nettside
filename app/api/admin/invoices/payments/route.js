@@ -7,12 +7,12 @@ const allowed=user=>user&&(user.role==="owner"||user.canUpdateOrders||user.canMa
 const fail=(error,status=400)=>NextResponse.json({error},{status});
 const uuid=value=>typeof value==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 export async function GET(req){
- if(!allowed(await getAdminUser()))return fail("Ingen tilgang.",403);
+ const user=await getAdminUser();if(!allowed(user))return fail("Ingen tilgang.",403);
  const invoiceId=new URL(req.url).searchParams.get("invoiceId");if(!uuid(invoiceId))return fail("Velg en faktura.");
  const s=db();if(!s)return fail("Database utilgjengelig.",503);
- const {data,error}=await s.from("invoice_payments").select("id,invoice_id,amount_ore,paid_on,note,recorded_at,reversed_at,vipps_reference").eq("invoice_id",invoiceId).order("recorded_at",{ascending:false});
+ const {data,error}=await s.from("invoice_payments").select("id,invoice_id,amount_ore,paid_on,note,recorded_at,reversed_at,vipps_reference,receipt_sent_at,receipt_delivery_error").eq("invoice_id",invoiceId).order("recorded_at",{ascending:false});
  if(error)return fail("Betalingshistorikken kunne ikke hentes.",500);
- return NextResponse.json({payments:data});
+ return NextResponse.json({payments:data,canSendManualReceipts:user.role==="owner"},{headers:{"Cache-Control":"private, no-store"}});
 }
 export async function POST(req){
  const guard=sameOriginGuard(req);if(guard)return guard;
