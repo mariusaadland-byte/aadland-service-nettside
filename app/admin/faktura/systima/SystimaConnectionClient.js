@@ -50,6 +50,28 @@ export default function SystimaConnectionClient(){
    window.location.assign(next.toString());
   }catch(e){setError(e.message);setBusy(false);}
  }
+ async function manage(action){
+  if(busy||!status?.hasAuthorization)return;
+  if(action==="refresh"&&!status.connectionAvailable)return;
+  const question=action==="disconnect"?
+   "Fjerne lagrede Systima-token fra Aadland Service? Dette stanser lokal bruk, men du må eventuelt trekke tilbake tilgangen i Systima også. Ingen regnskapsbilag slettes.":
+   "Be Systima om nye tilgangstoken? Ingen fakturaer eller regnskapsdata blir hentet.";
+  if(!window.confirm(question))return;
+  setBusy(true);setError("");setNotice("");
+  try{
+   const response=await fetch("/api/admin/systima/credentials",{
+    method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({action,confirmed:true})
+   });
+   const result=await response.json();
+   if(!response.ok)throw Error(result.error||"Handlingen kunne ikke gjennomføres.");
+   await refresh();
+   setNotice(action==="disconnect"?
+    "Den lokale Systima-tilkoblingen er fjernet. Opphev også tilgangen hos Systima ved behov.":
+    "Tilgangstoken er fornyet. Lesing av leverandørbilag er fortsatt sperret.");
+  }catch(e){setError(e.message||"Kunne ikke oppdatere Systima-tilkoblingen.");}
+  finally{setBusy(false);}
+ }
  return <main className="admin" style={{maxWidth:850,margin:"auto",padding:24}}>
   <p><Link href="/admin/faktura/mva">← Tilbake til MVA-avstemming</Link></p>
   <h1>Systima – tilkoblingskontroll</h1>
@@ -65,6 +87,30 @@ export default function SystimaConnectionClient(){
     <p><strong>OAuth-godkjenning:</strong> {status.hasAuthorization?
      "Krypterte tilgangstoken lagret":"Ikke tilkoblet"}</p>
     {status.authorizedAt&&<p>Sist godkjent: {new Date(status.authorizedAt).toLocaleString("nb-NO")}</p>}
+    <p><strong>Tokenstatus:</strong> {{
+     not_connected:"Ingen lagrede tilgangstoken",
+     token_stored:"Token lagret – ingen API-lesing aktivert",
+     unknown_expiry:"Token lagret, men Systima-datoene kunne ikke verifiseres",
+     expiring:"Tilgangstoken går snart ut",
+     needs_refresh:"Tilgangstoken er utløpt og må fornyes",
+     reauthorize:"Fornyingstoken er utløpt – godkjenn Systima på nytt",
+     cannot_read:"Kan ikke kontrollere kryptert token – sjekk servernøkkel"
+    }[status.tokenHealth?.status]||"Status er ukjent"}</p>
+    {status.tokenHealth?.accessExpiresAt&&
+     <p style={{fontSize:13}}>Tilgangstoken utløper: {
+      new Date(status.tokenHealth.accessExpiresAt).toLocaleString("nb-NO")
+     }</p>}
+    {status.hasAuthorization&&<div style={{display:"flex",gap:10,flexWrap:"wrap",margin:"12px 0"}}>
+     <button type="button" onClick={()=>manage("refresh")}
+      disabled={busy||!status.connectionAvailable||["cannot_read","reauthorize"].includes(status.tokenHealth?.status)}>
+      {busy?"Oppdaterer …":"Forny tilgangstoken"}
+     </button>
+     <button type="button" onClick={()=>manage("disconnect")} disabled={busy}>
+      Koble fra Systima lokalt
+     </button>
+    </div>}
+    <p style={{fontSize:12}}>Frakobling fjerner bare lokale tilgangstoken.
+     Selve autorisasjonen må eventuelt trekkes tilbake i Systima.</p>
     <p><strong>Lesing av leverandørfakturaer:</strong> Ikke aktivert.</p>
     <p style={{fontSize:13}}>{status.note}</p>
     {status.connectionAvailable&&<button type="button" disabled={busy} onClick={start}>
