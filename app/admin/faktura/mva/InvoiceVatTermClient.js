@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useState} from "react";
 import Link from "next/link";
+import InputVatRegisterClient from "./InputVatRegisterClient";
 
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const labels=["Januar–februar","Mars–april","Mai–juni","Juli–august","September–oktober","November–desember"];
@@ -78,18 +79,42 @@ export default function InvoiceVatTermClient(){
       <td style={{textAlign:"right"}}>{money(total.vat[rate].baseOre)}</td>
       <td style={{textAlign:"right"}}>{money(total.vat[rate].vatOre)}</td></tr>)}</tbody>
     </table></div>
+    <h3 style={{marginTop:20}}>Inngående MVA – kontrollert innkjøpsregister</h3>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
+     {[
+      ["Registrerte leverandørbilag",String(report.purchases.documentCount)],
+      ["MVA på registrerte kjøpsbilag",money(report.purchases.vatOnPurchasesOre)],
+      ["Vurdert fradragsberettiget inngående MVA",money(report.purchases.inputVatOre)],
+      ["Utgående MVA fra fakturaer",money(report.comparison.outputVatOre)],
+      ["Foreløpig differanse",money(report.comparison.differenceOre)]
+     ].map(([label,value])=><div key={label} style={{padding:"8px 0",borderBottom:"1px solid #e5ded1"}}>
+      <small style={{display:"block"}}>{label}</small><strong>{value}</strong>
+     </div>)}
+    </div>
+    <p style={{fontSize:13}}><strong>Ikke beregnet betaling til Skatteetaten:</strong> {report.comparison.warning}</p>
+    <h3>MVA fra registrerte innkjøp per sats</h3>
+    <div style={{overflowX:"auto"}}><table style={{width:"100%",minWidth:480}}>
+     <thead><tr><th>Sats</th><th style={{textAlign:"right"}}>Grunnlag eks. MVA</th><th style={{textAlign:"right"}}>MVA på bilag</th></tr></thead>
+     <tbody>{rates.map(rate=><tr key={rate}><th scope="row">{rate} %</th>
+      <td style={{textAlign:"right"}}>{money(report.purchases.byRate[rate].baseOre)}</td>
+      <td style={{textAlign:"right"}}>{money(report.purchases.byRate[rate].vatOre)}</td>
+     </tr>)}</tbody>
+    </table></div>
     <p style={{fontSize:13}}>
-     <strong>Viktig:</strong> Dette er en avstemmingsrapport over salgsdokumenter, ikke en ferdig MVA-melding.
-     Den omfatter ikke inngående MVA fra leverandørbilag, omsetning fra andre systemer, 
+     <strong>Viktig:</strong> Dette er en avstemmingsrapport, ikke en ferdig MVA-melding.
+     Innkjøpsregisteret er manuelt og inneholder bare bilag som er lagt inn her. Andre utgifter
+     og omsetning fra andre systemer, 
      nødvendige MVA-koder for 0 %-omsetning eller særtilfeller med for sen fakturering.
      Sammenlign den med bokføringen før du leverer til Skatteetaten.
     </p>
     <a href={"/api/admin/invoices/vat-terms?"+query+"&format=csv"} download>
-     Eksporter terminens dokumenter og MVA til CSV (Excel)
+     Eksporter salgsdokumenter, innkjøpsbilag og foreløpig MVA-avstemming (CSV)
     </a>
    </section>
+   <InputVatRegisterClient purchases={report.purchases.rows} period={report.period}
+    onChanged={()=>setReload(n=>n+1)}/>
    <section className="card" style={{padding:18}}>
-    <h2>Dokumentoversikt ({report.rows.length})</h2>
+    <h2>Salgsdokumentoversikt ({report.rows.length})</h2>
     {report.rows.length===0?<p>Ingen utstedte fakturaer eller kreditnotaer i denne terminen.</p>:
      <div style={{overflowX:"auto"}}><table style={{width:"100%",minWidth:850}}>
       <thead><tr><th>Dato</th><th>Dokument</th><th>Kunde</th>
