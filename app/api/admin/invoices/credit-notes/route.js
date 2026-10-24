@@ -30,7 +30,7 @@ export async function GET(req){
   }catch(e){return fail(e.message||"Kreditnota-PDF kunne ikke hentes.",503)}
  }
  const {data,error}=await s.from("invoice_credit_notes")
-  .select("id,credit_number,credit_date,reason,subtotal_ore,vat_ore,total_ore,issued_at,pdf_base64,sent_at,delivery_error")
+  .select("id,credit_number,credit_date,reason,lines,subtotal_ore,vat_ore,total_ore,issued_at,pdf_base64,sent_at,delivery_error")
   .eq("invoice_id",id).order("issued_at",{ascending:false}).limit(100);
  if(error)return fail("Kreditnotahistorikken kunne ikke hentes.",500);
  return NextResponse.json({canIssue:owner(user),creditNotes:(data||[]).map(({pdf_base64,...row})=>({...row,hasPdf:Boolean(pdf_base64)}))},
