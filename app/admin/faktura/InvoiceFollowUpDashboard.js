@@ -6,6 +6,8 @@ export default function InvoiceFollowUpDashboard({invoices,today,activeFilter,on
  const groups=[
   {key:"attention",label:"Må følges opp",count:stats.actionCount,
    description:"Forfalte fakturaer og saker som må kontrolleres"},
+  {key:"closed",label:"Avsluttede fakturaer",count:stats.closedCount,
+   description:"Ferdigbehandlet administrativt – kan åpnes igjen"},
   {key:"ready",label:"Klar for avslutning",count:stats.readyCount,
    description:"Økonomisk oppgjort – klart for en siste administrativ gjennomgang"},
   {key:"awaiting",label:"Venter på betaling",count:stats.notDueCount,

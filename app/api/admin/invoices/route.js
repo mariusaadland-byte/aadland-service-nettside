@@ -39,7 +39,25 @@ export async function GET(){
    }
   }
  }
- const invoicesWithActivity=summarizeInvoiceActivity(invoices,payments,credits);
+ // Administrative closure is independent of the issued invoice and its ledger.
+ // Fail closed when these records cannot be read; do not label unknown data as open.
+ const closureRows=[];
+ for(let start=0;start<invoiceIds.length;start+=100){
+  const ids=invoiceIds.slice(start,start+100);
+  for(let offset=0;;offset+=500){
+   const found=await s.from("invoice_admin_closures")
+    .select("invoice_id,closed_at,closed_by,close_note,last_changed_at,revision")
+    .in("invoice_id",ids).order("invoice_id",{ascending:true}).range(offset,offset+499);
+   if(found.error)return fail("Administrativ avslutningsstatus kunne ikke hentes.",503);
+   closureRows.push(...(found.data||[]));
+   if((found.data||[]).length<500)break;
+  }
+ }
+ const closureMap=new Map(closureRows.map(c=>[c.invoice_id,{
+  closedAt:c.closed_at,closeNote:c.close_note,lastChangedAt:c.last_changed_at,revision:c.revision
+ }]));
+ const invoicesWithActivity=summarizeInvoiceActivity(invoices,payments,credits)
+  .map(x=>({...x,adminClosure:closureMap.get(x.id)||null}));
  const contacts=[];
  if(invoices.some(x=>x.status==="draft")){
   for(let offset=0;;offset+=500){
