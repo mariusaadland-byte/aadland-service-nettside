@@ -90,6 +90,7 @@ export default function SystimaConnectionClient(){
     <p><strong>Tokenstatus:</strong> {{
      not_connected:"Ingen lagrede tilgangstoken",
      token_stored:"Token lagret – ingen API-lesing aktivert",
+     unknown_expiry:"Token lagret, men Systima-datoene kunne ikke verifiseres",
      expiring:"Tilgangstoken går snart ut",
      needs_refresh:"Tilgangstoken er utløpt og må fornyes",
      reauthorize:"Fornyingstoken er utløpt – godkjenn Systima på nytt",
