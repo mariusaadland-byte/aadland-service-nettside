@@ -1,10 +1,12 @@
 "use client";
 import {invoiceSettlementInfo} from "../../../lib/invoiceSettlementInfo";
+import {invoicePaymentProgress} from "../../../lib/invoicePartialPayments";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 export default function InvoiceSettlementPanel({invoice,today}){
  const a=invoice.activity;
  if(invoice.status==="draft")return null;
  const status=invoiceSettlementInfo(invoice,today);
+ const progress=invoicePaymentProgress(status);
  return <section id="invoice-settlement" style={{padding:"18px 0",borderBottom:"1px solid #d8c9ae",marginBottom:16}}>
   <h2>Oppgjør og korrigeringer</h2>
   <p style={{margin:"6px 0 14px"}}>
@@ -17,6 +19,17 @@ export default function InvoiceSettlementPanel({invoice,today}){
    <div><small>Registrert netto innbetalt</small><div><strong>{money(status.paid)}</strong></div></div>
    {status.outstanding>0&&<div><small>Gjenstående krav</small><div><strong>{money(status.outstanding)}</strong></div></div>}
   </div>
+  {progress.amount>0&&<div style={{margin:"10px 0 18px",padding:"12px 14px",border:"1px solid #e3d6bf",borderRadius:10}}>
+   <div style={{display:"flex",gap:10,justifyContent:"space-between",alignItems:"baseline",flexWrap:"wrap"}}>
+    <strong>{progress.paidPercent}% av korrigert fakturabeløp er betalt</strong>
+    <small>{money(progress.paid)} av {money(progress.amount)}</small>
+   </div>
+   <div role="progressbar" aria-label="Andel av fakturabeløpet som er betalt" aria-valuemin={0} aria-valuemax={100}
+    aria-valuenow={progress.paidPercent} style={{height:12,background:"#e5dfd4",borderRadius:20,overflow:"hidden",marginTop:8}}>
+    <div style={{height:"100%",background:"#836431",width:progress.paidPercent+"%"}}/>
+   </div>
+   {progress.outstanding>0&&<p style={{fontSize:13,margin:"8px 0 0"}}>Restbeløp: <strong>{money(progress.outstanding)}</strong>. Nye registrerte innbetalinger trekkes fra dette beløpet.</p>}
+  </div>}
   {a&&<div style={{fontSize:13,lineHeight:1.6,marginBottom:12}}>
    {a.vippsCapturedOre>0&&<div>Vipps trukket: <strong>{money(a.vippsCapturedOre)}</strong></div>}
    {status.refunded>0&&<div>Refundert via Vipps: <strong>{money(status.refunded)}</strong></div>}
