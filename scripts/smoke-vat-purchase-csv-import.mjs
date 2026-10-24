@@ -52,7 +52,7 @@ assert.deepEqual(result.map(r=>r.status),
 assert.equal(result[1].baseOre,10000);
 assert.equal(result[1].vatOre,2500);
 assert.equal(result[1].deductibleVatOre,2500);
-assert.ok(result[4].message.includes("stemmer"));
+assert.match(result[4].message,/stem/);
 assert.equal(result[5].status,"existing");
 assert.ok(!JSON.stringify(result).includes("businessPurpose"),"No unnecessary private business purpose in preview response");
 const oldButDifferent=[{...existing[0],base_ore:12000}];
