@@ -28,7 +28,9 @@ Nøkkelrotasjon krever kontrollert omkobling. Krypterte tilgangstoken lagres på
 - OAuth-autorisasjon gir **ikke** tilgang til automatisk eller manuell lesing i dette bygget. Det finnes ingen Systima-API-kall mot bilag og ingen regnskapsmessige skrivekall.
 - Når Systima har bekreftet et lesebasert endepunkt, må følgende avklares før kobling: selskap-ID, per-selskap autorisasjon, scopes, paginering, felter for leverandør, dokumentnummer og dato, kreditnotaer, MVA-koder, fradragsandel, vedlegg, annulleringer, endringer og ekstern stabil dokument-ID.
 - Etter bekreftelse kan data vises i den eksisterende kontrollforhåndsvisningen. All registrering krever fortsatt menneskelig kontroll og duplikatsjekk.
-- Automatisk tokenfornyelse, fjerning av lokal OAuth-tilgang og eventuell tilbakekalling hos Systima må ferdigstilles og dokumenteres **før ordinær drift av aktiv integrasjon**. Inntil da beholdes bryteren av.
+- **Tokenstatus og manuell fornying:** Den private Systima-siden kan nå se tokenenes utløpstid når Systima gir gyldige datoer. Eieren kan manuelt be om nytt tokenpar via leverandørens dokumenterte `refresh_token`-flyt. Nye token lagres kryptert, og samtidig frakobling eller nyere fornying hindrer at et gammelt tokenpar lagres tilbake. Ingen automatisk bakgrunnsfornying utføres.
+- **Frakobling:** Eieren kan slette krypterte token lokalt i Aadland Service. Dette **tilbakekaller ikke** godkjenningen hos Systima. Den må om nødvendig tilbakekalles separat hos Systima etter deres retningslinjer.
+- Automatisk bakgrunnsfornying og eventuell tilbakekalling hos Systima må vurderes og dokumenteres **før ordinær drift av aktiv leverandørimport**. Inntil lesemodellen er verifisert, beholdes bryteren av.
 - Eksisterende CSV-import og originalbilag-opplasting er den anbefalte driftsmetoden.
 
 Det er ikke behov for å opprette nytt Systima-selskap, opprette nye fakturaer, sende data til Systima eller flytte regnskap. Ingen leverandørbilag importeres av OAuth-koden.
