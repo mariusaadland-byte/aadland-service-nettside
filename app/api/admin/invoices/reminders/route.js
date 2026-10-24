@@ -3,6 +3,7 @@ import {getAdminUser} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
 import {sameOriginGuard} from "../../../../../lib/requestGuard";
 import {invoicePaymentState} from "../../../../../lib/invoicePaymentStatus";
+import {invoiceSettlementInfo,summarizeInvoiceActivity} from "../../../../../lib/invoiceSettlementInfo";
 import {buildInvoiceDraftPdf} from "../../../../../lib/invoiceDraftPdf";
 import {reminderText} from "../../../../../lib/invoiceReminders";
 import {isValidDateInput} from "../../../../../lib/osloTime";
@@ -38,6 +39,21 @@ export async function POST(req){
  const s=db();if(!s)return fail("Database utilgjengelig.",503);
  const initial=await s.from("invoice_drafts").select("*").eq("id",body.invoiceId).maybeSingle();
  if(initial.error||!initial.data)return fail("Fakturaen ble ikke funnet.",404);
+ // Do not trust the browser's last known refund state when sending a real reminder.
+ const [vippsResult,creditResult]=await Promise.all([
+  s.from("invoice_vipps_payments").select("invoice_id,state,captured_ore,refunded_ore")
+    .eq("invoice_id",body.invoiceId).limit(500),
+  s.from("invoice_credit_notes").select("invoice_id,total_ore,sent_at")
+    .eq("invoice_id",body.invoiceId).limit(500)
+ ]);
+ if(vippsResult.error||creditResult.error||vippsResult.data?.length===500||creditResult.data?.length===500)
+  return fail("Betalings-/kreditnotahistorikken kunne ikke kontrolleres. Send ikke purring før den er kontrollert.",503);
+ const current=summarizeInvoiceActivity([initial.data],vippsResult.data,creditResult.data)[0];
+ const review=invoiceSettlementInfo(current,osloDateKey(new Date()));
+ if(review.kind==="activeVipps"||review.kind==="mismatch")
+  return fail("Kravet har en åpen Vipps-betaling eller avvik i betalingshistorikken. Kontroller status før purring.",409);
+ if(review.kind==="refundedOutstanding"&&body.reviewedRefundRest!==true)
+  return fail("Vipps-refusjon er registrert. Bekreft først at restbeløpet fortsatt skal kreves fra kunden.",409);
  // Only server-generated standard wording is accepted.
  const existing=await s.from("invoice_reminder_sends").select("*").eq("id",body.requestId).eq("invoice_id",body.invoiceId).maybeSingle();
  if(existing.error)return fail("Tidligere sendeforsøk kunne ikke kontrolleres.",500);
