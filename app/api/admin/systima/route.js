@@ -28,13 +28,6 @@ export async function POST(req){
  if(process.env.VERCEL_ENV!=="production")
   return respond({error:"OAuth kan bare startes fra produksjonssiden."},403);
  const body=await req.json().catch(()=>({}));
- if(body.action==="disconnect"&&body.confirmed===true){
-  const s=db();if(!s)return respond({error:"Databasen er utilgjengelig."},503);
-  const result=await s.from("systima_oauth_connections").delete()
-   .eq("integration_key","systima");
-  if(result.error)return respond({error:"Tilkoblingen kunne ikke slettes."},503);
-  return respond({ok:true,disconnected:true});
- }
  if(body.action!=="start"||body.confirmed!==true)
   return respond({error:"Bekreft tilkoblingen."},400);
  const status=systimaSetupStatus();
