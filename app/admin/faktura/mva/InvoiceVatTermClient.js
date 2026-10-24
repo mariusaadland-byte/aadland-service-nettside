@@ -2,6 +2,7 @@
 import {useEffect,useState} from "react";
 import Link from "next/link";
 import InputVatRegisterClient from "./InputVatRegisterClient";
+import VatPurchaseCsvImport from "./VatPurchaseCsvImport";
 
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const labels=["Januar–februar","Mars–april","Mai–juni","Juli–august","September–oktober","November–desember"];
@@ -111,6 +112,7 @@ export default function InvoiceVatTermClient(){
      Eksporter salgsdokumenter, innkjøpsbilag og foreløpig MVA-avstemming (CSV)
     </a>
    </section>
+   <VatPurchaseCsvImport onChanged={()=>setReload(n=>n+1)}/>
    <InputVatRegisterClient purchases={report.purchases.rows} period={report.period}
     onChanged={()=>setReload(n=>n+1)}/>
    <section className="card" style={{padding:18}}>
