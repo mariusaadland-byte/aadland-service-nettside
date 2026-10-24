@@ -21,6 +21,8 @@ assert.equal(example[0].documentNumber,"2026-123");
 assert.equal(example[0].documentDate,"2026-10-24");
 assert.equal(example[0].groups[25].vat,"250,00");
 assert.equal(example[0].documentConfirmed,false,"CSV may not grant tax deduction by default");
+assert.equal(inspectVatImportRows(example,[])[0].status,"invalid",
+ "Example supplier from template is not a real invoice and may not import");
 const header=VAT_CSV_COLUMNS.map(v=>'"'+v+'"').join(";");
 const line=(vals)=>vals.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(";");
 const make=(supplier,number,kind="faktura",amount="100,00",tax="25,00")=>[
