@@ -59,6 +59,13 @@ export default function InvoicesClient({archiveMode=false}){
  const paymentInfo=form?invoicePaymentState(form,today):null;
  const paymentSafety=form?invoiceSettlementInfo(form,today):null;
  const manualPaymentBlocked=["activeVipps","mismatch"].includes(paymentSafety?.kind);
+ const paymentDraft=(()=>{
+  if(!paymentInfo||!paymentAmount.trim()||paymentInfo.outstanding<=0)return null;
+  try{
+   const amountOre=parseInvoicePaymentAmountOre(paymentAmount,paymentInfo.outstanding);
+   return {amountOre,outstandingAfterOre:paymentInfo.outstanding-amountOre,error:null};
+  }catch(e){return {amountOre:null,outstandingAfterOre:null,error:e.message||"Ugyldig innbetalt beløp."}}
+ })();
  const [previewOpen,setPreviewOpen]=useState(()=>typeof window!=="undefined"&&new URLSearchParams(window.location.search).get("preview")==="1");
  useEffect(()=>{
   if(!form?.id||!previewOpen||new URLSearchParams(window.location.search).get("preview")!=="1")return;
@@ -312,11 +319,16 @@ export default function InvoicesClient({archiveMode=false}){
    <input type="text" inputMode="decimal" autoComplete="off" placeholder="For eksempel 1250,50" value={paymentAmount}
     onChange={e=>{setPaymentAmount(e.target.value);paymentRequest.current=null}}/>
   </label>
+  {paymentDraft?.error&&<p role="alert" style={{color:"#a52a21",fontSize:13}}>{paymentDraft.error}</p>}
+  {paymentDraft&&paymentDraft.amountOre!==null&&<p style={{fontSize:13}}>
+   Etter denne innbetalingen gjenstår <strong>{money(paymentDraft.outstandingAfterOre)}</strong>.
+   {paymentDraft.outstandingAfterOre===0&&" Fakturaen blir fullt oppgjort."}
+  </p>}
   <label>Betalingsnotat (valgfritt)
    <input maxLength={500} placeholder="For eksempel bankoverføring" value={paymentNote}
     onChange={e=>{setPaymentNote(e.target.value);paymentRequest.current=null}}/>
   </label>
-  <button type="button" onClick={()=>registerPayment(false)} disabled={!paymentAmount.trim()}>Registrer mottatt beløp</button>
+  <button type="button" onClick={()=>registerPayment(false)} disabled={!paymentDraft||paymentDraft.amountOre===null}>Registrer mottatt beløp</button>
  </fieldset>
  </>}<h3>Betalingshistorikk</h3>{payments.length===0&&<p>Ingen innbetalinger registrert.</p>}{payments.map(p=><div key={p.id} style={{padding:"10px 0",borderBottom:"1px solid #ddd",opacity:p.reversed_at?.72:1}}>
  <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap",justifyContent:"space-between"}}>
