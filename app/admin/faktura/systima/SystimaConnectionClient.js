@@ -50,23 +50,6 @@ export default function SystimaConnectionClient(){
    window.location.assign(next.toString());
   }catch(e){setError(e.message);setBusy(false);}
  }
- async function disconnect(){
-  if(busy||!status?.hasAuthorization)return;
-  if(!window.confirm("Slette lagrede Systima-tilgangstoken hos Aadland Service? "+
-   "Dette sletter ingen regnskapsbilag. Du må også tilbakekalle tilgangen hos Systima dersom den skal oppheves der."))return;
-  setBusy(true);setError("");setNotice("");
-  try{
-   const res=await fetch("/api/admin/systima",{
-    method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({action:"disconnect",confirmed:true})
-   });
-   const data=await res.json();
-   if(!res.ok)throw Error(data.error||"Kunne ikke slette lagret tilkobling.");
-   await refresh();
-   setNotice("Lagrede tilgangstoken er slettet fra Aadland Service. Tilgangen må eventuelt tilbakekalles hos Systima.");
-  }catch(e){setError(e.message);}
-  finally{setBusy(false);}
- }
  return <main className="admin" style={{maxWidth:850,margin:"auto",padding:24}}>
   <p><Link href="/admin/faktura/mva">← Tilbake til MVA-avstemming</Link></p>
   <h1>Systima – tilkoblingskontroll</h1>
@@ -87,8 +70,7 @@ export default function SystimaConnectionClient(){
     {status.connectionAvailable&&<button type="button" disabled={busy} onClick={start}>
      {busy?"Åpner Systima …":"Start sikker Systima-innlogging"}
     </button>}
-    {status.hasAuthorization&&<p><button type="button" disabled={busy}
-     onClick={disconnect}>Slett lagret OAuth-tilkobling</button></p>}
+
    </section>
    <section className="card" style={{padding:18,marginBottom:16}}>
     <h2>Dette må være på plass</h2>
