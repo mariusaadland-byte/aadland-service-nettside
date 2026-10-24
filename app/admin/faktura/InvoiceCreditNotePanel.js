@@ -5,17 +5,17 @@ const money=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}
 export default function InvoiceCreditNotePanel({invoice,disabled=false,onRefresh}){
  const [notes,setNotes]=useState([]),[qty,setQty]=useState({}),[reason,setReason]=useState("");
  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
- const [loaded,setLoaded]=useState(false);
+ const [loaded,setLoaded]=useState(false),[canIssue,setCanIssue]=useState(false);
  const requestId=useRef(null);
  const invoiceId=invoice.id;
  async function refresh(){
   const r=await fetch("/api/admin/invoices/credit-notes?invoiceId="+encodeURIComponent(invoiceId),{cache:"no-store"});
   const d=await r.json();if(!r.ok)throw Error(d.error||"Kreditnotahistorikken er utilgjengelig.");
-  setNotes(d.creditNotes||[]);setLoaded(true);
+  setNotes(d.creditNotes||[]);setCanIssue(d.canIssue===true);setLoaded(true);
  }
- useEffect(()=>{let active=true;setLoaded(false);setNotes([]);setError("");setNotice("");setOpen(false);setQty({});requestId.current=null;
+ useEffect(()=>{let active=true;setLoaded(false);setCanIssue(false);setNotes([]);setError("");setNotice("");setOpen(false);setQty({});requestId.current=null;
   fetch("/api/admin/invoices/credit-notes?invoiceId="+encodeURIComponent(invoiceId),{cache:"no-store"})
-   .then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error);if(active){setNotes(d.creditNotes||[]);setLoaded(true);}})
+   .then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error);if(active){setNotes(d.creditNotes||[]);setCanIssue(d.canIssue===true);setLoaded(true);}})
    .catch(e=>{if(active)setError(e.message||"Kunne ikke hente kreditnotaer.");});
   return()=>{active=false};
  },[invoiceId]);
@@ -37,7 +37,7 @@ export default function InvoiceCreditNotePanel({invoice,disabled=false,onRefresh
   Math.round(x.quantity*1000)===x.quantity*1000&&x.gross>0)
   &&total<=netOutstanding&&reason.trim().length>=5&&reason.trim().length<=500;
  async function issue(){
-  if(busy||disabled||!valid)return;
+  if(busy||disabled||!canIssue||!valid)return;
   const summary="Utstede en EKTE, nummerert kreditnota for faktura "+invoice.invoice_number+
    "\nKreditert inkl. MVA: "+money(total)+"\nÅrsak: "+reason.trim()+
    "\n\nDette reduserer fakturakravet permanent, men sender ikke e-post og refunderer ikke penger. Fortsette?";
@@ -69,8 +69,8 @@ export default function InvoiceCreditNotePanel({invoice,disabled=false,onRefresh
     <a target="_blank" rel="noreferrer" href={"/api/admin/invoices/credit-notes?invoiceId="+encodeURIComponent(invoiceId)+"&documentId="+encodeURIComponent(n.id)}>Åpne kreditnota som PDF</a>
    </div>)}
   </>}
-  {loaded&&netOutstanding>0&&<button type="button" disabled={busy||disabled} onClick={()=>setOpen(v=>!v)}>{open?"Lukk":"Opprett kreditnota"}</button>}
-  {loaded&&netOutstanding===0&&<p>Det finnes ikke et utestående beløp å kreditere. Er fakturaen betalt, må tilbakebetaling avklares før kreditnota kan utstedes i denne løsningen.</p>}
+  {loaded&&canIssue&&netOutstanding>0&&<button type="button" disabled={busy||disabled} onClick={()=>setOpen(v=>!v)}>{open?"Lukk":"Opprett kreditnota"}</button>}
+  {loaded&&canIssue&&netOutstanding===0&&<p>Det finnes ikke et utestående beløp å kreditere. Er fakturaen betalt, må tilbakebetaling avklares før kreditnota kan utstedes i denne løsningen.</p>}
   {open&&<div style={{border:"1px solid #d8c9ae",borderRadius:10,padding:16,marginTop:12}}>
    <h3>Velg fakturalinjer og antall</h3>
    <p>Fyll inn antallet som skal krediteres. Original pris og MVA-sats hentes fra den utstedte fakturaen.</p>
@@ -90,7 +90,7 @@ export default function InvoiceCreditNotePanel({invoice,disabled=false,onRefresh
     Kreditnota inkl. MVA: <strong>{money(total)}</strong><br/>
     Gjenstående krav etter kreditnota: <strong>{money(Math.max(0,netOutstanding-total))}</strong></p>
    {total>netOutstanding&&<p role="alert">Beløpet overstiger ubetalt del av fakturaen. Refunder allerede betalte beløp først, eller reduser antallet.</p>}
-   <button type="button" disabled={busy||disabled||!valid} onClick={issue}>{busy?"Utsteder …":"Utsted kreditnota"}</button>
+   <button type="button" disabled={busy||disabled||!canIssue||!valid} onClick={issue}>{busy?"Utsteder …":"Utsted kreditnota"}</button>
   </div>}
   {error&&<p role="alert" style={{color:"crimson"}}>{error} <button type="button" onClick={()=>refresh().catch(e=>setError(e.message))}>Oppdater historikk</button></p>}
   {notice&&<p role="status">{notice}</p>}
