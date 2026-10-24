@@ -33,8 +33,8 @@ const refundUI=readFileSync("app/admin/faktura/InvoiceVippsPanel.js","utf8");
 assert.ok(refundUI.includes('parseRefundAmountOre(entered,available)'),"Refund flow uses validated integer øre");
 assert.ok(!refundUI.includes(String.raw`!/^\\d`),"Broken double-escaped regex is not allowed");
 assert.ok(refundUI.includes('href="#invoice-credit-note"'),"Refund receipt links to credit-note section");
-assert.ok(refundUI.indexOf('}{refundMessage&&')>refundUI.indexOf(' </section>}{refundMessage&&')-1,
- "Refund success remains visible after full payment is refunded");
+assert.ok(refundUI.includes(' </section>}{refundMessage&&'),
+ "Refund success must be rendered outside the conditional refund buttons, even after full refund");
 const creditUI=readFileSync("app/admin/faktura/InvoiceCreditNotePanel.js","utf8");
 assert.ok(creditUI.includes("invoiceCreditRemainingQuantities(invoice.line_items,notes)"));
 assert.ok(creditUI.includes('id="invoice-credit-note"'),"Refund link has a working destination");
