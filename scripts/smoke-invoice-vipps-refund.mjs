@@ -74,12 +74,12 @@ const routeSource=readFileSync("app/api/admin/invoices/vipps/route.js","utf8")
 const NextResponse={json(body,opts={}){return {status:opts.status||200,body,headers:opts.headers||{}}}};
 const routeDb={from(table){assert.equal(table,"invoice_drafts");const q={select(){return q;},eq(){return q;},async maybeSingle(){return {data:invoice,error:null}}};return q;}};
 let refundRouteCalls=0;
-const POST=new Function("NextResponse","getAdminUser","db","sameOriginGuard","vippsPublicPaymentsEnabled","startInvoiceVipps","reconcileInvoiceVipps","refundInvoiceVipps","invoiceVippsView",
+const POST=new Function("NextResponse","getAdminUser","db","sameOriginGuard","vippsPublicPaymentsEnabled","startInvoiceVipps","reconcileInvoiceVipps","refundInvoiceVipps","invoiceVippsView","sendInvoiceVippsRefundNoticeIfNeeded",
  routeSource+";return POST;")(
  NextResponse,async()=>({role}),()=>routeDb,()=>invalidOrigin?{status:403}:null,()=>false,
  async()=>{throw Error("No payment start");},async()=>{throw Error("No capture from refunds");},
  async(_db,_invoice,body)=>{refundRouteCalls++;assert.equal(body.confirmedInvoiceNumber,invoice.invoice_number);return {state:"refunded",reference};},
- p=>p
+ p=>p,async()=>({sent:true})
 );
 const payload={id:invoice.id,action:"refund",reference,amountOre:5000,expectedCapturedOre:12500,
  expectedRefundedOre:0,confirmedInvoiceNumber:invoice.invoice_number};

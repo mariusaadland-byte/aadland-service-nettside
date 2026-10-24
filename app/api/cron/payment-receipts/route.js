@@ -4,6 +4,7 @@ import {reconcileInvoiceVipps} from "../../../../lib/invoiceVipps";
 import {db} from "../../../../lib/supabase";
 import {sendVippsPaymentReceiptIfNeeded} from "../../../../lib/vippsPaymentReceipt";
 import {sendVippsRefundNoticeIfNeeded} from "../../../../lib/vippsRefundNotice";
+import {sendInvoiceVippsRefundNoticeIfNeeded} from "../../../../lib/invoiceVippsRefundNotice";
 import {sendPaidRentalConfirmationIfNeeded} from "../../../../lib/rentalConfirmationEmail";
 
 export const runtime="nodejs";
@@ -151,6 +152,21 @@ export async function GET(req){
    }
   }catch(e){failures.push({type:"invoice",reference:row.reference,error:String(e.message).slice(0,180)});}
  }
+ // Process durable refund notices queued by atomic payment reconciliation.
+ // Rows are claimed exclusively; retries reuse the same Resend idempotency key.
+ let invoiceRefundEmailsSent=0,invoiceRefundEmailSkipped=0;
+ for(let i=0;i<LIMIT_PER_TYPE;i++){
+  try{
+   const notice=await sendInvoiceVippsRefundNoticeIfNeeded({s});
+   if(notice?.reason==="nothing-pending"){invoiceRefundEmailSkipped++;break;}
+   if(notice?.sent)invoiceRefundEmailsSent++;
+   else {invoiceRefundEmailSkipped++;break;}
+  }catch(e){
+   failures.push({type:"invoice-refund-email",error:String(e.message||e).slice(0,180)});
+   console.error("INVOICE VIPPS REFUND EMAIL RETRY ERROR",{message:e.message});
+   break;
+  }
+ }
  if(failures.length)console.error("VIPPS RECEIPT RECOVERY INCOMPLETE",{failed:failures.length,types:failures.map(f=>f.type)});
  return NextResponse.json({
   ok:failures.length===0,
@@ -158,7 +174,7 @@ export async function GET(req){
   receipt:{checked:serviceIds.length+rentalIds.length,sent,skipped},
   rentalConfirmation:{checked:rentalConfirmationIds.length,sent:confirmationSent,skipped:confirmationSkipped},
   refund:{checked:serviceRefundIds.length+rentalRefundIds.length,sent:refundSent,skipped:refundSkipped},
-  invoice:{checked:invoiceChecked,paidOrPartial:invoicePaid,receiptConfirmed:invoiceReceiptSent,receiptPending:invoiceReceiptPending,settledRechecked:settledChecked,settlementChanges,refundsDetected},
+  invoice:{checked:invoiceChecked,paidOrPartial:invoicePaid,receiptConfirmed:invoiceReceiptSent,receiptPending:invoiceReceiptPending,settledRechecked:settledChecked,settlementChanges,refundsDetected,refundEmailsSent:invoiceRefundEmailsSent,refundEmailsSkipped:invoiceRefundEmailSkipped},
   failed:failures.length,
   failures
  },{status:failures.length?503:200});

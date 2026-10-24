@@ -47,9 +47,9 @@ const reconcile=async(_db,reference)=>{
  throw Error("Unexpected reference");
 };
 const handler=new Function("NextResponse","cronGuard","reconcileInvoiceVipps","db",
- "sendVippsPaymentReceiptIfNeeded","sendVippsRefundNoticeIfNeeded","sendPaidRentalConfirmationIfNeeded",
+ "sendVippsPaymentReceiptIfNeeded","sendVippsRefundNoticeIfNeeded","sendPaidRentalConfirmationIfNeeded","sendInvoiceVippsRefundNoticeIfNeeded",
  source+";return GET;")(
- NextResponse,()=>null,reconcile,()=>s,async()=>({sent:false}),async()=>({sent:false}),async()=>({sent:false})
+ NextResponse,()=>null,reconcile,()=>s,async()=>({sent:false}),async()=>({sent:false}),async()=>({sent:false}),async()=>({sent:false,reason:"nothing-pending"})
 );
 const originalConsole=console.error;console.error=()=>{};
 try{
