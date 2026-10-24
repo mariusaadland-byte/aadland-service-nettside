@@ -2,6 +2,7 @@ import {NextResponse} from "next/server";
 import {getAdminUser} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
 import {buildInvoiceVatTermReport,invoiceVatTermCsv,vatTermBounds} from "../../../../../lib/invoiceVatTermReport";
+import {calculateInputVatSummary,mergedVatReport,combinedVatCsv} from "../../../../../lib/invoiceInputVat";
 export const runtime="nodejs";
 const json=(body,status=200)=>NextResponse.json(body,{status,headers:{"Cache-Control":"private, no-store"}});
 async function collect(query,max=5000){
@@ -28,7 +29,7 @@ export async function GET(req){
  try{
   // Both sides of the VAT report use original document dates, regardless
   // of payment/closing time. Never join on administrative closure.
-  const [invoices,credits]=await Promise.all([
+  const [invoices,credits,purchases]=await Promise.all([
    collect(()=>s.from("invoice_drafts")
     .select("id,status,invoice_number,issued_date,customer,line_items")
     .gte("issued_date",bounds.from).lte("issued_date",bounds.to)
@@ -37,11 +38,19 @@ export async function GET(req){
    collect(()=>s.from("invoice_credit_notes")
     .select("id,invoice_id,credit_number,credit_date,original_invoice_number,customer,lines,subtotal_ore,vat_ore,total_ore")
     .gte("credit_date",bounds.from).lte("credit_date",bounds.to)
-    .order("credit_date",{ascending:true}).order("id",{ascending:true}))
+    .order("credit_date",{ascending:true}).order("id",{ascending:true})),
+   collect(()=>s.from("vat_purchase_documents")
+    .select("id,supplier_name,supplier_document_number,document_date,kind,evidence_reference,vat_groups,deduction_percent,base_ore,vat_ore,deductible_vat_ore,voided_at")
+    .gte("document_date",bounds.from).lte("document_date",bounds.to)
+    .is("voided_at",null)
+    .order("document_date",{ascending:true}).order("id",{ascending:true}))
   ]);
-  const report=buildInvoiceVatTermReport(invoices,credits,bounds);
+  const report=mergedVatReport(
+   buildInvoiceVatTermReport(invoices,credits,bounds),
+   calculateInputVatSummary(purchases,bounds)
+  );
   if(format==="csv"){
-   const data=Buffer.from(invoiceVatTermCsv(report),"utf8");
+   const data=Buffer.from(combinedVatCsv(report,invoiceVatTermCsv(report)),"utf8");
    return new NextResponse(data,{headers:{
     "Content-Type":"text/csv; charset=utf-8",
     "Content-Disposition":'attachment; filename="mva-avstemming-'+bounds.year+'-termin-'+bounds.term+'.csv"',
