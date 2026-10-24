@@ -37,12 +37,12 @@ const s={from(table){
  };
  return q;
 }};
-const handler=new Function("NextResponse","cronGuard","reconcileInvoiceVipps","db","sendVippsPaymentReceiptIfNeeded","sendVippsRefundNoticeIfNeeded","sendPaidRentalConfirmationIfNeeded",
+const handler=new Function("NextResponse","cronGuard","reconcileInvoiceVipps","db","sendVippsPaymentReceiptIfNeeded","sendVippsRefundNoticeIfNeeded","sendPaidRentalConfirmationIfNeeded","sendInvoiceVippsRefundNoticeIfNeeded",
  source+";return GET;")(
  NextResponse,()=>null,async()=>errorMode?
  {state:"paid",captured_ore:8000,refunded_ore:0,receipt_sent_at:null,receipt_error:"Temporary email failure"}:
  {state:"paid",captured_ore:8000,refunded_ore:0,receipt_sent_at:"2026-10-22T14:00:00Z",receipt_error:null},
- ()=>s,async()=>({sent:false}),async()=>({sent:false}),async()=>({sent:false})
+ ()=>s,async()=>({sent:false}),async()=>({sent:false}),async()=>({sent:false}),async()=>({sent:false,reason:"nothing-pending"})
 );
 const oldLog=console.error;console.error=()=>{};
 try{
