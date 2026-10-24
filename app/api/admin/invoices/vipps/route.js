@@ -5,6 +5,7 @@ import {sameOriginGuard} from "../../../../../lib/requestGuard";
 import {vippsPublicPaymentsEnabled} from "../../../../../lib/vippsClient";
 import {startInvoiceVipps,reconcileInvoiceVipps,invoiceVippsView} from "../../../../../lib/invoiceVipps";
 import {refundInvoiceVipps} from "../../../../../lib/invoiceVippsRefund";
+import {sendInvoiceVippsRefundNoticeIfNeeded} from "../../../../../lib/invoiceVippsRefundNotice";
 export const runtime="nodejs";
 export const maxDuration=60;
 const allowed=u=>u&&(u.role==="owner"||u.canUpdateOrders||u.canManageProducts);
@@ -34,7 +35,7 @@ export async function POST(req){
  const found=await s.from("invoice_drafts").select("*").eq("id",b.id).maybeSingle();
  if(found.error||!found.data)return NextResponse.json({error:"Fakturaen ble ikke funnet."},{status:404});
  try{
-  let p;
+  let p,refundNotice=null;
   if(b.action==="start"){
    if(b.workCompleted!==true)return NextResponse.json({error:"Bekreft at arbeidet er ferdig før direkte betaling."},{status:400});
    p=await startInvoiceVipps(s,found.data,b.confirmedInvoice,{
@@ -48,11 +49,13 @@ export async function POST(req){
     expectedRefundedOre:b.expectedRefundedOre,
     confirmedInvoiceNumber:b.confirmedInvoiceNumber
    });
+   try{refundNotice=await sendInvoiceVippsRefundNoticeIfNeeded({s,paymentId:p.id});}
+   catch(e){console.error("INVOICE VIPPS REFUND EMAIL ERROR",{id:p.id,message:e.message});refundNotice={sent:false,warning:"Tilbakebetalingen er bekreftet, men e-posten er ikke sendt. Automatisk nytt forsøk følger."};}
   }else{
    const latest=await s.from("invoice_vipps_payments").select("reference").eq("invoice_id",b.id).order("created_at",{ascending:false}).limit(1).maybeSingle();
    if(latest.error||!latest.data)throw Error("Ingen Vipps-betaling er startet.");
    p=await reconcileInvoiceVipps(s,latest.data.reference);
   }
-  return NextResponse.json({ok:true,payment:invoiceVippsView(p)},{headers:{"Cache-Control":"private, no-store"}});
+  return NextResponse.json({ok:true,payment:invoiceVippsView(p),refundNotice},{headers:{"Cache-Control":"private, no-store"}});
  }catch(e){console.error("INVOICE VIPPS",{id:b.id,message:e.message});return NextResponse.json({error:e.message||"Vipps-betalingen kunne ikke behandles. Prøv samme knapp igjen."},{status:409});}
 }
