@@ -143,11 +143,11 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    <label><input type="checkbox" checked={form.deductionConfirmed}
     onChange={e=>set("deductionConfirmed",e.target.checked)}/>
     Jeg har vurdert fradragsretten og at fradragsandelen er korrekt for avgiftspliktig virksomhet.</label>
-   {netTotal+vatTotal>=1000000&&<label><input type="checkbox" checked={form.bankConditionConfirmed}
+   {form.kind==="purchase"&&netTotal+vatTotal>=1000000&&<label><input type="checkbox" checked={form.bankConditionConfirmed}
     onChange={e=>set("bankConditionConfirmed",e.target.checked)}/>
     Jeg har kontrollert kravet om betaling via bank for kjøp på minst 10 000 kr inkl. MVA.</label>}
    <button type="submit" disabled={busy||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||
-    (netTotal+vatTotal>=1000000&&!form.bankConditionConfirmed)}>
+    (form.kind==="purchase"&&netTotal+vatTotal>=1000000&&!form.bankConditionConfirmed)}>
     {busy?"Lagrer …":"Registrer kontrollert bilag"}
    </button>
   </form>
