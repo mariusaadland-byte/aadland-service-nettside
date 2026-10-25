@@ -175,7 +175,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
      disabled={disabled||busy} onChange={choose} style={{display:"block",width:"100%",marginTop:7,fontSize:13}}/>
    </label>
   </div>
-  <p style={{fontSize:12,color:"#49645c"}}>PDF maks 4 MB. Bilder opptil 25 MB kan gjøres om til en mindre JPEG-kopi ved behov. OCR foregår lokalt på telefonen. Lesemotor og språkfiler lastes fra en ekstern leverandør.</p>
+  <p style={{fontSize:12,color:"#49645c"}}>PDF maks 4 MB. Bilder opptil 25 MB kan gjøres om til en mindre JPEG-kopi ved behov. OCR foregår lokalt på telefonen. Lesemotor og språkfiler lastes fra en ekstern leverandør.</p></p>
   {processedNotice&&<p role="note" style={{border:"1px solid #c8d7d2",padding:10,borderRadius:8,fontSize:13}}>{processedNotice}</p>
   {(busy||progress)&&<p role="status" style={{fontWeight:650}}>{progress||"Klargjør lesing …"}</p>}
   {error&&<p role="alert" style={{color:"#a52a21"}}>{error}</p>}
