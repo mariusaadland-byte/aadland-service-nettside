@@ -46,6 +46,12 @@ export default function VatOriginalAttachment({documentId}){
     <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
      disabled={busy} onChange={e=>{setFile(e.target.files?.[0]||null);setError("");}}/>
    </label>
+   <label style={{display:"block",margin:"9px 0",fontWeight:600}}>
+    Ta bilde av kvittering eller faktura med mobilkamera
+    <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment"
+     disabled={busy} onChange={e=>{setFile(e.target.files?.[0]||null);setError("");}}/>
+   </label>
+   <small>Bilder lagres kun etter at du har bekreftet opplasting. Maks 4 MB per originalbilag.</small>
    {file&&<div style={{margin:"6px 0"}}>Valgt: {file.name} ({formatSize(file.size)})</div>}
    <button type="button" onClick={upload} disabled={busy||!file}>
     {busy?"Laster opp …":"Lagre originalbilag"}
