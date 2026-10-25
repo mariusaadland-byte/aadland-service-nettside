@@ -64,4 +64,35 @@ assert.ok(ocr.includes('URL.revokeObjectURL(url)'));
 assert.ok(ocr.includes('Behold originalbildet'));
 assert.ok(ui.includes('receiptIsCopy'));
 assert.ok(ui.includes('JPEG-kopi'));
+const cropLogicSource=read("lib/vatReceiptCrop.js").replace(/^export /gm,"");
+const {detectReceiptBounds,cropReceiptPixels,fullReceiptBounds,clampReceiptBounds}=
+ new Function(cropLogicSource+";return {detectReceiptBounds,cropReceiptPixels,fullReceiptBounds,clampReceiptBounds};")();
+const image=(width,height,background,receipt=null)=>{
+ const pixels=new Uint8ClampedArray(width*height*4);
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  const isPaper=receipt&&x>=receipt.x&&x<receipt.x+receipt.w&&y>=receipt.y&&y<receipt.y+receipt.h;
+  const shade=isPaper?244:background;
+  const p=(y*width+x)*4;
+  pixels[p]=shade;pixels[p+1]=shade;pixels[p+2]=shade;pixels[p+3]=255;
+ }
+ return {width,height,data:pixels};
+};
+const detected=detectReceiptBounds(image(160,200,55,{x:24,y:18,w:112,h:165}));
+assert.ok(detected,"White receipt against dark background should be found");
+assert.ok(detected.x<=24/160&&detected.x+detected.w>=135/160,"X includes paper");
+assert.ok(detected.y<=18/200&&detected.y+detected.h>=182/200,"Y includes paper");
+assert.equal(detectReceiptBounds(image(160,200,255,{x:24,y:18,w:112,h:165})),null,
+ "White background must not silently auto-crop");
+assert.equal(detectReceiptBounds(image(160,200,45)),null,"Dark image must not auto-crop");
+assert.deepEqual(cropReceiptPixels(200,100,{x:.1,y:.2,w:.7,h:.6}),{x:20,y:20,width:140,height:60});
+assert.deepEqual(clampReceiptBounds({x:-.5,y:0,w:2,h:2}),fullReceiptBounds());
+const cropUI=read("app/admin/faktura/mva/VatReceiptCropper.js");
+assert.ok(cropUI.includes('onPointerDown={pointerDown}')&&cropUI.includes('data-handle={corner}'));
+assert.ok(cropUI.includes("detectReceiptBounds(ctx.getImageData"));
+assert.ok(cropUI.includes("await onApply(result,{cropped:!isWhole})"));
+assert.ok(cropUI.includes('role="group"'));
+assert.ok(ocr.includes("setCropJob({file,originalName:source.name"));
+assert.ok(ocr.includes("if(file.type!==\"application/pdf\")"));
+assert.ok(ocr.includes("onSelected(null)"));
+assert.ok(ocr.includes("await recognizeSelected(croppedFile"));
 console.log("MVA-kvitteringstest bestått: mobilkamera, PDF, norsk OCR, MVA-kontroll og sikker vedleggskobling.");
