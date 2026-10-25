@@ -16,6 +16,7 @@ const links=[
  {name:"Tegneprogram",subtitle:"Prosjekter og tegninger",href:"/admin/tegning",emoji:"📐",access:"products"},
  {name:"Utleieprodukter",subtitle:"Legg ut, rediger og skjul utstyr",href:"/admin/utleie",emoji:"🛠️",access:"products"},
  {name:"Utleiebookinger",subtitle:"Kalender og bestillinger",href:"/admin",emoji:"📅",access:"orders"},
+ {name:"Returkontroll og depositum",subtitle:"Skadesjekk, depositum og kontrollhistorikk",href:"/admin/utleie/depositum",emoji:"🔎",access:"orders"},
  {name:"Vipps",subtitle:"Betaling og oppgjør",href:"/admin/vipps",emoji:"💳",access:"owner"},
  {name:"MVA og bilag",subtitle:"Leverandørbilag og MVA-oversikt",href:"/admin/faktura/mva",emoji:"📸",access:"owner"},
 ];
