@@ -12,6 +12,7 @@ export default function NewRentalItemClient({itemId=null}){
  const [uploading,setUploading]=useState(false);
  const [error,setError]=useState("");
  const [originalName,setOriginalName]=useState("");
+ const [itemLoaded,setItemLoaded]=useState(false);
  const [v,setV]=useState({
   name:"",
   categoryId:"",
@@ -51,6 +52,7 @@ export default function NewRentalItemClient({itemId=null}){
      const item=(itemData?.items||[]).find(x=>x.id===itemId);
      if(!item)throw new Error("Utleieproduktet finnes ikke, eller du har ikke tilgang.");
      setOriginalName(item.name);
+     setItemLoaded(true);
      setV({
       name:item.name||"",categoryId:item.categoryId||"",description:item.description||"",
       status:item.status||"available",quantity:item.quantity||1,
@@ -89,6 +91,7 @@ export default function NewRentalItemClient({itemId=null}){
 
  async function save(e){
   e.preventDefault();
+  if(itemId&&!itemLoaded){setError("Produktet ble ikke lastet. Ingen endringer kan lagres.");return;}
   if(!v.categoryId){setError("Velg kategori før utstyret lagres.");return;}
   setSaving(true);
   setError("");
@@ -115,7 +118,7 @@ export default function NewRentalItemClient({itemId=null}){
 
    {error&&<p className="notice">{error}</p>}
 
-   {!loading&&categories.length===0?<div className="card">
+   {!loading&&itemId&&!itemLoaded?<div className="card"><h3>Utstyret kunne ikke lastes</h3><p>Redigering er sperret, slik at eksisterende opplysninger ikke kan overskrives ved feil.</p><Link className="btn alt" href="/admin/utleie">Tilbake til utleieoversikten</Link></div>:!loading&&categories.length===0?<div className="card">
     <h3>Du må lage en kategori først</h3>
     <p className="muted">Opprett for eksempel Hengere, Verktøy, Maskiner eller Hage.</p>
     <Link className="btn" href="/admin/utleiekategorier">Opprett utleiekategori</Link>
@@ -152,7 +155,7 @@ export default function NewRentalItemClient({itemId=null}){
     </div>
 
     <div className="rentalNewItemActions">
-     <button className="btn" disabled={saving||uploading||loading}>{saving?"Lagrer …":itemId?"Lagre endringene":"Lagre utleieprodukt"}</button>
+     <button className="btn" disabled={saving||uploading||loading||(itemId&&!itemLoaded)}>{saving?"Lagrer …":itemId?"Lagre endringene":"Lagre utleieprodukt"}</button>
      <Link className="btn alt" href="/admin/utleie">Avbryt</Link>
     </div>
    </form>}
