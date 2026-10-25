@@ -7,6 +7,13 @@ const {parseNorwegianReceipt,receiptAmountOre}=new Function(parserSource+
 assert.equal(receiptAmountOre("1 250,50"),125050);
 assert.equal(receiptAmountOre("1.250,50"),125050);
 assert.equal(receiptAmountOre("1250,50"),125050);
+assert.equal(receiptAmountOre("1,250.50"),125050);
+assert.equal(receiptAmountOre("1250.50"),125050);
+assert.equal(receiptAmountOre("1.250.50"),null,"Ambiguous separators must not be accepted");
+assert.equal(parseNorwegianReceipt(["TESTBUTIKK","25.10.2026","Sum","125,00","MVA 25% 100,00 25,00"].join("\n")).totalOre,12500);
+assert.equal(parseNorwegianReceipt(["TESTBUTIKK","25.10.2026","Sum eks mva 100,00","Mva totalt 25,00"].join("\n")).totalOre,null);
+assert.equal(parseNorwegianReceipt(["TESTBUTIKK","25.10.2026","MVA 25% 1,000.00 250.00","Total 1,250.00"].join("\n")).groups[25].base,"1000,00");
+
 assert.equal(receiptAmountOre("dårlig"),null);
 const sample=[
  "MEGAFLIS BERGEN AS","Org nr 912 345 678","Kvittering nr 540018",
