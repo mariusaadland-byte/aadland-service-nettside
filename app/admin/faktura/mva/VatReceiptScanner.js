@@ -3,6 +3,9 @@ import {useRef,useState} from "react";
 import {parseNorwegianReceipt} from "../../../../lib/vatReceiptParser";
 
 const MAX_SIZE=4*1024*1024;
+const MAX_SOURCE_SIZE=25*1024*1024;
+const receiptTypes=new Set(["image/jpeg","image/png","image/webp","application/pdf","image/heic","image/heif"]);
+const imageTypes=new Set(["image/jpeg","image/png","image/webp","image/heic","image/heif"]);
 const TESSERACT_URL="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
 const PDFJS_URL="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";
 const PDFJS_WORKER="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
@@ -52,6 +55,55 @@ async function imageFromPdf(file,onProgress){
   return {images,format:"pdf-skann"};
  }finally{await document.destroy();}
 }
+// Preserve the original file unchanged when it fits. On devices that can
+// decode HEIC natively, create an explicitly labelled JPEG *copy* for upload.
+// The source HEIC or oversized image must still be retained in bookkeeping.
+async function prepareReceiptFile(source,onProgress){
+ const extension=String(source.name||"").split(".").pop().toLowerCase();
+ const type=source.type||({heic:"image/heic",heif:"image/heif",jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",webp:"image/webp",pdf:"application/pdf"}[extension]||"");
+ if(!receiptTypes.has(type))throw Error("Velg JPG, PNG, WebP, HEIC eller PDF.");
+ if(source.size<12||source.size>MAX_SOURCE_SIZE)
+  throw Error("Filen er for stor eller tom. Maks 25 MB for mobilbilder.");
+ if(type==="application/pdf"){
+  if(source.size>MAX_SIZE)throw Error("PDF-filen er større enn 4 MB. Del opp eller lag en mindre PDF.");
+  return {file:source.type?source:new File([source],source.name,{type}),converted:false};
+ }
+ if(source.size<=MAX_SIZE&&!["image/heic","image/heif"].includes(type))
+  return {file:source.type?source:new File([source],source.name,{type}),converted:false};
+ onProgress("Tilpasser bildet til mobilopplasting uten å endre originalen …");
+ const url=URL.createObjectURL(source);
+ let image;
+ try{
+  image=await new Promise((resolve,reject)=>{
+   const img=new Image();
+   img.onload=()=>resolve(img);
+   img.onerror=()=>reject(Error("Telefonen kunne ikke åpne HEIC/bildet. Prøv i Safari eller lag en JPEG-kopi i Bilder."));
+   img.src=url;
+  });
+  const width=image.naturalWidth,height=image.naturalHeight;
+  if(width<500||height<500)throw Error("Bildet er for lite til å lese godt. Ta et nytt skarpt foto.");
+  let ratio=Math.min(1,2600/Math.max(width,height),Math.sqrt(8000000/(width*height)));
+  const safeBase=String(source.name||"kvittering").replace(/\.[^.]+$/,"").replace(/[^a-zA-Z0-9._-]/g,"_").slice(0,85)||"kvittering";
+  for(let shrink=0;shrink<4;shrink++){
+   const canvas=document.createElement("canvas");
+   canvas.width=Math.max(1,Math.round(width*ratio));
+   canvas.height=Math.max(1,Math.round(height*ratio));
+   const ctx=canvas.getContext("2d",{alpha:false});
+   if(!ctx)throw Error("Telefonen støtter ikke bildeforberedelse.");
+   ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);
+   ctx.drawImage(image,0,0,canvas.width,canvas.height);
+   const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",Math.max(.6,.88-shrink*.08)));
+   canvas.width=0;canvas.height=0;
+   if(blob&&blob.size>12&&blob.size<=MAX_SIZE){
+    return {file:new File([blob],safeBase+"-mobilkopi.jpg",{type:"image/jpeg"}),converted:true,
+     originalName:source.name};
+   }
+   ratio*=.78;
+  }
+  throw Error("Bildet kunne ikke tilpasses til 4 MB. Prøv med et foto i lavere oppløsning.");
+ }finally{URL.revokeObjectURL(url);}
+}
+
 async function readLocalReceipt(file,onProgress){
  let text="",format="bilde";
  let images=[file];
@@ -80,24 +132,21 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
  const [error,setError]=useState("");
  const [details,setDetails]=useState(null);
  const [busy,setBusy]=useState(false);
+ const [processedNotice,setProcessedNotice]=useState("");
  const scanId=useRef(0);
  async function choose(event){
-  const file=event.target.files?.[0]||null;
+  const source=event.target.files?.[0]||null;
   event.target.value="";
-  if(!file||busy||disabled)return;
-  setError("");setDetails(null);setProgress("");
-  if(file.size<12||file.size>MAX_SIZE){
-   setError("Bildet eller PDF-en må være maks 4 MB. Velg en mindre fil, eller lag en mindre JPEG-kopi.");
-   return;
-  }
-  if(!["image/jpeg","image/png","image/webp","application/pdf"].includes(file.type)){
-   setError("Bruk JPG, PNG, WebP eller PDF. iPhone-bilder i HEIC må først lagres som JPEG.");
-   return;
-  }
+  if(!source||busy||disabled)return;
+  setError("");setDetails(null);setProgress("");setProcessedNotice("");
   const thisScan=++scanId.current;
-  onSelected(file);
   setBusy(true);onBusyChange?.(true);
   try{
+   const prepared=await prepareReceiptFile(source,setProgress);
+   if(thisScan!==scanId.current)return;
+   const file=prepared.file;
+   onSelected(file,{converted:prepared.converted,originalName:source.name});
+   if(prepared.converted)setProcessedNotice("Filen ble gjort om til en JPEG-kopi for opplasting. Behold originalbildet på telefonen og i regnskapssystemet.");
    const recognized=await readLocalReceipt(file,setProgress);
    if(thisScan!==scanId.current)return;
    const parsed=parseNorwegianReceipt(recognized.text);
@@ -106,10 +155,11 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
    setProgress("Teksten er lest. Kontroller forslagene nedenfor før lagring.");
   }catch(e){
    setProgress("");
-   setError("Automatisk lesing lyktes ikke: "+String(e.message||"ukjent feil")+
-    " Filen er likevel valgt som vedlegg. Fyll inn feltene manuelt før du lagrer.");
+   setError("Lesing/filbehandling lyktes ikke: "+String(e.message||"ukjent feil")+
+    " Dersom filen ble valgt som vedlegg, kan du fylle ut feltene manuelt.");
   }finally{setBusy(false);onBusyChange?.(false);}
  }
+
  return <section style={{border:"1px solid #c8d7d2",background:"#f4faf8",borderRadius:14,padding:15,margin:"16px 0"}}>
   <h3 style={{margin:"0 0 7px"}}>1. Ta bilde eller velg kvittering</h3>
   <p style={{fontSize:13,margin:"0 0 12px"}}>
@@ -121,11 +171,12 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
      disabled={disabled||busy} onChange={choose} style={{display:"block",width:"100%",marginTop:7,fontSize:13}}/>
    </label>
    <label style={{flex:"1 1 150px",fontWeight:700}}>📁 Velg bilde eller PDF
-    <input aria-label="Velg kvittering fra telefonen" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+    <input aria-label="Velg kvittering fra telefonen" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/jpeg,image/png,image/webp"
      disabled={disabled||busy} onChange={choose} style={{display:"block",width:"100%",marginTop:7,fontSize:13}}/>
    </label>
   </div>
-  <p style={{fontSize:12,color:"#49645c"}}>Maks 4 MB. OCR foregår lokalt i nettleseren. Lesemotor og språkfiler hentes fra en ekstern leverandør; selve bildet sendes ikke dit for lesing.</p>
+  <p style={{fontSize:12,color:"#49645c"}}>PDF maks 4 MB. Bilder opptil 25 MB kan gjøres om til en mindre JPEG-kopi ved behov. OCR foregår lokalt på telefonen. Lesemotor og språkfiler lastes fra en ekstern leverandør.</p>
+  {processedNotice&&<p role="note" style={{border:"1px solid #c8d7d2",padding:10,borderRadius:8,fontSize:13}}>{processedNotice}</p>
   {(busy||progress)&&<p role="status" style={{fontWeight:650}}>{progress||"Klargjør lesing …"}</p>}
   {error&&<p role="alert" style={{color:"#a52a21"}}>{error}</p>}
   {details&&<div style={{fontSize:13,borderTop:"1px solid #d9e5e0",paddingTop:10}}>
