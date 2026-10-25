@@ -24,12 +24,14 @@ const labels={
 export default function VatExternalCsvMapper({source,disabled,onReview}){
  const [mapping,setMapping]=useState(()=>initialVatColumnMapping(source.headers));
  const [error,setError]=useState("");
- useEffect(()=>{setMapping(initialVatColumnMapping(source.headers));setError("");},[source]);
+ const [companyChecked,setCompanyChecked]=useState(false);
+ useEffect(()=>{setMapping(initialVatColumnMapping(source.headers));setError("");setCompanyChecked(false);},[source]);
  function choose(field,value){
   setMapping(old=>({...old,[field]:value}));setError("");
  }
  function preview(event){
   event.preventDefault();setError("");
+  if(!companyChecked){setError("Bekreft at eksporten gjelder riktig selskap før du går videre.");return;}
   try{onReview(mapExternalVatRows(source,mapping));}
   catch(e){setError(e.message||"Kunne ikke koble eksportkolonnene.");}
  }
@@ -60,8 +62,13 @@ export default function VatExternalCsvMapper({source,disabled,onReview}){
     og eventuelt legges inn i Aadland-malen først.
     En kreditnota må ha opprinnelig fakturanummer.
    </p>
-   {error&&<p role="alert" style={{color:"#a52a21"}}>{error}</p>}
-   <button type="submit" disabled={disabled}>Kontroller radene med denne feltkoblingen</button>
+   <label style={{display:"block",fontSize:13,margin:"12px 0"}}>
+    <input type="checkbox" checked={companyChecked} disabled={disabled}
+     onChange={e=>setCompanyChecked(e.target.checked)}/>
+    Jeg har kontrollert at eksportfilen gjelder Aadland Service og ikke et annet selskap.
+   </label>
+   {error&&<p role="alert" style={{color:"#a52a21"}}>{error}</p>
+   <button type="submit" disabled={disabled||!companyChecked}>Kontroller radene med denne feltkoblingen</button>
   </form>
  </section>;
 }
