@@ -67,7 +67,7 @@ export default function VatExternalCsvMapper({source,disabled,onReview}){
      onChange={e=>setCompanyChecked(e.target.checked)}/>
     Jeg har kontrollert at eksportfilen gjelder Aadland Service og ikke et annet selskap.
    </label>
-   {error&&<p role="alert" style={{color:"#a52a21"}}>{error}</p>
+   {error&&<p role="alert" style={{color:"#a52a21"}}>{error}</p>}
    <button type="submit" disabled={disabled||!companyChecked}>Kontroller radene med denne feltkoblingen</button>
   </form>
  </section>;
