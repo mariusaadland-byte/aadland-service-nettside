@@ -64,7 +64,7 @@ assert.equal(initialVatColumnMapping(headers).mva_25,"");
 assert.equal(mapExternalVatRows(direct,initialVatColumnMapping(direct.headers))[0].documentNumber,"INV-45");
 
 assert.throws(()=>mapExternalVatRows(source,{...mapping,leverandor:""}),/leverandor/);
-assert.throws(()=>mapExternalVatRows(source,{...mapping,mva_25:""}),/Grunnlag og MVA/);
+assert.throws(()=>mapExternalVatRows(source,{...mapping,mva_25:""}),/Koble minst ett par|Grunnlag og MVA/);
 assert.throws(()=>mapExternalVatRows(source,{...mapping,mva_25:"Eks 25"}),/Samme eksportkolonne/);
 assert.throws(()=>mapExternalVatRows(source,{...mapping,mva_25:"Not real"}),/finnes ikke/);
 assert.throws(()=>mapExternalVatRows(source,{...mapping,unsupported:"X"}),/Ukjent målkolonne/);
