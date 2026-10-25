@@ -4,13 +4,14 @@ import {useEffect,useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
 
-export default function NewRentalItemClient(){
+export default function NewRentalItemClient({itemId=null}){
  const router=useRouter();
  const [categories,setCategories]=useState([]);
  const [loading,setLoading]=useState(true);
  const [saving,setSaving]=useState(false);
  const [uploading,setUploading]=useState(false);
  const [error,setError]=useState("");
+ const [originalName,setOriginalName]=useState("");
  const [v,setV]=useState({
   name:"",
   categoryId:"",
@@ -34,17 +35,38 @@ export default function NewRentalItemClient(){
 
  useEffect(()=>{
   let cancelled=false;
-  fetch("/api/admin/rental/categories")
-   .then(async response=>{
-    const data=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(data.error||"Kategoriene kunne ikke lastes.");
+  Promise.all([fetch("/api/admin/rental/categories",{cache:"no-store"}),...(itemId?[fetch("/api/admin/rental",{cache:"no-store"})]:[])])
+   .then(async responses=>{
+    const data=await Promise.all(responses.map(async response=>{
+     const json=await response.json().catch(()=>({}));
+     if(!response.ok)throw new Error(json.error||"Utleiedata kunne ikke lastes.");
+     return json;
+    }));
     return data;
    })
-   .then(data=>{if(!cancelled)setCategories(data.categories||[])})
+   .then(([catData,itemData])=>{
+    if(cancelled)return;
+    setCategories(catData.categories||[]);
+    if(itemId){
+     const item=(itemData?.items||[]).find(x=>x.id===itemId);
+     if(!item)throw new Error("Utleieproduktet finnes ikke, eller du har ikke tilgang.");
+     setOriginalName(item.name);
+     setV({
+      name:item.name||"",categoryId:item.categoryId||"",description:item.description||"",
+      status:item.status||"available",quantity:item.quantity||1,
+      dailyPriceOre:item.dailyPriceOre||0,weekendPriceOre:item.weekendPriceOre??"",
+      weeklyPriceOre:item.weeklyPriceOre??"",longTermDays:item.longTermDays??"",
+      longTermDiscountPercent:item.longTermDiscountPercent||0,depositOre:item.depositOre||0,
+      bufferDays:item.bufferDays||0,pickupAvailable:item.pickupAvailable!==false,
+      deliveryAvailable:item.deliveryAvailable===true,active:item.active!==false,
+      sortOrder:item.sortOrder||0,imageUrls:item.imageUrls||[]
+     });
+    }
+   })
    .catch(err=>{if(!cancelled)setError(err.message||"Kategoriene kunne ikke lastes.")})
    .finally(()=>{if(!cancelled)setLoading(false)});
   return()=>{cancelled=true};
- },[]);
+ },[itemId]);
 
  async function upload(files){
   const list=Array.from(files||[]);
@@ -71,14 +93,14 @@ export default function NewRentalItemClient(){
   setSaving(true);
   setError("");
   const response=await fetch("/api/admin/rental",{
-   method:"POST",
+   method:itemId?"PATCH":"POST",
    headers:{"Content-Type":"application/json"},
-   body:JSON.stringify(v)
+   body:JSON.stringify({...v,...(itemId?{id:itemId}:{})})
   });
   const data=await response.json().catch(()=>({}));
   setSaving(false);
   if(!response.ok){setError(data.error||"Utstyret kunne ikke lagres.");return;}
-  router.push("/admin");
+  router.push("/admin/utleie");
   router.refresh();
  }
 
@@ -86,9 +108,9 @@ export default function NewRentalItemClient(){
   <section className="adminmain rentalNewItemMain">
    <div className="kicker">Aadland Service / Back office</div>
    <div className="rentalNewItemHeader">
-    <Link href="/admin" className="btn alt">← Tilbake til backoffice</Link>
-    <h1>Nytt utleieprodukt</h1>
-    <p className="muted">Alle utleieprodukter må plasseres i en kategori før de kan lagres.</p>
+    <Link href="/admin/utleie" className="btn alt">← Utleieoversikt</Link>
+    <h1>{itemId?"Rediger utleieprodukt":"Nytt utleieprodukt"}</h1>
+    <p className="muted">{itemId?("Du redigerer "+originalName+". Endringene publiseres når du lagrer."): "Alle utleieprodukter må plasseres i en kategori før de kan lagres."}</p>
    </div>
 
    {error&&<p className="notice">{error}</p>}
@@ -130,8 +152,8 @@ export default function NewRentalItemClient(){
     </div>
 
     <div className="rentalNewItemActions">
-     <button className="btn" disabled={saving||uploading||loading}>{saving?"Lagrer …":"Lagre utleieprodukt"}</button>
-     <Link className="btn alt" href="/admin">Avbryt</Link>
+     <button className="btn" disabled={saving||uploading||loading}>{saving?"Lagrer …":itemId?"Lagre endringene":"Lagre utleieprodukt"}</button>
+     <Link className="btn alt" href="/admin/utleie">Avbryt</Link>
     </div>
    </form>}
   </section>
