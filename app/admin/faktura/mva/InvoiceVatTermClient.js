@@ -159,10 +159,14 @@ export default function InvoiceVatTermClient(){
        <th style={{textAlign:"right"}}>MVA</th><th style={{textAlign:"right"}}>Inkl. MVA</th></tr></thead>
       <tbody>{report.rows.map(row=><tr key={row.key}>
        <td>{row.documentDate}</td>
-       <td><Link href={"/admin/faktura/arkiv?id="+encodeURIComponent(row.invoiceId)}>
-        {row.documentNumber}</Link>
+       <td>{row.externalDocumentId
+       ?<a href={"/api/admin/invoices/vat-external-files?documentId="+encodeURIComponent(row.externalDocumentId)+"&download=1"}
+        title="Last ned originalfaktura fra tidligere fakturasystem">{row.documentNumber}</a>
+       :<Link href={"/admin/faktura/arkiv?id="+encodeURIComponent(row.invoiceId)}>
+        {row.documentNumber}</Link>}
         <small style={{display:"block"}}>{row.kindLabel}
-         {row.invoiceNumberReference?" · Gjelder "+row.invoiceNumberReference:""}</small>
+         {row.invoiceNumberReference?" · Gjelder "+row.invoiceNumberReference:""}
+         {row.sourceSystem?" · "+row.sourceSystem:""}</small>
        </td>
        <td>{row.customerName}</td>
        <td style={{textAlign:"right"}}>{money(row.baseOre)}</td>
