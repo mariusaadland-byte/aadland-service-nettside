@@ -7,6 +7,7 @@ import {db,fromDbRentalItem} from "../../../lib/supabase";
 import {rentalEmailFrom,rentalReplyTo,rentalRequestSiteUrl,rentalSiteUrl,rentalResendApiKey} from "../../../lib/rentalEmailConfig";
 import {sendRentalConfirmation} from "../../../lib/rentalConfirmationEmail";
 import {rentalBillingDecision} from "../../../lib/rentalBilling";
+import {rentalCustomerClassification} from "../../../lib/rentalCustomerType";
 import {vippsUnitReadiness} from "../../../lib/vippsReadiness";
 import {createRentalPaymentLinkToken} from "../../../lib/rentalPaymentLink";
 import {peakRentalBookings} from "../../../lib/rentalAvailability";
@@ -106,6 +107,8 @@ export async function POST(req){
   const name=String(b.customer?.name||"").trim();
   const email=String(b.customer?.email||"").trim().toLowerCase();
   const phone=String(b.customer?.phone||"").trim();
+  const customerType=rentalCustomerClassification(b);
+  if(customerType.error)return NextResponse.json({error:customerType.error},{status:400});
 
   if(name.length>120||email.length>254||phone.length>40){
    return NextResponse.json({error:"Kontaktinformasjonen er for lang."},{status:400});
@@ -170,7 +173,9 @@ export async function POST(req){
    customer_user_id:customerUserId,
    booking_number:bookingNumber,
    rental_item_id:item.id,
-   customer:{name,email,phone,address,fulfillment,siteOrigin},
+   customer:{name,email,phone,address,fulfillment,siteOrigin,
+    customerType:customerType.type,
+    ...(customerType.company?{company:customerType.company}:{})},
    start_date:b.startDate,
    end_date:b.endDate,
    price_snapshot:snapshot,
@@ -192,7 +197,20 @@ export async function POST(req){
    throw insertError;
   }
 
-  const billing=await rentalBillingDecision(s,email,0);
+  // A self-declared business is never enough to approve invoice credit.
+  // Require a confirmed customer session matching the billed email, plus
+  // the already approved customer billing profile/credit policy.
+  let verifiedBillingEmail=false;
+  if(customerType.type==="company"&&customerUserId){
+   const {data:verified,error:verifiedError}=await s.from("customer_profiles")
+    .select("email").eq("id",customerUserId).maybeSingle();
+   verifiedBillingEmail=!verifiedError&&
+    String(verified?.email||"").trim().toLowerCase()===email;
+  }
+  const billing=customerType.type==="company"&&verifiedBillingEmail
+   ?await rentalBillingDecision(s,email,0)
+   :{eligible:false,reason:customerType.type==="company"?"company-review":"payment",
+     invoiceCustomer:false,creditLimitOre:null,exposureOre:0};
   const resendKey=rentalResendApiKey();
   let confirmationSent=false;
   let acknowledgementSent=false;
@@ -205,7 +223,7 @@ export async function POST(req){
    const minSideUrl=siteOrigin+"/min-side";
    const accountUrl=customerUserId?minSideUrl:"";
    let guestPaymentUrl="";
-   if(!billing.eligible&&!customerUserId){
+   if(customerType.type==="private"&&!billing.eligible&&!customerUserId){
     try{
      const readiness=await vippsUnitReadiness(s,"rental");
      if(readiness.ready===true){
