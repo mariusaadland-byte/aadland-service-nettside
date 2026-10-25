@@ -29,7 +29,7 @@ assert.equal(valid.company.name,"Test Verksted AS");
 assert.equal(valid.company.invoiceEmail,"faktura@example.invalid");
 assert.match(rentalCustomerClassification({customerType:"company"}).error,/firmanavn/i);
 assert.match(rentalCustomerClassification({customerType:"company",
- company:{name:"Test AS",organizationNumber:"111111111"}}).error,/organisasjonsnummer/i);
+ company:{name:"Test AS",organizationNumber:org.slice(0,-1)+"9"}}).error,/organisasjonsnummer/i);
 assert.match(rentalCustomerClassification({customerType:"company",
  company:{name:"Test AS",organizationNumber:org,invoiceEmail:"bad"}}).error,/e-post/i);
 assert.match(rentalCustomerClassification({customerType:"other"}).error,/privatperson/i);
