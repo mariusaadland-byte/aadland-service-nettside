@@ -150,7 +150,7 @@ export default function VatReceiptCropper({file,onApply,onCancel,disabled=false}
    :"Jeg fant ikke alle kantene sikkert. Dra hjørnene på rammen for å fjerne bakgrunnen."}</p>
   {loading&&<p role="status">Finner kvitteringskantene …</p>}
   <div style={{maxWidth:600,margin:"0 auto",position:"relative",touchAction:"none",overflow:"hidden",borderRadius:10,background:"#26352f"}}>
-   {url&&<img src={url} alt="Forhåndsvisning av kvittering som kan beskjæres" style={{display:"block",width:"100%",height:"auto",maxHeight:"65vh",objectFit:"contain"}}/>}
+   {url&&<img src={url} alt="Forhåndsvisning av kvittering som kan beskjæres" style={{display:"block",width:"100%",height:"auto"}}/>}
    {imageReady&&<div style={{
     position:"absolute",left:pct(bounds.x)+"%",top:pct(bounds.y)+"%",
     width:pct(bounds.w)+"%",height:pct(bounds.h)+"%",
