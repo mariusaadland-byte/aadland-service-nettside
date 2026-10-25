@@ -158,6 +158,22 @@ export async function POST(req){
   if(p.days>365)return NextResponse.json({error:"Utleieperioden kan ikke være lengre enn 365 dager."},{status:400});
 
   const customerUserId=await getCustomerUserId();
+  // A business booking is invoiced only when the verified account email
+  // belongs to a previously approved invoice/credit customer. Check BEFORE
+  // creating the atomic inventory reservation: otherwise unauthorised company
+  // requests could block stock without paying or receiving an invoice.
+  let billing={eligible:false,reason:"payment",invoiceCustomer:false,creditLimitOre:null,exposureOre:0};
+  if(customerType.type==="company"){
+   if(!customerUserId)
+    return NextResponse.json({error:"Bedriftsbestilling på faktura krever innlogging og forhåndsgodkjent bedriftskonto. Kontakt oss før du bestiller."},{status:403});
+   const {data:verified,error:verifiedError}=await s.from("customer_profiles")
+    .select("email").eq("id",customerUserId).maybeSingle();
+   if(verifiedError||String(verified?.email||"").trim().toLowerCase()!==email)
+    return NextResponse.json({error:"Bruk e-postadressen til den innloggede bedriftskontoen."},{status:403});
+   billing=await rentalBillingDecision(s,email,p.totalOre);
+   if(!billing.eligible)
+    return NextResponse.json({error:"Bedriftskontoen er ikke godkjent for faktura, eller har for lite tilgjengelig kreditt. Kontakt oss før bestilling."},{status:403});
+  }
   const siteOrigin=rentalRequestSiteUrl(req)||rentalSiteUrl(req);
   const bookingNumber=num();
   const snapshot={
@@ -197,20 +213,6 @@ export async function POST(req){
    throw insertError;
   }
 
-  // A self-declared business is never enough to approve invoice credit.
-  // Require a confirmed customer session matching the billed email, plus
-  // the already approved customer billing profile/credit policy.
-  let verifiedBillingEmail=false;
-  if(customerType.type==="company"&&customerUserId){
-   const {data:verified,error:verifiedError}=await s.from("customer_profiles")
-    .select("email").eq("id",customerUserId).maybeSingle();
-   verifiedBillingEmail=!verifiedError&&
-    String(verified?.email||"").trim().toLowerCase()===email;
-  }
-  const billing=customerType.type==="company"&&verifiedBillingEmail
-   ?await rentalBillingDecision(s,email,0)
-   :{eligible:false,reason:customerType.type==="company"?"company-review":"payment",
-     invoiceCustomer:false,creditLimitOre:null,exposureOre:0};
   const resendKey=rentalResendApiKey();
   let confirmationSent=false;
   let acknowledgementSent=false;
