@@ -5,7 +5,12 @@ const methods=new Function(raw+";return {vatTermBounds,buildInvoiceVatTermReport
 const purchaseCode=readFileSync("lib/invoiceInputVat.js","utf8")
  .replace(/^import .*;\n/gm,"").replace(/^export /gm,"");
 const input=new Function("vatTermBounds",purchaseCode+
- ";return {calculateInputVatSummary,mergedVatReport,combinedVatCsv};")(methods.vatTermBounds);
+ ";return {parseKronerOre,validInvoiceDay,calculateInputVatSummary,mergedVatReport,combinedVatCsv};")(methods.vatTermBounds);
+const rawExternal=readFileSync("lib/vatExternalSales.js","utf8")
+ .replace(/^import .*;\n/gm,"").replace(/^export /gm,"");
+const external=new Function("parseKronerOre","validInvoiceDay",rawExternal+
+ ";return {validateVatExternalSale,calculateExternalSalesSummary,mergeExternalVatReport};")(
+ input.parseKronerOre,input.validInvoiceDay);
 let role="owner",failed="",writes=0,reads=[],tooMany=false;
 const tables={
  invoice_drafts:[{
@@ -17,7 +22,8 @@ const tables={
   original_invoice_number:"AS-2026-OLD",customer:{name:"Person"},
   lines:[{netOre:2000,vatOre:500,vatRate:25}],subtotal_ore:2000,vat_ore:500,total_ore:2500
  }],
- vat_purchase_documents:[]
+ vat_purchase_documents:[],
+ vat_external_sales_documents:[]
 };
 const db=()=>({from(table){
  let lower,upper;
@@ -49,8 +55,10 @@ const source=readFileSync("app/api/admin/invoices/vat-terms/route.js","utf8")
  .replace(/^export async function /gm,"async function ");
 const GET=new Function("NextResponse","getAdminUser","db","buildInvoiceVatTermReport","invoiceVatTermCsv","vatTermBounds",
  "calculateInputVatSummary","mergedVatReport","combinedVatCsv",
+ "calculateExternalSalesSummary","mergeExternalVatReport",
  source+";return GET;")(NextResponse,async()=>({role}),db,methods.buildInvoiceVatTermReport,
- methods.invoiceVatTermCsv,methods.vatTermBounds,input.calculateInputVatSummary,input.mergedVatReport,input.combinedVatCsv);
+ methods.invoiceVatTermCsv,methods.vatTermBounds,input.calculateInputVatSummary,input.mergedVatReport,input.combinedVatCsv,
+ external.calculateExternalSalesSummary,external.mergeExternalVatReport);
 const call=query=>GET({url:"https://localhost/api/admin/invoices/vat-terms?"+query});
 let r=await call("year=2026&term=5");
 assert.equal(r.status,200);
@@ -59,8 +67,21 @@ assert.equal(r.body.total.creditCount,1);
 assert.equal(r.body.total.vatOre,2000);
 assert.equal(r.body.total.grossOre,10000);
 assert.equal(r.headers["Cache-Control"],"private, no-store");
-assert.deepEqual(reads.map(x=>x.table).sort(),["invoice_credit_notes","invoice_drafts","vat_purchase_documents"]);
+assert.deepEqual(reads.map(x=>x.table).sort(),["invoice_credit_notes","invoice_drafts","vat_external_sales_documents","vat_purchase_documents"]);
 assert.equal(r.body.purchases.inputVatOre,0);
+tables.vat_external_sales_documents.push({
+ id:"ext-1",document_date:"2026-10-15",document_number:"OLD-10",customer_name:"Kunde",
+ source_system:"Conta",kind:"invoice",base_ore:20000,vat_ore:5000,voided_at:null,
+ vat_groups:{"25":{baseOre:20000,vatOre:5000}}
+});
+r=await call("year=2026&term=5");
+assert.equal(r.status,200);
+assert.equal(r.body.total.invoiceCount,2);
+assert.equal(r.body.total.vatOre,7000);
+assert.equal(r.body.comparison.differenceOre,7000);
+assert.ok(r.body.rows.some(row=>row.externalDocumentId==="ext-1"));
+tables.vat_external_sales_documents.length=0;
+
 assert.ok(reads.every(x=>x.lower==="2026-09-01"&&x.upper==="2026-10-31"));
 r=await call("year=2026&term=5&format=csv");
 assert.equal(r.status,200);
