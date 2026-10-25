@@ -343,6 +343,7 @@ export default function RentalDetailPage(){
       <h2>{item.name}</h2>
       <p>{displayDate(chosen.startDate)} – {displayDate(chosen.endDate)}</p>
       <div className="rentalBookingPrice"><b>{kr(chosen.pricing?.totalOre)}</b>{item.depositOre>0&&<span>+ depositum {kr(item.depositOre)}</span>}</div>
+      {item.depositOre>0&&<p className="muted" style={{fontSize:12,marginTop:8}}>Depositum er en separat sikkerhet for utstyret. Det trekkes eller reserveres ikke automatisk med Vipps ved denne bestillingen.</p>}
      </div>
      <div className="rentalBookingFields">
       <div className="rentalFormTwo" role="group" aria-label="Kundetype">
