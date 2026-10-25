@@ -3,6 +3,7 @@ import {useEffect,useState} from "react";
 import Link from "next/link";
 import InputVatRegisterClient from "./InputVatRegisterClient";
 import VatPurchaseCsvImport from "./VatPurchaseCsvImport";
+import {vatSettlementPreview} from "../../../../lib/vatSettlementPreview";
 
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const labels=["Januar–februar","Mars–april","Mai–juni","Juli–august","September–oktober","November–desember"];
@@ -30,6 +31,7 @@ export default function InvoiceVatTermClient(){
   setChosen({year,term});
  }
  const total=report?.total;
+ const settlement=report?vatSettlementPreview(report.comparison):null;
  return <main className="admin" style={{maxWidth:1200,margin:"0 auto",padding:24}}>
   <p><Link href="/admin/faktura/arkiv">← Tilbake til fakturaarkivet</Link></p>
   <p><Link href="/admin/faktura/systima">Systima: tilkoblingsstatus og API-oppsett</Link></p>
@@ -59,6 +61,36 @@ export default function InvoiceVatTermClient(){
   {loading&&<p role="status">Kontrollerer alle fakturaer og kreditnotaer i terminen …</p>}
   {error&&<p role="alert" style={{color:"#a52a21"}}>{error} Rapporttall vises ikke hvis grunnlaget er ufullstendig.</p>}
   {report&&!loading&&<>
+   <section className="card" aria-labelledby="vat-outcome-title"
+    style={{padding:18,marginBottom:18,border:"2px solid #b5c5c3"}}>
+    <h2 id="vat-outcome-title" style={{margin:"0 0 7px"}}>
+     Hva ligger du an til i MVA? – {report.period.title}
+    </h2>
+    {settlement?<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",
+     gap:14,alignItems:"end",margin:"14px 0"}}>
+     <div style={{padding:"8px 0"}}>
+      <small style={{display:"block"}}>Utgående MVA fra registrerte salg</small>
+      <strong>{money(report.comparison.outputVatOre)}</strong>
+     </div>
+     <div style={{padding:"8px 0"}}>
+      <small style={{display:"block"}}>Registrert fradragsberettiget inngående MVA</small>
+      <strong>{money(report.comparison.inputVatOre)}</strong>
+     </div>
+     <div style={{padding:"10px 0",borderTop:"2px solid currentColor"}}>
+      <small style={{display:"block",fontWeight:700}}>{settlement.label}</small>
+      <strong style={{display:"block",fontSize:"clamp(24px,5vw,34px)",lineHeight:1.2}}>
+       {money(settlement.amountOre)}
+      </strong>
+     </div>
+    </div>:<p role="alert">MVA-beløpet kan ikke beregnes trygt fra rapporten.</p>}
+    <p style={{fontSize:13,lineHeight:1.55,marginBottom:0}}>
+     <strong>Dette er bare en foreløpig beregning, ikke et betalingskrav eller en godkjent tilbakebetaling.</strong>
+     {" "}Tallet er utgående MVA minus registrert fradragsberettiget inngående MVA
+     i Aadland Service. Kjøp, salg og øvrige MVA-poster som bare ligger i regnskapssystemet,
+     er ikke nødvendigvis med. Sammenlign med regnskapet og MVA-meldingen før du betaler eller
+     forventer penger tilbake fra Skatteetaten.
+    </p>
+   </section>
    <div id="mobilkvittering"/>
    <InputVatRegisterClient purchases={report.purchases.rows} period={report.period}
     onChanged={()=>setReload(n=>n+1)}/>
