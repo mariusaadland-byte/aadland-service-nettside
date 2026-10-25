@@ -203,16 +203,16 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   <h3 style={{margin:"0 0 7px"}}>1. Ta bilde eller velg kvittering</h3>
   <p style={{fontSize:13,margin:"0 0 11px"}}>Etter at du har tatt bildet, foreslår vi automatisk et utsnitt rundt kvitteringen. Du kan justere det før beløpene leses.</p>
   <p style={{fontSize:13,margin:"0 0 12px"}}>
-   Vi leser kvitteringens tekst på telefonen når det er mulig. Originalfilen lastes først opp privat etter at du har kontrollert og registrert bilaget.
+   Vi leser kvitteringens tekst på telefonen når det er mulig. Etter du har godkjent utsnittet, leser systemet teksten. Ved beskjæring lagres en JPEG-kopi av kvitteringen, mens originalbildet må beholdes i regnskapet.
   </p>
   <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
    <label style={{flex:"1 1 150px",fontWeight:700}}>📷 Ta bilde
     <input aria-label="Ta bilde av kvittering" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"
-     disabled={disabled||busy} onChange={choose} style={{display:"block",width:"100%",marginTop:7,fontSize:13}}/>
+     disabled={disabled||busy||Boolean(cropJob)} onChange={choose} style={{display:"block",width:"100%",marginTop:7,fontSize:13}}/>
    </label>
    <label style={{flex:"1 1 150px",fontWeight:700}}>📁 Velg bilde eller PDF
     <input aria-label="Velg kvittering fra telefonen" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/jpeg,image/png,image/webp"
-     disabled={disabled||busy} onChange={choose} style={{display:"block",width:"100%",marginTop:7,fontSize:13}}/>
+     disabled={disabled||busy||Boolean(cropJob)} onChange={choose} style={{display:"block",width:"100%",marginTop:7,fontSize:13}}/>
    </label>
   </div>
   <p style={{fontSize:12,color:"#49645c"}}>PDF maks 4 MB. Bilder opptil 25 MB kan gjøres om til en JPEG-kopi ved behov. Beskjæring og OCR utføres lokalt på telefonen. Lesemotor og språkfiler lastes fra en ekstern leverandør.</p>
