@@ -1,5 +1,6 @@
 import {NextResponse} from "next/server";
 import {db,fromDbRentalItem} from "../../../../lib/supabase";
+import {countedRentalBookings} from "../../../../lib/rentalAvailability";
 
 function validMonth(value){
  const input=String(value||"");
@@ -68,7 +69,7 @@ export async function GET(req){
    .lte("start_date",queryEnd)
    .gte("end_date",queryStart),
   s.from("rental_bookings")
-   .select("start_date,end_date,status")
+   .select("start_date,end_date,status,payment_status,payment_reference,payment_due_at")
    .eq("rental_item_id",item.id)
    .in("status",["new","confirmed","active"])
    .lte("start_date",queryEnd)
@@ -84,7 +85,7 @@ export async function GET(req){
   start:shiftDate(entry.start_date,-buffer),
   end:shiftDate(entry.end_date,buffer)
  }));
- const bookingPeriods=(bookings||[]).map(entry=>({
+ const bookingPeriods=countedRentalBookings(bookings).map(entry=>({
   start:shiftDate(entry.start_date,-buffer),
   end:shiftDate(entry.end_date,buffer)
  }));

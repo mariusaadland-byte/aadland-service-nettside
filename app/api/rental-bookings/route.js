@@ -10,7 +10,7 @@ import {rentalBillingDecision} from "../../../lib/rentalBilling";
 import {rentalCustomerClassification} from "../../../lib/rentalCustomerType";
 import {vippsUnitReadiness} from "../../../lib/vippsReadiness";
 import {createRentalPaymentLinkToken} from "../../../lib/rentalPaymentLink";
-import {peakRentalBookings} from "../../../lib/rentalAvailability";
+import {peakRentalBookings,countedRentalBookings} from "../../../lib/rentalAvailability";
 
 const RENTAL_TERMS_VERSION="2026-10";
 
@@ -63,7 +63,7 @@ function money(ore){
  return (Number(ore||0)/100).toLocaleString("nb-NO",{minimumFractionDigits:0,maximumFractionDigits:2})+" kr";
 }
 
-function acknowledgementHtml({bookingNumber,name,item,startDate,endDate,totalOre,depositOre,minSideUrl,accountUrl,billing,guestPaymentUrl}){
+function acknowledgementHtml({bookingNumber,name,item,startDate,endDate,totalOre,depositOre,minSideUrl,accountUrl,billing,guestPaymentUrl,pendingPayment=false}){
  const creditText=billing?.reason==="credit-limit"&&billing?.creditLimitOre
   ?`<p style="margin:12px 0 0;color:#d9b365;font-size:12px;line-height:1.55">Bookingen er reservert, men tilgjengelig kreditt må avklares før endelig leiebekreftelse sendes.</p>`
   :"";
@@ -73,14 +73,14 @@ function acknowledgementHtml({bookingNumber,name,item,startDate,endDate,totalOre
 <tr><td style="padding:28px 30px;background:#0d0d0d;color:#fff"><div style="font-size:18px;font-weight:900;letter-spacing:.13em">AADLAND UTLEIE</div><div style="margin-top:5px;color:#d9b365;font-size:11px;letter-spacing:.08em">BOOKING REGISTRERT</div></td></tr>
 <tr><td style="padding:30px">
 <div style="color:#d9b365;font-size:11px;font-weight:800;letter-spacing:.12em">${esc(bookingNumber)}</div>
-<h1 style="font-size:27px;line-height:1.15;margin:9px 0 14px;color:#fff">Leieperioden er reservert</h1>
+<h1 style="font-size:27px;line-height:1.15;margin:9px 0 14px;color:#fff">${pendingPayment?"Midlertidig reservasjon – 30 minutter":"Leieperioden er reservert"}</h1>
 <p style="color:#c9c3b8;line-height:1.65;margin:0 0 20px">Hei ${esc(name)}! Bookingen av ${esc(item.name)} er registrert automatisk fordi perioden er ledig.</p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#101010;border:1px solid #2d2d2d">
 <tr><td style="padding:12px 14px;color:#8e887f;font-size:11px">Periode</td><td style="padding:12px 14px;color:#fff;font-weight:700;text-align:right">${esc(startDate)} – ${esc(endDate)}</td></tr>
 <tr><td style="padding:12px 14px;color:#8e887f;font-size:11px;border-top:1px solid #2d2d2d">Leiepris</td><td style="padding:12px 14px;color:#fff;font-weight:700;text-align:right;border-top:1px solid #2d2d2d">${esc(money(totalOre))}</td></tr>
 ${depositOre?`<tr><td style="padding:12px 14px;color:#8e887f;font-size:11px;border-top:1px solid #2d2d2d">Depositum</td><td style="padding:12px 14px;color:#fff;font-weight:700;text-align:right;border-top:1px solid #2d2d2d">${esc(money(depositOre))}</td></tr>`:""}
 </table>
-<p style="color:#c9c3b8;line-height:1.65;margin:20px 0 0">Endelig leiebekreftelse sendes automatisk når betalingen er registrert, eller med en gang dersom kunden er godkjent for faktura/kreditt.</p>
+<p style="color:#c9c3b8;line-height:1.65;margin:20px 0 0">${pendingPayment?"Fullfør Vipps-betalingen innen 30 minutter. Reservasjonen faller bort dersom betaling ikke blir startet innen fristen.":"Endelig leiebekreftelse sendes når betalingen er registrert, eller med en gang dersom kunden er godkjent for faktura/kreditt."}</p>
 ${creditText}
 ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:`<a href="${esc(minSideUrl)}" style="display:inline-block;margin-top:20px;border:1px solid #d7a74e;color:#d7a74e;text-decoration:none;font-weight:900;padding:12px 18px">Opprett Min side →</a><p style="margin:10px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Opprett konto med samme e-postadresse, så kobles utleien automatisk til kontoen din.</p>`}
 ${guestPaymentUrl?`<a href="${esc(guestPaymentUrl)}" style="display:inline-block;margin-top:12px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Betal leien med Vipps →</a><p style="margin:10px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Vipps gjelder bare leiebeløpet. Eventuelt depositum håndteres separat.</p>`:""}
@@ -147,10 +147,10 @@ export async function POST(req){
 
   const [{data:blocks,error:blockError},{data:bookings,error:bookingError}]=await Promise.all([
    s.from("rental_blocks").select("id").eq("rental_item_id",item.id).lte("start_date",to).gte("end_date",from),
-   s.from("rental_bookings").select("id,start_date,end_date").eq("rental_item_id",item.id).in("status",["new","confirmed","active"]).lte("start_date",to).gte("end_date",from)
+   s.from("rental_bookings").select("id,start_date,end_date,status,payment_status,payment_reference,payment_due_at").eq("rental_item_id",item.id).in("status",["new","confirmed","active"]).lte("start_date",to).gte("end_date",from)
   ]);
   if(blockError||bookingError)throw blockError||bookingError;
-  if((blocks?.length||0)>0||peakRentalBookings(bookings,b.startDate,b.endDate,buffer)>=Math.max(1,Number(item.quantity)||1)){
+  if((blocks?.length||0)>0||peakRentalBookings(countedRentalBookings(bookings),b.startDate,b.endDate,buffer)>=Math.max(1,Number(item.quantity)||1)){
    return NextResponse.json({error:"Utstyret er allerede opptatt i denne perioden."},{status:409});
   }
 
@@ -174,7 +174,11 @@ export async function POST(req){
    if(!billing.eligible)
     return NextResponse.json({error:"Bedriftskontoen er ikke godkjent for faktura, eller har for lite tilgjengelig kreditt. Kontakt oss før bestilling."},{status:403});
   }
-  const siteOrigin=rentalRequestSiteUrl(req)||rentalSiteUrl(req);
+  // A private booking gets a 30-minute unpaid hold only after rental Vipps is verified ready.
+ // The currently disabled rental unit retains its legacy non-expiring workflow.
+ const paymentReady=customerType.type==="private"&&(await vippsUnitReadiness(s,"rental")).ready===true;
+ const pendingPayment=paymentReady;
+ const siteOrigin=rentalRequestSiteUrl(req)||rentalSiteUrl(req);
   const bookingNumber=num();
   const snapshot={
    dailyPriceOre:item.dailyPriceOre,
@@ -197,7 +201,8 @@ export async function POST(req){
    price_snapshot:snapshot,
    total_ore:p.totalOre,
    deposit_ore:p.depositOre,
-   terms_version:RENTAL_TERMS_VERSION
+   terms_version:RENTAL_TERMS_VERSION,
+   pending_payment:pendingPayment
   };
 
   const {data:newBookingId,error:insertError}=await s.rpc("create_rental_booking_if_available",{
@@ -213,6 +218,11 @@ export async function POST(req){
    throw insertError;
   }
 
+  const {data:hold,error:holdError}=pendingPayment?await s.from("rental_bookings").select("payment_due_at").eq("id",newBookingId).single():{data:null,error:null};
+  if(holdError)console.error("RENTAL CHECKOUT DEADLINE LOOKUP",holdError);
+  const paymentDueAt=hold?.payment_due_at||null;
+  const paymentLink=pendingPayment?createRentalPaymentLinkToken({...bookingRecord,id:newBookingId},{maxAgeSeconds:30*60}):null;
+  const paymentUrl=pendingPayment&&paymentLink?siteOrigin+"/betaling/utleie?booking="+encodeURIComponent(newBookingId)+"#token="+encodeURIComponent(paymentLink.token):"";
   const resendKey=rentalResendApiKey();
   let confirmationSent=false;
   let acknowledgementSent=false;
@@ -225,13 +235,9 @@ export async function POST(req){
    const minSideUrl=siteOrigin+"/min-side";
    const accountUrl=customerUserId?minSideUrl:"";
    let guestPaymentUrl="";
-   if(customerType.type==="private"&&!billing.eligible&&!customerUserId){
+   if(pendingPayment){
     try{
-     const readiness=await vippsUnitReadiness(s,"rental");
-     if(readiness.ready===true){
-      const paymentLink=createRentalPaymentLinkToken({...bookingRecord,id:newBookingId,status:"confirmed"});
-      guestPaymentUrl=siteOrigin+"/betaling/utleie?booking="+encodeURIComponent(newBookingId)+"#token="+encodeURIComponent(paymentLink.token);
-     }
+     guestPaymentUrl=paymentUrl;
     }catch(error){
      console.error("RENTAL BOOKING PAYMENT LINK",error);
     }
@@ -259,7 +265,7 @@ export async function POST(req){
     try{
      const customerHtml=acknowledgementHtml({
       bookingNumber,name,item,startDate:b.startDate,endDate:b.endDate,
-      totalOre:p.totalOre,depositOre:p.depositOre,minSideUrl,accountUrl,billing,guestPaymentUrl
+      totalOre:p.totalOre,depositOre:p.depositOre,minSideUrl,accountUrl,billing,guestPaymentUrl,pendingPayment
      });
      const result=await resend.emails.send({
       from:sender,
@@ -298,6 +304,7 @@ export async function POST(req){
       "",
       confirmationSent
        ?"Endelig leiebekreftelse er sendt automatisk (faktura/kreditt godkjent)."
+       :pendingPayment?"Midlertidig reservert i 30 minutter. Endelig booking krever Vipps-godkjenning."
        :"Perioden er reservert automatisk. Endelig leiebekreftelse venter på betaling eller godkjent faktura/kreditt."
      ].filter(Boolean).join("\n")
     });
@@ -311,12 +318,17 @@ export async function POST(req){
    bookingNumber,
    totalOre:p.totalOre,
    depositOre:p.depositOre,
-   autoConfirmed:true,
+   autoConfirmed:!pendingPayment,
+   paymentPending:pendingPayment,
+   paymentDueAt,
+   paymentUrl,
    confirmationSent,
    acknowledgementSent,
    billingReason:billing.reason,
    message:confirmationSent
     ?"Bookingen er bekreftet. Sjekk innboks og søppelpost for leiebekreftelsen."
+     :pendingPayment
+      ?"Utstyret er holdt av i 30 minutter. Fullfør Vipps-betalingen for å bekrefte bookingen."
     :acknowledgementSent
       ?"Bookingen er registrert og perioden er reservert. Sjekk innboks og søppelpost for bookingbekreftelse og betalingsinformasjon."
       :"Bookingen er registrert og perioden er reservert, men e-posten kunne ikke sendes. Kontakt oss hvis du trenger bekreftelsen."

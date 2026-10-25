@@ -7,7 +7,7 @@ import {buildReceiptPdf,receiptPdfFilename} from "../../../../lib/receiptPdf";
 import {rentalBookingSiteUrl,rentalEmailFrom,rentalReplyTo,rentalResendApiKey} from "../../../../lib/rentalEmailConfig";
 import {sendManualRentalRefundNotice} from "../../../../lib/rentalRefundNotice";
 import {sendRentalConfirmation} from "../../../../lib/rentalConfirmationEmail";
-import {peakRentalBookings} from "../../../../lib/rentalAvailability";
+import {peakRentalBookings,countedRentalBookings} from "../../../../lib/rentalAvailability";
 import {startRentalVippsPayment} from "../../../../lib/startRentalVippsPayment";
 
 async function canView(){
@@ -59,6 +59,8 @@ const map=b=>({
  refundNoticeSentAt:b.refund_notice_sent_at||null,
  receiptSentAt:b.receipt_sent_at||null,
  depositStatus:b.deposit_status||"not_paid",
+ paymentDueAt:b.payment_due_at||null,
+ checkoutHoldExpired:Boolean(b.status==="new"&&b.payment_status==="unpaid"&&!b.payment_reference&&b.payment_due_at&&Date.parse(b.payment_due_at)<=Date.now()),
  depositReference:b.deposit_reference||"",
  depositHeldOre:Number(b.deposit_held_ore)||0,
  depositReceivedAt:b.deposit_received_at||null,
@@ -95,7 +97,7 @@ async function checkAvailability(s,booking){
  const to=end.toISOString().slice(0,10);
 
  const [{data:conflicts,error:conflictError},{data:blocks,error:blockError}]=await Promise.all([
-  s.from("rental_bookings").select("id,start_date,end_date")
+  s.from("rental_bookings").select("id,start_date,end_date,status,payment_status,payment_reference,payment_due_at")
    .eq("rental_item_id",booking.rental_item_id)
    .neq("id",booking.id)
    .in("status",["new","confirmed","active"])
@@ -107,7 +109,7 @@ async function checkAvailability(s,booking){
    .gte("end_date",from)
  ]);
  if(conflictError||blockError)return {error:"Tilgjengelighet kunne ikke kontrolleres.",status:500};
- if((blocks?.length||0)>0||peakRentalBookings(conflicts,booking.start_date,booking.end_date,buffer)>=Math.max(1,Number(item.quantity)||1)){
+ if((blocks?.length||0)>0||peakRentalBookings(countedRentalBookings(conflicts),booking.start_date,booking.end_date,buffer)>=Math.max(1,Number(item.quantity)||1)){
   return {error:"Kan ikke bekrefte: utstyret er opptatt eller manuelt blokkert i perioden.",status:409};
  }
  return {item};

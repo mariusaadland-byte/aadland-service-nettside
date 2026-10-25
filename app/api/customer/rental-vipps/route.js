@@ -28,7 +28,7 @@ export async function POST(req){
  if(!s)return NextResponse.json({error:"Betaling er midlertidig utilgjengelig."},{status:503});
 
  const {data:booking,error:bookingError}=await s.from("rental_bookings")
-  .select("id,booking_number,customer_user_id,customer,status,total_ore,deposit_ore,payment_status,payment_provider,payment_reference,payment_psp_reference,payment_reserved_ore,payment_captured_ore,payment_refunded_ore,vipps_checkout_started_at")
+  .select("id,booking_number,customer_user_id,customer,status,total_ore,deposit_ore,payment_status,payment_provider,payment_reference,payment_psp_reference,payment_reserved_ore,payment_captured_ore,payment_refunded_ore,payment_due_at,vipps_checkout_started_at")
   .eq("id",bookingId)
   .eq("customer_user_id",customerUserId)
   .maybeSingle();

@@ -1,0 +1,26 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const src=readFileSync("lib/rentalAvailability.js","utf8").replace(/^export /gm,"");
+const {countedRentalBookings}=new Function(src+";return {countedRentalBookings};")();
+const date="2026-10-25T18:00:00Z";
+const b=(status,payment_status,payment_due_at,payment_reference=null)=>({status,payment_status,payment_due_at,payment_reference});
+assert.equal(countedRentalBookings([b("new","unpaid","2026-10-25T17:59:59Z")],date).length,0);
+assert.equal(countedRentalBookings([b("new","unpaid","2026-10-25T18:01:00Z")],date).length,1);
+assert.equal(countedRentalBookings([b("new","pending","2026-10-25T17:59:59Z","ref")],date).length,1);
+assert.equal(countedRentalBookings([b("new","authorized","2026-10-25T17:59:59Z","ref")],date).length,1);
+assert.equal(countedRentalBookings([b("confirmed","unpaid",null)],date).length,1);
+assert.equal(countedRentalBookings([b("new","unpaid",null)],date).length,1);
+for(const p of ["app/api/rental/calendar/route.js","app/api/rental/route.js","app/api/admin/rental-bookings/route.js","app/api/rental-bookings/route.js"])
+ assert.ok(readFileSync(p,"utf8").includes("countedRentalBookings("),p+" must ignore expired unused holds");
+const booking=readFileSync("app/api/rental-bookings/route.js","utf8");
+assert.ok(booking.includes('paymentReady=customerType.type==="private"'));
+assert.ok(booking.includes('pending_payment:pendingPayment'));
+assert.ok(booking.includes("paymentPending:pendingPayment"));
+const payment=readFileSync("lib/startRentalVippsPayment.js","utf8");
+assert.ok(payment.includes('["new","confirmed"].includes(booking.status)'));
+assert.ok(payment.includes('claim.gt("payment_due_at",startedAt)'));
+const sql=readFileSync("supabase/migrations/20261025190000_private_rental_checkout_hold.sql","utf8");
+assert.ok(sql.includes("payment_reference is null"));
+assert.ok(sql.includes("payment_status='unpaid'"));
+assert.ok(sql.includes("new.payment_status='authorized'"));
+console.log("Tidsbegrenset, betalingsbeskyttet utleiereservasjon: testene bestått.");

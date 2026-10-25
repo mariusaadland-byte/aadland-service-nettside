@@ -182,6 +182,7 @@ export default function RentalDetailPage(){
  const [fulfillment,setFulfillment]=useState("pickup");
  const [booking,setBooking]=useState(false);
  const [message,setMessage]=useState("");
+ const [paymentUrl,setPaymentUrl]=useState("");
  const [refreshKey,setRefreshKey]=useState(0);
  const [activeImage,setActiveImage]=useState(0);
  const [repeatFulfillment,setRepeatFulfillment]=useState("");
@@ -245,6 +246,7 @@ export default function RentalDetailPage(){
   setFulfillment(preferred);
   setRepeatFulfillment("");
   setMessage("");
+  setPaymentUrl("");
   window.setTimeout(()=>document.getElementById("booking")?.scrollIntoView({behavior:"smooth",block:"start"}),50);
  }
 
@@ -271,6 +273,7 @@ export default function RentalDetailPage(){
    const data=await response.json().catch(()=>({}));
    if(!response.ok)throw new Error(data.error||"Kunne ikke sende booking.");
    setMessage(data.message||("Booking "+data.bookingNumber+" er registrert. Sjekk innboks og søppelpost for e-post om leien."));
+   setPaymentUrl(data.paymentPending?data.paymentUrl||"":"");
    setChosen(null);
    setAccepted(false);
    setCustomerType("private");
@@ -330,7 +333,7 @@ export default function RentalDetailPage(){
    </div>
   </section>
 
-  {message&&<div className="catalogWrap"><div className="rentalMessage success"><b>Booking registrert</b><p>{message}</p><p><strong>Finner du ikke e-posten, sjekk søppelpost/spam.</strong></p>{customerAccount&&<Link className="catalogGoldButton" href="/min-side">Se bookingen på Min side →</Link>}</div></div>}
+  {message&&<div className="catalogWrap"><div className="rentalMessage success"><b>{paymentUrl?"Fullfør betalingen":"Booking registrert"}</b><p>{message}</p>{paymentUrl&&<a className="catalogGoldButton" href={paymentUrl}>Gå videre til Vipps-betaling →</a>}<p><strong>Finner du ikke e-posten, sjekk søppelpost/spam.</strong></p>{customerAccount&&<Link className="catalogGoldButton" href="/min-side">Se bookingen på Min side →</Link>}</div></div>}
   {error&&<div className="catalogWrap"><div className="rentalMessage notice"><b>Noe gikk galt</b><p>{error}</p></div></div>}
 
   {canFulfill&&item.status==="available"&&<div className="catalogWrap rentalDetailCalendarWrap"><RentalCalendar item={item} onChoose={choosePeriod} refreshKey={refreshKey}/></div>}

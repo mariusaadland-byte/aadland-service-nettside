@@ -13,6 +13,7 @@ function publicStatus(booking,ready){
  const captured=Math.max(0,Number(booking.payment_captured_ore)||0);
  const refunded=Math.max(0,Number(booking.payment_refunded_ore)||0);
  const settled=captured>refunded||["authorized","paid","refunded"].includes(paymentStatus);
+ const holdExpired=booking.status==="new"&&paymentStatus==="unpaid"&&!booking.payment_reference&&Boolean(booking.payment_due_at)&&Date.parse(booking.payment_due_at)<=Date.now();
  return {
   bookingNumber:booking.booking_number,
   itemName:booking.rental_items?.name||"Utleie",
@@ -22,8 +23,10 @@ function publicStatus(booking,ready){
   totalOre:Math.max(0,Number(booking.total_ore)||0),
   depositOre:Math.max(0,Number(booking.deposit_ore)||0),
   paymentStatus,
+  paymentDueAt:booking.payment_due_at||null,
+  holdExpired,
   vippsAvailable:ready===true,
-  canPay:ready===true&&booking.status==="confirmed"&&!settled
+  canPay:ready===true&&["new","confirmed"].includes(booking.status)&&!holdExpired&&!settled
  };
 }
 
@@ -50,7 +53,7 @@ export async function POST(req){
  if(!s)return NextResponse.json({error:"Betaling er midlertidig utilgjengelig."},{status:503});
 
  const {data:booking,error}=await s.from("rental_bookings")
-  .select("id,booking_number,customer_user_id,customer,start_date,end_date,status,total_ore,deposit_ore,payment_status,payment_provider,payment_reference,payment_psp_reference,payment_reserved_ore,payment_captured_ore,payment_refunded_ore,vipps_checkout_started_at,rental_items(name)")
+  .select("id,booking_number,customer_user_id,customer,start_date,end_date,status,total_ore,deposit_ore,payment_status,payment_provider,payment_reference,payment_psp_reference,payment_reserved_ore,payment_captured_ore,payment_refunded_ore,payment_due_at,vipps_checkout_started_at,rental_items(name)")
   .eq("id",bookingId)
   .maybeSingle();
 
