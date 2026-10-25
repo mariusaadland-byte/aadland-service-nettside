@@ -4,7 +4,9 @@
 
 Dette er en **manuell og kontrollert CSV-import**. Det er ikke en direkte Systima-integrasjon, ikke en automatisk regnskapsføring, og ikke en innsending av MVA-melding. Originalbilag må beholdes i regnskapssystemet. Bilagene her er bare en intern avstemmingskopi.
 
-Gå til **Admin → Fakturaarkiv → MVA-avstemming**. Åpne CSV-import, last ned malen og lim inn eksporterte data i malens eksakte kolonnerekkefølge. Lagre CSV som **UTF-8 med semikolon (;)**. Systemet aksepterer maks 50 rader og 256 KB per import.
+Gå til **Admin → Fakturaarkiv → MVA-avstemming**. Åpne CSV-import. Du kan enten bruke Aadland-malen direkte (UTF-8, semikolon), eller laste opp en CSV-eksport fra et annet regnskapssystem og manuelt velge hvilke eksportkolonner som tilsvarer Aadland-feltene. Komma, semikolon og tabulator som skilletegn støttes i denne feltmappingen. Systemet aksepterer maks 50 rader og 256 KB per import.
+
+**Ved feltmapping:** Du må bekrefte at filen gjelder Aadland Service, velge alle obligatoriske felt, og koble både MVA-grunnlag og MVA-beløp for minst én sats. Datoer og beløp valideres senere i samme kontroll. Vi gjetter aldri MVA ut fra bokføringskonto, MVA-kode, bruttosum eller en prosent du ikke selv har dokumentert. Filen blir ikke en regnskapsmessig primærkilde: kontroller originalbilaget, fradragsandelen og eventuell kreditnotareferanse. Eksterne CSV-filer kan inneholde ulike linjer for samme bilag; disse blir markert som duplikater fremfor slått sammen automatisk.
 
 | Felt | Betydning |
 |---|---|
