@@ -67,7 +67,6 @@ assert.throws(()=>mapExternalVatRows(source,{...mapping,leverandor:""}),/leveran
 assert.throws(()=>mapExternalVatRows(source,{...mapping,mva_25:""}),/Grunnlag og MVA/);
 assert.throws(()=>mapExternalVatRows(source,{...mapping,mva_25:"Eks 25"}),/Samme eksportkolonne/);
 assert.throws(()=>mapExternalVatRows(source,{...mapping,mva_25:"Not real"}),/finnes ikke/);
-assert.throws(()=>mapExternalVatRows(source,{...mapping,type:"Firma",leverandor:"Bilagstype"}),/.*?/); // Valid mapping, not a CSV syntax error
 assert.throws(()=>mapExternalVatRows(source,{...mapping,unsupported:"X"}),/Ukjent målkolonne/);
 assert.throws(()=>parseExternalVatCsv("K;K\nA;B"),/samme overskrift/);
 assert.throws(()=>parseExternalVatCsv("K;Other\nA"),/kolonner/);
