@@ -1,6 +1,7 @@
 "use client";
 import {useState} from "react";
 import VatOriginalAttachment from "./VatOriginalAttachment";
+import VatReceiptScanner from "./VatReceiptScanner";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const today=()=>new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe/Oslo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 const blank=()=>({0:{base:"",vat:""},12:{base:"",vat:""},15:{base:"",vat:""},25:{base:"",vat:""}});
@@ -19,6 +20,37 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   deductionConfirmed:false,bankConditionConfirmed:false
  });
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[success,setSuccess]=useState("");
+ const [receiptFile,setReceiptFile]=useState(null);
+ const [scanBusy,setScanBusy]=useState(false);
+ const [attachmentIssue,setAttachmentIssue]=useState(null);
+ const chooseReceipt=file=>{
+  setReceiptFile(file);setAttachmentIssue(null);setError("");setSuccess("");
+  setForm(x=>({...x,supplierName:"",documentNumber:"",documentDate:"",
+   groups:blank(),evidenceReference:"Aadland MVA – privat originalvedlegg",
+   documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
+ };
+ const receiveScan=result=>setForm(x=>({...x,
+  supplierName:result.supplierName||"",documentNumber:result.documentNumber||"",
+  documentDate:result.documentDate||"",groups:{...blank(),...result.groups}
+ }));
+ const attachToDocument=async(id,file)=>{
+  const payload=new FormData();payload.append("documentId",id);payload.append("file",file);
+  const response=await fetch("/api/admin/invoices/vat-attachments",{method:"POST",body:payload});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error(data.error||"Originalbilaget kunne ikke lagres.");
+  return data;
+ };
+ const retryAttachment=async()=>{
+  if(!attachmentIssue||busy)return;
+  setBusy(true);setError("");
+  try{
+   await attachToDocument(attachmentIssue.documentId,attachmentIssue.file);
+   setAttachmentIssue(null);
+   setSuccess("Originalbilaget er nå lagret privat og knyttet til bilaget.");
+   onChanged?.();
+  }catch(e){setError("Originalbilaget er fortsatt ikke lagret: "+(e.message||"ukjent feil"));}
+  finally{setBusy(false);}
+ };
  const set=(name,value)=>setForm(x=>({...x,[name]:value}));
  const setGroup=(rate,key,value)=>setForm(x=>({...x,groups:{...x.groups,[rate]:{...x.groups[rate],[key]:value}}}));
  let netTotal=0,vatTotal=0,valid=true;
@@ -33,6 +65,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const deductible=Math.round(vatTotal*percent/100);
  const submit=async e=>{
   e.preventDefault();setError("");setSuccess("");
+  if(scanBusy){setError("Kvitteringen leses fortsatt. Vent til lesingen er ferdig.");return;}
   if(!valid||netTotal<=0){setError("Kontroller grunnlag og MVA på hver sats (avrundingsavvik maks 0,05 kr).");return;}
   const question="Registrere et kontrollert leverandørbilag i intern MVA-avstemming?\n\n"+
    form.supplierName+" – "+form.documentNumber+"\nDokumentdato: "+form.documentDate+
@@ -49,7 +82,21 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    });
    const data=await response.json();
    if(!response.ok)throw Error(data.error||"Bilaget kunne ikke lagres.");
-   setSuccess("Bilaget er registrert. MVA-oversikten oppdateres.");
+   const documentId=data.document?.id;
+   let attachmentSaved=!receiptFile;
+   if(receiptFile&&documentId){
+    try{
+     await attachToDocument(documentId,receiptFile);
+     attachmentSaved=true;
+     setAttachmentIssue(null);
+    }catch(attachmentError){
+     setAttachmentIssue({documentId,file:receiptFile,message:attachmentError.message||"Ukjent feil"});
+    }
+   }
+   setSuccess(attachmentSaved
+    ?receiptFile?"Bilaget og kvitteringsbildet er lagret privat. MVA-oversikten oppdateres.":"Bilaget er registrert. MVA-oversikten oppdateres."
+    :"Bilaget er registrert, men originalfilen er IKKE lagret. Bruk knappen nedenfor for å prøve igjen.");
+   setReceiptFile(null);
    setForm(x=>({...x,documentNumber:"",originalDocumentNumber:"",
     evidenceReference:"",businessPurpose:"",groups:blank(),
     documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
@@ -80,6 +127,12 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   <p style={{fontSize:13}}>Dette er <strong>manuelle referanser til faktiske bilag</strong> i regnskapet,
    ikke import av leverandørprislisten. Ta med originalfakturaens dokumentdato og MVA-beløp.
    Leverandørkreditnotaer reduserer inngående MVA i sin utstedelsestermin.</p>
+  <VatReceiptScanner onSelected={chooseReceipt} onExtracted={receiveScan}
+   onBusyChange={setScanBusy} disabled={busy}/>
+  {receiptFile&&<p style={{fontSize:13,background:"#f1faf3",padding:10,borderRadius:8}}>
+   <strong>Valgt originalfil:</strong> {receiptFile.name}. Filen lagres automatisk privat etter at du godkjenner bilaget.
+   <button type="button" style={{marginLeft:10}} disabled={busy||scanBusy} onClick={()=>setReceiptFile(null)}>Ikke legg ved filen</button>
+  </p>}
   <form onSubmit={submit} style={{display:"grid",gap:12}}>
    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:10}}>
     <label>Type bilag
@@ -147,13 +200,18 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    {form.kind==="purchase"&&netTotal+vatTotal>=1000000&&<label><input type="checkbox" checked={form.bankConditionConfirmed}
     onChange={e=>set("bankConditionConfirmed",e.target.checked)}/>
     Jeg har kontrollert kravet om betaling via bank for kjøp på minst 10 000 kr inkl. MVA.</label>}
-   <button type="submit" disabled={busy||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||
+   <button type="submit" disabled={busy||scanBusy||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||
     (form.kind==="purchase"&&netTotal+vatTotal>=1000000&&!form.bankConditionConfirmed)}>
     {busy?"Lagrer …":"Registrer kontrollert bilag"}
    </button>
   </form>
   {error&&<p role="alert" style={{color:"#a52a21"}}>{error}</p>}
   {success&&<p role="status">{success}</p>}
+  {attachmentIssue&&<section role="alert" style={{background:"#fff1e9",border:"1px solid #df9f80",padding:13,borderRadius:10}}>
+   <strong>Originalbilaget mangler.</strong>
+   <p>Registreringen er allerede lagret. Ikke registrer samme bilag på nytt. {attachmentIssue.message}</p>
+   <button type="button" disabled={busy} onClick={retryAttachment}>{busy?"Laster opp …":"Prøv å laste opp originalen igjen"}</button>
+  </section>}
   <h3 style={{marginTop:22}}>Registrerte bilag i {period.title}</h3>
   {purchases.length===0?<p>Ingen manuelt registrerte leverandørbilag i denne terminen.</p>:
    <div style={{display:"grid",gap:8}}>{purchases.map(doc=><div key={doc.id}
@@ -167,7 +225,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
      id:doc.id,documentNumber:doc.documentNumber})}>Opphev registrering</button></div>
    </div>)}</div>}
   <p style={{fontSize:12,marginTop:15}}>
-   <strong>Viktig:</strong> Du kan laste opp PDF eller bilde etter at bilaget er registrert. Filen lagres privat og kan ikke overskrives. Originalbilaget må fortsatt oppbevares i regnskapssystemet.
+   <strong>Viktig:</strong> Ta bilde eller velg PDF før registrering; originalen lagres privat sammen med bilaget. OCR-forslag må kontrolleres, og bilaget må fortsatt oppbevares i regnskapssystemet.
    Denne oversikten garanterer ikke fradragsrett og erstatter ikke bokføring eller MVA-melding.
   </p>
  </section>;
