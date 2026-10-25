@@ -2,6 +2,7 @@
 import {useState} from "react";
 import VatOriginalAttachment from "./VatOriginalAttachment";
 import VatReceiptScanner from "./VatReceiptScanner";
+import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const today=()=>new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe/Oslo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 const blank=()=>({0:{base:"",vat:""},12:{base:"",vat:""},15:{base:"",vat:""},25:{base:"",vat:""}});
@@ -26,6 +27,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const [ocrMismatchChecked,setOcrMismatchChecked]=useState(false);
  const [scanBusy,setScanBusy]=useState(false);
  const [attachmentIssue,setAttachmentIssue]=useState(null);
+ const documentPeriod=vatDocumentPeriod(form.documentDate);
  const chooseReceipt=(file,meta={})=>{
   setReceiptFile(file);setReceiptIsCopy(Boolean(meta.converted));setAttachmentIssue(null);setError("");setSuccess("");
   setOcrGrossOre(null);setOcrMismatchChecked(false);
@@ -53,7 +55,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    await attachToDocument(attachmentIssue.documentId,attachmentIssue.file);
    setAttachmentIssue(null);
    setSuccess("Originalbilaget er nå lagret privat og knyttet til bilaget.");
-   onChanged?.();
+   onChanged?.({documentDate:attachmentIssue.documentDate});
   }catch(e){setError("Originalbilaget er fortsatt ikke lagret: "+(e.message||"ukjent feil"));}
   finally{setBusy(false);}
  };
@@ -98,7 +100,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
      attachmentSaved=true;
      setAttachmentIssue(null);
     }catch(attachmentError){
-     setAttachmentIssue({documentId,file:receiptFile,message:attachmentError.message||"Ukjent feil"});
+     setAttachmentIssue({documentId,file:receiptFile,documentDate:form.documentDate,message:attachmentError.message||"Ukjent feil"});
     }
    }
    setSuccess(attachmentSaved
@@ -109,7 +111,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
     evidenceReference:"",businessPurpose:"",groups:blank(),
     documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
    // A failed upload must keep the retry control and selected original visible.
-   if(attachmentSaved)onChanged?.();
+   if(attachmentSaved)onChanged?.({documentDate:data.document?.document_date||form.documentDate});
   }catch(e){setError(e.message||"Registreringen mislyktes.");}
   finally{setBusy(false);}
  };
@@ -163,6 +165,13 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
      <input required value={form.originalDocumentNumber} onChange={e=>set("originalDocumentNumber",e.target.value)}/>
     </label>}
    </div>
+   {documentPeriod&&<p style={{padding:12,background:"#edf6ef",borderRadius:9,margin:0}}>
+    <strong>Dokumentet hører til {documentPeriod.title} ({documentPeriod.months}).</strong>
+    {" "}Ved lagring åpnes denne terminen automatisk, også hvis bilaget er fra et tidligere år.
+    {period.year!==documentPeriod.year||period.term!==documentPeriod.term?
+     " Datoen ligger utenfor terminen du ser nå.":""}
+    {" "}Hvis MVA-meldingen for denne perioden allerede er levert, må eventuell korrigering håndteres separat.
+   </p>}
    <fieldset style={{border:"1px solid #d8cdbb",borderRadius:8,padding:12}}>
     <legend>Beløp fra bilaget – oppgi eks. MVA og MVA</legend>
     {rates.map(rate=><div key={rate} style={{display:"flex",gap:8,alignItems:"end",flexWrap:"wrap",padding:"6px 0",borderBottom:"1px solid #e6ded3"}}>

@@ -128,7 +128,7 @@ async function readLocalReceipt(file,onProgress){
   return {text,format};
  }finally{if(worker)await worker.terminate();}
 }
-export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,disabled=false}){
+export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,documentType="receipt",disabled=false}){
  const [progress,setProgress]=useState("");
  const [error,setError]=useState("");
  const [details,setDetails]=useState(null);
@@ -200,8 +200,10 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
  }
 
  return <section style={{border:"1px solid #c8d7d2",background:"#f4faf8",borderRadius:14,padding:15,margin:"16px 0"}}>
-  <h3 style={{margin:"0 0 7px"}}>1. Ta bilde eller velg kvittering</h3>
-  <p style={{fontSize:13,margin:"0 0 11px"}}>Etter at du har tatt bildet, foreslår vi automatisk et utsnitt rundt kvitteringen. Du kan justere det før beløpene leses.</p>
+  <h3 style={{margin:"0 0 7px"}}>{documentType==="invoice"?"Last opp tidligere kundefaktura (PDF eller bilde)":"1. Ta bilde eller velg kvittering"}</h3>
+  <p style={{fontSize:13,margin:"0 0 11px"}}>{documentType==="invoice"?
+   "Velg fakturaen fra det gamle fakturaprogrammet. Vi forsøker å lese dato, dokumentnummer og MVA-satser. Kontroller kunde og alle tall manuelt.":
+   "Etter at du har tatt bildet, foreslår vi automatisk et utsnitt rundt kvitteringen. Du kan justere det før beløpene leses."}</p>
   <p style={{fontSize:13,margin:"0 0 12px"}}>
    Vi leser kvitteringens tekst på telefonen når det er mulig. Etter du har godkjent utsnittet, leser systemet teksten. Ved beskjæring lagres en JPEG-kopi av kvitteringen, mens originalbildet må beholdes i regnskapet.
   </p>
@@ -222,7 +224,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   {error&&<p role="alert" style={{color:"#a52a21"}}>{error}</p>}
   {details&&<div style={{fontSize:13,borderTop:"1px solid #d9e5e0",paddingTop:10}}>
    <strong>Fant tekst ({details.format}).</strong>
-   <p>Forslag: {details.supplierName||"leverandør ukjent"} · {details.documentDate||"dato ukjent"} · {details.totalOre==null?"beløp ukjent":new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(details.totalOre/100)}</p>
+   <p>Forslag: {documentType==="invoice"?details.documentNumber||"fakturanummer ukjent":details.supplierName||"leverandør ukjent"} · {details.documentDate||"dato ukjent"} · {details.totalOre==null?"beløp ukjent":new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(details.totalOre/100)}</p>
    {details.warnings.length>0&&<ul>{details.warnings.map((warn,i)=><li key={i}>{warn}</li>)}</ul>}
    <details><summary>Se lest tekst for manuell kontroll</summary>
     <pre style={{whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:230,overflow:"auto",fontSize:11}}>{details.preview}</pre>

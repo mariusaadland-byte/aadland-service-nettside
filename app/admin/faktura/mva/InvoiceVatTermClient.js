@@ -3,6 +3,8 @@ import {useEffect,useState} from "react";
 import Link from "next/link";
 import InputVatRegisterClient from "./InputVatRegisterClient";
 import VatPurchaseCsvImport from "./VatPurchaseCsvImport";
+import ExternalVatSalesClient from "./ExternalVatSalesClient";
+import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
 import {vatSettlementPreview} from "../../../../lib/vatSettlementPreview";
 
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
@@ -30,12 +32,22 @@ export default function InvoiceVatTermClient(){
   if(!/^\d{4}$/.test(year)||Number(year)<2000||Number(year)>2100){setError("Velg et gyldig år.");return;}
   setChosen({year,term});
  }
+ const onDocumentSaved=({documentDate}={})=>{
+  const target=vatDocumentPeriod(documentDate);
+  if(target){setYear(String(target.year));setTerm(String(target.term));
+   setChosen({year:String(target.year),term:String(target.term)});}
+  setReload(n=>n+1);
+ };
  const total=report?.total;
  const settlement=report?vatSettlementPreview(report.comparison):null;
  return <main className="admin" style={{maxWidth:1200,margin:"0 auto",padding:24}}>
   <p><Link href="/admin/faktura/arkiv">← Tilbake til fakturaarkivet</Link></p>
   <p><Link href="/admin/faktura/systima">Systima: tilkoblingsstatus og API-oppsett</Link></p>
   <h1>MVA-avstemming – salgsdokumenter</h1>
+  <p style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+   <a href="#mobilkvittering">Skann eller registrer kvittering</a>
+   <a href="#eldre-kundefakturaer">Importer kundefaktura fra et tidligere system</a>
+  </p>
   <p>Oversikt over <strong>utgående MVA</strong> fra salgsdokumenter og <strong>manuelt bekreftet inngående MVA</strong> fra leverandørbilag,
    fordelt etter dokumentdato. Innbetalingsdato og administrativ avslutning påvirker ikke terminen.</p>
   <section className="card" style={{padding:18,marginBottom:18}}>
@@ -93,13 +105,14 @@ export default function InvoiceVatTermClient(){
    </section>
    <div id="mobilkvittering"/>
    <InputVatRegisterClient purchases={report.purchases.rows} period={report.period}
-    onChanged={()=>setReload(n=>n+1)}/>
+    onChanged={onDocumentSaved}/>
+   <ExternalVatSalesClient onChanged={onDocumentSaved}/>
    <section className="card" style={{padding:18,marginBottom:18}}>
     <h2>Utgående MVA – {report.period.title}</h2>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
      {[
-      ["Utstedte fakturaer",String(total.invoiceCount)],
-      ["Utstedte kreditnotaer",String(total.creditCount)],
+      ["Fakturaer (inkl. eldre import)",String(total.invoiceCount)],
+      ["Kreditnotaer (inkl. eldre import)",String(total.creditCount)],
       ["Fakturert inkl. MVA",money(total.invoiceGrossOre)],
       ["Kreditert inkl. MVA",money(total.creditedGrossOre)],
       ["Netto omsetningsgrunnlag",money(total.baseOre)],
@@ -152,6 +165,8 @@ export default function InvoiceVatTermClient(){
 
    <section className="card" style={{padding:18}}>
     <h2>Salgsdokumentoversikt ({report.rows.length})</h2>
+    <p style={{fontSize:13}}>Inkluderer fakturaer fra Aadland Service og kontrollert import fra eldre fakturasystemer.
+     Eldre dokumenter har lenke til privat lagret originalfaktura.</p>
     {report.rows.length===0?<p>Ingen utstedte fakturaer eller kreditnotaer i denne terminen.</p>:
      <div style={{overflowX:"auto"}}><table style={{width:"100%",minWidth:850}}>
       <thead><tr><th>Dato</th><th>Dokument</th><th>Kunde</th>
