@@ -100,7 +100,8 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    setForm(x=>({...x,documentNumber:"",originalDocumentNumber:"",
     evidenceReference:"",businessPurpose:"",groups:blank(),
     documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
-   onChanged();
+   // A failed upload must keep the retry control and selected original visible.
+   if(attachmentSaved)onChanged?.();
   }catch(e){setError(e.message||"Registreringen mislyktes.");}
   finally{setBusy(false);}
  };
