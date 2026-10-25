@@ -1,6 +1,8 @@
 "use client";
 import {useState} from "react";
 import {parseVatImportCsv,vatCsvTemplate,MAX_VAT_CSV_BYTES,MAX_VAT_IMPORT_ROWS} from "../../../../lib/vatPurchaseCsvImport";
+import {parseExternalVatCsv} from "../../../../lib/vatExternalCsvMapping";
+import VatExternalCsvMapper from "./VatExternalCsvMapper";
 
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const label={
@@ -11,6 +13,7 @@ const label={
 
 export default function VatPurchaseCsvImport({onChanged}){
  const [filename,setFilename]=useState(""),[candidates,setCandidates]=useState([]);
+ const [externalSource,setExternalSource]=useState(null);
  const [preview,setPreview]=useState(null),[chosen,setChosen]=useState([]);
  const [documentChecked,setDocumentChecked]=useState(false);
  const [deductionChecked,setDeductionChecked]=useState(false);
@@ -31,7 +34,7 @@ export default function VatPurchaseCsvImport({onChanged}){
  }
  async function pick(event){
   const file=event.target.files?.[0];event.target.value="";
-  setCandidates([]);setPreview(null);setChosen([]);
+  setCandidates([]);setPreview(null);setChosen([]);setExternalSource(null);
   setDocumentChecked(false);setDeductionChecked(false);setBankChecked(false);
   setError("");setMessage("");setFilename(file?.name||"");
   if(!file)return;
@@ -40,11 +43,32 @@ export default function VatPurchaseCsvImport({onChanged}){
   }
   setBusy(true);
   try{
-   const rows=parseVatImportCsv(await file.text());
+   const content=await file.text();
+   let rows;
+   try{rows=parseVatImportCsv(content);}
+   catch(error){
+    if(!String(error.message||"").includes("CSV-kolonnene stemmer ikke"))
+     throw error;
+    const external=parseExternalVatCsv(content);
+    setExternalSource(external);
+    setMessage("Eksportfilen har andre kolonner enn Aadland-malen. Velg feltene manuelt før duplikatsjekk. Ingen data er importert.");
+    return;
+   }
    const result=await checkRows(rows);
    setCandidates(rows);setPreview(result);setChosen([]);
    setMessage("Forhåndsvisningen er klar. Ingenting er importert. Kontroller hvert nytt bilag før du velger det.");
   }catch(e){setError(e.message||"Kunne ikke lese importfilen.");}
+  finally{setBusy(false);}
+ }
+ async function previewMapped(rows){
+  if(busy||!rows.length)return;
+  setBusy(true);setError("");setMessage("");setPreview(null);setCandidates([]);
+  setChosen([]);setDocumentChecked(false);setDeductionChecked(false);setBankChecked(false);
+  try{
+   const result=await checkRows(rows);
+   setCandidates(rows);setPreview(result);setExternalSource(null);
+   setMessage("Eksportkolonnene er koblet. Kontroller radene og velg bilag for eventuell registrering. Ingenting er importert.");
+  }catch(e){setError(e.message||"Duplikatsjekken kunne ikke fullføres.");}
   finally{setBusy(false);}
  }
  async function rerunPreview(){
@@ -105,8 +129,9 @@ export default function VatPurchaseCsvImport({onChanged}){
  return <section className="card" style={{padding:18,marginBottom:18}}>
   <h2>Importer leverandørbilag fra CSV</h2>
   <p style={{fontSize:13}}>
-   Importen bruker en <strong>Aadland-CSV-mal</strong>. En eksport fra Systima eller et annet system må først
-   ha de samme kolonnene som malen. Systemet gjetter ikke MVA-koder eller fradragsrett.
+   Du kan bruke <strong>Aadland-CSV-malen</strong> direkte, eller laste opp en CSV-eksport fra et annet
+   regnskapssystem og koble eksportens kolonner manuelt. Vi gjetter ikke MVA-koder eller fradragsrett.
+   Direkte Systima-API-import er fortsatt deaktivert.
    Ingenting blir importert før du velger og godkjenner bilagene.
   </p>
   <p><a download="aadland-leverandorbilag-mal.csv" href={template}>Last ned CSV-mal med eksempel</a> <small>– slett eksempelet og fyll inn ekte bilag før import.</small></p>
@@ -115,6 +140,8 @@ export default function VatPurchaseCsvImport({onChanged}){
    <input type="file" accept=".csv,text/csv" disabled={busy} onChange={pick}/>
   </label>
   {filename&&<p style={{fontSize:12}}>Fil: {filename}</p>}
+  {externalSource&&<VatExternalCsvMapper source={externalSource}
+   disabled={busy} onReview={previewMapped}/>}
   {busy&&<p role="status">Kontrollerer / importerer …</p>}
   {error&&<p role="alert" style={{color:"#a52a21"}}>{error}</p>}
   {message&&<p role="status">{message}</p>}

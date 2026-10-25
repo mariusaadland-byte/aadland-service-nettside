@@ -31,6 +31,7 @@ Nøkkelrotasjon krever kontrollert omkobling. Krypterte tilgangstoken lagres på
 - **Tokenstatus og manuell fornying:** Den private Systima-siden kan nå se tokenenes utløpstid når Systima gir gyldige datoer. Eieren kan manuelt be om nytt tokenpar via leverandørens dokumenterte `refresh_token`-flyt. Nye token lagres kryptert, og samtidig frakobling eller nyere fornying hindrer at et gammelt tokenpar lagres tilbake. Ingen automatisk bakgrunnsfornying utføres.
 - **Frakobling:** Eieren kan slette krypterte token lokalt i Aadland Service. Dette **tilbakekaller ikke** godkjenningen hos Systima. Den må om nødvendig tilbakekalles separat hos Systima etter deres retningslinjer.
 - Automatisk bakgrunnsfornying og eventuell tilbakekalling hos Systima må vurderes og dokumenteres **før ordinær drift av aktiv leverandørimport**. Inntil lesemodellen er verifisert, beholdes bryteren av.
+- Eksisterende CSV-import støtter nå også **manuell feltmapping fra andre regnskaps-CSV-filer**, i tillegg til Aadland-malen. Den bevarer kravet om kontroll av selskap, fradrag, originalbilag og duplikater før registrering. Dette er ingen direkte Systima-API-tilkobling.
 - Eksisterende CSV-import og originalbilag-opplasting er den anbefalte driftsmetoden.
 
 Det er ikke behov for å opprette nytt Systima-selskap, opprette nye fakturaer, sende data til Systima eller flytte regnskap. Ingen leverandørbilag importeres av OAuth-koden.
