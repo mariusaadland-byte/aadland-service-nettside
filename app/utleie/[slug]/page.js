@@ -176,6 +176,8 @@ export default function RentalDetailPage(){
  const [chosen,setChosen]=useState(null);
  const [customer,setCustomer]=useState({name:"",email:"",phone:"",address:""});
  const [customerAccount,setCustomerAccount]=useState(null);
+ const [customerType,setCustomerType]=useState("private");
+ const [company,setCompany]=useState({name:"",organizationNumber:"",invoiceEmail:""});
  const [accepted,setAccepted]=useState(false);
  const [fulfillment,setFulfillment]=useState("pickup");
  const [booking,setBooking]=useState(false);
@@ -260,6 +262,8 @@ export default function RentalDetailPage(){
      startDate:chosen.startDate,
      endDate:chosen.endDate,
      customer,
+     customerType,
+     ...(customerType==="company"?{company}:{}),
      fulfillment,
      acceptedTerms:accepted
     })
@@ -269,6 +273,8 @@ export default function RentalDetailPage(){
    setMessage(data.message||("Booking "+data.bookingNumber+" er registrert. Sjekk innboks og søppelpost for e-post om leien."));
    setChosen(null);
    setAccepted(false);
+   setCustomerType("private");
+   setCompany({name:"",organizationNumber:"",invoiceEmail:""});
    setCustomer(customerAccount?{
     name:customerAccount.name||"",
     email:customerAccount.email||"",
@@ -339,6 +345,18 @@ export default function RentalDetailPage(){
       <div className="rentalBookingPrice"><b>{kr(chosen.pricing?.totalOre)}</b>{item.depositOre>0&&<span>+ depositum {kr(item.depositOre)}</span>}</div>
      </div>
      <div className="rentalBookingFields">
+      <div className="rentalFormTwo" role="group" aria-label="Kundetype">
+       <label><input type="radio" name="rental-customer-type" checked={customerType==="private"} onChange={()=>setCustomerType("private")}/> Privatperson</label>
+       <label><input type="radio" name="rental-customer-type" checked={customerType==="company"} onChange={()=>setCustomerType("company")}/> Bedrift</label>
+      </div>
+      {customerType==="company"&&<div className="rentalCompanyFields" style={{border:"1px solid #b6a68f",borderRadius:12,padding:14,margin:"12px 0"}}>
+       <h3>Bedrift og fakturaopplysninger</h3>
+       <label><span>Firmanavn *</span><input required maxLength={180} autoComplete="organization" value={company.name} onChange={e=>setCompany({...company,name:e.target.value})}/></label>
+       <label><span>Organisasjonsnummer (9 sifre) *</span><input required type="text" inputMode="numeric" pattern="[0-9 ]{9,14}" value={company.organizationNumber} onChange={e=>setCompany({...company,organizationNumber:e.target.value})}/></label>
+       <label><span>Faktura-e-post (valgfritt)</span><input type="email" autoComplete="email" value={company.invoiceEmail} onChange={e=>setCompany({...company,invoiceEmail:e.target.value})}/></label>
+       <p className="muted">Faktura forutsetter at bedriften har en godkjent kundekonto og kredittavtale hos oss. Nye bedriftsbestillinger blir ikke automatisk innvilget fakturakreditt.</p>
+      </div>}
+      {customerType==="private"&&<p className="muted">Privatkunder får betalingsinformasjon for Vipps når utleiebetaling er aktivert. Sikkerhetsdepositum reserveres ikke automatisk ennå.</p>}
       {customerAccount&&<p className="customerPrefillNote">✓ Kontaktopplysninger er hentet fra Min side. Du kan endre dem for denne bookingen.</p>}
       <div className="rentalFormTwo">
        <label><span>Navn *</span><input autoComplete="name" required value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})}/></label>
