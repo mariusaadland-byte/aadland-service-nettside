@@ -22,18 +22,23 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[success,setSuccess]=useState("");
  const [receiptFile,setReceiptFile]=useState(null);
  const [receiptIsCopy,setReceiptIsCopy]=useState(false);
+ const [ocrGrossOre,setOcrGrossOre]=useState(null);
+ const [ocrMismatchChecked,setOcrMismatchChecked]=useState(false);
  const [scanBusy,setScanBusy]=useState(false);
  const [attachmentIssue,setAttachmentIssue]=useState(null);
  const chooseReceipt=(file,meta={})=>{
   setReceiptFile(file);setReceiptIsCopy(Boolean(meta.converted));setAttachmentIssue(null);setError("");setSuccess("");
+  setOcrGrossOre(null);setOcrMismatchChecked(false);
   setForm(x=>({...x,supplierName:"",documentNumber:"",documentDate:"",
    groups:blank(),evidenceReference:meta.converted?"Aadland MVA – vedlagt JPEG-kopi, original beholdes eksternt":"Aadland MVA – privat originalvedlegg",
    documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
  };
- const receiveScan=result=>setForm(x=>({...x,
-  supplierName:result.supplierName||"",documentNumber:result.documentNumber||"",
-  documentDate:result.documentDate||"",groups:{...blank(),...result.groups}
- }));
+ const receiveScan=result=>{
+  setOcrGrossOre(Number.isSafeInteger(result.totalOre)?result.totalOre:null);
+  setOcrMismatchChecked(false);
+  setForm(x=>({...x,supplierName:result.supplierName||"",documentNumber:result.documentNumber||"",
+   documentDate:result.documentDate||"",groups:{...blank(),...result.groups}}));
+ };
  const attachToDocument=async(id,file)=>{
   const payload=new FormData();payload.append("documentId",id);payload.append("file",file);
   const response=await fetch("/api/admin/invoices/vat-attachments",{method:"POST",body:payload});
@@ -53,7 +58,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   finally{setBusy(false);}
  };
  const set=(name,value)=>setForm(x=>({...x,[name]:value}));
- const setGroup=(rate,key,value)=>setForm(x=>({...x,groups:{...x.groups,[rate]:{...x.groups[rate],[key]:value}}}));
+ const setGroup=(rate,key,value)=>{setOcrMismatchChecked(false);setForm(x=>({...x,groups:{...x.groups,[rate]:{...x.groups[rate],[key]:value}}}));};
  let netTotal=0,vatTotal=0,valid=true;
  for(const rate of rates){
   const line=form.groups[rate],n=parse(line.base),v=parse(line.vat);
@@ -64,10 +69,12 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  }
  const percent=Number(form.deductionPercent);
  const deductible=Math.round(vatTotal*percent/100);
+ const ocrGrossMismatch=ocrGrossOre!==null&&netTotal>0&&Math.abs(ocrGrossOre-(netTotal+vatTotal))>5;
  const submit=async e=>{
   e.preventDefault();setError("");setSuccess("");
   if(scanBusy){setError("Kvitteringen leses fortsatt. Vent til lesingen er ferdig.");return;}
   if(!valid||netTotal<=0){setError("Kontroller grunnlag og MVA på hver sats (avrundingsavvik maks 0,05 kr).");return;}
+  if(ocrGrossMismatch&&!ocrMismatchChecked){setError("OCR-summen stemmer ikke med beløpene. Kontroller kvitteringen og bekreft avviket før registrering.");return;}
   const question="Registrere et kontrollert leverandørbilag i intern MVA-avstemming?\n\n"+
    form.supplierName+" – "+form.documentNumber+"\nDokumentdato: "+form.documentDate+
    "\n"+(form.kind==="credit"?"Kreditnota":"Kjøpsfaktura")+
@@ -97,7 +104,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    setSuccess(attachmentSaved
     ?receiptFile?(receiptIsCopy?"Bilaget og en JPEG-kopi er lagret privat. Behold originalfilen i regnskapet.":"Bilaget og originalkvitteringen er lagret privat.")+" MVA-oversikten oppdateres.":"Bilaget er registrert. MVA-oversikten oppdateres."
     :"Bilaget er registrert, men originalfilen er IKKE lagret. Bruk knappen nedenfor for å prøve igjen.");
-   setReceiptFile(null);setReceiptIsCopy(false);
+   setReceiptFile(null);setReceiptIsCopy(false);setOcrGrossOre(null);setOcrMismatchChecked(false);
    setForm(x=>({...x,documentNumber:"",originalDocumentNumber:"",
     evidenceReference:"",businessPurpose:"",groups:blank(),
     documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
@@ -178,6 +185,17 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
      Dokumentet: <strong>{money(netTotal)} eks. MVA + {money(vatTotal)} MVA = {money(netTotal+vatTotal)} inkl. MVA</strong>
     </p>
     {!valid&&<p role="alert" style={{color:"#a52a21"}}>MVA og grunnlag stemmer ikke med satsen eller beløpet er ugyldig.</p>}
+    {ocrGrossOre!==null&&<p style={{margin:"9px 0",fontSize:13}}>
+      Gjenkjent sum fra kvitteringen: <strong>{money(ocrGrossOre)}</strong>.
+    </p>}
+    {ocrGrossMismatch&&<label role="alert" style={{display:"block",background:"#fff1e9",padding:10,borderRadius:8,fontSize:13,color:"#863c24"}}>
+     <strong>Avvik!</strong> OCR leste {money(ocrGrossOre)}, men feltene summerer til {money(netTotal+vatTotal)}.
+     Kontroller originalkvitteringen og korriger beløpene.
+     <span style={{display:"block",marginTop:7}}>
+      <input type="checkbox" checked={ocrMismatchChecked} onChange={e=>setOcrMismatchChecked(e.target.checked)}/>
+      Jeg har kontrollert summen mot kvitteringen og vil bruke de manuelt angitte beløpene.
+     </span>
+    </label>}
    </fieldset>
    <label>Fradragsberettiget andel av MVA (%)
     <input type="number" min="0" max="100" step="1" required value={form.deductionPercent}
@@ -209,7 +227,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    {form.kind==="purchase"&&netTotal+vatTotal>=1000000&&<label><input type="checkbox" checked={form.bankConditionConfirmed}
     onChange={e=>set("bankConditionConfirmed",e.target.checked)}/>
     Jeg har kontrollert kravet om betaling via bank for kjøp på minst 10 000 kr inkl. MVA.</label>}
-   <button type="submit" disabled={busy||scanBusy||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||
+   <button type="submit" disabled={busy||scanBusy||(ocrGrossMismatch&&!ocrMismatchChecked)||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||
     (form.kind==="purchase"&&netTotal+vatTotal>=1000000&&!form.bankConditionConfirmed)}>
     {busy?"Lagrer …":"Registrer kontrollert bilag"}
    </button>
