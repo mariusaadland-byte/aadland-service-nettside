@@ -1,6 +1,7 @@
 "use client";
 import {useRef,useState} from "react";
 import {parseNorwegianReceipt} from "../../../../lib/vatReceiptParser";
+import VatReceiptCropper from "./VatReceiptCropper";
 
 const MAX_SIZE=4*1024*1024;
 const MAX_SOURCE_SIZE=25*1024*1024;
@@ -133,35 +134,74 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
  const [details,setDetails]=useState(null);
  const [busy,setBusy]=useState(false);
  const [processedNotice,setProcessedNotice]=useState("");
+ const [cropJob,setCropJob]=useState(null);
  const scanId=useRef(0);
+ async function recognizeSelected(file,meta){
+  onSelected(file,meta);
+  const recognized=await readLocalReceipt(file,setProgress);
+  const parsed=parseNorwegianReceipt(recognized.text);
+  setDetails({...parsed,format:recognized.format,preview:recognized.text.slice(0,7500)});
+  onExtracted(parsed);
+  setProgress("Teksten er lest. Kontroller forslagene nedenfor før lagring.");
+ }
  async function choose(event){
   const source=event.target.files?.[0]||null;
   event.target.value="";
-  if(!source||busy||disabled)return;
+  if(!source||busy||disabled||cropJob)return;
   setError("");setDetails(null);setProgress("");setProcessedNotice("");
+  // Never leave previously selected receipts associated with the new image.
+  onSelected(null);
   const thisScan=++scanId.current;
   setBusy(true);onBusyChange?.(true);
+  let awaitingCrop=false;
   try{
    const prepared=await prepareReceiptFile(source,setProgress);
    if(thisScan!==scanId.current)return;
    const file=prepared.file;
-   onSelected(file,{converted:prepared.converted,originalName:source.name});
-   if(prepared.converted)setProcessedNotice("Filen ble gjort om til en JPEG-kopi for opplasting. Behold originalbildet på telefonen og i regnskapssystemet.");
-   const recognized=await readLocalReceipt(file,setProgress);
-   if(thisScan!==scanId.current)return;
-   const parsed=parseNorwegianReceipt(recognized.text);
-   setDetails({...parsed,format:recognized.format,preview:recognized.text.slice(0,7500)});
-   onExtracted(parsed);
-   setProgress("Teksten er lest. Kontroller forslagene nedenfor før lagring.");
+   if(file.type!=="application/pdf"){
+    // No OCR or persistent upload until the crop has been approved.
+    setCropJob({file,originalName:source.name,previouslyConverted:prepared.converted});
+    setProgress("");
+    awaitingCrop=true;
+    return;
+   }
+   await recognizeSelected(file,{converted:false,originalName:source.name});
   }catch(e){
    setProgress("");
-   setError("Lesing/filbehandling lyktes ikke: "+String(e.message||"ukjent feil")+
-    " Dersom filen ble valgt som vedlegg, kan du fylle ut feltene manuelt.");
+   setError("Bildeforberedelse/lesing lyktes ikke: "+String(e.message||"ukjent feil")+
+    ". Prøv et nytt bilde eller fyll inn feltene manuelt.");
+  }finally{
+   setBusy(false);
+   if(!awaitingCrop)onBusyChange?.(false);
+  }
+ }
+ async function applyCrop(croppedFile,meta){
+  if(!cropJob)return;
+  const original=cropJob;
+  setCropJob(null);
+  const copied=Boolean(meta?.cropped||original.previouslyConverted);
+  const thisScan=++scanId.current;
+  setBusy(true);onBusyChange?.(true);setError("");setProgress("");
+  try{
+   setProcessedNotice(copied
+    ?"Beskjæringen er lagret som en JPEG-kopi. Behold hele originalbildet i regnskapssystemet."
+    :"Hele originalbildet er beholdt uendret som bilag.");
+   await recognizeSelected(croppedFile,{converted:copied,originalName:original.originalName});
+   if(thisScan!==scanId.current)return;
+  }catch(e){
+   setProgress("");
+   setError("Kvitteringen er valgt som vedlegg, men teksten kunne ikke leses: "+String(e.message||"ukjent feil")+
+    ". Du kan likevel fylle inn feltene manuelt.");
   }finally{setBusy(false);onBusyChange?.(false);}
+ }
+ function cancelCrop(){
+  setCropJob(null);setError("");setProgress("");setBusy(false);
+  onBusyChange?.(false);
  }
 
  return <section style={{border:"1px solid #c8d7d2",background:"#f4faf8",borderRadius:14,padding:15,margin:"16px 0"}}>
   <h3 style={{margin:"0 0 7px"}}>1. Ta bilde eller velg kvittering</h3>
+  <p style={{fontSize:13,margin:"0 0 11px"}}>Etter at du har tatt bildet, foreslår vi automatisk et utsnitt rundt kvitteringen. Du kan justere det før beløpene leses.</p>
   <p style={{fontSize:13,margin:"0 0 12px"}}>
    Vi leser kvitteringens tekst på telefonen når det er mulig. Originalfilen lastes først opp privat etter at du har kontrollert og registrert bilaget.
   </p>
@@ -175,7 +215,8 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
      disabled={disabled||busy} onChange={choose} style={{display:"block",width:"100%",marginTop:7,fontSize:13}}/>
    </label>
   </div>
-  <p style={{fontSize:12,color:"#49645c"}}>PDF maks 4 MB. Bilder opptil 25 MB kan gjøres om til en mindre JPEG-kopi ved behov. OCR foregår lokalt på telefonen. Lesemotor og språkfiler lastes fra en ekstern leverandør.</p>
+  <p style={{fontSize:12,color:"#49645c"}}>PDF maks 4 MB. Bilder opptil 25 MB kan gjøres om til en JPEG-kopi ved behov. Beskjæring og OCR utføres lokalt på telefonen. Lesemotor og språkfiler lastes fra en ekstern leverandør.</p>
+  {cropJob&&<VatReceiptCropper file={cropJob.file} onApply={applyCrop} onCancel={cancelCrop} disabled={busy||disabled}/>}
   {processedNotice&&<p role="note" style={{border:"1px solid #c8d7d2",padding:10,borderRadius:8,fontSize:13}}>{processedNotice}</p>}
   {(busy||progress)&&<p role="status" style={{fontWeight:650}}>{progress||"Klargjør lesing …"}</p>}
   {error&&<p role="alert" style={{color:"#a52a21"}}>{error}</p>}
