@@ -59,6 +59,9 @@ export default function InvoiceVatTermClient(){
   {loading&&<p role="status">Kontrollerer alle fakturaer og kreditnotaer i terminen …</p>}
   {error&&<p role="alert" style={{color:"#a52a21"}}>{error} Rapporttall vises ikke hvis grunnlaget er ufullstendig.</p>}
   {report&&!loading&&<>
+   <div id="mobilkvittering"/>
+   <InputVatRegisterClient purchases={report.purchases.rows} period={report.period}
+    onChanged={()=>setReload(n=>n+1)}/>
    <section className="card" style={{padding:18,marginBottom:18}}>
     <h2>Utgående MVA – {report.period.title}</h2>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
@@ -114,8 +117,7 @@ export default function InvoiceVatTermClient(){
     </a>
    </section>
    <VatPurchaseCsvImport onChanged={()=>setReload(n=>n+1)}/>
-   <InputVatRegisterClient purchases={report.purchases.rows} period={report.period}
-    onChanged={()=>setReload(n=>n+1)}/>
+
    <section className="card" style={{padding:18}}>
     <h2>Salgsdokumentoversikt ({report.rows.length})</h2>
     {report.rows.length===0?<p>Ingen utstedte fakturaer eller kreditnotaer i denne terminen.</p>:
