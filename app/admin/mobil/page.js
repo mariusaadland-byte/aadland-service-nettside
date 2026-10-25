@@ -14,7 +14,8 @@ const links=[
  {name:"Kunder og bestillinger",subtitle:"Åpne admin for kunder og oppdrag",href:"/admin",emoji:"👥",access:"orders"},
  {name:"Oppdragsklokke",subtitle:"Registrer tid underveis",href:"/admin/arbeidsklokke",emoji:"⏱️",access:"orders"},
  {name:"Tegneprogram",subtitle:"Prosjekter og tegninger",href:"/admin/tegning",emoji:"📐",access:"products"},
- {name:"Utleie",subtitle:"Bestillinger og tilgjengelighet",href:"/admin",emoji:"📅",access:"orders"},
+ {name:"Utleieprodukter",subtitle:"Legg ut, rediger og skjul utstyr",href:"/admin/utleie",emoji:"🛠️",access:"products"},
+ {name:"Utleiebookinger",subtitle:"Kalender og bestillinger",href:"/admin",emoji:"📅",access:"orders"},
  {name:"Vipps",subtitle:"Betaling og oppgjør",href:"/admin/vipps",emoji:"💳",access:"owner"},
  {name:"MVA og bilag",subtitle:"Leverandørbilag og MVA-oversikt",href:"/admin/faktura/mva",emoji:"📸",access:"owner"},
 ];
