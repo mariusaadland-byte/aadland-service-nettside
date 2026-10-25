@@ -21,12 +21,13 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  });
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[success,setSuccess]=useState("");
  const [receiptFile,setReceiptFile]=useState(null);
+ const [receiptIsCopy,setReceiptIsCopy]=useState(false);
  const [scanBusy,setScanBusy]=useState(false);
  const [attachmentIssue,setAttachmentIssue]=useState(null);
- const chooseReceipt=file=>{
-  setReceiptFile(file);setAttachmentIssue(null);setError("");setSuccess("");
+ const chooseReceipt=(file,meta={})=>{
+  setReceiptFile(file);setReceiptIsCopy(Boolean(meta.converted));setAttachmentIssue(null);setError("");setSuccess("");
   setForm(x=>({...x,supplierName:"",documentNumber:"",documentDate:"",
-   groups:blank(),evidenceReference:"Aadland MVA – privat originalvedlegg",
+   groups:blank(),evidenceReference:meta.converted?"Aadland MVA – vedlagt JPEG-kopi, original beholdes eksternt":"Aadland MVA – privat originalvedlegg",
    documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
  };
  const receiveScan=result=>setForm(x=>({...x,
@@ -94,9 +95,9 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
     }
    }
    setSuccess(attachmentSaved
-    ?receiptFile?"Bilaget og kvitteringsbildet er lagret privat. MVA-oversikten oppdateres.":"Bilaget er registrert. MVA-oversikten oppdateres."
+    ?receiptFile?(receiptIsCopy?"Bilaget og en JPEG-kopi er lagret privat. Behold originalfilen i regnskapet.":"Bilaget og originalkvitteringen er lagret privat.")+" MVA-oversikten oppdateres.":"Bilaget er registrert. MVA-oversikten oppdateres."
     :"Bilaget er registrert, men originalfilen er IKKE lagret. Bruk knappen nedenfor for å prøve igjen.");
-   setReceiptFile(null);
+   setReceiptFile(null);setReceiptIsCopy(false);
    setForm(x=>({...x,documentNumber:"",originalDocumentNumber:"",
     evidenceReference:"",businessPurpose:"",groups:blank(),
     documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
@@ -131,8 +132,8 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   <VatReceiptScanner onSelected={chooseReceipt} onExtracted={receiveScan}
    onBusyChange={setScanBusy} disabled={busy}/>
   {receiptFile&&<p style={{fontSize:13,background:"#f1faf3",padding:10,borderRadius:8}}>
-   <strong>Valgt originalfil:</strong> {receiptFile.name}. Filen lagres automatisk privat etter at du godkjenner bilaget.
-   <button type="button" style={{marginLeft:10}} disabled={busy||scanBusy} onClick={()=>setReceiptFile(null)}>Ikke legg ved filen</button>
+   <strong>{receiptIsCopy?"Valgt JPEG-kopi:":"Valgt originalfil:"}</strong> {receiptFile.name}. Filen lagres privat etter at du godkjenner bilaget. {receiptIsCopy&&"Kildebildet må fortsatt oppbevares separat."}
+   <button type="button" style={{marginLeft:10}} disabled={busy||scanBusy} onClick={()=>{setReceiptFile(null);setReceiptIsCopy(false);}}>Ikke legg ved filen</button>
   </p>}
   <form onSubmit={submit} style={{display:"grid",gap:12}}>
    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:10}}>
@@ -233,7 +234,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
      id:doc.id,documentNumber:doc.documentNumber})}>Opphev registrering</button></div>
    </div>)}</div>}
   <p style={{fontSize:12,marginTop:15}}>
-   <strong>Viktig:</strong> Ta bilde eller velg PDF før registrering; originalen lagres privat sammen med bilaget. OCR-forslag må kontrolleres, og bilaget må fortsatt oppbevares i regnskapssystemet.
+   <strong>Viktig:</strong> Ta bilde eller velg PDF før registrering. Originalen lagres uendret når formatet støttes og filen er under 4 MB. Større bilder/HEIC lagres som merket JPEG-kopi, og kilden må fortsatt oppbevares eksternt. OCR-forslag må kontrolleres, og bilaget må fortsatt oppbevares i regnskapssystemet.
    Denne oversikten garanterer ikke fradragsrett og erstatter ikke bokføring eller MVA-melding.
   </p>
  </section>;
