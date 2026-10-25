@@ -88,10 +88,38 @@ assert.equal(detectReceiptBounds(image(160,200,45)),null,"Dark image must not au
 assert.deepEqual(cropReceiptPixels(200,100,{x:.1,y:.2,w:.7,h:.6}),{x:20,y:20,width:140,height:60});
 assert.deepEqual(clampReceiptBounds({x:-.5,y:0,w:2,h:2}),fullReceiptBounds());
 const cropUI=read("app/admin/faktura/mva/VatReceiptCropper.js");
-assert.ok(cropUI.includes('onPointerDown={pointerDown}')&&cropUI.includes('data-handle={corner}'));
-assert.ok(cropUI.includes("detectReceiptBounds(ctx.getImageData"));
-assert.ok(cropUI.includes("await onApply(result,{cropped:!isWhole})"));
-assert.ok(cropUI.includes('role="group"'));
+
+assert.ok(cropUI.includes('onPointerDown={startDrag}'));
+assert.ok(cropUI.includes('data-corner={i}'));
+assert.ok(cropUI.includes('detectReceiptCorners(ctx.getImageData'));
+assert.ok(cropUI.includes('await onApply(preview,{cropped:true})'));
+assert.ok(cropUI.includes('Ferdig opprettet kvittering: bare papiret'));
+assert.ok(cropUI.includes('Vis bare kvitteringen'));
+assert.ok(cropUI.includes('receiptPerspectiveMatrix(corners)'));
+assert.ok(cropUI.includes('getImageData(0,0,srcW,srcH)'));
+const {detectReceiptCorners,fullReceiptCorners,validReceiptCorners,receiptCornerArea,
+ receiptPerspectiveMatrix,receiptPerspectivePoint,receiptScanDimensions}=
+ new Function(cropLogicSource+";return {detectReceiptCorners,fullReceiptCorners,validReceiptCorners,receiptCornerArea,receiptPerspectiveMatrix,receiptPerspectivePoint,receiptScanDimensions};")();
+assert.ok(validReceiptCorners(fullReceiptCorners()));
+assert.equal(validReceiptCorners([{x:0,y:0},{x:1,y:1},{x:1,y:0},{x:0,y:1}]),false);
+assert.equal(receiptCornerArea(fullReceiptCorners()),1);
+const tilt=[{x:.20,y:.14},{x:.77,y:.09},{x:.86,y:.84},{x:.14,y:.91}];
+assert.ok(validReceiptCorners(tilt));
+const perspective=receiptPerspectiveMatrix(tilt);
+assert.ok(perspective);
+for(const [i,[u,v]] of [[0,0],[1,0],[1,1],[0,1]].entries()){
+ const mapped=receiptPerspectivePoint(perspective,u,v);
+ assert.ok(Math.abs(mapped.x-tilt[i].x)<1e-8);
+ assert.ok(Math.abs(mapped.y-tilt[i].y)<1e-8);
+}
+const dims=receiptScanDimensions(tilt,1200,1600);
+assert.ok(dims.width>100&&dims.height>100&&dims.width*dims.height<=5200000+2000);
+const whitePaper=detectReceiptCorners(image(160,200,55,{x:24,y:18,w:112,h:165}));
+assert.ok(whitePaper&&validReceiptCorners(whitePaper),"Only the white paper quadrilateral should be detected");
+assert.ok(whitePaper[0].x<.20&&whitePaper[0].y<.14);
+assert.ok(whitePaper[2].x>.8&&whitePaper[2].y>.8);
+assert.equal(detectReceiptCorners(image(160,200,255,{x:24,y:18,w:112,h:165})),null);
+assert.equal(detectReceiptCorners(image(160,200,45)),null);
 assert.ok(ocr.includes("setCropJob({file,originalName:source.name"));
 assert.ok(ocr.includes("if(file.type!==\"application/pdf\")"));
 assert.ok(ocr.includes("onSelected(null)"));
