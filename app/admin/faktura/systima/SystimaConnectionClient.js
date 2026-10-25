@@ -136,7 +136,7 @@ export default function SystimaConnectionClient(){
      target="_blank" rel="noreferrer">Systimas offisielle API- og OAuth-veiledning</a></p>
    </section>
    <p style={{fontSize:13}}>I mellomtiden kan du fortsatt bruke
-    <Link href="/admin/faktura/mva"> CSV-import med kontroll før registrering</Link>.
+    <Link href="/admin/faktura/mva"> CSV-import med manuell feltmapping og duplikatkontroll</Link>.
     Den eksisterende MVA-rapporten påvirkes ikke.</p>
   </>}
  </main>;
