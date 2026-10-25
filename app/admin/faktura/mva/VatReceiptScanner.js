@@ -75,7 +75,7 @@ async function readLocalReceipt(file,onProgress){
   return {text,format};
  }finally{if(worker)await worker.terminate();}
 }
-export default function VatReceiptScanner({onSelected,onExtracted,disabled=false}){
+export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,disabled=false}){
  const [progress,setProgress]=useState("");
  const [error,setError]=useState("");
  const [details,setDetails]=useState(null);
@@ -96,7 +96,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,disabled=false
   }
   const thisScan=++scanId.current;
   onSelected(file);
-  setBusy(true);
+  setBusy(true);onBusyChange?.(true);
   try{
    const recognized=await readLocalReceipt(file,setProgress);
    if(thisScan!==scanId.current)return;
@@ -108,7 +108,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,disabled=false
    setProgress("");
    setError("Automatisk lesing lyktes ikke: "+String(e.message||"ukjent feil")+
     " Filen er likevel valgt som vedlegg. Fyll inn feltene manuelt før du lagrer.");
-  }finally{setBusy(false);}
+  }finally{setBusy(false);onBusyChange?.(false);}
  }
  return <section style={{border:"1px solid #c8d7d2",background:"#f4faf8",borderRadius:14,padding:15,margin:"16px 0"}}>
   <h3 style={{margin:"0 0 7px"}}>1. Ta bilde eller velg kvittering</h3>
