@@ -187,6 +187,13 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
     <input required maxLength={260} placeholder="For eksempel Systemia bilag #123"
      value={form.evidenceReference} onChange={e=>set("evidenceReference",e.target.value)}/>
    </label>
+   <div style={{fontSize:13}}>
+    <strong>Hurtigvalg – hva gjelder kjøpet?</strong>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:8}}>
+     {["Materialer til kundeoppdrag","Verktøy og utstyr","Driftskostnad","Transport i virksomheten"].map(purpose=>
+      <button key={purpose} type="button" onClick={()=>set("businessPurpose",purpose)}>{purpose}</button>)}
+    </div>
+   </div>
    <label>Bruksområde i virksomheten
     <textarea required rows={2} maxLength={500} placeholder="Beskriv hva kjøpet gjelder"
      value={form.businessPurpose} onChange={e=>set("businessPurpose",e.target.value)}/>
