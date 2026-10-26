@@ -23,7 +23,8 @@ const tables={
   lines:[{netOre:2000,vatOre:500,vatRate:25}],subtotal_ore:2000,vat_ore:500,total_ore:2500
  }],
  vat_purchase_documents:[],
- vat_external_sales_documents:[]
+ vat_external_sales_documents:[],
+ vat_reporting_profile:[{id:"primary",registration_date:"2026-06-01",first_term_year:2026,first_term:3}]
 };
 const db=()=>({from(table){
  let lower,upper;
@@ -34,6 +35,12 @@ const db=()=>({from(table){
   neq(field,value){assert.equal(field,"status");assert.equal(value,"draft");return q;},
   is(field,value){assert.equal(field,"voided_at");assert.equal(value,null);return q;},
   order(){return q;},
+  eq(field,value){assert.equal(field,"id");assert.equal(value,"primary");return q;},
+  async maybeSingle(){
+   reads.push({table});
+   if(failed===table)return {data:null,error:{message:"database unavailable"}};
+   return {data:tables[table][0]||null,error:null};
+  },
   async range(start,end){
    reads.push({table,start,end,lower,upper});
    if(failed===table)return {data:null,error:{message:"database unavailable"}};
@@ -53,12 +60,18 @@ const source=readFileSync("app/api/admin/invoices/vat-terms/route.js","utf8")
  .replace(/^import .*;\n/gm,"")
  .replace(/^export const .*;\n/gm,"")
  .replace(/^export async function /gm,"async function ");
+const guardSrc=readFileSync("lib/vatRegistrationGuard.js","utf8")
+ .replace(/^import .*;\n/gm,"").replace(/^export /gm,"");
+const {applyVatRegistrationGuard}=new Function("vatPeriodKey",guardSrc+
+ ";return {applyVatRegistrationGuard};")((year,term)=>{
+ const y=Number(year),t=Number(term);return y>=2000&&y<=2100&&t>=1&&t<=6?y*10+t:null;
+});
 const GET=new Function("NextResponse","getAdminUser","db","buildInvoiceVatTermReport","invoiceVatTermCsv","vatTermBounds",
  "calculateInputVatSummary","mergedVatReport","combinedVatCsv",
- "calculateExternalSalesSummary","mergeExternalVatReport",
+ "calculateExternalSalesSummary","mergeExternalVatReport","applyVatRegistrationGuard",
  source+";return GET;")(NextResponse,async()=>({role}),db,methods.buildInvoiceVatTermReport,
  methods.invoiceVatTermCsv,methods.vatTermBounds,input.calculateInputVatSummary,input.mergedVatReport,input.combinedVatCsv,
- external.calculateExternalSalesSummary,external.mergeExternalVatReport);
+ external.calculateExternalSalesSummary,external.mergeExternalVatReport,applyVatRegistrationGuard);
 const call=query=>GET({url:"https://localhost/api/admin/invoices/vat-terms?"+query});
 let r=await call("year=2026&term=5");
 assert.equal(r.status,200);
@@ -67,8 +80,9 @@ assert.equal(r.body.total.creditCount,1);
 assert.equal(r.body.total.vatOre,2000);
 assert.equal(r.body.total.grossOre,10000);
 assert.equal(r.headers["Cache-Control"],"private, no-store");
-assert.deepEqual(reads.map(x=>x.table).sort(),["invoice_credit_notes","invoice_drafts","vat_external_sales_documents","vat_purchase_documents"]);
+assert.deepEqual(reads.map(x=>x.table).sort(),["invoice_credit_notes","invoice_drafts","vat_external_sales_documents","vat_purchase_documents","vat_reporting_profile"]);
 assert.equal(r.body.purchases.inputVatOre,0);
+assert.equal(r.body.comparison.estimateAllowed,true);
 tables.vat_external_sales_documents.push({
  id:"ext-1",document_date:"2026-10-15",document_number:"OLD-10",customer_name:"Kunde",
  source_system:"Conta",kind:"invoice",base_ore:20000,vat_ore:5000,voided_at:null,
@@ -81,8 +95,19 @@ assert.equal(r.body.total.vatOre,7000);
 assert.equal(r.body.comparison.differenceOre,7000);
 assert.ok(r.body.rows.some(row=>row.externalDocumentId==="ext-1"));
 tables.vat_external_sales_documents.length=0;
+tables.vat_reporting_profile.length=0;
+r=await call("year=2026&term=5");
+assert.equal(r.status,200);
+assert.equal(r.body.comparison.estimateAllowed,false,"No registration profile: do not estimate payment");
+assert.equal(r.body.registrationReview.kind,"registration_unknown");
+tables.vat_reporting_profile.push({registration_date:"2026-06-01",first_term_year:2026,first_term:3});
+r=await call("year=2026&term=2");
+assert.equal(r.status,200);
+assert.equal(r.body.comparison.estimateAllowed,false,"No VAT estimate before first term");
+r=await call("year=2026&term=3");
+assert.equal(r.body.comparison.estimateAllowed,true,"First term permits ordinary qualifying input VAT");
 
-assert.ok(reads.every(x=>x.lower==="2026-09-01"&&x.upper==="2026-10-31"));
+assert.ok(reads.filter(x=>x.table!=="vat_reporting_profile").every(x=>x.lower==="2026-09-01"&&x.upper==="2026-10-31"));
 r=await call("year=2026&term=5&format=csv");
 assert.equal(r.status,200);
 assert.equal(r.headers["Content-Type"],"text/csv; charset=utf-8");

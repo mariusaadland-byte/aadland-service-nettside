@@ -89,16 +89,17 @@ const api=readFileSync("app/api/admin/invoices/vat-purchases/route.js","utf8");
 const vatPage=readFileSync("app/admin/faktura/mva/InvoiceVatTermClient.js","utf8");
 const settlementSrc=readFileSync("lib/vatSettlementPreview.js","utf8").replace(/^export /gm,"");
 const {vatSettlementPreview}=new Function(settlementSrc+";return {vatSettlementPreview};")();
-assert.deepEqual(vatSettlementPreview({outputVatOre:25000,inputVatOre:5000,differenceOre:20000}),{
+assert.deepEqual(vatSettlementPreview({outputVatOre:25000,inputVatOre:5000,differenceOre:20000,estimateAllowed:true}),{
  direction:"payable",label:"Foreløpig å betale til Skatteetaten",amountOre:20000});
-assert.deepEqual(vatSettlementPreview({outputVatOre:5000,inputVatOre:25000,differenceOre:-20000}),{
+assert.deepEqual(vatSettlementPreview({outputVatOre:5000,inputVatOre:25000,differenceOre:-20000,estimateAllowed:true}),{
  direction:"receivable",label:"Foreløpig MVA til gode",amountOre:20000});
-assert.deepEqual(vatSettlementPreview({outputVatOre:1250,inputVatOre:1250,differenceOre:0}),{
+assert.deepEqual(vatSettlementPreview({outputVatOre:1250,inputVatOre:1250,differenceOre:0,estimateAllowed:true}),{
  direction:"balanced",label:"Foreløpig MVA i balanse",amountOre:0});
 assert.equal(vatSettlementPreview({outputVatOre:2500,inputVatOre:500,differenceOre:1200}),null,
  "Amounts must reconcile: inconsistent reports cannot show payment estimates");
 assert.equal(vatSettlementPreview({outputVatOre:2500,inputVatOre:null,differenceOre:2500}),null);
 assert.equal(vatSettlementPreview({outputVatOre:Infinity,inputVatOre:500,differenceOre:500}),null);
+assert.equal(vatSettlementPreview({outputVatOre:25000,inputVatOre:5000,differenceOre:20000}),null);
 assert.ok(vatPage.includes("vatSettlementPreview(report.comparison)"));
 assert.ok(vatPage.includes("settlement.label"));
 assert.ok(vatPage.includes("money(settlement.amountOre)"));
