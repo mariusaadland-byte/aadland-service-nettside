@@ -32,6 +32,14 @@ export async function GET(request){
  if(!await allowed())return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const s=db();if(!s)return NextResponse.json({error:"Databasen er utilgjengelig."},{status:503});
  const url=new URL(request?.url||"https://localhost/api/admin/customer-contacts");
+ if(url.searchParams.has("contactId")){
+  const contactId=String(url.searchParams.get("contactId")||"");
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(contactId))
+   return NextResponse.json({error:"Oppgi en gyldig kunde-ID."},{status:400});
+  const {data,error}=await s.from("admin_customer_contacts").select(fields).eq("id",contactId).maybeSingle();
+  if(error)return NextResponse.json({error:"Kundekortet kunne ikke hentes. Ingen endringer er gjort."},{status:503});
+  return NextResponse.json({contact:data?map(data):null},{headers:{"Cache-Control":"private, no-store"}});
+ }
  if(url.searchParams.has("organizationNumber")){
   const org=String(url.searchParams.get("organizationNumber")||"").replace(/\s/g,"");
   if(!/^[0-9]{9}$/.test(org))

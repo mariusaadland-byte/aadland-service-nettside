@@ -3,9 +3,10 @@ import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import InvoiceInlineBusinessCustomer from "./InvoiceInlineBusinessCustomer";
 import InvoiceInlinePrivateCustomer from "./InvoiceInlinePrivateCustomer";
+import InvoiceCustomerCardReview from "./InvoiceCustomerCardReview";
 
 const norm=x=>String(x||"").trim().toLocaleLowerCase("nb-NO");
-export default function InvoiceCustomerPicker({customer={},onChoose,onCreate,disabled=false,busy=false,invoiceId}){
+export default function InvoiceCustomerPicker({customer={},onChoose,onCreate,disabled=false,busy=false,invoiceId,sourceQuoteId=""}){
  const [contacts,setContacts]=useState([]),[search,setSearch]=useState(""),[loading,setLoading]=useState(true);
  const [error,setError]=useState(""),[choosing,setChoosing]=useState("");
  const [inlineBusiness,setInlineBusiness]=useState(false),[inlinePrivate,setInlinePrivate]=useState(false);
@@ -42,6 +43,8 @@ export default function InvoiceCustomerPicker({customer={},onChoose,onCreate,dis
    <small>Standard betalingsfrist: {customer.paymentTermsDays??chosen?.paymentTermsDays??14} dager</small>
    <p style={{margin:"9px 0 0"}}><Link href={"/admin/kunder/"+encodeURIComponent(customer.contactId)+"?invoiceId="+encodeURIComponent(invoiceId)}>Åpne og rediger kundekortet →</Link></p>
   </div>}
+  {customer.contactId&&<InvoiceCustomerCardReview customer={customer}
+   disabled={locked} onChoose={choose} sourceQuoteId={sourceQuoteId}/>}
   {!customer.contactId&&customer.name&&<p style={{background:"#fff7eb",padding:10,borderRadius:8}}>Denne kladden har kunden «{customer.name}» som fritekst. Velg et kundekort nedenfor for å koble kunden til registeret.</p>}
   <label style={{display:"grid",gap:5}}>Søk etter kunde
    <input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Navn, telefon, e-post eller adresse" disabled={locked||loading} autoComplete="off"/>
