@@ -8,6 +8,7 @@ import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
 import VatReportingControlClient from "./VatReportingControlClient";
 import VatSubmissionReviewClient from "./VatSubmissionReviewClient";
 import {vatSettlementPreview} from "../../../../lib/vatSettlementPreview";
+import VatRetroCandidatesClient from "./VatRetroCandidatesClient";
 
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const labels=["Januar–februar","Mars–april","Mai–juni","Juli–august","September–oktober","November–desember"];
@@ -120,6 +121,8 @@ export default function InvoiceVatTermClient(){
      forventer penger tilbake fra Skatteetaten.
     </p>
    </section>
+   <VatRetroCandidatesClient period={report.period} registrationReview={report.registrationReview}
+    reload={reload} onOpenDate={date=>onDocumentSaved({documentDate:date})}/>
    <div id="mobilkvittering"/>
    <InputVatRegisterClient purchases={report.purchases.rows} period={report.period}
     onChanged={onDocumentSaved}/>
