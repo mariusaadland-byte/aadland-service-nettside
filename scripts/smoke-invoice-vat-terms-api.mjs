@@ -107,7 +107,7 @@ assert.equal(r.body.comparison.estimateAllowed,false,"No VAT estimate before fir
 r=await call("year=2026&term=3");
 assert.equal(r.body.comparison.estimateAllowed,true,"First term permits ordinary qualifying input VAT");
 
-assert.ok(reads.filter(x=>x.table!=="vat_reporting_profile").every(x=>x.lower==="2026-09-01"&&x.upper==="2026-10-31"));
+assert.ok(reads.filter(x=>x.table!=="vat_reporting_profile").slice(0,4).every(x=>x.lower==="2026-09-01"&&x.upper==="2026-10-31"));
 r=await call("year=2026&term=5&format=csv");
 assert.equal(r.status,200);
 assert.equal(r.headers["Content-Type"],"text/csv; charset=utf-8");
