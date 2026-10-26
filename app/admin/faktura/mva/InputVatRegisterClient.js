@@ -86,11 +86,26 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   if(!window.confirm(question))return;
   setBusy(true);
   try{
-   const response=await fetch("/api/admin/invoices/vat-purchases",{
-    method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({...form,action:"register"})
-   });
-   const data=await response.json();
+   const register=async acknowledgeFiledTerm=>{
+    const response=await fetch("/api/admin/invoices/vat-purchases",{
+     method:"POST",headers:{"Content-Type":"application/json"},
+     body:JSON.stringify({...form,action:"register",acknowledgeFiledTerm})
+    });
+    const data=await response.json().catch(()=>({}));
+    return {response,data};
+   };
+   let {response,data}=await register(false);
+   let filedTermAcknowledged=false;
+   if(response.status===409&&data.requiresFiledTermConfirmation===true){
+    // First request has saved nothing. Reattempt only after explicit approval.
+    const answer=window.confirm(
+     "VIKTIG: "+data.period+" er merket som LEVERT hos Skatteetaten"+
+     (data.filedOn?" (oppgitt innsendingsdato "+data.filedOn+")":"")+
+     ".\\n\\nRegistrere dette gamle bilaget likevel? Dette endrer IKKE MVA-meldingen som ble levert. Du må selv kontrollere om det kreves en endringsmelding og avstemme bilaget mot regnskapet.");
+    if(!answer){setError("Registreringen er avbrutt. Ingen bilag er lagret.");return;}
+    ({response,data}=await register(true));
+    filedTermAcknowledged=true;
+   }
    if(!response.ok)throw Error(data.error||"Bilaget kunne ikke lagres.");
    const documentId=data.document?.id;
    let attachmentSaved=!receiptFile;
@@ -103,9 +118,10 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
      setAttachmentIssue({documentId,file:receiptFile,documentDate:form.documentDate,message:attachmentError.message||"Ukjent feil"});
     }
    }
-   setSuccess(attachmentSaved
+   setSuccess((attachmentSaved
     ?receiptFile?(receiptIsCopy?"Bilaget og en JPEG-kopi er lagret privat. Behold originalfilen i regnskapet.":"Bilaget og originalkvitteringen er lagret privat.")+" MVA-oversikten oppdateres.":"Bilaget er registrert. MVA-oversikten oppdateres."
-    :"Bilaget er registrert, men originalfilen er IKKE lagret. Bruk knappen nedenfor for å prøve igjen.");
+    :"Bilaget er registrert, men originalfilen er IKKE lagret. Bruk knappen nedenfor for å prøve igjen.")+
+    (filedTermAcknowledged?" VIKTIG: Terminen er merket som levert. Ingen MVA-melding er endret eller sendt. Kontroller om du må sende en endringsmelding hos Skatteetaten.":""));
    setReceiptFile(null);setReceiptIsCopy(false);setOcrGrossOre(null);setOcrMismatchChecked(false);
    setForm(x=>({...x,documentNumber:"",originalDocumentNumber:"",
     evidenceReference:"",businessPurpose:"",groups:blank(),
@@ -170,7 +186,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
     {" "}Ved lagring åpnes denne terminen automatisk, også hvis bilaget er fra et tidligere år.
     {period.year!==documentPeriod.year||period.term!==documentPeriod.term?
      " Datoen ligger utenfor terminen du ser nå.":""}
-    {" "}Hvis MVA-meldingen for denne perioden allerede er levert, må eventuell korrigering håndteres separat.
+    {" "}Hvis MVA-meldingen for denne perioden allerede er levert, kreves egen bekreftelse før registrering. Ingen endringsmelding sendes automatisk.
    </p>}
    <fieldset style={{border:"1px solid #d8cdbb",borderRadius:8,padding:12}}>
     <legend>Beløp fra bilaget – oppgi eks. MVA og MVA</legend>

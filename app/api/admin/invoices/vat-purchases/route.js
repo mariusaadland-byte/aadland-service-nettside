@@ -3,6 +3,7 @@ import {getAdminUser} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
 import {sameOriginGuard} from "../../../../../lib/requestGuard";
 import {validateVatPurchaseInput} from "../../../../../lib/invoiceInputVat";
+import {vatDocumentPeriod} from "../../../../../lib/vatDocumentPeriod";
 export const runtime="nodejs";
 const json=(value,status=200)=>NextResponse.json(value,{status,headers:{"Cache-Control":"private, no-store"}});
 const uuid=v=>typeof v==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
@@ -30,6 +31,16 @@ export async function POST(req){
  if(body.action!=="register")return json({error:"Ukjent bilagshandling."},400);
  let entry;
  try{entry=validateVatPurchaseInput(body);}catch(e){return json({error:e.message},400);}
+ // Documents are always posted to the term of their document date.
+ // The registered filing status is owner-maintained, not verified by the tax office.
+ const documentPeriod=vatDocumentPeriod(entry.document_date);
+ if(!documentPeriod)return json({error:"Dokumentdatoen har ingen gyldig MVA-termin."},400);
+ const filing=await s.from("vat_reporting_term_status").select("status,filed_on")
+  .eq("year",documentPeriod.year).eq("term",documentPeriod.term).maybeSingle();
+ if(filing.error)return json({error:"Kunne ikke kontrollere om MVA-terminen allerede er levert. Ingen bilag er registrert."},503);
+ if(filing.data?.status==="filed"&&body.acknowledgeFiledTerm!==true)
+  return json({error:"Terminen er markert som levert. Bekreft at bilaget skal registreres uten å endre den innsendte MVA-meldingen.",
+   requiresFiledTermConfirmation:true,period:documentPeriod.title,filedOn:filing.data.filed_on||null},409);
  const inserted=await s.from("vat_purchase_documents").insert({...entry,confirmed_by:user.id})
   .select("id,supplier_name,supplier_document_number,document_date,kind,base_ore,vat_ore,deductible_vat_ore")
   .single();
