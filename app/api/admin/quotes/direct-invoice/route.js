@@ -37,7 +37,7 @@ export async function POST(req){
  if(quote.status!=="draft")return respond("Bare tilbudskladder i direkte-faktureringsmodus kan brukes her.");
  const contactId=String(quote.customer?.contactId||"");
  if(!validId(contactId))return respond("Velg en registrert kunde fra kunderegisteret før fakturering.");
- const {data:contact,error:contactError}=await s.from("admin_customer_contacts").select("id,name,email,phone,address,payment_terms_days").eq("id",contactId).maybeSingle();
+ const {data:contact,error:contactError}=await s.from("admin_customer_contacts").select("id,name,email,phone,address,payment_terms_days,customer_type,organization_number,contact_person").eq("id",contactId).maybeSingle();
  if(contactError||!contact)return respond("Kundekortet ble ikke funnet. Velg kunden på nytt.",400);
  if(!contact.name||!contact.address)return respond("Fyll inn kundens navn og adresse i kundekortet før fakturering.");
  const lines=Array.isArray(quote.line_items)?quote.line_items:[];
@@ -56,6 +56,9 @@ export async function POST(req){
   contactId:contact.id,
   name:contact.name,email:contact.email||"",phone:contact.phone||"",
   address:contact.address||"",paymentTermsDays:contact.payment_terms_days??14,
+  customerType:contact.customer_type==="business"?"business":"private",
+  organizationNumber:contact.customer_type==="business"?(contact.organization_number||""):"",
+  contactPerson:contact.customer_type==="business"?(contact.contact_person||""):"",
   paymentMethod:input.paymentMethod,
   workDescription:title,
   workDate:""

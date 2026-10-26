@@ -83,7 +83,11 @@ function sanitizeCustomer(value){
   email:clean(c.email,240).toLowerCase(),
   phone:clean(c.phone,80),
   address:clean(c.address,500),
-  contactId:/^[0-9a-f-]{36}$/i.test(String(c.contactId||""))?String(c.contactId):""
+  contactId:/^[0-9a-f-]{36}$/i.test(String(c.contactId||""))?String(c.contactId):"",
+  customerType:c.customerType==="business"?"business":"private",
+  organizationNumber:c.customerType==="business"?clean(c.organizationNumber,15).replace(/\s/g,""):"",
+  contactPerson:c.customerType==="business"?clean(c.contactPerson,180):"",
+  paymentTermsDays:Number.isInteger(Number(c.paymentTermsDays))&&Number(c.paymentTermsDays)>=0&&Number(c.paymentTermsDays)<=365?Number(c.paymentTermsDays):14
  };
 }
 function sanitizeLines(value){
@@ -145,6 +149,8 @@ function withoutFollowUpField(record){
 function payload(body,user,existing){
  const customer=sanitizeCustomer(body.customer);
  if(!customer.name)return {error:"Kunden må ha navn."};
+ if(customer.organizationNumber&&!/^[0-9]{9}$/.test(customer.organizationNumber))
+  return {error:"Bedriftens organisasjonsnummer må bestå av ni sifre."};
  const title=clean(body.title,240);
  if(!title)return {error:"Tilbudet må ha en tittel."};
  if(!Array.isArray(body.lineItems)||!body.lineItems.length)return {error:"Legg inn minst én tilbudslinje."};

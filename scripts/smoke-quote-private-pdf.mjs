@@ -67,6 +67,20 @@ assert.ok(data.includes("TOTALT INKL. MVA"),"Customer total is missing");
 assert.ok(data.includes("312,50 kr"),"Customer sales total is wrong");
 assert.ok(data.includes("62,50 kr"),"VAT must be shown");
 assert.ok(!data.includes(secret),"Private cost note leaked to customer PDF");
+const businessQuote={...quote,customer:{
+ name:"EKSEMPEL TESTBEDRIFT AS",email:"invoice@example.invalid",address:"Eksempelvegen 1",
+ phone:"90000000",customerType:"business",organizationNumber:"987654321",
+ contactPerson:"Ingrid Eksempel",internalNote:secret
+}};
+const businessText=(await buildQuotePdf(businessQuote,[])).toString("latin1");
+assert.ok(businessText.includes("Org.nr."),"Business PDF missing organization number label");
+assert.ok(businessText.includes("987654321"),"Business PDF missing organization number");
+assert.ok(businessText.includes("Ingrid Eksempel"),"Business PDF missing contact person");
+assert.ok(!businessText.includes(secret),"Private customer note exposed on quote PDF");
+const privateText=(await buildQuotePdf({...businessQuote,customer:{
+ ...businessQuote.customer,customerType:"private",organizationNumber:""
+}},[])).toString("latin1");
+assert.ok(!privateText.includes("987654321"),"Private quote leaked organization number");
 assert.ok(!data.includes("830044123"),"Private cost in øre leaked to customer PDF");
 assert.equal(quotePdfFilename(quote),"Tilbud-TILB-2026-9999.pdf");
 assert.ok((data.match(/\/Type \/Page \/Parent/g)||[]).length>=1,"PDF should have at least one page");

@@ -7,7 +7,10 @@ const blank={name:"",email:"",phone:"",address:"",paymentTermsDays:14,customerTy
 const normalize=value=>String(value||"").trim().toLocaleLowerCase("nb-NO");
 const customerSnapshot=contact=>({
  contactId:contact.id,name:contact.name||"",email:contact.email||"",phone:contact.phone||"",
- address:contact.address||"",paymentTermsDays:Number(contact.paymentTermsDays??14)
+ address:contact.address||"",paymentTermsDays:Number(contact.paymentTermsDays??14),
+ customerType:contact.customerType==="business"?"business":"private",
+ organizationNumber:contact.customerType==="business"?(contact.organizationNumber||""):"",
+ contactPerson:contact.customerType==="business"?(contact.contactPerson||""):""
 });
 const field={display:"grid",gap:4,fontSize:13};
 export default function QuoteCustomerPicker({customer,onChoose,disabled=false}){
@@ -27,7 +30,7 @@ export default function QuoteCustomerPicker({customer,onChoose,disabled=false}){
   return()=>{live=false};
  },[]);
  const selected=useMemo(()=>contacts.find(item=>item.id===customer.contactId)||null,[contacts,customer.contactId]);
- const matches=useMemo(()=>normalize(search)?contacts.filter(item=>[item.name,item.email,item.phone,item.address].some(value=>normalize(value).includes(normalize(search)))).slice(0,30):[],[contacts,search]);
+ const matches=useMemo(()=>normalize(search)?contacts.filter(item=>[item.name,item.email,item.phone,item.address,item.organizationNumber,item.contactPerson].some(value=>normalize(value).includes(normalize(search)))).slice(0,30):[],[contacts,search]);
  // Older quotes may only contain a customer snapshot, so allow one-click
  // association with the central customer card without changing it automatically.
  const possibleMatch=!customer.contactId&&customer.name?contacts.find(item=>{
@@ -68,12 +71,12 @@ export default function QuoteCustomerPicker({customer,onChoose,disabled=false}){
   <p className="muted">Kundeinformasjon og betalingsfrist hentes fra kundekortet. Du trenger ikke skrive inn alt på nytt i hvert tilbud.</p>
   {selected||customer.contactId?<div style={{padding:12,border:"1px solid #d7c8ad",borderRadius:9,marginBottom:12}}>
    <strong>{customer.name||"Valgt kunde"}</strong>
-   <p style={{margin:"5px 0"}}>{[customer.email,customer.phone,customer.address].filter(Boolean).join(" · ")||"Ingen kontaktopplysninger lagt inn"}</p>
+   <p style={{margin:"5px 0"}}>{[customer.organizationNumber?"Org.nr. "+customer.organizationNumber:null,customer.email,customer.phone,customer.address].filter(Boolean).join(" · ")||"Ingen kontaktopplysninger lagt inn"}</p>
    <small>Betalingsfrist: {customer.paymentTermsDays??selected?.paymentTermsDays??14} dager</small>
    <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:8}}>
     {customer.contactId&&<Link href={"/admin/kunder/"+encodeURIComponent(customer.contactId)} target="_blank" rel="noopener noreferrer">Åpne / rediger kundekort ↗</Link>}
     {customer.contactId&&!disabled&&<button type="button" className="btn alt" disabled={refreshing} onClick={refreshSelected}>{refreshing?"Oppdaterer …":"Hent siste endringer"}</button>}
-    {!disabled&&<button type="button" className="btn alt" onClick={()=>{onChoose({contactId:"",name:"",email:"",phone:"",address:"",paymentTermsDays:14});setSearch("");}}>Bytt kunde</button>}
+    {!disabled&&<button type="button" className="btn alt" onClick={()=>{onChoose({contactId:"",name:"",email:"",phone:"",address:"",paymentTermsDays:14,customerType:"private",organizationNumber:"",contactPerson:""});setSearch("");}}>Bytt kunde</button>}
    </div>
   </div>:customer.name&&<div style={{padding:12,background:"#fff7eb",borderRadius:8,marginBottom:10}}>
    <strong>{customer.name}</strong> er hentet fra et eldre tilbud / en overføring, men er ikke knyttet til et kundekort.
@@ -84,7 +87,7 @@ export default function QuoteCustomerPicker({customer,onChoose,disabled=false}){
   </label>
   {loading?<p>Laster kunder …</p>:normalize(search)?<div style={{maxHeight:210,overflowY:"auto",margin:"10px 0",display:"grid",gap:6}}>
    {matches.map(item=><button type="button" className="btn alt" key={item.id} onClick={()=>{onChoose(customerSnapshot(item));setSearch("");setCreating(false);}} style={{textAlign:"left",whiteSpace:"normal"}}>
-    <strong>{item.name}</strong><small style={{display:"block"}}>{[item.email,item.phone,item.address].filter(Boolean).join(" · ")} · {item.paymentTermsDays??14} dager</small>
+    <strong>{item.name}</strong><small style={{display:"block"}}>{[item.organizationNumber?"Org.nr. "+item.organizationNumber:null,item.email,item.phone,item.address].filter(Boolean).join(" · ")} · {item.paymentTermsDays??14} dager</small>
    </button>)}
    {matches.length===0&&<p className="muted">Ingen treff. Opprett en ny kunde nedenfor.</p>}
   </div>:<p className="muted" style={{fontSize:13,margin:"8px 0"}}>Skriv et navn, telefonnummer eller e-post for å finne kunden.</p>}

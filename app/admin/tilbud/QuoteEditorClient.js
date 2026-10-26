@@ -25,7 +25,7 @@ function blankState(){
  return {
   title:"",
   status:"draft",
-  customer:{contactId:"",name:"",email:"",phone:"",address:"",paymentTermsDays:14},
+  customer:{contactId:"",name:"",email:"",phone:"",address:"",paymentTermsDays:14,customerType:"private",organizationNumber:"",contactPerson:""},
   drawingIds:[],
   introText:"Takk for henvendelsen og interessen for Aadland Service. Vi har gleden av å presentere vårt tilbud på arbeidet som er beskrevet nedenfor. Tilbudet viser arbeid, materialer og øvrige leveranser med tilhørende priser og betingelser.",
   lineItems:[{id:lineId(),type:"work",description:"",quantity:1,unit:"time",unitPriceOre:"",vatRate:25}],
@@ -214,10 +214,14 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   setV(current=>({
    ...current,
    customer:{
+    ...current.customer,
     name:String(initialCustomer.name||""),
     email:String(initialCustomer.email||""),
     phone:String(initialCustomer.phone||""),
-    address:String(initialCustomer.address||"")
+    address:String(initialCustomer.address||""),
+    customerType:initialCustomer.customerType==="business"?"business":"private",
+    organizationNumber:String(initialCustomer.organizationNumber||""),
+    contactPerson:String(initialCustomer.contactPerson||"")
    }
   }));
  },[quoteId,sourceOrderId,initialCustomer]);
@@ -283,7 +287,10 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       name:quote.customer?.name||"",
       email:quote.customer?.email||"",
       phone:quote.customer?.phone||"",
-      address:quote.customer?.address||""
+      address:quote.customer?.address||"",
+      customerType:quote.customer?.customerType==="business"?"business":"private",
+      organizationNumber:quote.customer?.organizationNumber||"",
+      contactPerson:quote.customer?.contactPerson||""
      },
      drawingIds:Array.isArray(quote.drawingIds)?quote.drawingIds:[],
      introText:quote.introText||"",
