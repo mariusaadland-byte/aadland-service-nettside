@@ -19,7 +19,11 @@ async function fileIds(s,table,key,ids){
  const found=[];
  for(let start=0;start<ids.length;start+=100){
   const chunk=ids.slice(start,start+100);
-  const rows=await collect(()=>s.from(table).select(key).in(key,chunk),200);
+  // A single bill may legitimately have multiple receipt images or PDF files.
+  // The old 200-row cap rejected complete terms with >200 attachments per
+  // 100 documents, even when all source data was present. Continue paging
+  // and fail closed if the larger audited limit is reached.
+  const rows=await collect(()=>s.from(table).select(key).in(key,chunk),5000);
   found.push(...rows.map(row=>row[key]));
  }
  return found;

@@ -23,6 +23,15 @@ assert.equal(r.verifiedWithSkatteetaten,false);
 assert.equal(r.documentCounts.preRegistrationPurchases,1);
 assert.equal(r.documentCounts.purchaseAttachments,1);
 assert.equal(r.documentCounts.externalAttachments,0);
+assert.equal(r.documentCounts.purchaseFiles,1);
+assert.equal(r.documentCounts.externalFiles,0);
+const lotsOfFiles=Array.from({length:251},()=>("p1"));
+const multi=buildVatSubmissionReview({...current,purchaseFileIds:lotsOfFiles,externalFileIds:["e1","e1"]});
+assert.equal(multi.documentCounts.purchase,2,"Two purchase documents");
+assert.equal(multi.documentCounts.purchaseAttachments,1,"One purchase document has a file");
+assert.equal(multi.documentCounts.purchaseFiles,251,"All original files counted separately");
+assert.equal(multi.documentCounts.externalAttachments,1);
+assert.equal(multi.documentCounts.externalFiles,2);
 assert.ok(r.checks.some(c=>c.code==="post_filing_entries"&&c.count===2));
 assert.ok(r.checks.some(c=>c.code==="external_original_missing"));
 assert.ok(r.checks.some(c=>c.code==="pre_registration_purchases"));
@@ -45,7 +54,7 @@ const store={
  vat_reporting_term_status:[{year:2026,term:3,status:"filed",filed_on:"2026-08-01"}],
  vat_purchase_documents:purchase,
  vat_external_sales_documents:external,
- vat_purchase_document_files:[{purchase_document_id:"p1"}],
+ vat_purchase_document_files:Array.from({length:251},()=>({purchase_document_id:"p1"})),
  vat_external_sales_files:[]
 };
 let owner="owner",failing="",readCount=0,writeCount=0;
@@ -92,6 +101,9 @@ r=await call(3);
 assert.equal(r.status,200);
 assert.ok(r.body.review.checks.some(c=>c.code==="post_filing_entries"));
 assert.equal(r.body.review.documentCounts.externalAttachments,0);
+assert.equal(r.body.review.documentCounts.purchaseFiles,251,
+ "Pagination must read >200 original files for a single purchase group");
+assert.equal(r.body.review.documentCounts.purchaseAttachments,1);
 assert.equal(r.headers["Cache-Control"],"private, no-store");
 owner="staff";r=await call(3);assert.equal(r.status,403);
 owner="owner";r=await call(7);assert.equal(r.status,400);
@@ -102,4 +114,7 @@ const page=read("app/admin/faktura/mva/InvoiceVatTermClient.js");
 assert.ok(page.includes("VatSubmissionReviewClient")&&page.includes("revision={reload}"));
 assert.ok(screen.includes("klar")||screen.includes("klarsignal"));
 assert.ok(screen.includes("Skatteetaten"));
+assert.ok(screen.includes("Totalt antall kjøpsfiler"));
+assert.ok(screen.includes("Kjøpsbilag med vedlagt originalfil"));
+assert.ok(screen.includes("Totalt antall salgsfiler"));
 console.log("MVA-kontrolliste bestått: retrospektive bilag, etterinnsending, filkontroll, manglende status og fail-closed API.");

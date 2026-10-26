@@ -26,9 +26,11 @@ export default function VatSubmissionReviewClient({year,term,revision}){
    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(155px,1fr))",gap:11,margin:"14px 0"}}>
     {[
      ["Innkjøpsbilag",review.documentCounts.purchase],
-     ["Originalfiler fra kjøp lagret her",review.documentCounts.purchaseAttachments],
+     ["Kjøpsbilag med vedlagt originalfil",review.documentCounts.purchaseAttachments],
+     ["Totalt antall kjøpsfiler",review.documentCounts.purchaseFiles],
      ["Importerte kundefakturaer/kreditnotaer",review.documentCounts.externalSales],
-     ["Originalfiler fra eldre salg lagret her",review.documentCounts.externalAttachments]
+     ["Importerte salgsdokumenter med originalfil",review.documentCounts.externalAttachments],
+     ["Totalt antall salgsfiler",review.documentCounts.externalFiles]
     ].map(([label,value])=><div key={label} style={{borderBottom:"1px solid #ddd",paddingBottom:8}}>
      <small style={{display:"block"}}>{label}</small><strong>{value}</strong>
     </div>)}
