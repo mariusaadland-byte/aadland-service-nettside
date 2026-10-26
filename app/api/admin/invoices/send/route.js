@@ -28,7 +28,7 @@ export async function POST(req){
   invoice.automatic_send!==true||invoice.auto_send_state!=="processing"||
   !invoice.planned_send_on||invoice.planned_send_on>today))
   return fail("Ingen aktiv og forfalt planlagt del-faktura kan sendes.",403);
- if(!cronCall&&invoice.status==="draft"&&invoice.automatic_send&&invoice.auto_send_state==="needs_review")
+ if(!cronCall&&invoice.automatic_send&&invoice.auto_send_state==="needs_review")
   return fail("Planlagt faktura krever kontroll. Bruk «Frigi for manuell sending» før du sender, og kontroller e-postloggen ved tidligere sendeforsøk.",409);
  if(!cronCall&&invoice.status==="draft"&&invoice.auto_send_state==="processing")
   return fail("Automatisk utsendelse pågår. Kontroller status før manuell sending.",409);
