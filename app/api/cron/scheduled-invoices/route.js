@@ -4,6 +4,7 @@ import {cronGuard} from "../../../../lib/cronAuth";
 import {osloDateKey} from "../../../../lib/osloTime";
 import {POST as sendInvoice} from "../../admin/invoices/send/route";
 import {scheduledInvoicePreflight} from "../../../../lib/scheduledInvoicePreflight";
+import {sendScheduledInvoiceOwnerNotice} from "../../../../lib/scheduledInvoiceOwnerNotice";
 export const runtime="nodejs";
 export const maxDuration=60;
 const json=(value,status=200)=>NextResponse.json(value,{status,headers:{"Cache-Control":"no-store"}});
@@ -16,6 +17,20 @@ export async function GET(req){
  const today=osloDateKey(new Date());
  const expired=await s.rpc("expire_stale_scheduled_invoice_claims");
  if(expired.error)return json({error:"Forrige planlagte utsendelser kunne ikke avstemmes."},503);
+ // A timed-out cron job cannot send its own failure notice. When we recover
+ // its claim on the next run, notify the owner without attempting customer
+ // delivery again. Notices share the original idempotency key with the
+ // ordinary failure path, so a duplicate notification is not generated.
+ const staleToReview=(expired.data||[]).filter(item=>item.final_state==="needs_review");
+ const staleNotices=await Promise.allSettled(staleToReview.map(item=>
+  sendScheduledInvoiceOwnerNotice({
+   invoiceId:item.invoice_id,
+   reason:"Et tidligere automatisk sendeforsøk ble avbrutt eller fikk ukjent resultat.",
+   apiKey:process.env.RESEND_API_KEY
+  })
+ ));
+ const failedNotices=staleNotices.filter(result=>result.status==="rejected").length;
+ if(failedNotices)console.error("SCHEDULED INVOICE STALE REVIEW NOTICE FAILED",{count:failedNotices});
  const claimed=await s.rpc("claim_scheduled_invoice_sends",{p_today:today,p_batch_size:5});
  if(claimed.error)return json({error:"Planlagte fakturaer kunne ikke kontrolleres."},503);
  const results=[];
@@ -71,21 +86,10 @@ export async function GET(req){
    }).eq("id",id).eq("auto_send_state","processing");
    console.error("SCHEDULED INVOICE NEEDS REVIEW",{id,delivered});
    if(!delivered){
-    // Best-effort owner notification; unknown provider outcomes do not cause
-    // another automatic attempt or change the invoice's recipient.
     try{
-     const {Resend}=await import("resend");
-     const resend=new Resend(process.env.RESEND_API_KEY);
-     const note=await resend.emails.send({
-      from:"Aadland Service <noreply@aadland-service.no>",
-      to:"post@aadland-service.no",
-      subject:"Kontroller planlagt del-faktura før sending",
-      text:"Automatisk utsendelse av del-faktura 2 ble stoppet.\\n"+
-       "Årsak: "+String(error?.message||"Ukjent feil").slice(0,250)+"\\n"+
-       "Åpne fakturakladden: https://www.aadland-service.no/admin/faktura?id="+encodeURIComponent(id)+
-       "\\nDet er ikke bekreftet at e-post ble sendt. Sjekk fakturaarkivet og e-postloggen før et nytt forsøk."
-     },{idempotencyKey:"scheduled-invoice-review/"+id});
-     if(note.error)console.error("SCHEDULED INVOICE REVIEW NOTICE FAILED",{id});
+     await sendScheduledInvoiceOwnerNotice({
+      invoiceId:id,reason:error?.message,apiKey:process.env.RESEND_API_KEY
+     });
     }catch{
      console.error("SCHEDULED INVOICE REVIEW NOTICE FAILED",{id});
     }
@@ -94,6 +98,7 @@ export async function GET(req){
   }
  }
  return json({ok:true,date:today,processed:results.length,
-  recoveredForReview:(expired.data||[]).filter(item=>item.final_state==="needs_review").length,
+  recoveredForReview:staleToReview.length,
+  reviewNoticeFailures:failedNotices,
   results});
 }
