@@ -75,7 +75,7 @@ assert.equal(combined.comparison.outputVatOre,2500);
 assert.equal(combined.comparison.inputVatOre,-1900);
 assert.equal(combined.comparison.differenceOre,4400);
 assert.equal(combined.comparison.isComplete,false);
-const csv=combinedVatCsv(combined,term.invoiceVatTermCsv(combined));
+const csv=combinedVatCsv({...combined,comparison:{...combined.comparison,estimateAllowed:true}},term.invoiceVatTermCsv(combined));
 assert.ok(csv.startsWith("\uFEFF"));
 assert.match(csv,/Inngående MVA/);
 assert.ok(csv.includes("Systemia bilag 46"));
