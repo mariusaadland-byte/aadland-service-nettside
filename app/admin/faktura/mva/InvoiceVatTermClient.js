@@ -100,7 +100,10 @@ export default function InvoiceVatTermClient(){
        {money(settlement.amountOre)}
       </strong>
      </div>
-    </div>:<p role="alert">MVA-beløpet kan ikke beregnes trygt fra rapporten.</p>}
+    </div>:<p role="alert" style={{padding:13,border:"1px solid #d1aa70",borderRadius:9}}>
+     <strong>Beløp å betale / til gode vises ikke.</strong>{" "}
+     {report.registrationReview?.message||"Registreringsdatoen må kontrolleres først."}
+    </p>}
     <p style={{fontSize:13,background:"#f1f5f2",padding:12,borderRadius:10}}>
      <strong>Ubetalte fakturaer påvirker ikke når MVA skal meldes.</strong>
      {" "}For fakturaer laget i Aadland Service er det per nå <strong>{total.paymentSnapshot?.openCount??0}</strong> fakturaer
@@ -151,12 +154,12 @@ export default function InvoiceVatTermClient(){
       ["MVA på registrerte kjøpsbilag",money(report.purchases.vatOnPurchasesOre)],
       ["Vurdert fradragsberettiget inngående MVA",money(report.purchases.inputVatOre)],
       ["Utgående MVA fra fakturaer",money(report.comparison.outputVatOre)],
-      ["Foreløpig differanse",money(report.comparison.differenceOre)]
+      ["Foreløpig differanse",report.comparison.estimateAllowed?money(report.comparison.differenceOre):"Ikke beregnet"]
      ].map(([label,value])=><div key={label} style={{padding:"8px 0",borderBottom:"1px solid #e5ded1"}}>
       <small style={{display:"block"}}>{label}</small><strong>{value}</strong>
      </div>)}
     </div>
-    <p style={{fontSize:13}}><strong>Ikke beregnet betaling til Skatteetaten:</strong> {report.comparison.warning}</p>
+    <p style={{fontSize:13}}><strong>Ikke beregnet endelig betaling til Skatteetaten:</strong> {report.comparison.warning}</p>
     <h3>MVA fra registrerte innkjøp per sats</h3>
     <div style={{overflowX:"auto"}}><table style={{width:"100%",minWidth:480}}>
      <thead><tr><th>Sats</th><th style={{textAlign:"right"}}>Grunnlag eks. MVA</th><th style={{textAlign:"right"}}>MVA på bilag</th></tr></thead>

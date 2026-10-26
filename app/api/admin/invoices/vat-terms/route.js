@@ -4,6 +4,7 @@ import {db} from "../../../../../lib/supabase";
 import {buildInvoiceVatTermReport,invoiceVatTermCsv,vatTermBounds} from "../../../../../lib/invoiceVatTermReport";
 import {calculateInputVatSummary,mergedVatReport,combinedVatCsv} from "../../../../../lib/invoiceInputVat";
 import {calculateExternalSalesSummary,mergeExternalVatReport} from "../../../../../lib/vatExternalSales";
+import {applyVatRegistrationGuard} from "../../../../../lib/vatRegistrationGuard";
 export const runtime="nodejs";
 const json=(body,status=200)=>NextResponse.json(body,{status,headers:{"Cache-Control":"private, no-store"}});
 async function collect(query,max=5000){
@@ -30,7 +31,7 @@ export async function GET(req){
  try{
   // Both sides of the VAT report use original document dates, regardless
   // of payment/closing time. Never join on administrative closure.
-  const [invoices,credits,purchases,externalSales]=await Promise.all([
+  const [invoices,credits,purchases,externalSales,profile]=await Promise.all([
    collect(()=>s.from("invoice_drafts")
     .select("id,status,invoice_number,issued_date,customer,line_items,paid_ore,credited_ore")
     .gte("issued_date",bounds.from).lte("issued_date",bounds.to)
@@ -49,12 +50,15 @@ export async function GET(req){
     .select("id,customer_name,source_system,document_number,document_date,kind,original_document_number,vat_groups,base_ore,vat_ore,voided_at")
     .gte("document_date",bounds.from).lte("document_date",bounds.to)
     .is("voided_at",null)
-    .order("document_date",{ascending:true}).order("id",{ascending:true}))
+    .order("document_date",{ascending:true}).order("id",{ascending:true})),
+   s.from("vat_reporting_profile")
+    .select("registration_date,first_term_year,first_term").eq("id","primary").maybeSingle()
   ]);
-  const report=mergeExternalVatReport(mergedVatReport(
+  if(profile.error)throw Error("MVA-registreringen kunne ikke kontrolleres. Rapporten vises ikke.");
+  const report=applyVatRegistrationGuard(mergeExternalVatReport(mergedVatReport(
    buildInvoiceVatTermReport(invoices,credits,bounds),
    calculateInputVatSummary(purchases,bounds)
-  ),calculateExternalSalesSummary(externalSales,bounds));
+  ),calculateExternalSalesSummary(externalSales,bounds)),profile.data||null);
   if(format==="csv"){
    const data=Buffer.from(combinedVatCsv(report,invoiceVatTermCsv(report)),"utf8");
    return new NextResponse(data,{headers:{
