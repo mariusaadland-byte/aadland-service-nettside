@@ -5,7 +5,7 @@ export default function CompanyRegistrySearch({onSelect,disabled=false,initialQu
  const [loading,setLoading]=useState(false),[error,setError]=useState(""),[selected,setSelected]=useState(null);
  useEffect(()=>{
   const q=query.trim();
-  if(q.length<3||disabled){setResults([]);setLoading(false);setError("");return;}
+  if(q.length<3||disabled||selected?.name===q){setResults([]);setLoading(false);setError("");return;}
   let active=true;const controller=new AbortController();
   const timeout=setTimeout(async()=>{
    setLoading(true);setError("");
@@ -20,7 +20,7 @@ export default function CompanyRegistrySearch({onSelect,disabled=false,initialQu
    }finally{if(active)setLoading(false);}
   },400);
   return()=>{active=false;clearTimeout(timeout);controller.abort();};
- },[query,disabled]);
+ },[query,disabled,selected?.organizationNumber]);
  function pick(company){
   onSelect?.(company);setSelected(company);
   setQuery(company.name);setResults([]);

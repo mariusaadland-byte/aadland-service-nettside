@@ -18,6 +18,7 @@ export default function NewCustomerClient({invoiceId=""}){
    const data=await res.json().catch(()=>({}));
    if(!res.ok)throw Error(data.error||"Kunden kunne ikke lagres.");
    if(!data.contact?.id)throw Error("Kundekortet ble ikke bekreftet lagret.");
+   if(data.existing&&data.message)window.alert(data.message);
    const target=invoiceId?"/admin/faktura?id="+encodeURIComponent(invoiceId)+"&customerId="+encodeURIComponent(data.contact.id):"/admin/kunder/"+encodeURIComponent(data.contact.id);
    window.location.assign(target);
   }catch(e){setError(e.message||"Kunden kunne ikke opprettes.");}

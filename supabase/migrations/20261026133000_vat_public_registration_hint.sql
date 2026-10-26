@@ -18,3 +18,7 @@ insert into public.vat_registration_public_hint
  'https://sokfirma.no/selskap/937781873/aadland-service',
  'MVA-status ble oppdatert fra Nei til Ja 5. juni 2026. Datoen er et forslag, ikke en bekreftet juridisk virkningsdato.')
  on conflict(id) do nothing;
+-- Prevent two active business cards for the same organization. Existing database checked first.
+create unique index if not exists admin_customer_contacts_org_unique
+ on public.admin_customer_contacts(organization_number)
+ where organization_number is not null;

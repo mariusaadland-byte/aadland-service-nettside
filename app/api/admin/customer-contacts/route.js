@@ -51,7 +51,11 @@ export async function POST(request){
  if(input.data.email){
   const {data:existing,error:lookupError}=await s.from("admin_customer_contacts").select(fields).eq("email",input.data.email).maybeSingle();
   if(lookupError)return NextResponse.json({error:"Kunne ikke sjekke eksisterende kunde."},{status:500});
-  if(existing)return NextResponse.json({contact:map(existing),existing:true});
+  if(existing){
+   if(input.data.organization_number&&existing.organization_number!==input.data.organization_number)
+    return NextResponse.json({error:"E-postadressen tilhører allerede et annet kundekort. Åpne og kontroller kunden først."},{status:409});
+   return NextResponse.json({contact:map(existing),existing:true});
+  }
  }
  const {data,error}=await s.from("admin_customer_contacts").insert(input.data).select(fields).single();
  if(error){console.error("ADMIN CUSTOMER CONTACT CREATE",error);return NextResponse.json({error:"Kunden kunne ikke opprettes. Sjekk om e-posten er i bruk."},{status:500})}
