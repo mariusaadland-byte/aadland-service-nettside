@@ -28,9 +28,19 @@ function sanitize(body){
  if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return {error:"Ugyldig e-postadresse."};
  return {data:{payment_terms_days:days,name,email:email||null,phone:phone||null,address:address||null,customer_type:customerType,organization_number:customerType==="business"?(organizationNumber||null):null,contact_person:customerType==="business"?(contactPerson||null):null,internal_note:internalNote||null,preferred_payment_method:preferredPaymentMethod,updated_at:new Date().toISOString()}};
 }
-export async function GET(){
+export async function GET(request){
  if(!await allowed())return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const s=db();if(!s)return NextResponse.json({error:"Databasen er utilgjengelig."},{status:503});
+ const url=new URL(request?.url||"https://localhost/api/admin/customer-contacts");
+ if(url.searchParams.has("organizationNumber")){
+  const org=String(url.searchParams.get("organizationNumber")||"").replace(/\s/g,"");
+  if(!/^[0-9]{9}$/.test(org))
+   return NextResponse.json({error:"Oppgi et gyldig organisasjonsnummer."},{status:400});
+  const {data,error}=await s.from("admin_customer_contacts").select(fields)
+   .eq("organization_number",org).maybeSingle();
+  if(error)return NextResponse.json({error:"Kunne ikke kontrollere eksisterende bedriftskunde."},{status:503});
+  return NextResponse.json({contact:data?map(data):null},{headers:{"Cache-Control":"private, no-store"}});
+ }
  const {data,error}=await s.from("admin_customer_contacts").select(fields).order("name").limit(1000);
  if(error)return NextResponse.json({error:"Kundelisten kunne ikke hentes."},{status:500});
  return NextResponse.json({contacts:(data||[]).map(map)});

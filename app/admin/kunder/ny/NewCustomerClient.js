@@ -38,7 +38,14 @@ export default function NewCustomerClient({invoiceId=""}){
      </label>
      <label style={labelStyle}>Kundenavn / firmanavn *<input required autoFocus maxLength={180} value={form.name} onChange={e=>set("name",e.target.value)} autoComplete="name" placeholder="Navn på kunden"/></label>
      {form.customerType==="business"&&<>
-      <CompanyRegistrySearch disabled={busy} onSelect={company=>
+      <CompanyRegistrySearch disabled={busy} checkExisting
+       onUseExisting={contact=>{
+        const target=invoiceId?
+         "/admin/faktura?id="+encodeURIComponent(invoiceId)+"&customerId="+encodeURIComponent(contact.id):
+         "/admin/kunder/"+encodeURIComponent(contact.id);
+        window.location.assign(target);
+       }}
+       onSelect={company=>
        setForm(prev=>({...prev,customerType:"business",name:company.name,
         organizationNumber:company.organizationNumber,address:company.address||prev.address}))}/>
       <label style={labelStyle}>Organisasjonsnummer (9 sifre)<input inputMode="numeric" maxLength={9} pattern="[0-9]{9}" value={form.organizationNumber} onChange={e=>set("organizationNumber",e.target.value)} placeholder="9 sifre"/></label>

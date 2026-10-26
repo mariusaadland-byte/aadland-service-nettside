@@ -59,7 +59,7 @@ export default function QuoteCustomerPicker({customer,onChoose,disabled=false}){
    setContacts(current=>[result.contact,...current.filter(item=>item.id!==result.contact.id)]);
    onChoose(customerSnapshot(result.contact));
    setSearch("");setCreating(false);setNewCustomer(blank);
-   if(result.existing)setError("E-postadressen finnes allerede. Eksisterende kundekort er valgt.");
+   if(result.existing)setError(result.message||"Kunden finnes allerede. Eksisterende kundekort er valgt.");
   }catch(e){setError(e.message||"Kunden kunne ikke opprettes.");}
   finally{setBusy(false);}
  }
@@ -98,7 +98,12 @@ export default function QuoteCustomerPicker({customer,onChoose,disabled=false}){
     </select>
    </label>
    {newCustomer.customerType==="business"&&<>
-    <CompanyRegistrySearch disabled={busy} onSelect={company=>
+    <CompanyRegistrySearch disabled={busy} checkExisting
+     onUseExisting={contact=>{
+      onChoose(customerSnapshot(contact));
+      setSearch("");setCreating(false);setNewCustomer(blank);setError("");
+     }}
+     onSelect={company=>
      setNewCustomer(c=>({...c,customerType:"business",name:company.name,
       organizationNumber:company.organizationNumber,address:company.address||c.address}))}/>
     <label style={field}>Organisasjonsnummer

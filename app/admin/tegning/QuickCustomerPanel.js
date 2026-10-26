@@ -49,7 +49,9 @@ export default function QuickCustomerPanel({onClose,onChoose}){
       </select>
      </label>
      {customer.customerType==="business"&&<>
-      <CompanyRegistrySearch disabled={saving} onSelect={company=>
+      <CompanyRegistrySearch disabled={saving} checkExisting
+       onUseExisting={contact=>pick(contact)}
+       onSelect={company=>
        setCustomer(c=>({...c,customerType:"business",name:company.name,
         organizationNumber:company.organizationNumber,address:company.address||c.address}))}/>
       <label>Organisasjonsnummer
