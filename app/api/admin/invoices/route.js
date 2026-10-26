@@ -112,12 +112,21 @@ export async function PATCH(req){
  }
  const chosen=selected?{name:selected.name,email:selected.email||"",address:selected.address||"",phone:selected.phone||"",contactId:selected.id,paymentTermsDays:selected.payment_terms_days??14,customerType:selected.customer_type||"private",organizationNumber:selected.customer_type==="business"?(selected.organization_number||""):"",contactPerson:selected.customer_type==="business"?(selected.contact_person||""):""}:
  {name:clean(body.customer?.name),email:clean(body.customer?.email),address:clean(body.customer?.address,500),phone:clean(body.customer?.phone,70),contactId:"",paymentTermsDays:Number(body.customer?.paymentTermsDays??14),customerType:body.customer?.customerType==="business"?"business":"private",organizationNumber:body.customer?.customerType==="business"?clean(body.customer?.organizationNumber,9):"",contactPerson:body.customer?.customerType==="business"?clean(body.customer?.contactPerson,180):""};
+ // Auto due date must be derived from the *selected customer card*, not the
+ // possibly outdated 14-day deadline the browser submitted. This is a draft
+ // display value; the issuance procedure calculates final due date again.
+ const days=selected?Number(chosen.paymentTermsDays):14;
+ const osloToday=osloDateKey(new Date());
+ const baseDay=/^\d{4}-\d{2}-\d{2}$/.test(osloToday||"")?osloToday:new Date().toISOString().slice(0,10);
+ const automaticDue=new Date(baseDay+"T12:00:00Z");
+ automaticDue.setUTCDate(automaticDue.getUTCDate()+days);
+ const savedDueDate=mode==="auto"?automaticDue.toISOString().slice(0,10):due;
  const chosenPaymentMethod=body.customer?.paymentMethod==="vipps"?"vipps":body.customer?.paymentMethod==="bank"?"bank":selected?.preferred_payment_method==="vipps"?"vipps":"bank";
  const workDate=chosenPaymentMethod==="vipps"?osloDateKey(new Date()):clean(body.customer?.workDate,10);
- const update={title:clean(body.title),customer:{...chosen,workDescription:clean(body.customer?.workDescription,3000),workDate,workAddress:clean(body.customer?.workAddress,500),paymentMethod:chosenPaymentMethod},pricing_model:body.pricingModel,line_items:body.lineItems.map(x=>({description:clean(x.description,500),type:clean(x.type,20),quantity:Number(x.quantity),unit:clean(x.unit,30),unitPriceOre:Number(x.unitPriceOre),vatRate:Number(x.vatRate)})),notes:clean(body.notes,4000),due_date:due,due_date_mode:mode,updated_at:new Date().toISOString()};
+ const update={title:clean(body.title),customer:{...chosen,workDescription:clean(body.customer?.workDescription,3000),workDate,workAddress:clean(body.customer?.workAddress,500),paymentMethod:chosenPaymentMethod},pricing_model:body.pricingModel,line_items:body.lineItems.map(x=>({description:clean(x.description,500),type:clean(x.type,20),quantity:Number(x.quantity),unit:clean(x.unit,30),unitPriceOre:Number(x.unitPriceOre),vatRate:Number(x.vatRate)})),notes:clean(body.notes,4000),due_date:savedDueDate,due_date_mode:mode,updated_at:new Date().toISOString()};
  const {data,error}=await s.from("invoice_drafts").update(update).eq("id",body.id).eq("status","draft")
   .eq("updated_at",body.expectedUpdatedAt).select("id,updated_at").maybeSingle();
  if(error)return fail("Fakturakladden kunne ikke lagres.",500);
  if(!data)return fail("Kladden er endret eller allerede utstedt i en annen fane. Last inn fakturaen på nytt for å unngå å overskrive nye kundeopplysninger eller priser.",409);
- return NextResponse.json({ok:true,updatedAt:data.updated_at,savedCustomer:update.customer});
+ return NextResponse.json({ok:true,updatedAt:data.updated_at,savedCustomer:update.customer,savedDueDate});
 }
