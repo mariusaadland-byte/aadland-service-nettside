@@ -2,12 +2,13 @@
 import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import InvoiceInlineBusinessCustomer from "./InvoiceInlineBusinessCustomer";
+import InvoiceInlinePrivateCustomer from "./InvoiceInlinePrivateCustomer";
 
 const norm=x=>String(x||"").trim().toLocaleLowerCase("nb-NO");
 export default function InvoiceCustomerPicker({customer={},onChoose,onCreate,disabled=false,busy=false,invoiceId}){
  const [contacts,setContacts]=useState([]),[search,setSearch]=useState(""),[loading,setLoading]=useState(true);
  const [error,setError]=useState(""),[choosing,setChoosing]=useState("");
- const [inlineBusiness,setInlineBusiness]=useState(false);
+ const [inlineBusiness,setInlineBusiness]=useState(false),[inlinePrivate,setInlinePrivate]=useState(false);
  useEffect(()=>{
   let live=true;
   fetch("/api/admin/customer-contacts",{cache:"no-store"}).then(async r=>{
@@ -21,11 +22,14 @@ export default function InvoiceCustomerPicker({customer={},onChoose,onCreate,dis
   const q=norm(search);return (q?contacts.filter(c=>[c.name,c.email,c.phone,c.address,c.organizationNumber,c.contactPerson].some(x=>norm(x).includes(q))):contacts).slice(0,q?30:10);
  },[contacts,search]);
  async function choose(item){
-  if(disabled||busy||choosing)return;
+  if(disabled||busy||choosing)throw Error("Fakturaen behandles. Prøv å velge kunden på nytt.");
   setError("");setChoosing(item.id);
-  try{await onChoose(item);setSearch("");setInlineBusiness(false);}
-  catch(e){setError(e.message||"Kunden kunne ikke velges.");}
-  finally{setChoosing("");}
+  try{
+   await onChoose(item);setSearch("");setInlineBusiness(false);setInlinePrivate(false);
+  }catch(e){
+   setError(e.message||"Kunden kunne ikke velges.");
+   throw e; // Inline forms must know when invoice binding fails, to retry without another POST.
+  }finally{setChoosing("");}
  }
  const locked=disabled||busy||Boolean(choosing);
  return <section aria-label="Velg fakturakunde" className="card" style={{padding:18,margin:"16px 0",border:"1px solid #c99a49"}}>
@@ -43,7 +47,7 @@ export default function InvoiceCustomerPicker({customer={},onChoose,onCreate,dis
    <input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Navn, telefon, e-post eller adresse" disabled={locked||loading} autoComplete="off"/>
   </label>
   {loading?<p role="status">Laster kunderegisteret …</p>:<div style={{margin:"12px 0",display:"grid",gap:8,maxHeight:260,overflowY:"auto"}}>
-   {matches.map(item=><button key={item.id} type="button" disabled={locked} onClick={()=>choose(item)} aria-pressed={customer.contactId===item.id}
+   {matches.map(item=><button key={item.id} type="button" disabled={locked} onClick={()=>{void choose(item).catch(()=>{});}} aria-pressed={customer.contactId===item.id}
     style={{padding:12,textAlign:"left",whiteSpace:"normal",borderRadius:8,border:customer.contactId===item.id?"2px solid #b58b47":"1px solid #ddd1bd",background:customer.contactId===item.id?"#fff5e4":"#fff"}}>
     <strong>{item.name}</strong>{item.customerType==="business"?" · Bedrift":""}{customer.contactId===item.id?" ✓":""}
     <small style={{display:"block",marginTop:4}}>{[item.organizationNumber?"Org.nr. "+item.organizationNumber:null,item.email,item.phone,item.address].filter(Boolean).join(" · ")||"Ingen ekstra opplysninger"} · {item.paymentTermsDays??14} dager</small>
@@ -52,8 +56,12 @@ export default function InvoiceCustomerPicker({customer={},onChoose,onCreate,dis
   </div>}
   <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",marginTop:10}}>
    <button type="button" disabled={locked} aria-expanded={inlineBusiness}
-    onClick={()=>setInlineBusiness(open=>!open)}>
+    onClick={()=>{setInlinePrivate(false);setInlineBusiness(open=>!open);}}>
     {inlineBusiness?"Lukk firmasøk":"＋ Finn og legg til bedrift her"}
+   </button>
+   <button type="button" disabled={locked} aria-expanded={inlinePrivate}
+    onClick={()=>{setInlineBusiness(false);setInlinePrivate(open=>!open);}}>
+    {inlinePrivate?"Lukk privatkunde":"＋ Legg til privatkunde her"}
    </button>
    <button type="button" disabled={locked} onClick={onCreate}>
     ＋ Ny kunde – åpne kunderegistrering
@@ -62,8 +70,12 @@ export default function InvoiceCustomerPicker({customer={},onChoose,onCreate,dis
   {inlineBusiness&&<InvoiceInlineBusinessCustomer disabled={locked} onChoose={choose}
    onCreated={contact=>setContacts(current=>[contact,...current.filter(c=>c.id!==contact.id)])}
    onClose={()=>setInlineBusiness(false)}/>}
-  {!inlineBusiness&&<p className="muted" style={{fontSize:12,marginTop:9}}>
-   Bruk firmasøk for bedrifter. For privatkunder åpner du vanlig kunderegistrering.
+  {inlinePrivate&&<InvoiceInlinePrivateCustomer disabled={locked} onChoose={choose}
+   onCreated={contact=>setContacts(current=>[contact,...current.filter(c=>c.id!==contact.id)])}
+   onClose={()=>setInlinePrivate(false)}/>}
+  {!inlineBusiness&&!inlinePrivate&&<p className="muted" style={{fontSize:12,marginTop:9}}>
+   Opprett bedrifts- eller privatkunder uten å forlate fakturaen.
+   Du kan også bruke den fullstendige kunderegistreringen.
   </p>}
   {choosing&&<p role="status">Lagrer valgt kunde på fakturaen …</p>}
   {error&&<p role="alert" style={{color:"#a52a21"}}>{error} <button type="button" onClick={()=>{setLoading(true);setError("");fetch("/api/admin/customer-contacts",{cache:"no-store"}).then(r=>r.json().then(d=>{if(!r.ok)throw Error(d.error);setContacts(d.contacts||[]);})).catch(e=>setError(e.message)).finally(()=>setLoading(false));}}>Prøv på nytt</button></p>}
