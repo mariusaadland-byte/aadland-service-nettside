@@ -14,9 +14,15 @@ export async function PATCH(req){
  if(process.env.VERCEL_ENV!=="production")
   return json({error:"Planlagt fakturering endres bare i produksjon."},403);
  const body=await req.json().catch(()=>({}));
- if(!uuid(body.id)||body.action!=="cancel"||body.confirmed!==true)
-  return json({error:"Bekreft hvilken planlagt faktura som skal stoppes."},400);
+ if(!uuid(body.id)||!["cancel","review_manual"].includes(body.action)||body.confirmed!==true)
+  return json({error:"Bekreft hvilken planlagt faktura som skal endres."},400);
  const s=db();if(!s)return json({error:"Databasen er utilgjengelig."},503);
+ if(body.action==="review_manual"){
+  const released=await s.rpc("review_scheduled_invoice_for_manual_send",{p_id:body.id});
+  if(released.error)return json({error:released.error.message||
+   "Manuell frigivelse ble avvist. Kontroller sendestatus og kunden."},409);
+  return json({ok:true,id:body.id,customerUpdated:released.data?.customerUpdated===true});
+ }
  const {data,error}=await s.from("invoice_drafts").update({
   automatic_send:false,auto_send_state:"cancelled",auto_send_error:null
  }).eq("id",body.id).eq("split_part",2).eq("status","draft")

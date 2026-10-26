@@ -14,6 +14,8 @@ export async function GET(req){
  if(!process.env.RESEND_API_KEY)return json({error:"E-post er ikke konfigurert."},503);
  const s=db();if(!s)return json({error:"Database utilgjengelig."},503);
  const today=osloDateKey(new Date());
+ const expired=await s.rpc("expire_stale_scheduled_invoice_claims");
+ if(expired.error)return json({error:"Forrige planlagte utsendelser kunne ikke avstemmes."},503);
  const claimed=await s.rpc("claim_scheduled_invoice_sends",{p_today:today,p_batch_size:5});
  if(claimed.error)return json({error:"Planlagte fakturaer kunne ikke kontrolleres."},503);
  const results=[];
@@ -91,5 +93,7 @@ export async function GET(req){
    results.push({id,status:delivered?"sent":"needs_review"});
   }
  }
- return json({ok:true,date:today,processed:results.length,results});
+ return json({ok:true,date:today,processed:results.length,
+  recoveredForReview:(expired.data||[]).filter(item=>item.final_state==="needs_review").length,
+  results});
 }

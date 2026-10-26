@@ -294,6 +294,12 @@ export default function InvoicesClient({archiveMode=false}){
  function exportCsv(){if(!form)return;const esc=v=>'"'+String(v??"").replaceAll('"','""')+'"';const rows=[["Beskrivelse","Antall","Enhet","Enhetspris eks MVA (kr)","MVA %"],...form.line_items.map(l=>[l.description,l.quantity,l.unit,(Number(l.unitPriceOre)/100).toFixed(2),l.vatRate])];const csv="\uFEFF"+rows.map(row=>row.map(esc).join(";")).join("\r\n");const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download="fakturakladd-"+form.id+".csv";a.click();URL.revokeObjectURL(url);}
  return <main className="admin" style={{maxWidth:1100,margin:"auto",padding:24}}><Link href="/admin">← Admin</Link><h1>{archiveMode?"Fakturaarkiv":"Fakturakladder"}</h1><nav aria-label="Fakturaoversikt" style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:18}}><Link href="/admin/faktura" aria-current={!archiveMode?"page":undefined}>Kladder</Link><Link href="/admin/faktura/arkiv" aria-current={archiveMode?"page":undefined}>Fakturaarkiv – betalinger</Link>{archiveMode&&<Link href="/admin/faktura/rapport">Rapport og CSV – avsluttede fakturaer</Link>}{archiveMode&&<Link href="/admin/faktura/mva">MVA-avstemming per termin</Link>}</nav><p>{archiveMode?"Her finner du alle utstedte fakturaer. Registrer innbetalinger og se hva som gjenstår. Oversikten bygger på betalingene du registrerer her.":"Opprett og kontroller fakturakladder. Utstedte fakturaer flyttes automatisk til fakturaarkivet."}</p>
  {error&&<p role="alert" style={{color:"crimson"}}>{error} {error.includes("en annen fane")&&<button type="button" disabled={busy} onClick={reloadAfterConflict}>Hent siste fakturakladd</button>}</p>}{printHref&&<p><a href={printHref} target="_blank" rel="noreferrer">Åpne faktura for utskrift →</a></p>}
+ {!archiveMode&&items.some(x=>x.auto_send_state==="needs_review"||x.auto_send_state==="processing")&&
+ <p role="alert" style={{padding:12,border:"1px solid #cc9980",borderRadius:8}}>
+  <strong>Planlagte fakturaer trenger oppfølging:</strong> {items.filter(x=>x.auto_send_state==="needs_review").length} stoppet for kontroll,
+  {items.filter(x=>x.auto_send_state==="processing").length} under behandling.
+  Åpne den aktuelle fakturakladden nedenfor før du prøver ny sending.
+ </p>}
  {!archiveMode&&<section className="card" style={{padding:18,marginBottom:20}}><h2>Opprett fakturakladd</h2><p>Godkjente tilbud får egne kladder for forskudd, delbetaling og sluttoppgjør etter tilbudets betalingsplan. Faktura- og forfallsdato beregnes automatisk når du fakturerer, etter betalingsfristen på kundekortet.</p><button disabled={busy} onClick={()=>create(null)}>Ny tom kladd</button> <select id="invoiceQuote" defaultValue=""><option value="">Velg godkjent tilbud</option>{quotes.map(q=><option key={q.id} value={q.id}>{q.quoteNumber} – {q.title}</option>)}</select> <button disabled={busy} onClick={()=>{const id=document.getElementById("invoiceQuote").value;if(id)create(id);else setError("Velg et godkjent tilbud.");}}>Hent betalingsplan fra tilbud</button></section>}
  {archiveMode&&<InvoiceFollowUpDashboard invoices={items} today={today} activeFilter={filter} onFilterChange={setFilter} loading={loadingInvoices}/>}
  {archiveMode&&<section className="card" style={{padding:18,marginBottom:20}}>
@@ -411,8 +417,25 @@ export default function InvoicesClient({archiveMode=false}){
    {form.automatic_send?" Automatisk: ":" Manuell: "}
    <b>{({scheduled:"Planlagt",processing:"Sender",sent:"Sendt",needs_review:"Krever kontroll",cancelled:"Avbrutt",manual:"Manuell"})[form.auto_send_state]||"Manuell"}</b>.
   </p>
-  {form.auto_send_state==="needs_review"&&<p role="alert">Automatisk sending er ikke bekreftet. Sjekk e-postloggen før du prøver igjen.
-   {form.auto_send_error&&<span style={{display:"block"}}>{form.auto_send_error}</span>}</p>}
+  {form.auto_send_state==="needs_review"&&<div role="alert">
+   <p>Automatisk sending er stoppet og krever kontroll. Kontroller del 1, kundekortet og e-postloggen før du fortsetter.
+    {form.auto_send_error&&<span style={{display:"block"}}>{form.auto_send_error}</span>}</p>
+   {form.status==="draft"&&<button type="button" disabled={busy} onClick={async()=>{
+    if(!window.confirm("Jeg har kontrollert at del 2 IKKE allerede er sendt, og at del 1 er sendt.\\n"+
+     "Frigi del 2 for MANUELL fakturering? Systemet vil oppdatere mottakeropplysningene fra kundekortet.\\n"+
+     "Ingen faktura sendes når du trykker OK. Kontroller mottaker og beløp på nytt før du sender."))return;
+    setBusy(true);setError("");setSaved("");
+    try{
+     const response=await fetch("/api/admin/invoices/split",{method:"PATCH",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({id:form.id,action:"review_manual",confirmed:true})});
+     const data=await response.json().catch(()=>({}));
+     if(!response.ok)throw Error(data.error||"Fakturaen kunne ikke frigis.");
+     await load();setSaved("Autosending er avsluttet. Mottakeren er kontrollert. Del 2 kan nå sendes manuelt.");
+    }catch(e){setError(e.message||"Manuell frigivelse ble avvist.");}
+    finally{setBusy(false);}
+   }}>Frigi for manuell sending etter kontroll</button>}
+  </div>}
   {form.automatic_send&&form.auto_send_state==="scheduled"&&
    <button type="button" disabled={busy} onClick={async()=>{
     if(!window.confirm("Avbryte automatisk sending av del 2? Kladden beholdes og kan sendes manuelt."))return;

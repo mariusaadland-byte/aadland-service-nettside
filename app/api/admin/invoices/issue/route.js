@@ -17,6 +17,8 @@ export async function POST(req){
  let invoice=found.data;
  if(invoice.status==="draft"&&invoice.planned_send_on&&invoice.planned_send_on>osloDateKey(new Date()))
   return fail("Fakturaen er planlagt til "+invoice.planned_send_on+" og kan ikke utstedes tidligere.",409);
+ if(invoice.status==="draft"&&invoice.automatic_send&&invoice.auto_send_state==="needs_review")
+  return fail("Planlagt faktura krever kontroll. Frigi den for manuell sending etter gjennomgang.",409);
  if(invoice.status==="draft"&&invoice.auto_send_state==="processing")
   return fail("Automatisk utsendelse er i gang. Vent til status er kontrollert.",409);
  if(invoice.status==="draft"&&invoice.automatic_send&&invoice.auto_send_state==="scheduled")
