@@ -119,5 +119,5 @@ export async function PATCH(req){
   .eq("updated_at",body.expectedUpdatedAt).select("id,updated_at").maybeSingle();
  if(error)return fail("Fakturakladden kunne ikke lagres.",500);
  if(!data)return fail("Kladden er endret eller allerede utstedt i en annen fane. Last inn fakturaen på nytt for å unngå å overskrive nye kundeopplysninger eller priser.",409);
- return NextResponse.json({ok:true,updatedAt:data.updated_at});
+ return NextResponse.json({ok:true,updatedAt:data.updated_at,savedCustomer:update.customer});
 }

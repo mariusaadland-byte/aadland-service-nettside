@@ -19,6 +19,7 @@ import InvoiceActivityTimeline from "./InvoiceActivityTimeline";
 import InvoicePaymentStatementPanel from "./InvoicePaymentStatementPanel";
 import InvoiceCustomerPicker from "./InvoiceCustomerPicker";
 import {invoiceWithSelectedCustomer} from "../../../lib/invoiceCustomerSelection";
+import {invoiceSavedDraft} from "../../../lib/invoiceCanonicalSave";
 import {hasAdjustableVippsPriceLine,linesForCustomerTotal} from "../../../lib/vippsPriceLines";
 import {COMPANY_INFO,COMPANY_ADDRESS} from "../../../lib/companyInfo";
 const money=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(ore)||0)/100);
@@ -163,10 +164,16 @@ export default function InvoicesClient({archiveMode=false}){
   });
   const data=await res.json().catch(()=>({}));
   if(!res.ok)throw Error(data.error||"Fakturakladden kunne ikke lagres.");
-  if(!data.updatedAt)throw Error("Lagring ble ikke bekreftet. Last inn kladden på nytt.");
-  // Refresh the local revision without throwing away the saved edits.
-  setItems(current=>current.map(item=>item.id===snapshot.id?{...item,...snapshot,updated_at:data.updatedAt}:item));
-  return data.updatedAt;
+  const savedInvoice=invoiceSavedDraft(snapshot,data);
+  // A linked customer card may have changed while this draft was open.
+  // Never overwrite the canonical, just-saved customer with stale UI values.
+  setItems(current=>current.map(item=>item.id===snapshot.id?{...item,...savedInvoice.invoice}:item));
+  if(savedInvoice.changed.length){
+   throw Error("Kundeopplysninger er endret på kundekortet siden kladden ble åpnet ("+
+    savedInvoice.changed.map(item=>item.label).join(", ")+
+    "). Kladden er lagret med oppdaterte opplysninger. Kontroller mottaker og betalingsfrist før du fakturerer igjen. Ingen faktura er utstedt eller sendt.");
+  }
+  return savedInvoice;
  }
  function applyVippsPrice(quotedGrossOre){
   if(!form||form.status!=="draft")return;
@@ -191,8 +198,8 @@ export default function InvoicesClient({archiveMode=false}){
   setBusy(true);setError("");setSaved("");
   try{
    const next=invoiceWithSelectedCustomer(base,contact,today);
-   await persist(next);
-   setForm(next);
+   const saved=await persist(next);
+   setForm(saved.invoice);
    await load();
    setSaved("Kundekortet er valgt og lagret på fakturaen. Betalingsfrist og kontaktopplysninger er oppdatert.");
   }catch(e){setError(e.message||"Kunden kunne ikke velges.");throw e;}
