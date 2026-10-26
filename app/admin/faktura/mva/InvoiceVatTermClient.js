@@ -5,6 +5,7 @@ import InputVatRegisterClient from "./InputVatRegisterClient";
 import VatPurchaseCsvImport from "./VatPurchaseCsvImport";
 import ExternalVatSalesClient from "./ExternalVatSalesClient";
 import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
+import VatReportingControlClient from "./VatReportingControlClient";
 import {vatSettlementPreview} from "../../../../lib/vatSettlementPreview";
 
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
@@ -38,6 +39,7 @@ export default function InvoiceVatTermClient(){
    setChosen({year:String(target.year),term:String(target.term)});}
   setReload(n=>n+1);
  };
+ const selectTerm=nextTerm=>{setTerm(String(nextTerm));setChosen({year:chosen.year,term:String(nextTerm)});};
  const total=report?.total;
  const settlement=report?vatSettlementPreview(report.comparison):null;
  return <main className="admin" style={{maxWidth:1200,margin:"0 auto",padding:24}}>
@@ -73,6 +75,8 @@ export default function InvoiceVatTermClient(){
   {loading&&<p role="status">Kontrollerer alle fakturaer og kreditnotaer i terminen …</p>}
   {error&&<p role="alert" style={{color:"#a52a21"}}>{error} Rapporttall vises ikke hvis grunnlaget er ufullstendig.</p>}
   {report&&!loading&&<>
+   <VatReportingControlClient year={chosen.year} term={chosen.term}
+    onChanged={()=>setReload(n=>n+1)} onSelectTerm={selectTerm}/>
    <section className="card" aria-labelledby="vat-outcome-title"
     style={{padding:18,marginBottom:18,border:"2px solid #b5c5c3"}}>
     <h2 id="vat-outcome-title" style={{margin:"0 0 7px"}}>
@@ -95,6 +99,14 @@ export default function InvoiceVatTermClient(){
       </strong>
      </div>
     </div>:<p role="alert">MVA-beløpet kan ikke beregnes trygt fra rapporten.</p>}
+    <p style={{fontSize:13,background:"#f1f5f2",padding:12,borderRadius:10}}>
+     <strong>Ubetalte fakturaer påvirker ikke når MVA skal meldes.</strong>
+     {" "}For fakturaer laget i Aadland Service er det per nå <strong>{total.paymentSnapshot?.openCount??0}</strong> fakturaer
+     med utestående beløp på <strong>{money(total.paymentSnapshot?.openGrossOre||0)}</strong> inkl. MVA.
+     {" "}Dette er utestående fakturabeløp, ikke MVA-beløpet på de ubetalte fakturaene.
+     {total.paymentSnapshot?.unknownCount>0?" Betalingsstatus mangler på noen fakturaer.":""}
+     {" "}Betalingsstatus for eldre importerte fakturaer må kontrolleres i det gamle systemet.
+    </p>
     <p style={{fontSize:13,lineHeight:1.55,marginBottom:0}}>
      <strong>Dette er bare en foreløpig beregning, ikke et betalingskrav eller en godkjent tilbakebetaling.</strong>
      {" "}Tallet er utgående MVA minus registrert fradragsberettiget inngående MVA
@@ -109,6 +121,7 @@ export default function InvoiceVatTermClient(){
    <ExternalVatSalesClient onChanged={onDocumentSaved}/>
    <section className="card" style={{padding:18,marginBottom:18}}>
     <h2>Utgående MVA – {report.period.title}</h2>
+    <p style={{fontSize:13}}>Både betalte og ubetalte utstedte fakturaer er med. Betalingsstatusen nedenfor viser <strong>saldo per nå</strong>, ikke saldo da terminen sluttet.</p>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
      {[
       ["Fakturaer (inkl. eldre import)",String(total.invoiceCount)],
@@ -171,7 +184,8 @@ export default function InvoiceVatTermClient(){
      <div style={{overflowX:"auto"}}><table style={{width:"100%",minWidth:850}}>
       <thead><tr><th>Dato</th><th>Dokument</th><th>Kunde</th>
        <th style={{textAlign:"right"}}>Eks. MVA</th>
-       <th style={{textAlign:"right"}}>MVA</th><th style={{textAlign:"right"}}>Inkl. MVA</th></tr></thead>
+       <th style={{textAlign:"right"}}>MVA</th><th style={{textAlign:"right"}}>Inkl. MVA</th>
+       <th style={{textAlign:"right"}}>Utestående nå</th></tr></thead>
       <tbody>{report.rows.map(row=><tr key={row.key}>
        <td>{row.documentDate}</td>
        <td>{row.externalDocumentId
@@ -187,6 +201,7 @@ export default function InvoiceVatTermClient(){
        <td style={{textAlign:"right"}}>{money(row.baseOre)}</td>
        <td style={{textAlign:"right"}}>{money(row.vatOre)}</td>
        <td style={{textAlign:"right"}}>{money(row.totalOre)}</td>
+       <td style={{textAlign:"right"}}>{row.outstandingOre===null||row.outstandingOre===undefined?"Ikke kjent":money(row.outstandingOre)}</td>
       </tr>)}</tbody>
      </table></div>}
    </section>

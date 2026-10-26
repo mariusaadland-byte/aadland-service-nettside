@@ -32,7 +32,7 @@ export async function GET(req){
   // of payment/closing time. Never join on administrative closure.
   const [invoices,credits,purchases,externalSales]=await Promise.all([
    collect(()=>s.from("invoice_drafts")
-    .select("id,status,invoice_number,issued_date,customer,line_items")
+    .select("id,status,invoice_number,issued_date,customer,line_items,paid_ore,credited_ore")
     .gte("issued_date",bounds.from).lte("issued_date",bounds.to)
     .neq("status","draft")
     .order("issued_date",{ascending:true}).order("id",{ascending:true})),
