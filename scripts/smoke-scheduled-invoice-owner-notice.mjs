@@ -10,13 +10,14 @@ const result=scheduledInvoiceOwnerNotice({
 });
 assert.equal(result.to,"post@aadland-service.no");
 assert.equal(result.idempotencyKey,"scheduled-invoice-review/"+id);
-assert.ok(result.text.includes("Tidligere utsendelsesforsøk"));
+assert.ok(result.text.includes("Årsak og status vises"));
 assert.ok(result.text.includes("https://www.aadland-service.no/admin/faktura?id="+id));
 assert.ok(result.text.includes("ikke bekreftet at e-post ble sendt"));
 assert.ok(!result.text.includes("API-KEY"));
 assert.throws(()=>scheduledInvoiceOwnerNotice({invoiceId:"not-an-id"}),/Ugyldig faktura-ID/);
 const trimmed=scheduledInvoiceOwnerNotice({invoiceId:id,reason:"A".repeat(500)});
 assert.ok(trimmed.text.length<750,"Do not send unbounded technical errors in emails");
+assert.equal(trimmed.text,result.text,"Same idempotency key must have identical provider payload even if error changes");
 assert.equal(trimmed.idempotencyKey,result.idempotencyKey,
  "Repeated notices about same invoice must share provider idempotency key");
 const cron=read("app/api/cron/scheduled-invoices/route.js");
