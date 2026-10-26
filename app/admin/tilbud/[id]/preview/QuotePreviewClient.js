@@ -86,7 +86,7 @@ export default function QuotePreviewClient({quoteId}){
       <p>Org.nr. {quote.customer.organizationNumber}</p>}
      {quote.customer?.customerType==="business"&&quote.customer?.contactPerson&&
       <p>Kontaktperson: {quote.customer.contactPerson}</p>}
-     {quote.customer?.address&&<p>{quote.customer.address}</p>
+     {quote.customer?.address&&<p>{quote.customer.address}</p>}
     </div>
     <div>
      {quote.customer?.phone&&<span>{quote.customer.phone}</span>}
