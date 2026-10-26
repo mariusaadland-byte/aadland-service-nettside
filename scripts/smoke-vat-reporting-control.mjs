@@ -11,6 +11,7 @@ const reg=validateVatReportingProfile({registrationDate:"2026-06-04",confirmed:t
 assert.deepEqual(reg,{id:"primary",registration_date:"2026-06-04",first_term_year:2026,first_term:3});
 assert.throws(()=>validateVatReportingProfile({registrationDate:"2026-06-04",confirmed:false}),/Bekreft/);
 assert.throws(()=>validateVatReportingProfile({registrationDate:"2026-02-31",confirmed:true}),/gyldig/);
+assert.throws(()=>validateVatReportingProfile({registrationDate:"2026-11-01",confirmed:true},"2026-10-26"),/fremtidig/);
 assert.deepEqual(vatReportingAdvice(reg,2026,2).kind,"before_registration");
 assert.equal(vatReportingAdvice(reg,2026,3).kind,"normal");
 assert.equal(vatReportingAdvice(reg,2026,5).kind,"normal");
