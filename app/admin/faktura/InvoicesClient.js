@@ -421,7 +421,7 @@ export default function InvoicesClient({archiveMode=false}){
      const response=await fetch("/api/admin/invoices/split",{
       method:"PATCH",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({id:form.id,action:"cancel",confirmed:true})});
-     const data=await response.json().catch(()=>({});
+     const data=await response.json().catch(()=>({}));
      if(!response.ok)throw Error(data.error||"Kunne ikke avbryte.");
      await load();setSaved("Autosending er avbrutt. Del 2 kan sendes manuelt.");
     }catch(e){setError(e.message||"Kunne ikke avbryte.");}finally{setBusy(false);}
