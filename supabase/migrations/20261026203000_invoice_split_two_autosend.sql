@@ -37,7 +37,7 @@ create or replace function public.split_invoice_draft_in_two(
 declare original public.invoice_drafts%rowtype; first_items jsonb:='[]'::jsonb;
  second_items jsonb:='[]'::jsonb; line jsonb; amount bigint; first_amount bigint;
  quantum integer; rate integer; first_total bigint:=0; second_total bigint:=0;
- i uuid:=gen_random_uuid(); date_today date:=(now() at time zone 'Europe/Oslo')::date;
+ source_total bigint:=0; i uuid:=gen_random_uuid(); date_today date:=(now() at time zone 'Europe/Oslo')::date;
  work_date date; percentage text; num_lines integer:=0;
 begin
  select * into original from public.invoice_drafts where id=p_invoice_id for update;
@@ -80,6 +80,7 @@ begin
   amount:=round((line->>'quantity')::numeric*(line->>'unitPriceOre')::numeric);
   quantum:=case rate when 12 then 25 when 15 then 20 when 25 then 4 else 1 end;
   first_amount:=least(amount,greatest(0,round(amount::numeric*p_first_percent/100/quantum)*quantum));
+  source_total:=source_total+amount+round(amount::numeric*rate/100);
   first_total:=first_total+first_amount+round(first_amount::numeric*rate/100);
   second_total:=second_total+(amount-first_amount)+round((amount-first_amount)::numeric*rate/100);
   first_items:=first_items||jsonb_build_array(jsonb_build_object(
@@ -91,7 +92,7 @@ begin
    'type',coalesce(line->>'type','work'),'quantity',1,'unit','andel',
    'unitPriceOre',amount-first_amount,'vatRate',rate));
  end loop;
- if num_lines>120 or first_total<=0 or second_total<=0 then
+ if num_lines>120 or first_total<=0 or second_total<=0 or first_total+second_total<>source_total then
   raise exception 'Beløpet er for lite til å deles i to positive fakturaer.'; end if;
  -- The second part is a separate UNISSUED draft. Invoice number assigned on send.
  insert into public.invoice_drafts(
