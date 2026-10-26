@@ -56,7 +56,7 @@ const sql=read("supabase/migrations/20261026224000_scheduled_invoice_review_reco
 assert.ok(sql.includes("auto_send_claimed_at"));
 assert.ok(sql.includes("for update skip locked"));
 assert.ok(sql.includes("status='sent' or i.sent_at is not null"));
-assert.ok(sql.includes("auto_send_state='needs_review'"));
+assert.ok(sql.includes("i.auto_send_state<>'needs_review'")&&sql.includes("then 'sent' else 'needs_review'"));
 assert.ok(sql.includes("i.first_send_at is not null or i.invoice_number is not null"));
 assert.ok(sql.includes("first_invoice.status<>'sent'"));
 assert.ok(sql.includes("next_customer:=next_customer||jsonb_build_object"));
