@@ -43,7 +43,7 @@ assert.ok(cron.indexOf("scheduledInvoicePreflight(")<cron.indexOf("await sendInv
  "Preflight must run before any issue/send attempt");
 assert.ok(cron.includes("expire_stale_scheduled_invoice_claims"));
 assert.ok(cron.includes("auto_send_state:delivered?\"sent\":\"needs_review\""));
-assert.ok(cron.includes('idempotencyKey:"scheduled-invoice-review/"+id'),"Notify owner once");
+assert.ok(cron.includes("sendScheduledInvoiceOwnerNotice"),"Notify owner for both interrupted and failed sends");
 assert.ok(!cron.includes("resend.emails.send({from"),"Do not send directly to customer from cron");
 const splitApi=read("app/api/admin/invoices/split/route.js");
 assert.ok(splitApi.includes('"review_manual"'));

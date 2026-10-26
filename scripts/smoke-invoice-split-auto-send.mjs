@@ -48,7 +48,7 @@ assert.ok(cron.includes("claim_scheduled_invoice_sends"));
 assert.ok(cron.includes("await sendInvoice(internal)"));
 assert.ok(cron.includes('auto_send_state:delivered?"sent":"needs_review"'));
 assert.ok(cron.includes("await sendInvoice(internal)"),"Scheduled customer delivery must use idempotent invoice sender");
-assert.ok(cron.includes('to:"post@aadland-service.no"'),"Only admin review warnings may use direct mail from scheduled cron");
+assert.ok(cron.includes("sendScheduledInvoiceOwnerNotice"),"Owner review notice uses separate idempotent helper");
 const raw=read("app/api/admin/invoices/split/route.js")
  .replace(/^import .*;\n/gm,"").replace(/^export const .*;\n/gm,"")
  .replace(/^export async function /gm,"async function ");
