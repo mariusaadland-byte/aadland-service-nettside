@@ -3,19 +3,35 @@ import {getAdminUser} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
 import {sameOriginGuard} from "../../../../../lib/requestGuard";
 import {buildInvoiceDraftPdf} from "../../../../../lib/invoiceDraftPdf";
+import {osloDateKey} from "../../../../../lib/osloTime";
 export const runtime="nodejs";
 export const maxDuration=60;
 const fail=(error,status=400)=>NextResponse.json({error},{status});
 const total=lines=>(lines||[]).reduce((sum,l)=>{const net=Math.round(Number(l.quantity)*Number(l.unitPriceOre));return sum+net+Math.round(net*Number(l.vatRate)/100)},0);
 export async function POST(req){
- const origin=sameOriginGuard(req);if(origin)return origin;
- const user=await getAdminUser();if(!user||!(user.role==="owner"||user.canUpdateOrders||user.canManageProducts))return fail("Ingen tilgang.",403);
- if(process.env.VERCEL_ENV==="preview")return fail("Fakturaer sendes fra produksjonssiden.",403);
+ const authorization=String(req.headers.get("authorization")||"");
+ const cronCall=Boolean(process.env.CRON_SECRET)&&authorization==="Bearer "+process.env.CRON_SECRET;
+ if(!cronCall){
+  const origin=sameOriginGuard(req);if(origin)return origin;
+  const user=await getAdminUser();if(!user||!(user.role==="owner"||user.canUpdateOrders||user.canManageProducts))return fail("Ingen tilgang.",403);
+ }
+ if(process.env.VERCEL_ENV!=="production")return fail("Fakturaer sendes kun fra produksjonssiden.",403);
  const key=process.env.RESEND_API_KEY;if(!key)return fail("E-post er ikke konfigurert.",503);
  const {id}=await req.json().catch(()=>({}));if(typeof id!=="string")return fail("Velg en faktura.");
  const s=db();if(!s)return fail("Database utilgjengelig.",503);
  let {data:invoice,error}=await s.from("invoice_drafts").select("*").eq("id",id).maybeSingle();
  if(error||!invoice)return fail("Fakturaen ble ikke funnet.",404);
+ const today=osloDateKey(new Date());
+ if(invoice.status==="draft"&&invoice.planned_send_on&&invoice.planned_send_on>today)
+  return fail("Denne del-fakturaen kan ikke utstedes før "+invoice.planned_send_on+".",409);
+ if(cronCall&&(invoice.status!=="draft"||invoice.split_part!==2||
+  invoice.automatic_send!==true||invoice.auto_send_state!=="processing"||
+  !invoice.planned_send_on||invoice.planned_send_on>today))
+  return fail("Ingen aktiv og forfalt planlagt del-faktura kan sendes.",403);
+ if(!cronCall&&invoice.status==="draft"&&invoice.auto_send_state==="processing")
+  return fail("Automatisk utsendelse pågår. Kontroller status før manuell sending.",409);
+ if(!cronCall&&invoice.status==="draft"&&invoice.automatic_send&&invoice.auto_send_state==="scheduled")
+  return fail("Autosending er allerede planlagt. Avbryt autosending før manuell utsendelse.",409);
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invoice.customer?.email||""))return fail("Fyll inn en gyldig e-postadresse før e-postsending.");
  if(invoice.sent_at)return NextResponse.json({ok:true,alreadySent:true,invoiceNumber:invoice.invoice_number,sentTo:invoice.customer.email});
  if(invoice.status==="draft"){
@@ -52,7 +68,9 @@ export async function POST(req){
    attachments:[{filename:"Aadland-Service-Faktura-"+invoice.invoice_number+".pdf",content:invoice.pdf_base64}]
   },{idempotencyKey:"invoice-send/"+id});
   if(result.error||!result.data?.id)throw Error("E-posttjenesten kunne ikke bekrefte sendingen. Prøv igjen.");
-  const saved=await s.from("invoice_drafts").update({status:"sent",sent_at:new Date().toISOString(),resend_id:result.data.id,delivery_error:null}).eq("id",id);
+  const saved=await s.from("invoice_drafts").update({status:"sent",sent_at:new Date().toISOString(),
+   resend_id:result.data.id,delivery_error:null,
+   ...(invoice.split_group_id?{auto_send_state:"sent",auto_send_error:null}:{})}).eq("id",id);
   if(saved.error)return fail("E-posten er sendt, men sendestatus kunne ikke lagres. Prøv samme knapp igjen; fakturanummer og sending gjenbrukes.",500);
   return NextResponse.json({ok:true,invoiceNumber:invoice.invoice_number,sentTo:invoice.customer.email});
  }catch(err){
