@@ -137,7 +137,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   <h2>Registrer inngående MVA fra leverandørbilag</h2>
   <p style={{fontSize:13}}>Dette er <strong>manuelle referanser til faktiske bilag</strong> i regnskapet,
    ikke import av leverandørprislisten. Ta med originalfakturaens dokumentdato og MVA-beløp.
-   Leverandørkreditnotaer reduserer inngående MVA i sin utstedelsestermin.</p>
+   Leverandørkreditnotaer reduserer inngående MVA i sin utstedelsestermin. En vanlig ubetalt leverandørfaktura kan normalt ha fradragsberettiget MVA i fakturaterminen – betaling er ikke nødvendig for å registrere bilaget.</p>
   <VatReceiptScanner onSelected={chooseReceipt} onExtracted={receiveScan}
    onBusyChange={setScanBusy} disabled={busy}/>
   {receiptFile&&<p style={{fontSize:13,background:"#f1faf3",padding:10,borderRadius:8}}>
@@ -235,7 +235,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
     Jeg har vurdert fradragsretten og at fradragsandelen er korrekt for avgiftspliktig virksomhet.</label>
    {form.kind==="purchase"&&netTotal+vatTotal>=1000000&&<label><input type="checkbox" checked={form.bankConditionConfirmed}
     onChange={e=>set("bankConditionConfirmed",e.target.checked)}/>
-    Jeg har kontrollert kravet om betaling via bank for kjøp på minst 10 000 kr inkl. MVA.</label>}
+    Jeg har kontrollert bankbetalingskravet for kjøp på minst 10 000 kr inkl. MVA. Hvis fakturaen ikke er betalt ennå, skal betalingen senere skje via bank/godkjent betalingsformidler.</label>}
    <button type="submit" disabled={busy||scanBusy||(ocrGrossMismatch&&!ocrMismatchChecked)||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||
     (form.kind==="purchase"&&netTotal+vatTotal>=1000000&&!form.bankConditionConfirmed)}>
     {busy?"Lagrer …":"Registrer kontrollert bilag"}

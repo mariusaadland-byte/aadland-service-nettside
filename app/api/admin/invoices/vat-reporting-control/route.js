@@ -29,7 +29,7 @@ export async function POST(req){
  const s=db();if(!s)return json({error:"Databasen er utilgjengelig."},503);
  if(body.action==="registration"){
   let settings;
-  try{settings=validateVatReportingProfile(body);}catch(e){return json({error:e.message},400);}
+  try{settings=validateVatReportingProfile(body,currentDay());}catch(e){return json({error:e.message},400);}
   const {data,error}=await s.from("vat_reporting_profile").upsert({
    ...settings,confirmed_by:user.id,updated_at:new Date().toISOString()
   },{onConflict:"id"}).select("registration_date,first_term_year,first_term,updated_at").single();
