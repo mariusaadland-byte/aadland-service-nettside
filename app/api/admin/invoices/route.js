@@ -101,10 +101,6 @@ export async function PATCH(req){
  const due=body.dueDate?clean(body.dueDate,10):null;
  if(due&&!/^\d{4}-\d{2}-\d{2}$/.test(due))return fail("Ugyldig forfallsdato.");
  const s=db();if(!s)return fail("Database utilgjengelig.",503);
- const savedDraft=await s.from("invoice_drafts").select("id,split_group_id")
-  .eq("id",body.id).maybeSingle();
- if(savedDraft.error)return fail("Kunne ikke kontrollere fakturakladden.",503);
- if(savedDraft.data?.split_group_id)return fail("Del-fakturaer er låst for endring av totalbeløp og kundeopplysninger. Kontroller planlagt utsendelse.",409);
  let selected=null;
  const requestedId=clean(body.customer?.contactId,36);
  if(requestedId){
