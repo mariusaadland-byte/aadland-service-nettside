@@ -61,7 +61,7 @@ assert.equal(response.status,409,"Issued invoices are immutable");
 assert.equal(writes,1);
 const ui=readFileSync("app/admin/faktura/InvoicesClient.js","utf8");
 assert.ok(ui.includes("expectedUpdatedAt:snapshot.updated_at"),"UI must pass revision");
-assert.ok(ui.includes("updated_at:data.updatedAt"),"UI must refresh revision for next edit");
+assert.ok(ui.includes("...savedInvoice.invoice")&&ui.includes("invoiceSavedDraft(snapshot,data)"),"UI must refresh revision and canonical recipient for next edit");
 assert.ok(ui.includes("Hent siste fakturakladd"),"Offer explicit reload of conflicted draft");
 assert.ok(ui.includes("Leveringsdato / dato for utført arbeid"),"Offer required work date next to invoice preview");
 assert.ok(ui.includes("Utstede faktura på "), "Confirm irreversible issue for printing");
