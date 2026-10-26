@@ -6,6 +6,7 @@ import VatPurchaseCsvImport from "./VatPurchaseCsvImport";
 import ExternalVatSalesClient from "./ExternalVatSalesClient";
 import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
 import VatReportingControlClient from "./VatReportingControlClient";
+import VatSubmissionReviewClient from "./VatSubmissionReviewClient";
 import {vatSettlementPreview} from "../../../../lib/vatSettlementPreview";
 
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
@@ -77,6 +78,7 @@ export default function InvoiceVatTermClient(){
   {report&&!loading&&<>
    <VatReportingControlClient year={chosen.year} term={chosen.term}
     onChanged={()=>setReload(n=>n+1)} onSelectTerm={selectTerm}/>
+   <VatSubmissionReviewClient year={chosen.year} term={chosen.term} revision={reload}/>
    <section className="card" aria-labelledby="vat-outcome-title"
     style={{padding:18,marginBottom:18,border:"2px solid #b5c5c3"}}>
     <h2 id="vat-outcome-title" style={{margin:"0 0 7px"}}>
