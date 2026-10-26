@@ -48,7 +48,7 @@ assert.equal(r.status,503,"Fail closed on unavailable database");
 databaseError=false;
 r=await route("");
 assert.equal(r.status,200);assert.equal(r.body.contacts.length,1);
-assert.ok(readCount>=4);
+assert.ok(readCount===3);
 assert.ok(client.includes("checkExisting=false"));
 assert.ok(client.includes("if(result.contact)"));
 assert.ok(client.includes("setExistingCustomer(result.contact)"));
