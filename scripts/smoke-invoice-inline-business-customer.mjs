@@ -20,7 +20,7 @@ assert.ok(inline.includes('onCreated?.(data.contact)'));
 assert.ok(inline.includes('setStored(data.contact)'),"After POST: protect saved card from duplicate retries");
 assert.ok(inline.includes('if(busy||disabled||stored)return'),"Already saved card must not create twice");
 assert.ok(inline.includes('await attach(data.contact)'));
-assert.ok(inline.includes('if(data.existing)'),"Check whether returned data was existing");
+assert.ok(inline.includes('setSuccess(data.existing?'),"Check whether returned data was existing");
 assert.ok(inline.includes('if(!data.contact?.id)'));
 assert.ok(inline.includes('Bruk valgte opplysninger')===false);
 assert.ok(inline.includes('Velg lagret kundekort på fakturaen'));
