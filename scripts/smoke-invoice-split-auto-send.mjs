@@ -4,7 +4,7 @@ const read=p=>readFileSync(p,"utf8");
 const sql=read("supabase/migrations/20261026203000_invoice_split_two_autosend.sql");
 for(const word of ["split_invoice_draft_in_two","for update","first_total+second_total<>source_total",
  "invoice_split_group_unique","p_second_on<=p_first_on","status<>'draft'",
- "issue_invoice_draft","set_split_invoice_due_at_issue","claim_scheduled_invoice_sends",
+ "protect_split_invoice_draft","set_split_invoice_due_at_issue","claim_scheduled_invoice_sends",
  "for update skip locked","grant execute on function public.split_invoice_draft_in_two"]){
  // issuing stays in the existing trigger/function; the SQL mentions it in comments.
  assert.ok(sql.includes(word),word+" missing in migration");
@@ -34,7 +34,7 @@ assert.ok(panel.includes("firstTermsDays")&&panel.includes("secondTermsDays"));
 assert.ok(panel.includes("await onPrepare?.()"));
 assert.ok(panel.includes("window.confirm("));
 assert.ok(invoices.includes("split_group_id,split_part,payment_terms_override_days"));
-assert.ok(invoices.includes("savedDraft.data?.split_group_id"));
+assert.ok(sql.includes("old.split_group_id is not null"));
 assert.ok(terms.includes("invoice.payment_terms_override_days??"));
 assert.ok(issue.includes("invoice.planned_send_on>osloDateKey(new Date())"));
 assert.ok(send.includes('invoice.auto_send_state!=="processing"'));
