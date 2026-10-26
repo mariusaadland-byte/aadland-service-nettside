@@ -106,12 +106,12 @@ export async function PATCH(req){
  if(requestedId){
   if(!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(requestedId))return fail("Kundekortet er ugyldig.");
   const {data:contact,error:contactError}=await s.from("admin_customer_contacts")
-   .select("id,name,email,phone,address,payment_terms_days,customer_type,organization_number,preferred_payment_method").eq("id",requestedId).maybeSingle();
+   .select("id,name,email,phone,address,payment_terms_days,customer_type,organization_number,contact_person,preferred_payment_method").eq("id",requestedId).maybeSingle();
   if(contactError||!contact)return fail("Kundekortet finnes ikke. Velg kunden på nytt.",409);
   selected=contact;
  }
- const chosen=selected?{name:selected.name,email:selected.email||"",address:selected.address||"",phone:selected.phone||"",contactId:selected.id,paymentTermsDays:selected.payment_terms_days??14,customerType:selected.customer_type||"private",organizationNumber:selected.organization_number||""}:
- {name:clean(body.customer?.name),email:clean(body.customer?.email),address:clean(body.customer?.address,500),phone:clean(body.customer?.phone,70),contactId:"",paymentTermsDays:Number(body.customer?.paymentTermsDays??14),customerType:body.customer?.customerType||"private",organizationNumber:clean(body.customer?.organizationNumber,9)};
+ const chosen=selected?{name:selected.name,email:selected.email||"",address:selected.address||"",phone:selected.phone||"",contactId:selected.id,paymentTermsDays:selected.payment_terms_days??14,customerType:selected.customer_type||"private",organizationNumber:selected.customer_type==="business"?(selected.organization_number||""):"",contactPerson:selected.customer_type==="business"?(selected.contact_person||""):""}:
+ {name:clean(body.customer?.name),email:clean(body.customer?.email),address:clean(body.customer?.address,500),phone:clean(body.customer?.phone,70),contactId:"",paymentTermsDays:Number(body.customer?.paymentTermsDays??14),customerType:body.customer?.customerType==="business"?"business":"private",organizationNumber:body.customer?.customerType==="business"?clean(body.customer?.organizationNumber,9):"",contactPerson:body.customer?.customerType==="business"?clean(body.customer?.contactPerson,180):""};
  const chosenPaymentMethod=body.customer?.paymentMethod==="vipps"?"vipps":body.customer?.paymentMethod==="bank"?"bank":selected?.preferred_payment_method==="vipps"?"vipps":"bank";
  const workDate=chosenPaymentMethod==="vipps"?osloDateKey(new Date()):clean(body.customer?.workDate,10);
  const update={title:clean(body.title),customer:{...chosen,workDescription:clean(body.customer?.workDescription,3000),workDate,workAddress:clean(body.customer?.workAddress,500),paymentMethod:chosenPaymentMethod},pricing_model:body.pricingModel,line_items:body.lineItems.map(x=>({description:clean(x.description,500),type:clean(x.type,20),quantity:Number(x.quantity),unit:clean(x.unit,30),unitPriceOre:Number(x.unitPriceOre),vatRate:Number(x.vatRate)})),notes:clean(body.notes,4000),due_date:due,due_date_mode:mode,updated_at:new Date().toISOString()};
