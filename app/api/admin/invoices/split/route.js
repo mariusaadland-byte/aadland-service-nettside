@@ -7,6 +7,26 @@ export const runtime="nodejs";
 const json=(body,status=200)=>NextResponse.json(body,{status,headers:{"Cache-Control":"private, no-store"}});
 const uuid=v=>typeof v==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 
+export async function PATCH(req){
+ const guard=sameOriginGuard(req);if(guard)return guard;
+ const user=await getAdminUser();if(user?.role!=="owner")
+  return json({error:"Bare eieren kan stoppe autosending."},403);
+ if(process.env.VERCEL_ENV!=="production")
+  return json({error:"Planlagt fakturering endres bare i produksjon."},403);
+ const body=await req.json().catch(()=>({}));
+ if(!uuid(body.id)||body.action!=="cancel"||body.confirmed!==true)
+  return json({error:"Bekreft hvilken planlagt faktura som skal stoppes."},400);
+ const s=db();if(!s)return json({error:"Databasen er utilgjengelig."},503);
+ const {data,error}=await s.from("invoice_drafts").update({
+  automatic_send:false,auto_send_state:"cancelled",auto_send_error:null
+ }).eq("id",body.id).eq("split_part",2).eq("status","draft")
+  .eq("automatic_send",true).eq("auto_send_state","scheduled")
+  .select("id").maybeSingle();
+ if(error)return json({error:"Autosending kunne ikke stoppes. Kontroller status."},503);
+ if(!data)return json({error:"Planen er allerede under behandling, sendt eller avbrutt. Oppdater status."},409);
+ return json({ok:true,id:data.id});
+}
+
 export async function POST(req){
  const guard=sameOriginGuard(req);if(guard)return guard;
  const user=await getAdminUser();

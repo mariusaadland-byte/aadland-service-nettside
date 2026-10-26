@@ -15,7 +15,7 @@ export async function GET(){
  const s=db();if(!s)return fail("Database utilgjengelig.",503);
  const invoices=[];
  for(let offset=0;;offset+=500){
-  const {data,error}=await s.from("invoice_drafts").select("id,source_quote_id,customer,title,pricing_model,line_items,due_date,due_date_mode,notes,status,created_at,updated_at,installment_index,installment_label,installment_percent,installment_trigger,invoice_number,issued_date,issued_at,sent_at,resend_id,delivery_error,paid_ore,credited_ore,paid_date,payment_updated_at,split_group_id,split_part,payment_terms_override_days,planned_send_on,automatic_send,auto_send_state").order("created_at",{ascending:false}).order("id",{ascending:false}).range(offset,offset+499);
+  const {data,error}=await s.from("invoice_drafts").select("id,source_quote_id,customer,title,pricing_model,line_items,due_date,due_date_mode,notes,status,created_at,updated_at,installment_index,installment_label,installment_percent,installment_trigger,invoice_number,issued_date,issued_at,sent_at,resend_id,delivery_error,paid_ore,credited_ore,paid_date,payment_updated_at,split_group_id,split_part,payment_terms_override_days,planned_send_on,automatic_send,auto_send_state,auto_send_error").order("created_at",{ascending:false}).order("id",{ascending:false}).range(offset,offset+499);
   if(error)return fail("Kunne ikke hente fakturaer.",500);
   invoices.push(...data);
   if(data.length<500)break;

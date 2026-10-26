@@ -5,7 +5,8 @@ alter table public.invoice_drafts
  add column if not exists payment_terms_override_days integer,
  add column if not exists planned_send_on date,
  add column if not exists automatic_send boolean not null default false,
- add column if not exists auto_send_state text;
+ add column if not exists auto_send_state text,
+ add column if not exists auto_send_error text;
 alter table public.invoice_drafts
  add constraint invoice_split_part_valid check (split_part is null or split_part in (1,2)),
  add constraint invoice_split_group_consistent check ((split_group_id is null)=(split_part is null)),

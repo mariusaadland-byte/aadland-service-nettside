@@ -411,7 +411,8 @@ export default function InvoicesClient({archiveMode=false}){
    {form.automatic_send?" Automatisk: ":" Manuell: "}
    <b>{({scheduled:"Planlagt",processing:"Sender",sent:"Sendt",needs_review:"Krever kontroll",cancelled:"Avbrutt",manual:"Manuell"})[form.auto_send_state]||"Manuell"}</b>.
   </p>
-  {form.auto_send_state==="needs_review"&&<p role="alert">Automatisk sending er ikke bekreftet. Sjekk e-postloggen før du prøver igjen.</p>}
+  {form.auto_send_state==="needs_review"&&<p role="alert">Automatisk sending er ikke bekreftet. Sjekk e-postloggen før du prøver igjen.
+   {form.auto_send_error&&<span style={{display:"block"}}>{form.auto_send_error}</span>}</p>}
   {form.automatic_send&&form.auto_send_state==="scheduled"&&
    <button type="button" disabled={busy} onClick={async()=>{
     if(!window.confirm("Avbryte automatisk sending av del 2? Kladden beholdes og kan sendes manuelt."))return;
