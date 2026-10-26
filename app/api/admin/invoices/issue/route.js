@@ -3,6 +3,7 @@ import {getAdminUser} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
 import {sameOriginGuard} from "../../../../../lib/requestGuard";
 import {buildInvoiceDraftPdf} from "../../../../../lib/invoiceDraftPdf";
+import {osloDateKey} from "../../../../../lib/osloTime";
 export const runtime="nodejs";
 const fail=(error,status=400)=>NextResponse.json({error},{status});
 export async function POST(req){
@@ -14,6 +15,12 @@ export async function POST(req){
  const found=await s.from("invoice_drafts").select("*").eq("id",id).maybeSingle();
  if(found.error||!found.data)return fail("Fakturaen ble ikke funnet.",404);
  let invoice=found.data;
+ if(invoice.status==="draft"&&invoice.planned_send_on&&invoice.planned_send_on>osloDateKey(new Date()))
+  return fail("Fakturaen er planlagt til "+invoice.planned_send_on+" og kan ikke utstedes tidligere.",409);
+ if(invoice.status==="draft"&&invoice.auto_send_state==="processing")
+  return fail("Automatisk utsendelse er i gang. Vent til status er kontrollert.",409);
+ if(invoice.status==="draft"&&invoice.automatic_send&&invoice.auto_send_state==="scheduled")
+  return fail("Stopp automatisk utsendelse først dersom du vil fakturere manuelt.",409);
  if(invoice.status==="draft"){
   const issued=await s.rpc("issue_invoice_draft",{p_id:id,p_expected_updated_at:invoice.updated_at});
   if(issued.error)return fail(issued.error.message);

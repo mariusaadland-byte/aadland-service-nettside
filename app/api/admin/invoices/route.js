@@ -15,7 +15,7 @@ export async function GET(){
  const s=db();if(!s)return fail("Database utilgjengelig.",503);
  const invoices=[];
  for(let offset=0;;offset+=500){
-  const {data,error}=await s.from("invoice_drafts").select("id,source_quote_id,customer,title,pricing_model,line_items,due_date,due_date_mode,notes,status,created_at,updated_at,installment_index,installment_label,installment_percent,installment_trigger,invoice_number,issued_date,issued_at,sent_at,resend_id,delivery_error,paid_ore,credited_ore,paid_date,payment_updated_at").order("created_at",{ascending:false}).order("id",{ascending:false}).range(offset,offset+499);
+  const {data,error}=await s.from("invoice_drafts").select("id,source_quote_id,customer,title,pricing_model,line_items,due_date,due_date_mode,notes,status,created_at,updated_at,installment_index,installment_label,installment_percent,installment_trigger,invoice_number,issued_date,issued_at,sent_at,resend_id,delivery_error,paid_ore,credited_ore,paid_date,payment_updated_at,split_group_id,split_part,payment_terms_override_days,planned_send_on,automatic_send,auto_send_state").order("created_at",{ascending:false}).order("id",{ascending:false}).range(offset,offset+499);
   if(error)return fail("Kunne ikke hente fakturaer.",500);
   invoices.push(...data);
   if(data.length<500)break;
@@ -101,6 +101,10 @@ export async function PATCH(req){
  const due=body.dueDate?clean(body.dueDate,10):null;
  if(due&&!/^\d{4}-\d{2}-\d{2}$/.test(due))return fail("Ugyldig forfallsdato.");
  const s=db();if(!s)return fail("Database utilgjengelig.",503);
+ const savedDraft=await s.from("invoice_drafts").select("id,split_group_id")
+  .eq("id",body.id).maybeSingle();
+ if(savedDraft.error)return fail("Kunne ikke kontrollere fakturakladden.",503);
+ if(savedDraft.data?.split_group_id)return fail("Del-fakturaer er låst for endring av totalbeløp og kundeopplysninger. Kontroller planlagt utsendelse.",409);
  let selected=null;
  const requestedId=clean(body.customer?.contactId,36);
  if(requestedId){
