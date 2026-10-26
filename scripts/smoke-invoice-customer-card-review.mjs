@@ -42,7 +42,8 @@ const db=()=>({from(table){
    data:found?{id,name:"Kunde AS",customer_type:"business",organization_number:"987654321",
     contact_person:"Marta Kontakt",email:"faktura@example.invalid",
     address:"Nyveien 3",phone:"91234567",payment_terms_days:21}:null,error:null
-  }};
+  }}
+ };
  return query;
 }});
 const GET=new Function("NextResponse","sameOriginGuard","getAdminUser","db",routeSource+
