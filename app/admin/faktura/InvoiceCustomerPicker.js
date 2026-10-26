@@ -1,11 +1,13 @@
 "use client";
 import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
+import InvoiceInlineBusinessCustomer from "./InvoiceInlineBusinessCustomer";
 
 const norm=x=>String(x||"").trim().toLocaleLowerCase("nb-NO");
 export default function InvoiceCustomerPicker({customer={},onChoose,onCreate,disabled=false,busy=false,invoiceId}){
  const [contacts,setContacts]=useState([]),[search,setSearch]=useState(""),[loading,setLoading]=useState(true);
  const [error,setError]=useState(""),[choosing,setChoosing]=useState("");
+ const [inlineBusiness,setInlineBusiness]=useState(false);
  useEffect(()=>{
   let live=true;
   fetch("/api/admin/customer-contacts",{cache:"no-store"}).then(async r=>{
@@ -21,7 +23,7 @@ export default function InvoiceCustomerPicker({customer={},onChoose,onCreate,dis
  async function choose(item){
   if(disabled||busy||choosing)return;
   setError("");setChoosing(item.id);
-  try{await onChoose(item);setSearch("");}
+  try{await onChoose(item);setSearch("");setInlineBusiness(false);}
   catch(e){setError(e.message||"Kunden kunne ikke velges.");}
   finally{setChoosing("");}
  }
@@ -48,7 +50,21 @@ export default function InvoiceCustomerPicker({customer={},onChoose,onCreate,dis
    </button>)}
    {!matches.length&&<p className="muted">Ingen kunder funnet. Opprett et nytt kundekort nedenfor.</p>}
   </div>}
-  <button type="button" disabled={locked} onClick={onCreate} style={{marginTop:7}}>＋ Ny kunde – åpne kunderegistrering</button>
+  <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",marginTop:10}}>
+   <button type="button" disabled={locked} aria-expanded={inlineBusiness}
+    onClick={()=>setInlineBusiness(open=>!open)}>
+    {inlineBusiness?"Lukk firmasøk":"＋ Finn og legg til bedrift her"}
+   </button>
+   <button type="button" disabled={locked} onClick={onCreate}>
+    ＋ Ny kunde – åpne kunderegistrering
+   </button>
+  </div>
+  {inlineBusiness&&<InvoiceInlineBusinessCustomer disabled={locked} onChoose={choose}
+   onCreated={contact=>setContacts(current=>[contact,...current.filter(c=>c.id!==contact.id)])}
+   onClose={()=>setInlineBusiness(false)}/>}
+  {!inlineBusiness&&<p className="muted" style={{fontSize:12,marginTop:9}}>
+   Bruk firmasøk for bedrifter. For privatkunder åpner du vanlig kunderegistrering.
+  </p>}
   {choosing&&<p role="status">Lagrer valgt kunde på fakturaen …</p>}
   {error&&<p role="alert" style={{color:"#a52a21"}}>{error} <button type="button" onClick={()=>{setLoading(true);setError("");fetch("/api/admin/customer-contacts",{cache:"no-store"}).then(r=>r.json().then(d=>{if(!r.ok)throw Error(d.error);setContacts(d.contacts||[]);})).catch(e=>setError(e.message)).finally(()=>setLoading(false));}}>Prøv på nytt</button></p>}
  </section>;
