@@ -1,9 +1,10 @@
 "use client";
 import {useEffect,useState} from "react";
 import styles from "./quickCustomer.module.css";
+import CompanyRegistrySearch from "../kunder/CompanyRegistrySearch";
 export default function QuickCustomerPanel({onClose,onChoose}){
  const [contacts,setContacts]=useState([]);
- const [customer,setCustomer]=useState({name:"",email:"",phone:"",address:""});
+ const [customer,setCustomer]=useState({name:"",email:"",phone:"",address:"",customerType:"private",organizationNumber:""});
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState("");
  const [search,setSearch]=useState("");
  useEffect(()=>{
@@ -41,6 +42,21 @@ export default function QuickCustomerPanel({onClose,onChoose}){
     </div>
     <form className={styles.create} onSubmit={save}>
      <h3>＋ Ny kunde</h3>
+     <label>Kundetype
+      <select value={customer.customerType} onChange={e=>setCustomer(c=>({...c,customerType:e.target.value,
+       organizationNumber:e.target.value==="business"?c.organizationNumber:""}))}>
+       <option value="private">Privatkunde</option><option value="business">Bedrift</option>
+      </select>
+     </label>
+     {customer.customerType==="business"&&<>
+      <CompanyRegistrySearch disabled={saving} onSelect={company=>
+       setCustomer(c=>({...c,customerType:"business",name:company.name,
+        organizationNumber:company.organizationNumber,address:company.address||c.address}))}/>
+      <label>Organisasjonsnummer
+       <input maxLength={9} inputMode="numeric" value={customer.organizationNumber}
+        onChange={e=>setCustomer(c=>({...c,organizationNumber:e.target.value}))}/>
+      </label>
+     </>}
      <label>Navn *<input required maxLength={180} autoComplete="name" value={customer.name} onChange={e=>setCustomer(c=>({...c,name:e.target.value}))}/></label>
      <label>E-post<input type="email" maxLength={240} autoComplete="email" value={customer.email} onChange={e=>setCustomer(c=>({...c,email:e.target.value}))}/></label>
      <label>Telefon<input type="tel" maxLength={70} autoComplete="tel" value={customer.phone} onChange={e=>setCustomer(c=>({...c,phone:e.target.value}))}/></label>

@@ -1,6 +1,7 @@
 "use client";
 import {useState} from "react";
 import Link from "next/link";
+import CompanyRegistrySearch from "../CompanyRegistrySearch";
 
 const initial={customerType:"private",name:"",organizationNumber:"",contactPerson:"",email:"",phone:"",address:"",paymentTermsDays:14,preferredPaymentMethod:"bank",internalNote:""};
 const labelStyle={display:"grid",gap:5,margin:"8px 0"};
@@ -36,6 +37,9 @@ export default function NewCustomerClient({invoiceId=""}){
      </label>
      <label style={labelStyle}>Kundenavn / firmanavn *<input required autoFocus maxLength={180} value={form.name} onChange={e=>set("name",e.target.value)} autoComplete="name" placeholder="Navn på kunden"/></label>
      {form.customerType==="business"&&<>
+      <CompanyRegistrySearch disabled={busy} onSelect={company=>
+       setForm(prev=>({...prev,customerType:"business",name:company.name,
+        organizationNumber:company.organizationNumber,address:company.address||prev.address}))}/>
       <label style={labelStyle}>Organisasjonsnummer (9 sifre)<input inputMode="numeric" maxLength={9} pattern="[0-9]{9}" value={form.organizationNumber} onChange={e=>set("organizationNumber",e.target.value)} placeholder="9 sifre"/></label>
       <label style={labelStyle}>Kontaktperson<input maxLength={180} value={form.contactPerson} onChange={e=>set("contactPerson",e.target.value)}/></label>
      </>}

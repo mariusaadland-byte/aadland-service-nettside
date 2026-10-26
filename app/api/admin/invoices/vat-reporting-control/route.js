@@ -12,13 +12,14 @@ export async function GET(req){
  const url=new URL(req.url),year=Number(url.searchParams.get("year"));
  if(!vatPeriodKey(year,1))return json({error:"Velg gyldig år."},400);
  const s=db();if(!s)return json({error:"Databasen er utilgjengelig."},503);
- const [profile,terms]=await Promise.all([
+ const [profile,terms,suggestion]=await Promise.all([
   s.from("vat_reporting_profile").select("registration_date,first_term_year,first_term,updated_at").eq("id","primary").maybeSingle(),
-  s.from("vat_reporting_term_status").select("year,term,status,filed_on,submission_reference,notes,updated_at").eq("year",year).order("term",{ascending:true})
+  s.from("vat_reporting_term_status").select("year,term,status,filed_on,submission_reference,notes,updated_at").eq("year",year).order("term",{ascending:true}),
+  s.from("vat_registration_public_hint").select("observed_date,source_name,source_url,source_note,confirmed_effective_date").eq("id","primary").maybeSingle()
  ]);
- if(profile.error||terms.error||!Array.isArray(terms.data))
+ if(profile.error||terms.error||suggestion.error||!Array.isArray(terms.data))
   return json({error:"Kunne ikke hente komplett MVA-oppfølgingsstatus."},503);
- return json({profile:profile.data||null,terms:terms.data,verifiedWithSkatteetaten:false});
+ return json({profile:profile.data||null,terms:terms.data,suggestion:suggestion.data||null,verifiedWithSkatteetaten:false});
 }
 export async function POST(req){
  const guard=sameOriginGuard(req);if(guard)return guard;

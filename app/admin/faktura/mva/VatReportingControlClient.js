@@ -21,7 +21,7 @@ export default function VatReportingControlClient({year,term,onChanged,onSelectT
    .then(async response=>{const body=await response.json().catch(()=>({}));
     if(!response.ok)throw Error(body.error||"Kunne ikke hente MVA-status.");
     if(active){
-     setResult(body);setRegistrationDate(body.profile?.registration_date||"");
+     setResult(body);setRegistrationDate(body.profile?.registration_date||body.suggestion?.observed_date||"");
      setConfirmedDate(false);
     }
    }).catch(e=>{if(active){setResult(null);setError(e.message||"Ukjent feil");}})
@@ -83,6 +83,14 @@ export default function VatReportingControlClient({year,term,onChanged,onSelectT
   {result&&!loading&&<>
    <form onSubmit={saveProfile} style={{background:"#f1f5f2",padding:14,borderRadius:10,marginBottom:15}}>
     <h3 style={{margin:"0 0 8px"}}>Dato for MVA-registrering</h3>
+    {result.suggestion&&!result.profile&&<p style={{fontSize:13,background:"#fff3df",padding:12,borderRadius:9}}>
+     <strong>Foreløpig dato lagt inn: {result.suggestion.observed_date}.</strong>
+     {" "}5. juni 2026 er datoen da MVA-statusen ble endret i offentlig historikk.
+     Det er ikke nødvendigvis juridisk virkningsdato.
+     {" "}<a href={result.suggestion.source_url} target="_blank" rel="noopener noreferrer">
+      Se endringshistorikken</a>.
+     Datoen er forhåndsutfylt, men ikke bekreftet eller brukt til endelig MVA-oppgjør.
+    </p>}
     <p style={{fontSize:13}}>Fyll inn datoen som står i bekreftelsen fra Skatteetaten
      (ikke datoen du sendte søknaden). Det avgjør hva som er første ordinære MVA-termin.</p>
     <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"end"}}>

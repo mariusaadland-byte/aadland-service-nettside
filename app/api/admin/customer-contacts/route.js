@@ -41,6 +41,13 @@ export async function POST(request){
  if(!user||!(user.role==="owner"||user.canUpdateOrders||user.canManageProducts))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const input=sanitize(await request.json().catch(()=>({})));if(input.error)return NextResponse.json({error:input.error},{status:400});
  const s=db();if(!s)return NextResponse.json({error:"Databasen er utilgjengelig."},{status:503});
+ if(input.data.organization_number){
+  const {data:match,error:checkError}=await s.from("admin_customer_contacts")
+   .select(fields).eq("organization_number",input.data.organization_number).maybeSingle();
+  if(checkError)return NextResponse.json({error:"Kunne ikke kontrollere organisasjonsnummeret."},{status:503});
+  if(match)return NextResponse.json({contact:map(match),existing:true,
+   message:"Bedriften finnes allerede i kunderegisteret. Eksisterende kundekort er valgt."});
+ }
  if(input.data.email){
   const {data:existing,error:lookupError}=await s.from("admin_customer_contacts").select(fields).eq("email",input.data.email).maybeSingle();
   if(lookupError)return NextResponse.json({error:"Kunne ikke sjekke eksisterende kunde."},{status:500});

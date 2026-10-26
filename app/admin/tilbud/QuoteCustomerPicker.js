@@ -1,8 +1,9 @@
 "use client";
 import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
+import CompanyRegistrySearch from "../kunder/CompanyRegistrySearch";
 
-const blank={name:"",email:"",phone:"",address:"",paymentTermsDays:14};
+const blank={name:"",email:"",phone:"",address:"",paymentTermsDays:14,customerType:"private",organizationNumber:""};
 const normalize=value=>String(value||"").trim().toLocaleLowerCase("nb-NO");
 const customerSnapshot=contact=>({
  contactId:contact.id,name:contact.name||"",email:contact.email||"",phone:contact.phone||"",
@@ -90,6 +91,21 @@ export default function QuoteCustomerPicker({customer,onChoose,disabled=false}){
   <button type="button" className="btn alt" onClick={()=>setCreating(value=>!value)} aria-expanded={creating}>{creating?"Lukk ny kunde":"＋ Opprett ny kunde"}</button>
   {creating&&<form onSubmit={create} style={{padding:"16px 0",display:"grid",gap:12}}>
    <h4>Opprett kundekort</h4>
+   <label style={field}>Kundetype
+    <select value={newCustomer.customerType} onChange={e=>setNewCustomer(c=>({...c,customerType:e.target.value,
+     organizationNumber:e.target.value==="business"?c.organizationNumber:""}))}>
+     <option value="private">Privatkunde</option><option value="business">Bedrift</option>
+    </select>
+   </label>
+   {newCustomer.customerType==="business"&&<>
+    <CompanyRegistrySearch disabled={busy} onSelect={company=>
+     setNewCustomer(c=>({...c,customerType:"business",name:company.name,
+      organizationNumber:company.organizationNumber,address:company.address||c.address}))}/>
+    <label style={field}>Organisasjonsnummer
+     <input value={newCustomer.organizationNumber} inputMode="numeric" maxLength={9}
+      onChange={e=>setNewCustomer(c=>({...c,organizationNumber:e.target.value}))}/>
+    </label>
+   </>}
    <label style={field}>Navn *<input required maxLength={180} value={newCustomer.name} onChange={e=>setNewCustomer(current=>({...current,name:e.target.value}))}/></label>
    <label style={field}>E-postadresse<input type="email" maxLength={240} value={newCustomer.email} onChange={e=>setNewCustomer(current=>({...current,email:e.target.value}))}/></label>
    <label style={field}>Telefon<input type="tel" maxLength={70} value={newCustomer.phone} onChange={e=>setNewCustomer(current=>({...current,phone:e.target.value}))}/></label>
