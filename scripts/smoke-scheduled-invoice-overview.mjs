@@ -60,7 +60,7 @@ assert.equal(scheduledInvoiceDraftOverview([],today).nextDate,null);
 const page=readFileSync("app/admin/faktura/InvoicesClient.js","utf8");
 assert.ok(page.includes("scheduledInvoiceDraftOverview(items,today)"));
 assert.ok(page.includes("prioritizeInvoiceDrafts(rawVisibleItems,today,items)"));
-assert.ok(page.includes("Sendingsdato passert"));
+assert.ok(page.includes("passert sendingsdato"));
 assert.ok(page.includes("Kontroller cron- og e-postloggen"));
 assert.ok(page.includes("10:20 UTC"));
 const config=JSON.parse(readFileSync("vercel.json","utf8"));
