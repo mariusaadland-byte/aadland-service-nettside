@@ -62,4 +62,71 @@ assert.ok(page.includes("scheduledSecondDrafts"),"Show upcoming automatic second
 assert.ok(page.includes("Del 2 – autosending planlagt"),"Each scheduled second invoice should show its state");
 assert.ok(page.includes("Del 2 – stoppet, må kontrolleres"),"Display held second-invoice send clearly");
 assert.ok(page.includes('["scheduled","processing","needs_review"].includes(form.auto_send_state)'),"Held automatic invoices may not be issued from the print button");
+
+const preflightSrc=read("lib/scheduledInvoicePreflight.js").replace(/^export /gm,"");
+const strictPreflight=new Function(preflightSrc+";return scheduledInvoicePreflight;")();
+const firstId=uuid,secondId="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const contactId="cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const sourceCustomer={contactId,name:"Eksempel AS",email:"kunde@example.invalid",
+ address:"Testveien 1",phone:"90000000",customerType:"business",
+ organizationNumber:"987654321",contactPerson:"Ola",paymentMethod:"bank"};
+const currentContact={id:contactId,name:"Eksempel AS",email:"kunde@example.invalid",
+ address:"Testveien 1",phone:"90000000",customer_type:"business",
+ organization_number:"987654321",contact_person:"Ola"};
+const firstInvoice={id:firstId,status:"sent",sent_at:"2026-11-01T10:00:00Z",credited_ore:0};
+const secondInvoice={id:secondId,status:"draft",split_group_id:firstId,split_part:2,
+ automatic_send:true,auto_send_state:"scheduled",planned_send_on:"2026-11-10",
+ first_send_at:null,issued_at:null,invoice_number:null,sent_at:null,customer:sourceCustomer};
+let lookups=0;
+const readDb=()=>({
+ rpc(){throw Error("GET readiness must not mutate through RPC");},
+ from(table){return {
+  id:null,select(){return this},eq(field,value){
+   assert.equal(field,"id");this.id=value;return this;
+  },update(){throw Error("Readiness must never write");},
+  async maybeSingle(){
+   lookups++;
+   const record=table==="invoice_drafts"?
+    (this.id===firstId?firstInvoice:this.id===secondId?secondInvoice:null):
+    table==="admin_customer_contacts"&&this.id===contactId?currentContact:null;
+   assert.ok(["invoice_drafts","admin_customer_contacts"].includes(table));
+   return {data:record?{...record}:null,error:null};
+  }
+ }}
+});
+const GET=new Function("NextResponse","getAdminUser","db","scheduledInvoicePreflight","process",
+ api+";return GET;")({json:(body,o={})=>({body,status:o.status||200})},
+ async()=>({role}),readDb,strictPreflight,{env});
+preview=false;role="owner";cronKey="cron-test";resendKey="resend-test";
+const checkReadiness=(id=secondId)=>GET({url:"https://example.invalid/api/admin/invoices/split?id="+id});
+let readiness=await checkReadiness();
+assert.equal(readiness.status,200);assert.equal(readiness.body.ready,true);
+assert.equal(readiness.body.plannedSendOn,"2026-11-10");
+assert.match(readiness.body.note,/Ingen e-post er sendt/);
+firstInvoice.credited_ore=1;
+readiness=await checkReadiness();assert.equal(readiness.body.ready,false);
+assert.match(readiness.body.reason,/kreditert/);
+firstInvoice.credited_ore=0;firstInvoice.status="issued";
+readiness=await checkReadiness();assert.equal(readiness.body.ready,false);
+firstInvoice.status="sent";currentContact.address="Annen adresse 2";
+readiness=await checkReadiness();assert.equal(readiness.body.ready,false);
+assert.match(readiness.body.reason,/Fakturaadresse/);
+currentContact.address="Testveien 1";secondInvoice.first_send_at="2026-11-09T12:00:00Z";
+readiness=await checkReadiness();assert.equal(readiness.body.ready,false);
+secondInvoice.first_send_at=null;secondInvoice.auto_send_state="manual";
+readiness=await checkReadiness();assert.equal(readiness.body.ready,false);
+secondInvoice.auto_send_state="scheduled";
+cronKey="";readiness=await checkReadiness();assert.equal(readiness.body.ready,false);
+cronKey="cron-test";resendKey="";readiness=await checkReadiness();assert.equal(readiness.body.ready,false);
+resendKey="resend-test";
+const readBeforeUnauthorized=lookups;
+role="staff";readiness=await checkReadiness();assert.equal(readiness.status,403);
+assert.equal(lookups,readBeforeUnauthorized,"Only the owner can read invoice readiness");
+role="owner";readiness=await checkReadiness("invalid");assert.equal(readiness.status,400);
+preview=true;readiness=await checkReadiness();assert.equal(readiness.status,403);
+preview=false;
+assert.ok(page.includes("Forhåndskontroller faktura 2 – ingen utsending"));
+assert.ok(page.includes("/api/admin/invoices/split?id="));
+console.log("Faktura 2 forhåndskontroll bestått: eiertilgang, faktura 1, kreditering, kundekort, sendeforsøk, oppsett og kun lesing.");
+
 console.log("Flytt del-faktura 2 bestått: dato, betalingsfrist, autosend, særskilt bekreftelse, statuslås og beløpsbeskyttelse.");
