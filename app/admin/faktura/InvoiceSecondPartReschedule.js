@@ -1,5 +1,5 @@
 "use client";
-import {useState} from "react";
+import {useEffect,useState} from "react";
 
 const formatDateAdd=(date,days)=>{
  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(date||"")))return "–";
@@ -13,6 +13,12 @@ export default function InvoiceSecondPartReschedule({invoice,today,disabled=fals
  const [terms,setTerms]=useState(invoice.payment_terms_override_days??14);
  const [auto,setAuto]=useState(invoice.automatic_send===true);
  const [busy,setBusy]=useState(false),[error,setError]=useState("");
+ useEffect(()=>{
+  setSendOn(invoice.planned_send_on||today);
+  setTerms(invoice.payment_terms_override_days??14);
+  setAuto(invoice.automatic_send===true);
+  setError("");
+ },[invoice.id,invoice.planned_send_on,invoice.payment_terms_override_days,invoice.automatic_send,today]);
  if(invoice.status!=="draft"||invoice.split_part!==2||
   !["scheduled","manual","cancelled"].includes(invoice.auto_send_state))return null;
  async function submit(e){
