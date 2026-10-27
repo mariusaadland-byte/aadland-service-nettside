@@ -6,6 +6,9 @@ const sampleSource=read("lib/invoiceSplitSelfTest.js").replace(/^export /gm,"");
 const {makeSplitSelfTestDocs,splitSelfTestTotalOre,splitSelfTestEmail,SPLIT_SELFTEST_RECIPIENT}=
  new Function(sampleSource+";return {makeSplitSelfTestDocs,splitSelfTestTotalOre,splitSelfTestEmail,SPLIT_SELFTEST_RECIPIENT};")();
 const docs=makeSplitSelfTestDocs(today);
+const assessmentSource=read("lib/invoiceSplitSelfTestReadiness.js").replace(/^import .*;\n/gm,"").replace(/^export /gm,"");
+const invoiceSplitSelfTestReadiness=new Function("splitSelfTestTotalOre",
+ assessmentSource+";return invoiceSplitSelfTestReadiness;")(splitSelfTestTotalOre);
 assert.equal(docs.length,2);
 assert.equal(docs[0].installment_percent,40);
 assert.equal(docs[1].installment_percent,60);
@@ -40,6 +43,17 @@ for(const pdf of pdfs){
  assert.ok(!src.includes("Kontonummer: 8450"),"Demo must not include payable bank details");
 }
 assert.notDeepEqual(pdfs[0],pdfs[1]);
+const goodChecks=invoiceSplitSelfTestReadiness(docs,pdfs,{emailConfigured:true,cronConfigured:true});
+assert.equal(goodChecks.safeForDemoPreview,true);
+assert.equal(goodChecks.emailConfigured,true);
+assert.equal(goodChecks.cronConfigured,true);
+assert.deepEqual(goodChecks.partsOre,[400000,600000]);
+assert.equal(goodChecks.sampleTotalOre,1000000);
+const badPdfs=[Buffer.from("%PDF-1.4\nNO TEST MARKING\n%%EOF"),pdfs[1]];
+const failChecks=invoiceSplitSelfTestReadiness(docs,badPdfs);
+assert.equal(failChecks.safeForDemoPreview,false,"Unmarked PDF must not pass readiness");
+assert.equal(failChecks.pdfsClearlyMarked,false);
+assert.equal(invoiceSplitSelfTestReadiness([{...docs[0],invoice_number:"REAL"},docs[1]],pdfs).safeForDemoPreview,false);
 const files=pdfs.map((bytes,index)=>({
  filename:"TEST-Aadland-Service-Del-"+(index+1)+".pdf",content:bytes.toString("base64")
 }));
@@ -61,6 +75,7 @@ assert.ok(routeFile.includes('admin?.role!=="owner"'));
 assert.ok(routeFile.includes('process.env.VERCEL_ENV!=="production"'));
 assert.ok(routeFile.includes('idempotencyKey:"invoice-split-selftest/"+today'));
 assert.ok(routeFile.includes("splitSelfTestEmail(docs,attachments)"));
+assert.ok(routeFile.includes("if(!assessment.safeForDemoPreview)"),"Reject unsafe demo PDFs before emailing");
 assert.ok(!routeFile.includes("to:input"),"Recipient must never come from request input");
 const page=read("app/admin/faktura/test/page.js");
 const panel=read("app/admin/faktura/test/SplitInvoiceSelfTestClient.js");
@@ -90,12 +105,12 @@ const env={get VERCEL_ENV(){return preview?"preview":"production"},
  get RESEND_API_KEY(){return key}};
 const {GET,POST}=new Function("NextResponse","getAdminUser","sameOriginGuard",
  "buildInvoiceDraftPdf","osloDateKey","makeSplitSelfTestDocs",
- "splitSelfTestEmail","SPLIT_SELFTEST_RECIPIENT","MockResend","process",
+ "splitSelfTestEmail","SPLIT_SELFTEST_RECIPIENT","invoiceSplitSelfTestReadiness","MockResend","process",
  source+";return {GET,POST};")(
  MockNextResponse,async()=>({role}),
  ()=>blockOrigin?Response.json({error:"CSRF"},{status:403}):null,
  buildInvoiceDraftPdf,()=>today,makeSplitSelfTestDocs,splitSelfTestEmail,
- SPLIT_SELFTEST_RECIPIENT,MockResend,{env}
+ SPLIT_SELFTEST_RECIPIENT,invoiceSplitSelfTestReadiness,MockResend,{env}
 );
 const previewPdf=part=>GET(new Request("https://example.invalid/api/admin/invoices/selftest?part="+part));
 let res=await previewPdf(1);
@@ -130,4 +145,36 @@ res=await POST(request(action));assert.equal(res.status,200);
 assert.equal(deliveries[1].opts.idempotencyKey,deliveries[0].opts.idempotencyKey);
 mailFails=true;res=await POST(request(action));assert.equal(res.status,502);
 assert.equal(deliveries[2].message.to,"post@aadland-service.no");
+
+const readyFile=read("app/api/admin/invoices/selftest/readiness/route.js");
+assert.ok(!readyFile.includes("invoice_drafts"),"Readiness must not read live invoices");
+assert.ok(!/[\s.]db\s*\(/.test(readyFile),"Readiness must not access DB");
+assert.ok(!readyFile.includes("emails.send"),"Readiness cannot send emails");
+assert.ok(readyFile.includes('admin?.role!=="owner"'));
+const readySource=readyFile.replace(/^import .*;\n/gm,"")
+ .replace(/^export const .*;\n/gm,"")
+ .replace(/^export async function /gm,"async function ");
+const readinessGET=new Function("NextResponse","getAdminUser","osloDateKey",
+ "buildInvoiceDraftPdf","makeSplitSelfTestDocs","invoiceSplitSelfTestReadiness","process",
+ readySource+";return GET;")(
+ MockNextResponse,async()=>({role}),()=>today,buildInvoiceDraftPdf,makeSplitSelfTestDocs,
+ invoiceSplitSelfTestReadiness,{env}
+);
+role="owner";
+let liveResponse=await readinessGET();
+assert.equal(liveResponse.status,200);
+let liveJson=await liveResponse.json();
+assert.equal(liveJson.checkedOn,today);
+assert.equal(liveJson.checks.safeForDemoPreview,true);
+assert.equal(liveJson.checks.emailConfigured,true);
+assert.equal(liveJson.checks.cronConfigured,false,"Unset test CRON_SECRET is reported, not misrepresented");
+assert.equal(deliveries.length,3,"Readiness must not send");
+role="staff";
+liveResponse=await readinessGET();assert.equal(liveResponse.status,403);
+role="owner";
+const readinessPanel=read("app/admin/faktura/test/SplitInvoiceSelfTestClient.js");
+assert.ok(readinessPanel.includes("Kontroller testoppsettet – uten utsending"));
+assert.ok(readinessPanel.includes("/api/admin/invoices/selftest/readiness"));
+assert.ok(readinessPanel.includes("Ingen bank-/Vipps-betalingsinstruksjoner"));
+
 console.log("Faktura-deling selvtest bestått: ekte PDF-motor med to ugyldige demo-PDF-er, 40/60-summer og MVA, kun eier/CSRF/produksjon, låst intern mottaker og idempotent e-post-mock. Ingen ekte faktura eller e-post.");
