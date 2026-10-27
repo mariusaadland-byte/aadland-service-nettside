@@ -66,6 +66,8 @@ export default function InvoicesClient({archiveMode=false}){
  async function create(quoteId){setBusy(true);setError("");try{const res=await fetch("/api/admin/invoices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(quoteId?{quoteId}:{})});const data=await res.json();if(!res.ok)throw Error(data.error);await load();setActive(data.id);window.history.replaceState(null,"","/admin/faktura?id="+encodeURIComponent(data.id));setSaved(data.count>1?data.count+" fakturakladder er klare.":"");}catch(e){setError(e.message)}finally{setBusy(false)}}
  const draft=items.find(x=>x.id===active);
  const [form,setForm]=useState(null);
+ const [scheduledCheck,setScheduledCheck]=useState(null),[checkingScheduled,setCheckingScheduled]=useState(false);
+ useEffect(()=>{setScheduledCheck(null)},[form?.id,form?.planned_send_on,form?.automatic_send,form?.auto_send_state,form?.updated_at]);
  const paymentInfo=form?invoicePaymentState(form,today):null;
  const paymentSafety=form?invoiceSettlementInfo(form,today):null;
  const manualPaymentBlocked=["activeVipps","mismatch"].includes(paymentSafety?.kind);
@@ -188,6 +190,18 @@ export default function InvoicesClient({archiveMode=false}){
   setForm(current=>({...current,line_items:result.lineItems,customer:{...current.customer,paymentMethod:"vipps",workDate:today}}));
   setSaved("Vipps-prisen er lagt inn. Kontroller fakturalinjene og lagre kladden.");
   setError("");
+ }
+ async function previewScheduledInvoice(){
+  if(!form||busy||checkingScheduled)return;
+  const invoiceId=form.id;
+  setCheckingScheduled(true);setScheduledCheck(null);
+  try{
+   const response=await fetch("/api/admin/invoices/split?id="+encodeURIComponent(invoiceId),{cache:"no-store"});
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(result.error||"Forhåndskontrollen kunne ikke utføres.");
+   setScheduledCheck({invoiceId,...result});
+  }catch(e){setScheduledCheck({invoiceId,ready:false,reason:e.message||"Forhåndskontrollen mislyktes."});}
+  finally{setCheckingScheduled(false)}
  }
  async function save(){setBusy(true);setError("");setSaved("");try{await persist(form);setSaved("Kladden er lagret.");await load();}catch(e){setError(e.message)}finally{setBusy(false)}}
  async function reloadAfterConflict(){
@@ -433,6 +447,17 @@ export default function InvoicesClient({archiveMode=false}){
     setSaved("Sendingsdato, betalingsfrist og sendingsmetode er oppdatert for del 2. "+
      "Beløpet og del 1 er uendret.");
    }}/>}
+  {form.split_part===2&&form.status==="draft"&&form.automatic_send&&form.auto_send_state==="scheduled"&&<>
+   <button type="button" disabled={busy||checkingScheduled} onClick={previewScheduledInvoice}>
+    {checkingScheduled?"Kontrollerer …":"Forhåndskontroller faktura 2 – ingen utsending"}
+   </button>
+   {scheduledCheck?.invoiceId===form.id&&<p role={scheduledCheck.ready?"status":"alert"}
+    style={{fontSize:13,border:"1px solid #d8c9ae",borderRadius:8,padding:10}}>
+    <strong>{scheduledCheck.ready?"Kontrollen er OK med lagrede opplysninger.":"Må rettes eller kontrolleres:"}</strong>
+    {!scheduledCheck.ready&&<> {scheduledCheck.reason}</>}
+    <span style={{display:"block",marginTop:5}}>{scheduledCheck.note||"Ingen faktura er sendt fra denne kontrollen."}</span>
+   </p>}
+  </>}
   {form.auto_send_state==="needs_review"&&<div role="alert">
    <p>Automatisk sending er stoppet og krever kontroll. Kontroller del 1, kundekortet og e-postloggen før du fortsetter.
     {form.auto_send_error&&<span style={{display:"block"}}>{form.auto_send_error}</span>}</p>
