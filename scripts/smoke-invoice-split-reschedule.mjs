@@ -58,4 +58,8 @@ assert.ok(ui.includes("action:\"reschedule\""));
 assert.ok(ui.includes("window.confirm("));
 assert.ok(ui.includes('["scheduled","manual","cancelled"].includes(invoice.auto_send_state)'));
 assert.ok(page.includes("<InvoiceSecondPartReschedule"));
+assert.ok(page.includes("scheduledSecondDrafts"),"Show upcoming automatic second-invoice sends in draft overview");
+assert.ok(page.includes("Del 2 – autosending planlagt"),"Each scheduled second invoice should show its state");
+assert.ok(page.includes("Del 2 – stoppet, må kontrolleres"),"Display held second-invoice send clearly");
+assert.ok(page.includes('["scheduled","processing","needs_review"].includes(form.auto_send_state)'),"Held automatic invoices may not be issued from the print button");
 console.log("Flytt del-faktura 2 bestått: dato, betalingsfrist, autosend, særskilt bekreftelse, statuslås og beløpsbeskyttelse.");
