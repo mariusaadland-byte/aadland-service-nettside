@@ -4,6 +4,7 @@ import {sameOriginGuard} from "../../../../../lib/requestGuard";
 import {buildInvoiceDraftPdf} from "../../../../../lib/invoiceDraftPdf";
 import {osloDateKey} from "../../../../../lib/osloTime";
 import {makeSplitSelfTestDocs,splitSelfTestEmail,SPLIT_SELFTEST_RECIPIENT} from "../../../../../lib/invoiceSplitSelfTest";
+import {invoiceSplitSelfTestReadiness} from "../../../../../lib/invoiceSplitSelfTestReadiness";
 
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
@@ -47,10 +48,14 @@ export async function POST(req){
  try{
   // Deliberately no access to Supabase or invoice numbering.
   const docs=makeSplitSelfTestDocs(today);
-  const attachments=await Promise.all(docs.map(async(doc,index)=>({
+  const pdfs=await Promise.all(docs.map(doc=>buildInvoiceDraftPdf(doc)));
+  const assessment=invoiceSplitSelfTestReadiness(docs,pdfs);
+  if(!assessment.safeForDemoPreview)
+   return json({error:"En test-PDF mangler korrekt merking, beløp eller sikker betalingsinformasjon. Ingen e-post er sendt."},503);
+  const attachments=pdfs.map((pdf,index)=>({
    filename:"TEST-Aadland-Service-Del-"+(index+1)+".pdf",
-   content:(await buildInvoiceDraftPdf(doc)).toString("base64")
-  })));
+   content:pdf.toString("base64")
+  }));
   const message=splitSelfTestEmail(docs,attachments);
   const {Resend}=await import("resend");
   const result=await new Resend(apiKey).emails.send(message,{
