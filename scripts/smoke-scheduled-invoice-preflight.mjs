@@ -14,11 +14,22 @@ const latest={id:contactId,name:"Firma Eksempel AS",email:"kunde@example.invalid
 const invoice={id:"cccccccc-cccc-4ccc-8ccc-cccccccccccc",split_group_id:id,
  status:"draft",split_part:2,automatic_send:true,auto_send_state:"processing",
  planned_send_on:"2026-11-10",first_send_at:null,customer:original};
-const firstInvoice={id,status:"sent",sent_at:"2026-11-01T11:30:00.000Z"};
+const firstInvoice={id,status:"sent",sent_at:"2026-11-01T11:30:00.000Z",credited_ore:0};
 const check=(patch={},first=firstInvoice,contact=latest,today="2026-11-10")=>
  scheduledInvoicePreflight({invoice:{...invoice,...patch},firstInvoice:first,contact,today});
 assert.equal(check().ok,true,"Recipient current and first sent");
 assert.equal(check({},firstInvoice,{...latest,email:" KUNDE@EXAMPLE.INVALID "}).ok,true);
+assert.equal(check({}, {...firstInvoice,credited_ore:1}).ok,false,
+ "Any partial credit must stop a scheduled second invoice");
+assert.match(check({}, {...firstInvoice,credited_ore:1}).reason,/kreditert/);
+assert.equal(check({}, {...firstInvoice,credited_ore:125000}).ok,false,
+ "A fully credited first installment must block automatic second installment");
+assert.equal(check({}, {...firstInvoice,credited_ore:"0"}).ok,true,
+ "Supabase bigint values may be serialized as numeric strings");
+assert.equal(check({}, {...firstInvoice,credited_ore:undefined}).ok,false,
+ "Unknown credit status must fail closed");
+assert.equal(check({}, {...firstInvoice,credited_ore:-1}).ok,false,
+ "Invalid credit status must fail closed");
 for(const field of ["name","email","address","phone","customer_type","organization_number","contact_person"]){
  const updated={...latest,[field]:field==="email"?"new@example.invalid":"ENDRET"};
  const r=check({},firstInvoice,updated);
@@ -42,6 +53,9 @@ const cron=read("app/api/cron/scheduled-invoices/route.js");
 assert.ok(cron.indexOf("scheduledInvoicePreflight(")<cron.indexOf("await sendInvoice(internal)"),
  "Preflight must run before any issue/send attempt");
 assert.ok(cron.includes("expire_stale_scheduled_invoice_claims"));
+assert.ok(cron.includes('select("id,status,sent_at,credited_ore")'),
+ "The automatic send query must load credit amount, not silently treat it as zero");
+assert.ok(src.includes("credited>0"),"Credited first installments must block autosending");
 assert.ok(cron.includes("auto_send_state:delivered?\"sent\":\"needs_review\""));
 assert.ok(cron.includes("sendScheduledInvoiceOwnerNotice"),"Notify owner for both interrupted and failed sends");
 assert.ok(!cron.includes("resend.emails.send({from"),"Do not send directly to customer from cron");

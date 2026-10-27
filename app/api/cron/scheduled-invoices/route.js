@@ -46,7 +46,7 @@ export async function GET(req){
     .eq("id",id).maybeSingle();
    if(current.error||!current.data)throw Error("Fakturakladden kunne ikke kontrolleres.");
    const invoice=current.data;
-   const first=await s.from("invoice_drafts").select("id,status,sent_at")
+   const first=await s.from("invoice_drafts").select("id,status,sent_at,credited_ore")
     .eq("id",invoice.split_group_id||id).maybeSingle();
    if(first.error)throw Error("Del 1 kunne ikke kontrolleres.");
    let contact=null;
