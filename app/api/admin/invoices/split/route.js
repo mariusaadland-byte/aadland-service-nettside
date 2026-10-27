@@ -14,9 +14,25 @@ export async function PATCH(req){
  if(process.env.VERCEL_ENV!=="production")
   return json({error:"Planlagt fakturering endres bare i produksjon."},403);
  const body=await req.json().catch(()=>({}));
- if(!uuid(body.id)||!["cancel","review_manual"].includes(body.action)||body.confirmed!==true)
+ if(!uuid(body.id)||!["cancel","review_manual","reschedule"].includes(body.action)||body.confirmed!==true)
   return json({error:"Bekreft hvilken planlagt faktura som skal endres."},400);
+ if(body.action==="reschedule"){
+  if(!validInvoiceDay(body.sendOn)||!Number.isInteger(body.termsDays)||
+    body.termsDays<0||body.termsDays>365||typeof body.autoSend!=="boolean")
+   return json({error:"Velg gyldig sendingsdato, betalingsfrist og sendingsmetode."},400);
+  if(body.autoSend&&(!process.env.CRON_SECRET||!process.env.RESEND_API_KEY))
+   return json({error:"Automatisk utsendelse er ikke konfigurert. Velg manuell utsendelse."},503);
+ }
  const s=db();if(!s)return json({error:"Databasen er utilgjengelig."},503);
+ if(body.action==="reschedule"){
+  const result=await s.rpc("reschedule_second_invoice_draft",{
+   p_id:body.id,p_send_on:body.sendOn,
+   p_terms_days:body.termsDays,p_auto_send:body.autoSend
+  });
+  if(result.error)return json({error:result.error.message||
+   "Planlagt sendingsdato kunne ikke endres. Ingen faktura er sendt."},409);
+  return json({ok:true,plan:result.data});
+ }
  if(body.action==="review_manual"){
   const released=await s.rpc("review_scheduled_invoice_for_manual_send",{p_id:body.id});
   if(released.error)return json({error:released.error.message||
