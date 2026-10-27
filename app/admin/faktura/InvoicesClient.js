@@ -19,6 +19,7 @@ import InvoiceActivityTimeline from "./InvoiceActivityTimeline";
 import InvoicePaymentStatementPanel from "./InvoicePaymentStatementPanel";
 import InvoiceCustomerPicker from "./InvoiceCustomerPicker";
 import InvoiceSplitPanel from "./InvoiceSplitPanel";
+import InvoiceSecondPartReschedule from "./InvoiceSecondPartReschedule";
 import {invoiceWithSelectedCustomer} from "../../../lib/invoiceCustomerSelection";
 import {invoiceSavedDraft} from "../../../lib/invoiceCanonicalSave";
 import {hasAdjustableVippsPriceLine,linesForCustomerTotal} from "../../../lib/vippsPriceLines";
@@ -423,6 +424,12 @@ export default function InvoicesClient({archiveMode=false}){
    {form.automatic_send?" Automatisk: ":" Manuell: "}
    <b>{({scheduled:"Planlagt",processing:"Sender",sent:"Sendt",needs_review:"Krever kontroll",cancelled:"Avbrutt",manual:"Manuell"})[form.auto_send_state]||"Manuell"}</b>.
   </p>
+  {form.split_part===2&&<InvoiceSecondPartReschedule key={form.id} invoice={form} today={today}
+   disabled={busy} onSaved={async plan=>{
+    await load();
+    setSaved("Sendingsdato, betalingsfrist og sendingsmetode er oppdatert for del 2. "+
+     "Beløpet og del 1 er uendret.");
+   }}/>}
   {form.auto_send_state==="needs_review"&&<div role="alert">
    <p>Automatisk sending er stoppet og krever kontroll. Kontroller del 1, kundekortet og e-postloggen før du fortsetter.
     {form.auto_send_error&&<span style={{display:"block"}}>{form.auto_send_error}</span>}</p>
