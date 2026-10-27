@@ -3,9 +3,59 @@ import {getAdminUser} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
 import {sameOriginGuard} from "../../../../../lib/requestGuard";
 import {validInvoiceDay} from "../../../../../lib/invoiceInputVat";
+import {scheduledInvoicePreflight} from "../../../../../lib/scheduledInvoicePreflight";
 export const runtime="nodejs";
 const json=(body,status=200)=>NextResponse.json(body,{status,headers:{"Cache-Control":"private, no-store"}});
 const uuid=v=>typeof v==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+
+// A read-only rehearsal for an owner's scheduled second invoice.
+// No invoice number, PDF, email or database write is created here.
+export async function GET(req){
+ const user=await getAdminUser();
+ if(user?.role!=="owner")return json({error:"Bare eieren kan kontrollere planlagt fakturering."},403);
+ if(process.env.VERCEL_ENV!=="production")
+  return json({error:"Forhåndskontroll er bare tilgjengelig på produksjonssiden."},403);
+ const id=new URL(req.url).searchParams.get("id");
+ if(!uuid(id))return json({error:"Velg en gyldig del-faktura."},400);
+ const s=db();if(!s)return json({error:"Databasen er utilgjengelig."},503);
+ const found=await s.from("invoice_drafts")
+  .select("id,status,split_group_id,split_part,automatic_send,auto_send_state,planned_send_on,first_send_at,issued_at,invoice_number,sent_at,customer")
+  .eq("id",id).maybeSingle();
+ if(found.error)return json({error:"Forhåndskontrollen kunne ikke hente fakturaen."},503);
+ if(!found.data)return json({error:"Fakturaen ble ikke funnet."},404);
+ const invoice=found.data;
+ const result=(ready,reason)=>json({ok:true,ready,reason,
+  plannedSendOn:invoice.planned_send_on||null,
+  note:"Kun forhåndskontroll med dagens lagrede data. Ekte utsendelse sjekkes på nytt på sendingsdagen. Ingen e-post er sendt."});
+ if(invoice.status!=="draft"||invoice.split_part!==2||!invoice.split_group_id||
+  !invoice.automatic_send||invoice.auto_send_state!=="scheduled")
+  return result(false,"Denne fakturaen har ikke en aktiv, planlagt autosending.");
+ if(invoice.first_send_at||invoice.sent_at||invoice.issued_at||invoice.invoice_number)
+  return result(false,"Et utstedelses- eller sendeforsøk er registrert. Kontroller e-postloggen og fakturaarkivet.");
+ if(!invoice.planned_send_on)
+  return result(false,"Fakturaen mangler planlagt sendingsdato.");
+ if(!process.env.CRON_SECRET||!process.env.RESEND_API_KEY)
+  return result(false,"Planlagt utsendelse er ikke konfigurert. Kontroller oppsettet.");
+ const first=await s.from("invoice_drafts").select("id,status,sent_at,credited_ore")
+  .eq("id",invoice.split_group_id).maybeSingle();
+ if(first.error)return json({error:"Faktura 1 kunne ikke kontrolleres."},503);
+ let contact=null;
+ const contactId=String(invoice.customer?.contactId||"").trim();
+ if(contactId){
+  const current=await s.from("admin_customer_contacts")
+   .select("id,name,email,address,phone,customer_type,organization_number,contact_person")
+   .eq("id",contactId).maybeSingle();
+  if(current.error)return json({error:"Kundekortet kunne ikke kontrolleres."},503);
+  contact=current.data;
+ }
+ // The actual cron changes 'scheduled' to 'processing' through an atomic claim.
+ // Only simulate that state for a side-effect-free read of the same preflight rules.
+ const check=scheduledInvoicePreflight({
+  invoice:{...invoice,auto_send_state:"processing"},
+  firstInvoice:first.data,contact,today:invoice.planned_send_on
+ });
+ return result(check.ok,check.reason);
+}
 
 export async function PATCH(req){
  const guard=sameOriginGuard(req);if(guard)return guard;
