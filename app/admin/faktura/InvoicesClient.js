@@ -325,7 +325,7 @@ export default function InvoicesClient({archiveMode=false,isOwner=false}){
   {scheduledSummary.invalidDate>0&&<p style={{color:"#933f2c"}}>{scheduledSummary.invalidDate} sendingsplaner mangler gyldig dato.</p>}
   {scheduledSummary.firstMissing>0&&<p>{scheduledSummary.firstMissing} {scheduledSummary.firstMissing===1?"faktura venter":"fakturaer venter"} på at del 1 registreres sendt på e-post.</p>}
   <p style={{fontSize:12,marginBottom:0}}>Automatisk sending kjøres daglig kl. 10:20 UTC (normalt ca. 11:20 norsk vintertid / 12:20 sommertid). En sendingsdato er ikke et løfte om klokkeslett.</p>
- </section>}}
+ </section>}
  {!archiveMode&&<section className="card" style={{padding:18,marginBottom:20}}><h2>Opprett fakturakladd</h2><p>Godkjente tilbud får egne kladder for forskudd, delbetaling og sluttoppgjør etter tilbudets betalingsplan. Faktura- og forfallsdato beregnes automatisk når du fakturerer, etter betalingsfristen på kundekortet.</p><button disabled={busy} onClick={()=>create(null)}>Ny tom kladd</button> <select id="invoiceQuote" defaultValue=""><option value="">Velg godkjent tilbud</option>{quotes.map(q=><option key={q.id} value={q.id}>{q.quoteNumber} – {q.title}</option>)}</select> <button disabled={busy} onClick={()=>{const id=document.getElementById("invoiceQuote").value;if(id)create(id);else setError("Velg et godkjent tilbud.");}}>Hent betalingsplan fra tilbud</button></section>}
  {archiveMode&&<InvoiceFollowUpDashboard invoices={items} today={today} activeFilter={filter} onFilterChange={setFilter} loading={loadingInvoices}/>}
  {archiveMode&&<section className="card" style={{padding:18,marginBottom:20}}>
