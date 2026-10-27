@@ -5,5 +5,5 @@ export default async function InvoicePage(){
  const admin=await getAdminUser();
  if(!admin)redirect("/admin/login");
  if(!(admin.role==="owner"||admin.canUpdateOrders||admin.canManageProducts))redirect("/admin");
- return <InvoicesClient/>;
+ return <InvoicesClient isOwner={admin.role==="owner"}/>;
 }
