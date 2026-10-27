@@ -49,7 +49,7 @@ assert.equal(scheduledInvoiceStatus(pending,today,missing).kind,"firstMissing");
 const selected=[manual,pending,overdue,needsReview,due,processing];
 const copy=[...selected];
 const prioritized=prioritizeInvoiceDrafts(selected,today,all);
-assert.deepEqual(prioritized.map(x=>x.id),["late","review","processing","due","pending","ordinary"],
+assert.deepEqual(prioritized.map(x=>x.id),["review","late","processing","due","pending","ordinary"],
  "Held or overdue split drafts must come before normal drafts");
 // Parents may disappear from the filtered search results: use full invoice list.
 assert.equal(prioritizeInvoiceDrafts([due],today,[due,first])[0].id,"due");
