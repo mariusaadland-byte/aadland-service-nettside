@@ -69,5 +69,5 @@ assert.ok(text.includes("recognized.confidence<45"));
 assert.ok(text.includes("Brukte {details.seconds} sekunder"));
 assert.ok(text.includes("onExtracted(parsed)"));
 assert.ok(text.includes("recognizeSelected(file"));
-assert.ok(read("app/admin/faktura/mva/InputVatRegisterClient.js").includes("supplierName:result.supplierName||x.supplierName"));
+assert.ok(read("app/admin/faktura/mva/InputVatRegisterClient.js").includes("mergeVatReceiptSuggestions(x,previous,result)"));
 console.log("iPhone OCR hastighet/sikkerhet bestått: maks 2,6 MP lesekopi, trygg beskæring, gjenbrukt worker, feilgjenoppretting, avvist feilnavn og bevart manuell informasjon.");
