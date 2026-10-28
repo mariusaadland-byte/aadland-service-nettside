@@ -62,7 +62,7 @@ assert.ok(scanner.includes('"Fant "+details.detectedFields'));
 assert.ok(scanner.includes("onExtracted(parsed)"));
 
 const form=read("app/admin/faktura/mva/InputVatRegisterClient.js");
-assert.ok(form.includes("if(!file)return; // Preparing a new image must not erase manually entered work."));
+assert.ok(form.includes("previousOcr.current"),"New scans clear old OCR guesses, while retaining manually corrected values");
 assert.ok(form.includes("supplierName:result.supplierName||x.supplierName"));
 assert.ok(form.includes("documentNumber:result.documentNumber||x.documentNumber"));
 assert.ok(form.includes("documentDate:result.documentDate||x.documentDate"));
