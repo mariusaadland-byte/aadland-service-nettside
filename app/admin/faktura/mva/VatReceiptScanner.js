@@ -179,13 +179,14 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
  async function chooseSource(source){
   if(!source||busy||disabled||cropJob)return;
   setError("");setDetails(null);setProgress("");setProcessedNotice("");setImageForCrop(null);setDiagnostic(null);
-  // Never leave previously selected receipts associated with the new image.
-  onSelected(null);
+  // Keep the current attachment if the new file cannot be opened/validated.
+  // Once validation succeeds, replace the previous receipt before OCR starts.
   const thisScan=++scanId.current;
   setBusy(true);onBusyChange?.(true);
   try{
    const prepared=await prepareReceiptFile(source,setProgress);
    if(thisScan!==scanId.current)return;
+   onSelected(null);
    const file=prepared.file;
    if(file.type!=="application/pdf")
     setImageForCrop({file,originalName:source.name,previouslyConverted:prepared.converted});
