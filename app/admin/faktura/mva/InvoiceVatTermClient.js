@@ -35,6 +35,7 @@ export default function InvoiceVatTermClient(){
   setView(next);
   const hash={receipt:"#mobilkvittering",overview:"#mva-oversikt",more:"#flere-funksjoner"}[next];
   window.history.replaceState(null,"",window.location.pathname+window.location.search+hash);
+  window.scrollTo({top:0,behavior:"instant"});
  };
 
  const parameters=new URLSearchParams({year:chosen.year,term:chosen.term});
