@@ -6,6 +6,7 @@ import styles from "./VatSimpleForm.module.css";
 import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
 import {emptyVatOcrSuggestion,snapshotVatOcrSuggestion,mergeVatReceiptSuggestions,startNewVatReceiptDraft} from "../../../../lib/vatReceiptAutofill";
 import {vatReceiptAttachmentIssue,validateVatReceiptAttachmentBytes,removeVatReceiptAttachmentReference} from "../../../../lib/vatReceiptAttachmentReadiness";
+import {updateVatReceiptReviewedField,updateVatReceiptReviewedAmount} from "../../../../lib/vatReceiptReview";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const blank=()=>({0:{base:"",vat:""},12:{base:"",vat:""},15:{base:"",vat:""},25:{base:"",vat:""}});
 const parse=value=>{
@@ -93,8 +94,14 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   }catch(e){setError("Originalbilaget er fortsatt ikke lagret: "+(e.message||"ukjent feil"));}
   finally{setBusy(false);}
  };
- const set=(name,value)=>setForm(x=>({...x,[name]:value}));
- const setGroup=(rate,key,value)=>{setOcrMismatchChecked(false);setForm(x=>({...x,groups:{...x.groups,[rate]:{...x.groups[rate],[key]:value}}}));};
+ const set=(name,value)=>{
+  if(!["documentConfirmed","deductionConfirmed","bankConditionConfirmed"].includes(name))setOcrMismatchChecked(false);
+  setForm(x=>updateVatReceiptReviewedField(x,name,value));
+ };
+ const setGroup=(rate,key,value)=>{
+  setOcrMismatchChecked(false);
+  setForm(x=>updateVatReceiptReviewedAmount(x,rate,key,value));
+ };
  let netTotal=0,vatTotal=0,valid=true;
  for(const rate of rates){
   const line=form.groups[rate],n=parse(line.base),v=parse(line.vat);
