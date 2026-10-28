@@ -113,8 +113,16 @@ result=await post();
 assert.equal(result.status,201);assert.equal(uploadCount,3);
 assert.equal(result.body.attachment.filename,"testbilag.pdf");
 assert.equal(record.sha256,inspected.sha256);
-result=await post();assert.equal(result.status,409);
-assert.equal(uploadCount,3,"Cannot overwrite verified originals");
+result=await post();assert.equal(result.status,200,"Retry of the exact stored file must succeed");
+assert.equal(result.body.alreadyUploaded,true);
+assert.equal(result.body.attachment.filename,"testbilag.pdf");
+assert.equal(uploadCount,3,"Do not store a second copy of the same original");
+const differentBytes=Buffer.from("%PDF-1.7\n2 0 obj << /Type /Catalog >> endobj\n%%EOF\n");
+const differentFile={size:differentBytes.length,type:"application/pdf",name:"other.pdf",
+ async arrayBuffer(){return differentBytes.buffer.slice(differentBytes.byteOffset,differentBytes.byteOffset+differentBytes.length)}};
+result=await post(differentFile);
+assert.equal(result.status,409,"Do not overwrite an original with a different attachment");
+assert.equal(uploadCount,3,"A different file must be rejected before storage");
 result=await get();
 assert.equal(result.body.attachment.filename,"testbilag.pdf");
 assert.equal(JSON.stringify(result.body).includes("storage_path"),false);
