@@ -139,7 +139,7 @@ export default function InvoiceVatTermClient(){
    </section>
    </>}
    {view==="more"&&<VatRetroCandidatesClient period={report.period} registrationReview={report.registrationReview}
-    reload={reload} onOpenDate={date=>onDocumentSaved({documentDate:date})}/>
+    reload={reload} onOpenDate={date=>onDocumentSaved({documentDate:date})}/>}
    <div id="mobilkvittering" hidden={view!=="receipt"}>
     <InputVatRegisterClient purchases={report.purchases.rows} period={report.period}
      onChanged={onDocumentSaved}/>
