@@ -1,6 +1,7 @@
 "use client";
 import {useRef,useState} from "react";
 import {parseNorwegianReceipt} from "../../../../lib/vatReceiptParser";
+import {recognizeVatReceiptImages} from "../../../../lib/vatReceiptRecognition";
 import VatReceiptCropper from "./VatReceiptCropper";
 import styles from "./VatSimpleForm.module.css";
 
@@ -115,19 +116,9 @@ async function readLocalReceipt(file,onProgress){
   images=pdf.images;format="pdf-skann";
  }
  const tess=await loadScript(TESSERACT_URL,"Tesseract");
- let worker;
- try{
-  onProgress("Laster norsk kvitteringsleser …");
-  worker=await tess.createWorker("nor+eng",1,{logger:message=>{
-   if(message?.status==="recognizing text")onProgress("Leser kvitteringen: "+Math.round((message.progress||0)*100)+" %");
-  }});
-  for(let i=0;i<images.length;i++){
-   onProgress("Leser "+(i+1)+" av "+images.length+" side(r) …");
-   const result=await worker.recognize(images[i]);
-   text+="\n"+String(result?.data?.text||"");
-  }
-  return {text,format};
- }finally{if(worker)await worker.terminate();}
+ const recognizedText=await recognizeVatReceiptImages(tess,images,onProgress);
+ return {text:recognizedText,format};
+
 }
 export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,documentType="receipt",disabled=false}){
  const [progress,setProgress]=useState("");
@@ -136,44 +127,46 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
  const [busy,setBusy]=useState(false);
  const [processedNotice,setProcessedNotice]=useState("");
  const [cropJob,setCropJob]=useState(null);
+ const [imageForCrop,setImageForCrop]=useState(null);
  const scanId=useRef(0);
  async function recognizeSelected(file,meta){
   onSelected(file,meta);
   const recognized=await readLocalReceipt(file,setProgress);
   const parsed=parseNorwegianReceipt(recognized.text);
-  setDetails({...parsed,format:recognized.format,preview:recognized.text.slice(0,7500)});
+  const detectedFields=[parsed.supplierName,parsed.documentNumber,parsed.documentDate].filter(Boolean).length+
+   Object.keys(parsed.groups||{}).length;
+  setDetails({...parsed,format:recognized.format,preview:recognized.text.slice(0,7500),detectedFields});
   onExtracted(parsed);
-  setProgress("Teksten er lest. Kontroller forslagene nedenfor før lagring.");
+  setProgress(detectedFields>0
+   ?"Tekstlesing ferdig – "+detectedFields+" opplysning(er) foreslått. Kontroller dem før lagring."
+   :"Fant ingen sikre opplysninger. Bruk «Juster utsnitt og les på nytt» eller fyll inn manuelt.");
+
  }
  async function choose(event){
   const source=event.target.files?.[0]||null;
   event.target.value="";
   if(!source||busy||disabled||cropJob)return;
-  setError("");setDetails(null);setProgress("");setProcessedNotice("");
+  setError("");setDetails(null);setProgress("");setProcessedNotice("");setImageForCrop(null);
   // Never leave previously selected receipts associated with the new image.
   onSelected(null);
   const thisScan=++scanId.current;
   setBusy(true);onBusyChange?.(true);
-  let awaitingCrop=false;
   try{
    const prepared=await prepareReceiptFile(source,setProgress);
    if(thisScan!==scanId.current)return;
    const file=prepared.file;
-   if(file.type!=="application/pdf"){
-    // No OCR or persistent upload until the crop has been approved.
-    setCropJob({file,originalName:source.name,previouslyConverted:prepared.converted});
-    setProgress("");
-    awaitingCrop=true;
-    return;
-   }
-   await recognizeSelected(file,{converted:false,originalName:source.name});
+   if(file.type!=="application/pdf")
+    setImageForCrop({file,originalName:source.name,previouslyConverted:prepared.converted});
+   // Start OCR immediately. Cropping is optional, not a mandatory two-step gate.
+   setProgress("Bildet er valgt. Starter automatisk tekstlesing …");
+   await recognizeSelected(file,{converted:prepared.converted,originalName:source.name});
   }catch(e){
    setProgress("");
-   setError("Bildeforberedelse/lesing lyktes ikke: "+String(e.message||"ukjent feil")+
-    ". Prøv et nytt bilde eller fyll inn feltene manuelt.");
+   setError("Automatisk tekstlesing lyktes ikke: "+String(e.message||"ukjent feil")+
+    ". Du kan justere utsnittet og prøve igjen, eller fylle inn manuelt.");
   }finally{
    setBusy(false);
-   if(!awaitingCrop)onBusyChange?.(false);
+   onBusyChange?.(false);
   }
  }
  async function applyCrop(croppedFile,meta){
@@ -189,6 +182,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
     :"Hele originalbildet er beholdt uendret som bilag.");
    await recognizeSelected(croppedFile,{converted:copied,originalName:original.originalName});
    if(thisScan!==scanId.current)return;
+   setImageForCrop(null);
   }catch(e){
    setProgress("");
    setError("Kvitteringen er valgt som vedlegg, men teksten kunne ikke leses: "+String(e.message||"ukjent feil")+
@@ -217,12 +211,17 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
    <summary>Filstørrelse og hvordan lesingen virker</summary>
    <p>PDF maks 4 MB, bilder opptil 25 MB. Vi foreslår et utsnitt du kan justere før lesingen starter. OCR kjøres på telefonen, mens leseprogram og språkfiler lastes fra en ekstern leverandør. Ved beskjæring lagres en JPEG-kopi; behold originalen i regnskapet.</p>
   </details>
+  {imageForCrop&&!cropJob&&<button type="button" className={styles.textAction} disabled={disabled||busy}
+   onClick={()=>{setCropJob(imageForCrop);setError("");setProgress("");}}>
+   Juster utsnitt og les på nytt
+  </button>}
   {cropJob&&<VatReceiptCropper file={cropJob.file} onApply={applyCrop} onCancel={cancelCrop} disabled={busy||disabled}/>}
+  {!cropJob&&busy&&<p role="status" className={styles.scanMessage}>Bildet leses automatisk. Feltene fylles ut når lesingen er ferdig.</p>}
   {processedNotice&&<p role="note" className={styles.scanMessage}>{processedNotice}</p>}
   {(busy||progress)&&<p role="status" className={styles.scanMessage}><strong>{progress||"Klargjør lesing …"}</strong></p>}
   {error&&<p role="alert" className={styles.scanMessage} style={{color:"#a52a21"}}>{error}</p>}
   {details&&<div className={styles.scanResult}>
-   <strong>Forslag fra kvitteringen</strong>
+   <strong>{details.detectedFields>0?"Fylte ut "+details.detectedFields+" opplysninger automatisk":"Ingen sikre felt ble fylt ut"}</strong>
    <p>{documentType==="invoice"?details.documentNumber||"Fakturanummer ikke funnet":details.supplierName||"Leverandør ikke funnet"} · {details.documentDate||"Dato ikke funnet"} · {details.totalOre==null?"Sum ikke funnet":new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(details.totalOre/100)}</p>
    {details.warnings.length>0&&<ul>{details.warnings.map((warn,i)=><li key={i}>{warn}</li>)}</ul>}
    <details><summary>Vis lest tekst</summary>
