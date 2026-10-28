@@ -1,0 +1,78 @@
+
+/* A quiet, touch-friendly purchase-VAT form. Scoped so rental/other admin pages are unchanged. */
+.registerShell{background:#fff;border:0;box-shadow:none;outline:0;border-radius:16px;padding:22px 24px;margin:0 0 22px;color:#262420;min-width:0}
+.registerShell *{box-sizing:border-box}
+.header{padding-bottom:17px;border-bottom:1px solid #e9e6e0;margin-bottom:19px}
+.header h2{font-size:clamp(21px,4vw,27px);line-height:1.2;letter-spacing:-.025em;margin:0 0 6px}
+.intro{font-size:13px;color:#65615b;line-height:1.55;margin:0}
+.form{display:grid;gap:22px;min-width:0}
+.groupTitle{font-size:17px;letter-spacing:-.015em;font-weight:750;margin:0 0 11px}
+.fieldGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.fullWidth{grid-column:1/-1}
+.form label:not(.checkLabel):not(.inlineLabel){font-size:12px;font-weight:650;line-height:1.35;color:#4c4944;display:grid;gap:5px;min-width:0;margin:0}
+.form input:not([type="checkbox"]),.form select,.form textarea{
+ appearance:auto;display:block;width:100%;max-width:100%;min-width:0;min-height:44px;
+ border:1px solid #d9d5ce;border-radius:10px;background:#fff!important;color:#25231f!important;
+ -webkit-text-fill-color:#25231f!important;caret-color:#25231f; color-scheme:light;
+ padding:10px 12px;font-size:16px;line-height:1.3;box-shadow:none
+}
+.form textarea{min-height:80px;resize:vertical}
+.form input::placeholder,.form textarea::placeholder{color:#87827a!important;-webkit-text-fill-color:#87827a!important;opacity:1}
+.form input:focus-visible,.form select:focus-visible,.form textarea:focus-visible{outline:2px solid #927044;outline-offset:1px;border-color:#927044}
+.section{padding:0 0 19px;border-bottom:1px solid #e9e6e0}
+.termHint{font-size:12px;line-height:1.5;color:#625c52;margin:11px 0 0}
+.termHint strong{font-weight:750;color:#332d24}
+.termHint details{display:inline}
+.termHint summary{display:inline;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.noBorderFieldset{border:0;margin:0;padding:0;min-width:0}
+.noBorderFieldset legend{padding:0;font-size:17px;font-weight:750;margin-bottom:11px;letter-spacing:-.015em}
+.rateRow{padding:12px 0;border-top:1px solid #eeece7}
+.rateHead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 10px}
+.rateHead strong{font-size:14px}
+.rateInputs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.rateInputs label{font-size:12px}
+.textAction{display:inline-block;border:0!important;box-shadow:none!important;padding:6px 0!important;min-height:32px!important;background:transparent!important;color:#70512e!important;font-size:13px!important;font-weight:750!important;text-decoration:underline;text-underline-offset:3px;white-space:normal}
+.textAction:focus-visible{outline:2px solid #70512e;outline-offset:3px}
+.amountSummary{border-top:1px solid #e9e6e0;padding-top:13px;margin:9px 0 0;display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.amountSummary span{font-size:13px;color:#635c52}
+.amountSummary strong{font-size:21px;letter-spacing:-.02em}
+.secondarySummary{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:12px 0 0}
+.secondarySummary span{font-size:13px}
+.secondarySummary strong{font-weight:750}
+.deductionRow{display:grid;grid-template-columns:minmax(0,1fr) 92px;gap:12px;align-items:end}
+.deductionRow label{grid-column:2}
+.deductionRow span{font-size:13px;color:#635d55;align-self:center}
+.confirmations{display:grid;gap:11px}
+.checkLabel{display:flex;align-items:flex-start;gap:10px;line-height:1.45;font-size:13px;color:#3e3932;cursor:pointer}
+.checkLabel input[type="checkbox"]{width:20px;height:20px;min-width:20px;accent-color:#725935;flex:0 0 20px;margin:0;align-self:flex-start}
+.submit{display:block!important;width:100%;min-height:49px!important;border:0!important;border-radius:11px!important;background:#201d19!important;color:#fff!important;font-weight:750;font-size:15px!important;margin:4px 0 0;padding:12px 16px}
+.submit:disabled{opacity:.42;cursor:not-allowed}
+.notice{font-size:13px;color:#72502c;line-height:1.5;margin:0}
+.receiptList{display:grid;gap:0;margin-top:8px}
+.receiptItem{padding:13px 0;border-bottom:1px solid #e9e6e0}
+.receiptItem strong{display:block;font-size:14px}
+.receiptItem small{color:#68645d;line-height:1.55;display:block}
+.receiptFooter{font-size:12px;color:#67625b;line-height:1.5;margin:14px 0 0}
+.scanShell{border:0;background:transparent;margin:0 0 22px;padding:0 0 18px;border-bottom:1px solid #e9e6e0;min-width:0}
+.scanShell h3{font-size:17px;margin:0 0 5px}
+.scanLead{font-size:13px;margin:0 0 12px;color:#67625b;line-height:1.45}
+.uploadActions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.uploadAction{position:relative;display:flex;align-items:center;justify-content:center;gap:7px;padding:12px 8px;min-height:50px;
+ border:1px solid #d9d5ce;border-radius:10px;background:#f9f8f5;cursor:pointer;text-align:center;color:#24211d;font-size:13px;font-weight:700}
+.uploadAction:focus-within{outline:2px solid #927044;outline-offset:2px}
+.uploadAction input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.uploadAction:has(input:disabled){opacity:.5;cursor:not-allowed}
+.scanHelp{font-size:12px;color:#666059;margin-top:11px}
+.scanHelp summary{cursor:pointer;display:inline;text-decoration:underline;text-underline-offset:3px}
+.scanHelp p{margin:9px 0 0;line-height:1.55}
+.scanMessage{font-size:13px;line-height:1.5;margin:10px 0}
+.scanResult{margin-top:14px;padding-top:12px;border-top:1px solid #e8e5df;font-size:13px}
+@media(max-width:680px){
+ .registerShell{margin:0 -8px 18px;padding:18px 16px;border-radius:12px}
+ .fieldGrid{grid-template-columns:minmax(0,1fr)}
+ .fullWidth{grid-column:auto}
+ .form{gap:19px}
+ .rateInputs{gap:8px}
+ .uploadAction{font-size:13px;padding:12px 5px}
+}
+@media(max-width:340px){.uploadActions{grid-template-columns:1fr}}
