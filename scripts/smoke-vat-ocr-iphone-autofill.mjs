@@ -73,7 +73,7 @@ assert.ok(scanner.includes("await recognizeSelected(file,{converted:prepared.con
 assert.ok(scanner.includes('setImageForCrop({file,originalName:source.name'),
  "Keep optional crop retry for unclear receipt");
 assert.ok(scanner.includes("Juster utsnitt og les på nytt"));
-assert.ok(scanner.includes("Tekstlesing ferdig"));
+assert.ok(scanner.includes("Lesing fullført"));
 assert.ok(scanner.includes("Fant ingen sikre opplysninger"));
 assert.ok(scanner.includes("Automatisk tekstlesing lyktes ikke"));
 assert.ok(scanner.includes("onExtracted(parsed)"));
