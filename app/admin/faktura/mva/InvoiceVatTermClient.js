@@ -9,6 +9,7 @@ import VatReportingControlClient from "./VatReportingControlClient";
 import VatSubmissionReviewClient from "./VatSubmissionReviewClient";
 import {vatSettlementPreview} from "../../../../lib/vatSettlementPreview";
 import VatRetroCandidatesClient from "./VatRetroCandidatesClient";
+import styles from "./VatTermPage.module.css";
 
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const labels=["Januar–februar","Mars–april","Mai–juni","Juli–august","September–oktober","November–desember"];
@@ -19,6 +20,24 @@ export default function InvoiceVatTermClient(){
  const [term,setTerm]=useState(String(Math.ceil((now.getMonth()+1)/2)));
  const [chosen,setChosen]=useState({year:String(now.getFullYear()),term:String(Math.ceil((now.getMonth()+1)/2))});
  const [reload,setReload]=useState(0),[report,setReport]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState("");
+ const [view,setView]=useState("receipt");
+ useEffect(()=>{
+  function syncHash(){
+   const hash=window.location.hash;
+   if(hash==="#mobilkvittering")setView("receipt");
+   else if(hash==="#mva-oversikt")setView("overview");
+   else if(hash==="#eldre-kundefakturaer"||hash==="#flere-funksjoner")setView("more");
+  }
+  syncHash();window.addEventListener("hashchange",syncHash);
+  return()=>window.removeEventListener("hashchange",syncHash);
+ },[]);
+ const showView=next=>{
+  setView(next);
+  const hash={receipt:"#mobilkvittering",overview:"#mva-oversikt",more:"#flere-funksjoner"}[next];
+  window.history.replaceState(null,"",window.location.pathname+window.location.search+hash);
+  window.scrollTo({top:0,behavior:"instant"});
+ };
+
  const parameters=new URLSearchParams({year:chosen.year,term:chosen.term});
  const query=parameters.toString(),url="/api/admin/invoices/vat-terms?"+query;
  useEffect(()=>{
@@ -44,39 +63,37 @@ export default function InvoiceVatTermClient(){
  const selectTerm=nextTerm=>{setTerm(String(nextTerm));setChosen({year:chosen.year,term:String(nextTerm)});};
  const total=report?.total;
  const settlement=report?vatSettlementPreview(report.comparison):null;
- return <main className="admin" style={{maxWidth:1200,margin:"0 auto",padding:24}}>
-  <p><Link href="/admin/faktura/arkiv">← Tilbake til fakturaarkivet</Link></p>
-  <p><Link href="/admin/faktura/systima">Systima: tilkoblingsstatus og API-oppsett</Link></p>
-  <h1>MVA-avstemming – salgsdokumenter</h1>
-  <p style={{display:"flex",gap:16,flexWrap:"wrap"}}>
-   <a href="#mobilkvittering">Skann eller registrer kvittering</a>
-   <a href="#eldre-kundefakturaer">Importer kundefaktura fra et tidligere system</a>
-  </p>
-  <p>Oversikt over <strong>utgående MVA</strong> fra salgsdokumenter og <strong>manuelt bekreftet inngående MVA</strong> fra leverandørbilag,
-   fordelt etter dokumentdato. Innbetalingsdato og administrativ avslutning påvirker ikke terminen.</p>
-  <section className="card" style={{padding:18,marginBottom:18}}>
-   <h2>Velg MVA-termin</h2>
-   <form onSubmit={choose} style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"end"}}>
+ return <main className={"admin "+styles.page}>
+  <Link className={styles.topLink} href="/admin/faktura/arkiv">← Til fakturaarkivet</Link>
+  <h1 className={styles.heading}>MVA og kvitteringer</h1>
+  <p className={styles.subtitle}>Registrer bilag, se oversikten eller åpne flere funksjoner.</p>
+  <nav aria-label="MVA-funksjoner" className={styles.tabs}>
+   <button type="button" className={styles.tab} aria-pressed={view==="receipt"} onClick={()=>showView("receipt")}>Ny kvittering</button>
+   <button type="button" className={styles.tab} aria-pressed={view==="overview"} onClick={()=>showView("overview")}>MVA-oversikt</button>
+   <button type="button" className={styles.tab} aria-pressed={view==="more"} onClick={()=>showView("more")}>Flere valg</button>
+  </nav>
+  <details className={styles.periodBlock}>
+   <summary className={styles.periodToggle}>Termin: {chosen.term}. termin {chosen.year} · {labels[Number(chosen.term)-1]}</summary>
+   <form onSubmit={choose} className={styles.periodForm}>
     <label>År
      <input type="number" min="2000" max="2100" step="1" value={year} onChange={e=>setYear(e.target.value)}/>
     </label>
     <label>Termin
      <select value={term} onChange={e=>setTerm(e.target.value)}>
-      {labels.map((name,index)=><option key={index} value={String(index+1)}>
-       {index+1}. termin – {name}
-      </option>)}
+      {labels.map((name,index)=><option key={index} value={String(index+1)}>{index+1}. termin – {name}</option>)}
      </select>
     </label>
-    <button type="submit" disabled={loading}>Vis termin</button>
-    <button type="button" disabled={loading} onClick={()=>setReload(n=>n+1)}>Oppdater</button>
+    <div className={styles.periodActions}>
+     <button type="submit" disabled={loading}>Vis termin</button>
+     <button type="button" disabled={loading} onClick={()=>setReload(n=>n+1)}>Oppdater</button>
+    </div>
    </form>
-   {report&&<p style={{fontSize:13,margin:"12px 0 0"}}>
-    Dokumentdato: <strong>{report.period.from} til {report.period.to}</strong>.
-   </p>}
-  </section>
+   {report&&<p style={{fontSize:12,margin:"9px 0 0"}}>Dokumentdato: {report.period.from}–{report.period.to}. Kvitteringer plasseres etter dokumentdato.</p>}
+  </details>
   {loading&&<p role="status">Kontrollerer alle fakturaer og kreditnotaer i terminen …</p>}
   {error&&<p role="alert" style={{color:"#a52a21"}}>{error} Rapporttall vises ikke hvis grunnlaget er ufullstendig.</p>}
   {report&&!loading&&<>
+   {view==="overview"&&<>
    <VatReportingControlClient year={chosen.year} term={chosen.term}
     onChanged={()=>setReload(n=>n+1)} onSelectTerm={selectTerm}/>
    <VatSubmissionReviewClient year={chosen.year} term={chosen.term} revision={reload}/>
@@ -121,12 +138,19 @@ export default function InvoiceVatTermClient(){
      forventer penger tilbake fra Skatteetaten.
     </p>
    </section>
-   <VatRetroCandidatesClient period={report.period} registrationReview={report.registrationReview}
-    reload={reload} onOpenDate={date=>onDocumentSaved({documentDate:date})}/>
-   <div id="mobilkvittering"/>
-   <InputVatRegisterClient purchases={report.purchases.rows} period={report.period}
-    onChanged={onDocumentSaved}/>
-   <ExternalVatSalesClient onChanged={onDocumentSaved}/>
+   </>}
+   {view==="more"&&<VatRetroCandidatesClient period={report.period} registrationReview={report.registrationReview}
+    reload={reload} onOpenDate={date=>onDocumentSaved({documentDate:date})}/>}
+   <div id="mobilkvittering" hidden={view!=="receipt"}>
+    <InputVatRegisterClient purchases={report.purchases.rows} period={report.period}
+     onChanged={onDocumentSaved}/>
+   </div>
+   {view==="more"&&<div id="flere-funksjoner">
+    <p className={styles.moreIntro}>Importer eldre kundefakturaer og leverandørbilag, eller kontroller Systima-tilkoblingen.</p>
+    <p><Link className={styles.secondaryLink} href="/admin/faktura/systima">Systima: tilkobling og API-oppsett</Link></p>
+    <ExternalVatSalesClient onChanged={onDocumentSaved}/>
+   </div>}
+   {view==="overview"&&<div id="mva-oversikt">
    <section className="card" style={{padding:18,marginBottom:18}}>
     <h2>Utgående MVA – {report.period.title}</h2>
     <p style={{fontSize:13}}>Både betalte og ubetalte utstedte fakturaer er med. Betalingsstatusen nedenfor viser <strong>saldo per nå</strong>, ikke saldo da terminen sluttet.</p>
@@ -182,9 +206,10 @@ export default function InvoiceVatTermClient(){
      Eksporter salgsdokumenter, innkjøpsbilag og foreløpig MVA-avstemming (CSV)
     </a>
    </section>
-   <VatPurchaseCsvImport onChanged={()=>setReload(n=>n+1)}/>
+   </div>}
+   {view==="more"&&<VatPurchaseCsvImport onChanged={()=>setReload(n=>n+1)}/>}
 
-   <section className="card" style={{padding:18}}>
+   {view==="overview"&&<section className="card" style={{padding:18}}>
     <h2>Salgsdokumentoversikt ({report.rows.length})</h2>
     <p style={{fontSize:13}}>Inkluderer fakturaer fra Aadland Service og kontrollert import fra eldre fakturasystemer.
      Eldre dokumenter har lenke til privat lagret originalfaktura.</p>
@@ -212,7 +237,7 @@ export default function InvoiceVatTermClient(){
        <td style={{textAlign:"right"}}>{row.outstandingOre===null||row.outstandingOre===undefined?"Ikke kjent":money(row.outstandingOre)}</td>
       </tr>)}</tbody>
      </table></div>}
-   </section>
+   </section>}
   </>}
  </main>;
 }
