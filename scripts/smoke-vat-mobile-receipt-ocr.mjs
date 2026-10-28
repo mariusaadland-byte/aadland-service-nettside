@@ -46,7 +46,7 @@ assert.equal(invalidDate.documentDate,"");
 const ui=read("app/admin/faktura/mva/InputVatRegisterClient.js");
 const ocr=read("app/admin/faktura/mva/VatReceiptScanner.js");
 assert.ok(ui.includes("<VatReceiptScanner"));
-assert.ok(ui.includes("setReceiptFile(file)"));
+assert.ok(ui.includes("setReceiptFile(file||null)"));
 assert.ok(ui.includes("attachToDocument(documentId,receiptFile)"));
 assert.ok(ui.includes("retryAttachment"));
 assert.ok(ui.includes("setScanBusy"));
