@@ -10,6 +10,13 @@ const uuid=v=>typeof v==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[8
 const fail=(error,status=400)=>NextResponse.json({error},{status,headers:{"Cache-Control":"private, no-store"}});
 const validUser=async()=>{const user=await getAdminUser();return user?.role==="owner"?user:null};
 const metadataFields="id,purchase_document_id,original_filename,mime_type,file_size,sha256,uploaded_at";
+const confirmedAttachment=data=>({
+ id:data.id,filename:data.original_filename,
+ mimeType:data.mime_type,fileSize:data.file_size,uploadedAt:data.uploaded_at
+});
+const sameOriginal=(existing,checked)=>Boolean(existing&&
+ existing.sha256===checked.sha256&&existing.original_filename===checked.filename&&
+ existing.mime_type===checked.mimeType&&Number(existing.file_size)===checked.fileSize);
 
 export async function GET(req){
  if(!await validUser())return fail("Bare eieren kan åpne originale leverandørbilag.",403);
@@ -66,12 +73,19 @@ export async function POST(req){
  const [purchase,existing]=await Promise.all([
   s.from("vat_purchase_documents").select("id,voided_at")
    .eq("id",documentId).maybeSingle(),
-  s.from("vat_purchase_document_files").select("id,original_filename,sha256")
+  s.from("vat_purchase_document_files").select(metadataFields)
    .eq("purchase_document_id",documentId).maybeSingle()
  ]);
  if(purchase.error||existing.error)return fail("Bilaget kunne ikke kontrolleres.",503);
  if(!purchase.data||purchase.data.voided_at)return fail("Kun et aktivt, registrert leverandørbilag kan få et vedlegg.",409);
- if(existing.data)return fail("Dette bilaget har allerede et låst originalvedlegg. Opphev feilregistreringen og opprett nytt bilag ved behov.",409);
+ if(existing.data){
+  // A lost network response after a successful upload must be safe to retry.
+  // The same bytes/name/type are already stored. Never write a duplicate.
+  if(sameOriginal(existing.data,checked))
+   return NextResponse.json({ok:true,alreadyUploaded:true,attachment:confirmedAttachment(existing.data)},
+    {status:200,headers:{"Cache-Control":"private, no-store"}});
+  return fail("Dette bilaget har allerede et annet låst originalvedlegg. Opphev feilregistreringen og opprett nytt bilag ved behov.",409);
+ }
  const path="vat-purchases/"+documentId+"/"+crypto.randomUUID()+"."+checked.ext;
  const uploaded=await s.storage.from(vatAttachmentBucket)
   .upload(path,buffer,{contentType:checked.mimeType,upsert:false,cacheControl:"0"});
@@ -84,12 +98,17 @@ export async function POST(req){
  if(saved.error||!saved.data){
   // Only remove the orphaned new object, never an existing original.
   await s.storage.from(vatAttachmentBucket).remove([path]);
-  return fail(saved.error?.code==="23505"?
-   "Et originalbilag er allerede knyttet til registreringen.":
-   "Dokumenttilknytningen kunne ikke lagres. Prøv igjen.",saved.error?.code==="23505"?409:503);
+  if(saved.error?.code==="23505"){
+   // A concurrent identical upload may have won the unique constraint.
+   const locked=await s.from("vat_purchase_document_files")
+    .select(metadataFields).eq("purchase_document_id",documentId).maybeSingle();
+   if(!locked.error&&sameOriginal(locked.data,checked))
+    return NextResponse.json({ok:true,alreadyUploaded:true,attachment:confirmedAttachment(locked.data)},
+     {status:200,headers:{"Cache-Control":"private, no-store"}});
+   return fail("Et annet originalbilag er allerede knyttet til registreringen.",409);
+  }
+  return fail("Dokumenttilknytningen kunne ikke lagres. Prøv igjen.",503);
  }
- return NextResponse.json({ok:true,attachment:{
-  id:saved.data.id,filename:saved.data.original_filename,
-  mimeType:saved.data.mime_type,fileSize:saved.data.file_size,uploadedAt:saved.data.uploaded_at
- }},{status:201,headers:{"Cache-Control":"private, no-store"}});
+ return NextResponse.json({ok:true,attachment:confirmedAttachment(saved.data)},
+  {status:201,headers:{"Cache-Control":"private, no-store"}});
 }
