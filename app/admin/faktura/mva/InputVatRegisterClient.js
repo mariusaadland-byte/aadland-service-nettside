@@ -33,17 +33,25 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const [attachmentIssue,setAttachmentIssue]=useState(null);
  const documentPeriod=vatDocumentPeriod(form.documentDate);
  const chooseReceipt=(file,meta={})=>{
-  setReceiptFile(file);setReceiptIsCopy(Boolean(meta.converted));setAttachmentIssue(null);setError("");setSuccess("");
-  setOcrGrossOre(null);setOcrMismatchChecked(false);setShowMoreRates(false);
-  setForm(x=>({...x,supplierName:"",documentNumber:"",documentDate:"",
-   groups:blank(),evidenceReference:meta.converted?"Aadland MVA – vedlagt JPEG-kopi, original beholdes eksternt":"Aadland MVA – privat originalvedlegg",
+  setReceiptFile(file||null);setReceiptIsCopy(Boolean(file&&meta.converted));setAttachmentIssue(null);setError("");setSuccess("");
+  setOcrGrossOre(null);setOcrMismatchChecked(false);
+  if(!file)return; // Preparing a new image must not erase manually entered work.
+  setForm(x=>({...x,
+   evidenceReference:x.evidenceReference||(
+    meta.converted?"Aadland MVA – vedlagt JPEG-kopi, original beholdes eksternt":"Aadland MVA – privat originalvedlegg"),
    documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
  };
  const receiveScan=result=>{
   setOcrGrossOre(Number.isSafeInteger(result.totalOre)?result.totalOre:null);
   setOcrMismatchChecked(false);
-  setForm(x=>({...x,supplierName:result.supplierName||"",documentNumber:result.documentNumber||"",
-   documentDate:result.documentDate||"",groups:{...blank(),...result.groups}}));
+  // OCR supplies suggestions only. A failed scan must not blank manually
+  // entered fields or remove other rates that the user already checked.
+  setForm(x=>({...x,
+   supplierName:result.supplierName||x.supplierName,
+   documentNumber:result.documentNumber||x.documentNumber,
+   documentDate:result.documentDate||x.documentDate,
+   groups:{...x.groups,...result.groups}
+  }));
  };
  const attachToDocument=async(id,file)=>{
   const payload=new FormData();payload.append("documentId",id);payload.append("file",file);
