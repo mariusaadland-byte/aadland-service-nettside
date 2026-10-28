@@ -34,4 +34,7 @@ assert.ok(form.includes("mergeVatReceiptSuggestions(x,previous,result)"));
 assert.ok(form.includes("clearVatReceiptSuggestions(x,previous)"));
 assert.ok(form.includes("snapshotVatOcrSuggestion(result)"));
 assert.ok(form.includes("setOcrMismatchChecked(false)"));
+assert.ok(form.includes('setForm(x=>({...x,supplierName:"",documentNumber:"",documentDate:""'),"New purchase must not inherit previous supplier");
+assert.ok(form.includes("previousOcr.current=emptyVatOcrSuggestion();"),"Reset OCR snapshot after saved receipt");
+
 console.log("Sikker OCR-autofyll bestått: bevarer manuelt korrigerte felt, trekker tilbake usikre tidligere forslag.");
