@@ -4,7 +4,7 @@ import VatOriginalAttachment from "./VatOriginalAttachment";
 import VatReceiptScanner from "./VatReceiptScanner";
 import styles from "./VatSimpleForm.module.css";
 import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
-import {emptyVatOcrSuggestion,snapshotVatOcrSuggestion,mergeVatReceiptSuggestions,clearVatReceiptSuggestions} from "../../../../lib/vatReceiptAutofill";
+import {emptyVatOcrSuggestion,snapshotVatOcrSuggestion,mergeVatReceiptSuggestions,startNewVatReceiptDraft} from "../../../../lib/vatReceiptAutofill";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const blank=()=>({0:{base:"",vat:""},12:{base:"",vat:""},15:{base:"",vat:""},25:{base:"",vat:""}});
 const parse=value=>{
@@ -28,6 +28,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const [ocrGrossOre,setOcrGrossOre]=useState(null);
  const [ocrMismatchChecked,setOcrMismatchChecked]=useState(false);
  const [scanBusy,setScanBusy]=useState(false);
+ const [receiptSession,setReceiptSession]=useState(0);
  const [showMoreRates,setShowMoreRates]=useState(false);
  const [customPurpose,setCustomPurpose]=useState(false);
  const [attachmentIssue,setAttachmentIssue]=useState(null);
@@ -37,11 +38,15 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   setReceiptFile(file||null);setReceiptIsCopy(Boolean(file&&meta.converted));setAttachmentIssue(null);setError("");setSuccess("");
   setOcrGrossOre(null);setOcrMismatchChecked(false);
   if(!file){
-   const previous=previousOcr.current;
+   // A valid new receipt starts a new accounting draft. Never carry a
+   // manually corrected amount, supplier, VAT rate or purpose to this one.
+   // This is NOT called on a crop or OCR retry of the same receipt.
    previousOcr.current=emptyVatOcrSuggestion();
-   setForm(x=>clearVatReceiptSuggestions(x,previous));
+   setForm(x=>startNewVatReceiptDraft(x));
+   setShowMoreRates(false);
+   setCustomPurpose(false);
    return;
-  } // Preparing a new image must not erase manually entered work.
+  } // OCR retry/initial attachment must not erase work on the same receipt.
   setForm(x=>({...x,
    evidenceReference:x.evidenceReference||(
     meta.converted?"Aadland MVA – vedlagt JPEG-kopi, original beholdes eksternt":"Aadland MVA – privat originalvedlegg"),
@@ -134,8 +139,10 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    setReceiptFile(null);setReceiptIsCopy(false);setOcrGrossOre(null);setOcrMismatchChecked(false);
    previousOcr.current=emptyVatOcrSuggestion();
    setForm(x=>({...x,supplierName:"",documentNumber:"",documentDate:"",originalDocumentNumber:"",
-    evidenceReference:"",businessPurpose:"",groups:blank(),
+    evidenceReference:"",businessPurpose:"",kind:"purchase",deductionPercent:"100",groups:blank(),
     documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
+   setShowMoreRates(false);setCustomPurpose(false);
+   setReceiptSession(n=>n+1);
    // A failed upload must keep the retry control and selected original visible.
    if(attachmentSaved)onChanged?.({documentDate:data.document?.document_date||form.documentDate});
   }catch(e){setError(e.message||"Registreringen mislyktes.");}
@@ -165,7 +172,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    <p className={styles.intro}>Ta et bilde eller velg en kvittering. Kontroller opplysningene før du registrerer.</p>
   </div>
   <VatReceiptScanner onSelected={chooseReceipt} onExtracted={receiveScan}
-   onBusyChange={setScanBusy} disabled={busy||Boolean(attachmentIssue)}/>
+   onBusyChange={setScanBusy} resetToken={receiptSession} disabled={busy||Boolean(attachmentIssue)}/>
   {receiptFile&&<div className={styles.scanMessage}>
    <strong>{receiptIsCopy?"JPEG-kopi valgt":"Valgt fil"}:</strong> {receiptFile.name}
    {receiptIsCopy&&". Behold originalen i regnskapssystemet."}
