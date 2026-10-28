@@ -31,7 +31,7 @@ assert.equal(cleared.groups[25].vat,"","Withdraw old OCR VAT from new receipt");
 assert.equal(mergeVatReceiptSuggestions(blank(),before,{}).supplierName,"");
 const form=read("app/admin/faktura/mva/InputVatRegisterClient.js");
 assert.ok(form.includes("mergeVatReceiptSuggestions(x,previous,result)"));
-assert.ok(form.includes("clearVatReceiptSuggestions(x,previous)"));
+assert.ok(form.includes("startNewVatReceiptDraft(x)"));
 assert.ok(form.includes("snapshotVatOcrSuggestion(result)"));
 assert.ok(form.includes("setOcrMismatchChecked(false)"));
 assert.ok(form.includes('setForm(x=>({...x,supplierName:"",documentNumber:"",documentDate:""'),"New purchase must not inherit previous supplier");
