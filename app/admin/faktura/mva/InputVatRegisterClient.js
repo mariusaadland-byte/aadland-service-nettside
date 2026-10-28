@@ -5,7 +5,7 @@ import VatReceiptScanner from "./VatReceiptScanner";
 import styles from "./VatSimpleForm.module.css";
 import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
 import {emptyVatOcrSuggestion,snapshotVatOcrSuggestion,mergeVatReceiptSuggestions,startNewVatReceiptDraft} from "../../../../lib/vatReceiptAutofill";
-import {vatReceiptAttachmentIssue,removeVatReceiptAttachmentReference} from "../../../../lib/vatReceiptAttachmentReadiness";
+import {vatReceiptAttachmentIssue,validateVatReceiptAttachmentBytes,removeVatReceiptAttachmentReference} from "../../../../lib/vatReceiptAttachmentReadiness";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const blank=()=>({0:{base:"",vat:""},12:{base:"",vat:""},15:{base:"",vat:""},25:{base:"",vat:""}});
 const parse=value=>{
@@ -34,6 +34,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const [customPurpose,setCustomPurpose]=useState(false);
  const [attachmentIssue,setAttachmentIssue]=useState(null);
  const previousOcr=useRef(emptyVatOcrSuggestion());
+ const submittingRef=useRef(false);
  const documentPeriod=vatDocumentPeriod(form.documentDate);
  const chooseReceipt=(file,meta={})=>{
   setReceiptFile(file||null);setReceiptIsCopy(Boolean(file&&meta.converted));setAttachmentIssue(null);setError("");setSuccess("");
@@ -101,7 +102,9 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const ocrGrossMismatch=ocrGrossOre!==null&&netTotal>0&&Math.abs(ocrGrossOre-(netTotal+vatTotal))>5;
  const receiptUploadIssue=vatReceiptAttachmentIssue(receiptFile,form.evidenceReference);
  const submit=async e=>{
-  e.preventDefault();setError("");setSuccess("");
+  e.preventDefault();
+  if(submittingRef.current||busy)return;
+  setError("");setSuccess("");
   if(attachmentIssue){
    setError("Forrige bilag er registrert, men originalvedlegget mangler. Bruk opplastingsknappen for det bilaget før du oppretter et nytt.");
    return;
@@ -110,15 +113,20 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   if(receiptUploadIssue){setError(receiptUploadIssue);return;}
   if(!valid||netTotal<=0){setError("Kontroller grunnlag og MVA på hver sats (avrundingsavvik maks 0,05 kr).");return;}
   if(ocrGrossMismatch&&!ocrMismatchChecked){setError("OCR-summen stemmer ikke med beløpene. Kontroller kvitteringen og bekreft avviket før registrering.");return;}
-  const question="Registrere et kontrollert leverandørbilag i intern MVA-avstemming?\n\n"+
+  // Reserve the submission synchronously; otherwise a double-tap can submit
+  // twice while Safari is reading the file header asynchronously.
+  submittingRef.current=true;
+  setBusy(true);
+  try{
+   const actualFileIssue=await validateVatReceiptAttachmentBytes(receiptFile,form.evidenceReference);
+   if(actualFileIssue){setError(actualFileIssue);return;}
+   const question="Registrere et kontrollert leverandørbilag i intern MVA-avstemming?\n\n"+
    form.supplierName+" – "+form.documentNumber+"\nDokumentdato: "+form.documentDate+
    "\n"+(form.kind==="credit"?"Kreditnota":"Kjøpsfaktura")+
    "\nBrutto beløp: "+money(netTotal+vatTotal)+
    "\nFradragsandel: "+percent+" %\nFradragsberettiget inngående MVA: "+
    money(deductible)+"\n\nOriginalbilaget må fortsatt bevares i regnskapssystemet.";
-  if(!window.confirm(question))return;
-  setBusy(true);
-  try{
+   if(!window.confirm(question))return;
    const response=await fetch("/api/admin/invoices/vat-purchases",{
     method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({...form,action:"register"})
@@ -149,7 +157,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    // A failed upload must keep the retry control and selected original visible.
    if(attachmentSaved)onChanged?.({documentDate:data.document?.document_date||form.documentDate});
   }catch(e){setError(e.message||"Registreringen mislyktes.");}
-  finally{setBusy(false);}
+  finally{submittingRef.current=false;setBusy(false);}
  };
  const voidDoc=async doc=>{
   if(busy||doc.voided_at)return;
