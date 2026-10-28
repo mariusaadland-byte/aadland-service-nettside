@@ -2,6 +2,7 @@
 import {useRef,useState} from "react";
 import {parseNorwegianReceipt} from "../../../../lib/vatReceiptParser";
 import VatReceiptCropper from "./VatReceiptCropper";
+import styles from "./VatSimpleForm.module.css";
 
 const MAX_SIZE=4*1024*1024;
 const MAX_SOURCE_SIZE=25*1024*1024;
@@ -199,34 +200,32 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   onBusyChange?.(false);
  }
 
- return <section style={{border:"1px solid #c8d7d2",background:"#f4faf8",borderRadius:14,padding:15,margin:"16px 0"}}>
-  <h3 style={{margin:"0 0 7px"}}>{documentType==="invoice"?"Last opp tidligere kundefaktura (PDF eller bilde)":"1. Ta bilde eller velg kvittering"}</h3>
-  <p style={{fontSize:13,margin:"0 0 11px"}}>{documentType==="invoice"?
-   "Velg fakturaen fra det gamle fakturaprogrammet. Vi forsøker å lese dato, dokumentnummer og MVA-satser. Kontroller kunde og alle tall manuelt.":
-   "Etter at du har tatt bildet, foreslår vi automatisk et utsnitt rundt kvitteringen. Du kan justere det før beløpene leses."}</p>
-  <p style={{fontSize:13,margin:"0 0 12px"}}>
-   Vi leser kvitteringens tekst på telefonen når det er mulig. Etter du har godkjent utsnittet, leser systemet teksten. Ved beskjæring lagres en JPEG-kopi av kvitteringen, mens originalbildet må beholdes i regnskapet.
-  </p>
-  <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-   <label style={{flex:"1 1 150px",fontWeight:700}}>📷 Ta bilde
+ return <section className={styles.scanShell}>
+  <h3>{documentType==="invoice"?"Last opp faktura":"1. Legg til kvittering"}</h3>
+  <p className={styles.scanLead}>Ta bilde eller velg en fil. Vi forsøker å fylle ut feltene automatisk.</p>
+  <div className={styles.uploadActions}>
+   <label className={styles.uploadAction}>📷 Ta bilde
     <input aria-label="Ta bilde av kvittering" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"
-     disabled={disabled||busy||Boolean(cropJob)} onChange={choose} style={{display:"block",width:"100%",marginTop:7,fontSize:13}}/>
+     disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
    </label>
-   <label style={{flex:"1 1 150px",fontWeight:700}}>📁 Velg bilde eller PDF
+   <label className={styles.uploadAction}>📁 Velg bilde / PDF
     <input aria-label="Velg kvittering fra telefonen" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/jpeg,image/png,image/webp"
-     disabled={disabled||busy||Boolean(cropJob)} onChange={choose} style={{display:"block",width:"100%",marginTop:7,fontSize:13}}/>
+     disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
    </label>
   </div>
-  <p style={{fontSize:12,color:"#49645c"}}>PDF maks 4 MB. Bilder opptil 25 MB kan gjøres om til en JPEG-kopi ved behov. Beskjæring og OCR utføres lokalt på telefonen. Lesemotor og språkfiler lastes fra en ekstern leverandør.</p>
+  <details className={styles.scanHelp}>
+   <summary>Filstørrelse og hvordan lesingen virker</summary>
+   <p>PDF maks 4 MB, bilder opptil 25 MB. Vi foreslår et utsnitt du kan justere før lesingen starter. OCR kjøres på telefonen, mens leseprogram og språkfiler lastes fra en ekstern leverandør. Ved beskjæring lagres en JPEG-kopi; behold originalen i regnskapet.</p>
+  </details>
   {cropJob&&<VatReceiptCropper file={cropJob.file} onApply={applyCrop} onCancel={cancelCrop} disabled={busy||disabled}/>}
-  {processedNotice&&<p role="note" style={{border:"1px solid #c8d7d2",padding:10,borderRadius:8,fontSize:13}}>{processedNotice}</p>}
-  {(busy||progress)&&<p role="status" style={{fontWeight:650}}>{progress||"Klargjør lesing …"}</p>}
-  {error&&<p role="alert" style={{color:"#a52a21"}}>{error}</p>}
-  {details&&<div style={{fontSize:13,borderTop:"1px solid #d9e5e0",paddingTop:10}}>
-   <strong>Fant tekst ({details.format}).</strong>
-   <p>Forslag: {documentType==="invoice"?details.documentNumber||"fakturanummer ukjent":details.supplierName||"leverandør ukjent"} · {details.documentDate||"dato ukjent"} · {details.totalOre==null?"beløp ukjent":new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(details.totalOre/100)}</p>
+  {processedNotice&&<p role="note" className={styles.scanMessage}>{processedNotice}</p>}
+  {(busy||progress)&&<p role="status" className={styles.scanMessage}><strong>{progress||"Klargjør lesing …"}</strong></p>}
+  {error&&<p role="alert" className={styles.scanMessage} style={{color:"#a52a21"}}>{error}</p>}
+  {details&&<div className={styles.scanResult}>
+   <strong>Forslag fra kvitteringen</strong>
+   <p>{documentType==="invoice"?details.documentNumber||"Fakturanummer ikke funnet":details.supplierName||"Leverandør ikke funnet"} · {details.documentDate||"Dato ikke funnet"} · {details.totalOre==null?"Sum ikke funnet":new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(details.totalOre/100)}</p>
    {details.warnings.length>0&&<ul>{details.warnings.map((warn,i)=><li key={i}>{warn}</li>)}</ul>}
-   <details><summary>Se lest tekst for manuell kontroll</summary>
+   <details><summary>Vis lest tekst</summary>
     <pre style={{whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:230,overflow:"auto",fontSize:11}}>{details.preview}</pre>
    </details>
   </div>}
