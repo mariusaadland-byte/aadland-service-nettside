@@ -65,7 +65,7 @@ const form=read("app/admin/faktura/mva/InputVatRegisterClient.js");
 assert.ok(form.includes("previousOcr.current"),"New scans clear old OCR guesses, while retaining manually corrected values");
 assert.ok(form.includes("mergeVatReceiptSuggestions(x,previous,result)"));
 assert.ok(form.includes("snapshotVatOcrSuggestion(result)"));
-assert.ok(form.includes("clearVatReceiptSuggestions(x,previous)"));
+assert.ok(form.includes("startNewVatReceiptDraft(x)"));
 assert.ok(form.includes("previousOcr.current"));
 assert.ok(form.includes("documentConfirmed:false"));
 assert.ok(form.includes("deductionConfirmed:false"));
