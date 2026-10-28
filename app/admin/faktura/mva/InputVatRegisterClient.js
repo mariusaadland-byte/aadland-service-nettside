@@ -2,6 +2,7 @@
 import {useState} from "react";
 import VatOriginalAttachment from "./VatOriginalAttachment";
 import VatReceiptScanner from "./VatReceiptScanner";
+import styles from "./VatSimpleForm.module.css";
 import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const today=()=>new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe/Oslo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
@@ -13,6 +14,7 @@ const parse=value=>{
 };
 const moneyInput=ore=>(ore/100).toFixed(2).replace(".",",");
 const rates=[0,12,15,25];
+const purposeChoices=["Materialer til kundeoppdrag","Verktøy og utstyr","Driftskostnad","Transport i virksomheten"];
 export default function InputVatRegisterClient({purchases,period,onChanged}){
  const [form,setForm]=useState({
   supplierName:"",documentNumber:"",documentDate:today(),kind:"purchase",
@@ -26,11 +28,13 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const [ocrGrossOre,setOcrGrossOre]=useState(null);
  const [ocrMismatchChecked,setOcrMismatchChecked]=useState(false);
  const [scanBusy,setScanBusy]=useState(false);
+ const [showMoreRates,setShowMoreRates]=useState(false);
+ const [customPurpose,setCustomPurpose]=useState(false);
  const [attachmentIssue,setAttachmentIssue]=useState(null);
  const documentPeriod=vatDocumentPeriod(form.documentDate);
  const chooseReceipt=(file,meta={})=>{
   setReceiptFile(file);setReceiptIsCopy(Boolean(meta.converted));setAttachmentIssue(null);setError("");setSuccess("");
-  setOcrGrossOre(null);setOcrMismatchChecked(false);
+  setOcrGrossOre(null);setOcrMismatchChecked(false);setShowMoreRates(false);
   setForm(x=>({...x,supplierName:"",documentNumber:"",documentDate:"",
    groups:blank(),evidenceReference:meta.converted?"Aadland MVA – vedlagt JPEG-kopi, original beholdes eksternt":"Aadland MVA – privat originalvedlegg",
    documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
@@ -69,6 +73,9 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    else {netTotal+=n;vatTotal+=v;}
   }
  }
+ const otherRateHasValue=rates.filter(rate=>rate!==25).some(rate=>Boolean(form.groups[rate]?.base||form.groups[rate]?.vat));
+ const visibleRates=(showMoreRates||otherRateHasValue)?[25,15,12,0]:[25];
+ const selectedPurpose=purposeChoices.includes(form.businessPurpose)?form.businessPurpose:(customPurpose||form.businessPurpose?"custom":"");
  const percent=Number(form.deductionPercent);
  const deductible=Math.round(vatTotal*percent/100);
  const ocrGrossMismatch=ocrGrossOre!==null&&netTotal>0&&Math.abs(ocrGrossOre-(netTotal+vatTotal))>5;
@@ -133,113 +140,146 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   }catch(e){setError(e.message||"Kunne ikke oppheve bilaget.");}
   finally{setBusy(false);}
  };
- return <section className="card" style={{padding:18,marginBottom:18}}>
-  <h2>Registrer inngående MVA fra leverandørbilag</h2>
-  <p style={{fontSize:13}}>Dette er <strong>manuelle referanser til faktiske bilag</strong> i regnskapet,
-   ikke import av leverandørprislisten. Ta med originalfakturaens dokumentdato og MVA-beløp.
-   Leverandørkreditnotaer reduserer inngående MVA i sin utstedelsestermin. En vanlig ubetalt leverandørfaktura kan normalt ha fradragsberettiget MVA i fakturaterminen – betaling er ikke nødvendig for å registrere bilaget.</p>
+ return <section className={styles.registerShell}>
+  <div className={styles.header}>
+   <h2>Legg til kjøpsbilag</h2>
+   <p className={styles.intro}>Ta et bilde eller velg en kvittering. Kontroller opplysningene før du registrerer.</p>
+  </div>
   <VatReceiptScanner onSelected={chooseReceipt} onExtracted={receiveScan}
    onBusyChange={setScanBusy} disabled={busy}/>
-  {receiptFile&&<p style={{fontSize:13,background:"#f1faf3",padding:10,borderRadius:8}}>
-   <strong>{receiptIsCopy?"Valgt JPEG-kopi:":"Valgt originalfil:"}</strong> {receiptFile.name}. Filen lagres privat etter at du godkjenner bilaget. {receiptIsCopy&&"Kildebildet må fortsatt oppbevares separat."}
-   <button type="button" style={{marginLeft:10}} disabled={busy||scanBusy} onClick={()=>{setReceiptFile(null);setReceiptIsCopy(false);}}>Ikke legg ved filen</button>
-  </p>}
-  <form onSubmit={submit} style={{display:"grid",gap:12}}>
-   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:10}}>
-    <label>Type bilag
-     <select value={form.kind} onChange={e=>set("kind",e.target.value)}>
-      <option value="purchase">Kjøpsfaktura/kvittering</option>
-      <option value="credit">Kreditnota fra leverandør</option>
-     </select>
-    </label>
-    <label>Leverandør
-     <input required maxLength={160} value={form.supplierName} onChange={e=>set("supplierName",e.target.value)} placeholder="For eksempel Megaflis"/>
-    </label>
-    <label>Faktura-/kreditnotanummer
-     <input required maxLength={90} value={form.documentNumber} onChange={e=>set("documentNumber",e.target.value)}/>
-    </label>
-    <label>Dokumentdato
-     <input type="date" required value={form.documentDate} onChange={e=>set("documentDate",e.target.value)}/>
-    </label>
-    {form.kind==="credit"&&<label>Opprinnelig fakturanummer
-     <input required value={form.originalDocumentNumber} onChange={e=>set("originalDocumentNumber",e.target.value)}/>
-    </label>}
-   </div>
-   {documentPeriod&&<p style={{padding:12,background:"#edf6ef",borderRadius:9,margin:0}}>
-    <strong>Dokumentet hører til {documentPeriod.title} ({documentPeriod.months}).</strong>
-    {" "}Ved lagring åpnes denne terminen automatisk, også hvis bilaget er fra et tidligere år.
-    {period.year!==documentPeriod.year||period.term!==documentPeriod.term?
-     " Datoen ligger utenfor terminen du ser nå.":""}
-    {" "}Hvis MVA-meldingen for denne perioden allerede er levert, må eventuell korrigering håndteres separat.
-   </p>}
-   <fieldset style={{border:"1px solid #d8cdbb",borderRadius:8,padding:12}}>
-    <legend>Beløp fra bilaget – oppgi eks. MVA og MVA</legend>
-    {rates.map(rate=><div key={rate} style={{display:"flex",gap:8,alignItems:"end",flexWrap:"wrap",padding:"6px 0",borderBottom:"1px solid #e6ded3"}}>
-     <strong style={{minWidth:45}}>{rate} %</strong>
-     <label style={{flex:"1 1 125px"}}>Grunnlag eks. MVA (kr)
-      <input inputMode="decimal" placeholder="0,00" value={form.groups[rate].base}
-       onChange={e=>setGroup(rate,"base",e.target.value)}/>
+  {receiptFile&&<div className={styles.scanMessage}>
+   <strong>{receiptIsCopy?"JPEG-kopi valgt":"Valgt fil"}:</strong> {receiptFile.name}
+   {receiptIsCopy&&". Behold originalen i regnskapssystemet."}
+   <button className={styles.textAction} type="button" disabled={busy||scanBusy}
+    onClick={()=>{setReceiptFile(null);setReceiptIsCopy(false);}}>Fjern vedlegg</button>
+  </div>}
+  <form onSubmit={submit} className={styles.form}>
+   <section className={styles.section}>
+    <h3 className={styles.groupTitle}>2. Opplysninger</h3>
+    <div className={styles.fieldGrid}>
+     <label>Leverandør
+      <input required maxLength={160} autoComplete="organization" value={form.supplierName} onChange={e=>set("supplierName",e.target.value)} placeholder="For eksempel Megaflis"/>
      </label>
-     <label style={{flex:"1 1 125px"}}>MVA fra bilaget (kr)
-      <input inputMode="decimal" placeholder="0,00" value={form.groups[rate].vat}
-       onChange={e=>setGroup(rate,"vat",e.target.value)}/>
+     <label>Bilagsnummer
+      <input required maxLength={90} value={form.documentNumber} onChange={e=>set("documentNumber",e.target.value)} placeholder="Fra kvitteringen"/>
      </label>
-     <button type="button" onClick={()=>{
-      const n=parse(form.groups[rate].base);
-      if(n===null)return;
-      setGroup(rate,"vat",moneyInput(Math.round(n*rate/100)));
-     }}>Beregn {rate} %</button>
-    </div>)}
-    <p style={{margin:"10px 0 0",fontSize:13}}>
-     Dokumentet: <strong>{money(netTotal)} eks. MVA + {money(vatTotal)} MVA = {money(netTotal+vatTotal)} inkl. MVA</strong>
-    </p>
-    {!valid&&<p role="alert" style={{color:"#a52a21"}}>MVA og grunnlag stemmer ikke med satsen eller beløpet er ugyldig.</p>}
-    {ocrGrossOre!==null&&<p style={{margin:"9px 0",fontSize:13}}>
-      Gjenkjent sum fra kvitteringen: <strong>{money(ocrGrossOre)}</strong>.
-    </p>}
-    {ocrGrossMismatch&&<label role="alert" style={{display:"block",background:"#fff1e9",padding:10,borderRadius:8,fontSize:13,color:"#863c24"}}>
-     <strong>Avvik!</strong> OCR leste {money(ocrGrossOre)}, men feltene summerer til {money(netTotal+vatTotal)}.
-     Kontroller originalkvitteringen og korriger beløpene.
-     <span style={{display:"block",marginTop:7}}>
-      <input type="checkbox" checked={ocrMismatchChecked} onChange={e=>setOcrMismatchChecked(e.target.checked)}/>
-      Jeg har kontrollert summen mot kvitteringen og vil bruke de manuelt angitte beløpene.
-     </span>
-    </label>}
-   </fieldset>
-   <label>Fradragsberettiget andel av MVA (%)
-    <input type="number" min="0" max="100" step="1" required value={form.deductionPercent}
-     onChange={e=>set("deductionPercent",e.target.value)}/>
-   </label>
-   <p style={{margin:0}}>Forslag til fradrag etter valgt andel: <strong>{money(deductible)}</strong>
-    {form.kind==="credit"&&" trekkes fra inngående MVA"}</p>
-   <label>Hvor er originalbilaget lagret? (referanse i regnskapssystemet)
-    <input required maxLength={260} placeholder="For eksempel Systemia bilag #123"
-     value={form.evidenceReference} onChange={e=>set("evidenceReference",e.target.value)}/>
-   </label>
-   <div style={{fontSize:13}}>
-    <strong>Hurtigvalg – hva gjelder kjøpet?</strong>
-    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:8}}>
-     {["Materialer til kundeoppdrag","Verktøy og utstyr","Driftskostnad","Transport i virksomheten"].map(purpose=>
-      <button key={purpose} type="button" onClick={()=>set("businessPurpose",purpose)}>{purpose}</button>)}
+     <label>Dokumentdato
+      <input type="date" required value={form.documentDate} onChange={e=>set("documentDate",e.target.value)}/>
+     </label>
+     <label>Bilagstype
+      <select value={form.kind} onChange={e=>set("kind",e.target.value)}>
+       <option value="purchase">Kjøpsfaktura / kvittering</option>
+       <option value="credit">Kreditnota fra leverandør</option>
+      </select>
+     </label>
+     {form.kind==="credit"&&<label className={styles.fullWidth}>Gjelder fakturanummer
+      <input required value={form.originalDocumentNumber} onChange={e=>set("originalDocumentNumber",e.target.value)}/>
+     </label>}
     </div>
-   </div>
-   <label>Bruksområde i virksomheten
-    <textarea required rows={2} maxLength={500} placeholder="Beskriv hva kjøpet gjelder"
-     value={form.businessPurpose} onChange={e=>set("businessPurpose",e.target.value)}/>
-   </label>
-   <label><input type="checkbox" checked={form.documentConfirmed}
-    onChange={e=>set("documentConfirmed",e.target.checked)}/>
-    Jeg har kontrollert leverandørbilaget og har originaldokumentasjonen tilgjengelig i regnskapet.</label>
-   <label><input type="checkbox" checked={form.deductionConfirmed}
-    onChange={e=>set("deductionConfirmed",e.target.checked)}/>
-    Jeg har vurdert fradragsretten og at fradragsandelen er korrekt for avgiftspliktig virksomhet.</label>
-   {form.kind==="purchase"&&netTotal+vatTotal>=1000000&&<label><input type="checkbox" checked={form.bankConditionConfirmed}
-    onChange={e=>set("bankConditionConfirmed",e.target.checked)}/>
-    Jeg har kontrollert bankbetalingskravet for kjøp på minst 10 000 kr inkl. MVA. Hvis fakturaen ikke er betalt ennå, skal betalingen senere skje via bank/godkjent betalingsformidler.</label>}
-   <button type="submit" disabled={busy||scanBusy||(ocrGrossMismatch&&!ocrMismatchChecked)||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||
-    (form.kind==="purchase"&&netTotal+vatTotal>=1000000&&!form.bankConditionConfirmed)}>
-    {busy?"Lagrer …":"Registrer kontrollert bilag"}
-   </button>
+    {documentPeriod&&<div className={styles.termHint}>
+     <strong>{documentPeriod.title} · {documentPeriod.months}</strong>
+     {period.year!==documentPeriod.year||period.term!==documentPeriod.term?" · Annen termin enn den som vises.":""}
+     {" · "}
+     <details><summary>Om termin og korrigering</summary>
+      <p>Bilaget plasseres i terminen for dokumentdatoen. Terminen åpnes ved registrering. Er MVA-meldingen allerede levert, må eventuell korrigering håndteres separat.</p>
+     </details>
+    </div>}
+   </section>
+   <section className={styles.section}>
+    <fieldset className={styles.noBorderFieldset}>
+     <legend>3. Beløp og MVA</legend>
+     <p className={styles.intro} style={{marginBottom:12}}>Fyll inn grunnlag og MVA fra bilaget. Vanlig sats er 25 %.</p>
+     {visibleRates.map(rate=><div key={rate} className={styles.rateRow}>
+      <div className={styles.rateHead}>
+       <strong>{rate} % MVA</strong>
+       <button type="button" className={styles.textAction} onClick={()=>{
+        const n=parse(form.groups[rate].base);
+        if(n===null)return;
+        setGroup(rate,"vat",moneyInput(Math.round(n*rate/100)));
+       }}>Beregn {rate} %</button>
+      </div>
+      <div className={styles.rateInputs}>
+       <label>Eks. MVA (kr)
+        <input inputMode="decimal" placeholder="0,00" value={form.groups[rate].base}
+         onChange={e=>setGroup(rate,"base",e.target.value)}/>
+       </label>
+       <label>MVA (kr)
+        <input inputMode="decimal" placeholder="0,00" value={form.groups[rate].vat}
+         onChange={e=>setGroup(rate,"vat",e.target.value)}/>
+       </label>
+      </div>
+     </div>)}
+     {!otherRateHasValue&&<button className={styles.textAction} type="button" aria-expanded={showMoreRates} onClick={()=>setShowMoreRates(x=>!x)}>
+      {showMoreRates?"Vis bare 25 %":"＋ Flere MVA-satser (0, 12 og 15 %)"}
+     </button>}
+     <div className={styles.amountSummary}>
+      <span>Sum inkl. MVA</span>
+      <strong>{money(netTotal+vatTotal)}</strong>
+     </div>
+     <div className={styles.secondarySummary}><span>Eks. MVA {money(netTotal)}</span><span>MVA {money(vatTotal)}</span></div>
+     {!valid&&<p role="alert" className={styles.notice}>MVA og grunnlag stemmer ikke med satsen eller beløpet er ugyldig.</p>}
+     {ocrGrossOre!==null&&<p className={styles.notice} style={{marginTop:10}}>Gjenkjent sum fra kvitteringen: <strong>{money(ocrGrossOre)}</strong>.</p>}
+     {ocrGrossMismatch&&<label role="alert" className={styles.checkLabel} style={{background:"#fff4e9",padding:11,borderRadius:9,marginTop:10}}>
+      <input type="checkbox" checked={ocrMismatchChecked} onChange={e=>setOcrMismatchChecked(e.target.checked)}/>
+      <span><strong>Summen avviker.</strong> OCR fant {money(ocrGrossOre)}, mens feltene viser {money(netTotal+vatTotal)}. Jeg har kontrollert originalen og vil bruke beløpene jeg har oppgitt.</span>
+     </label>}
+    </fieldset>
+   </section>
+   <section className={styles.section}>
+    <h3 className={styles.groupTitle}>4. Hva gjelder kjøpet?</h3>
+    <div className={styles.fieldGrid}>
+     <label className={styles.fullWidth}>Bruksområde i virksomheten
+      <select value={selectedPurpose} required onChange={e=>{
+       const value=e.target.value;
+       setCustomPurpose(value==="custom");
+       set("businessPurpose",value==="custom"?"":value);
+      }}>
+       <option value="">Velg hva kjøpet gjelder</option>
+       {purposeChoices.map(choice=><option key={choice} value={choice}>{choice}</option>)}
+       <option value="custom">Annet – beskriv selv</option>
+      </select>
+     </label>
+     {selectedPurpose==="custom"&&<label className={styles.fullWidth}>Beskrivelse av kjøpet
+      <textarea required rows={2} maxLength={500} placeholder="Beskriv hva kjøpet gjelder"
+       value={form.businessPurpose} onChange={e=>set("businessPurpose",e.target.value)}/>
+     </label>}
+     <label className={styles.fullWidth}>Hvor er originalbilaget lagret?
+      <input required maxLength={260} placeholder="Referanse i regnskapssystemet"
+       value={form.evidenceReference} onChange={e=>set("evidenceReference",e.target.value)}/>
+     </label>
+     <div className={styles.fullWidth}>
+      <div className={styles.deductionRow}>
+       <span>Fradragsberettiget MVA</span>
+       <label>Andel (%)
+        <input type="number" min="0" max="100" step="1" required value={form.deductionPercent}
+         onChange={e=>set("deductionPercent",e.target.value)}/>
+       </label>
+      </div>
+      <p className={styles.secondarySummary}>Forslag til fradrag: <strong>{money(deductible)}</strong>{form.kind==="credit"&&" trekkes fra inngående MVA"}</p>
+     </div>
+    </div>
+   </section>
+   <section>
+    <h3 className={styles.groupTitle}>5. Kontroller og lagre</h3>
+    <div className={styles.confirmations}>
+     <label className={styles.checkLabel}><input type="checkbox" checked={form.documentConfirmed}
+      onChange={e=>set("documentConfirmed",e.target.checked)}/>
+      <span>Jeg har kontrollert bilaget og har originaldokumentasjonen tilgjengelig i regnskapet.</span>
+     </label>
+     <label className={styles.checkLabel}><input type="checkbox" checked={form.deductionConfirmed}
+      onChange={e=>set("deductionConfirmed",e.target.checked)}/>
+      <span>Jeg har kontrollert fradragsretten og fradragsandelen.</span>
+     </label>
+     {form.kind==="purchase"&&netTotal+vatTotal>=1000000&&<label className={styles.checkLabel}>
+      <input type="checkbox" checked={form.bankConditionConfirmed} onChange={e=>set("bankConditionConfirmed",e.target.checked)}/>
+      <span>Jeg har kontrollert bankbetalingskravet for kjøp på minst 10 000 kr inkl. MVA. Hvis fakturaen ikke er betalt ennå, skal den senere betales via bank eller godkjent betalingsformidler.</span>
+     </label>}
+    </div>
+    <button className={styles.submit} type="submit" disabled={busy||scanBusy||(ocrGrossMismatch&&!ocrMismatchChecked)||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||
+     (form.kind==="purchase"&&netTotal+vatTotal>=1000000&&!form.bankConditionConfirmed)}>
+     {busy?"Lagrer …":"Registrer kontrollert bilag"}
+    </button>
+   </section>
   </form>
   {error&&<p role="alert" style={{color:"#a52a21"}}>{error}</p>}
   {success&&<p role="status">{success}</p>}
@@ -248,21 +288,19 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    <p>Registreringen er allerede lagret. Ikke registrer samme bilag på nytt. {attachmentIssue.message}</p>
    <button type="button" disabled={busy} onClick={retryAttachment}>{busy?"Laster opp …":"Prøv å laste opp originalen igjen"}</button>
   </section>}
-  <h3 style={{marginTop:22}}>Registrerte bilag i {period.title}</h3>
-  {purchases.length===0?<p>Ingen manuelt registrerte leverandørbilag i denne terminen.</p>:
-   <div style={{display:"grid",gap:8}}>{purchases.map(doc=><div key={doc.id}
-    style={{padding:12,border:"1px solid #ded3c0",borderRadius:8}}>
-    <strong>{doc.supplier}</strong> · {doc.documentNumber} · {doc.date}
-    <div style={{fontSize:13}}>{doc.kind==="credit"?"Leverandørkreditnota":"Kjøpsfaktura"}
-     {" · "}{money(doc.baseOre+doc.vatOre)} inkl. MVA · Inngående fradrag {money(doc.deductibleVatOre)}</div>
+  <h3 style={{margin:"28px 0 8px"}}>Registrerte bilag i {period.title}</h3>
+  {purchases.length===0?<p className={styles.receiptFooter}>Ingen registrerte leverandørbilag i denne terminen.</p>:
+   <div className={styles.receiptList}>{purchases.map(doc=><div key={doc.id} className={styles.receiptItem}>
+    <strong>{doc.supplier}</strong>
+    <small>{doc.documentNumber} · {doc.date} · {doc.kind==="credit"?"Kreditnota":"Kjøpsfaktura"}</small>
+    <small>{money(doc.baseOre+doc.vatOre)} inkl. MVA · Inngående fradrag {money(doc.deductibleVatOre)}</small>
     <small>Originalbilag: {doc.evidenceReference}</small>
     <VatOriginalAttachment documentId={doc.id}/>
-    <div><button type="button" disabled={busy} onClick={()=>voidDoc({
-     id:doc.id,documentNumber:doc.documentNumber})}>Opphev registrering</button></div>
+    <button type="button" className={styles.textAction} disabled={busy} onClick={()=>voidDoc({
+     id:doc.id,documentNumber:doc.documentNumber})}>Opphev registrering</button>
    </div>)}</div>}
-  <p style={{fontSize:12,marginTop:15}}>
-   <strong>Viktig:</strong> Ta bilde eller velg PDF før registrering. Originalen lagres uendret når formatet støttes og filen er under 4 MB. Større bilder/HEIC lagres som merket JPEG-kopi, og kilden må fortsatt oppbevares eksternt. OCR-forslag må kontrolleres, og bilaget må fortsatt oppbevares i regnskapssystemet.
-   Denne oversikten garanterer ikke fradragsrett og erstatter ikke bokføring eller MVA-melding.
-  </p>
+  <details className={styles.receiptFooter}><summary>Viktig om originalbilag og MVA</summary>
+   <p>Last opp bilde eller PDF og kontroller OCR-forslag før registrering. Originalen bevares uendret når format og filstørrelse tillater det. Større bilder/HEIC lagres som JPEG-kopi; originalen må beholdes eksternt. Oversikten erstatter ikke regnskapsføring eller MVA-melding.</p>
+  </details>
  </section>;
 }
