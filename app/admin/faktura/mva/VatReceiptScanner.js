@@ -110,7 +110,7 @@ async function prepareReceiptFile(source,onProgress){
  }finally{URL.revokeObjectURL(url);}
 }
 
-async function readLocalReceipt(file,onProgress,readerRef){
+async function readLocalReceipt(file,onProgress,readerRef,options={}){
  let format="bilde",images=[file];
  if(file.type==="application/pdf"){
   const pdf=await imageFromPdf(file,onProgress);
@@ -121,7 +121,7 @@ async function readLocalReceipt(file,onProgress,readerRef){
  // Keep the worker alive within this page: models need not be downloaded and
  // initialized for every receipt photo. Dispose when leaving the page.
  if(!readerRef.current)readerRef.current=createVatReceiptReader(tess);
- const prepared=(await Promise.all(images.map(image=>prepareVatOcrImage(image,onProgress)))).flat();
+ const prepared=(await Promise.all(images.map(image=>prepareVatOcrImage(image,onProgress,options)))).flat();
  const recognized=await readerRef.current.recognize(prepared,onProgress);
  const first={...recognized,parsed:parseNorwegianReceipt(recognized.text)};
  let best={...first,retried:false};
@@ -151,10 +151,10 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
  const scanId=useRef(0);
  const readerRef=useRef(null);
  useEffect(()=>()=>{if(readerRef.current)void readerRef.current.close().catch(()=>{});},[]);
- async function recognizeSelected(file,meta){
+ async function recognizeSelected(file,meta,options={}){
   onSelected(file,meta);
   const startTime=typeof performance!=="undefined"?performance.now():Date.now();
-  const recognized=await readLocalReceipt(file,setProgress,readerRef);
+  const recognized=await readLocalReceipt(file,setProgress,readerRef,options);
   const seconds=Math.round(((typeof performance!=="undefined"?performance.now():Date.now())-startTime)/100)/10;
   const parsed=recognized.parsed||parseNorwegianReceipt(recognized.text);
   if(recognized.confidence!==null&&recognized.confidence<55&&parsed.documentDate){
@@ -228,11 +228,11 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   setCropJob(null);setError("");setProgress("");setBusy(false);
   onBusyChange?.(false);
  }
- async function retryRead(){
+ async function retryRead(noAutoCrop=false){
   if(!imageForCrop||busy||disabled||cropJob)return;
   setBusy(true);onBusyChange?.(true);setError("");setProgress("");setDetails(null);
   try{
-   await recognizeSelected(imageForCrop.file,{converted:imageForCrop.previouslyConverted,originalName:imageForCrop.originalName});
+   await recognizeSelected(imageForCrop.file,{converted:imageForCrop.previouslyConverted,originalName:imageForCrop.originalName},{noAutoCrop});
   }catch(e){
    setProgress("");
    setError("Ny tekstlesing mislyktes: "+String(e.message||"ukjent feil")+".");
@@ -294,7 +294,9 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   </details>
   {imageForCrop&&!cropJob&&<div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
    <button type="button" className={styles.textAction} disabled={disabled||busy}
-    onClick={retryRead}>Les bildet på nytt</button>
+    onClick={()=>retryRead(false)}>Les bildet på nytt</button>
+   <button type="button" className={styles.textAction} disabled={disabled||busy}
+    onClick={()=>retryRead(true)}>Les hele bildet uten automatisk beskjæring</button>
    <button type="button" className={styles.textAction} disabled={disabled||busy}
     onClick={()=>{setCropJob(imageForCrop);setError("");setProgress("");}}>
     Juster utsnitt og les på nytt
