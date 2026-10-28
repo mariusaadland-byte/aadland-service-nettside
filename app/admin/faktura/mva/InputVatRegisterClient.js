@@ -76,7 +76,6 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  };
  const receiveScan=result=>{
   grossCalculated.current=false;
-  manualVatRates.current.clear();
   setOcrGrossOre(Number.isSafeInteger(result.totalOre)?result.totalOre:null);
   if(!grossManuallyEdited.current)
    setGrossInput(Number.isSafeInteger(result.totalOre)?moneyInput(result.totalOre):"");
