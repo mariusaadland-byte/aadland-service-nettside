@@ -45,8 +45,16 @@ const css=read("app/admin/faktura/mva/VatSimpleForm.module.css");
 assert.ok(scanner.includes("completeVatReceiptAmounts(recognized.parsed||parseNorwegianReceipt(recognized.text),recognized.text)"));
 assert.ok(form.includes("const [grossInput,setGrossInput]=useState"));
 assert.ok(form.includes("if(!grossManuallyEdited.current)"));
-assert.ok(form.includes("const pair=grossCalculated.current?vatSplitFromGross(parseVatGrossInput(raw),vatRateChoice):null"),
+assert.ok(form.includes("const autoFill=Boolean(vatRateChoice)&&(grossCalculated.current||!anyAmounts)"),
+ "If rate is chosen first, gross amount must automatically fill the net and VAT");
+assert.ok(form.includes("const pair=autoFill?vatSplitFromGross(parseVatGrossInput(raw),vatRateChoice):null"),
  "Once enabled, recompute values as user changes the gross sum");
+assert.ok(form.includes('if(key==="vat")manualVatRates.current.add(rate)'),
+ "Manual tax corrections must be protected");
+assert.ok(form.includes('manualVatRates.current.has(rate)'),
+ "Typing a net amount must not overwrite an explicitly corrected tax amount");
+assert.ok(form.includes('moneyInput(Math.round(baseOre*rate/100))'),
+ "Entering net amount must immediately compute tax at the selected rate");
 assert.ok(form.includes('setVatRateChoice(rate);rateManuallyChosen.current=true'));
 assert.ok(form.includes('if(rate)calculateFromGross(rate,true)'),
  "Choosing rate calculates immediately when amounts are empty");
