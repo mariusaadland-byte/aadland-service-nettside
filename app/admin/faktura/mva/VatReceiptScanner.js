@@ -152,7 +152,9 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
  const readerRef=useRef(null);
  useEffect(()=>()=>{if(readerRef.current)void readerRef.current.close().catch(()=>{});},[]);
  async function recognizeSelected(file,meta,options={}){
-  onSelected(file,meta);
+  // When rescanning a crop or retrying OCR, the already selected original
+  // receipt stays attached. Only the initial camera/file choice changes it.
+  if(!options.preserveAttachment)onSelected(file,meta);
   const startTime=typeof performance!=="undefined"?performance.now():Date.now();
   const recognized=await readLocalReceipt(file,setProgress,readerRef,options);
   const seconds=Math.round(((typeof performance!=="undefined"?performance.now():Date.now())-startTime)/100)/10;
@@ -212,10 +214,10 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   const thisScan=++scanId.current;
   setBusy(true);onBusyChange?.(true);setError("");setProgress("");
   try{
-   setProcessedNotice(copied
-    ?"Beskjæringen er lagret som en JPEG-kopi. Behold hele originalbildet i regnskapssystemet."
-    :"Hele originalbildet er beholdt uendret som bilag.");
-   await recognizeSelected(croppedFile,{converted:copied,originalName:original.originalName});
+   setProcessedNotice(original.previouslyConverted
+    ?"Det beskårne bildet brukes bare til tekstlesing. Vedlegget er en JPEG-kopi; behold originalfotoet selv."
+    :"Det beskårne bildet brukes bare til tekstlesing. Originalfotoet beholdes som bilagsvedlegg.");
+   await recognizeSelected(croppedFile,{converted:copied,originalName:original.originalName},{preserveAttachment:true});
    if(thisScan!==scanId.current)return;
    setImageForCrop(null);
   }catch(e){
@@ -232,7 +234,8 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   if(!imageForCrop||busy||disabled||cropJob)return;
   setBusy(true);onBusyChange?.(true);setError("");setProgress("");setDetails(null);
   try{
-   await recognizeSelected(imageForCrop.file,{converted:imageForCrop.previouslyConverted,originalName:imageForCrop.originalName},{noAutoCrop});
+   await recognizeSelected(imageForCrop.file,{converted:imageForCrop.previouslyConverted,originalName:imageForCrop.originalName},
+    {noAutoCrop,preserveAttachment:true});
   }catch(e){
    setProgress("");
    setError("Ny tekstlesing mislyktes: "+String(e.message||"ukjent feil")+".");
