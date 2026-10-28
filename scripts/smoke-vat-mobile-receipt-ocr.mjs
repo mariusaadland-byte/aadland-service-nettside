@@ -52,7 +52,7 @@ assert.ok(ui.includes("retryAttachment"));
 assert.ok(ui.includes("setScanBusy"));
 assert.ok(ocr.includes('capture="environment"'));
 assert.ok(ocr.includes('application/pdf'));
-assert.ok(ocr.includes("recognizeVatReceiptImages"));
+assert.ok(ocr.includes("createVatReceiptReader"));
 assert.ok(ocr.includes("parseNorwegianReceipt"));
 assert.ok(ocr.includes("onBusyChange?.(false)"));
 assert.ok(ocr.includes('image/heic')&&ocr.includes('image/heif'));
