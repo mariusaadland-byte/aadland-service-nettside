@@ -138,7 +138,7 @@ async function readLocalReceipt(file,onProgress,readerRef,options={}){
  return {text:best.text,confidence:best.confidence,format,parsed:best.parsed,retried:best.retried};
 }
 
-export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,documentType="receipt",disabled=false}){
+export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,documentType="receipt",disabled=false,resetToken=0}){
  const [progress,setProgress]=useState("");
  const [error,setError]=useState("");
  const [details,setDetails]=useState(null);
@@ -150,7 +150,15 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
  const [liveCamera,setLiveCamera]=useState(false);
  const scanId=useRef(0);
  const readerRef=useRef(null);
+ const lastResetToken=useRef(resetToken);
  useEffect(()=>()=>{if(readerRef.current)void readerRef.current.close().catch(()=>{});},[]);
+ useEffect(()=>{
+  if(lastResetToken.current===resetToken)return;
+  lastResetToken.current=resetToken;
+  scanId.current++;
+  setProgress("");setError("");setDetails(null);setProcessedNotice("");
+  setCropJob(null);setImageForCrop(null);setDiagnostic(null);setLiveCamera(false);
+ },[resetToken]);
  async function recognizeSelected(file,meta,options={}){
   // When rescanning a crop or retrying OCR, the already selected original
   // receipt stays attached. Only the initial camera/file choice changes it.
