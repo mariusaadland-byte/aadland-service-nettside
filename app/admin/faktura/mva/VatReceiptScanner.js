@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import {parseNorwegianReceipt} from "../../../../lib/vatReceiptParser";
+import {completeVatReceiptAmounts} from "../../../../lib/vatReceiptGrossCalculator";
 import {createVatReceiptReader} from "../../../../lib/vatReceiptRecognition";
 import {prepareVatOcrImage} from "../../../../lib/vatOcrImage";
 import {needsVatReceiptRetry,chooseVatReceiptScan} from "../../../../lib/vatReceiptQuality";
@@ -166,7 +167,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   const startTime=typeof performance!=="undefined"?performance.now():Date.now();
   const recognized=await readLocalReceipt(file,setProgress,readerRef,options);
   const seconds=Math.round(((typeof performance!=="undefined"?performance.now():Date.now())-startTime)/100)/10;
-  const parsed=recognized.parsed||parseNorwegianReceipt(recognized.text);
+  const parsed=completeVatReceiptAmounts(recognized.parsed||parseNorwegianReceipt(recognized.text),recognized.text);
   if(recognized.confidence!==null&&recognized.confidence<55&&parsed.documentDate){
    parsed.documentDate="";
    parsed.warnings.unshift("Datoen ble lest med lav sikkerhet og fylles ikke ut. Kontroller datoen på kvitteringen.");
