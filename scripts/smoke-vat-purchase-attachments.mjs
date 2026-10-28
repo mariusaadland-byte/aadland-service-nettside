@@ -32,7 +32,7 @@ assert.equal(utils.inspectVatAttachment(webp,"image/webp","photo.webp").ext,"web
 
 const documentId="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaa0551";
 let role="owner",preview=false,guarded=false,voided=false,record=null;
-let uploadError=false,writeError=false,downloadTampered=false;
+let uploadError=false,writeError=false,downloadTampered=false,raceRecord=null;
 let uploadCount=0,deleteCount=0,insertCount=0;
 const objects=new Map();
 const db=()=>({
@@ -46,6 +46,12 @@ const db=()=>({
    },
    async single(){
     if(writeError)return {data:null,error:{message:"metadata failure"}};
+    if(raceRecord){
+     // Simulate another upload winning the unique constraint after our
+     // initial no-record check, but before our insert.
+     record=raceRecord;raceRecord=null;
+     return {data:null,error:{code:"23505",message:"already exists"}};
+    }
     record={id:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbb0551",...q.data,uploaded_at:"2026-10-25T10:00:00Z"};
     return {data:record,error:null};
    }
@@ -147,4 +153,18 @@ assert.match(sql,/unique references public\.vat_purchase_documents/);
 assert.ok(ui.includes("<VatOriginalAttachment"));
 assert.ok(attachmentUI.includes("Lagre originalbilag"));
 assert.ok(attachmentUI.includes("Last ned originalbilaget sikkert"));
+const prior=record;
+const priorDelete=deleteCount,priorUploads=uploadCount;
+record=null;raceRecord=prior;
+result=await post();
+assert.equal(result.status,200,"Concurrent identical upload must return the verified stored attachment");
+assert.equal(result.body.alreadyUploaded,true);
+assert.equal(uploadCount,priorUploads+1,"Concurrent uploads may transiently store a second object");
+assert.equal(deleteCount,priorDelete+1,"Discard only the losing uploaded object");
+assert.equal(objects.size,1,"Concurrent retry must never leave a second stored original");
+record=null;raceRecord={...prior,sha256:"f".repeat(64)};
+result=await post();
+assert.equal(result.status,409,"A different already-stored original must not be treated as same file");
+assert.equal(objects.size,1,"Conflicting concurrent upload must be cleaned up");
+record=prior;
 console.log("Originalbilag bestått: privat PDF/bilde, filsignatur, 4 MB-grense, SHA-256, eiertilgang, dublettsperre og sikker nedlasting.");
