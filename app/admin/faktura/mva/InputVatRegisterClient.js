@@ -5,6 +5,7 @@ import VatReceiptScanner from "./VatReceiptScanner";
 import styles from "./VatSimpleForm.module.css";
 import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
 import {emptyVatOcrSuggestion,snapshotVatOcrSuggestion,mergeVatReceiptSuggestions,startNewVatReceiptDraft} from "../../../../lib/vatReceiptAutofill";
+import {vatReceiptAttachmentIssue,removeVatReceiptAttachmentReference} from "../../../../lib/vatReceiptAttachmentReadiness";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const blank=()=>({0:{base:"",vat:""},12:{base:"",vat:""},15:{base:"",vat:""},25:{base:"",vat:""}});
 const parse=value=>{
@@ -98,6 +99,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const percent=Number(form.deductionPercent);
  const deductible=Math.round(vatTotal*percent/100);
  const ocrGrossMismatch=ocrGrossOre!==null&&netTotal>0&&Math.abs(ocrGrossOre-(netTotal+vatTotal))>5;
+ const receiptUploadIssue=vatReceiptAttachmentIssue(receiptFile,form.evidenceReference);
  const submit=async e=>{
   e.preventDefault();setError("");setSuccess("");
   if(attachmentIssue){
@@ -105,6 +107,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    return;
   }
   if(scanBusy){setError("Kvitteringen leses fortsatt. Vent til lesingen er ferdig.");return;}
+  if(receiptUploadIssue){setError(receiptUploadIssue);return;}
   if(!valid||netTotal<=0){setError("Kontroller grunnlag og MVA på hver sats (avrundingsavvik maks 0,05 kr).");return;}
   if(ocrGrossMismatch&&!ocrMismatchChecked){setError("OCR-summen stemmer ikke med beløpene. Kontroller kvitteringen og bekreft avviket før registrering.");return;}
   const question="Registrere et kontrollert leverandørbilag i intern MVA-avstemming?\n\n"+
@@ -177,8 +180,13 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    <strong>{receiptIsCopy?"JPEG-kopi valgt":"Valgt fil"}:</strong> {receiptFile.name}
    {receiptIsCopy&&". Behold originalen i regnskapssystemet."}
    <button className={styles.textAction} type="button" disabled={busy||scanBusy}
-    onClick={()=>{setReceiptFile(null);setReceiptIsCopy(false);}}>Fjern vedlegg</button>
+    onClick={()=>{
+     setReceiptFile(null);setReceiptIsCopy(false);setOcrGrossOre(null);setOcrMismatchChecked(false);
+     setForm(x=>removeVatReceiptAttachmentReference(x));
+     setReceiptSession(n=>n+1);
+    }}>Fjern vedlegg</button>
   </div>}
+  {receiptUploadIssue&&<p role="alert" className={styles.notice}>{receiptUploadIssue}</p>}
   <form onSubmit={submit} className={styles.form}>
    <section className={styles.section}>
     <h3 className={styles.groupTitle}>2. Opplysninger</h3>
@@ -301,7 +309,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
       <span>Jeg har kontrollert bankbetalingskravet for kjøp på minst 10 000 kr inkl. MVA. Hvis fakturaen ikke er betalt ennå, skal den senere betales via bank eller godkjent betalingsformidler.</span>
      </label>}
     </div>
-    <button className={styles.submit} type="submit" disabled={busy||scanBusy||Boolean(attachmentIssue)||(ocrGrossMismatch&&!ocrMismatchChecked)||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||
+    <button className={styles.submit} type="submit" disabled={busy||scanBusy||Boolean(attachmentIssue)||Boolean(receiptUploadIssue)||(ocrGrossMismatch&&!ocrMismatchChecked)||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||
      (form.kind==="purchase"&&netTotal+vatTotal>=1000000&&!form.bankConditionConfirmed)}>
      {busy?"Lagrer …":"Registrer kontrollert bilag"}
     </button>
