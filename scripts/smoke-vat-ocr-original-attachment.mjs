@@ -27,6 +27,10 @@ assert.ok(form.includes("attachToDocument(documentId,receiptFile)"),
 assert.ok(form.includes("attachmentSaved=!receiptFile"),"Do not claim attached until upload completes");
 assert.ok(form.includes("disabled={busy||Boolean(attachmentIssue)}"),
  "Block new receipt scans while a previous original could not be uploaded");
+assert.ok(form.includes('if(attachmentIssue){'),
+ "Refuse another register request while a previously saved original is missing");
+assert.ok(form.includes('disabled={busy||scanBusy||Boolean(attachmentIssue)'),
+ "Disable the final register button while attachment retry is unresolved");
 assert.ok(form.includes("documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));"),
  "Require fresh confirmation after a new OCR result");
 console.log("Originalkvittering bestått: beskjæring og ny OCR endrer ikke valgt bilagsvedlegg, kontroll kreves på nytt.");
