@@ -1,5 +1,5 @@
 "use client";
-import {useRef,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import VatOriginalAttachment from "./VatOriginalAttachment";
 import VatReceiptScanner from "./VatReceiptScanner";
 import styles from "./VatSimpleForm.module.css";
@@ -25,6 +25,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  });
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[success,setSuccess]=useState("");
  const [receiptFile,setReceiptFile]=useState(null);
+ const [receiptPreviewUrl,setReceiptPreviewUrl]=useState("");
  const [receiptIsCopy,setReceiptIsCopy]=useState(false);
  const [ocrGrossOre,setOcrGrossOre]=useState(null);
  const [ocrMismatchChecked,setOcrMismatchChecked]=useState(false);
@@ -33,6 +34,14 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const [showMoreRates,setShowMoreRates]=useState(false);
  const [customPurpose,setCustomPurpose]=useState(false);
  const [attachmentIssue,setAttachmentIssue]=useState(null);
+ useEffect(()=>{
+  if(!receiptFile?.type?.startsWith("image/")){
+   setReceiptPreviewUrl("");return;
+  }
+  const url=URL.createObjectURL(receiptFile);
+  setReceiptPreviewUrl(url);
+  return()=>URL.revokeObjectURL(url);
+ },[receiptFile]);
  const previousOcr=useRef(emptyVatOcrSuggestion());
  const submittingRef=useRef(false);
  const documentPeriod=vatDocumentPeriod(form.documentDate);
@@ -184,6 +193,11 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   </div>
   <VatReceiptScanner onSelected={chooseReceipt} onExtracted={receiveScan}
    onBusyChange={setScanBusy} resetToken={receiptSession} disabled={busy||Boolean(attachmentIssue)}/>
+  {receiptFile&&receiptPreviewUrl&&<details className={styles.receiptImagePreview}>
+   <summary>Vis kvitteringsbildet og kontroller dato/beløp</summary>
+   <img src={receiptPreviewUrl} alt="Kvitteringen du har valgt som originalbilag"/>
+   <p>Bildet vises bare her mens du kontrollerer opplysningene.</p>
+  </details>}
   {receiptFile&&<div className={styles.scanMessage}>
    <strong>{receiptIsCopy?"JPEG-kopi valgt":"Valgt fil"}:</strong> {receiptFile.name}
    {receiptIsCopy&&". Behold originalen i regnskapssystemet."}
