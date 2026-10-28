@@ -62,7 +62,7 @@ assert.equal(legit.supplierName,"MEGAFLIS BERGEN AS");
 const grocery=parser("REMA 1000 STORSLETT\nKvitt.nr. 1111\nDato 28.10.2026");
 assert.equal(grocery.supplierName,"REMA 1000 STORSLETT");
 const text=read("app/admin/faktura/mva/VatReceiptScanner.js");
-assert.ok(text.includes("prepareVatOcrImage(image,onProgress)"));
+assert.ok(text.includes("prepareVatOcrImage(image,onProgress,options)"));
 assert.ok(text.includes("createVatReceiptReader(tess)"));
 assert.ok(text.includes("readerRef.current.close()"));
 assert.ok(text.includes("recognized.confidence<45"));
