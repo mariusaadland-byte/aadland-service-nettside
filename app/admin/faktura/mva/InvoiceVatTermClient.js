@@ -8,6 +8,7 @@ import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
 import VatReportingControlClient from "./VatReportingControlClient";
 import VatSubmissionReviewClient from "./VatSubmissionReviewClient";
 import {vatSettlementPreview} from "../../../../lib/vatSettlementPreview";
+import VatQuickBalance from "./VatQuickBalance";
 import VatRetroCandidatesClient from "./VatRetroCandidatesClient";
 import styles from "./VatTermPage.module.css";
 
@@ -93,6 +94,8 @@ export default function InvoiceVatTermClient(){
   {loading&&<p role="status">Kontrollerer alle fakturaer og kreditnotaer i terminen …</p>}
   {error&&<p role="alert" style={{color:"#a52a21"}}>{error} Rapporttall vises ikke hvis grunnlaget er ufullstendig.</p>}
   {report&&!loading&&<>
+   {view!=="overview"&&<VatQuickBalance report={report} settlement={settlement}
+    onDetails={()=>showView("overview")} onRefresh={()=>setReload(n=>n+1)}/>}
    {view==="overview"&&<>
    <VatReportingControlClient year={chosen.year} term={chosen.term}
     onChanged={()=>setReload(n=>n+1)} onSelectTerm={selectTerm}/>
