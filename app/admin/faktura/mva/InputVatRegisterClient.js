@@ -34,6 +34,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const [vatRateChoice,setVatRateChoice]=useState("");
  const grossManuallyEdited=useRef(false);
  const rateManuallyChosen=useRef(false);
+ const grossCalculated=useRef(false);
  const [ocrMismatchChecked,setOcrMismatchChecked]=useState(false);
  const [scanBusy,setScanBusy]=useState(false);
  const [receiptSession,setReceiptSession]=useState(0);
@@ -56,7 +57,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   setOcrGrossOre(null);setOcrMismatchChecked(false);
   if(!file){
    setGrossInput("");setVatRateChoice("");
-   grossManuallyEdited.current=false;rateManuallyChosen.current=false;
+   grossManuallyEdited.current=false;rateManuallyChosen.current=false;grossCalculated.current=false;
    // A valid new receipt starts a new accounting draft. Never carry a
    // manually corrected amount, supplier, VAT rate or purpose to this one.
    // This is NOT called on a crop or OCR retry of the same receipt.
@@ -72,6 +73,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
  };
  const receiveScan=result=>{
+  grossCalculated.current=false;
   setOcrGrossOre(Number.isSafeInteger(result.totalOre)?result.totalOre:null);
   if(!grossManuallyEdited.current)
    setGrossInput(Number.isSafeInteger(result.totalOre)?moneyInput(result.totalOre):"");
@@ -112,6 +114,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   setForm(x=>updateVatReceiptReviewedField(x,name,value));
  };
  const setGroup=(rate,key,value)=>{
+  grossCalculated.current=false;
   setOcrMismatchChecked(false);
   setForm(x=>updateVatReceiptReviewedAmount(x,rate,key,value));
  };
@@ -120,10 +123,11 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   const pair=vatSplitFromGross(total,rate);
   if(!pair){if(!onlyIfEmpty)setError("Oppgi en gyldig sum inkl. MVA og velg satsen fra kvitteringen.");return;}
   const hasAmounts=Object.values(form.groups).some(g=>g.base||g.vat);
-  if(onlyIfEmpty&&hasAmounts)return;
-  if(hasAmounts&&!onlyIfEmpty&&!window.confirm("Dette erstatter MVA-beløp du allerede har fylt inn. Er du sikker?"))return;
+  if(onlyIfEmpty&&hasAmounts&&!grossCalculated.current)return;
+  if(hasAmounts&&!onlyIfEmpty&&!grossCalculated.current&&!window.confirm("Dette erstatter MVA-beløp du allerede har fylt inn. Er du sikker?"))return;
   setForm(x=>({...x,groups:{...blank(),[rate]:pair},
    documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
+  grossCalculated.current=true;
   setOcrMismatchChecked(false);setError("");
  };
  let netTotal=0,vatTotal=0,valid=true;
@@ -193,7 +197,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
     :"Bilaget er registrert, men originalfilen er IKKE lagret. Bruk knappen nedenfor for å prøve igjen.");
    setReceiptFile(null);setReceiptIsCopy(false);setOcrGrossOre(null);setOcrMismatchChecked(false);
    setGrossInput("");setVatRateChoice("");
-   grossManuallyEdited.current=false;rateManuallyChosen.current=false;
+   grossManuallyEdited.current=false;rateManuallyChosen.current=false;grossCalculated.current=false;
    previousOcr.current=emptyVatOcrSuggestion();
    setForm(x=>({...x,supplierName:"",documentNumber:"",documentDate:"",originalDocumentNumber:"",
     evidenceReference:"",businessPurpose:"",kind:"purchase",deductionPercent:"100",groups:blank(),
@@ -288,9 +292,12 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
       <label>Sum inkl. MVA (kr)
        <input inputMode="decimal" placeholder="For eksempel 1 051,65" value={grossInput}
         onChange={e=>{
-         setGrossInput(e.target.value);grossManuallyEdited.current=true;
+         const raw=e.target.value;
+         setGrossInput(raw);grossManuallyEdited.current=true;
          setOcrMismatchChecked(false);
-         setForm(x=>({...x,documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
+         const pair=grossCalculated.current?vatSplitFromGross(parseVatGrossInput(raw),vatRateChoice):null;
+         setForm(x=>({...x,...(pair?{groups:{...blank(),[Number(vatRateChoice)]:pair}}:{}),
+          documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
         }}/>
       </label>
       <label>MVA-sats på kvitteringen
