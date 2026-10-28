@@ -8,7 +8,7 @@ const scan=(values={},confidence=85)=>({text:"tekst",confidence,
  parsed:{supplierName:"",documentNumber:"",documentDate:"",totalOre:null,groups:{},warnings:[],...values}});
 const first=scan({supplierName:"MEGAFLIS",documentDate:"2026-10-28",totalOre:12500},85);
 assert.equal(needsVatReceiptRetry(first),true,"Try another layout when VAT cannot be read");
-const second=scan({supplierName:"MEGAFLIS",documentDate:"2026-10-28",totalOre:12500,
+const second=scan({supplierName:"MEGAFLIS",documentNumber:"12345",documentDate:"2026-10-28",totalOre:12500,
  groups:{25:{base:"100,00",vat:"25,00"}}},75);
 assert.equal(chooseVatReceiptScan(first,second).parsed.groups[25].vat,"25,00");
 assert.equal(chooseVatReceiptScan(first,second).retried,true);
@@ -20,6 +20,38 @@ const worse=scan({supplierName:"Utydelig"},50);
 assert.equal(chooseVatReceiptScan(second,worse).parsed.documentDate,"2026-10-28");
 assert.equal(needsVatReceiptRetry(second),false,"Do not spend extra OCR time on complete receipts");
 assert.equal(needsVatReceiptRetry(scan({supplierName:"Butikk"},50)),true);
+
+const julaBase=scan({supplierName:"JULA",documentNumber:"37889",
+ documentDate:"2026-10-19",totalOre:105165},82);
+const julaVat=scan({groups:{25:{base:"841,32",vat:"210,33"}},
+ documentDate:"2026-10-19"},77);
+const combined=chooseVatReceiptScan(julaBase,julaVat);
+assert.equal(combined.parsed.supplierName,"JULA");
+assert.equal(combined.parsed.documentNumber,"37889");
+assert.equal(combined.parsed.documentDate,"2026-10-19");
+assert.equal(combined.parsed.totalOre,105165);
+assert.deepEqual(combined.parsed.groups[25],{base:"841,32",vat:"210,33"});
+assert.ok(combined.text.includes("Alternativ OCR-lesing"),"Show both text sources when fields are combined");
+assert.equal(combined.parsed.warnings.length,0,"No stale 'missing' messages after complementary reads");
+
+const grossConflict=chooseVatReceiptScan(julaBase,scan({
+ totalOre:105155,groups:{25:{base:"841,32",vat:"210,33"}}
+},94));
+assert.equal(grossConflict.parsed.totalOre,null,"Conflicting totals must not be guessed");
+assert.equal(Object.keys(grossConflict.parsed.groups).length,0,"Conflicting gross cannot autofill tax");
+assert.match(grossConflict.parsed.warnings.join(" "),/ulike totalbeløp/);
+const taxConflict=chooseVatReceiptScan(scan({...julaBase.parsed,groups:{25:{base:"841,32",vat:"210,33"}}}),
+ scan({...julaBase.parsed,groups:{25:{base:"841,32",vat:"210,34"}}},93));
+assert.deepEqual(taxConflict.parsed.groups,{},"Conflicting VAT amounts must not be filled");
+assert.match(taxConflict.parsed.warnings.join(" "),/MVA-tallene/);
+const idConflict=chooseVatReceiptScan(julaBase,scan({...julaBase.parsed,documentNumber:"37880"}));
+assert.equal(idConflict.parsed.documentNumber,"","Conflicting receipt numbers require user review");
+const incompleteDate=chooseVatReceiptScan(scan({...julaBase.parsed,documentDate:"",
+ warnings:["Fant flere mulige dokumentdatoer. Velg riktig dato."]}),julaVat);
+assert.equal(incompleteDate.parsed.documentDate,"","Ambiguous first-pass date cannot be silently replaced");
+assert.equal(needsVatReceiptRetry(scan({supplierName:"JULA",documentNumber:"37889",
+ totalOre:105165,groups:{25:{base:"841,32",vat:"210,33"}}})),true,"Retry to find missing date");
+
 assert.ok(vatReceiptScanQuality(second).score>vatReceiptScanQuality(first).score);
 
 const createVatReceiptReader=new Function(read("lib/vatReceiptRecognition.js")
