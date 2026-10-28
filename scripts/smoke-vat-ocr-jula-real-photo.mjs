@@ -36,6 +36,23 @@ assert.equal(partial.documentNumber,"12345");
 assert.equal(partial.totalOre,null);
 assert.deepEqual(partial.groups[25],{base:"841,32",vat:"210,33"});
 assert.match(partial.warnings.join(" "),/totalbeløpet/i);
+// Representative text from the automatically deskewed photo. The OCR
+// incorrectly read one number in the VAT gross column as 1 051,55, while
+// the standalone total and the net+VAT arithmetic both say 1 051,65.
+const realOcr=[
+ "Salgskvittering","Julano Lagunen","1 ST 020571 270,05",
+ "TOTAL: NOK 1051.65","Avrunding 0,35","Kontant 1200.90",
+ "Mva % Eks Mva Mva Salg",'25,00 "841,32 > 210,33 1051,55',
+ "SUM 841,32 210,33 1051,55",
+ "Dato : mandag 19. oktober 2026 18:43:05",
+ "Kasse: 63599 Bong: 12345. (67890)"
+].join("\n");
+const r=parse(realOcr);
+assert.equal(r.documentDate,"2026-10-19");
+assert.equal(r.totalOre,105165);
+assert.deepEqual(r.groups[25],{base:"841,32",vat:"210,33"});
+assert.equal(r.documentNumber,"12345");
+assert.deepEqual(r.warnings,[]);
 assert.equal(parse("TEST\nDato mandag 31. februar 2026").documentDate,"");
 assert.equal(parse("TEST\nMva % Eks Mva Mva\n25,00 841,32 220,33\nSUM 841,32 220,33").groups[25],undefined,
  "Incorrect 25 percent math must be rejected");
