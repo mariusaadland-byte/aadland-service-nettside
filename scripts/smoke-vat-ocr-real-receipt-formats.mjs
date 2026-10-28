@@ -63,10 +63,10 @@ assert.ok(scanner.includes("onExtracted(parsed)"));
 
 const form=read("app/admin/faktura/mva/InputVatRegisterClient.js");
 assert.ok(form.includes("previousOcr.current"),"New scans clear old OCR guesses, while retaining manually corrected values");
-assert.ok(form.includes("supplierName:result.supplierName||x.supplierName"));
-assert.ok(form.includes("documentNumber:result.documentNumber||x.documentNumber"));
-assert.ok(form.includes("documentDate:result.documentDate||x.documentDate"));
-assert.ok(form.includes("groups:{...x.groups,...result.groups}"));
+assert.ok(form.includes("mergeVatReceiptSuggestions(x,previous,result)"));
+assert.ok(form.includes("snapshotVatOcrSuggestion(result)"));
+assert.ok(form.includes("clearVatReceiptSuggestions(x,previous)"));
+assert.ok(form.includes("previousOcr.current"));
 assert.ok(form.includes("documentConfirmed:false"));
 assert.ok(form.includes("deductionConfirmed:false"));
 console.log("Kvitteringstolkning og mobilfeilsøking bestått: 25/15 %, linjedelte MVA-tabeller, Posten/REMA-format, ingen oppdiktet fradrag, tap av manuell tekst eller ekstern diagnostikkopplasting.");
