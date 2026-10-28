@@ -119,7 +119,7 @@ async function readLocalReceipt(file,onProgress,readerRef){
  // Keep the worker alive within this page: models need not be downloaded and
  // initialized for every receipt photo. Dispose when leaving the page.
  if(!readerRef.current)readerRef.current=createVatReceiptReader(tess);
- const prepared=await Promise.all(images.map(image=>prepareVatOcrImage(image,onProgress)));
+ const prepared=(await Promise.all(images.map(image=>prepareVatOcrImage(image,onProgress)))).flat();
  const recognized=await readerRef.current.recognize(prepared,onProgress);
  return {text:recognized.text,confidence:recognized.confidence,format};
 }
@@ -142,6 +142,10 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   const recognized=await readLocalReceipt(file,setProgress,readerRef);
   const seconds=Math.round(((typeof performance!=="undefined"?performance.now():Date.now())-startTime)/100)/10;
   const parsed=parseNorwegianReceipt(recognized.text);
+  if(recognized.confidence!==null&&recognized.confidence<55&&parsed.documentDate){
+   parsed.documentDate="";
+   parsed.warnings.unshift("Datoen ble lest med lav sikkerhet og fylles ikke ut. Kontroller datoen på kvitteringen.");
+  }
   if(recognized.confidence!==null&&recognized.confidence<45&&parsed.supplierName){
    parsed.supplierName="";
    parsed.warnings.unshift("OCR-teksten er for usikker til å foreslå leverandør. Kontroller kvitteringsbildet.");
