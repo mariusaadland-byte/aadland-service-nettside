@@ -54,7 +54,10 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   // changes the recognized receipt. Never carry an old OCR date forward.
   const previous=previousOcr.current;
   previousOcr.current=snapshotVatOcrSuggestion(result);
-  setForm(x=>mergeVatReceiptSuggestions(x,previous,result));
+  // A new OCR result can change amounts or the date. Require the user to
+  // re-confirm the receipt after reviewing the updated suggestions.
+  setForm(x=>({...mergeVatReceiptSuggestions(x,previous,result),
+   documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
  };
  const attachToDocument=async(id,file)=>{
   const payload=new FormData();payload.append("documentId",id);payload.append("file",file);
@@ -158,7 +161,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    <p className={styles.intro}>Ta et bilde eller velg en kvittering. Kontroller opplysningene før du registrerer.</p>
   </div>
   <VatReceiptScanner onSelected={chooseReceipt} onExtracted={receiveScan}
-   onBusyChange={setScanBusy} disabled={busy}/>
+   onBusyChange={setScanBusy} disabled={busy||Boolean(attachmentIssue)}/>
   {receiptFile&&<div className={styles.scanMessage}>
    <strong>{receiptIsCopy?"JPEG-kopi valgt":"Valgt fil"}:</strong> {receiptFile.name}
    {receiptIsCopy&&". Behold originalen i regnskapssystemet."}
