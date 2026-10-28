@@ -5,6 +5,7 @@ import {createVatReceiptReader} from "../../../../lib/vatReceiptRecognition";
 import {prepareVatOcrImage} from "../../../../lib/vatOcrImage";
 import {needsVatReceiptRetry,chooseVatReceiptScan} from "../../../../lib/vatReceiptQuality";
 import VatReceiptCropper from "./VatReceiptCropper";
+import VatReceiptLiveCamera from "./VatReceiptLiveCamera";
 import styles from "./VatSimpleForm.module.css";
 
 const MAX_SIZE=4*1024*1024;
@@ -146,6 +147,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
  const [cropJob,setCropJob]=useState(null);
  const [imageForCrop,setImageForCrop]=useState(null);
  const [diagnostic,setDiagnostic]=useState(null);
+ const [liveCamera,setLiveCamera]=useState(false);
  const scanId=useRef(0);
  const readerRef=useRef(null);
  useEffect(()=>()=>{if(readerRef.current)void readerRef.current.close().catch(()=>{});},[]);
@@ -172,9 +174,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
    :"Lesing fullført på "+seconds+" s, men ingen sikre opplysninger funnet. Juster utsnitt eller ta et skarpere bilde.");
 
  }
- async function choose(event){
-  const source=event.target.files?.[0]||null;
-  event.target.value="";
+ async function chooseSource(source){
   if(!source||busy||disabled||cropJob)return;
   setError("");setDetails(null);setProgress("");setProcessedNotice("");setImageForCrop(null);setDiagnostic(null);
   // Never leave previously selected receipts associated with the new image.
@@ -198,6 +198,11 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
    setBusy(false);
    onBusyChange?.(false);
   }
+ }
+ function choose(event){
+  const source=event.target.files?.[0]||null;
+  event.target.value="";
+  if(source)void chooseSource(source);
  }
  async function applyCrop(croppedFile,meta){
   if(!cropJob)return;
@@ -264,15 +269,19 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   <h3>{documentType==="invoice"?"Last opp faktura":"1. Legg til kvittering"}</h3>
   <p className={styles.scanLead}>Ta bilde eller velg en fil. Vi forsøker å fylle ut feltene automatisk.</p>
   <div className={styles.uploadActions}>
-   <label className={styles.uploadAction}>📷 Ta bilde
-    <input aria-label="Ta bilde av kvittering" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"
-     disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
-   </label>
+   <button type="button" className={styles.uploadAction} disabled={disabled||busy||Boolean(cropJob)}
+    onClick={()=>setLiveCamera(true)}>📷 Skann med ramme</button>
    <label className={styles.uploadAction}>📁 Velg bilde / PDF
     <input aria-label="Velg kvittering fra telefonen" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/jpeg,image/png,image/webp"
      disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
    </label>
   </div>
+  {!liveCamera&&<label className={styles.nativeCameraLink}>Bruk vanlig kamera
+   <input aria-label="Ta bilde av kvittering" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"
+    disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
+  </label>}
+  {liveCamera&&<VatReceiptLiveCamera onCapture={file=>{setLiveCamera(false);void chooseSource(file);}}
+   onCancel={()=>setLiveCamera(false)} disabled={disabled||busy}/>} 
   <details className={styles.scanHelp}>
    <summary>Hjelp hvis tekstlesingen ikke virker</summary>
    <p>PDF maks 4 MB, bilder opptil 25 MB. OCR skjer på telefonen, mens program og språkfiler lastes fra en ekstern leverandør. Nå brukes en mindre lesekopi av bildet, og samme lesemotor gjenbrukes ved neste kvittering. Hvis et utsnitt blir feil, kan du justere det. Originalen beholdes i regnskapet.</p>
