@@ -49,7 +49,8 @@ assert.throws(()=>updateVatReceiptReviewedAmount(reviewed,23,"vat","20,00"),/Ukj
 assert.throws(()=>updateVatReceiptReviewedAmount(reviewed,25,"gross","100,00"),/Ukjent MVA/);
 const form=read("app/admin/faktura/mva/InputVatRegisterClient.js");
 assert.ok(form.includes("setForm(x=>updateVatReceiptReviewedField(x,name,value))"));
-assert.ok(form.includes("setForm(x=>updateVatReceiptReviewedAmount(x,rate,key,value))"));
+assert.ok(form.includes("const next=updateVatReceiptReviewedAmount(x,rate,key,value)"),
+ "Changing an amount must still revoke existing accounting confirmations");
 assert.ok(form.includes('if(!["documentConfirmed","deductionConfirmed","bankConditionConfirmed"].includes(name))setOcrMismatchChecked(false)'),
  "Changing a reviewed value requires new mismatch confirmation");
 assert.ok(form.includes('checked={form.documentConfirmed}'));
