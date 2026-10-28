@@ -91,3 +91,9 @@
  .uploadAction{font-size:13px;padding:12px 5px}
 }
 @media(max-width:340px){.uploadActions{grid-template-columns:1fr}}
+
+.receiptImagePreview{margin:12px 0;padding:9px 0;border:0;max-width:520px}
+.receiptImagePreview summary{font-weight:650;cursor:pointer;color:#272420;font-size:13px}
+.receiptImagePreview img{display:block;width:100%;max-height:520px;margin-top:10px;
+ object-fit:contain;border-radius:9px;background:#f4f3f0}
+.receiptImagePreview p{font-size:12px;color:#666059;margin:6px 0}
