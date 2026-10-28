@@ -33,7 +33,7 @@ function harness({failNor=false,failEnglish=false,noText=false}={}){
  };
 }
 const jpeg={type:"image/jpeg"};
-const statuses=[];
+let statuses=[];
 let result=await recognizeVatReceiptImages(harness(),[jpeg],msg=>statuses.push(msg));
 let parsed=parseNorwegianReceipt(result);
 assert.equal(parsed.supplierName,"MEGAFLIS BERGEN AS");
