@@ -1,11 +1,10 @@
 "use client";
-import {useState} from "react";
+import {useRef,useState} from "react";
 import VatOriginalAttachment from "./VatOriginalAttachment";
 import VatReceiptScanner from "./VatReceiptScanner";
 import styles from "./VatSimpleForm.module.css";
 import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
-const today=()=>new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe/Oslo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 const blank=()=>({0:{base:"",vat:""},12:{base:"",vat:""},15:{base:"",vat:""},25:{base:"",vat:""}});
 const parse=value=>{
  if(!/^\d+(?:[,.]\d{1,2})?$/.test(String(value||"").trim()))return null;
@@ -17,7 +16,7 @@ const rates=[0,12,15,25];
 const purposeChoices=["Materialer til kundeoppdrag","Verktøy og utstyr","Driftskostnad","Transport i virksomheten"];
 export default function InputVatRegisterClient({purchases,period,onChanged}){
  const [form,setForm]=useState({
-  supplierName:"",documentNumber:"",documentDate:today(),kind:"purchase",
+  supplierName:"",documentNumber:"",documentDate:"",kind:"purchase",
   originalDocumentNumber:"",evidenceReference:"",businessPurpose:"",
   deductionPercent:"100",groups:blank(),documentConfirmed:false,
   deductionConfirmed:false,bankConditionConfirmed:false
@@ -31,17 +30,41 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const [showMoreRates,setShowMoreRates]=useState(false);
  const [customPurpose,setCustomPurpose]=useState(false);
  const [attachmentIssue,setAttachmentIssue]=useState(null);
+ const previousOcr=useRef({supplierName:"",documentNumber:"",documentDate:"",groups:{}});
  const documentPeriod=vatDocumentPeriod(form.documentDate);
  const chooseReceipt=(file,meta={})=>{
   setReceiptFile(file||null);setReceiptIsCopy(Boolean(file&&meta.converted));setAttachmentIssue(null);setError("");setSuccess("");
   setOcrGrossOre(null);setOcrMismatchChecked(false);
-  if(!file)return; // Preparing a new image must not erase manually entered work.
+  if(!file){
+   // A different photo must never inherit the previous receipt's guessed date,
+   // merchant, receipt number or VAT figures. Manual corrections are kept.
+   const old=previousOcr.current;
+   previousOcr.current={supplierName:"",documentNumber:"",documentDate:"",groups:{}};
+   setForm(x=>({
+    ...x,
+    supplierName:old.supplierName&&x.supplierName===old.supplierName?"":x.supplierName,
+    documentNumber:old.documentNumber&&x.documentNumber===old.documentNumber?"":x.documentNumber,
+    documentDate:old.documentDate&&x.documentDate===old.documentDate?"":x.documentDate,
+    groups:Object.fromEntries(Object.entries(x.groups).map(([rate,group])=>{
+     const before=old.groups?.[rate];
+     return [rate,{
+      base:before?.base&&group.base===before.base?"":group.base,
+      vat:before?.vat&&group.vat===before.vat?"":group.vat
+     }];
+    }))
+   }));
+   return;
+  } // Preparing a new image must not erase manually entered work.
   setForm(x=>({...x,
    evidenceReference:x.evidenceReference||(
     meta.converted?"Aadland MVA – vedlagt JPEG-kopi, original beholdes eksternt":"Aadland MVA – privat originalvedlegg"),
    documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
  };
  const receiveScan=result=>{
+  previousOcr.current={
+   supplierName:result.supplierName||"",documentNumber:result.documentNumber||"",
+   documentDate:result.documentDate||"",groups:result.groups||{}
+  };
   setOcrGrossOre(Number.isSafeInteger(result.totalOre)?result.totalOre:null);
   setOcrMismatchChecked(false);
   // OCR supplies suggestions only. A failed scan must not blank manually
@@ -122,7 +145,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
     ?receiptFile?(receiptIsCopy?"Bilaget og en JPEG-kopi er lagret privat. Behold originalfilen i regnskapet.":"Bilaget og originalkvitteringen er lagret privat.")+" MVA-oversikten oppdateres.":"Bilaget er registrert. MVA-oversikten oppdateres."
     :"Bilaget er registrert, men originalfilen er IKKE lagret. Bruk knappen nedenfor for å prøve igjen.");
    setReceiptFile(null);setReceiptIsCopy(false);setOcrGrossOre(null);setOcrMismatchChecked(false);
-   setForm(x=>({...x,documentNumber:"",originalDocumentNumber:"",
+   setForm(x=>({...x,documentNumber:"",documentDate:"",originalDocumentNumber:"",
     evidenceReference:"",businessPurpose:"",groups:blank(),
     documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
    // A failed upload must keep the retry control and selected original visible.
