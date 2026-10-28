@@ -3,6 +3,7 @@ import {useEffect,useRef,useState} from "react";
 import {parseNorwegianReceipt} from "../../../../lib/vatReceiptParser";
 import {createVatReceiptReader} from "../../../../lib/vatReceiptRecognition";
 import {prepareVatOcrImage} from "../../../../lib/vatOcrImage";
+import {needsVatReceiptRetry,chooseVatReceiptScan} from "../../../../lib/vatReceiptQuality";
 import VatReceiptCropper from "./VatReceiptCropper";
 import styles from "./VatSimpleForm.module.css";
 
@@ -121,7 +122,19 @@ async function readLocalReceipt(file,onProgress,readerRef){
  if(!readerRef.current)readerRef.current=createVatReceiptReader(tess);
  const prepared=(await Promise.all(images.map(image=>prepareVatOcrImage(image,onProgress)))).flat();
  const recognized=await readerRef.current.recognize(prepared,onProgress);
- return {text:recognized.text,confidence:recognized.confidence,format};
+ const first={...recognized,parsed:parseNorwegianReceipt(recognized.text)};
+ let best={...first,retried:false};
+ if(needsVatReceiptRetry(first)){
+  onProgress("Noen felt mangler. Prøver en annen måte å lese kvitteringen på …");
+  try{
+   const second=await readerRef.current.recognize(prepared,onProgress,{layout:"column"});
+   best=chooseVatReceiptScan(first,{...second,parsed:parseNorwegianReceipt(second.text)});
+  }catch{
+   // Keep the first OCR result if the alternate layout is unsupported or fails.
+   onProgress("Alternativ lesing var ikke tilgjengelig. Beholder første resultat …");
+  }
+ }
+ return {text:best.text,confidence:best.confidence,format,parsed:best.parsed,retried:best.retried};
 }
 
 export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,documentType="receipt",disabled=false}){
@@ -141,7 +154,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   const startTime=typeof performance!=="undefined"?performance.now():Date.now();
   const recognized=await readLocalReceipt(file,setProgress,readerRef);
   const seconds=Math.round(((typeof performance!=="undefined"?performance.now():Date.now())-startTime)/100)/10;
-  const parsed=parseNorwegianReceipt(recognized.text);
+  const parsed=recognized.parsed||parseNorwegianReceipt(recognized.text);
   if(recognized.confidence!==null&&recognized.confidence<55&&parsed.documentDate){
    parsed.documentDate="";
    parsed.warnings.unshift("Datoen ble lest med lav sikkerhet og fylles ikke ut. Kontroller datoen på kvitteringen.");
@@ -155,7 +168,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   setDetails({...parsed,format:recognized.format,preview:recognized.text.slice(0,7500),detectedFields,seconds,confidence:recognized.confidence});
   onExtracted(parsed);
   setProgress(detectedFields>0
-   ?"Lesing fullført på "+seconds+" s. "+detectedFields+" forslag. Kontroller dem før lagring."
+   ?"Lesing fullført på "+seconds+" s"+(recognized.retried?" etter to lesemetoder":"")+". "+detectedFields+" forslag. Kontroller dem før lagring."
    :"Lesing fullført på "+seconds+" s, men ingen sikre opplysninger funnet. Juster utsnitt eller ta et skarpere bilde.");
 
  }
