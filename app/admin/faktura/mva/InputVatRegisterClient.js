@@ -35,6 +35,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const grossManuallyEdited=useRef(false);
  const rateManuallyChosen=useRef(false);
  const grossCalculated=useRef(false);
+ const manualVatRates=useRef(new Set());
  const [ocrMismatchChecked,setOcrMismatchChecked]=useState(false);
  const [scanBusy,setScanBusy]=useState(false);
  const [receiptSession,setReceiptSession]=useState(0);
@@ -58,6 +59,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   if(!file){
    setGrossInput("");setVatRateChoice("");
    grossManuallyEdited.current=false;rateManuallyChosen.current=false;grossCalculated.current=false;
+   manualVatRates.current.clear();
    // A valid new receipt starts a new accounting draft. Never carry a
    // manually corrected amount, supplier, VAT rate or purpose to this one.
    // This is NOT called on a crop or OCR retry of the same receipt.
@@ -74,6 +76,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  };
  const receiveScan=result=>{
   grossCalculated.current=false;
+  manualVatRates.current.clear();
   setOcrGrossOre(Number.isSafeInteger(result.totalOre)?result.totalOre:null);
   if(!grossManuallyEdited.current)
    setGrossInput(Number.isSafeInteger(result.totalOre)?moneyInput(result.totalOre):"");
@@ -115,8 +118,17 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  };
  const setGroup=(rate,key,value)=>{
   grossCalculated.current=false;
+  if(key==="vat")manualVatRates.current.add(rate);
   setOcrMismatchChecked(false);
-  setForm(x=>updateVatReceiptReviewedAmount(x,rate,key,value));
+  setForm(x=>{
+   const next=updateVatReceiptReviewedAmount(x,rate,key,value);
+   // When the user fills net amount, compute the matching tax immediately.
+   // A VAT amount the user explicitly corrected must never be overwritten.
+   if(key!=="base"||manualVatRates.current.has(rate))return next;
+   const baseOre=parse(value);
+   return baseOre!==null&&baseOre>0
+    ?updateVatReceiptReviewedAmount(next,rate,"vat",moneyInput(Math.round(baseOre*rate/100))):next;
+  });
  };
  const calculateFromGross=(rateValue=vatRateChoice,onlyIfEmpty=false)=>{
   const total=parseVatGrossInput(grossInput),rate=Number(rateValue);
@@ -128,6 +140,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   setForm(x=>({...x,groups:{...blank(),[rate]:pair},
    documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
   grossCalculated.current=true;
+  manualVatRates.current.clear();
   setOcrMismatchChecked(false);setError("");
  };
  let netTotal=0,vatTotal=0,valid=true;
@@ -198,6 +211,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    setReceiptFile(null);setReceiptIsCopy(false);setOcrGrossOre(null);setOcrMismatchChecked(false);
    setGrossInput("");setVatRateChoice("");
    grossManuallyEdited.current=false;rateManuallyChosen.current=false;grossCalculated.current=false;
+   manualVatRates.current.clear();
    previousOcr.current=emptyVatOcrSuggestion();
    setForm(x=>({...x,supplierName:"",documentNumber:"",documentDate:"",originalDocumentNumber:"",
     evidenceReference:"",businessPurpose:"",kind:"purchase",deductionPercent:"100",groups:blank(),
@@ -295,7 +309,10 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
          const raw=e.target.value;
          setGrossInput(raw);grossManuallyEdited.current=true;
          setOcrMismatchChecked(false);
-         const pair=grossCalculated.current?vatSplitFromGross(parseVatGrossInput(raw),vatRateChoice):null;
+         const anyAmounts=Object.values(form.groups).some(g=>g.base||g.vat);
+         const autoFill=Boolean(vatRateChoice)&&(grossCalculated.current||!anyAmounts);
+         const pair=autoFill?vatSplitFromGross(parseVatGrossInput(raw),vatRateChoice):null;
+         if(pair){grossCalculated.current=true;manualVatRates.current.clear();}
          setForm(x=>({...x,...(pair?{groups:{...blank(),[Number(vatRateChoice)]:pair}}:{}),
           documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
         }}/>
@@ -319,7 +336,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
        Beregn eks. MVA og MVA
       </button>
      </div>
-     <p className={styles.grossHelp}>Velg satsen som faktisk står på kvitteringen. Har kjøpet flere MVA-satser, fyll inn hver sats separat nedenfor.</p>
+     <p className={styles.grossHelp}>Velg satsen som faktisk står på kvitteringen. Beløpene regnes ut automatisk. Har kjøpet flere satser, fyll inn hver sats separat nedenfor. Du kan også skrive eks. MVA direkte for å beregne MVA.</p>
      {visibleRates.map(rate=><div key={rate} className={styles.rateRow}>
       <div className={styles.rateHead}>
        <strong>{rate} % MVA</strong>
