@@ -56,7 +56,7 @@ assert.ok(scanner.includes("async function testReader()"));
 assert.ok(scanner.includes("canvas.toBlob(resolve,\"image/jpeg\",.92)"));
 assert.ok(scanner.includes("readLocalReceipt(file,message=>setDiagnostic"));
 assert.ok(scanner.includes("Ingen kvittering, regnskapsdata eller bilder sendes"));
-assert.ok(scanner.includes("async function retryRead()"));
+assert.ok(scanner.includes("async function retryRead(noAutoCrop=false)"));
 assert.ok(scanner.includes("Juster utsnitt og les på nytt"));
 assert.ok(scanner.includes('"Fant "+details.detectedFields'));
 assert.ok(scanner.includes("onExtracted(parsed)"));
