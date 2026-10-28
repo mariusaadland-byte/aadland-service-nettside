@@ -1,7 +1,8 @@
 "use client";
-import {useRef,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import {parseNorwegianReceipt} from "../../../../lib/vatReceiptParser";
-import {recognizeVatReceiptImages} from "../../../../lib/vatReceiptRecognition";
+import {createVatReceiptReader} from "../../../../lib/vatReceiptRecognition";
+import {prepareVatOcrImage} from "../../../../lib/vatOcrImage";
 import VatReceiptCropper from "./VatReceiptCropper";
 import styles from "./VatSimpleForm.module.css";
 
@@ -107,19 +108,22 @@ async function prepareReceiptFile(source,onProgress){
  }finally{URL.revokeObjectURL(url);}
 }
 
-async function readLocalReceipt(file,onProgress){
- let text="",format="bilde";
- let images=[file];
+async function readLocalReceipt(file,onProgress,readerRef){
+ let format="bilde",images=[file];
  if(file.type==="application/pdf"){
   const pdf=await imageFromPdf(file,onProgress);
-  if(pdf.text)return {text:pdf.text,format:pdf.format};
+  if(pdf.text)return {text:pdf.text,format:pdf.format,confidence:null};
   images=pdf.images;format="pdf-skann";
  }
  const tess=await loadScript(TESSERACT_URL,"Tesseract");
- const recognizedText=await recognizeVatReceiptImages(tess,images,onProgress);
- return {text:recognizedText,format};
-
+ // Keep the worker alive within this page: models need not be downloaded and
+ // initialized for every receipt photo. Dispose when leaving the page.
+ if(!readerRef.current)readerRef.current=createVatReceiptReader(tess);
+ const prepared=await Promise.all(images.map(image=>prepareVatOcrImage(image,onProgress)));
+ const recognized=await readerRef.current.recognize(prepared,onProgress);
+ return {text:recognized.text,confidence:recognized.confidence,format};
 }
+
 export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,documentType="receipt",disabled=false}){
  const [progress,setProgress]=useState("");
  const [error,setError]=useState("");
@@ -130,17 +134,25 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
  const [imageForCrop,setImageForCrop]=useState(null);
  const [diagnostic,setDiagnostic]=useState(null);
  const scanId=useRef(0);
+ const readerRef=useRef(null);
+ useEffect(()=>()=>{if(readerRef.current)void readerRef.current.close().catch(()=>{});},[]);
  async function recognizeSelected(file,meta){
   onSelected(file,meta);
-  const recognized=await readLocalReceipt(file,setProgress);
+  const startTime=typeof performance!=="undefined"?performance.now():Date.now();
+  const recognized=await readLocalReceipt(file,setProgress,readerRef);
+  const seconds=Math.round(((typeof performance!=="undefined"?performance.now():Date.now())-startTime)/100)/10;
   const parsed=parseNorwegianReceipt(recognized.text);
+  if(recognized.confidence!==null&&recognized.confidence<45&&parsed.supplierName){
+   parsed.supplierName="";
+   parsed.warnings.unshift("OCR-teksten er for usikker til å foreslå leverandør. Kontroller kvitteringsbildet.");
+  }
   const detectedFields=[parsed.supplierName,parsed.documentNumber,parsed.documentDate].filter(Boolean).length+
    Object.keys(parsed.groups||{}).length;
-  setDetails({...parsed,format:recognized.format,preview:recognized.text.slice(0,7500),detectedFields});
+  setDetails({...parsed,format:recognized.format,preview:recognized.text.slice(0,7500),detectedFields,seconds,confidence:recognized.confidence});
   onExtracted(parsed);
   setProgress(detectedFields>0
-   ?"Tekstlesing ferdig – "+detectedFields+" opplysning(er) foreslått. Kontroller dem før lagring."
-   :"Fant ingen sikre opplysninger. Bruk «Juster utsnitt og les på nytt» eller fyll inn manuelt.");
+   ?"Lesing fullført på "+seconds+" s. "+detectedFields+" forslag. Kontroller dem før lagring."
+   :"Lesing fullført på "+seconds+" s, men ingen sikre opplysninger funnet. Juster utsnitt eller ta et skarpere bilde.");
 
  }
  async function choose(event){
@@ -222,7 +234,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
    canvas.width=0;canvas.height=0;
    if(!blob)throw Error("Telefonen kunne ikke lage testbildet.");
    const file=new File([blob],"ocr-testbilde.jpg",{type:"image/jpeg"});
-   const result=await readLocalReceipt(file,message=>setDiagnostic({ok:null,message}));
+   const result=await readLocalReceipt(file,message=>setDiagnostic({ok:null,message}),readerRef);
    const chars=result.text.replace(/\s/g,"").length;
    if(chars<12)throw Error("Lesemotoren startet, men fant ikke tilstrekkelig tekst i testbildet.");
    setDiagnostic({ok:true,message:"Tekstleseren virker på denne telefonen. Den fant tekst i et innebygd eksempelbilde. En virkelig kvittering må fortsatt være skarp og tydelig."});
@@ -246,7 +258,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   </div>
   <details className={styles.scanHelp}>
    <summary>Hjelp hvis tekstlesingen ikke virker</summary>
-   <p>PDF maks 4 MB, bilder opptil 25 MB. OCR kjøres på telefonen; lesemotor og språkfiler lastes fra en ekstern leverandør. Et skarpere bilde eller justert utsnitt kan forbedre resultatet. Ved beskjæring lagres en JPEG-kopi; behold originalen i regnskapet.</p>
+   <p>PDF maks 4 MB, bilder opptil 25 MB. OCR skjer på telefonen, mens program og språkfiler lastes fra en ekstern leverandør. Nå brukes en mindre lesekopi av bildet, og samme lesemotor gjenbrukes ved neste kvittering. Hvis et utsnitt blir feil, kan du justere det. Originalen beholdes i regnskapet.</p>
    <button type="button" className={styles.textAction} disabled={disabled||busy||Boolean(cropJob)} onClick={testReader}>
     Test tekstleseren på denne telefonen
    </button>
@@ -269,6 +281,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   {error&&<p role="alert" className={styles.scanMessage} style={{color:"#a52a21"}}>{error}</p>}
   {details&&<div className={styles.scanResult}>
    <strong>{details.detectedFields>0?"Fant "+details.detectedFields+" forslag fra kvitteringen":"Ingen sikre felt ble gjenkjent"}</strong>
+   <p style={{fontSize:12}}>Brukte {details.seconds} sekunder{details.confidence!==null?", OCR-sikkerhet "+details.confidence+" %":""}. Dette er bare forslag.</p>
    <p>{documentType==="invoice"?details.documentNumber||"Fakturanummer ikke funnet":details.supplierName||"Leverandør ikke funnet"} · {details.documentDate||"Dato ikke funnet"} · {details.totalOre==null?"Sum ikke funnet":new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(details.totalOre/100)}</p>
    {details.warnings.length>0&&<ul>{details.warnings.map((warn,i)=><li key={i}>{warn}</li>)}</ul>}
    <details><summary>Vis lest tekst</summary>
