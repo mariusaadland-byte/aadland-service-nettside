@@ -125,7 +125,8 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
     ?receiptFile?(receiptIsCopy?"Bilaget og en JPEG-kopi er lagret privat. Behold originalfilen i regnskapet.":"Bilaget og originalkvitteringen er lagret privat.")+" MVA-oversikten oppdateres.":"Bilaget er registrert. MVA-oversikten oppdateres."
     :"Bilaget er registrert, men originalfilen er IKKE lagret. Bruk knappen nedenfor for å prøve igjen.");
    setReceiptFile(null);setReceiptIsCopy(false);setOcrGrossOre(null);setOcrMismatchChecked(false);
-   setForm(x=>({...x,documentNumber:"",documentDate:"",originalDocumentNumber:"",
+   previousOcr.current=emptyVatOcrSuggestion();
+   setForm(x=>({...x,supplierName:"",documentNumber:"",documentDate:"",originalDocumentNumber:"",
     evidenceReference:"",businessPurpose:"",groups:blank(),
     documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
    // A failed upload must keep the retry control and selected original visible.
