@@ -4,6 +4,7 @@ import VatOriginalAttachment from "./VatOriginalAttachment";
 import VatReceiptScanner from "./VatReceiptScanner";
 import styles from "./VatSimpleForm.module.css";
 import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
+import {emptyVatOcrSuggestion,snapshotVatOcrSuggestion,mergeVatReceiptSuggestions,clearVatReceiptSuggestions} from "../../../../lib/vatReceiptAutofill";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const blank=()=>({0:{base:"",vat:""},12:{base:"",vat:""},15:{base:"",vat:""},25:{base:"",vat:""}});
 const parse=value=>{
@@ -30,29 +31,15 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const [showMoreRates,setShowMoreRates]=useState(false);
  const [customPurpose,setCustomPurpose]=useState(false);
  const [attachmentIssue,setAttachmentIssue]=useState(null);
- const previousOcr=useRef({supplierName:"",documentNumber:"",documentDate:"",groups:{}});
+ const previousOcr=useRef(emptyVatOcrSuggestion());
  const documentPeriod=vatDocumentPeriod(form.documentDate);
  const chooseReceipt=(file,meta={})=>{
   setReceiptFile(file||null);setReceiptIsCopy(Boolean(file&&meta.converted));setAttachmentIssue(null);setError("");setSuccess("");
   setOcrGrossOre(null);setOcrMismatchChecked(false);
   if(!file){
-   // A different photo must never inherit the previous receipt's guessed date,
-   // merchant, receipt number or VAT figures. Manual corrections are kept.
-   const old=previousOcr.current;
-   previousOcr.current={supplierName:"",documentNumber:"",documentDate:"",groups:{}};
-   setForm(x=>({
-    ...x,
-    supplierName:old.supplierName&&x.supplierName===old.supplierName?"":x.supplierName,
-    documentNumber:old.documentNumber&&x.documentNumber===old.documentNumber?"":x.documentNumber,
-    documentDate:old.documentDate&&x.documentDate===old.documentDate?"":x.documentDate,
-    groups:Object.fromEntries(Object.entries(x.groups).map(([rate,group])=>{
-     const before=old.groups?.[rate];
-     return [rate,{
-      base:before?.base&&group.base===before.base?"":group.base,
-      vat:before?.vat&&group.vat===before.vat?"":group.vat
-     }];
-    }))
-   }));
+   const previous=previousOcr.current;
+   previousOcr.current=emptyVatOcrSuggestion();
+   setForm(x=>clearVatReceiptSuggestions(x,previous));
    return;
   } // Preparing a new image must not erase manually entered work.
   setForm(x=>({...x,
@@ -61,20 +48,13 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
  };
  const receiveScan=result=>{
-  previousOcr.current={
-   supplierName:result.supplierName||"",documentNumber:result.documentNumber||"",
-   documentDate:result.documentDate||"",groups:result.groups||{}
-  };
   setOcrGrossOre(Number.isSafeInteger(result.totalOre)?result.totalOre:null);
   setOcrMismatchChecked(false);
-  // OCR supplies suggestions only. A failed scan must not blank manually
-  // entered fields or remove other rates that the user already checked.
-  setForm(x=>({...x,
-   supplierName:result.supplierName||x.supplierName,
-   documentNumber:result.documentNumber||x.documentNumber,
-   documentDate:result.documentDate||x.documentDate,
-   groups:{...x.groups,...result.groups}
-  }));
+  // Preserve manual corrections; withdraw outdated OCR values when a crop
+  // changes the recognized receipt. Never carry an old OCR date forward.
+  const previous=previousOcr.current;
+  previousOcr.current=snapshotVatOcrSuggestion(result);
+  setForm(x=>mergeVatReceiptSuggestions(x,previous,result));
  };
  const attachToDocument=async(id,file)=>{
   const payload=new FormData();payload.append("documentId",id);payload.append("file",file);
