@@ -58,7 +58,7 @@ assert.ok(scanner.includes("readLocalReceipt(file,message=>setDiagnostic"));
 assert.ok(scanner.includes("Ingen kvittering, regnskapsdata eller bilder sendes"));
 assert.ok(scanner.includes("async function retryRead()"));
 assert.ok(scanner.includes("Juster utsnitt og les på nytt"));
-assert.ok(scanner.includes("Fant "+'' ) || scanner.includes("Fant \"+details.detectedFields"));
+assert.ok(scanner.includes('"Fant "+details.detectedFields'));
 assert.ok(scanner.includes("onExtracted(parsed)"));
 
 const form=read("app/admin/faktura/mva/InputVatRegisterClient.js");
