@@ -128,6 +128,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
  const [processedNotice,setProcessedNotice]=useState("");
  const [cropJob,setCropJob]=useState(null);
  const [imageForCrop,setImageForCrop]=useState(null);
+ const [diagnostic,setDiagnostic]=useState(null);
  const scanId=useRef(0);
  async function recognizeSelected(file,meta){
   onSelected(file,meta);
@@ -146,7 +147,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   const source=event.target.files?.[0]||null;
   event.target.value="";
   if(!source||busy||disabled||cropJob)return;
-  setError("");setDetails(null);setProgress("");setProcessedNotice("");setImageForCrop(null);
+  setError("");setDetails(null);setProgress("");setProcessedNotice("");setImageForCrop(null);setDiagnostic(null);
   // Never leave previously selected receipts associated with the new image.
   onSelected(null);
   const thisScan=++scanId.current;
@@ -193,6 +194,42 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   setCropJob(null);setError("");setProgress("");setBusy(false);
   onBusyChange?.(false);
  }
+ async function retryRead(){
+  if(!imageForCrop||busy||disabled||cropJob)return;
+  setBusy(true);onBusyChange?.(true);setError("");setProgress("");setDetails(null);
+  try{
+   await recognizeSelected(imageForCrop.file,{converted:imageForCrop.previouslyConverted,originalName:imageForCrop.originalName});
+  }catch(e){
+   setProgress("");
+   setError("Ny tekstlesing mislyktes: "+String(e.message||"ukjent feil")+".");
+  }finally{setBusy(false);onBusyChange?.(false);}
+ }
+ async function testReader(){
+  if(busy||disabled||cropJob)return;
+  setBusy(true);onBusyChange?.(true);
+  setDiagnostic({ok:null,message:"Tester tekstleseren på denne telefonen …"});
+  try{
+   const canvas=document.createElement("canvas");
+   canvas.width=1200;canvas.height=550;
+   const ctx=canvas.getContext("2d");
+   if(!ctx)throw Error("Telefonen kunne ikke starte bildetest.");
+   ctx.fillStyle="#ffffff";ctx.fillRect(0,0,canvas.width,canvas.height);
+   ctx.fillStyle="#111111";ctx.font="bold 68px Arial";
+   ctx.fillText("KVITTERING 123456",55,130);
+   ctx.fillText("MEGAFLIS BERGEN",55,240);
+   ctx.fillText("TOTAL 125,00",55,350);
+   const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",.92));
+   canvas.width=0;canvas.height=0;
+   if(!blob)throw Error("Telefonen kunne ikke lage testbildet.");
+   const file=new File([blob],"ocr-testbilde.jpg",{type:"image/jpeg"});
+   const result=await readLocalReceipt(file,message=>setDiagnostic({ok:null,message}));
+   const chars=result.text.replace(/\s/g,"").length;
+   if(chars<12)throw Error("Lesemotoren startet, men fant ikke tilstrekkelig tekst i testbildet.");
+   setDiagnostic({ok:true,message:"Tekstleseren virker på denne telefonen. Den fant tekst i et innebygd eksempelbilde. En virkelig kvittering må fortsatt være skarp og tydelig."});
+  }catch(e){
+   setDiagnostic({ok:false,message:"Tekstleseren virker ikke som forventet: "+String(e.message||"ukjent feil")});
+  }finally{setBusy(false);onBusyChange?.(false);}
+ }
 
  return <section className={styles.scanShell}>
   <h3>{documentType==="invoice"?"Last opp faktura":"1. Legg til kvittering"}</h3>
@@ -208,20 +245,30 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
    </label>
   </div>
   <details className={styles.scanHelp}>
-   <summary>Filstørrelse og hvordan lesingen virker</summary>
-   <p>PDF maks 4 MB, bilder opptil 25 MB. Vi foreslår et utsnitt du kan justere før lesingen starter. OCR kjøres på telefonen, mens leseprogram og språkfiler lastes fra en ekstern leverandør. Ved beskjæring lagres en JPEG-kopi; behold originalen i regnskapet.</p>
+   <summary>Hjelp hvis tekstlesingen ikke virker</summary>
+   <p>PDF maks 4 MB, bilder opptil 25 MB. OCR kjøres på telefonen; lesemotor og språkfiler lastes fra en ekstern leverandør. Et skarpere bilde eller justert utsnitt kan forbedre resultatet. Ved beskjæring lagres en JPEG-kopi; behold originalen i regnskapet.</p>
+   <button type="button" className={styles.textAction} disabled={disabled||busy||Boolean(cropJob)} onClick={testReader}>
+    Test tekstleseren på denne telefonen
+   </button>
+   <p style={{fontSize:12}}>Tester bare et innebygd eksempelbilde. Ingen kvittering, regnskapsdata eller bilder sendes til Aadland Service.</p>
+   {diagnostic&&<p role={diagnostic.ok===false?"alert":"status"} className={styles.scanMessage}
+    style={diagnostic.ok===false?{color:"#a52a21"}:{}}>{diagnostic.message}</p>}
   </details>
-  {imageForCrop&&!cropJob&&<button type="button" className={styles.textAction} disabled={disabled||busy}
-   onClick={()=>{setCropJob(imageForCrop);setError("");setProgress("");}}>
-   Juster utsnitt og les på nytt
-  </button>}
+  {imageForCrop&&!cropJob&&<div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
+   <button type="button" className={styles.textAction} disabled={disabled||busy}
+    onClick={retryRead}>Les bildet på nytt</button>
+   <button type="button" className={styles.textAction} disabled={disabled||busy}
+    onClick={()=>{setCropJob(imageForCrop);setError("");setProgress("");}}>
+    Juster utsnitt og les på nytt
+   </button>
+  </div>}
   {cropJob&&<VatReceiptCropper file={cropJob.file} onApply={applyCrop} onCancel={cancelCrop} disabled={busy||disabled}/>}
   {!cropJob&&busy&&<p role="status" className={styles.scanMessage}>Bildet leses automatisk. Feltene fylles ut når lesingen er ferdig.</p>}
   {processedNotice&&<p role="note" className={styles.scanMessage}>{processedNotice}</p>}
   {(busy||progress)&&<p role="status" className={styles.scanMessage}><strong>{progress||"Klargjør lesing …"}</strong></p>}
   {error&&<p role="alert" className={styles.scanMessage} style={{color:"#a52a21"}}>{error}</p>}
   {details&&<div className={styles.scanResult}>
-   <strong>{details.detectedFields>0?"Fylte ut "+details.detectedFields+" opplysninger automatisk":"Ingen sikre felt ble fylt ut"}</strong>
+   <strong>{details.detectedFields>0?"Fant "+details.detectedFields+" forslag fra kvitteringen":"Ingen sikre felt ble gjenkjent"}</strong>
    <p>{documentType==="invoice"?details.documentNumber||"Fakturanummer ikke funnet":details.supplierName||"Leverandør ikke funnet"} · {details.documentDate||"Dato ikke funnet"} · {details.totalOre==null?"Sum ikke funnet":new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(details.totalOre/100)}</p>
    {details.warnings.length>0&&<ul>{details.warnings.map((warn,i)=><li key={i}>{warn}</li>)}</ul>}
    <details><summary>Vis lest tekst</summary>
