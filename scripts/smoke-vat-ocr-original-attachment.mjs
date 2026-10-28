@@ -7,6 +7,9 @@ const cropper=read("app/admin/faktura/mva/VatReceiptCropper.js");
 
 assert.ok(scanner.includes("if(!options.preserveAttachment)onSelected(file,meta)"),
  "Only a new selected original can replace the accounting attachment");
+assert.ok(scanner.indexOf("const prepared=await prepareReceiptFile(source,setProgress);") <
+ scanner.indexOf("   onSelected(null);"),
+ "An invalid replacement photo must not remove the previously selected original");
 assert.ok(scanner.includes('await recognizeSelected(file,{converted:prepared.converted,originalName:source.name});'),
  "Original is attached on initial photo");
 assert.ok(scanner.includes('await recognizeSelected(croppedFile,{converted:copied,originalName:original.originalName},{preserveAttachment:true});'),
