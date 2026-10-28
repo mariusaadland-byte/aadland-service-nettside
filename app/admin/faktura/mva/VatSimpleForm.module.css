@@ -69,7 +69,7 @@
 .nativeCameraLink:has(input:disabled){opacity:.5;cursor:not-allowed}
 .liveCameraShell{margin:14px 0 10px;padding:0;max-width:520px}
 .liveCameraStage{position:relative;background:#161616;border-radius:12px;overflow:hidden;min-height:220px}
-.liveCameraVideo{display:block;width:100%;height:auto;min-height:220px;max-height:60vh;object-fit:contain}
+.liveCameraVideo{display:block;width:100%;height:auto;min-height:220px;object-fit:fill}
 .liveCameraOutline{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .liveCameraHint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:white;font-size:13px}
 .liveCameraActions{display:flex;gap:10px;margin-top:12px}
