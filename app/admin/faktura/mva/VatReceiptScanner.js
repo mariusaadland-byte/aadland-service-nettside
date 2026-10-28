@@ -3,7 +3,9 @@ import {useEffect,useRef,useState} from "react";
 import {parseNorwegianReceipt} from "../../../../lib/vatReceiptParser";
 import {createVatReceiptReader} from "../../../../lib/vatReceiptRecognition";
 import {prepareVatOcrImage} from "../../../../lib/vatOcrImage";
+import {needsVatReceiptRetry,chooseVatReceiptScan} from "../../../../lib/vatReceiptQuality";
 import VatReceiptCropper from "./VatReceiptCropper";
+import VatReceiptLiveCamera from "./VatReceiptLiveCamera";
 import styles from "./VatSimpleForm.module.css";
 
 const MAX_SIZE=4*1024*1024;
@@ -108,7 +110,7 @@ async function prepareReceiptFile(source,onProgress){
  }finally{URL.revokeObjectURL(url);}
 }
 
-async function readLocalReceipt(file,onProgress,readerRef){
+async function readLocalReceipt(file,onProgress,readerRef,options={}){
  let format="bilde",images=[file];
  if(file.type==="application/pdf"){
   const pdf=await imageFromPdf(file,onProgress);
@@ -119,12 +121,24 @@ async function readLocalReceipt(file,onProgress,readerRef){
  // Keep the worker alive within this page: models need not be downloaded and
  // initialized for every receipt photo. Dispose when leaving the page.
  if(!readerRef.current)readerRef.current=createVatReceiptReader(tess);
- const prepared=await Promise.all(images.map(image=>prepareVatOcrImage(image,onProgress)));
+ const prepared=(await Promise.all(images.map(image=>prepareVatOcrImage(image,onProgress,options)))).flat();
  const recognized=await readerRef.current.recognize(prepared,onProgress);
- return {text:recognized.text,confidence:recognized.confidence,format};
+ const first={...recognized,parsed:parseNorwegianReceipt(recognized.text)};
+ let best={...first,retried:false};
+ if(needsVatReceiptRetry(first)){
+  onProgress("Noen felt mangler. Prøver en annen måte å lese kvitteringen på …");
+  try{
+   const second=await readerRef.current.recognize(prepared,onProgress,{layout:"column"});
+   best=chooseVatReceiptScan(first,{...second,parsed:parseNorwegianReceipt(second.text)});
+  }catch{
+   // Keep the first OCR result if the alternate layout is unsupported or fails.
+   onProgress("Alternativ lesing var ikke tilgjengelig. Beholder første resultat …");
+  }
+ }
+ return {text:best.text,confidence:best.confidence,format,parsed:best.parsed,retried:best.retried};
 }
 
-export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,documentType="receipt",disabled=false}){
+export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,documentType="receipt",disabled=false,resetToken=0}){
  const [progress,setProgress]=useState("");
  const [error,setError]=useState("");
  const [details,setDetails]=useState(null);
@@ -133,15 +147,30 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
  const [cropJob,setCropJob]=useState(null);
  const [imageForCrop,setImageForCrop]=useState(null);
  const [diagnostic,setDiagnostic]=useState(null);
+ const [liveCamera,setLiveCamera]=useState(false);
  const scanId=useRef(0);
  const readerRef=useRef(null);
+ const lastResetToken=useRef(resetToken);
  useEffect(()=>()=>{if(readerRef.current)void readerRef.current.close().catch(()=>{});},[]);
- async function recognizeSelected(file,meta){
-  onSelected(file,meta);
+ useEffect(()=>{
+  if(lastResetToken.current===resetToken)return;
+  lastResetToken.current=resetToken;
+  scanId.current++;
+  setProgress("");setError("");setDetails(null);setProcessedNotice("");
+  setCropJob(null);setImageForCrop(null);setDiagnostic(null);setLiveCamera(false);
+ },[resetToken]);
+ async function recognizeSelected(file,meta,options={}){
+  // When rescanning a crop or retrying OCR, the already selected original
+  // receipt stays attached. Only the initial camera/file choice changes it.
+  if(!options.preserveAttachment)onSelected(file,meta);
   const startTime=typeof performance!=="undefined"?performance.now():Date.now();
-  const recognized=await readLocalReceipt(file,setProgress,readerRef);
+  const recognized=await readLocalReceipt(file,setProgress,readerRef,options);
   const seconds=Math.round(((typeof performance!=="undefined"?performance.now():Date.now())-startTime)/100)/10;
-  const parsed=parseNorwegianReceipt(recognized.text);
+  const parsed=recognized.parsed||parseNorwegianReceipt(recognized.text);
+  if(recognized.confidence!==null&&recognized.confidence<55&&parsed.documentDate){
+   parsed.documentDate="";
+   parsed.warnings.unshift("Datoen ble lest med lav sikkerhet og fylles ikke ut. Kontroller datoen på kvitteringen.");
+  }
   if(recognized.confidence!==null&&recognized.confidence<45&&parsed.supplierName){
    parsed.supplierName="";
    parsed.warnings.unshift("OCR-teksten er for usikker til å foreslå leverandør. Kontroller kvitteringsbildet.");
@@ -151,22 +180,21 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   setDetails({...parsed,format:recognized.format,preview:recognized.text.slice(0,7500),detectedFields,seconds,confidence:recognized.confidence});
   onExtracted(parsed);
   setProgress(detectedFields>0
-   ?"Lesing fullført på "+seconds+" s. "+detectedFields+" forslag. Kontroller dem før lagring."
+   ?"Lesing fullført på "+seconds+" s"+(recognized.retried?" etter to lesemetoder":"")+". "+detectedFields+" forslag. Kontroller dem før lagring."
    :"Lesing fullført på "+seconds+" s, men ingen sikre opplysninger funnet. Juster utsnitt eller ta et skarpere bilde.");
 
  }
- async function choose(event){
-  const source=event.target.files?.[0]||null;
-  event.target.value="";
+ async function chooseSource(source){
   if(!source||busy||disabled||cropJob)return;
   setError("");setDetails(null);setProgress("");setProcessedNotice("");setImageForCrop(null);setDiagnostic(null);
-  // Never leave previously selected receipts associated with the new image.
-  onSelected(null);
+  // Keep the current attachment if the new file cannot be opened/validated.
+  // Once validation succeeds, replace the previous receipt before OCR starts.
   const thisScan=++scanId.current;
   setBusy(true);onBusyChange?.(true);
   try{
    const prepared=await prepareReceiptFile(source,setProgress);
    if(thisScan!==scanId.current)return;
+   onSelected(null);
    const file=prepared.file;
    if(file.type!=="application/pdf")
     setImageForCrop({file,originalName:source.name,previouslyConverted:prepared.converted});
@@ -182,6 +210,11 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
    onBusyChange?.(false);
   }
  }
+ function choose(event){
+  const source=event.target.files?.[0]||null;
+  event.target.value="";
+  if(source)void chooseSource(source);
+ }
  async function applyCrop(croppedFile,meta){
   if(!cropJob)return;
   const original=cropJob;
@@ -190,10 +223,10 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   const thisScan=++scanId.current;
   setBusy(true);onBusyChange?.(true);setError("");setProgress("");
   try{
-   setProcessedNotice(copied
-    ?"Beskjæringen er lagret som en JPEG-kopi. Behold hele originalbildet i regnskapssystemet."
-    :"Hele originalbildet er beholdt uendret som bilag.");
-   await recognizeSelected(croppedFile,{converted:copied,originalName:original.originalName});
+   setProcessedNotice(original.previouslyConverted
+    ?"Det beskårne bildet brukes bare til tekstlesing. Vedlegget er en JPEG-kopi; behold originalfotoet selv."
+    :"Det beskårne bildet brukes bare til tekstlesing. Originalfotoet beholdes som bilagsvedlegg.");
+   await recognizeSelected(croppedFile,{converted:copied,originalName:original.originalName},{preserveAttachment:true});
    if(thisScan!==scanId.current)return;
    setImageForCrop(null);
   }catch(e){
@@ -206,11 +239,12 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   setCropJob(null);setError("");setProgress("");setBusy(false);
   onBusyChange?.(false);
  }
- async function retryRead(){
+ async function retryRead(noAutoCrop=false){
   if(!imageForCrop||busy||disabled||cropJob)return;
   setBusy(true);onBusyChange?.(true);setError("");setProgress("");setDetails(null);
   try{
-   await recognizeSelected(imageForCrop.file,{converted:imageForCrop.previouslyConverted,originalName:imageForCrop.originalName});
+   await recognizeSelected(imageForCrop.file,{converted:imageForCrop.previouslyConverted,originalName:imageForCrop.originalName},
+    {noAutoCrop,preserveAttachment:true});
   }catch(e){
    setProgress("");
    setError("Ny tekstlesing mislyktes: "+String(e.message||"ukjent feil")+".");
@@ -247,15 +281,19 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   <h3>{documentType==="invoice"?"Last opp faktura":"1. Legg til kvittering"}</h3>
   <p className={styles.scanLead}>Ta bilde eller velg en fil. Vi forsøker å fylle ut feltene automatisk.</p>
   <div className={styles.uploadActions}>
-   <label className={styles.uploadAction}>📷 Ta bilde
-    <input aria-label="Ta bilde av kvittering" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"
-     disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
-   </label>
+   <button type="button" className={styles.uploadAction} disabled={disabled||busy||Boolean(cropJob)}
+    onClick={()=>setLiveCamera(true)}>📷 Skann med ramme</button>
    <label className={styles.uploadAction}>📁 Velg bilde / PDF
     <input aria-label="Velg kvittering fra telefonen" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/jpeg,image/png,image/webp"
      disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
    </label>
   </div>
+  {!liveCamera&&<label className={styles.nativeCameraLink}>Bruk vanlig kamera
+   <input aria-label="Ta bilde av kvittering" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"
+    disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
+  </label>}
+  {liveCamera&&<VatReceiptLiveCamera onCapture={file=>{setLiveCamera(false);void chooseSource(file);}}
+   onCancel={()=>setLiveCamera(false)} disabled={disabled||busy}/>} 
   <details className={styles.scanHelp}>
    <summary>Hjelp hvis tekstlesingen ikke virker</summary>
    <p>PDF maks 4 MB, bilder opptil 25 MB. OCR skjer på telefonen, mens program og språkfiler lastes fra en ekstern leverandør. Nå brukes en mindre lesekopi av bildet, og samme lesemotor gjenbrukes ved neste kvittering. Hvis et utsnitt blir feil, kan du justere det. Originalen beholdes i regnskapet.</p>
@@ -268,7 +306,9 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   </details>
   {imageForCrop&&!cropJob&&<div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
    <button type="button" className={styles.textAction} disabled={disabled||busy}
-    onClick={retryRead}>Les bildet på nytt</button>
+    onClick={()=>retryRead(false)}>Les bildet på nytt</button>
+   <button type="button" className={styles.textAction} disabled={disabled||busy}
+    onClick={()=>retryRead(true)}>Les hele bildet uten automatisk beskjæring</button>
    <button type="button" className={styles.textAction} disabled={disabled||busy}
     onClick={()=>{setCropJob(imageForCrop);setError("");setProgress("");}}>
     Juster utsnitt og les på nytt

@@ -80,7 +80,7 @@ assert.ok(scanner.includes("onExtracted(parsed)"));
 assert.ok(scanner.includes("detectedFields"));
 const form=read("app/admin/faktura/mva/InputVatRegisterClient.js");
 assert.ok(form.includes("receiveScan=result=>"));
-assert.ok(form.includes("groups:{...x.groups,...result.groups}"));
+assert.ok(form.includes("mergeVatReceiptSuggestions(x,previous,result)"));
 assert.ok(form.includes("setOcrGrossOre"));
 assert.ok(form.includes("documentConfirmed:false"),"Original review must stay manual");
 assert.ok(form.includes("deductionConfirmed:false"),"Deduction approval must stay manual");

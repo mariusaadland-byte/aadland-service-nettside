@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const read=path=>readFileSync(path,"utf8");
+const processor=read("lib/vatOcrImage.js");
+const scanner=read("app/admin/faktura/mva/VatReceiptScanner.js");
+assert.ok(processor.includes("options.noAutoCrop"));
+assert.ok(processor.includes("if(options.noAutoCrop){"));
+assert.ok(processor.includes("const geometry=vatOcrGeometry(img.naturalWidth,img.naturalHeight,bounds)"));
+assert.ok(processor.includes('onProgress("Leser hele originalbildet uten automatisk beskjæring'));
+assert.ok(scanner.includes("prepareVatOcrImage(image,onProgress,options)"));
+assert.ok(scanner.includes("readLocalReceipt(file,setProgress,readerRef,options)"));
+assert.ok(scanner.includes("retryRead(true)"));
+assert.ok(scanner.includes("retryRead(false)"));
+assert.ok(scanner.includes("Les hele bildet uten automatisk beskjæring"));
+assert.ok(scanner.includes("if(needsVatReceiptRetry(first))"),"Still retry OCR layout when image read is weak");
+assert.ok(scanner.includes("onExtracted(parsed)"));
+console.log("OCR originalfoto-fallback bestått: brukeren kan omgå feil autoutsnitt, vanlig skanning beholdes.");

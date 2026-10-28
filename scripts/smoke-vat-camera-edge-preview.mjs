@@ -1,0 +1,36 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const read=path=>readFileSync(path,"utf8");
+const source=read("lib/vatReceiptCrop.js").replace(/^export /gm,"");
+const detectReceiptCorners=new Function(source+";return detectReceiptCorners;")();
+const width=160,height=220;
+const data=new Uint8ClampedArray(width*height*4);
+for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+ const paper=x>=23&&x<138&&y>=17&&y<203;
+ const shade=paper?248:48,p=(y*width+x)*4;
+ data[p]=shade;data[p+1]=shade;data[p+2]=shade;data[p+3]=255;
+}
+const corners=detectReceiptCorners({width,height,data});
+assert.ok(corners&&corners.length===4,"Find receipt boundary on dark background");
+assert.ok(corners[0].x<.20&&corners[0].y<.12);
+assert.ok(corners[2].x>.80&&corners[2].y>.87);
+const camera=read("app/admin/faktura/mva/VatReceiptLiveCamera.js");
+assert.ok(camera.includes("navigator.mediaDevices.getUserMedia"));
+assert.ok(camera.includes('facingMode:{ideal:"environment"}'));
+assert.ok(camera.includes("detectReceiptCorners(ctx.getImageData"));
+assert.ok(camera.includes('setInterval(()=>'));
+assert.ok(camera.includes('stream.getTracks().forEach(track=>track.stop())'));
+assert.ok(camera.includes('autoPlay playsInline muted'));
+assert.ok(camera.includes("<polygon points={outline}"));
+assert.ok(camera.includes('onCapture(new File([blob]'));
+assert.ok(camera.includes('!ready||disabled||capturing'));
+assert.ok(camera.includes('Bruk vanlig kamera'));
+const scanner=read("app/admin/faktura/mva/VatReceiptScanner.js");
+assert.ok(scanner.includes("<VatReceiptLiveCamera"));
+assert.ok(scanner.includes("setLiveCamera(false)"));
+assert.ok(scanner.includes('capture="environment"'),"Keep regular iPhone camera fallback");
+assert.ok(scanner.includes("chooseSource(file)"));
+const styles=read("app/admin/faktura/mva/VatSimpleForm.module.css");
+assert.ok(styles.includes(".liveCameraOutline"));
+assert.ok(styles.includes(".liveCameraCapture"));
+console.log("Live skanning bestått: kamerapermisjon, grønn kant, iPhone-alternativ, fullstendig JPEG, kamerarengjøring og fallback.");

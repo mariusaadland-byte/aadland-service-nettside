@@ -1,11 +1,13 @@
 "use client";
-import {useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import VatOriginalAttachment from "./VatOriginalAttachment";
 import VatReceiptScanner from "./VatReceiptScanner";
 import styles from "./VatSimpleForm.module.css";
 import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
+import {emptyVatOcrSuggestion,snapshotVatOcrSuggestion,mergeVatReceiptSuggestions,startNewVatReceiptDraft} from "../../../../lib/vatReceiptAutofill";
+import {vatReceiptAttachmentIssue,validateVatReceiptAttachmentBytes,removeVatReceiptAttachmentReference} from "../../../../lib/vatReceiptAttachmentReadiness";
+import {updateVatReceiptReviewedField,updateVatReceiptReviewedAmount} from "../../../../lib/vatReceiptReview";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
-const today=()=>new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe/Oslo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 const blank=()=>({0:{base:"",vat:""},12:{base:"",vat:""},15:{base:"",vat:""},25:{base:"",vat:""}});
 const parse=value=>{
  if(!/^\d+(?:[,.]\d{1,2})?$/.test(String(value||"").trim()))return null;
@@ -17,25 +19,46 @@ const rates=[0,12,15,25];
 const purposeChoices=["Materialer til kundeoppdrag","Verktøy og utstyr","Driftskostnad","Transport i virksomheten"];
 export default function InputVatRegisterClient({purchases,period,onChanged}){
  const [form,setForm]=useState({
-  supplierName:"",documentNumber:"",documentDate:today(),kind:"purchase",
+  supplierName:"",documentNumber:"",documentDate:"",kind:"purchase",
   originalDocumentNumber:"",evidenceReference:"",businessPurpose:"",
   deductionPercent:"100",groups:blank(),documentConfirmed:false,
   deductionConfirmed:false,bankConditionConfirmed:false
  });
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[success,setSuccess]=useState("");
  const [receiptFile,setReceiptFile]=useState(null);
+ const [receiptPreviewUrl,setReceiptPreviewUrl]=useState("");
  const [receiptIsCopy,setReceiptIsCopy]=useState(false);
  const [ocrGrossOre,setOcrGrossOre]=useState(null);
  const [ocrMismatchChecked,setOcrMismatchChecked]=useState(false);
  const [scanBusy,setScanBusy]=useState(false);
+ const [receiptSession,setReceiptSession]=useState(0);
  const [showMoreRates,setShowMoreRates]=useState(false);
  const [customPurpose,setCustomPurpose]=useState(false);
  const [attachmentIssue,setAttachmentIssue]=useState(null);
+ useEffect(()=>{
+  if(!receiptFile?.type?.startsWith("image/")){
+   setReceiptPreviewUrl("");return;
+  }
+  const url=URL.createObjectURL(receiptFile);
+  setReceiptPreviewUrl(url);
+  return()=>URL.revokeObjectURL(url);
+ },[receiptFile]);
+ const previousOcr=useRef(emptyVatOcrSuggestion());
+ const submittingRef=useRef(false);
  const documentPeriod=vatDocumentPeriod(form.documentDate);
  const chooseReceipt=(file,meta={})=>{
   setReceiptFile(file||null);setReceiptIsCopy(Boolean(file&&meta.converted));setAttachmentIssue(null);setError("");setSuccess("");
   setOcrGrossOre(null);setOcrMismatchChecked(false);
-  if(!file)return; // Preparing a new image must not erase manually entered work.
+  if(!file){
+   // A valid new receipt starts a new accounting draft. Never carry a
+   // manually corrected amount, supplier, VAT rate or purpose to this one.
+   // This is NOT called on a crop or OCR retry of the same receipt.
+   previousOcr.current=emptyVatOcrSuggestion();
+   setForm(x=>startNewVatReceiptDraft(x));
+   setShowMoreRates(false);
+   setCustomPurpose(false);
+   return;
+  } // OCR retry/initial attachment must not erase work on the same receipt.
   setForm(x=>({...x,
    evidenceReference:x.evidenceReference||(
     meta.converted?"Aadland MVA – vedlagt JPEG-kopi, original beholdes eksternt":"Aadland MVA – privat originalvedlegg"),
@@ -44,14 +67,14 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const receiveScan=result=>{
   setOcrGrossOre(Number.isSafeInteger(result.totalOre)?result.totalOre:null);
   setOcrMismatchChecked(false);
-  // OCR supplies suggestions only. A failed scan must not blank manually
-  // entered fields or remove other rates that the user already checked.
-  setForm(x=>({...x,
-   supplierName:result.supplierName||x.supplierName,
-   documentNumber:result.documentNumber||x.documentNumber,
-   documentDate:result.documentDate||x.documentDate,
-   groups:{...x.groups,...result.groups}
-  }));
+  // Preserve manual corrections; withdraw outdated OCR values when a crop
+  // changes the recognized receipt. Never carry an old OCR date forward.
+  const previous=previousOcr.current;
+  previousOcr.current=snapshotVatOcrSuggestion(result);
+  // A new OCR result can change amounts or the date. Require the user to
+  // re-confirm the receipt after reviewing the updated suggestions.
+  setForm(x=>({...mergeVatReceiptSuggestions(x,previous,result),
+   documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
  };
  const attachToDocument=async(id,file)=>{
   const payload=new FormData();payload.append("documentId",id);payload.append("file",file);
@@ -71,8 +94,14 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   }catch(e){setError("Originalbilaget er fortsatt ikke lagret: "+(e.message||"ukjent feil"));}
   finally{setBusy(false);}
  };
- const set=(name,value)=>setForm(x=>({...x,[name]:value}));
- const setGroup=(rate,key,value)=>{setOcrMismatchChecked(false);setForm(x=>({...x,groups:{...x.groups,[rate]:{...x.groups[rate],[key]:value}}}));};
+ const set=(name,value)=>{
+  if(!["documentConfirmed","deductionConfirmed","bankConditionConfirmed"].includes(name))setOcrMismatchChecked(false);
+  setForm(x=>updateVatReceiptReviewedField(x,name,value));
+ };
+ const setGroup=(rate,key,value)=>{
+  setOcrMismatchChecked(false);
+  setForm(x=>updateVatReceiptReviewedAmount(x,rate,key,value));
+ };
  let netTotal=0,vatTotal=0,valid=true;
  for(const rate of rates){
   const line=form.groups[rate],n=parse(line.base),v=parse(line.vat);
@@ -87,20 +116,33 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const percent=Number(form.deductionPercent);
  const deductible=Math.round(vatTotal*percent/100);
  const ocrGrossMismatch=ocrGrossOre!==null&&netTotal>0&&Math.abs(ocrGrossOre-(netTotal+vatTotal))>5;
+ const receiptUploadIssue=vatReceiptAttachmentIssue(receiptFile,form.evidenceReference);
  const submit=async e=>{
-  e.preventDefault();setError("");setSuccess("");
+  e.preventDefault();
+  if(submittingRef.current||busy)return;
+  setError("");setSuccess("");
+  if(attachmentIssue){
+   setError("Forrige bilag er registrert, men originalvedlegget mangler. Bruk opplastingsknappen for det bilaget før du oppretter et nytt.");
+   return;
+  }
   if(scanBusy){setError("Kvitteringen leses fortsatt. Vent til lesingen er ferdig.");return;}
+  if(receiptUploadIssue){setError(receiptUploadIssue);return;}
   if(!valid||netTotal<=0){setError("Kontroller grunnlag og MVA på hver sats (avrundingsavvik maks 0,05 kr).");return;}
   if(ocrGrossMismatch&&!ocrMismatchChecked){setError("OCR-summen stemmer ikke med beløpene. Kontroller kvitteringen og bekreft avviket før registrering.");return;}
-  const question="Registrere et kontrollert leverandørbilag i intern MVA-avstemming?\n\n"+
+  // Reserve the submission synchronously; otherwise a double-tap can submit
+  // twice while Safari is reading the file header asynchronously.
+  submittingRef.current=true;
+  setBusy(true);
+  try{
+   const actualFileIssue=await validateVatReceiptAttachmentBytes(receiptFile,form.evidenceReference);
+   if(actualFileIssue){setError(actualFileIssue);return;}
+   const question="Registrere et kontrollert leverandørbilag i intern MVA-avstemming?\n\n"+
    form.supplierName+" – "+form.documentNumber+"\nDokumentdato: "+form.documentDate+
    "\n"+(form.kind==="credit"?"Kreditnota":"Kjøpsfaktura")+
    "\nBrutto beløp: "+money(netTotal+vatTotal)+
    "\nFradragsandel: "+percent+" %\nFradragsberettiget inngående MVA: "+
    money(deductible)+"\n\nOriginalbilaget må fortsatt bevares i regnskapssystemet.";
-  if(!window.confirm(question))return;
-  setBusy(true);
-  try{
+   if(!window.confirm(question))return;
    const response=await fetch("/api/admin/invoices/vat-purchases",{
     method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({...form,action:"register"})
@@ -122,13 +164,16 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
     ?receiptFile?(receiptIsCopy?"Bilaget og en JPEG-kopi er lagret privat. Behold originalfilen i regnskapet.":"Bilaget og originalkvitteringen er lagret privat.")+" MVA-oversikten oppdateres.":"Bilaget er registrert. MVA-oversikten oppdateres."
     :"Bilaget er registrert, men originalfilen er IKKE lagret. Bruk knappen nedenfor for å prøve igjen.");
    setReceiptFile(null);setReceiptIsCopy(false);setOcrGrossOre(null);setOcrMismatchChecked(false);
-   setForm(x=>({...x,documentNumber:"",originalDocumentNumber:"",
-    evidenceReference:"",businessPurpose:"",groups:blank(),
+   previousOcr.current=emptyVatOcrSuggestion();
+   setForm(x=>({...x,supplierName:"",documentNumber:"",documentDate:"",originalDocumentNumber:"",
+    evidenceReference:"",businessPurpose:"",kind:"purchase",deductionPercent:"100",groups:blank(),
     documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
+   setShowMoreRates(false);setCustomPurpose(false);
+   setReceiptSession(n=>n+1);
    // A failed upload must keep the retry control and selected original visible.
    if(attachmentSaved)onChanged?.({documentDate:data.document?.document_date||form.documentDate});
   }catch(e){setError(e.message||"Registreringen mislyktes.");}
-  finally{setBusy(false);}
+  finally{submittingRef.current=false;setBusy(false);}
  };
  const voidDoc=async doc=>{
   if(busy||doc.voided_at)return;
@@ -154,13 +199,23 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    <p className={styles.intro}>Ta et bilde eller velg en kvittering. Kontroller opplysningene før du registrerer.</p>
   </div>
   <VatReceiptScanner onSelected={chooseReceipt} onExtracted={receiveScan}
-   onBusyChange={setScanBusy} disabled={busy}/>
+   onBusyChange={setScanBusy} resetToken={receiptSession} disabled={busy||Boolean(attachmentIssue)}/>
+  {receiptFile&&receiptPreviewUrl&&<details className={styles.receiptImagePreview}>
+   <summary>Vis kvitteringsbildet og kontroller dato/beløp</summary>
+   <img src={receiptPreviewUrl} alt="Kvitteringen du har valgt som originalbilag"/>
+   <p>Bildet vises bare her mens du kontrollerer opplysningene.</p>
+  </details>}
   {receiptFile&&<div className={styles.scanMessage}>
    <strong>{receiptIsCopy?"JPEG-kopi valgt":"Valgt fil"}:</strong> {receiptFile.name}
    {receiptIsCopy&&". Behold originalen i regnskapssystemet."}
    <button className={styles.textAction} type="button" disabled={busy||scanBusy}
-    onClick={()=>{setReceiptFile(null);setReceiptIsCopy(false);}}>Fjern vedlegg</button>
+    onClick={()=>{
+     setReceiptFile(null);setReceiptIsCopy(false);setOcrGrossOre(null);setOcrMismatchChecked(false);
+     setForm(x=>removeVatReceiptAttachmentReference(x));
+     setReceiptSession(n=>n+1);
+    }}>Fjern vedlegg</button>
   </div>}
+  {receiptUploadIssue&&<p role="alert" className={styles.notice}>{receiptUploadIssue}</p>}
   <form onSubmit={submit} className={styles.form}>
    <section className={styles.section}>
     <h3 className={styles.groupTitle}>2. Opplysninger</h3>
@@ -283,7 +338,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
       <span>Jeg har kontrollert bankbetalingskravet for kjøp på minst 10 000 kr inkl. MVA. Hvis fakturaen ikke er betalt ennå, skal den senere betales via bank eller godkjent betalingsformidler.</span>
      </label>}
     </div>
-    <button className={styles.submit} type="submit" disabled={busy||scanBusy||(ocrGrossMismatch&&!ocrMismatchChecked)||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||
+    <button className={styles.submit} type="submit" disabled={busy||scanBusy||Boolean(attachmentIssue)||Boolean(receiptUploadIssue)||(ocrGrossMismatch&&!ocrMismatchChecked)||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||
      (form.kind==="purchase"&&netTotal+vatTotal>=1000000&&!form.bankConditionConfirmed)}>
      {busy?"Lagrer …":"Registrer kontrollert bilag"}
     </button>
