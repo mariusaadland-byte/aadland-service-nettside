@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from "react";
 import VatOriginalAttachment from "./VatOriginalAttachment";
 import VatReceiptScanner from "./VatReceiptScanner";
+import VatInvoicePdfViewer from "./VatInvoicePdfViewer";
 import styles from "./VatSimpleForm.module.css";
 import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
 import {emptyVatOcrSuggestion,snapshotVatOcrSuggestion,mergeVatReceiptSuggestions,startNewVatReceiptDraft} from "../../../../lib/vatReceiptAutofill";
@@ -243,10 +244,11 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  return <section className={styles.registerShell}>
   <div className={styles.header}>
    <h2>Legg til kjøpsbilag</h2>
-   <p className={styles.intro}>Ta et bilde eller velg en kvittering. Kontroller opplysningene før du registrerer.</p>
+   <p className={styles.intro}>Velg faktura eller kvittering fra Filer på telefonen, eller ta et bilde. Du kan lese hele PDF-fakturaen her før registrering.</p>
   </div>
   <VatReceiptScanner onSelected={chooseReceipt} onExtracted={receiveScan}
    onBusyChange={setScanBusy} resetToken={receiptSession} disabled={busy||Boolean(attachmentIssue)}/>
+  {receiptFile?.type==="application/pdf"&&<VatInvoicePdfViewer file={receiptFile}/>}
   {receiptFile&&receiptPreviewUrl&&<details className={styles.receiptImagePreview}>
    <summary>Vis kvitteringsbildet og kontroller dato/beløp</summary>
    <img src={receiptPreviewUrl} alt="Kvitteringen du har valgt som originalbilag"/>
