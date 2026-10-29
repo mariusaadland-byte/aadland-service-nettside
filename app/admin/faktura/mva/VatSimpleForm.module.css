@@ -157,3 +157,43 @@
 @media(max-height:560px){
  .liveCameraReviewActions .liveCameraCapture,.liveCameraRetake{min-height:49px}
 }
+
+/* Read the uploaded PDF itself on a phone, independently of OCR accuracy. */
+.pdfOpenButton{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+ min-height:48px;padding:10px 14px;margin:0 0 14px;border:1px solid #b6c2b6;border-radius:11px;
+ background:#edf4ef;color:#22392d;font-size:15px;font-weight:750}
+.pdfOpenButton:focus-visible{outline:3px solid #617b69;outline-offset:2px}
+.pdfViewerModal{position:fixed;inset:0;z-index:2147483000;
+ height:100vh;height:100dvh;width:100vw;
+ display:flex;flex-direction:column;min-height:0;overflow:hidden;
+ overscroll-behavior:contain;background:#282b2b;color:#fff}
+.pdfViewerHeader{display:flex;justify-content:space-between;align-items:center;gap:14px;
+ flex:0 0 auto;padding:calc(12px + env(safe-area-inset-top,0px)) 15px 12px;
+ background:#171b1b;min-height:65px}
+.pdfViewerHeader div{min-width:0}
+.pdfViewerHeader strong{display:block;color:#fff;font-size:17px}
+.pdfViewerHeader span{display:block;font-size:12px;line-height:1.4;color:#c7cfcd;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px;max-width:65vw}
+.pdfViewerClose{flex:0 0 auto;min-height:44px;padding:9px 14px;
+ border:1px solid #7c8580;border-radius:9px;background:#2d3431;color:#fff;font-weight:750}
+.pdfViewerToolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;
+ padding:9px 12px;background:#252c29;flex:0 0 auto}
+.pdfViewerToolbar button,.pdfViewerFooter button{padding:9px 12px;min-height:43px;
+ background:#e8f0eb;border:1px solid #bdcbc0;border-radius:9px;color:#1f3025;font-size:13px;font-weight:700}
+.pdfViewerToolbar button:disabled,.pdfViewerFooter button:disabled{opacity:.38;cursor:not-allowed}
+.pdfPageCounter{font-size:13px;font-weight:750;text-align:center;white-space:nowrap}
+.pdfViewerScroll{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;
+ -webkit-overflow-scrolling:touch;padding:12px;background:#373b39}
+.pdfViewerCanvas{display:block;margin:0 auto;background:#fff;max-width:none;
+ border-radius:2px;box-shadow:0 3px 15px #14171799}
+.pdfViewerStatus{padding:16px;max-width:400px;margin:20px auto;color:#fff;
+ text-align:center;line-height:1.6;font-size:14px}
+.pdfViewerFooter{display:flex;flex:0 0 auto;align-items:center;justify-content:center;
+ gap:12px;flex-wrap:wrap;padding:12px 12px calc(15px + env(safe-area-inset-bottom,0px));
+ background:#171b1b;color:#fff}
+.pdfViewerFooter strong{font-size:13px;font-variant-numeric:tabular-nums}
+.pdfViewerFooter p{width:100%;margin:0;font-size:11px;line-height:1.4;
+ text-align:center;color:#ccd3ce}
+.pdfViewerClose:focus-visible,.pdfViewerToolbar button:focus-visible,
+.pdfViewerFooter button:focus-visible{outline:3px solid #9fdaae;outline-offset:2px}
+@media(max-width:390px){.pdfViewerToolbar button{padding:8px;min-height:41px}}
