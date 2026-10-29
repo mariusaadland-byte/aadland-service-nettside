@@ -47,7 +47,15 @@ async function imageFromPdf(file,onProgress){
    const {items}=await page.getTextContent();
    text+="\n"+vatPdfTextRows(items);
   }
-  if(text.replace(/\s/g,"").length>=45)return {text,format:"pdf-tekst"};
+  const invoice=isLikelySupplierInvoice(text);
+  const parsed=invoice?parseNorwegianSupplierInvoice(text):null;
+  const complete=parsed&&parsed.supplierName&&parsed.documentNumber&&parsed.documentDate&&
+   Number.isSafeInteger(parsed.totalOre)&&Object.keys(parsed.groups||{}).length>0;
+  // A PDF can contain a few searchable header/footer words while its actual
+  // invoice is a scanned image. Render and OCR it if essential invoice fields
+  // are missing; keep the trustworthy text as another independent reading.
+  if(text.replace(/\s/g,"").length>=45&&(!invoice||complete))
+   return {text,format:"pdf-tekst"};
   const images=[];
   for(let i=1;i<=Math.min(document.numPages,2);i++){
    const page=await document.getPage(i);
@@ -63,7 +71,7 @@ async function imageFromPdf(file,onProgress){
    canvas.width=0;canvas.height=0;
    if(blob)images.push(blob);
   }
-  return {images,format:"pdf-skann"};
+  return {images,format:"pdf-skann",extractedText:invoice?text:""};
  }finally{await document.destroy();}
 }
 // Preserve the original file unchanged when it fits. On devices that can
@@ -116,11 +124,11 @@ async function prepareReceiptFile(source,onProgress){
 }
 
 async function readLocalReceipt(file,onProgress,readerRef,options={}){
- let format="bilde",images=[file];
+ let format="bilde",images=[file],pdfText="";
  if(file.type==="application/pdf"){
   const pdf=await imageFromPdf(file,onProgress);
   if(pdf.text)return {text:pdf.text,format:pdf.format,confidence:null};
-  images=pdf.images;format="pdf-skann";
+  images=pdf.images;format="pdf-skann";pdfText=pdf.extractedText||"";
  }
  const tess=await loadScript(TESSERACT_URL,"Tesseract");
  // Keep the worker alive within this page: models need not be downloaded and
@@ -146,6 +154,16 @@ async function readLocalReceipt(file,onProgress,readerRef,options={}){
    // Keep the first OCR result if the alternate layout is unsupported or fails.
    onProgress("Alternativ lesing var ikke tilgjengelig. Beholder første resultat …");
   }
+ }
+ if(pdfText){
+  const searchable={text:pdfText,confidence:null,parsed:parseNorwegianSupplierInvoice(pdfText)};
+  // Compare the OCR reading with the embedded PDF text. Conflicting invoice
+  // numbers, dates or amounts remain blank instead of being silently guessed.
+  const invoiceOcr=best.parsed?.documentKind==="supplier-invoice"
+   ?best:{...best,parsed:parseNorwegianSupplierInvoice(best.text)};
+  const merged=chooseVatReceiptScan(searchable,invoiceOcr);
+  return {text:merged.text,confidence:best.confidence,format:"pdf-tekst-og-bilde",
+   parsed:merged.parsed,retried:true};
  }
  return {text:best.text,confidence:best.confidence,format,parsed:best.parsed,retried:best.retried};
 }
