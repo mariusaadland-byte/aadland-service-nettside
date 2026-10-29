@@ -73,7 +73,7 @@ export default function VatInvoicePdfViewer({file}){
     const data=new Uint8Array(await file.arrayBuffer());
     const task=library.getDocument({data});
     document=await task.promise;
-    if(cancelled)return;
+    if(cancelled){await document.destroy().catch(()=>{});document=null;return;}
     if(!document.numPages)throw Error("PDF-filen inneholder ingen sider.");
     setPdf(document);setPages(document.numPages);
    }catch(e){
@@ -139,6 +139,7 @@ export default function VatInvoicePdfViewer({file}){
    <div ref={scrollRef} className={styles.pdfViewerScroll}>
     {loading&&<p role="status" className={styles.pdfViewerStatus}>Leser fakturaen fra telefonen …</p>}
     {error&&<p role="alert" className={styles.pdfViewerStatus}>{error}</p>}
+    {rendering&&!error&&<p role="status" className={styles.pdfViewerStatus}>Viser side {pageNumber} …</p>}
     <canvas ref={canvasRef} className={styles.pdfViewerCanvas} aria-label={"Faktura side "+pageNumber} role="img"
      style={{visibility:pdf&&!error?"visible":"hidden"}}/>
    </div>
