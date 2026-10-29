@@ -11,7 +11,7 @@ import styles from "./VatSimpleForm.module.css";
 export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}){
  const videoRef=useRef(null),streamRef=useRef(null),stageRef=useRef(null);
  const closeRef=useRef(null),previousFocus=useRef(null),dialogRef=useRef(null);
- const cancelRef=useRef(onCancel),capturingRef=useRef(false);
+ const cancelRef=useRef(onCancel),capturingRef=useRef(false),reviewRef=useRef(false);
  cancelRef.current=onCancel;
  const [mounted,setMounted]=useState(false);
  const [corners,setCorners]=useState(null);
@@ -19,6 +19,9 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
  const [error,setError]=useState("");
  const [ready,setReady]=useState(false);
  const [capturing,setCapturing]=useState(false);
+ const [photo,setPhoto]=useState(null);
+ reviewRef.current=Boolean(photo);
+ useEffect(()=>()=>{if(photo?.url)URL.revokeObjectURL(photo.url);},[photo]);
 
  useEffect(()=>{setMounted(true);},[]);
  useEffect(()=>{
@@ -86,7 +89,7 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
     const ctx=preview.getContext("2d",{willReadFrequently:true});
     if(!ctx)return;
     timer=setInterval(()=>{
-     if(video.readyState<2||!video.videoWidth||!video.videoHeight||canceled)return;
+     if(reviewRef.current||video.readyState<2||!video.videoWidth||!video.videoHeight||canceled)return;
      try{
       const scale=Math.min(1,280/Math.max(video.videoWidth,video.videoHeight));
       preview.width=Math.max(80,Math.round(video.videoWidth*scale));
@@ -113,7 +116,7 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
 
  async function takePicture(){
   const video=videoRef.current;
-  if(disabled||capturing||!ready||!video?.videoWidth)return;
+  if(disabled||capturing||photo||!ready||!video?.videoWidth)return;
   capturingRef.current=true;setCapturing(true);setError("");
   try{
    const canvas=document.createElement("canvas");
@@ -126,45 +129,72 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
    const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",.91));
    canvas.width=0;canvas.height=0;
    if(!blob||blob.size<12)throw Error("Kunne ikke lagre kamerabildet.");
-   await onCapture(new File([blob],"kvittering-kamera.jpg",{type:"image/jpeg"}));
+   const file=new File([blob],"kvittering-kamera.jpg",{type:"image/jpeg"});
+   // Retaking leaves the previous form and accounting attachment unchanged.
+   const url=URL.createObjectURL(blob);
+   setPhoto({file,url});
   }catch(e){setError(String(e.message||"Klarte ikke å ta bildet."));}
   finally{capturingRef.current=false;setCapturing(false);}
  }
 
+ async function acceptPhoto(){
+  if(!photo||disabled||capturingRef.current)return;
+  capturingRef.current=true;setCapturing(true);setError("");
+  try{await onCapture(photo.file);}
+  catch(e){setError(String(e?.message||"Kunne ikke bruke bildet. Prøv igjen."));}
+  finally{capturingRef.current=false;setCapturing(false);}
+ }
+ function retakePhoto(){
+  if(capturing||disabled)return;
+  setPhoto(null);setError("");setCorners(null);
+ }
  if(!mounted)return null;
  const outline=corners?.map(p=>`${(p.x*100).toFixed(2)},${(p.y*100).toFixed(2)}`).join(" ")||"";
  return createPortal(<div ref={dialogRef} className={styles.liveCameraFullscreen} role="dialog"
   aria-modal="true" aria-label="Skann kvittering i fullskjerm">
   <header className={styles.liveCameraHeader}>
-   <div><strong>Skann kvittering</strong><span>Hold hele kvitteringen synlig i kameraet</span></div>
+   <div><strong>{photo?"Kontroller bildet":"Skann kvittering"}</strong>
+    <span>{photo?"Les hele kvitteringen før du fortsetter":"Hold hele kvitteringen synlig i kameraet"}</span></div>
    <button ref={closeRef} type="button" onClick={onCancel} disabled={capturing}
     className={styles.liveCameraClose} aria-label="Lukk skanneren">✕ Lukk</button>
   </header>
   <div ref={stageRef} className={styles.liveCameraStage}>
    <video ref={videoRef} autoPlay playsInline muted className={styles.liveCameraVideo}
+    style={photo?{visibility:"hidden"}:undefined}
     onLoadedMetadata={()=>{const video=videoRef.current,stage=stageRef.current;
      if(!video?.videoWidth||!stage)return;
      const frame=vatCameraVisibleFrame(stage.clientWidth,stage.clientHeight,video.videoWidth,video.videoHeight);
      if(frame)setPreviewBox(frame);
     }}/>
-   {outline&&previewBox&&<svg className={styles.liveCameraOutline} viewBox="0 0 100 100"
+   {photo&&<img className={styles.liveCameraPhotoReview} src={photo.url}
+    alt="Bildet du nettopp tok av kvitteringen. Kontroller at hele papiret er med og teksten er skarp."/>}
+   {!photo&&outline&&previewBox&&<svg className={styles.liveCameraOutline} viewBox="0 0 100 100"
     style={{left:previewBox.left,top:previewBox.top,width:previewBox.width,height:previewBox.height}}
     preserveAspectRatio="none" aria-hidden="true">
     <polygon points={outline} fill="rgba(18,160,106,.08)" stroke="#26d894"
      strokeWidth=".8" strokeLinejoin="round"/>
    </svg>}
-   {!ready&&!error&&<p className={styles.liveCameraHint}>Starter kamera …</p>}
+   {!photo&&!ready&&!error&&<p className={styles.liveCameraHint}>Starter kamera …</p>}
   </div>
   <footer className={styles.liveCameraFooter}>
-   <p className={styles.liveCameraStatus} aria-live="polite">{corners
+   <p className={styles.liveCameraStatus} aria-live="polite">{photo
+    ?"Ser du hele kvitteringen tydelig? Velg Bruk bildet, eller ta et nytt bilde."
+    :corners
     ?"Grønn ramme funnet. Hold telefonen stille og ta bildet."
     :"Legg hele kvitteringen på et mørkere underlag. Ta bilde også uten grønn ramme."}</p>
    {error&&<p role="alert" className={styles.liveCameraError}>{error}</p>}
-   <button type="button" onClick={takePicture} disabled={!ready||disabled||capturing}
+   {photo?<div className={styles.liveCameraReviewActions}>
+    <button type="button" onClick={retakePhoto} disabled={disabled||capturing}
+     className={styles.liveCameraRetake}>Ta på nytt</button>
+    <button type="button" onClick={acceptPhoto} disabled={disabled||capturing}
+     className={styles.liveCameraCapture} aria-label="Bruk det fotograferte kvitteringsbildet">
+     {capturing?"Behandler …":"Bruk bildet"}
+    </button>
+   </div>:<button type="button" onClick={takePicture} disabled={!ready||disabled||capturing}
     className={styles.liveCameraCapture} aria-label="Ta bilde av kvitteringen">
     <span aria-hidden="true" className={styles.liveCameraShutterIcon}/>
     {capturing?"Tar bilde …":"Ta bilde"}
-   </button>
+   </button>}
   </footer>
  </div>,document.body);
 }

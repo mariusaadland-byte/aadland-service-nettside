@@ -39,7 +39,8 @@ assert.ok(camera.includes('querySelectorAll("button:not([disabled])")'),
  "Keyboard focus should remain within the camera");
 assert.ok(camera.includes("onClick={onCancel}"),"Close camera from the top bar");
 assert.ok(camera.includes("disabled={!ready||disabled||capturing}"),"No blank photo before ready");
-assert.ok(camera.includes("onCapture(new File([blob]"),"Keep full camera JPEG capture");
+assert.ok(camera.includes("const file=new File([blob]"),"Keep full camera JPEG capture");
+assert.ok(camera.includes("onCapture(photo.file)"),"Captured photo must be accepted before OCR begins");
 assert.ok(camera.includes('stream.getTracks().forEach(track=>track.stop())'),
  "Camera tracks must stop after closing");
 assert.ok(camera.includes("observer?.disconnect()"),
