@@ -91,6 +91,8 @@
 .liveCameraStage{position:relative;flex:1 1 auto;min-height:0;width:100%;overflow:hidden;background:#080909}
 .liveCameraVideo{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain;background:#080909}
 .liveCameraOutline{position:absolute;pointer-events:none;overflow:visible}
+.liveCameraPhotoReview{position:absolute;inset:0;display:block;width:100%;height:100%;
+ object-fit:contain;background:#080909}
 .liveCameraHint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
  color:#fff;text-align:center;font-size:15px}
 .liveCameraFooter{
@@ -143,3 +145,15 @@
 .grossCalcButton:disabled{opacity:.5;cursor:not-allowed}
 .grossHelp{font-size:12px;line-height:1.5;color:#67615b;margin:0 0 12px}
 @media(max-width:420px){.grossCalculator{grid-template-columns:minmax(0,1fr)}}
+
+/* Review the original full-sized camera photo before starting OCR. */
+.liveCameraReviewActions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+ align-items:stretch;gap:10px;width:min(100%,440px)}
+.liveCameraReviewActions .liveCameraCapture{width:100%;min-height:60px}
+.liveCameraRetake{min-height:60px;padding:12px 10px;border-radius:15px;
+ border:1px solid #8a9590;background:#29312e;color:#fff;font-size:16px;font-weight:750}
+.liveCameraRetake:disabled{opacity:.45;cursor:not-allowed}
+.liveCameraRetake:focus-visible{outline:3px solid #70d8aa;outline-offset:3px}
+@media(max-height:560px){
+ .liveCameraReviewActions .liveCameraCapture,.liveCameraRetake{min-height:49px}
+}
