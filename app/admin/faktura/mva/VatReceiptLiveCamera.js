@@ -9,7 +9,9 @@ import styles from "./VatSimpleForm.module.css";
 // so its lines stay on the paper even when iPhone cameras change aspect.
 export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}){
  const videoRef=useRef(null),streamRef=useRef(null),stageRef=useRef(null);
- const closeRef=useRef(null),previousFocus=useRef(null);
+ const closeRef=useRef(null),previousFocus=useRef(null),dialogRef=useRef(null);
+ const cancelRef=useRef(onCancel),capturingRef=useRef(false);
+ cancelRef.current=onCancel;
  const [mounted,setMounted]=useState(false);
  const [corners,setCorners]=useState(null);
  const [previewBox,setPreviewBox]=useState(null);
@@ -32,7 +34,14 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
   body.style.width="100%";body.style.overflow="hidden";
   closeRef.current?.focus();
   const onKey=e=>{
-   if(e.key==="Escape"&&!capturing){e.preventDefault();onCancel();}
+   if(e.key==="Escape"&&!capturingRef.current){e.preventDefault();cancelRef.current();}
+   if(e.key==="Tab"){
+    const buttons=[...dialogRef.current?.querySelectorAll("button:not([disabled])")||[]];
+    if(!buttons.length)return;
+    const first=buttons[0],last=buttons[buttons.length-1];
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+   }
   };
   window.addEventListener("keydown",onKey);
   return ()=>{
@@ -41,7 +50,7 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
    window.scrollTo(0,scrollY);
    previousFocus.current?.focus?.();
   };
- },[mounted,capturing,onCancel]);
+ },[mounted]);
 
  useEffect(()=>{
   if(!mounted)return;
@@ -105,7 +114,7 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
  async function takePicture(){
   const video=videoRef.current;
   if(disabled||capturing||!ready||!video?.videoWidth)return;
-  setCapturing(true);setError("");
+  capturingRef.current=true;setCapturing(true);setError("");
   try{
    const canvas=document.createElement("canvas");
    const scale=Math.min(1,3000/Math.max(video.videoWidth,video.videoHeight));
@@ -119,12 +128,12 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
    if(!blob||blob.size<12)throw Error("Kunne ikke lagre kamerabildet.");
    await onCapture(new File([blob],"kvittering-kamera.jpg",{type:"image/jpeg"}));
   }catch(e){setError(String(e.message||"Klarte ikke å ta bildet."));}
-  finally{setCapturing(false);}
+  finally{capturingRef.current=false;setCapturing(false);}
  }
 
  if(!mounted)return null;
  const outline=corners?.map(p=>`${(p.x*100).toFixed(2)},${(p.y*100).toFixed(2)}`).join(" ")||"";
- return createPortal(<div className={styles.liveCameraFullscreen} role="dialog"
+ return createPortal(<div ref={dialogRef} className={styles.liveCameraFullscreen} role="dialog"
   aria-modal="true" aria-label="Skann kvittering i fullskjerm">
   <header className={styles.liveCameraHeader}>
    <div><strong>Skann kvittering</strong><span>Hold hele kvitteringen synlig i kameraet</span></div>
