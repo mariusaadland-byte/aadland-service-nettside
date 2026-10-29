@@ -311,7 +311,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
 
  return <section className={styles.scanShell}>
   <h3>{documentType==="invoice"?"Last opp faktura":"1. Legg til kvittering"}</h3>
-  <p className={styles.scanLead}>Ta bilde eller velg en fil. Vi forsøker å fylle ut feltene automatisk.</p>
+  <p className={styles.scanLead}>Har du fakturaen som PDF på telefonen? Velg den fra Filer – én eller flere sider leses direkte. Du trenger ikke ta bilde.</p>
   <div className={styles.uploadActions}>
    <button type="button" className={styles.uploadAction} disabled={disabled||busy||Boolean(cropJob)}
     onClick={()=>setLiveCamera(true)}>📷 Skann med ramme</button>
