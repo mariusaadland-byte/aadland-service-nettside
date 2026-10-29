@@ -44,6 +44,11 @@ for(const sample of samples){
  assert.deepEqual(p.groups,sample.group,sample.name+" VAT breakdown");
  assert.deepEqual(p.warnings,[],sample.name+" warnings");
 }
+const decimalRate=parseNorwegianSupplierInvoice(
+ "Leverandør: Grossist AS\\nFakturanr: 233301\\nFakturadato: 20.10.2026\\n"+
+ "Sum eks. mva 2 000,00\\nMVA 25,00 % 500,00\\nÅ betale 2 500,00");
+assert.deepEqual(decimalRate.groups[25],{base:"2000,00",vat:"500,00"},
+ "Common Norwegian 25,00 % notation must work");
 const wrongVat=parseNorwegianSupplierInvoice(
  "Leverandør: Test AS\nFakturanr: 100020\nFakturadato: 20.10.2026\n"+
  "MVA Grunnlag Avgift Totalt\n25 % 100,00 25,00 125,00\nÅ betale 170,00");
