@@ -194,7 +194,7 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
     className={styles.liveCameraCapture} aria-label="Ta bilde av kvitteringen">
     <span aria-hidden="true" className={styles.liveCameraShutterIcon}/>
     {capturing?"Tar bilde …":"Ta bilde"}
-   </button>
+   </button>}
   </footer>
  </div>,document.body);
 }
