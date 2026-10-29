@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from "react";
 import {createPortal} from "react-dom";
 import {detectReceiptCorners} from "../../../../lib/vatReceiptCrop";
+import {vatCameraVisibleFrame} from "../../../../lib/vatCameraVisibleFrame";
 import styles from "./VatSimpleForm.module.css";
 
 // The full camera feed is captured, never just the green guide polygon.
@@ -36,7 +37,7 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
   const onKey=e=>{
    if(e.key==="Escape"&&!capturingRef.current){e.preventDefault();cancelRef.current();}
    if(e.key==="Tab"){
-    const buttons=[...dialogRef.current?.querySelectorAll("button:not([disabled])")||[]];
+    const buttons=[...(dialogRef.current?.querySelectorAll("button:not([disabled])")||[])];
     if(!buttons.length)return;
     const first=buttons[0],last=buttons[buttons.length-1];
     if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
@@ -58,9 +59,8 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
   const updateOverlay=()=>{
    const video=videoRef.current,stage=stageRef.current;
    if(!video?.videoWidth||!video?.videoHeight||!stage?.clientWidth||!stage?.clientHeight)return;
-   const scale=Math.min(stage.clientWidth/video.videoWidth,stage.clientHeight/video.videoHeight);
-   const width=video.videoWidth*scale,height=video.videoHeight*scale;
-   setPreviewBox({left:(stage.clientWidth-width)/2,top:(stage.clientHeight-height)/2,width,height});
+   const frame=vatCameraVisibleFrame(stage.clientWidth,stage.clientHeight,video.videoWidth,video.videoHeight);
+   if(frame)setPreviewBox(frame);
   };
   const observer=typeof ResizeObserver!=="undefined"?new ResizeObserver(updateOverlay):null;
   if(stageRef.current)observer?.observe(stageRef.current);
@@ -144,9 +144,8 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
    <video ref={videoRef} autoPlay playsInline muted className={styles.liveCameraVideo}
     onLoadedMetadata={()=>{const video=videoRef.current,stage=stageRef.current;
      if(!video?.videoWidth||!stage)return;
-     const scale=Math.min(stage.clientWidth/video.videoWidth,stage.clientHeight/video.videoHeight);
-     const width=video.videoWidth*scale,height=video.videoHeight*scale;
-     setPreviewBox({left:(stage.clientWidth-width)/2,top:(stage.clientHeight-height)/2,width,height});
+     const frame=vatCameraVisibleFrame(stage.clientWidth,stage.clientHeight,video.videoWidth,video.videoHeight);
+     if(frame)setPreviewBox(frame);
     }}/>
    {outline&&previewBox&&<svg className={styles.liveCameraOutline} viewBox="0 0 100 100"
     style={{left:previewBox.left,top:previewBox.top,width:previewBox.width,height:previewBox.height}}
