@@ -24,7 +24,7 @@ assert.ok(camera.includes('autoPlay playsInline muted'));
 assert.ok(camera.includes("<polygon points={outline}"));
 assert.ok(camera.includes('onCapture(new File([blob]'));
 assert.ok(camera.includes('!ready||disabled||capturing'));
-assert.ok(camera.includes('Bruk vanlig kamera'));
+assert.ok(camera.toLowerCase().includes('bruk vanlig kamera'),"Keep the native camera fallback in fullscreen error text");
 const scanner=read("app/admin/faktura/mva/VatReceiptScanner.js");
 assert.ok(scanner.includes("<VatReceiptLiveCamera"));
 assert.ok(scanner.includes("setLiveCamera(false)"));

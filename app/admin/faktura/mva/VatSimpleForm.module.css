@@ -67,16 +67,54 @@
  text-underline-offset:3px;color:#675033;margin-top:10px}
 .nativeCameraLink input{position:absolute;width:1px;height:1px;opacity:0}
 .nativeCameraLink:has(input:disabled){opacity:.5;cursor:not-allowed}
-.liveCameraShell{margin:14px 0 10px;padding:0;max-width:520px}
-.liveCameraStage{position:relative;background:#161616;border-radius:12px;overflow:hidden;min-height:220px}
-.liveCameraVideo{display:block;width:100%;height:auto;min-height:220px;object-fit:fill}
-.liveCameraOutline{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-.liveCameraHint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:white;font-size:13px}
-.liveCameraActions{display:flex;gap:10px;margin-top:12px}
-.liveCameraActions button{flex:1;min-height:45px;border-radius:10px;padding:9px 13px;font-size:14px;font-weight:700}
-.liveCameraCancel{background:#f7f5f1;color:#25231f;border:1px solid #d8d4cd}
-.liveCameraCapture{background:#201d19;color:#fff;border:1px solid #201d19}
-.liveCameraCapture:disabled{opacity:.5}
+/* Full viewport camera overlay, rendered into body so admin containers
+   cannot clip it. Keep the ENTIRE feed visible (never distort or crop). */
+.liveCameraFullscreen{
+ position:fixed;inset:0;z-index:2147483000;
+ display:flex;flex-direction:column;
+ width:100vw;height:100vh;height:100dvh;min-height:0;
+ overflow:hidden;overscroll-behavior:none;background:#080909;color:#fff;
+}
+.liveCameraHeader{
+ flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;
+ min-height:70px;padding:calc(12px + env(safe-area-inset-top,0px)) 17px 13px;
+ background:#141515;color:#fff;
+}
+.liveCameraHeader strong{display:block;font-size:18px;line-height:1.2;color:#fff}
+.liveCameraHeader span{display:block;font-size:12px;color:#d0d4d2;line-height:1.4;margin-top:5px}
+.liveCameraClose{
+ flex:0 0 auto;min-width:72px;min-height:44px;padding:10px 13px;
+ border:1px solid #717675;border-radius:10px;background:#292d2c;color:#fff;
+ font-size:14px;font-weight:700;
+}
+.liveCameraClose:disabled{opacity:.5}
+.liveCameraStage{position:relative;flex:1 1 auto;min-height:0;width:100%;overflow:hidden;background:#080909}
+.liveCameraVideo{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain;background:#080909}
+.liveCameraOutline{position:absolute;pointer-events:none;overflow:visible}
+.liveCameraHint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+ color:#fff;text-align:center;font-size:15px}
+.liveCameraFooter{
+ flex:0 0 auto;display:flex;flex-direction:column;align-items:center;
+ gap:12px;min-height:135px;
+ padding:14px 15px calc(18px + env(safe-area-inset-bottom,0px));background:#141515;color:#fff;
+}
+.liveCameraStatus{font-size:13px;color:#e0e5e1;line-height:1.4;text-align:center;max-width:360px;margin:0}
+.liveCameraError{font-size:13px;color:#ffe4bb;line-height:1.45;text-align:center;margin:0}
+.liveCameraCapture{
+ display:flex;align-items:center;justify-content:center;gap:12px;
+ width:min(100%,350px);min-height:66px;padding:12px 18px;
+ border:2px solid #fff;border-radius:15px;background:#fff;color:#131716;
+ font-size:18px;font-weight:800;box-shadow:none;
+}
+.liveCameraShutterIcon{display:inline-block;flex:0 0 28px;width:28px;height:28px;border-radius:50%;
+ background:#252a29;border:5px solid #e8edea;box-shadow:0 0 0 2px #252a29}
+.liveCameraCapture:disabled{opacity:.45;cursor:not-allowed}
+.liveCameraClose:focus-visible,.liveCameraCapture:focus-visible{outline:3px solid #70d8aa;outline-offset:3px}
+@media(max-height:560px){
+ .liveCameraHeader{min-height:52px;padding-top:max(8px,env(safe-area-inset-top,0px));padding-bottom:8px}
+ .liveCameraFooter{min-height:102px;gap:7px;padding-top:9px;padding-bottom:max(10px,env(safe-area-inset-bottom,0px))}
+ .liveCameraCapture{min-height:50px}
+}
 .scanHelp{font-size:12px;color:#666059;margin-top:11px}
 .scanHelp summary{cursor:pointer;display:inline;text-decoration:underline;text-underline-offset:3px}
 .scanHelp p{margin:9px 0 0;line-height:1.55}
