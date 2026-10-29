@@ -1,21 +1,64 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
+import {createPortal} from "react-dom";
 import {detectReceiptCorners} from "../../../../lib/vatReceiptCrop";
 import styles from "./VatSimpleForm.module.css";
 
-// Live edge hints, not an irreversible auto-crop: a receipt on a light
-// surface may be impossible to detect reliably. The captured JPEG is full.
+// The full camera feed is captured, never just the green guide polygon.
+// The overlay uses the visible video dimensions, including letterboxing,
+// so its lines stay on the paper even when iPhone cameras change aspect.
 export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}){
- const videoRef=useRef(null),streamRef=useRef(null);
+ const videoRef=useRef(null),streamRef=useRef(null),stageRef=useRef(null);
+ const closeRef=useRef(null),previousFocus=useRef(null);
+ const [mounted,setMounted]=useState(false);
  const [corners,setCorners]=useState(null);
+ const [previewBox,setPreviewBox]=useState(null);
  const [error,setError]=useState("");
  const [ready,setReady]=useState(false);
  const [capturing,setCapturing]=useState(false);
+
+ useEffect(()=>{setMounted(true);},[]);
  useEffect(()=>{
+  if(!mounted)return;
+  const body=document.body;
+  const scrollY=window.scrollY;
+  previousFocus.current=document.activeElement;
+  const before={position:body.style.position,top:body.style.top,
+   left:body.style.left,right:body.style.right,width:body.style.width,
+   overflow:body.style.overflow};
+  body.style.position="fixed";
+  body.style.top="-"+scrollY+"px";
+  body.style.left="0";body.style.right="0";
+  body.style.width="100%";body.style.overflow="hidden";
+  closeRef.current?.focus();
+  const onKey=e=>{
+   if(e.key==="Escape"&&!capturing){e.preventDefault();onCancel();}
+  };
+  window.addEventListener("keydown",onKey);
+  return ()=>{
+   window.removeEventListener("keydown",onKey);
+   for(const key of Object.keys(before))body.style[key]=before[key];
+   window.scrollTo(0,scrollY);
+   previousFocus.current?.focus?.();
+  };
+ },[mounted,capturing,onCancel]);
+
+ useEffect(()=>{
+  if(!mounted)return;
   let canceled=false,timer=null;
+  const updateOverlay=()=>{
+   const video=videoRef.current,stage=stageRef.current;
+   if(!video?.videoWidth||!video?.videoHeight||!stage?.clientWidth||!stage?.clientHeight)return;
+   const scale=Math.min(stage.clientWidth/video.videoWidth,stage.clientHeight/video.videoHeight);
+   const width=video.videoWidth*scale,height=video.videoHeight*scale;
+   setPreviewBox({left:(stage.clientWidth-width)/2,top:(stage.clientHeight-height)/2,width,height});
+  };
+  const observer=typeof ResizeObserver!=="undefined"?new ResizeObserver(updateOverlay):null;
+  if(stageRef.current)observer?.observe(stageRef.current);
+  window.addEventListener("resize",updateOverlay);
   async function start(){
    if(!navigator.mediaDevices?.getUserMedia){
-    setError("Nettleseren støtter ikke direkteskanning. Bruk vanlig kamera i stedet.");return;
+    setError("Nettleseren støtter ikke direkteskanning. Lukk og bruk vanlig kamera.");return;
    }
    try{
     const stream=await navigator.mediaDevices.getUserMedia({
@@ -24,11 +67,12 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
     if(canceled){stream.getTracks().forEach(track=>track.stop());return;}
     streamRef.current=stream;
     const video=videoRef.current;
-    if(!video){stream.getTracks().forEach(track=>track.stop());return;}
+    if(!video){stream.getTracks().forEach(track=>track.stop());streamRef.current=null;return;}
     video.srcObject=stream;
     await video.play();
     if(canceled)return;
     setReady(true);
+    updateOverlay();
     const preview=document.createElement("canvas");
     const ctx=preview.getContext("2d",{willReadFrequently:true});
     if(!ctx)return;
@@ -43,18 +87,21 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
      }catch{setCorners(null);}
     },550);
    }catch{
-    if(!canceled)setError("Fikk ikke tilgang til kameraet. Sjekk kameratillatelsen, eller bruk vanlig kamera.");
+    if(!canceled)setError("Fikk ikke tilgang til kameraet. Sjekk kameratillatelsen, eller lukk og bruk vanlig kamera.");
    }
   }
   void start();
   return ()=>{
    canceled=true;
    if(timer!==null)clearInterval(timer);
+   observer?.disconnect();
+   window.removeEventListener("resize",updateOverlay);
    const stream=streamRef.current;
    if(stream){stream.getTracks().forEach(track=>track.stop());streamRef.current=null;}
    if(videoRef.current)videoRef.current.srcObject=null;
   };
- },[]);
+ },[mounted]);
+
  async function takePicture(){
   const video=videoRef.current;
   if(disabled||capturing||!ready||!video?.videoWidth)return;
@@ -74,25 +121,42 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
   }catch(e){setError(String(e.message||"Klarte ikke å ta bildet."));}
   finally{setCapturing(false);}
  }
+
+ if(!mounted)return null;
  const outline=corners?.map(p=>`${(p.x*100).toFixed(2)},${(p.y*100).toFixed(2)}`).join(" ")||"";
- return <div className={styles.liveCameraShell}>
-  <div className={styles.liveCameraStage}>
-   <video ref={videoRef} autoPlay playsInline muted className={styles.liveCameraVideo}/>
-   {outline&&<svg className={styles.liveCameraOutline} viewBox="0 0 100 100"
+ return createPortal(<div className={styles.liveCameraFullscreen} role="dialog"
+  aria-modal="true" aria-label="Skann kvittering i fullskjerm">
+  <header className={styles.liveCameraHeader}>
+   <div><strong>Skann kvittering</strong><span>Hold hele kvitteringen synlig i kameraet</span></div>
+   <button ref={closeRef} type="button" onClick={onCancel} disabled={capturing}
+    className={styles.liveCameraClose} aria-label="Lukk skanneren">✕ Lukk</button>
+  </header>
+  <div ref={stageRef} className={styles.liveCameraStage}>
+   <video ref={videoRef} autoPlay playsInline muted className={styles.liveCameraVideo}
+    onLoadedMetadata={()=>{const video=videoRef.current,stage=stageRef.current;
+     if(!video?.videoWidth||!stage)return;
+     const scale=Math.min(stage.clientWidth/video.videoWidth,stage.clientHeight/video.videoHeight);
+     const width=video.videoWidth*scale,height=video.videoHeight*scale;
+     setPreviewBox({left:(stage.clientWidth-width)/2,top:(stage.clientHeight-height)/2,width,height});
+    }}/>
+   {outline&&previewBox&&<svg className={styles.liveCameraOutline} viewBox="0 0 100 100"
+    style={{left:previewBox.left,top:previewBox.top,width:previewBox.width,height:previewBox.height}}
     preserveAspectRatio="none" aria-hidden="true">
     <polygon points={outline} fill="rgba(18,160,106,.08)" stroke="#26d894"
-     strokeWidth="1" strokeLinejoin="round"/>
+     strokeWidth=".8" strokeLinejoin="round"/>
    </svg>}
    {!ready&&!error&&<p className={styles.liveCameraHint}>Starter kamera …</p>}
   </div>
-  <p className={styles.scanMessage}>{corners
-   ?"Kvitteringen er markert. Hold telefonen stille og ta bildet."
-   :"Legg hele kvitteringen på et mørkere underlag. Du kan ta bilde selv om rammen ikke vises."}</p>
-  {error&&<p role="alert" className={styles.scanMessage}>{error}</p>}
-  <div className={styles.liveCameraActions}>
-   <button type="button" onClick={onCancel} className={styles.liveCameraCancel}>Lukk kamera</button>
+  <footer className={styles.liveCameraFooter}>
+   <p className={styles.liveCameraStatus} aria-live="polite">{corners
+    ?"Grønn ramme funnet. Hold telefonen stille og ta bildet."
+    :"Legg hele kvitteringen på et mørkere underlag. Ta bilde også uten grønn ramme."}</p>
+   {error&&<p role="alert" className={styles.liveCameraError}>{error}</p>}
    <button type="button" onClick={takePicture} disabled={!ready||disabled||capturing}
-    className={styles.liveCameraCapture}>{capturing?"Tar bilde …":"Ta bilde"}</button>
-  </div>
- </div>;
+    className={styles.liveCameraCapture} aria-label="Ta bilde av kvitteringen">
+    <span aria-hidden="true" className={styles.liveCameraShutterIcon}/>
+    {capturing?"Tar bilde …":"Ta bilde"}
+   </button>
+  </footer>
+ </div>,document.body);
 }
