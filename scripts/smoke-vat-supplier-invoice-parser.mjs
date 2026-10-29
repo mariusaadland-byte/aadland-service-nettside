@@ -89,6 +89,12 @@ assert.equal(vatPdfTextRows([]),"");
 assert.match(vatPdfTextRows([{str:"Fakturanr: 222",hasEOL:true},{str:"Fakturadato: 20.10.2026"}]),/Fakturanr: 222\nFakturadato/);
 const scanner=read("app/admin/faktura/mva/VatReceiptScanner.js");
 assert.ok(scanner.includes("vatPdfTextRows(items)"),"Use layout-preserving PDF text");
+assert.ok(scanner.includes("if(text.replace(/\\s/g,\"\").length>=45&&(!invoice||complete))"),
+ "Unreadable invoice PDF should not stop at boilerplate text");
+assert.ok(scanner.includes('format:"pdf-skann",extractedText:invoice?text:""'),
+ "Retain extracted invoice text while running image OCR");
+assert.ok(scanner.includes("const merged=chooseVatReceiptScan(searchable,invoiceOcr)"),
+ "Reconcile OCR with searchable PDF data without accepting contradictions");
 assert.ok(scanner.includes("isLikelySupplierInvoice(text)"));
 assert.ok(scanner.includes("parseNorwegianSupplierInvoice(text)"));
 assert.ok(scanner.includes("sourceParsed.documentKind==="+'"supplier-invoice"'),
