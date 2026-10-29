@@ -134,7 +134,14 @@ async function readLocalReceipt(file,onProgress,readerRef,options={}){
   onProgress("Noen felt mangler. Prøver en annen måte å lese kvitteringen på …");
   try{
    const second=await readerRef.current.recognize(prepared,onProgress,{layout:"column"});
-   best=chooseVatReceiptScan(first,{...second,parsed:parseDocument(second.text,options.documentType)});
+   const alternate={...second,parsed:parseDocument(second.text,options.documentType)};
+   // If either reading clearly identifies a supplier invoice, never
+   // combine that invoice's numbers with fields from receipt parsing.
+   if(first.parsed.documentKind==="supplier-invoice"||alternate.parsed.documentKind==="supplier-invoice"){
+    first.parsed=parseNorwegianSupplierInvoice(first.text);
+    alternate.parsed=parseNorwegianSupplierInvoice(second.text);
+   }
+   best=chooseVatReceiptScan(first,alternate);
   }catch{
    // Keep the first OCR result if the alternate layout is unsupported or fails.
    onProgress("Alternativ lesing var ikke tilgjengelig. Beholder første resultat …");
