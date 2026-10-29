@@ -8,7 +8,7 @@ assert.ok(processor.includes("if(options.noAutoCrop){"));
 assert.ok(processor.includes("const geometry=vatOcrGeometry(img.naturalWidth,img.naturalHeight,bounds)"));
 assert.ok(processor.includes('onProgress("Leser hele originalbildet uten automatisk beskjæring'));
 assert.ok(scanner.includes("prepareVatOcrImage(image,onProgress,options)"));
-assert.ok(scanner.includes("readLocalReceipt(file,setProgress,readerRef,options)"));
+assert.ok(scanner.includes("readLocalReceipt(file,setProgress,readerRef,{...options,documentType})"));
 assert.ok(scanner.includes("retryRead(true)"));
 assert.ok(scanner.includes("retryRead(false)"));
 assert.ok(scanner.includes("Les hele bildet uten automatisk beskjæring"));

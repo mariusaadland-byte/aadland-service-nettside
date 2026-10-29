@@ -1,6 +1,8 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import {parseNorwegianReceipt} from "../../../../lib/vatReceiptParser";
+import {isLikelySupplierInvoice,parseNorwegianSupplierInvoice} from "../../../../lib/vatSupplierInvoiceParser";
+import {vatPdfTextRows} from "../../../../lib/vatPdfTextLayout";
 import {completeVatReceiptAmounts} from "../../../../lib/vatReceiptGrossCalculator";
 import {createVatReceiptReader} from "../../../../lib/vatReceiptRecognition";
 import {prepareVatOcrImage} from "../../../../lib/vatOcrImage";
@@ -17,6 +19,8 @@ const TESSERACT_URL="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesser
 const PDFJS_URL="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";
 const PDFJS_WORKER="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 const scripts=new Map();
+const parseDocument=(text,type="receipt")=>type==="invoice"||isLikelySupplierInvoice(text)
+ ?parseNorwegianSupplierInvoice(text):parseNorwegianReceipt(text);
 function loadScript(url,globalKey){
  if(typeof window!=="undefined"&&window[globalKey])return Promise.resolve(window[globalKey]);
  if(scripts.has(url))return scripts.get(url);
@@ -41,9 +45,17 @@ async function imageFromPdf(file,onProgress){
    onProgress("Leser PDF-side "+i+" av "+pageCount+" …");
    const page=await document.getPage(i);
    const {items}=await page.getTextContent();
-   text+="\n"+items.map(item=>item.str+(item.hasEOL?"\n":" ")).join("");
+   text+="\n"+vatPdfTextRows(items);
   }
-  if(text.replace(/\s/g,"").length>=45)return {text,format:"pdf-tekst"};
+  const invoice=isLikelySupplierInvoice(text);
+  const parsed=invoice?parseNorwegianSupplierInvoice(text):null;
+  const complete=parsed&&parsed.supplierName&&parsed.documentNumber&&parsed.documentDate&&
+   Number.isSafeInteger(parsed.totalOre)&&Object.keys(parsed.groups||{}).length>0;
+  // A PDF can contain a few searchable header/footer words while its actual
+  // invoice is a scanned image. Render and OCR it if essential invoice fields
+  // are missing; keep the trustworthy text as another independent reading.
+  if(text.replace(/\s/g,"").length>=45&&(!invoice||complete))
+   return {text,format:"pdf-tekst"};
   const images=[];
   for(let i=1;i<=Math.min(document.numPages,2);i++){
    const page=await document.getPage(i);
@@ -59,7 +71,7 @@ async function imageFromPdf(file,onProgress){
    canvas.width=0;canvas.height=0;
    if(blob)images.push(blob);
   }
-  return {images,format:"pdf-skann"};
+  return {images,format:"pdf-skann",extractedText:invoice?text:""};
  }finally{await document.destroy();}
 }
 // Preserve the original file unchanged when it fits. On devices that can
@@ -112,11 +124,11 @@ async function prepareReceiptFile(source,onProgress){
 }
 
 async function readLocalReceipt(file,onProgress,readerRef,options={}){
- let format="bilde",images=[file];
+ let format="bilde",images=[file],pdfText="";
  if(file.type==="application/pdf"){
   const pdf=await imageFromPdf(file,onProgress);
   if(pdf.text)return {text:pdf.text,format:pdf.format,confidence:null};
-  images=pdf.images;format="pdf-skann";
+  images=pdf.images;format="pdf-skann";pdfText=pdf.extractedText||"";
  }
  const tess=await loadScript(TESSERACT_URL,"Tesseract");
  // Keep the worker alive within this page: models need not be downloaded and
@@ -124,17 +136,34 @@ async function readLocalReceipt(file,onProgress,readerRef,options={}){
  if(!readerRef.current)readerRef.current=createVatReceiptReader(tess);
  const prepared=(await Promise.all(images.map(image=>prepareVatOcrImage(image,onProgress,options)))).flat();
  const recognized=await readerRef.current.recognize(prepared,onProgress);
- const first={...recognized,parsed:parseNorwegianReceipt(recognized.text)};
+ const first={...recognized,parsed:parseDocument(recognized.text,options.documentType)};
  let best={...first,retried:false};
  if(needsVatReceiptRetry(first)){
   onProgress("Noen felt mangler. Prøver en annen måte å lese kvitteringen på …");
   try{
    const second=await readerRef.current.recognize(prepared,onProgress,{layout:"column"});
-   best=chooseVatReceiptScan(first,{...second,parsed:parseNorwegianReceipt(second.text)});
+   const alternate={...second,parsed:parseDocument(second.text,options.documentType)};
+   // If either reading clearly identifies a supplier invoice, never
+   // combine that invoice's numbers with fields from receipt parsing.
+   if(first.parsed.documentKind==="supplier-invoice"||alternate.parsed.documentKind==="supplier-invoice"){
+    first.parsed=parseNorwegianSupplierInvoice(first.text);
+    alternate.parsed=parseNorwegianSupplierInvoice(second.text);
+   }
+   best=chooseVatReceiptScan(first,alternate);
   }catch{
    // Keep the first OCR result if the alternate layout is unsupported or fails.
    onProgress("Alternativ lesing var ikke tilgjengelig. Beholder første resultat …");
   }
+ }
+ if(pdfText){
+  const searchable={text:pdfText,confidence:null,parsed:parseNorwegianSupplierInvoice(pdfText)};
+  // Compare the OCR reading with the embedded PDF text. Conflicting invoice
+  // numbers, dates or amounts remain blank instead of being silently guessed.
+  const invoiceOcr=best.parsed?.documentKind==="supplier-invoice"
+   ?best:{...best,parsed:parseNorwegianSupplierInvoice(best.text)};
+  const merged=chooseVatReceiptScan(searchable,invoiceOcr);
+  return {text:merged.text,confidence:best.confidence,format:"pdf-tekst-og-bilde",
+   parsed:merged.parsed,retried:true};
  }
  return {text:best.text,confidence:best.confidence,format,parsed:best.parsed,retried:best.retried};
 }
@@ -165,9 +194,11 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   // receipt stays attached. Only the initial camera/file choice changes it.
   if(!options.preserveAttachment)onSelected(file,meta);
   const startTime=typeof performance!=="undefined"?performance.now():Date.now();
-  const recognized=await readLocalReceipt(file,setProgress,readerRef,options);
+  const recognized=await readLocalReceipt(file,setProgress,readerRef,{...options,documentType});
   const seconds=Math.round(((typeof performance!=="undefined"?performance.now():Date.now())-startTime)/100)/10;
-  const parsed=completeVatReceiptAmounts(recognized.parsed||parseNorwegianReceipt(recognized.text),recognized.text);
+  const sourceParsed=recognized.parsed||parseDocument(recognized.text,documentType);
+  const parsed=sourceParsed.documentKind==="supplier-invoice"
+   ?sourceParsed:completeVatReceiptAmounts(sourceParsed,recognized.text);
   if(recognized.confidence!==null&&recognized.confidence<55&&parsed.documentDate){
    parsed.documentDate="";
    parsed.warnings.unshift("Datoen ble lest med lav sikkerhet og fylles ikke ut. Kontroller datoen på kvitteringen.");
@@ -323,7 +354,8 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   {details&&<div className={styles.scanResult}>
    <strong>{details.detectedFields>0?"Fant "+details.detectedFields+" forslag fra kvitteringen":"Ingen sikre felt ble gjenkjent"}</strong>
    <p style={{fontSize:12}}>Brukte {details.seconds} sekunder{details.confidence!==null?", OCR-sikkerhet "+details.confidence+" %":""}. Dette er bare forslag.</p>
-   <p>{documentType==="invoice"?details.documentNumber||"Fakturanummer ikke funnet":details.supplierName||"Leverandør ikke funnet"} · {details.documentDate||"Dato ikke funnet"} · {details.totalOre==null?"Sum ikke funnet":new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(details.totalOre/100)}</p>
+   <p>{details.documentKind==="supplier-invoice"?"Leverandørfaktura":"Kvittering"} · {details.supplierName||"Leverandør ikke funnet"} · {details.documentNumber||"Nummer ikke funnet"} · {details.documentDate||"Fakturadato ikke funnet"} · {details.totalOre==null?"Sum ikke funnet":new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(details.totalOre/100)}</p>
+   {details.documentKind==="supplier-invoice"&&<p>Forfallsdato: <strong>{details.dueDate||"Ikke funnet"}</strong> (kun til kontroll – ikke lagret i MVA-bilaget)</p>}
    {details.warnings.length>0&&<ul>{details.warnings.map((warn,i)=><li key={i}>{warn}</li>)}</ul>}
    <details><summary>Vis lest tekst</summary>
     <pre style={{whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:230,overflow:"auto",fontSize:11}}>{details.preview}</pre>

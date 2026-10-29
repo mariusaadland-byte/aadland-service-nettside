@@ -42,7 +42,8 @@ assert.deepEqual(completeVatReceiptAmounts({...base,groups:{25:{base:"841,32",va
 const scanner=read("app/admin/faktura/mva/VatReceiptScanner.js");
 const form=read("app/admin/faktura/mva/InputVatRegisterClient.js");
 const css=read("app/admin/faktura/mva/VatSimpleForm.module.css");
-assert.ok(scanner.includes("completeVatReceiptAmounts(recognized.parsed||parseNorwegianReceipt(recognized.text),recognized.text)"));
+assert.ok(scanner.includes('sourceParsed.documentKind==="supplier-invoice"\n   ?sourceParsed:completeVatReceiptAmounts(sourceParsed,recognized.text)'),
+ "Receipt VAT completion remains available while invoices get their own parser");
 assert.ok(form.includes("const [grossInput,setGrossInput]=useState"));
 assert.ok(form.includes("if(!grossManuallyEdited.current)"));
 assert.ok(form.includes("const autoFill=Boolean(vatRateChoice)&&(grossCalculated.current||!anyAmounts)"),
