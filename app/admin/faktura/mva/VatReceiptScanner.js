@@ -337,7 +337,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
    <strong>{details.detectedFields>0?"Fant "+details.detectedFields+" forslag fra kvitteringen":"Ingen sikre felt ble gjenkjent"}</strong>
    <p style={{fontSize:12}}>Brukte {details.seconds} sekunder{details.confidence!==null?", OCR-sikkerhet "+details.confidence+" %":""}. Dette er bare forslag.</p>
    <p>{details.documentKind==="supplier-invoice"?"Leverandørfaktura":"Kvittering"} · {details.supplierName||"Leverandør ikke funnet"} · {details.documentNumber||"Nummer ikke funnet"} · {details.documentDate||"Fakturadato ikke funnet"} · {details.totalOre==null?"Sum ikke funnet":new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(details.totalOre/100)}</p>
-   {details.documentKind==="supplier-invoice"&&<p>Forfallsdato: <strong>{details.dueDate||"Ikke funnet"}</strong> (kun til kontroll – ikke lagret i MVA-bilaget)</p>
+   {details.documentKind==="supplier-invoice"&&<p>Forfallsdato: <strong>{details.dueDate||"Ikke funnet"}</strong> (kun til kontroll – ikke lagret i MVA-bilaget)</p>}
    {details.warnings.length>0&&<ul>{details.warnings.map((warn,i)=><li key={i}>{warn}</li>)}</ul>}
    <details><summary>Vis lest tekst</summary>
     <pre style={{whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:230,overflow:"auto",fontSize:11}}>{details.preview}</pre>
