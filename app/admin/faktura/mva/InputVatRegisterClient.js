@@ -230,8 +230,11 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    if(latestDuplicate.status==="duplicate"){
     setError("Bilaget er allerede registrert. Registrering er stoppet.");return;
    }
-   if(latestDuplicate.status==="possible"&&!duplicateReviewed){
-    setError("Samme bilagsnummer finnes fra før. Kontroller tidligere bilag før du bekrefter.");return;
+   if(latestDuplicate.status==="possible"&&
+    (!duplicateReviewed||duplicateCheck.status!=="possible"||
+      duplicateCheck.match?.id!==latestDuplicate.match?.id)){
+    setDuplicateReviewed(false);
+    setError("Mulig dublett ble funnet eller endret. Kontroller tidligere bilag på nytt før du registrerer.");return;
    }
    const question="Registrere et kontrollert leverandørbilag i intern MVA-avstemming?\n\n"+
    form.supplierName+" – "+form.documentNumber+"\nDokumentdato: "+form.documentDate+
@@ -242,10 +245,20 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    if(!window.confirm(question))return;
    const response=await fetch("/api/admin/invoices/vat-purchases",{
     method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({...form,action:"register"})
+    body:JSON.stringify({...form,action:"register",
+     ...(latestDuplicate.status==="possible"&&duplicateReviewed
+      ?{possibleDuplicateReviewed:true,possibleDuplicateMatchId:latestDuplicate.match.id}:{})})
    });
    const data=await response.json();
-   if(!response.ok)throw Error(data.error||"Bilaget kunne ikke lagres.");
+   if(!response.ok){
+    // Another invoice may have been registered between our last lookup and
+    // POST. Show the newest collision without removing the selected PDF.
+    if(response.status===409&&data.duplicate?.status){
+     setDuplicateCheck({...data.duplicate,key:duplicateKey});
+     setDuplicateReviewed(false);
+    }
+    throw Error(data.error||"Bilaget kunne ikke lagres.");
+   }
    const documentId=data.document?.id;
    let attachmentSaved=!receiptFile;
    if(receiptFile&&documentId){
