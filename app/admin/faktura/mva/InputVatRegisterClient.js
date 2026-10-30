@@ -9,6 +9,7 @@ import {emptyVatOcrSuggestion,snapshotVatOcrSuggestion,mergeVatReceiptSuggestion
 import {vatReceiptAttachmentIssue,validateVatReceiptAttachmentBytes,removeVatReceiptAttachmentReference} from "../../../../lib/vatReceiptAttachmentReadiness";
 import {updateVatReceiptReviewedField,updateVatReceiptReviewedAmount} from "../../../../lib/vatReceiptReview";
 import {parseVatGrossInput,vatSplitFromGross} from "../../../../lib/vatReceiptGrossCalculator";
+import {vatDuplicateKey} from "../../../../lib/vatPurchaseDuplicateCheck";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const blank=()=>({0:{base:"",vat:""},12:{base:"",vat:""},15:{base:"",vat:""},25:{base:"",vat:""}});
 const parse=value=>{
@@ -43,6 +44,42 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const [showMoreRates,setShowMoreRates]=useState(false);
  const [customPurpose,setCustomPurpose]=useState(false);
  const [attachmentIssue,setAttachmentIssue]=useState(null);
+ const [duplicateCheck,setDuplicateCheck]=useState({status:"idle",key:"",match:null});
+ const [duplicateReviewed,setDuplicateReviewed]=useState(false);
+ const [duplicateReload,setDuplicateReload]=useState(0);
+ const duplicateKey=vatDuplicateKey(form);
+ const validDuplicateInput=form.supplierName.trim().length>=2&&Boolean(form.documentNumber.trim());
+ const duplicateCurrent=validDuplicateInput&&duplicateCheck.key===duplicateKey;
+ const duplicateBlocking=validDuplicateInput&&(!duplicateCurrent||
+  !["clear","possible"].includes(duplicateCheck.status)||
+  duplicateCheck.status==="possible"&&!duplicateReviewed);
+ const checkDuplicate=async(input,signal)=>{
+  const key=vatDuplicateKey(input);
+  const params=new URLSearchParams({supplierName:input.supplierName,
+   documentNumber:input.documentNumber,kind:input.kind});
+  const response=await fetch("/api/admin/invoices/vat-purchases?"+params,{cache:"no-store",signal});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error(data.error||"Kunne ikke kontrollere bilagsnummeret.");
+  if(data.key!==key||!["clear","possible","duplicate"].includes(data.status))
+   throw Error("Dublettkontrollen ga et ugyldig svar. Prøv igjen.");
+  return data;
+ };
+ useEffect(()=>{
+  setDuplicateReviewed(false);
+  if(!validDuplicateInput){setDuplicateCheck({status:"idle",key:duplicateKey,match:null});return;}
+  let cancelled=false;
+  const controller=new AbortController();
+  setDuplicateCheck({status:"checking",key:duplicateKey,match:null});
+  const timer=setTimeout(()=>{
+   checkDuplicate(form,controller.signal).then(result=>{
+    if(!cancelled)setDuplicateCheck(result);
+   }).catch(error=>{
+    if(!cancelled)setDuplicateCheck({status:"error",key:duplicateKey,
+     match:null,message:error.message||"Dublettkontroll mislyktes."});
+   });
+  },400);
+  return()=>{cancelled=true;clearTimeout(timer);controller.abort();};
+ },[form.supplierName,form.documentNumber,form.kind,duplicateReload]);
  useEffect(()=>{
   if(!receiptFile?.type?.startsWith("image/")){
    setReceiptPreviewUrl("");return;
@@ -171,6 +208,11 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   }
   if(scanBusy){setError("Kvitteringen leses fortsatt. Vent til lesingen er ferdig.");return;}
   if(receiptUploadIssue){setError(receiptUploadIssue);return;}
+  if(!validDuplicateInput){setError("Oppgi leverandør og bilagsnummer før dublettkontrollen.");return;}
+  if(duplicateBlocking){
+   setError("Bilagsnummeret må kontrolleres. Se meldingen under bilagsnummeret.");
+   return;
+  }
   if(!valid||netTotal<=0){setError("Kontroller grunnlag og MVA på hver sats (avrundingsavvik maks 0,05 kr).");return;}
   if(editedGrossMismatch){setError("Sum inkl. MVA stemmer ikke med feltene. Trykk Beregn fra totalsum eller rett beløpene.");return;}
   if(ocrGrossMismatch&&!ocrMismatchChecked){setError("OCR-summen stemmer ikke med beløpene. Kontroller kvitteringen og bekreft avviket før registrering.");return;}
@@ -181,6 +223,16 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   try{
    const actualFileIssue=await validateVatReceiptAttachmentBytes(receiptFile,form.evidenceReference);
    if(actualFileIssue){setError(actualFileIssue);return;}
+   // Always recheck against the live database just before registration.
+   // The DB's atomic unique index is the final guard for simultaneous saves.
+   const latestDuplicate=await checkDuplicate(form);
+   setDuplicateCheck(latestDuplicate);
+   if(latestDuplicate.status==="duplicate"){
+    setError("Bilaget er allerede registrert. Registrering er stoppet.");return;
+   }
+   if(latestDuplicate.status==="possible"&&!duplicateReviewed){
+    setError("Samme bilagsnummer finnes fra før. Kontroller tidligere bilag før du bekrefter.");return;
+   }
    const question="Registrere et kontrollert leverandørbilag i intern MVA-avstemming?\n\n"+
    form.supplierName+" – "+form.documentNumber+"\nDokumentdato: "+form.documentDate+
    "\n"+(form.kind==="credit"?"Kreditnota":"Kjøpsfaktura")+
@@ -217,6 +269,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
     evidenceReference:"",businessPurpose:"",kind:"purchase",deductionPercent:"100",groups:blank(),
     documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
    setShowMoreRates(false);setCustomPurpose(false);
+   setDuplicateReviewed(false);setDuplicateReload(n=>n+1);
    setReceiptSession(n=>n+1);
    // A failed upload must keep the retry control and selected original visible.
    if(attachmentSaved)onChanged?.({documentDate:data.document?.document_date||form.documentDate});
@@ -290,6 +343,32 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
       <input required value={form.originalDocumentNumber} onChange={e=>set("originalDocumentNumber",e.target.value)}/>
      </label>}
     </div>
+    {validDuplicateInput&&<div className={styles.duplicateCheck} aria-live="polite">
+     {!duplicateCurrent||duplicateCheck.status==="checking"
+      ?<p role="status">Kontrollerer bilagsnummeret mot tidligere terminer …</p>:null}
+     {duplicateCurrent&&duplicateCheck.status==="clear"
+      &&<p className={styles.duplicateClear}>Ingen aktiv registrering funnet med dette fakturanummeret.</p>}
+     {duplicateCurrent&&duplicateCheck.status==="duplicate"&&<p role="alert" className={styles.duplicateWarning}>
+      <strong>Allerede registrert – kan ikke legges inn igjen.</strong>
+      {" "}{duplicateCheck.match?.supplierName} · {duplicateCheck.match?.documentNumber}
+      {" "}({duplicateCheck.match?.documentDate}). Dette bilaget er registrert fra før, også om det ligger i en annen MVA-termin.
+     </p>}
+     {duplicateCurrent&&duplicateCheck.status==="possible"&&<div role="alert" className={styles.duplicateWarning}>
+      <strong>Mulig dublett: samme fakturanummer finnes fra før.</strong>
+      <p>{duplicateCheck.match?.supplierName} · {duplicateCheck.match?.documentNumber}
+       {" "}({duplicateCheck.match?.documentDate}, {duplicateCheck.match?.kind==="credit"?"kreditnota":"kjøpsfaktura"}).
+       Kontroller at dette virkelig er en annen faktura, ikke et annet navn på samme leverandør.</p>
+      <label className={styles.checkLabel}><input type="checkbox" checked={duplicateReviewed}
+       onChange={e=>setDuplicateReviewed(e.target.checked)}/>
+       <span>Jeg har kontrollert tidligere bilag og bekrefter at dette er et annet dokument.</span>
+      </label>
+     </div>}
+     {duplicateCurrent&&duplicateCheck.status==="error"&&<div role="alert" className={styles.duplicateWarning}>
+      <p><strong>Bilagsnummeret ble ikke kontrollert.</strong> {duplicateCheck.message}</p>
+      <button className={styles.textAction} type="button" onClick={()=>setDuplicateReload(n=>n+1)}>
+       Prøv dublettkontroll på nytt</button>
+     </div>}
+    </div>}
     {documentPeriod&&<div className={styles.termHint}>
      <strong>{documentPeriod.title} · {documentPeriod.months}</strong>
      {period.year!==documentPeriod.year||period.term!==documentPeriod.term?" · Annen termin enn den som vises.":""}
@@ -425,7 +504,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
       <span>Jeg har kontrollert bankbetalingskravet for kjøp på minst 10 000 kr inkl. MVA. Hvis fakturaen ikke er betalt ennå, skal den senere betales via bank eller godkjent betalingsformidler.</span>
      </label>}
     </div>
-    <button className={styles.submit} type="submit" disabled={busy||scanBusy||Boolean(attachmentIssue)||Boolean(receiptUploadIssue)||editedGrossMismatch||(ocrGrossMismatch&&!ocrMismatchChecked)||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||
+    <button className={styles.submit} type="submit" disabled={busy||scanBusy||duplicateBlocking||Boolean(attachmentIssue)||Boolean(receiptUploadIssue)||editedGrossMismatch||(ocrGrossMismatch&&!ocrMismatchChecked)||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||
      (form.kind==="purchase"&&netTotal+vatTotal>=1000000&&!form.bankConditionConfirmed)}>
      {busy?"Lagrer …":"Registrer kontrollert bilag"}
     </button>
