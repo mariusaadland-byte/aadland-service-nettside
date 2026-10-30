@@ -32,7 +32,7 @@ assert.ok(form.includes("disabled={busy||Boolean(attachmentIssue)}"),
  "Block new receipt scans while a previous original could not be uploaded");
 assert.ok(form.includes('if(attachmentIssue){'),
  "Refuse another register request while a previously saved original is missing");
-assert.ok(form.includes('disabled={busy||scanBusy||Boolean(attachmentIssue)'),
+assert.ok(form.includes('disabled={busy||scanBusy||duplicateBlocking||Boolean(attachmentIssue)'),
  "Disable the final register button while attachment retry is unresolved");
 assert.ok(form.includes("documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));"),
  "Require fresh confirmation after a new OCR result");
