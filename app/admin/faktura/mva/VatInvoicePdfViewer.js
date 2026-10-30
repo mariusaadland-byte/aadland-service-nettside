@@ -22,18 +22,19 @@ function loadPdfReader(){
 
 // Only render the chosen local PDF in a canvas. It never goes to a
 // third-party PDF viewer, gets uploaded, or is written to persistent storage.
-export default function VatInvoicePdfViewer({file}){
- const [open,setOpen]=useState(false),[mounted,setMounted]=useState(false);
+export default function VatInvoicePdfViewer({file,autoOpen=false,onClose,title="Leverandørfaktura"}){
+ const [open,setOpen]=useState(Boolean(autoOpen)),[mounted,setMounted]=useState(false);
  const [pdf,setPdf]=useState(null),[pages,setPages]=useState(0);
  const [pageNumber,setPageNumber]=useState(1),[zoom,setZoom]=useState(1);
  const [loading,setLoading]=useState(false),[rendering,setRendering]=useState(false);
  const [error,setError]=useState("");
  const canvasRef=useRef(null),scrollRef=useRef(null),dialogRef=useRef(null);
- const closeRef=useRef(null),triggerRef=useRef(null);
+ const closeRef=useRef(null),triggerRef=useRef(null),previousFocusRef=useRef(null);
+ const onCloseRef=useRef(onClose);onCloseRef.current=onClose;
  useEffect(()=>setMounted(true),[]);
  useEffect(()=>{
-  setOpen(false);setPdf(null);setPages(0);setPageNumber(1);setZoom(1);
- },[file]);
+  setOpen(Boolean(autoOpen));setPdf(null);setPages(0);setPageNumber(1);setZoom(1);
+ },[file,autoOpen]);
  useEffect(()=>{
   if(!open)return;
   // On iOS, switching BODY to position:fixed can reset the web-app scroll
@@ -45,12 +46,14 @@ export default function VatInvoicePdfViewer({file}){
   const previousRootOverflow=root.style.overflow;
   body.style.overflow="hidden";
   root.style.overflow="hidden";
+  previousFocusRef.current=document.activeElement;
   closeRef.current?.focus();
   const onKey=e=>{
    if(e.key==="Escape"){
     e.preventDefault();e.stopPropagation();
     e.stopImmediatePropagation?.();
     setOpen(false);
+    onCloseRef.current?.();
    }
    else if(e.key==="Tab"){
     const controls=[...(dialogRef.current?.querySelectorAll("button:not([disabled])")||[])];
@@ -72,6 +75,7 @@ export default function VatInvoicePdfViewer({file}){
    if(Math.abs(window.scrollY-scrollY)>2||Math.abs(window.scrollX-scrollX)>2)
     window.scrollTo(scrollX,scrollY);
    triggerRef.current?.focus({preventScroll:true});
+   if(!triggerRef.current)previousFocusRef.current?.focus?.({preventScroll:true});
   };
  },[open]);
  useEffect(()=>{
@@ -135,16 +139,17 @@ export default function VatInvoicePdfViewer({file}){
   e?.preventDefault?.();
   e?.stopPropagation?.();
   setOpen(false);
+  onCloseRef.current?.();
  };
  if(!file||file.type!=="application/pdf")return null;
  return <>
-  <button ref={triggerRef} type="button" className={styles.pdfOpenButton}
-   onClick={e=>{e.preventDefault();e.stopPropagation();setOpen(true);}}> <span aria-hidden="true">📄</span> Åpne og les fakturaen (PDF)</button>
+  {!autoOpen&&<button ref={triggerRef} type="button" className={styles.pdfOpenButton}
+   onClick={e=>{e.preventDefault();e.stopPropagation();setOpen(true);}}> <span aria-hidden="true">📄</span> Åpne og les fakturaen (PDF)</button>}
   {mounted&&open&&createPortal(<div ref={dialogRef} className={styles.pdfViewerModal}
-   role="dialog" aria-modal="true" aria-label="Vis opplastet leverandørfaktura"
+   role="dialog" aria-modal="true" aria-label={title}
    onClick={e=>e.stopPropagation()} onPointerDown={e=>e.stopPropagation()}>
    <header className={styles.pdfViewerHeader}>
-    <div><strong>Leverandørfaktura</strong><span title={file.name}>{file.name}</span></div>
+    <div><strong>{title}</strong><span title={file.name}>{file.name}</span></div>
     <button ref={closeRef} type="button" className={styles.pdfViewerClose}
      onClick={closeViewer}>Lukk ✕</button>
    </header>
@@ -170,7 +175,7 @@ export default function VatInvoicePdfViewer({file}){
     <strong>{Math.round(zoom*100)} %</strong>
     <button type="button" disabled={loading||zoom>=2.5||rendering}
      onClick={()=>setZoom(z=>Math.min(2.5,Math.round((z+.25)*100)/100))}>＋ Større</button>
-    <p>Hele fakturaen kan leses her. Lukk for å kontrollere OCR-feltene. Ingen bilag registreres ved visning.</p>
+    <p>Du kan lese alle sider her. Lukk for å komme tilbake til registreringsskjemaet. Ingen bilag registreres ved visning.</p>
    </footer>
   </div>,document.body)}
  </>;
