@@ -3,6 +3,7 @@ import {useEffect,useRef,useState} from "react";
 import VatOriginalAttachment from "./VatOriginalAttachment";
 import VatReceiptScanner from "./VatReceiptScanner";
 import VatInvoicePdfViewer from "./VatInvoicePdfViewer";
+import VatDuplicateOriginalPreview from "./VatDuplicateOriginalPreview";
 import styles from "./VatSimpleForm.module.css";
 import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
 import {emptyVatOcrSuggestion,snapshotVatOcrSuggestion,mergeVatReceiptSuggestions,startNewVatReceiptDraft} from "../../../../lib/vatReceiptAutofill";
@@ -361,14 +362,15 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
       ?<p role="status">Kontrollerer bilagsnummeret mot tidligere terminer …</p>:null}
      {duplicateCurrent&&duplicateCheck.status==="clear"
       &&<p className={styles.duplicateClear}>Ingen aktiv registrering funnet med dette fakturanummeret.</p>}
-     {duplicateCurrent&&duplicateCheck.status==="duplicate"&&<p role="alert" className={styles.duplicateWarning}>
+     {duplicateCurrent&&duplicateCheck.status==="duplicate"&&<div role="alert" className={styles.duplicateWarning}>
       <strong>Allerede registrert – kan ikke legges inn igjen.</strong>
       {" "}{duplicateCheck.match?.supplierName} · {duplicateCheck.match?.documentNumber}
       {" "}({duplicateCheck.match?.documentDate}
       {Number.isSafeInteger(duplicateCheck.match?.grossOre)
        ?", "+money(duplicateCheck.match.grossOre):""}).
       Dette bilaget er registrert fra før, også om det ligger i en annen MVA-termin.
-     </p>}
+      <VatDuplicateOriginalPreview key={duplicateKey+":"+duplicateCheck.match?.id} match={duplicateCheck.match}/>
+     </div>}
      {duplicateCurrent&&duplicateCheck.status==="possible"&&<div role="alert" className={styles.duplicateWarning}>
       <strong>{duplicateCheck.reason==="number-format"
        ?"Mulig dublett: fakturanummeret ligner et bilag fra før."
@@ -380,6 +382,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
        {duplicateCheck.reason==="number-format"
         ?" Nummeret kan være lest med andre mellomrom, bindestreker eller punktum av OCR.":" "}
        Kontroller at dette virkelig er en annen faktura, ikke et annet navn på samme leverandør.</p>
+      <VatDuplicateOriginalPreview key={duplicateKey+":"+duplicateCheck.match?.id} match={duplicateCheck.match}/>
       <label className={styles.checkLabel}><input type="checkbox" checked={duplicateReviewed}
        onChange={e=>setDuplicateReviewed(e.target.checked)}/>
        <span>Jeg har kontrollert tidligere bilag og bekrefter at dette er et annet dokument.</span>

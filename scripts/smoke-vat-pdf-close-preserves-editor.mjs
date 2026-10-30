@@ -36,7 +36,8 @@ assert.ok(viewer.includes('window.addEventListener("keydown",onKey,true)'),
  "Escape must be handled at the dialog before global app shortcuts");
 assert.ok(viewer.includes('e.stopImmediatePropagation?.()'),"Escape must not trigger an app-wide back handler");
 assert.ok(viewer.includes('role="dialog" aria-modal="true"'));
-assert.ok(viewer.includes('aria-label="Vis opplastet leverandørfaktura"'));
+assert.ok(viewer.includes('role="dialog" aria-modal="true" aria-label={title}'),
+ "Dialog keeps an accessible label, also for earlier-original comparison");
 assert.ok(viewer.includes('setPages(document.numPages)'),"Keep one-/multi-page PDFs");
 assert.ok(viewer.includes('getPage(pageNumber)'),"Keep PDF page navigation");
 assert.ok(viewer.includes('setZoom('),"Keep zoom for invoices on a phone");
