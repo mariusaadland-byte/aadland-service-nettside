@@ -2,14 +2,41 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 const read=p=>readFileSync(p,"utf8");
 const helper=read("lib/vatPurchaseDuplicateCheck.js").replace(/^export /gm,"");
-const {checkVatPurchaseDuplicate,vatDuplicateKey,vatDuplicateIdentity}=
- new Function(helper+";return {checkVatPurchaseDuplicate,vatDuplicateKey,vatDuplicateIdentity};")();
+const {checkVatPurchaseDuplicate,vatDuplicateKey,vatDuplicateIdentity,vatInvoiceNumberFingerprint}=
+ new Function(helper+";return {checkVatPurchaseDuplicate,vatDuplicateKey,vatDuplicateIdentity,vatInvoiceNumberFingerprint};")();
 const existing=[
  {id:"old",supplier_name:"E.A. Smith AS",supplier_document_number:"260262706",document_date:"2026-09-14",kind:"purchase",voided_at:null},
  {id:"other-supplier",supplier_name:"Megaflis AS",supplier_document_number:"INV-100",document_date:"2026-08-18",kind:"purchase",voided_at:null},
  {id:"old-credit",supplier_name:"E.A. Smith AS",supplier_document_number:"KN-44",document_date:"2026-09-20",kind:"credit",voided_at:null},
  {id:"void",supplier_name:"Jula",supplier_document_number:"345",document_date:"2026-07-02",kind:"purchase",voided_at:"2026-09-01T11:00:00Z"}
 ];
+const sepExample={id:"separator",supplier_name:"Byggmesteren AS",
+ supplier_document_number:"INV-123456",document_date:"2026-10-29",
+ kind:"purchase",base_ore:100000,vat_ore:25000,voided_at:null};
+const similar=checkVatPurchaseDuplicate({
+ supplierName:"Byggmesteren AS",documentNumber:"INV 123456",kind:"purchase"
+},[sepExample]);
+assert.equal(similar.status,"possible","OCR punctuation differences must trigger a warning");
+assert.equal(similar.reason,"number-format");
+assert.equal(similar.match.grossOre,125000);
+assert.equal(vatInvoiceNumberFingerprint("INV.123/456"),"inv123456");
+assert.equal(checkVatPurchaseDuplicate({
+ supplierName:"Byggmesteren AS",documentNumber:"INV123456",kind:"purchase"
+},[sepExample]).status,"possible");
+assert.equal(checkVatPurchaseDuplicate({
+ supplierName:"Byggmesteren AS",documentNumber:"INV-123456",kind:"purchase"
+},[sepExample]).status,"duplicate","The exact registration remains impossible");
+assert.equal(checkVatPurchaseDuplicate({
+ supplierName:"Byggmesteren AS",documentNumber:"INV-123457",kind:"purchase"
+},[sepExample]).status,"clear","Other numbers must not be blocked");
+assert.equal(checkVatPurchaseDuplicate({
+ supplierName:"Other AS",documentNumber:"INV/123456",kind:"purchase"
+},[sepExample]).status,"possible","Another supplier with similar OCR number needs review");
+const shortNumber={...sepExample,supplier_document_number:"1-23"};
+assert.equal(checkVatPurchaseDuplicate({
+ supplierName:"Byggmesteren AS",documentNumber:"123",kind:"purchase"
+},[shortNumber]).status,"clear",
+ "Tiny invoice numbers must not be treated as punctuation matches");
 const lookup=(supplierName,documentNumber,kind="purchase",rows=existing)=>
  checkVatPurchaseDuplicate({supplierName,documentNumber,kind},rows);
 assert.equal(lookup(" E.A. SMITH as ","260262706").status,"duplicate",
@@ -92,6 +119,12 @@ assert.ok(form.includes('disabled={busy||scanBusy||duplicateBlocking||'),
 assert.ok(form.includes('Registrert fra før')||form.includes('Allerede registrert'));
 assert.ok(form.includes('Kontrollerer bilagsnummeret mot tidligere terminer'));
 assert.ok(css.includes(".duplicateWarning")&&css.includes(".duplicateClear"));
+assert.ok(form.includes('duplicateCheck.reason==="number-format"'),
+ "Show an OCR-specific explanation for punctuation variants");
+assert.ok(form.includes('duplicateCheck.match?.grossOre'),
+ "Show the previous amount so the owner can compare invoices");
+assert.ok(route.includes('base_ore,vat_ore,voided_at'),"Preflight includes previous totals");
+
 assert.ok(route.includes('insert({...entry,confirmed_by:user.id})'),
  "Existing server-side and database collision protection stays in place");
 assert.ok(route.includes('inserted.error.code==="23505"'),
