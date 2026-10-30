@@ -3,6 +3,7 @@ import {useEffect,useRef,useState} from "react";
 import VatOriginalAttachment from "./VatOriginalAttachment";
 import VatReceiptScanner from "./VatReceiptScanner";
 import VatInvoicePdfViewer from "./VatInvoicePdfViewer";
+import VatDuplicateOriginalPreview from "./VatDuplicateOriginalPreview";
 import styles from "./VatSimpleForm.module.css";
 import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
 import {emptyVatOcrSuggestion,snapshotVatOcrSuggestion,mergeVatReceiptSuggestions,startNewVatReceiptDraft} from "../../../../lib/vatReceiptAutofill";
@@ -368,6 +369,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
       {Number.isSafeInteger(duplicateCheck.match?.grossOre)
        ?", "+money(duplicateCheck.match.grossOre):""}).
       Dette bilaget er registrert fra før, også om det ligger i en annen MVA-termin.
+      <VatDuplicateOriginalPreview key={duplicateKey+":"+duplicateCheck.match?.id} match={duplicateCheck.match}/>
      </p>}
      {duplicateCurrent&&duplicateCheck.status==="possible"&&<div role="alert" className={styles.duplicateWarning}>
       <strong>{duplicateCheck.reason==="number-format"
@@ -380,6 +382,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
        {duplicateCheck.reason==="number-format"
         ?" Nummeret kan være lest med andre mellomrom, bindestreker eller punktum av OCR.":" "}
        Kontroller at dette virkelig er en annen faktura, ikke et annet navn på samme leverandør.</p>
+      <VatDuplicateOriginalPreview key={duplicateKey+":"+duplicateCheck.match?.id} match={duplicateCheck.match}/>
       <label className={styles.checkLabel}><input type="checkbox" checked={duplicateReviewed}
        onChange={e=>setDuplicateReviewed(e.target.checked)}/>
        <span>Jeg har kontrollert tidligere bilag og bekrefter at dette er et annet dokument.</span>
