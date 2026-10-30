@@ -362,7 +362,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
       ?<p role="status">Kontrollerer bilagsnummeret mot tidligere terminer …</p>:null}
      {duplicateCurrent&&duplicateCheck.status==="clear"
       &&<p className={styles.duplicateClear}>Ingen aktiv registrering funnet med dette fakturanummeret.</p>}
-     {duplicateCurrent&&duplicateCheck.status==="duplicate"&&<p role="alert" className={styles.duplicateWarning}>
+     {duplicateCurrent&&duplicateCheck.status==="duplicate"&&<div role="alert" className={styles.duplicateWarning}>
       <strong>Allerede registrert – kan ikke legges inn igjen.</strong>
       {" "}{duplicateCheck.match?.supplierName} · {duplicateCheck.match?.documentNumber}
       {" "}({duplicateCheck.match?.documentDate}
@@ -370,7 +370,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
        ?", "+money(duplicateCheck.match.grossOre):""}).
       Dette bilaget er registrert fra før, også om det ligger i en annen MVA-termin.
       <VatDuplicateOriginalPreview key={duplicateKey+":"+duplicateCheck.match?.id} match={duplicateCheck.match}/>
-     </p>}
+     </div>}
      {duplicateCurrent&&duplicateCheck.status==="possible"&&<div role="alert" className={styles.duplicateWarning}>
       <strong>{duplicateCheck.reason==="number-format"
        ?"Mulig dublett: fakturanummeret ligner et bilag fra før."
