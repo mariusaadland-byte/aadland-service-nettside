@@ -351,12 +351,21 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
      {duplicateCurrent&&duplicateCheck.status==="duplicate"&&<p role="alert" className={styles.duplicateWarning}>
       <strong>Allerede registrert – kan ikke legges inn igjen.</strong>
       {" "}{duplicateCheck.match?.supplierName} · {duplicateCheck.match?.documentNumber}
-      {" "}({duplicateCheck.match?.documentDate}). Dette bilaget er registrert fra før, også om det ligger i en annen MVA-termin.
+      {" "}({duplicateCheck.match?.documentDate}
+      {Number.isSafeInteger(duplicateCheck.match?.grossOre)
+       ?", "+money(duplicateCheck.match.grossOre):""}).
+      Dette bilaget er registrert fra før, også om det ligger i en annen MVA-termin.
      </p>}
      {duplicateCurrent&&duplicateCheck.status==="possible"&&<div role="alert" className={styles.duplicateWarning}>
-      <strong>Mulig dublett: samme fakturanummer finnes fra før.</strong>
+      <strong>{duplicateCheck.reason==="number-format"
+       ?"Mulig dublett: fakturanummeret ligner et bilag fra før."
+       :"Mulig dublett: samme fakturanummer finnes fra før."}</strong>
       <p>{duplicateCheck.match?.supplierName} · {duplicateCheck.match?.documentNumber}
-       {" "}({duplicateCheck.match?.documentDate}, {duplicateCheck.match?.kind==="credit"?"kreditnota":"kjøpsfaktura"}).
+       {" "}({duplicateCheck.match?.documentDate}, {duplicateCheck.match?.kind==="credit"?"kreditnota":"kjøpsfaktura"})
+       {Number.isSafeInteger(duplicateCheck.match?.grossOre)
+        ?", sum inkl. MVA: "+money(duplicateCheck.match.grossOre):""}.
+       {duplicateCheck.reason==="number-format"
+        ?" Nummeret kan være lest med andre mellomrom, bindestreker eller punktum av OCR.":" "}
        Kontroller at dette virkelig er en annen faktura, ikke et annet navn på samme leverandør.</p>
       <label className={styles.checkLabel}><input type="checkbox" checked={duplicateReviewed}
        onChange={e=>setDuplicateReviewed(e.target.checked)}/>
