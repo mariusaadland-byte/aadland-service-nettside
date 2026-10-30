@@ -36,14 +36,22 @@ export default function VatInvoicePdfViewer({file}){
  },[file]);
  useEffect(()=>{
   if(!open)return;
-  const body=document.body,scrollY=window.scrollY;
-  const previous={position:body.style.position,top:body.style.top,
-   left:body.style.left,right:body.style.right,width:body.style.width,overflow:body.style.overflow};
-  body.style.position="fixed";body.style.top="-"+scrollY+"px";body.style.left="0";
-  body.style.right="0";body.style.width="100%";body.style.overflow="hidden";
+  // On iOS, switching BODY to position:fixed can reset the web-app scroll
+  // position when the viewer closes. Lock scrolling without repositioning
+  // the registration page underneath the PDF.
+  const body=document.body,root=document.documentElement;
+  const scrollX=window.scrollX,scrollY=window.scrollY;
+  const previousBodyOverflow=body.style.overflow;
+  const previousRootOverflow=root.style.overflow;
+  body.style.overflow="hidden";
+  root.style.overflow="hidden";
   closeRef.current?.focus();
   const onKey=e=>{
-   if(e.key==="Escape"){e.preventDefault();setOpen(false);}
+   if(e.key==="Escape"){
+    e.preventDefault();e.stopPropagation();
+    e.stopImmediatePropagation?.();
+    setOpen(false);
+   }
    else if(e.key==="Tab"){
     const controls=[...(dialogRef.current?.querySelectorAll("button:not([disabled])")||[])];
     if(!controls.length)return;
@@ -54,12 +62,16 @@ export default function VatInvoicePdfViewer({file}){
     }
    }
   };
-  window.addEventListener("keydown",onKey);
+  window.addEventListener("keydown",onKey,true);
   return ()=>{
-   window.removeEventListener("keydown",onKey);
-   for(const key of Object.keys(previous))body.style[key]=previous[key];
-   window.scrollTo(0,scrollY);
-   triggerRef.current?.focus();
+   window.removeEventListener("keydown",onKey,true);
+   body.style.overflow=previousBodyOverflow;
+   root.style.overflow=previousRootOverflow;
+   // Restore only if iOS shifted the page while the PDF was open.
+   // Focusing the opener must not scroll the user up to the navigation.
+   if(Math.abs(window.scrollY-scrollY)>2||Math.abs(window.scrollX-scrollX)>2)
+    window.scrollTo(scrollX,scrollY);
+   triggerRef.current?.focus({preventScroll:true});
   };
  },[open]);
  useEffect(()=>{
@@ -116,16 +128,25 @@ export default function VatInvoicePdfViewer({file}){
   void draw();
   return()=>{cancelled=true;renderTask?.cancel();};
  },[open,pdf,pageNumber,zoom]);
+ const closeViewer=e=>{
+  // The PDF is portalled to document.body, but React events still bubble
+  // through the accounting component tree. Keep this action entirely local:
+  // no form submit, no menu event, no Next.js navigation or URL change.
+  e?.preventDefault?.();
+  e?.stopPropagation?.();
+  setOpen(false);
+ };
  if(!file||file.type!=="application/pdf")return null;
  return <>
   <button ref={triggerRef} type="button" className={styles.pdfOpenButton}
-   onClick={()=>setOpen(true)}> <span aria-hidden="true">📄</span> Åpne og les fakturaen (PDF)</button>
+   onClick={e=>{e.preventDefault();e.stopPropagation();setOpen(true);}}> <span aria-hidden="true">📄</span> Åpne og les fakturaen (PDF)</button>
   {mounted&&open&&createPortal(<div ref={dialogRef} className={styles.pdfViewerModal}
-   role="dialog" aria-modal="true" aria-label="Vis opplastet leverandørfaktura">
+   role="dialog" aria-modal="true" aria-label="Vis opplastet leverandørfaktura"
+   onClick={e=>e.stopPropagation()} onPointerDown={e=>e.stopPropagation()}>
    <header className={styles.pdfViewerHeader}>
     <div><strong>Leverandørfaktura</strong><span title={file.name}>{file.name}</span></div>
     <button ref={closeRef} type="button" className={styles.pdfViewerClose}
-     onClick={()=>setOpen(false)}>Lukk ✕</button>
+     onClick={closeViewer}>Lukk ✕</button>
    </header>
    <div className={styles.pdfViewerToolbar}>
     <button type="button" disabled={loading||pageNumber<=1||rendering}

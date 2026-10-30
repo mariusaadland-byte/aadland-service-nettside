@@ -40,8 +40,10 @@ assert.ok(viewer.includes('setZoom(')&&viewer.includes('zoom>=2.5'),
 assert.ok(viewer.includes('renderTask?.cancel()')&&viewer.includes('document.destroy()'),
  "Closing/changing PDF must free renderer and file");
 assert.ok(viewer.includes('await document.destroy().catch'),"Dispose while PDF is still loading");
-assert.ok(viewer.includes('window.addEventListener("keydown",onKey)'));
-assert.ok(viewer.includes('triggerRef.current?.focus()'));
+assert.ok(viewer.includes('window.addEventListener("keydown",onKey,true)'),
+ "PDF modal handles Escape before app-level navigation on iPhone");
+assert.ok(viewer.includes('triggerRef.current?.focus({preventScroll:true})'),
+ "Closing PDF must restore keyboard focus without scrolling back to top");
 assert.ok(viewer.includes('setOpen(false)'));
 assert.ok(css.includes('height:100dvh')&&css.includes('.pdfViewerModal'));
 assert.ok(css.includes('safe-area-inset-top')&&css.includes('safe-area-inset-bottom'),
