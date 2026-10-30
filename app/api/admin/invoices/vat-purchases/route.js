@@ -63,7 +63,7 @@ export async function GET(req){
  // based on a partial list. The current register is small.
  for(let offset=0;offset<5000;offset+=500){
   const page=await s.from("vat_purchase_documents")
-   .select("id,supplier_name,supplier_document_number,document_date,kind,voided_at")
+   .select("id,supplier_name,supplier_document_number,document_date,kind,base_ore,vat_ore,voided_at")
    .is("voided_at",null).order("id",{ascending:true}).range(offset,offset+499);
   if(page.error||!Array.isArray(page.data))
    return json({error:"Kunne ikke kontrollere alle registrerte bilag. Prøv igjen."},503);
