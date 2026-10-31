@@ -16,6 +16,9 @@ assert.equal(combinedWorkClockText(120,begin,new Date(end).getTime()),"02:30:00"
  "The visible timer must show both saved and currently running time");
 assert.equal(combinedWorkClockText(0,begin,new Date(begin).getTime()),"00:00:00");
 
+const stampSource=read("lib/workTimeStamps.js").replace(/^export /gm,"");
+const {storedWorkStamps,workStamp,normalizeStampEdit}=new Function(stampSource+
+ ";return {storedWorkStamps,workStamp,normalizeStampEdit};")();
 const raw=read("app/api/admin/work-time/route.js")
  .replace(/^import .*;\n/gm,"")
  .replace(/^export async function /gm,"async function ");
@@ -52,9 +55,9 @@ const db=()=>({from(name){
 }});
 const NextResponse={json:(data,opts={})=>({status:opts.status||200,body:data})};
 const PATCH=new Function("NextResponse","sameOriginGuard","getAdminUser","db","isValidDateInput",
- "osloDateKey","accruedWorkMinutes","console",raw+";return PATCH;")(
+ "osloDateKey","accruedWorkMinutes","storedWorkStamps","workStamp","normalizeStampEdit","console",raw+";return PATCH;")(
  NextResponse,()=>null,async()=>roleOK?{id:userId,role:"owner"}:null,db,
- ()=>true,()=>"",accruedWorkMinutes,{error(){}}
+ ()=>true,()=>"",accruedWorkMinutes,storedWorkStamps,workStamp,normalizeStampEdit,{error(){}}
 );
 const invoke=(action,id=entryId)=>PATCH({json:async()=>({action,id})});
 let response=await invoke("resume");
@@ -76,6 +79,9 @@ response=await invoke("stop");
 assert.equal(response.status,200);
 assert.ok(record.duration_minutes>=121,"Stop must ADD to previous minutes");
 assert.ok(record.ended_at,"Finished clock now has end time");
+assert.ok(record.work_sessions?.length===2,
+ "Stopping a resumed timer must retain the previous interval and append the new stamp");
+assert.equal(record.work_sessions.reduce((sum,x)=>sum+x.minutes,0),record.duration_minutes);
 assert.equal(writes,2);
 response=await invoke("stop");
 assert.equal(response.status,409,"A repeated stop must never double-count");
