@@ -3,7 +3,7 @@
 import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import styles from "./workClock.module.css";
-import {clockAfterDeduction} from "../../../lib/workTimeDeduction";
+import {clockAfterDeduction,formatDeductionHours,parseDeductionHours} from "../../../lib/workTimeDeduction";
 import WorkClockCustomerPicker from "./WorkClockCustomerPicker";
 
 const DEFAULT_RATE="500";
@@ -75,7 +75,7 @@ function defaultDraft(){
  return {orderId:"",customerRef:"",projectLabel:"",customerLabel:"",note:"",hourlyRate:DEFAULT_RATE};
 }
 function defaultManual(){
- return {...defaultDraft(),workDate:osloDate(),durationHours:"",deductedMinutes:"0",distanceKm:"",kmRate:DEFAULT_KM_RATE,toll:""};
+ return {...defaultDraft(),workDate:osloDate(),durationHours:"",deductedHours:"0",distanceKm:"",kmRate:DEFAULT_KM_RATE,toll:""};
 }
 
 export default function WorkClockClient({userName}){
@@ -279,13 +279,18 @@ export default function WorkClockClient({userName}){
  }
  async function addManual(event){
   event.preventDefault();
+  const deductedMinutes=parseDeductionHours(manual.deductedHours);
+  if(deductedMinutes===null){
+   setError("Skriv minustid i timer, for eksempel 1,5 for halvannen time eller 15 for femten timer.");
+   return;
+  }
   const data=await request("POST",{
    action:"manual",
    orderId:manual.orderId||null,
    customerRef:manual.customerRef||"",
    workDate:manual.workDate,
    durationMinutes:minutesFromHours(manual.durationHours),
-   deductedMinutes:Number(manual.deductedMinutes||0),
+   deductedMinutes,
    projectLabel:manual.projectLabel,
    customerLabel:manual.customerLabel,
    note:manual.note,
@@ -314,7 +319,7 @@ export default function WorkClockClient({userName}){
    distanceKm:String(entry.distanceKm||"").replace(".",","),
    kmRate:String((entry.kmRateOre||0)/100).replace(".",","),
    toll:String((entry.tollOre||0)/100).replace(".",","),
-   deductedMinutes:String(entry.deductedMinutes||0),
+   deductedHours:formatDeductionHours(entry.deductedMinutes||0),
    stampEditorEnabled:Boolean(entry.startedAt&&entry.endedAt),
    sessions:(entry.sessions||[]).map(item=>({
     startedAt:item.startedAt?osloDateTimeLocal(item.startedAt):"",
@@ -327,6 +332,11 @@ export default function WorkClockClient({userName}){
  async function saveEdit(event){
   event.preventDefault();
   if(!editing)return;
+  const deductedMinutes=parseDeductionHours(editing.deductedHours);
+  if(deductedMinutes===null){
+   setError("Skriv minustid i timer, for eksempel 1,5 for halvannen time eller 15 for femten timer.");
+   return;
+  }
   let sessions;
   if(editing.stampEditorEnabled){
    sessions=editing.sessions.map(item=>item.historical
@@ -344,7 +354,7 @@ export default function WorkClockClient({userName}){
    customerRef:editing.customerRef||"",
    workDate:editing.workDate,
    durationMinutes:minutesFromHours(editing.durationHours),
-   deductedMinutes:Number(editing.deductedMinutes),
+   deductedMinutes,
    ...(sessions?{sessions}:{}),
    projectLabel:editing.projectLabel,
    customerLabel:editing.customerLabel,
@@ -382,7 +392,7 @@ export default function WorkClockClient({userName}){
 
  function exportExcel(){
   const rows=entries.filter(entry=>!(entry.startedAt&&!entry.endedAt));
-  const header=["Dato","Prosjekt","Kunde","Timer netto","Lunsj/minustid (min)","Timepris inkl. mva","Arbeid inkl. mva","Km","Km-sats inkl. mva","Kjøring inkl. mva","Bom inkl. mva","Total inkl. mva","Notat"];
+  const header=["Dato","Prosjekt","Kunde","Timer netto","Lunsj/minustid (timer)","Timepris inkl. mva","Arbeid inkl. mva","Km","Km-sats inkl. mva","Kjøring inkl. mva","Bom inkl. mva","Total inkl. mva","Notat"];
   const tableRows=[
    header.map(value=>'<Cell><Data ss:Type="String">'+xml(value)+'</Data></Cell>').join(""),
    ...rows.map(entry=>{
@@ -390,7 +400,7 @@ export default function WorkClockClient({userName}){
     const cells=[
      ["String",entry.workDate],["String",entry.projectLabel],["String",entry.customerLabel],
      ["Number",(Math.max(0,entry.durationMinutes-(entry.deductedMinutes||0))/60).toFixed(2)],
-     ["Number",Number(entry.deductedMinutes)||0],["Number",moneyNumber(entry.hourlyRateOre)],
+     ["Number",((Number(entry.deductedMinutes)||0)/60).toFixed(2)],["Number",moneyNumber(entry.hourlyRateOre)],
      ["Number",moneyNumber(cost.labor)],["Number",Number(entry.distanceKm||0).toFixed(2)],
      ["Number",moneyNumber(entry.kmRateOre)],["Number",moneyNumber(cost.travel)],
      ["Number",moneyNumber(cost.toll)],["Number",moneyNumber(cost.total)],["String",entry.note]
@@ -448,7 +458,7 @@ export default function WorkClockClient({userName}){
       onClick={()=>lunch(30)}>🍽️ {active.lunchDays?.includes(osloDate())?"Lunsj er trukket i dag":"Lunsj −30 min"}</button>
      {active.lunchDays?.includes(osloDate())&&<button type="button" className={styles.undoLunch}
       disabled={busy} onClick={()=>lunch(-30)}>Angre lunsj i dag</button>}
-     <span>Minustid totalt: {active.deductedMinutes||0} min. Arbeidsklokken går videre.</span>
+     <span>Minustid totalt: {formatDeductionHours(active.deductedMinutes||0)} t. Arbeidsklokken går videre.</span>
     </div>}
     {active&&<div className={styles.creditLive}>
      {(()=>{const progress=workCreditProgress(active);return progress?<>
@@ -561,8 +571,11 @@ export default function WorkClockClient({userName}){
       <input value={manual.customerLabel} onChange={e=>setManual(current=>({...current,customerLabel:e.target.value}))}/>
      </label>}
      <label>Timepris inkl. mva<div className={styles.money}><span>kr</span><input inputMode="decimal" value={manual.hourlyRate} onChange={e=>setManual(current=>({...current,hourlyRate:e.target.value}))}/></div></label>
-     <label>Minustid (minutter)<input inputMode="numeric" type="number" min="0" step="1" value={manual.deductedMinutes||"0"}
-      onChange={e=>setManual(current=>({...current,deductedMinutes:e.target.value}))}/></label>
+     <label>Minustid (timer, f.eks. 1,5 = 1 t 30 min)
+      <input type="text" inputMode="decimal" value={manual.deductedHours}
+       onChange={e=>setManual(current=>({...current,deductedHours:e.target.value}))}
+       placeholder="0 eller 1,5"/>
+     </label>
      <label>Km<input inputMode="decimal" value={manual.distanceKm} onChange={e=>setManual(current=>({...current,distanceKm:e.target.value}))} placeholder="0"/></label>
      <label>Km-sats inkl. mva<div className={styles.money}><span>kr</span><input inputMode="decimal" value={manual.kmRate} onChange={e=>setManual(current=>({...current,kmRate:e.target.value}))}/></div></label>
      <label>Bom inkl. mva<div className={styles.money}><span>kr</span><input inputMode="decimal" value={manual.toll} onChange={e=>setManual(current=>({...current,toll:e.target.value}))} placeholder="0"/></div></label>
@@ -596,7 +609,7 @@ export default function WorkClockClient({userName}){
        </td>
        <td>{activeRow?<span className={styles.running}>Pågår</span>:<>
         {hours(Math.max(0,entry.durationMinutes-(entry.deductedMinutes||0)))} t
-        {entry.deductedMinutes>0&&<small>−{entry.deductedMinutes} min lunsj/fratrekk</small>}
+        {entry.deductedMinutes>0&&<small>−{formatDeductionHours(entry.deductedMinutes)} t lunsj/fratrekk</small>}
        </>}</td>
        <td>{activeRow?"—":kroner(cost.labor)}</td>
        <td>{entry.distanceKm?entry.distanceKm.toLocaleString("nb-NO",{maximumFractionDigits:2})+" km":"—"}</td>
@@ -640,9 +653,10 @@ export default function WorkClockClient({userName}){
       <label>Timer<input inputMode="decimal" value={editing.durationHours} onChange={e=>setEditing(current=>({...current,durationHours:e.target.value}))}
        disabled={editing.stampEditorEnabled} title={editing.stampEditorEnabled
         ?"Summen regnes automatisk fra stemplingene. Endre klokkeslettene nedenfor.":""}/></label>
-      <label>Minustid (minutter)
-       <input type="number" min="0" step="1" inputMode="numeric"
-        value={editing.deductedMinutes} onChange={e=>setEditing(current=>({...current,deductedMinutes:e.target.value}))}/>
+      <label>Minustid (timer, f.eks. 1,5 = 1 t 30 min)
+       <input type="text" inputMode="decimal"
+        value={editing.deductedHours} onChange={e=>setEditing(current=>({...current,deductedHours:e.target.value}))}
+        placeholder="0 eller 1,5"/>
       </label>
       <label>Eksisterende oppdrag
        <select value={editing.orderId} onChange={e=>applyOrder(setEditing,e.target.value)}>
