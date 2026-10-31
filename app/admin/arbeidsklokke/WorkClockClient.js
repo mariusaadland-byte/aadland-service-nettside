@@ -383,17 +383,18 @@ export default function WorkClockClient({userName}){
       const cost=entryCosts(entry);
       return <tr key={entry.id} className={activeRow?styles.activeRow:""}>
        <td>{dateLabel(entry.workDate)}</td>
-       <td><b>{entry.projectLabel||"Arbeid"}</b><small>{entry.customerLabel||entry.note||""}</small></td>
+       <td><b>{entry.projectLabel||"Arbeid"}</b><small>{entry.customerLabel||entry.note||""}</small>
+        {!activeRow&&!entry.orderId&&Boolean(entry.startedAt&&entry.endedAt)&&
+         <button type="button" className={styles.resumeButton} disabled={busy||Boolean(active)}
+          title={active?"Stopp klokken som går før du fortsetter en annen.":"Fortsett på samme timeregistrering"}
+          onClick={()=>resume(entry)}>▶ Fortsett</button>}
+       </td>
        <td>{activeRow?<span className={styles.running}>Pågår</span>:hours(entry.durationMinutes)+" t"}</td>
        <td>{activeRow?"—":kroner(cost.labor)}</td>
        <td>{entry.distanceKm?entry.distanceKm.toLocaleString("nb-NO",{maximumFractionDigits:2})+" km":"—"}</td>
        <td>{entry.tollOre?kroner(entry.tollOre):"—"}</td>
        <td><b>{activeRow?"—":kroner(cost.total)}</b></td>
        <td><div className={styles.entryActions}>
-        {!activeRow&&!entry.orderId&&Boolean(entry.startedAt&&entry.endedAt)&&
-         <button type="button" className={styles.resumeButton} disabled={busy||Boolean(active)}
-          title={active?"Stopp klokken som går før du fortsetter en annen.":"Fortsett på samme timeregistrering"}
-          onClick={()=>resume(entry)}>▶ Fortsett</button>}
         {!activeRow&&<button type="button" className={styles.editButton} disabled={busy} onClick={()=>openEdit(entry)}>Rediger</button>}
        </div></td>
       </tr>
