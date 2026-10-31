@@ -220,6 +220,7 @@ export default function WorkClockClient({userName}){
    distanceKm:String(entry.distanceKm||"").replace(".",","),
    kmRate:String((entry.kmRateOre||0)/100).replace(".",","),
    toll:String((entry.tollOre||0)/100).replace(".",","),
+   stampEditorEnabled:Boolean(entry.startedAt&&entry.endedAt),
    sessions:(entry.sessions||[]).map(item=>({
     startedAt:item.startedAt?osloDateTimeLocal(item.startedAt):"",
     endedAt:item.endedAt?osloDateTimeLocal(item.endedAt):"",
@@ -232,7 +233,7 @@ export default function WorkClockClient({userName}){
   event.preventDefault();
   if(!editing)return;
   let sessions;
-  if(editing.sessions?.length){
+  if(editing.stampEditorEnabled){
    sessions=editing.sessions.map(item=>item.historical
     ?{startedAt:null,endedAt:null,minutes:item.minutes,historical:true}
     :{startedAt:fromOsloDateTimeLocal(item.startedAt),
@@ -449,7 +450,7 @@ export default function WorkClockClient({userName}){
      <div className={styles.formGrid}>
       <label>Dato<input type="date" value={editing.workDate} onChange={e=>setEditing(current=>({...current,workDate:e.target.value}))}/></label>
       <label>Timer<input inputMode="decimal" value={editing.durationHours} onChange={e=>setEditing(current=>({...current,durationHours:e.target.value}))}
-       disabled={editing.sessions?.some(item=>!item.historical)} title={editing.sessions?.some(item=>!item.historical)
+       disabled={editing.stampEditorEnabled} title={editing.stampEditorEnabled
         ?"Summen regnes automatisk fra stemplingene. Endre klokkeslettene nedenfor.":""}/></label>
       <label>Eksisterende oppdrag
        <select value={editing.orderId} onChange={e=>applyOrder(setEditing,e.target.value)}>
@@ -465,7 +466,7 @@ export default function WorkClockClient({userName}){
       <label>Bom inkl. mva<div className={styles.money}><span>kr</span><input inputMode="decimal" value={editing.toll} onChange={e=>setEditing(current=>({...current,toll:e.target.value}))}/></div></label>
       <label className={styles.full}>Notat<input value={editing.note} onChange={e=>setEditing(current=>({...current,note:e.target.value}))}/></label>
      </div>
-     {editing.sessions?.length>0&&<section className={styles.stampEditor}>
+     {editing.stampEditorEnabled&&<section className={styles.stampEditor}>
       <h3>Inn- og utstemplinger</h3>
       <p>Endre dato og klokkeslett for hver økt. Samlet tid regnes automatisk når du lagrer.</p>
       {editing.sessions.map((stamp,index)=><div className={styles.stampLine} key={index}>
