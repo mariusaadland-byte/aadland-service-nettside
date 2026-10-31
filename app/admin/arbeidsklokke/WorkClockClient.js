@@ -3,7 +3,7 @@
 import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import styles from "./workClock.module.css";
-import {combinedWorkClockText} from "../../../lib/workTimeAccumulation";
+import {clockAfterDeduction} from "../../../lib/workTimeDeduction";
 
 const DEFAULT_RATE="500";
 const DEFAULT_KM_RATE="5.30";
@@ -60,7 +60,8 @@ function hours(minutes){
 }
 function minutesFromHours(value){return Math.max(0,Math.round(number(value)*60))}
 function entryCosts(entry){
- const labor=Math.round((Number(entry.durationMinutes)||0)*(Number(entry.hourlyRateOre)||0)/60);
+ const net=Math.max(0,(Number(entry.durationMinutes)||0)-(Number(entry.deductedMinutes)||0));
+ const labor=Math.round(net*(Number(entry.hourlyRateOre)||0)/60);
  const travel=Math.round((Number(entry.distanceKm)||0)*(Number(entry.kmRateOre)||0));
  const toll=Number(entry.tollOre)||0;
  return {labor,travel,toll,total:labor+travel+toll};
@@ -73,7 +74,7 @@ function defaultDraft(){
  return {orderId:"",projectLabel:"",customerLabel:"",note:"",hourlyRate:DEFAULT_RATE};
 }
 function defaultManual(){
- return {...defaultDraft(),workDate:osloDate(),durationHours:"",distanceKm:"",kmRate:DEFAULT_KM_RATE,toll:""};
+ return {...defaultDraft(),workDate:osloDate(),durationHours:"",deductedMinutes:"0",distanceKm:"",kmRate:DEFAULT_KM_RATE,toll:""};
 }
 
 export default function WorkClockClient({userName}){
@@ -90,6 +91,10 @@ export default function WorkClockClient({userName}){
  const [timerDraft,setTimerDraft]=useState(defaultDraft);
  const [manual,setManual]=useState(defaultManual);
  const [editing,setEditing]=useState(null);
+ const [credits,setCredits]=useState([]);
+ const [laborOreByScope,setLaborOreByScope]=useState({});
+ const [creditEditor,setCreditEditor]=useState(null);
+ const [selectedCreditOrder,setSelectedCreditOrder]=useState("");
 
  async function load(targetMonth=month){
   setLoading(true); setError(""); setMessage("");
@@ -107,6 +112,8 @@ export default function WorkClockClient({userName}){
    setSetupRequired(false);
    setEntries(Array.isArray(data.entries)?data.entries:[]);
    setActive(data.active||null);
+   setCredits(Array.isArray(data.credits)?data.credits:[]);
+   setLaborOreByScope(data.laborOreByScope||{});
 
    if(ordersResponse.ok){
     const orderData=await ordersResponse.json().catch(()=>({}));
@@ -177,6 +184,67 @@ export default function WorkClockClient({userName}){
   setMessage("Klokken fortsetter på samme registrering. Tidligere timer er beholdt.");
   setEntries(current=>current.map(item=>item.id===data.entry.id?data.entry:item));
  }
+ async function lunch(deltaMinutes){
+  if(!active||busy)return;
+  const data=await request("PATCH",{
+   action:"deduct",id:active.id,deltaMinutes,expectedUpdatedAt:active.updatedAt
+  });
+  if(!data)return;
+  setActive(data.entry);
+  const scope=active.orderId?"order:"+active.orderId:"entry:"+active.id;
+  const saved=Number(active.durationMinutes)||0,rate=Number(active.hourlyRateOre)||0;
+  const oldBase=Math.round(Math.max(0,saved-(Number(active.deductedMinutes)||0))*rate/60);
+  const newBase=Math.round(Math.max(0,saved-(Number(data.entry.deductedMinutes)||0))*rate/60);
+  setLaborOreByScope(previous=>({...previous,[scope]:(Number(previous[scope])||0)+newBase-oldBase}));
+  setEntries(current=>current.map(entry=>entry.id===data.entry.id?data.entry:entry));
+  setMessage(deltaMinutes>0?"30 minutter lunsj er trukket fra arbeidstiden.":"Siste lunsjtrekk er angret.");
+ }
+ function scopeKey(entry){return entry?.orderId?"order:"+entry.orderId:"entry:"+entry?.id}
+ function showCreditEditor(entry){
+  const key=scopeKey(entry);
+  const saved=credits.find(c=>c.scopeKey===key);
+  setCreditEditor({entryId:entry.orderId?null:entry.id,orderId:entry.orderId||null,
+   scopeKey:key,agreedValueKroner:saved?String(saved.agreedValueOre/100).replace(".",","):"",
+   description:saved?.description||""});
+ }
+ async function saveCredit(event){
+  event.preventDefault();
+  if(!creditEditor)return;
+  const input=String(creditEditor.agreedValueKroner||"").trim().replace(",",".");
+  if(!/^\d+(?:\.\d{1,2})?$/.test(input)){
+   setError("Oppgi avtalt verdi som et gyldig kronebeløp, for eksempel 5000.");
+   return;
+  }
+  const amount=Math.round(Number(input)*100);
+  const data=await request(creditEditor.orderId?"POST":"PATCH",{
+   action:creditEditor.orderId?"setOrderCredit":"setCredit",
+   ...(creditEditor.orderId?{orderId:creditEditor.orderId}:{id:creditEditor.entryId}),
+   agreedValueOre:amount,creditDescription:creditEditor.description});
+  if(!data)return;
+  setCredits(current=>[...current.filter(c=>c.scopeKey!==data.credit.scopeKey),data.credit]);
+  setCreditEditor(null);
+  setMessage("Avtalt motregningsverdi er lagret. Den trekkes fra prosjektets arbeidsverdi, ikke fra timene.");
+ }
+ function workCreditProgress(entry){
+  const scope=scopeKey(entry),credit=credits.find(c=>c.scopeKey===scope);
+  if(!credit||credit.agreedValueOre<=0)return null;
+  const saved=Number(laborOreByScope[scope]||0);
+  const currentIsActive=active&&scopeKey(active)===scope;
+  const liveMinutes=currentIsActive?Math.max(0,(now-Date.parse(active.startedAt))/60000):0;
+  const runningSavedMinutes=currentIsActive?
+   Math.max(0,(Number(active.durationMinutes)||0)-(Number(active.deductedMinutes)||0)):0;
+  const runningNowMinutes=currentIsActive?
+   Math.max(0,(Number(active.durationMinutes)||0)+liveMinutes-(Number(active.deductedMinutes)||0)):0;
+  const activeLaborDelta=currentIsActive?
+   Math.round(runningNowMinutes*(Number(active.hourlyRateOre)||0)/60)-
+   Math.round(runningSavedMinutes*(Number(active.hourlyRateOre)||0)/60):0;
+  const labor=saved+activeLaborDelta;
+  const remaining=Math.max(0,credit.agreedValueOre-labor);
+  const extra=Math.max(0,labor-credit.agreedValueOre);
+  const hourlyRate=Number(active?.hourlyRateOre||entry.hourlyRateOre)||0;
+  return {credit,labor,remaining,extra,remainingMinutes:hourlyRate>0?
+   Math.ceil(remaining*60/hourlyRate):null};
+ }
  async function stop(){
   if(!active)return;
   const data=await request("PATCH",{action:"stop",id:active.id});
@@ -193,6 +261,7 @@ export default function WorkClockClient({userName}){
    orderId:manual.orderId||null,
    workDate:manual.workDate,
    durationMinutes:minutesFromHours(manual.durationHours),
+   deductedMinutes:Number(manual.deductedMinutes||0),
    projectLabel:manual.projectLabel,
    customerLabel:manual.customerLabel,
    note:manual.note,
@@ -220,6 +289,7 @@ export default function WorkClockClient({userName}){
    distanceKm:String(entry.distanceKm||"").replace(".",","),
    kmRate:String((entry.kmRateOre||0)/100).replace(".",","),
    toll:String((entry.tollOre||0)/100).replace(".",","),
+   deductedMinutes:String(entry.deductedMinutes||0),
    stampEditorEnabled:Boolean(entry.startedAt&&entry.endedAt),
    sessions:(entry.sessions||[]).map(item=>({
     startedAt:item.startedAt?osloDateTimeLocal(item.startedAt):"",
@@ -248,6 +318,7 @@ export default function WorkClockClient({userName}){
    orderId:editing.orderId||null,
    workDate:editing.workDate,
    durationMinutes:minutesFromHours(editing.durationHours),
+   deductedMinutes:Number(editing.deductedMinutes),
    ...(sessions?{sessions}:{}),
    projectLabel:editing.projectLabel,
    customerLabel:editing.customerLabel,
@@ -274,7 +345,7 @@ export default function WorkClockClient({userName}){
 
  const totals=useMemo(()=>entries.filter(entry=>!(entry.startedAt&&!entry.endedAt)).reduce((sum,entry)=>{
   const cost=entryCosts(entry);
-  sum.minutes+=Number(entry.durationMinutes)||0;
+  sum.minutes+=Math.max(0,(Number(entry.durationMinutes)||0)-(Number(entry.deductedMinutes)||0));
   sum.labor+=cost.labor;
   sum.km+=Number(entry.distanceKm)||0;
   sum.travel+=cost.travel;
@@ -285,14 +356,15 @@ export default function WorkClockClient({userName}){
 
  function exportExcel(){
   const rows=entries.filter(entry=>!(entry.startedAt&&!entry.endedAt));
-  const header=["Dato","Prosjekt","Kunde","Timer","Timepris inkl. mva","Arbeid inkl. mva","Km","Km-sats inkl. mva","Kjøring inkl. mva","Bom inkl. mva","Total inkl. mva","Notat"];
+  const header=["Dato","Prosjekt","Kunde","Timer netto","Lunsj/minustid (min)","Timepris inkl. mva","Arbeid inkl. mva","Km","Km-sats inkl. mva","Kjøring inkl. mva","Bom inkl. mva","Total inkl. mva","Notat"];
   const tableRows=[
    header.map(value=>'<Cell><Data ss:Type="String">'+xml(value)+'</Data></Cell>').join(""),
    ...rows.map(entry=>{
     const cost=entryCosts(entry);
     const cells=[
      ["String",entry.workDate],["String",entry.projectLabel],["String",entry.customerLabel],
-     ["Number",(entry.durationMinutes/60).toFixed(2)],["Number",moneyNumber(entry.hourlyRateOre)],
+     ["Number",(Math.max(0,entry.durationMinutes-(entry.deductedMinutes||0))/60).toFixed(2)],
+     ["Number",Number(entry.deductedMinutes)||0],["Number",moneyNumber(entry.hourlyRateOre)],
      ["Number",moneyNumber(cost.labor)],["Number",Number(entry.distanceKm||0).toFixed(2)],
      ["Number",moneyNumber(entry.kmRateOre)],["Number",moneyNumber(cost.travel)],
      ["Number",moneyNumber(cost.toll)],["Number",moneyNumber(cost.total)],["String",entry.note]
@@ -301,7 +373,7 @@ export default function WorkClockClient({userName}){
    }),
    [
     ["String","TOTAL"],["String",""],["String",""],["Number",(totals.minutes/60).toFixed(2)],
-    ["String",""],["Number",moneyNumber(totals.labor)],["Number",totals.km.toFixed(2)],["String",""],
+    ["String",""],["String",""],["Number",moneyNumber(totals.labor)],["Number",totals.km.toFixed(2)],["String",""],
     ["Number",moneyNumber(totals.travel)],["Number",moneyNumber(totals.toll)],["Number",moneyNumber(totals.total)],["String",""]
    ].map(([type,value])=>'<Cell><Data ss:Type="'+type+'">'+xml(value)+'</Data></Cell>').join("")
   ].map(cells=>"<Row>"+cells+"</Row>").join("");
@@ -341,9 +413,30 @@ export default function WorkClockClient({userName}){
        {active.durationMinutes>0&&<> · {hours(active.durationMinutes)} t lagret fra før</>}</p>}
      </div>
      {active&&<div className={styles.liveTime} aria-label="Samlet registrert og pågående arbeidstid">
-      {combinedWorkClockText(active.durationMinutes,active.startedAt,now)}
+      {clockAfterDeduction(active.durationMinutes,active.startedAt,now,active.deductedMinutes)}
      </div>}
     </div>
+    {active&&<div className={styles.runningBreak}>
+     <button type="button" className={styles.lunchButton}
+      disabled={busy||active.lunchDays?.includes(osloDate())}
+      onClick={()=>lunch(30)}>🍽️ {active.lunchDays?.includes(osloDate())?"Lunsj er trukket i dag":"Lunsj −30 min"}</button>
+     {active.lunchDays?.includes(osloDate())&&<button type="button" className={styles.undoLunch}
+      disabled={busy} onClick={()=>lunch(-30)}>Angre lunsj i dag</button>}
+     <span>Minustid totalt: {active.deductedMinutes||0} min. Arbeidsklokken går videre.</span>
+    </div>}
+    {active&&<div className={styles.creditLive}>
+     {(()=>{const progress=workCreditProgress(active);return progress?<>
+      <b>Motregning: {kroner(progress.credit.agreedValueOre)}</b>
+      <span>Arbeid utført: {kroner(progress.labor)}</span>
+      <strong>{progress.remaining>0?"Verdi igjen: "+kroner(progress.remaining):
+       "Til fakturering utover avtalen: "+kroner(progress.extra)}</strong>
+      {progress.remainingMinutes!==null&&progress.remaining>0&&
+       <small>Ca. {hours(progress.remainingMinutes)} arbeidstimer igjen ved dagens timepris</small>}
+     </>:null})()}
+     <button type="button" disabled={busy} onClick={()=>showCreditEditor(active)}>
+      {workCreditProgress(active)?"Endre avtalt verdi":"Legg inn avtalt verdi / motregning"}
+     </button>
+    </div>}
 
     {!active?<div className={styles.timerFields}>
      <label>Eksisterende oppdrag
@@ -369,6 +462,35 @@ export default function WorkClockClient({userName}){
      <div><b>{kroner(active.hourlyRateOre)}/t</b><span>Timeprisen kan redigeres etter at klokken er stoppet.</span></div>
      <button className={styles.stopButton} type="button" onClick={stop} disabled={busy}>■ Stopp og lagre</button>
     </div>}
+   </section>
+
+   <section className={styles.creditProject}>
+    <div><span className={styles.eyebrow}>OPPDRAG / MOTREGNING</span>
+     <h2>Avtalt verdi for eksisterende oppdrag</h2>
+     <p>Legg inn verdien du skal arbeide for, for eksempel en bil. Klokken regner ned verdien i kroner og viser arbeid som overstiger avtalen.</p>
+    </div>
+    <div className={styles.creditProjectControls}>
+     <label>Velg oppdrag
+      <select value={selectedCreditOrder} onChange={e=>setSelectedCreditOrder(e.target.value)}>
+       <option value="">Velg eksisterende oppdrag</option>
+       {orders.map(o=><option key={o.id} value={o.id}>{o.orderNumber} · {o.sourceQuoteTitle||o.customerName||"Oppdrag"}</option>)}
+      </select>
+     </label>
+     <button type="button" disabled={busy||!selectedCreditOrder}
+      onClick={()=>showCreditEditor({id:null,orderId:selectedCreditOrder,hourlyRateOre:0})}>
+      {credits.some(c=>c.scopeKey==="order:"+selectedCreditOrder)?"Endre avtalt verdi":"Legg inn avtalt verdi"}
+     </button>
+    </div>
+    {selectedCreditOrder&&(()=>{const c=credits.find(x=>x.scopeKey==="order:"+selectedCreditOrder);
+     if(!c||c.agreedValueOre<=0)return null;
+     const spent=Number(laborOreByScope["order:"+selectedCreditOrder]||0);
+     return <p className={styles.creditProjectSummary}>
+      Avtalt: <b>{kroner(c.agreedValueOre)}</b> · Utført arbeid: <b>{kroner(spent)}</b> ·
+      {spent<c.agreedValueOre?" Verdi igjen: ":" Til fakturering utover avtalen: "}
+      <b>{kroner(Math.abs(c.agreedValueOre-spent))}</b>
+     </p>;
+    })()}
+    <small>Dette er en intern beregning. Faktura eller motregningsbilag lages ikke automatisk.</small>
    </section>
 
    <section className={styles.monthBar}>
@@ -399,6 +521,8 @@ export default function WorkClockClient({userName}){
      <label>Prosjekt / jobb<input value={manual.projectLabel} onChange={e=>setManual(current=>({...current,projectLabel:e.target.value}))}/></label>
      <label>Kunde<input value={manual.customerLabel} onChange={e=>setManual(current=>({...current,customerLabel:e.target.value}))}/></label>
      <label>Timepris inkl. mva<div className={styles.money}><span>kr</span><input inputMode="decimal" value={manual.hourlyRate} onChange={e=>setManual(current=>({...current,hourlyRate:e.target.value}))}/></div></label>
+     <label>Minustid (minutter)<input inputMode="numeric" type="number" min="0" step="1" value={manual.deductedMinutes||"0"}
+      onChange={e=>setManual(current=>({...current,deductedMinutes:e.target.value}))}/></label>
      <label>Km<input inputMode="decimal" value={manual.distanceKm} onChange={e=>setManual(current=>({...current,distanceKm:e.target.value}))} placeholder="0"/></label>
      <label>Km-sats inkl. mva<div className={styles.money}><span>kr</span><input inputMode="decimal" value={manual.kmRate} onChange={e=>setManual(current=>({...current,kmRate:e.target.value}))}/></div></label>
      <label>Bom inkl. mva<div className={styles.money}><span>kr</span><input inputMode="decimal" value={manual.toll} onChange={e=>setManual(current=>({...current,toll:e.target.value}))} placeholder="0"/></div></label>
@@ -430,7 +554,10 @@ export default function WorkClockClient({userName}){
           title={active?"Stopp klokken som går før du fortsetter en annen.":"Fortsett på samme timeregistrering"}
           onClick={()=>resume(entry)}>▶ Fortsett</button>}
        </td>
-       <td>{activeRow?<span className={styles.running}>Pågår</span>:hours(entry.durationMinutes)+" t"}</td>
+       <td>{activeRow?<span className={styles.running}>Pågår</span>:<>
+        {hours(Math.max(0,entry.durationMinutes-(entry.deductedMinutes||0)))} t
+        {entry.deductedMinutes>0&&<small>−{entry.deductedMinutes} min lunsj/fratrekk</small>}
+       </>}</td>
        <td>{activeRow?"—":kroner(cost.labor)}</td>
        <td>{entry.distanceKm?entry.distanceKm.toLocaleString("nb-NO",{maximumFractionDigits:2})+" km":"—"}</td>
        <td>{entry.tollOre?kroner(entry.tollOre):"—"}</td>
@@ -443,6 +570,27 @@ export default function WorkClockClient({userName}){
     </table></div>}
    </section>
 
+   {creditEditor&&<div className={`${styles.modalBackdrop} ${styles.creditBackdrop}`}>
+    <form className={styles.creditModal} onSubmit={saveCredit}>
+     <div className={styles.modalHead}><h2>Avtalt verdi / motregning</h2>
+      <button type="button" onClick={()=>setCreditEditor(null)}>×</button></div>
+     <p>Registrer verdien du allerede har fått/avtalt å jobbe opp, for eksempel en bil.
+      Faktisk arbeidstid blir beholdt. Når arbeidsverdien overstiger avtalen, vises overskytende beløp som fakturerbart.</p>
+     <label>Avtalt verdi inkl. mva (kr)
+      <input inputMode="decimal" required value={creditEditor.agreedValueKroner}
+       onChange={e=>setCreditEditor(x=>({...x,agreedValueKroner:e.target.value}))} placeholder="F.eks. 5000"/>
+     </label>
+     <label>Hva gjelder motregningen?
+      <input value={creditEditor.description} onChange={e=>setCreditEditor(x=>({...x,description:e.target.value}))}
+       placeholder="F.eks. bil – avtalt arbeidsverdi"/>
+     </label>
+     <p>Dette er en beregning, ikke automatisk fakturering eller bokføring. Kontroller MVA og dokumentasjon ved byttehandel.</p>
+     <div className={styles.modalActions}>
+      <button type="button" onClick={()=>setCreditEditor(null)}>Avbryt</button>
+      <button className={styles.saveButton} disabled={busy}>Lagre avtalt verdi</button>
+     </div>
+    </form>
+   </div>}
    {editing&&<div className={styles.modalBackdrop} onMouseDown={event=>{if(event.target===event.currentTarget)setEditing(null)}}>
     <form className={styles.modal} onSubmit={saveEdit}>
      <div className={styles.modalHead}><div><span className={styles.eyebrow}>REDIGER / FLYTT TIMER</span><h2>{editing.projectLabel||"Timeregistrering"}</h2></div><button type="button" onClick={()=>setEditing(null)}>×</button></div>
@@ -452,6 +600,10 @@ export default function WorkClockClient({userName}){
       <label>Timer<input inputMode="decimal" value={editing.durationHours} onChange={e=>setEditing(current=>({...current,durationHours:e.target.value}))}
        disabled={editing.stampEditorEnabled} title={editing.stampEditorEnabled
         ?"Summen regnes automatisk fra stemplingene. Endre klokkeslettene nedenfor.":""}/></label>
+      <label>Minustid (minutter)
+       <input type="number" min="0" step="1" inputMode="numeric"
+        value={editing.deductedMinutes} onChange={e=>setEditing(current=>({...current,deductedMinutes:e.target.value}))}/>
+      </label>
       <label>Eksisterende oppdrag
        <select value={editing.orderId} onChange={e=>applyOrder(setEditing,e.target.value)}>
         <option value="">Ikke koblet til oppdrag</option>
@@ -465,6 +617,13 @@ export default function WorkClockClient({userName}){
       <label>Km-sats inkl. mva<div className={styles.money}><span>kr</span><input inputMode="decimal" value={editing.kmRate} onChange={e=>setEditing(current=>({...current,kmRate:e.target.value}))}/></div></label>
       <label>Bom inkl. mva<div className={styles.money}><span>kr</span><input inputMode="decimal" value={editing.toll} onChange={e=>setEditing(current=>({...current,toll:e.target.value}))}/></div></label>
       <label className={styles.full}>Notat<input value={editing.note} onChange={e=>setEditing(current=>({...current,note:e.target.value}))}/></label>
+     </div>
+     <div className={styles.creditEditAction}>
+      <button type="button" onClick={()=>showCreditEditor(editing)} disabled={busy}>
+       {credits.some(c=>c.scopeKey===(editing.orderId?"order:"+editing.orderId:"entry:"+editing.id))?
+        "Rediger avtalt verdi / motregning":"Legg til avtalt verdi / motregning"}
+      </button>
+      <p>En avtalt verdi gjelder hele oppdraget, eller bare denne registreringen hvis den ikke er koblet til et oppdrag.</p>
      </div>
      {editing.stampEditorEnabled&&<section className={styles.stampEditor}>
       <h3>Inn- og utstemplinger</h3>

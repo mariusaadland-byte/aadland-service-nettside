@@ -19,6 +19,9 @@ assert.equal(combinedWorkClockText(0,begin,new Date(begin).getTime()),"00:00:00"
 const stampSource=read("lib/workTimeStamps.js").replace(/^export /gm,"");
 const {storedWorkStamps,workStamp,normalizeStampEdit}=new Function(stampSource+
  ";return {storedWorkStamps,workStamp,normalizeStampEdit};")();
+const workDeductionSource=read("lib/workTimeDeduction.js").replace(/^export /gm,"");
+const {netWorkMinutes,validDeductedMinutes}=new Function(workDeductionSource+
+ ";return {netWorkMinutes,validDeductedMinutes};")();
 const raw=read("app/api/admin/work-time/route.js")
  .replace(/^import .*;\n/gm,"")
  .replace(/^export async function /gm,"async function ");
@@ -55,9 +58,9 @@ const db=()=>({from(name){
 }});
 const NextResponse={json:(data,opts={})=>({status:opts.status||200,body:data})};
 const PATCH=new Function("NextResponse","sameOriginGuard","getAdminUser","db","isValidDateInput",
- "osloDateKey","accruedWorkMinutes","storedWorkStamps","workStamp","normalizeStampEdit","console",raw+";return PATCH;")(
+ "osloDateKey","accruedWorkMinutes","storedWorkStamps","workStamp","normalizeStampEdit","netWorkMinutes","validDeductedMinutes","console",raw+";return PATCH;")(
  NextResponse,()=>null,async()=>roleOK?{id:userId,role:"owner"}:null,db,
- ()=>true,()=>"",accruedWorkMinutes,storedWorkStamps,workStamp,normalizeStampEdit,{error(){}}
+ ()=>true,()=>"",accruedWorkMinutes,storedWorkStamps,workStamp,normalizeStampEdit,netWorkMinutes,validDeductedMinutes,{error(){}}
 );
 const invoke=(action,id=entryId)=>PATCH({json:async()=>({action,id})});
 let response=await invoke("resume");
@@ -112,7 +115,7 @@ const css=read("app/admin/arbeidsklokke/workClock.module.css");
 assert.ok(client.includes('action:"resume",id:entry.id'));
 assert.ok(client.includes('if(busy||active||entry.orderId||!entry.startedAt||!entry.endedAt)return;'));
 assert.ok(client.includes('setActive(data.entry)'),"Show the reopened timer as active");
-assert.ok(client.includes("combinedWorkClockText(active.durationMinutes,active.startedAt,now)"),
+assert.ok(client.includes("clockAfterDeduction(active.durationMinutes,active.startedAt,now,active.deductedMinutes)"),
  "Display the accumulated time as soon as the row is resumed");
 assert.ok(client.includes("!activeRow&&!entry.orderId&&Boolean(entry.startedAt&&entry.endedAt)"),
  "Show Fortsett only on stopped standalone clocks");
