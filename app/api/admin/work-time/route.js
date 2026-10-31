@@ -116,10 +116,36 @@ export async function GET(req){
   console.error("WORK TIME GET",error);
   return NextResponse.json({error:"Arbeidstiden kunne ikke hentes."},{status:500});
  }
+ // Value credits apply to every time entry on the same order even if the
+ // sessions were recorded in different months. Fetch the full work ledger.
+ const allWork=[];
+ for(let offset=0;offset<5000;offset+=500){
+  const page=await s.from("work_time_entries")
+   .select("id,order_id,duration_minutes,deducted_minutes,hourly_rate_ore,started_at,ended_at")
+   .eq("admin_user_id",user.id).order("id",{ascending:true}).range(offset,offset+499);
+  if(page.error||!Array.isArray(page.data))
+   return NextResponse.json({error:"Kunne ikke kontrollere prosjektets fulle arbeidstid."},{status:503});
+  allWork.push(...page.data);
+  if(page.data.length<500)break;
+  if(offset===4500)return NextResponse.json({error:"For mange tidsregistreringer for sikker prosjektoversikt."},{status:503});
+ }
+ const credits=await s.from("work_time_value_credits")
+  .select("scope_key,agreed_value_ore,description,updated_at")
+  .eq("admin_user_id",user.id);
+ if(credits.error)return NextResponse.json({error:"Kunne ikke laste avtalte motregningsverdier."},{status:503});
+ const laborOreByScope={};
+ for(const entry of allWork){
+  const key=entry.order_id?"order:"+entry.order_id:"entry:"+entry.id;
+  const net=Math.max(0,(Number(entry.duration_minutes)||0)-(Number(entry.deducted_minutes)||0));
+  laborOreByScope[key]=(laborOreByScope[key]||0)+Math.round(net*(Number(entry.hourly_rate_ore)||0)/60);
+ }
  return NextResponse.json({
   month:requested,
   entries:(entriesResult.data||[]).map(map),
-  active:map(activeResult.data)
+  active:map(activeResult.data),
+  credits:(credits.data||[]).map(x=>({scopeKey:x.scope_key,agreedValueOre:Number(x.agreed_value_ore)||0,
+   description:x.description,updatedAt:x.updated_at})),
+  laborOreByScope
  });
 }
 
@@ -188,6 +214,27 @@ export async function PATCH(req){
  const existing=existingResult.data;
  if(!existing)return NextResponse.json({error:"Registreringen ble ikke funnet."},{status:404});
 
+ if(action==="setCredit"){
+  // Never use a client-supplied project ID: derive a stable scope from
+  // a work record belonging to this authenticated admin.
+  const scopeKey=existing.order_id?"order:"+existing.order_id:"entry:"+existing.id;
+  const amount=Number(body.agreedValueOre);
+  if(!Number.isSafeInteger(amount)||amount<0||amount>100000000000)
+   return NextResponse.json({error:"Oppgi en gyldig avtalt verdi i kroner."},{status:400});
+  const description=clean(body.creditDescription,400);
+  const {data,error}=await s.from("work_time_value_credits").upsert({
+   admin_user_id:user.id,scope_key:scopeKey,agreed_value_ore:amount,
+   description,updated_at:new Date().toISOString()
+  },{onConflict:"admin_user_id,scope_key"})
+   .select("scope_key,agreed_value_ore,description,updated_at").single();
+  if(error){
+   console.error("WORK TIME CREDIT",error.code);
+   return NextResponse.json({error:"Avtalt motregningsverdi kunne ikke lagres."},{status:500});
+  }
+  return NextResponse.json({credit:{scopeKey:data.scope_key,
+   agreedValueOre:Number(data.agreed_value_ore),description:data.description,
+   updatedAt:data.updated_at}});
+ }
  let values;
  if(action==="stop"){
   if(!existing.started_at||existing.ended_at)return NextResponse.json({error:"Denne klokken går ikke."},{status:409});
