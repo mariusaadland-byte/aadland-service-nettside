@@ -22,6 +22,9 @@ const {storedWorkStamps,workStamp,normalizeStampEdit}=new Function(stampSource+
 const workDeductionSource=read("lib/workTimeDeduction.js").replace(/^export /gm,"");
 const {netWorkMinutes,validDeductedMinutes}=new Function(workDeductionSource+
  ";return {netWorkMinutes,validDeductedMinutes};")();
+const customerSource=read("lib/workClockCustomer.js").replace(/^export /gm,"");
+const {parseWorkClockCustomerRef,resolveWorkClockCustomer}=new Function(customerSource+
+ ";return {parseWorkClockCustomerRef,resolveWorkClockCustomer};")();
 const raw=read("app/api/admin/work-time/route.js")
  .replace(/^import .*;\n/gm,"")
  .replace(/^export async function /gm,"async function ");
@@ -58,9 +61,9 @@ const db=()=>({from(name){
 }});
 const NextResponse={json:(data,opts={})=>({status:opts.status||200,body:data})};
 const PATCH=new Function("NextResponse","sameOriginGuard","getAdminUser","db","isValidDateInput",
- "osloDateKey","accruedWorkMinutes","storedWorkStamps","workStamp","normalizeStampEdit","netWorkMinutes","validDeductedMinutes","console",raw+";return PATCH;")(
+ "osloDateKey","accruedWorkMinutes","storedWorkStamps","workStamp","normalizeStampEdit","netWorkMinutes","validDeductedMinutes","parseWorkClockCustomerRef","resolveWorkClockCustomer","console",raw+";return PATCH;")(
  NextResponse,()=>null,async()=>roleOK?{id:userId,role:"owner"}:null,db,
- ()=>true,()=>"",accruedWorkMinutes,storedWorkStamps,workStamp,normalizeStampEdit,netWorkMinutes,validDeductedMinutes,{error(){}}
+ ()=>true,()=>"",accruedWorkMinutes,storedWorkStamps,workStamp,normalizeStampEdit,netWorkMinutes,validDeductedMinutes,parseWorkClockCustomerRef,resolveWorkClockCustomer,{error(){}}
 );
 const invoke=(action,id=entryId)=>PATCH({json:async()=>({action,id})});
 let response=await invoke("resume");
