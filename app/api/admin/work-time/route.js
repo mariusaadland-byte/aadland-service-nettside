@@ -3,6 +3,7 @@ import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {getAdminUser} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
 import {isValidDateInput,osloDateKey} from "../../../../lib/osloTime";
+import {accruedWorkMinutes} from "../../../../lib/workTimeAccumulation";
 
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SELECT_FIELDS="id,admin_user_id,order_id,work_date,project_label,customer_label,note,started_at,ended_at,duration_minutes,hourly_rate_ore,distance_km,km_rate_ore,toll_ore,created_at,updated_at";
@@ -179,9 +180,20 @@ export async function PATCH(req){
  if(action==="stop"){
   if(!existing.started_at||existing.ended_at)return NextResponse.json({error:"Denne klokken går ikke."},{status:409});
   const endedAt=new Date();
-  const startedAt=new Date(existing.started_at);
-  const durationMinutes=Math.max(1,Math.round((endedAt.getTime()-startedAt.getTime())/60000));
+  const durationMinutes=accruedWorkMinutes(existing.duration_minutes,existing.started_at,endedAt);
+  if(durationMinutes===null)return NextResponse.json({error:"Tidsregistreringen kan ikke overstige 100 000 minutter. Kontroller registreringen."},{status:409});
   values={ended_at:endedAt.toISOString(),duration_minutes:durationMinutes,updated_at:endedAt.toISOString()};
+ }else if(action==="resume"){
+  // Re-use the *same row* only if it was a stopped timer without
+  // a linked order. Preserve work date, labels, rates, km and toll.
+  if(existing.order_id)return NextResponse.json({error:"Bare timere uten koblet oppdrag kan startes igjen."},{status:409});
+  if(!existing.started_at||!existing.ended_at)
+   return NextResponse.json({error:"Bare en tidligere stoppet klokke kan fortsettes."},{status:409});
+  if(!Number.isSafeInteger(Number(existing.duration_minutes))||
+   Number(existing.duration_minutes)<1||Number(existing.duration_minutes)>=100000)
+   return NextResponse.json({error:"Denne registreringen kan ikke fortsettes med gyldig timetotal."},{status:409});
+  const resumedAt=new Date().toISOString();
+  values={started_at:resumedAt,ended_at:null,updated_at:resumedAt};
  }else if(action==="update"){
   if(existing.started_at&&!existing.ended_at)return NextResponse.json({error:"Stopp klokken før du redigerer registreringen."},{status:409});
   const workDate=clean(body.workDate,10);
@@ -193,11 +205,30 @@ export async function PATCH(req){
   return NextResponse.json({error:"Ukjent handling."},{status:400});
  }
 
- const {data,error}=await s.from("work_time_entries").update(values).eq("id",id).eq("admin_user_id",user.id).select(SELECT_FIELDS).single();
+ let mutation=s.from("work_time_entries").update(values).eq("id",id).eq("admin_user_id",user.id);
+ if(action==="stop"){
+  // Two simultaneous Stop requests must not add the same interval twice.
+  mutation=mutation.is("ended_at",null).eq("started_at",existing.started_at)
+   .eq("duration_minutes",existing.duration_minutes);
+ }else if(action==="resume"){
+  // If this row was changed or resumed from another phone since GET,
+  // the conditional update must not overwrite that work session.
+  mutation=mutation.eq("ended_at",existing.ended_at).eq("started_at",existing.started_at)
+   .eq("duration_minutes",existing.duration_minutes).is("order_id",null);
+ }else if(action==="update"){
+  mutation=mutation.eq("duration_minutes",existing.duration_minutes);
+  if(existing.started_at&&existing.ended_at)mutation=mutation.eq("ended_at",existing.ended_at);
+  else mutation=mutation.is("started_at",null);
+ }
+ const {data,error}=await mutation.select(SELECT_FIELDS).maybeSingle();
  if(error){
+  if(String(error.code||"")==="23505")
+   return NextResponse.json({error:"Du har allerede en arbeidsklokke som går. Stopp den før du fortsetter en annen."},{status:409});
+  if(tableError(error))return NextResponse.json({error:"Databaseoppdatering mangler for arbeidsklokken.",setupRequired:true},{status:503});
   console.error("WORK TIME PATCH",error);
   return NextResponse.json({error:"Registreringen kunne ikke oppdateres."},{status:500});
  }
+ if(!data)return NextResponse.json({error:"Timeregistreringen ble endret et annet sted. Oppdater siden og prøv på nytt."},{status:409});
  return NextResponse.json({entry:map(data)});
 }
 
