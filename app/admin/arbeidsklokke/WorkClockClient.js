@@ -4,6 +4,7 @@ import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import styles from "./workClock.module.css";
 import {clockAfterDeduction} from "../../../lib/workTimeDeduction";
+import WorkClockCustomerPicker from "./WorkClockCustomerPicker";
 
 const DEFAULT_RATE="500";
 const DEFAULT_KM_RATE="5.30";
@@ -71,7 +72,7 @@ function xml(value){
 }
 function moneyNumber(oreValue){return ((Number(oreValue)||0)/100).toFixed(2)}
 function defaultDraft(){
- return {orderId:"",projectLabel:"",customerLabel:"",note:"",hourlyRate:DEFAULT_RATE};
+ return {orderId:"",customerRef:"",projectLabel:"",customerLabel:"",note:"",hourlyRate:DEFAULT_RATE};
 }
 function defaultManual(){
  return {...defaultDraft(),workDate:osloDate(),durationHours:"",deductedMinutes:"0",distanceKm:"",kmRate:DEFAULT_KM_RATE,toll:""};
@@ -82,6 +83,8 @@ export default function WorkClockClient({userName}){
  const [entries,setEntries]=useState([]);
  const [active,setActive]=useState(null);
  const [orders,setOrders]=useState([]);
+ const [customers,setCustomers]=useState([]);
+ const [customerLoadError,setCustomerLoadError]=useState("");
  const [loading,setLoading]=useState(true);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
@@ -99,9 +102,10 @@ export default function WorkClockClient({userName}){
  async function load(targetMonth=month){
   setLoading(true); setError(""); setMessage("");
   try{
-   const [timeResponse,ordersResponse]=await Promise.all([
+   const [timeResponse,ordersResponse,customerResponse]=await Promise.all([
     fetch("/api/admin/work-time?month="+encodeURIComponent(targetMonth)),
-    fetch("/api/admin/orders")
+    fetch("/api/admin/orders"),
+    fetch("/api/admin/work-time/customers",{cache:"no-store"})
    ]);
    const data=await timeResponse.json().catch(()=>({}));
    if(timeResponse.status===401||timeResponse.status===403){window.location.href="/admin/login";return;}
@@ -118,6 +122,14 @@ export default function WorkClockClient({userName}){
    if(ordersResponse.ok){
     const orderData=await ordersResponse.json().catch(()=>({}));
     setOrders(Array.isArray(orderData.orders)?orderData.orders.filter(order=>order.orderType==="custom"&&!order.archivedAt&&order.status!=="cancelled"):[]);
+   }
+   if(customerResponse.ok){
+    const list=await customerResponse.json().catch(()=>({}));
+    setCustomers(Array.isArray(list.customers)?list.customers:[]);
+    setCustomerLoadError("");
+   }else{
+    const details=await customerResponse.json().catch(()=>({}));
+    setCustomerLoadError(details.error||"Kunne ikke hente kunderegisteret. Du kan fortsatt skrive inn kunden manuelt.");
    }
   }catch(err){
    setError(err.message||"Arbeidstiden kunne ikke hentes.");
@@ -139,8 +151,18 @@ export default function WorkClockClient({userName}){
   setter(current=>({
    ...current,
    orderId:value,
+   customerRef:job?"":current.customerRef,
    projectLabel:job?(job.sourceQuoteTitle||job.orderNumber||"Oppdrag"):current.projectLabel,
    customerLabel:job?(job.customerName||job.customer?.name||""):current.customerLabel
+  }));
+ }
+ function chooseCustomer(setter,customer){
+  setter(current=>({
+   ...current,
+   orderId:"",
+   projectLabel:current.orderId?"":current.projectLabel,
+   customerRef:customer?.customerRef||"",
+   customerLabel:customer?.name||""
   }));
  }
  async function request(method,body){
@@ -159,6 +181,7 @@ export default function WorkClockClient({userName}){
   const data=await request("POST",{
    action:"start",
    orderId:timerDraft.orderId||null,
+   customerRef:timerDraft.customerRef||"",
    projectLabel:timerDraft.projectLabel,
    customerLabel:timerDraft.customerLabel,
    note:timerDraft.note,
@@ -259,6 +282,7 @@ export default function WorkClockClient({userName}){
   const data=await request("POST",{
    action:"manual",
    orderId:manual.orderId||null,
+   customerRef:manual.customerRef||"",
    workDate:manual.workDate,
    durationMinutes:minutesFromHours(manual.durationHours),
    deductedMinutes:Number(manual.deductedMinutes||0),
@@ -280,6 +304,7 @@ export default function WorkClockClient({userName}){
   setEditing({
    id:entry.id,
    orderId:entry.orderId||"",
+   customerRef:entry.customerRef||"",
    workDate:entry.workDate,
    durationHours:String(Math.round((entry.durationMinutes/60)*100)/100).replace(".",","),
    projectLabel:entry.projectLabel||"",
@@ -316,6 +341,7 @@ export default function WorkClockClient({userName}){
   const data=await request("PATCH",{
    action:"update",id:editing.id,
    orderId:editing.orderId||null,
+   customerRef:editing.customerRef||"",
    workDate:editing.workDate,
    durationMinutes:minutesFromHours(editing.durationHours),
    deductedMinutes:Number(editing.deductedMinutes),
@@ -448,9 +474,16 @@ export default function WorkClockClient({userName}){
      <label>Prosjekt / jobb
       <input value={timerDraft.projectLabel} onChange={e=>setTimerDraft(current=>({...current,projectLabel:e.target.value}))} placeholder="F.eks. Terrasse"/>
      </label>
-     <label>Kunde
-      <input value={timerDraft.customerLabel} onChange={e=>setTimerDraft(current=>({...current,customerLabel:e.target.value}))} placeholder="Valgfritt"/>
-     </label>
+     <div className={styles.full}>
+      <WorkClockCustomerPicker customers={customers} value={timerDraft.customerRef}
+       disabled={busy||Boolean(timerDraft.orderId)} loadError={customerLoadError}
+       onSelect={customer=>chooseCustomer(setTimerDraft,customer)}/>
+     </div>
+     {!timerDraft.customerRef&&<label>Kunde (valgfritt navn)
+      <input value={timerDraft.customerLabel}
+       onChange={e=>setTimerDraft(current=>({...current,customerLabel:e.target.value}))}
+       placeholder="Eller skriv navn uten kundekort"/>
+     </label>}
      <label>Timepris inkl. mva
       <div className={styles.money}><span>kr</span><input inputMode="decimal" value={timerDraft.hourlyRate} onChange={e=>setTimerDraft(current=>({...current,hourlyRate:e.target.value}))}/></div>
      </label>
@@ -519,7 +552,14 @@ export default function WorkClockClient({userName}){
       </select>
      </label>
      <label>Prosjekt / jobb<input value={manual.projectLabel} onChange={e=>setManual(current=>({...current,projectLabel:e.target.value}))}/></label>
-     <label>Kunde<input value={manual.customerLabel} onChange={e=>setManual(current=>({...current,customerLabel:e.target.value}))}/></label>
+     <div className={styles.full}>
+      <WorkClockCustomerPicker customers={customers} value={manual.customerRef}
+       disabled={busy||Boolean(manual.orderId)} loadError={customerLoadError}
+       onSelect={customer=>chooseCustomer(setManual,customer)}/>
+     </div>
+     {!manual.customerRef&&<label>Kunde (valgfritt navn)
+      <input value={manual.customerLabel} onChange={e=>setManual(current=>({...current,customerLabel:e.target.value}))}/>
+     </label>}
      <label>Timepris inkl. mva<div className={styles.money}><span>kr</span><input inputMode="decimal" value={manual.hourlyRate} onChange={e=>setManual(current=>({...current,hourlyRate:e.target.value}))}/></div></label>
      <label>Minustid (minutter)<input inputMode="numeric" type="number" min="0" step="1" value={manual.deductedMinutes||"0"}
       onChange={e=>setManual(current=>({...current,deductedMinutes:e.target.value}))}/></label>
@@ -611,7 +651,14 @@ export default function WorkClockClient({userName}){
        </select>
       </label>
       <label>Prosjekt / jobb<input value={editing.projectLabel} onChange={e=>setEditing(current=>({...current,projectLabel:e.target.value}))}/></label>
-      <label>Kunde<input value={editing.customerLabel} onChange={e=>setEditing(current=>({...current,customerLabel:e.target.value}))}/></label>
+      <div className={styles.full}>
+       <WorkClockCustomerPicker customers={customers} value={editing.customerRef}
+        disabled={busy||Boolean(editing.orderId)} loadError={customerLoadError}
+        onSelect={customer=>chooseCustomer(setEditing,customer)}/>
+      </div>
+      {!editing.customerRef&&<label>Kunde (valgfritt navn)
+       <input value={editing.customerLabel} onChange={e=>setEditing(current=>({...current,customerLabel:e.target.value}))}/>
+      </label>}
       <label>Timepris inkl. mva<div className={styles.money}><span>kr</span><input inputMode="decimal" value={editing.hourlyRate} onChange={e=>setEditing(current=>({...current,hourlyRate:e.target.value}))}/></div></label>
       <label>Km<input inputMode="decimal" value={editing.distanceKm} onChange={e=>setEditing(current=>({...current,distanceKm:e.target.value}))}/></label>
       <label>Km-sats inkl. mva<div className={styles.money}><span>kr</span><input inputMode="decimal" value={editing.kmRate} onChange={e=>setEditing(current=>({...current,kmRate:e.target.value}))}/></div></label>
