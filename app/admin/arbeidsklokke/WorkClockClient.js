@@ -61,7 +61,7 @@ function hours(minutes){
 }
 function minutesFromHours(value){return Math.max(0,Math.round(number(value)*60))}
 function entryCosts(entry){
- const net=Math.max(0,(Number(entry.durationMinutes)||0)-(Number(entry.deductedMinutes)||0));
+ const net=(Number(entry.durationMinutes)||0)-(Number(entry.deductedMinutes)||0);
  const labor=Math.round(net*(Number(entry.hourlyRateOre)||0)/60);
  const travel=Math.round((Number(entry.distanceKm)||0)*(Number(entry.kmRateOre)||0));
  const toll=Number(entry.tollOre)||0;
@@ -72,7 +72,7 @@ function xml(value){
 }
 function moneyNumber(oreValue){return ((Number(oreValue)||0)/100).toFixed(2)}
 function defaultDraft(){
- return {orderId:"",customerRef:"",projectLabel:"",customerLabel:"",note:"",hourlyRate:DEFAULT_RATE};
+ return {orderId:"",customerRef:"",projectLabel:"",customerLabel:"",note:"",hourlyRate:DEFAULT_RATE,deductedHours:"0"};
 }
 function defaultManual(){
  return {...defaultDraft(),workDate:osloDate(),durationHours:"",deductedHours:"0",distanceKm:"",kmRate:DEFAULT_KM_RATE,toll:""};
@@ -96,6 +96,8 @@ export default function WorkClockClient({userName}){
  const [editing,setEditing]=useState(null);
  const [credits,setCredits]=useState([]);
  const [laborOreByScope,setLaborOreByScope]=useState({});
+ const [netMinutesByScope,setNetMinutesByScope]=useState({});
+ const [activeMinusInput,setActiveMinusInput]=useState("0");
  const [creditEditor,setCreditEditor]=useState(null);
  const [selectedCreditOrder,setSelectedCreditOrder]=useState("");
 
@@ -116,6 +118,8 @@ export default function WorkClockClient({userName}){
    setSetupRequired(false);
    setEntries(Array.isArray(data.entries)?data.entries:[]);
    setActive(data.active||null);
+   setActiveMinusInput(formatDeductionHours(data.active?.deductedMinutes||0));
+   setNetMinutesByScope(data.netMinutesByScope||{});
    setCredits(Array.isArray(data.credits)?data.credits:[]);
    setLaborOreByScope(data.laborOreByScope||{});
 
@@ -178,6 +182,8 @@ export default function WorkClockClient({userName}){
   }finally{setBusy(false)}
  }
  async function start(){
+  const deductedMinutes=parseDeductionHours(timerDraft.deductedHours);
+  if(deductedMinutes===null){setError("Oppgi gyldig minustid i timer, f.eks. 15 eller 1,5.");return;}
   const data=await request("POST",{
    action:"start",
    orderId:timerDraft.orderId||null,
@@ -186,13 +192,19 @@ export default function WorkClockClient({userName}){
    customerLabel:timerDraft.customerLabel,
    note:timerDraft.note,
    hourlyRateOre:ore(timerDraft.hourlyRate),
+   deductedMinutes,
    distanceKm:0,
    kmRateOre:ore(DEFAULT_KM_RATE),
    tollOre:0
   });
   if(!data)return;
   setActive(data.entry);
-  setMessage("Arbeidsklokken er startet.");
+  setActiveMinusInput(formatDeductionHours(data.entry.deductedMinutes));
+  const startedScope=data.entry.orderId?"order:"+data.entry.orderId:"entry:"+data.entry.id;
+  setNetMinutesByScope(current=>({...current,[startedScope]:(Number(current[startedScope])||0)-deductedMinutes}));
+  setLaborOreByScope(current=>({...current,[startedScope]:
+   (Number(current[startedScope])||0)-Math.round(deductedMinutes*Number(data.entry.hourlyRateOre||0)/60)}));
+  setMessage("Arbeidsklokken er startet. Minustiden telles opp mot null.");
   if(data.entry?.workDate?.slice(0,7)===month)setEntries(current=>[data.entry,...current.filter(item=>item.id!==data.entry.id)]);
  }
  async function resume(entry){
@@ -203,6 +215,7 @@ export default function WorkClockClient({userName}){
   if(!data)return;
   setEditing(null);
   setActive(data.entry);
+  setActiveMinusInput(formatDeductionHours(data.entry.deductedMinutes));
   setNow(Date.now());
   setMessage("Klokken fortsetter på samme registrering. Tidligere timer er beholdt.");
   setEntries(current=>current.map(item=>item.id===data.entry.id?data.entry:item));
@@ -216,11 +229,33 @@ export default function WorkClockClient({userName}){
   setActive(data.entry);
   const scope=active.orderId?"order:"+active.orderId:"entry:"+active.id;
   const saved=Number(active.durationMinutes)||0,rate=Number(active.hourlyRateOre)||0;
-  const oldBase=Math.round(Math.max(0,saved-(Number(active.deductedMinutes)||0))*rate/60);
-  const newBase=Math.round(Math.max(0,saved-(Number(data.entry.deductedMinutes)||0))*rate/60);
+  const oldBase=Math.round((saved-(Number(active.deductedMinutes)||0))*rate/60);
+  const newBase=Math.round((saved-(Number(data.entry.deductedMinutes)||0))*rate/60);
   setLaborOreByScope(previous=>({...previous,[scope]:(Number(previous[scope])||0)+newBase-oldBase}));
+  setNetMinutesByScope(previous=>({...previous,[scope]:(Number(previous[scope])||0)+
+   (Number(active.deductedMinutes)||0)-(Number(data.entry.deductedMinutes)||0)}));
+  setActiveMinusInput(formatDeductionHours(data.entry.deductedMinutes));
   setEntries(current=>current.map(entry=>entry.id===data.entry.id?data.entry:entry));
   setMessage(deltaMinutes>0?"30 minutter lunsj er trukket fra arbeidstiden.":"Siste lunsjtrekk er angret.");
+ }
+ async function saveRunningMinus(){
+  if(!active||busy)return;
+  const deductedMinutes=parseDeductionHours(activeMinusInput);
+  if(deductedMinutes===null){
+   setError("Skriv minustid i timer: 1,5 betyr 1 time og 30 minutter, 15 betyr 15 timer.");return;
+  }
+  const data=await request("PATCH",{action:"setDeduction",id:active.id,
+   deductedMinutes,expectedUpdatedAt:active.updatedAt});
+  if(!data)return;
+  const scope=active.orderId?"order:"+active.orderId:"entry:"+active.id;
+  const delta=Number(active.deductedMinutes||0)-Number(data.entry.deductedMinutes||0);
+  setNetMinutesByScope(previous=>({...previous,[scope]:(Number(previous[scope])||0)+delta}));
+  setLaborOreByScope(previous=>({...previous,[scope]:(Number(previous[scope])||0)+
+   Math.round(delta*Number(active.hourlyRateOre||0)/60)}));
+  setActive(data.entry);
+  setActiveMinusInput(formatDeductionHours(data.entry.deductedMinutes));
+  setEntries(previous=>previous.map(e=>e.id===data.entry.id?data.entry:e));
+  setMessage("Minustiden er lagret. Klokken fortsetter og saldoen kan være negativ.");
  }
  function scopeKey(entry){return entry?.orderId?"order:"+entry.orderId:"entry:"+entry?.id}
  function showCreditEditor(entry){
@@ -255,9 +290,9 @@ export default function WorkClockClient({userName}){
   const currentIsActive=active&&scopeKey(active)===scope;
   const liveMinutes=currentIsActive?Math.max(0,(now-Date.parse(active.startedAt))/60000):0;
   const runningSavedMinutes=currentIsActive?
-   Math.max(0,(Number(active.durationMinutes)||0)-(Number(active.deductedMinutes)||0)):0;
+   (Number(active.durationMinutes)||0)-(Number(active.deductedMinutes)||0):0;
   const runningNowMinutes=currentIsActive?
-   Math.max(0,(Number(active.durationMinutes)||0)+liveMinutes-(Number(active.deductedMinutes)||0)):0;
+   (Number(active.durationMinutes)||0)+liveMinutes-(Number(active.deductedMinutes)||0):0;
   const activeLaborDelta=currentIsActive?
    Math.round(runningNowMinutes*(Number(active.hourlyRateOre)||0)/60)-
    Math.round(runningSavedMinutes*(Number(active.hourlyRateOre)||0)/60):0;
@@ -381,7 +416,7 @@ export default function WorkClockClient({userName}){
 
  const totals=useMemo(()=>entries.filter(entry=>!(entry.startedAt&&!entry.endedAt)).reduce((sum,entry)=>{
   const cost=entryCosts(entry);
-  sum.minutes+=Math.max(0,(Number(entry.durationMinutes)||0)-(Number(entry.deductedMinutes)||0));
+  sum.minutes+=(Number(entry.durationMinutes)||0)-(Number(entry.deductedMinutes)||0);
   sum.labor+=cost.labor;
   sum.km+=Number(entry.distanceKm)||0;
   sum.travel+=cost.travel;
@@ -399,7 +434,7 @@ export default function WorkClockClient({userName}){
     const cost=entryCosts(entry);
     const cells=[
      ["String",entry.workDate],["String",entry.projectLabel],["String",entry.customerLabel],
-     ["Number",(Math.max(0,entry.durationMinutes-(entry.deductedMinutes||0))/60).toFixed(2)],
+     ["Number",((entry.durationMinutes-(entry.deductedMinutes||0))/60).toFixed(2)],
      ["Number",((Number(entry.deductedMinutes)||0)/60).toFixed(2)],["Number",moneyNumber(entry.hourlyRateOre)],
      ["Number",moneyNumber(cost.labor)],["Number",Number(entry.distanceKm||0).toFixed(2)],
      ["Number",moneyNumber(entry.kmRateOre)],["Number",moneyNumber(cost.travel)],
@@ -460,6 +495,20 @@ export default function WorkClockClient({userName}){
       disabled={busy} onClick={()=>lunch(-30)}>Angre lunsj i dag</button>}
      <span>Minustid totalt: {formatDeductionHours(active.deductedMinutes||0)} t. Arbeidsklokken går videre.</span>
     </div>}
+    {active&&<div className={styles.runningMinusEditor}>
+     <label>Minustid / startsaldo (timer)
+      <input type="text" inputMode="decimal" value={activeMinusInput}
+       onChange={e=>setActiveMinusInput(e.target.value)} placeholder="F.eks. 15 eller 1,5"/>
+     </label>
+     <button type="button" disabled={busy} onClick={saveRunningMinus}>Lagre minustid</button>
+     <small>Du kan legge inn mer minustid enn du har jobbet. Klokken teller da opp fra minus mot null.</small>
+    </div>}
+    {active&&<div className={styles.scopeBalance} aria-live="polite">
+     <span>{active.orderId?"Samlet timessaldo for oppdraget":"Saldo for denne registreringen"}</span>
+     <strong>{hours((Number(netMinutesByScope[scopeKey(active)])||0)+
+      Math.max(0,(now-Date.parse(active.startedAt))/60000))} t</strong>
+     {active.orderId&&<small>Inkluderer tidligere registreringer på oppdraget, også fra andre måneder.</small>}
+    </div>}
     {active&&<div className={styles.creditLive}>
      {(()=>{const progress=workCreditProgress(active);return progress?<>
       <b>Motregning: {kroner(progress.credit.agreedValueOre)}</b>
@@ -494,6 +543,11 @@ export default function WorkClockClient({userName}){
        onChange={e=>setTimerDraft(current=>({...current,customerLabel:e.target.value}))}
        placeholder="Eller skriv navn uten kundekort"/>
      </label>}
+     <label>Minustid ved start (timer)
+      <input type="text" inputMode="decimal" value={timerDraft.deductedHours}
+       onChange={e=>setTimerDraft(current=>({...current,deductedHours:e.target.value}))}
+       placeholder="0 eller 15"/>
+     </label>
      <label>Timepris inkl. mva
       <div className={styles.money}><span>kr</span><input inputMode="decimal" value={timerDraft.hourlyRate} onChange={e=>setTimerDraft(current=>({...current,hourlyRate:e.target.value}))}/></div>
      </label>
@@ -533,6 +587,13 @@ export default function WorkClockClient({userName}){
       <b>{kroner(Math.abs(c.agreedValueOre-spent))}</b>
      </p>;
     })()}
+    {selectedCreditOrder&&<p className={styles.scopeBalance}>
+     Samlet timessaldo for oppdraget: <strong>
+      {hours((Number(netMinutesByScope["order:"+selectedCreditOrder])||0)+
+       (active?.orderId===selectedCreditOrder?
+        Math.max(0,(now-Date.parse(active.startedAt))/60000):0))} t
+     </strong>
+    </p>}
     <small>Dette er en intern beregning. Faktura eller motregningsbilag lages ikke automatisk.</small>
    </section>
 
@@ -554,7 +615,7 @@ export default function WorkClockClient({userName}){
     <div className={styles.sectionHead}><div><span className={styles.eyebrow}>ETTERREGISTRERING</span><h2>Legg inn timer manuelt</h2></div></div>
     <form className={styles.formGrid} onSubmit={addManual}>
      <label>Dato<input type="date" value={manual.workDate} onChange={e=>setManual(current=>({...current,workDate:e.target.value}))} required/></label>
-     <label>Timer<input inputMode="decimal" value={manual.durationHours} onChange={e=>setManual(current=>({...current,durationHours:e.target.value}))} placeholder="F.eks. 7,5" required/></label>
+     <label>Timer<input inputMode="decimal" value={manual.durationHours} onChange={e=>setManual(current=>({...current,durationHours:e.target.value}))} placeholder="0 eller 7,5"/></label>
      <label>Eksisterende oppdrag
       <select value={manual.orderId} onChange={e=>applyOrder(setManual,e.target.value)}>
        <option value="">Ikke koblet til oppdrag</option>
@@ -571,7 +632,7 @@ export default function WorkClockClient({userName}){
       <input value={manual.customerLabel} onChange={e=>setManual(current=>({...current,customerLabel:e.target.value}))}/>
      </label>}
      <label>Timepris inkl. mva<div className={styles.money}><span>kr</span><input inputMode="decimal" value={manual.hourlyRate} onChange={e=>setManual(current=>({...current,hourlyRate:e.target.value}))}/></div></label>
-     <label>Minustid (timer, f.eks. 1,5 = 1 t 30 min)
+     <label>Minustid (timer, kan være høyere enn arbeidstiden)
       <input type="text" inputMode="decimal" value={manual.deductedHours}
        onChange={e=>setManual(current=>({...current,deductedHours:e.target.value}))}
        placeholder="0 eller 1,5"/>
@@ -608,7 +669,7 @@ export default function WorkClockClient({userName}){
           onClick={()=>resume(entry)}>▶ Fortsett</button>}
        </td>
        <td>{activeRow?<span className={styles.running}>Pågår</span>:<>
-        {hours(Math.max(0,entry.durationMinutes-(entry.deductedMinutes||0)))} t
+        {hours(entry.durationMinutes-(entry.deductedMinutes||0))} t
         {entry.deductedMinutes>0&&<small>−{formatDeductionHours(entry.deductedMinutes)} t lunsj/fratrekk</small>}
        </>}</td>
        <td>{activeRow?"—":kroner(cost.labor)}</td>
@@ -653,7 +714,7 @@ export default function WorkClockClient({userName}){
       <label>Timer<input inputMode="decimal" value={editing.durationHours} onChange={e=>setEditing(current=>({...current,durationHours:e.target.value}))}
        disabled={editing.stampEditorEnabled} title={editing.stampEditorEnabled
         ?"Summen regnes automatisk fra stemplingene. Endre klokkeslettene nedenfor.":""}/></label>
-      <label>Minustid (timer, f.eks. 1,5 = 1 t 30 min)
+      <label>Minustid (timer, kan være høyere enn arbeidstiden)
        <input type="text" inputMode="decimal"
         value={editing.deductedHours} onChange={e=>setEditing(current=>({...current,deductedHours:e.target.value}))}
         placeholder="0 eller 1,5"/>
