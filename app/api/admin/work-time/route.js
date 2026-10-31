@@ -6,9 +6,10 @@ import {isValidDateInput,osloDateKey} from "../../../../lib/osloTime";
 import {accruedWorkMinutes} from "../../../../lib/workTimeAccumulation";
 import {storedWorkStamps,workStamp,normalizeStampEdit} from "../../../../lib/workTimeStamps";
 import {netWorkMinutes,validDeductedMinutes} from "../../../../lib/workTimeDeduction";
+import {parseWorkClockCustomerRef,resolveWorkClockCustomer} from "../../../../lib/workClockCustomer";
 
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const SELECT_FIELDS="id,admin_user_id,order_id,work_date,project_label,customer_label,note,started_at,ended_at,duration_minutes,hourly_rate_ore,distance_km,km_rate_ore,toll_ore,deducted_minutes,lunch_days,work_sessions,created_at,updated_at";
+const SELECT_FIELDS="id,admin_user_id,order_id,customer_ref,work_date,project_label,customer_label,note,started_at,ended_at,duration_minutes,hourly_rate_ore,distance_km,km_rate_ore,toll_ore,deducted_minutes,lunch_days,work_sessions,created_at,updated_at";
 
 async function allowed(){
  const user=await getAdminUser();
@@ -37,6 +38,7 @@ function map(row){
  return {
   id:row.id,
   orderId:row.order_id||null,
+  customerRef:row.customer_ref||"",
   workDate:row.work_date,
   projectLabel:row.project_label||"",
   customerLabel:row.customer_label||"",
@@ -71,6 +73,17 @@ function monthBounds(value){
   first:month+"-01",
   next:next.toISOString().slice(0,7)+"-01"
  };
+}
+async function applyCustomerSelection(s,values,customerRef){
+ const parsed=parseWorkClockCustomerRef(customerRef);
+ if(parsed?.error)return parsed.error;
+ if(values.order_id&&parsed)return "Velg enten eksisterende oppdrag eller en kunde uten prosjekt.";
+ if(!parsed){values.customer_ref="";return null;}
+ const resolved=await resolveWorkClockCustomer(s,parsed.ref);
+ if(resolved.error)return resolved.error;
+ values.customer_ref=resolved.customerRef;
+ values.customer_label=resolved.customerLabel;
+ return null;
 }
 function commonValues(body){
  return {
@@ -211,6 +224,8 @@ export async function POST(req){
   return NextResponse.json({error:"Ukjent handling."},{status:400});
  }
 
+ const customerIssue=await applyCustomerSelection(s,values,body.customerRef||"");
+ if(customerIssue)return NextResponse.json({error:customerIssue},{status:400});
  const {data,error}=await s.from("work_time_entries").insert(values).select(SELECT_FIELDS).single();
  if(error){
   if(tableError(error))return NextResponse.json({error:"Databaseoppdatering mangler for arbeidsklokken.",setupRequired:true},{status:503});
@@ -313,6 +328,8 @@ export async function PATCH(req){
   if(!isValidDateInput(workDate))return NextResponse.json({error:"Velg en gyldig dato."},{status:400});
   if(durationMinutes<1)return NextResponse.json({error:"Registrer minst ett minutt arbeidstid."},{status:400});
   values={...commonValues(body),work_date:workDate,duration_minutes:durationMinutes};
+  const customerIssue=await applyCustomerSelection(s,values,body.customerRef??existing.customer_ref??"");
+  if(customerIssue)return NextResponse.json({error:customerIssue},{status:400});
   const deducted=validDeductedMinutes(body.deductedMinutes??existing.deducted_minutes??0);
   if(deducted===null)return NextResponse.json({error:"Oppgi gyldig minustid i hele minutter."},{status:400});
   values.deducted_minutes=deducted;
