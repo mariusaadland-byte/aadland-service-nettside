@@ -80,3 +80,29 @@
  .creditProjectControls button{width:100%}
  .creditModal{max-height:94dvh}
 }
+
+/* Search saved customers directly, without creating a project. */
+.customerPicker{max-width:100%;display:flex;flex-direction:column;gap:9px;
+ padding:15px;border:1px solid #484334;border-radius:12px;background:#211f1b}
+.customerPickerLabel{font-size:14px;font-weight:850;color:#f0dfbd}
+.customerPicker input[type="search"]{box-sizing:border-box;width:100%;min-height:47px;
+ padding:10px 12px;border:1px solid #646052;border-radius:10px;
+ background:#101318;color:#fff;font:inherit}
+.customerPicker input:focus-visible{outline:2px solid #f1d18c;outline-offset:2px}
+.customerPicker>small{color:#b9b6ad;font-size:12px;line-height:1.5}
+.customerPicker>p{color:#f6bdbd;font-size:12px;margin:0}
+.customerMatches{display:flex;flex-direction:column;gap:4px;max-height:255px;
+ overflow:auto;padding:4px;border:1px solid #474b50;border-radius:10px;background:#161a20}
+.customerMatches button{display:flex;flex-direction:column;gap:3px;min-height:47px;
+ align-items:flex-start;justify-content:center;text-align:left;padding:9px 12px;
+ font:inherit;color:#fff;border:0;border-radius:7px;background:#282e35;cursor:pointer}
+.customerMatches button:focus-visible{outline:2px solid #f0cf83;outline-offset:1px}
+.customerMatches small,.customerSelected small{color:#afb7b4;font-size:11px}
+.customerMatches p{margin:8px;color:#adb3b7;font-size:13px}
+.customerSelected{display:flex;align-items:center;justify-content:space-between;gap:12px;
+ flex-wrap:wrap;padding:10px;border-radius:9px;background:#293126}
+.customerSelected>div{display:flex;flex-direction:column;gap:4px}
+.customerSelected strong{color:#e9f4df}
+.customerSelected button{min-height:42px;padding:8px 11px;color:#fff;
+ background:#303839;border:1px solid #697472;border-radius:9px;font:inherit;font-weight:750}
+@media(max-width:520px){.customerSelected button{width:100%}}

@@ -36,6 +36,9 @@ assert.equal(preserved.stamps[0].minutes,120);
 const workDeductionSource=read("lib/workTimeDeduction.js").replace(/^export /gm,"");
 const {netWorkMinutes,validDeductedMinutes}=new Function(workDeductionSource+
  ";return {netWorkMinutes,validDeductedMinutes};")();
+const customerSource=read("lib/workClockCustomer.js").replace(/^export /gm,"");
+const {parseWorkClockCustomerRef,resolveWorkClockCustomer}=new Function(customerSource+
+ ";return {parseWorkClockCustomerRef,resolveWorkClockCustomer};")();
 const raw=read("app/api/admin/work-time/route.js")
  .replace(/^import .*;\n/gm,"").replace(/^export async function /gm,"async function ");
 const id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -65,9 +68,9 @@ const mockDB=()=>({from(table){
 const NextResponse={json:(body,opts={})=>({body,status:opts.status||200})};
 const PATCH=new Function("NextResponse","sameOriginGuard","getAdminUser","db",
  "isValidDateInput","osloDateKey","accruedWorkMinutes","storedWorkStamps",
- "workStamp","normalizeStampEdit","netWorkMinutes","validDeductedMinutes","console",raw+";return PATCH;")(
+ "workStamp","normalizeStampEdit","netWorkMinutes","validDeductedMinutes","parseWorkClockCustomerRef","resolveWorkClockCustomer","console",raw+";return PATCH;")(
  NextResponse,()=>null,async()=>({id:admin,role:"owner"}),mockDB,
- ()=>true,()=>"",()=>0,storedWorkStamps,workStamp,normalizeStampEdit,netWorkMinutes,validDeductedMinutes,{error(){}}
+ ()=>true,()=>"",()=>0,storedWorkStamps,workStamp,normalizeStampEdit,netWorkMinutes,validDeductedMinutes,parseWorkClockCustomerRef,resolveWorkClockCustomer,{error(){}}
 );
 const make=payload=>PATCH({json:async()=>({action:"update",id,workDate:"2026-10-30",
  durationMinutes:90,projectLabel:"Diverse arbeid",hourlyRateOre:50000,...payload})});

@@ -15,6 +15,9 @@ assert.equal(clockAfterDeduction(0,"2026-10-31T08:00:00Z",Date.parse("2026-10-31
 const stampsSource=read("lib/workTimeStamps.js").replace(/^export /gm,"");
 const {storedWorkStamps,workStamp,normalizeStampEdit}=new Function(stampsSource+
  ";return {storedWorkStamps,workStamp,normalizeStampEdit};")();
+const customerSource=read("lib/workClockCustomer.js").replace(/^export /gm,"");
+const {parseWorkClockCustomerRef,resolveWorkClockCustomer}=new Function(customerSource+
+ ";return {parseWorkClockCustomerRef,resolveWorkClockCustomer};")();
 const raw=read("app/api/admin/work-time/route.js").replace(/^import .*;\n/gm,"")
  .replace(/^export async function /gm,"async function ");
 const userId="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -61,11 +64,11 @@ const DB=()=>({from(name){
 const NextResponse={json:(body,opts={})=>({body,status:opts.status||200})};
 const endpoints=new Function("NextResponse","sameOriginGuard","getAdminUser","db",
  "isValidDateInput","osloDateKey","accruedWorkMinutes","storedWorkStamps",
- "workStamp","normalizeStampEdit","netWorkMinutes","validDeductedMinutes","console",
+ "workStamp","normalizeStampEdit","netWorkMinutes","validDeductedMinutes","parseWorkClockCustomerRef","resolveWorkClockCustomer","console",
  raw+";return {POST,PATCH};")(NextResponse,()=>null,
  async()=>readRole==="owner"?{role:"owner",id:userId}:null,DB,
  ()=>true,()=>today,()=>0,storedWorkStamps,workStamp,normalizeStampEdit,
- netWorkMinutes,validDeductedMinutes,{error(){}});
+ netWorkMinutes,validDeductedMinutes,parseWorkClockCustomerRef,resolveWorkClockCustomer,{error(){}});
 const patch=body=>endpoints.PATCH({json:async()=>({id:entryId,...body})});
 const post=body=>endpoints.POST({json:async()=>body});
 let result=await patch({action:"deduct",deltaMinutes:30,expectedUpdatedAt:work.updated_at});
