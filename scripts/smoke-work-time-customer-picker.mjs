@@ -51,11 +51,11 @@ const raw=read("app/api/admin/work-time/route.js")
 const stampSource=read("lib/workTimeStamps.js").replace(/^export /gm,"");
 const {storedWorkStamps}=new Function(stampSource+";return {storedWorkStamps};")();
 const deductionSource=read("lib/workTimeDeduction.js").replace(/^export /gm,"");
-const {netWorkMinutes}=new Function(deductionSource+";return {netWorkMinutes};")();
+const {netWorkMinutes,validDeductedMinutes}=new Function(deductionSource+";return {netWorkMinutes,validDeductedMinutes};")();
 const NextResponse={json:(body,opts={})=>({status:opts.status||200,body})};
 let role="owner",seenValues=null;
 const POST=new Function("NextResponse","sameOriginGuard","getAdminUser","db","osloDateKey",
- "parseWorkClockCustomerRef","resolveWorkClockCustomer","storedWorkStamps","netWorkMinutes","console",
+ "parseWorkClockCustomerRef","resolveWorkClockCustomer","storedWorkStamps","netWorkMinutes","validDeductedMinutes","console",
  raw+";return POST;")(NextResponse,()=>null,
  async()=>role==="owner"?{id:profile,role:"owner"}:null,
  ()=>({from(table){
@@ -74,7 +74,7 @@ const POST=new Function("NextResponse","sameOriginGuard","getAdminUser","db","os
    };
    return query;
   }}),
- ()=>"2026-10-31",parseWorkClockCustomerRef,resolveWorkClockCustomer,storedWorkStamps,netWorkMinutes,
+ ()=>"2026-10-31",parseWorkClockCustomerRef,resolveWorkClockCustomer,storedWorkStamps,netWorkMinutes,validDeductedMinutes,
  {error(){}});
 const post=body=>POST({json:async()=>({action:"start",hourlyRateOre:50000,...body})});
 let res=await post({orderId:null,customerRef:"contact:"+contact,customerLabel:"Not the right name"});
