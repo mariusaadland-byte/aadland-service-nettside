@@ -14,7 +14,8 @@ export async function GET(){
   {table:"admin_customer_contacts",kind:"contact"},
   {table:"customer_profiles",kind:"profile"}
  ];
- const results=await Promise.all(sources.map(async src=>{
+ let results;
+ try{results=await Promise.all(sources.map(async src=>{
   const all=[];
   for(let offset=0;offset<5000;offset+=500){
    const {data,error}=await s.from(src.table).select("id,name,phone")
@@ -29,7 +30,8 @@ export async function GET(){
    })).filter(row=>row.name);
   }
   throw Error("Kunderegisteret er for stort til å vise fullstendig.");
- }));
+ }));}
+ catch(e){return NextResponse.json({error:e.message||"Kunderegisteret kunne ikke leses."},{status:503});}
  return NextResponse.json({customers:results.flat().sort((a,b)=>
   a.name.localeCompare(b.name,"nb-NO")),count:results[0].length+results[1].length},
   {headers:{"Cache-Control":"private, no-store"}});
