@@ -8,7 +8,7 @@ import {storedWorkStamps,workStamp,normalizeStampEdit} from "../../../../lib/wor
 import {netWorkMinutes,validDeductedMinutes} from "../../../../lib/workTimeDeduction";
 
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const SELECT_FIELDS="id,admin_user_id,order_id,work_date,project_label,customer_label,note,started_at,ended_at,duration_minutes,hourly_rate_ore,distance_km,km_rate_ore,toll_ore,deducted_minutes,work_sessions,created_at,updated_at";
+const SELECT_FIELDS="id,admin_user_id,order_id,work_date,project_label,customer_label,note,started_at,ended_at,duration_minutes,hourly_rate_ore,distance_km,km_rate_ore,toll_ore,deducted_minutes,lunch_days,work_sessions,created_at,updated_at";
 
 async function allowed(){
  const user=await getAdminUser();
@@ -45,6 +45,7 @@ function map(row){
   endedAt:row.ended_at||null,
   durationMinutes:Number(row.duration_minutes)||0,
   deductedMinutes:Number(row.deducted_minutes)||0,
+  lunchDays:Array.isArray(row.lunch_days)?row.lunch_days:[],
   netDurationMinutes:Math.max(0,netWorkMinutes(Number(row.duration_minutes)||0,Number(row.deducted_minutes)||0)||0),
   hourlyRateOre:Number(row.hourly_rate_ore)||0,
   distanceKm:Number(row.distance_km)||0,
@@ -166,6 +167,7 @@ export async function POST(req){
   values.ended_at=null;
   values.duration_minutes=0;
   values.deducted_minutes=0;
+  values.lunch_days=[];
   values.work_sessions=[];
  }else if(action==="manual"){
   const workDate=clean(body.workDate,10);
@@ -180,6 +182,7 @@ export async function POST(req){
   if(deducted===null||deducted>durationMinutes)
    return NextResponse.json({error:"Minustid kan ikke være større enn registrert arbeidstid."},{status:400});
   values.deducted_minutes=deducted;
+  values.lunch_days=[];
   values.work_sessions=[];
  }else{
   return NextResponse.json({error:"Ukjent handling."},{status:400});
@@ -257,10 +260,18 @@ export async function PATCH(req){
    return NextResponse.json({error:"Velg lunsjfratrekk på 30 minutter eller angre 30 minutter."},{status:400});
   if(!body.expectedUpdatedAt||body.expectedUpdatedAt!==existing.updated_at)
    return NextResponse.json({error:"Klokken ble endret. Last inn oppdatert tid før du prøver igjen."},{status:409});
+  const day=osloDateKey(new Date());
+  const days=Array.isArray(existing.lunch_days)?existing.lunch_days:[];
+  if(delta===30&&days.includes(day))
+   return NextResponse.json({error:"Du har allerede trukket 30 minutter lunsj i dag. Bruk redigering hvis noe skal endres."},{status:409});
+  if(delta===-30&&!days.includes(day))
+   return NextResponse.json({error:"Det er ikke registrert en lunsj i dag som kan angres."},{status:409});
   const deducted=validDeductedMinutes(Number(existing.deducted_minutes||0)+delta);
   if(deducted===null)
    return NextResponse.json({error:"Minustiden kan ikke være negativ eller overstige 100 000 minutter."},{status:400});
-  values={deducted_minutes:deducted,updated_at:new Date().toISOString()};
+  values={deducted_minutes:deducted,
+   lunch_days:delta===30?[...days,day]:days.filter(x=>x!==day),
+   updated_at:new Date().toISOString()};
  }else if(action==="resume"){
   // Re-use the *same row* only if it was a stopped timer without
   // a linked order. Preserve work date, labels, rates, km and toll.
