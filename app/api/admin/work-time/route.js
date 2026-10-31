@@ -48,7 +48,7 @@ function map(row){
   durationMinutes:Number(row.duration_minutes)||0,
   deductedMinutes:Number(row.deducted_minutes)||0,
   lunchDays:Array.isArray(row.lunch_days)?row.lunch_days:[],
-  netDurationMinutes:Math.max(0,netWorkMinutes(Number(row.duration_minutes)||0,Number(row.deducted_minutes)||0)||0),
+  netDurationMinutes:netWorkMinutes(Number(row.duration_minutes)||0,Number(row.deducted_minutes)||0)||0,
   hourlyRateOre:Number(row.hourly_rate_ore)||0,
   distanceKm:Number(row.distance_km)||0,
   kmRateOre:Number(row.km_rate_ore)||0,
@@ -147,10 +147,11 @@ export async function GET(req){
   .select("scope_key,agreed_value_ore,description,updated_at")
   .eq("admin_user_id",user.id);
  if(credits.error)return NextResponse.json({error:"Kunne ikke laste avtalte motregningsverdier."},{status:503});
- const laborOreByScope={};
+ const laborOreByScope={},netMinutesByScope={};
  for(const entry of allWork){
   const key=entry.order_id?"order:"+entry.order_id:"entry:"+entry.id;
-  const net=Math.max(0,(Number(entry.duration_minutes)||0)-(Number(entry.deducted_minutes)||0));
+  const net=netWorkMinutes(Number(entry.duration_minutes)||0,Number(entry.deducted_minutes)||0)||0;
+  netMinutesByScope[key]=(netMinutesByScope[key]||0)+net;
   laborOreByScope[key]=(laborOreByScope[key]||0)+Math.round(net*(Number(entry.hourly_rate_ore)||0)/60);
  }
  return NextResponse.json({
@@ -159,7 +160,8 @@ export async function GET(req){
   active:map(activeResult.data),
   credits:(credits.data||[]).map(x=>({scopeKey:x.scope_key,agreedValueOre:Number(x.agreed_value_ore)||0,
    description:x.description,updatedAt:x.updated_at})),
-  laborOreByScope
+  laborOreByScope,
+  netMinutesByScope
  });
 }
 
@@ -202,21 +204,27 @@ export async function POST(req){
   values.started_at=new Date().toISOString();
   values.ended_at=null;
   values.duration_minutes=0;
-  values.deducted_minutes=0;
+  const deducted=validDeductedMinutes(body.deductedMinutes??0);
+  if(deducted===null)return NextResponse.json({error:"Oppgi gyldig minustid i hele minutter."},{status:400});
+  values.deducted_minutes=deducted;
   values.lunch_days=[];
   values.work_sessions=[];
  }else if(action==="manual"){
   const workDate=clean(body.workDate,10);
   const durationMinutes=integer(body.durationMinutes,0,100000);
   if(!isValidDateInput(workDate))return NextResponse.json({error:"Velg en gyldig dato."},{status:400});
-  if(durationMinutes<1)return NextResponse.json({error:"Registrer minst ett minutt arbeidstid."},{status:400});
+  if(durationMinutes<1&&validDeductedMinutes(body.deductedMinutes??0)!==null&&
+   Number(body.deductedMinutes??0)===0)
+   return NextResponse.json({error:"Oppgi arbeidstid eller minustid for å registrere en negativ startsaldo."},{status:400});
   values.work_date=workDate;
   values.started_at=null;
   values.ended_at=null;
   values.duration_minutes=durationMinutes;
   const deducted=validDeductedMinutes(body.deductedMinutes??0);
-  if(deducted===null||deducted>durationMinutes)
-   return NextResponse.json({error:"Minustid kan ikke være større enn registrert arbeidstid."},{status:400});
+  if(deducted===null)
+   return NextResponse.json({error:"Oppgi gyldig minustid i hele minutter."},{status:400});
+  if(durationMinutes===0&&deducted===0)
+   return NextResponse.json({error:"Oppgi arbeidstid eller minustid."},{status:400});
   values.deducted_minutes=deducted;
   values.lunch_days=[];
   values.work_sessions=[];
@@ -282,8 +290,6 @@ export async function PATCH(req){
   const endedAt=new Date();
   const durationMinutes=accruedWorkMinutes(existing.duration_minutes,existing.started_at,endedAt);
   if(durationMinutes===null)return NextResponse.json({error:"Tidsregistreringen kan ikke overstige 100 000 minutter. Kontroller registreringen."},{status:409});
-  if(netWorkMinutes(durationMinutes,existing.deducted_minutes)<0)
-   return NextResponse.json({error:"Lunsj-/minustiden er større enn klokkens arbeidstid. Angre fratrekket eller la klokken gå lenger."},{status:409});
   const lastStamp=workStamp(existing.started_at,endedAt);
   if(!lastStamp)return NextResponse.json({error:"Klokkeslettene kan ikke brukes. Kontroller registreringen."},{status:409});
   values={ended_at:endedAt.toISOString(),duration_minutes:durationMinutes,
@@ -310,6 +316,19 @@ export async function PATCH(req){
   values={deducted_minutes:deducted,
    lunch_days:delta===30?[...days,day]:days.filter(x=>x!==day),
    updated_at:new Date().toISOString()};
+ }else if(action==="setDeduction"){
+  // Explicitly set a negative starting balance while a timer is running,
+  // including an already-started order. Preserve clock-in/out sessions.
+  if(!existing.started_at||existing.ended_at)
+   return NextResponse.json({error:"Klokken må gå for å endre minustid her. Avsluttede registreringer endres med Rediger."},{status:409});
+  if(!body.expectedUpdatedAt||body.expectedUpdatedAt!==existing.updated_at)
+   return NextResponse.json({error:"Klokken ble endret. Oppdater siden og prøv på nytt."},{status:409});
+  const deducted=validDeductedMinutes(body.deductedMinutes);
+  if(deducted===null)return NextResponse.json({error:"Oppgi minustid som et gyldig antall timer."},{status:400});
+  const days=Array.isArray(existing.lunch_days)?existing.lunch_days:[];
+  values={deducted_minutes:deducted,
+   lunch_days:deducted>=30*days.length?days:[],
+   updated_at:new Date().toISOString()};
  }else if(action==="resume"){
   // Re-use the *same row* only if it was a stopped timer without
   // a linked order. Preserve work date, labels, rates, km and toll.
@@ -326,13 +345,14 @@ export async function PATCH(req){
   const workDate=clean(body.workDate,10);
   const durationMinutes=integer(body.durationMinutes,0,100000);
   if(!isValidDateInput(workDate))return NextResponse.json({error:"Velg en gyldig dato."},{status:400});
-  if(durationMinutes<1)return NextResponse.json({error:"Registrer minst ett minutt arbeidstid."},{status:400});
   values={...commonValues(body),work_date:workDate,duration_minutes:durationMinutes};
   const customerIssue=await applyCustomerSelection(s,values,body.customerRef??existing.customer_ref??"");
   if(customerIssue)return NextResponse.json({error:customerIssue},{status:400});
   const deducted=validDeductedMinutes(body.deductedMinutes??existing.deducted_minutes??0);
   if(deducted===null)return NextResponse.json({error:"Oppgi gyldig minustid i hele minutter."},{status:400});
   values.deducted_minutes=deducted;
+  if(values.duration_minutes===0&&deducted===0)
+   return NextResponse.json({error:"Oppgi arbeidstid eller minustid."},{status:400});
   if(Array.isArray(body.sessions)){
    if(!existing.started_at||!existing.ended_at)
     return NextResponse.json({error:"Stemplinger kan bare redigeres når klokken er stoppet."},{status:409});
@@ -346,8 +366,6 @@ export async function PATCH(req){
    durationMinutes!==existing.duration_minutes){
    return NextResponse.json({error:"Rediger inn- og utstemplingene for å justere timer på en registrering med klokkehistorikk."},{status:409});
   }
-  if(netWorkMinutes(values.duration_minutes,values.deducted_minutes)<0)
-   return NextResponse.json({error:"Minustiden kan ikke overstige samlet registrert arbeidstid."},{status:400});
  }else{
   return NextResponse.json({error:"Ukjent handling."},{status:400});
  }
@@ -358,7 +376,7 @@ export async function PATCH(req){
   mutation=mutation.is("ended_at",null).eq("started_at",existing.started_at)
    .eq("duration_minutes",existing.duration_minutes).eq("updated_at",existing.updated_at)
    .eq("deducted_minutes",existing.deducted_minutes);
- }else if(action==="deduct"){
+ }else if(action==="deduct"||action==="setDeduction"){
   mutation=mutation.eq("updated_at",existing.updated_at).is("ended_at",null)
    .eq("deducted_minutes",existing.deducted_minutes);
  }else if(action==="resume"){
