@@ -114,7 +114,8 @@ assert.ok(ui.includes('"setOrderCredit"'),"Existing orders must support credit")
 assert.ok(ui.includes('"order:"+selectedCreditOrder'));
 assert.ok(ui.includes("Til fakturering utover avtalen"));
 assert.ok(ui.includes("showCreditEditor(active)"));
-assert.ok(ui.includes('action:"setCredit"'));
+assert.ok(ui.includes('creditEditor.orderId?"setOrderCredit":"setCredit"'),
+ "Standalone registrations and real projects use separate credit actions");
 assert.ok(css.includes(".lunchButton")&&css.includes(".creditProject"));
 assert.ok(migrationA.includes("deducted_minutes integer not null default 0"));
 assert.ok(migrationA.includes("lunch_days jsonb not null default '[]'"));
