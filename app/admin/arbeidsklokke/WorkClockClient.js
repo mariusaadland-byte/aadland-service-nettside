@@ -3,6 +3,7 @@
 import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import styles from "./workClock.module.css";
+import {combinedWorkClockText} from "../../../lib/workTimeAccumulation";
 
 const DEFAULT_RATE="500";
 const DEFAULT_KM_RATE="5.30";
@@ -45,14 +46,6 @@ function entryCosts(entry){
  const travel=Math.round((Number(entry.distanceKm)||0)*(Number(entry.kmRateOre)||0));
  const toll=Number(entry.tollOre)||0;
  return {labor,travel,toll,total:labor+travel+toll};
-}
-function elapsed(startedAt,now){
- const ms=Math.max(0,now-new Date(startedAt).getTime());
- const seconds=Math.floor(ms/1000);
- const h=Math.floor(seconds/3600);
- const m=Math.floor((seconds%3600)/60);
- const s=seconds%60;
- return [h,m,s].map(value=>String(value).padStart(2,"0")).join(":");
 }
 function xml(value){
  return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[ch]));
@@ -153,6 +146,18 @@ export default function WorkClockClient({userName}){
   setActive(data.entry);
   setMessage("Arbeidsklokken er startet.");
   if(data.entry?.workDate?.slice(0,7)===month)setEntries(current=>[data.entry,...current.filter(item=>item.id!==data.entry.id)]);
+ }
+ async function resume(entry){
+  // Only a finished timer with no order may be resumed. Never create
+  // a second entry; the API reopens the existing row by ID.
+  if(busy||active||entry.orderId||!entry.startedAt||!entry.endedAt)return;
+  const data=await request("PATCH",{action:"resume",id:entry.id});
+  if(!data)return;
+  setEditing(null);
+  setActive(data.entry);
+  setNow(Date.now());
+  setMessage("Klokken fortsetter på samme registrering. Tidligere timer er beholdt.");
+  setEntries(current=>current.map(item=>item.id===data.entry.id?data.entry:item));
  }
  async function stop(){
   if(!active)return;
@@ -295,9 +300,12 @@ export default function WorkClockClient({userName}){
      <div>
       <span className={styles.eyebrow}>{active?"KLOKKEN GÅR":"NY ARBEIDSØKT"}</span>
       <h2>{active?(active.projectLabel||"Arbeid pågår"):"Start klokke"}</h2>
-      {active&&<p>{active.customerLabel||"Ingen kunde valgt"} · startet {new Date(active.startedAt).toLocaleTimeString("nb-NO",{hour:"2-digit",minute:"2-digit",timeZone:"Europe/Oslo"})}</p>}
+      {active&&<p>{active.customerLabel||"Ingen kunde valgt"} · startet {new Date(active.startedAt).toLocaleTimeString("nb-NO",{hour:"2-digit",minute:"2-digit",timeZone:"Europe/Oslo"})}
+       {active.durationMinutes>0&&<> · {hours(active.durationMinutes)} t lagret fra før</>}</p>}
      </div>
-     {active&&<div className={styles.liveTime}>{elapsed(active.startedAt,now)}</div>}
+     {active&&<div className={styles.liveTime} aria-label="Samlet registrert og pågående arbeidstid">
+      {combinedWorkClockText(active.durationMinutes,active.startedAt,now)}
+     </div>}
     </div>
 
     {!active?<div className={styles.timerFields}>
@@ -375,13 +383,20 @@ export default function WorkClockClient({userName}){
       const cost=entryCosts(entry);
       return <tr key={entry.id} className={activeRow?styles.activeRow:""}>
        <td>{dateLabel(entry.workDate)}</td>
-       <td><b>{entry.projectLabel||"Arbeid"}</b><small>{entry.customerLabel||entry.note||""}</small></td>
+       <td><b>{entry.projectLabel||"Arbeid"}</b><small>{entry.customerLabel||entry.note||""}</small>
+        {!activeRow&&!entry.orderId&&Boolean(entry.startedAt&&entry.endedAt)&&
+         <button type="button" className={styles.resumeButton} disabled={busy||Boolean(active)}
+          title={active?"Stopp klokken som går før du fortsetter en annen.":"Fortsett på samme timeregistrering"}
+          onClick={()=>resume(entry)}>▶ Fortsett</button>}
+       </td>
        <td>{activeRow?<span className={styles.running}>Pågår</span>:hours(entry.durationMinutes)+" t"}</td>
        <td>{activeRow?"—":kroner(cost.labor)}</td>
        <td>{entry.distanceKm?entry.distanceKm.toLocaleString("nb-NO",{maximumFractionDigits:2})+" km":"—"}</td>
        <td>{entry.tollOre?kroner(entry.tollOre):"—"}</td>
        <td><b>{activeRow?"—":kroner(cost.total)}</b></td>
-       <td>{!activeRow&&<button type="button" className={styles.editButton} onClick={()=>openEdit(entry)}>Rediger</button>}</td>
+       <td><div className={styles.entryActions}>
+        {!activeRow&&<button type="button" className={styles.editButton} disabled={busy} onClick={()=>openEdit(entry)}>Rediger</button>}
+       </div></td>
       </tr>
      })}</tbody>
     </table></div>}
