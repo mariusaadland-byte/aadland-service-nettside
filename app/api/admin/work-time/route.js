@@ -158,6 +158,29 @@ export async function POST(req){
  const action=clean(body.action,30);
  const s=db();
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+ if(action==="setOrderCredit"){
+  // Permit a value agreement on an EXISTING project even before a
+  // work-clock entry is attached to it. Never trust a project name alone.
+  const target=orderId(body.orderId);
+  if(!target)return NextResponse.json({error:"Velg et eksisterende oppdrag."},{status:400});
+  const {data:order,error:orderError}=await s.from("orders").select("id,order_type,status")
+   .eq("id",target).maybeSingle();
+  if(orderError)return NextResponse.json({error:"Oppdraget kunne ikke kontrolleres."},{status:503});
+  if(!order||order.order_type!=="custom"||order.status==="cancelled")
+   return NextResponse.json({error:"Dette oppdraget kan ikke brukes til motregning."},{status:400});
+  const amount=Number(body.agreedValueOre);
+  if(!Number.isSafeInteger(amount)||amount<0||amount>100000000000)
+   return NextResponse.json({error:"Oppgi en gyldig avtalt verdi i kroner."},{status:400});
+  const {data,error}=await s.from("work_time_value_credits").upsert({
+   admin_user_id:user.id,scope_key:"order:"+target,agreed_value_ore:amount,
+   description:clean(body.creditDescription,400),updated_at:new Date().toISOString()
+  },{onConflict:"admin_user_id,scope_key"})
+   .select("scope_key,agreed_value_ore,description,updated_at").single();
+  if(error)return NextResponse.json({error:"Avtalt prosjektverdi kunne ikke lagres."},{status:500});
+  return NextResponse.json({credit:{scopeKey:data.scope_key,
+   agreedValueOre:Number(data.agreed_value_ore),description:data.description,
+   updatedAt:data.updated_at}});
+ }
  const values=commonValues(body);
  values.admin_user_id=user.id;
 
