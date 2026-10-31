@@ -94,6 +94,7 @@ export default function WorkClockClient({userName}){
  const [credits,setCredits]=useState([]);
  const [laborOreByScope,setLaborOreByScope]=useState({});
  const [creditEditor,setCreditEditor]=useState(null);
+ const [selectedCreditOrder,setSelectedCreditOrder]=useState("");
 
  async function load(targetMonth=month){
   setLoading(true); setError(""); setMessage("");
@@ -197,14 +198,22 @@ export default function WorkClockClient({userName}){
  function showCreditEditor(entry){
   const key=scopeKey(entry);
   const saved=credits.find(c=>c.scopeKey===key);
-  setCreditEditor({entryId:entry.id,scopeKey:key,agreedValueKroner:saved?String(saved.agreedValueOre/100).replace(".",","):"",
+  setCreditEditor({entryId:entry.orderId?null:entry.id,orderId:entry.orderId||null,
+   scopeKey:key,agreedValueKroner:saved?String(saved.agreedValueOre/100).replace(".",","):"",
    description:saved?.description||""});
  }
  async function saveCredit(event){
   event.preventDefault();
   if(!creditEditor)return;
-  const amount=Math.round(number(creditEditor.agreedValueKroner)*100);
-  const data=await request("PATCH",{action:"setCredit",id:creditEditor.entryId,
+  const input=String(creditEditor.agreedValueKroner||"").trim().replace(",",".");
+  if(!/^\d+(?:\.\d{1,2})?$/.test(input)){
+   setError("Oppgi avtalt verdi som et gyldig kronebeløp, for eksempel 5000.");
+   return;
+  }
+  const amount=Math.round(Number(input)*100);
+  const data=await request(creditEditor.orderId?"POST":"PATCH",{
+   action:creditEditor.orderId?"setOrderCredit":"setCredit",
+   ...(creditEditor.orderId?{orderId:creditEditor.orderId}:{id:creditEditor.entryId}),
    agreedValueOre:amount,creditDescription:creditEditor.description});
   if(!data)return;
   setCredits(current=>[...current.filter(c=>c.scopeKey!==data.credit.scopeKey),data.credit]);
@@ -215,12 +224,19 @@ export default function WorkClockClient({userName}){
   const scope=scopeKey(entry),credit=credits.find(c=>c.scopeKey===scope);
   if(!credit||credit.agreedValueOre<=0)return null;
   const saved=Number(laborOreByScope[scope]||0);
-  const currentIsActive=active?.id===entry?.id;
+  const currentIsActive=active&&scopeKey(active)===scope;
   const liveMinutes=currentIsActive?Math.max(0,(now-Date.parse(active.startedAt))/60000):0;
-  const labor=saved+Math.round(liveMinutes*Number(active?.hourlyRateOre||0)/60);
+  const runningSavedMinutes=currentIsActive?
+   Math.max(0,(Number(active.durationMinutes)||0)-(Number(active.deductedMinutes)||0)):0;
+  const runningNowMinutes=currentIsActive?
+   Math.max(0,(Number(active.durationMinutes)||0)+liveMinutes-(Number(active.deductedMinutes)||0)):0;
+  const activeLaborDelta=currentIsActive?
+   Math.round(runningNowMinutes*(Number(active.hourlyRateOre)||0)/60)-
+   Math.round(runningSavedMinutes*(Number(active.hourlyRateOre)||0)/60):0;
+  const labor=saved+activeLaborDelta;
   const remaining=Math.max(0,credit.agreedValueOre-labor);
   const extra=Math.max(0,labor-credit.agreedValueOre);
-  const hourlyRate=Number(entry.hourlyRateOre)||0;
+  const hourlyRate=Number(active?.hourlyRateOre||entry.hourlyRateOre)||0;
   return {credit,labor,remaining,extra,remainingMinutes:hourlyRate>0?
    Math.ceil(remaining*60/hourlyRate):null};
  }
@@ -396,10 +412,11 @@ export default function WorkClockClient({userName}){
      </div>}
     </div>
     {active&&<div className={styles.runningBreak}>
-     <button type="button" className={styles.lunchButton} disabled={busy}
-      onClick={()=>lunch(30)}>🍽️ Lunsj −30 min</button>
-     {active.deductedMinutes>0&&<button type="button" className={styles.undoLunch}
-      disabled={busy} onClick={()=>lunch(-30)}>Angre siste 30 min</button>}
+     <button type="button" className={styles.lunchButton}
+      disabled={busy||active.lunchDays?.includes(osloDate())}
+      onClick={()=>lunch(30)}>🍽️ {active.lunchDays?.includes(osloDate())?"Lunsj er trukket i dag":"Lunsj −30 min"}</button>
+     {active.lunchDays?.includes(osloDate())&&<button type="button" className={styles.undoLunch}
+      disabled={busy} onClick={()=>lunch(-30)}>Angre lunsj i dag</button>}
      <span>Minustid totalt: {active.deductedMinutes||0} min. Arbeidsklokken går videre.</span>
     </div>}
     {active&&<div className={styles.creditLive}>
@@ -440,6 +457,35 @@ export default function WorkClockClient({userName}){
      <div><b>{kroner(active.hourlyRateOre)}/t</b><span>Timeprisen kan redigeres etter at klokken er stoppet.</span></div>
      <button className={styles.stopButton} type="button" onClick={stop} disabled={busy}>■ Stopp og lagre</button>
     </div>}
+   </section>
+
+   <section className={styles.creditProject}>
+    <div><span className={styles.eyebrow}>OPPDRAG / MOTREGNING</span>
+     <h2>Avtalt verdi for eksisterende oppdrag</h2>
+     <p>Legg inn verdien du skal arbeide for, for eksempel en bil. Klokken regner ned verdien i kroner og viser arbeid som overstiger avtalen.</p>
+    </div>
+    <div className={styles.creditProjectControls}>
+     <label>Velg oppdrag
+      <select value={selectedCreditOrder} onChange={e=>setSelectedCreditOrder(e.target.value)}>
+       <option value="">Velg eksisterende oppdrag</option>
+       {orders.map(o=><option key={o.id} value={o.id}>{o.orderNumber} · {o.sourceQuoteTitle||o.customerName||"Oppdrag"}</option>)}
+      </select>
+     </label>
+     <button type="button" disabled={busy||!selectedCreditOrder}
+      onClick={()=>showCreditEditor({id:null,orderId:selectedCreditOrder,hourlyRateOre:0})}>
+      {credits.some(c=>c.scopeKey==="order:"+selectedCreditOrder)?"Endre avtalt verdi":"Legg inn avtalt verdi"}
+     </button>
+    </div>
+    {selectedCreditOrder&&(()=>{const c=credits.find(x=>x.scopeKey==="order:"+selectedCreditOrder);
+     if(!c||c.agreedValueOre<=0)return null;
+     const spent=Number(laborOreByScope["order:"+selectedCreditOrder]||0);
+     return <p className={styles.creditProjectSummary}>
+      Avtalt: <b>{kroner(c.agreedValueOre)}</b> · Utført arbeid: <b>{kroner(spent)}</b> ·
+      {spent<c.agreedValueOre?" Verdi igjen: ":" Til fakturering utover avtalen: "}
+      <b>{kroner(Math.abs(c.agreedValueOre-spent))}</b>
+     </p>;
+    })()}
+    <small>Dette er en intern beregning. Faktura eller motregningsbilag lages ikke automatisk.</small>
    </section>
 
    <section className={styles.monthBar}>
