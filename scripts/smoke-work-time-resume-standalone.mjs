@@ -115,7 +115,7 @@ const css=read("app/admin/arbeidsklokke/workClock.module.css");
 assert.ok(client.includes('action:"resume",id:entry.id'));
 assert.ok(client.includes('if(busy||active||entry.orderId||!entry.startedAt||!entry.endedAt)return;'));
 assert.ok(client.includes('setActive(data.entry)'),"Show the reopened timer as active");
-assert.ok(client.includes("combinedWorkClockText(active.durationMinutes,active.startedAt,now)"),
+assert.ok(client.includes("clockAfterDeduction(active.durationMinutes,active.startedAt,now,active.deductedMinutes)"),
  "Display the accumulated time as soon as the row is resumed");
 assert.ok(client.includes("!activeRow&&!entry.orderId&&Boolean(entry.startedAt&&entry.endedAt)"),
  "Show Fortsett only on stopped standalone clocks");
