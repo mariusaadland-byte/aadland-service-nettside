@@ -191,6 +191,11 @@ export default function WorkClockClient({userName}){
   });
   if(!data)return;
   setActive(data.entry);
+  const scope=active.orderId?"order:"+active.orderId:"entry:"+active.id;
+  const saved=Number(active.durationMinutes)||0,rate=Number(active.hourlyRateOre)||0;
+  const oldBase=Math.round(Math.max(0,saved-(Number(active.deductedMinutes)||0))*rate/60);
+  const newBase=Math.round(Math.max(0,saved-(Number(data.entry.deductedMinutes)||0))*rate/60);
+  setLaborOreByScope(previous=>({...previous,[scope]:(Number(previous[scope])||0)+newBase-oldBase}));
   setEntries(current=>current.map(entry=>entry.id===data.entry.id?data.entry:entry));
   setMessage(deltaMinutes>0?"30 minutter lunsj er trukket fra arbeidstiden.":"Siste lunsjtrekk er angret.");
  }
@@ -565,7 +570,7 @@ export default function WorkClockClient({userName}){
     </table></div>}
    </section>
 
-   {creditEditor&&<div className={styles.modalBackdrop}>
+   {creditEditor&&<div className={`${styles.modalBackdrop} ${styles.creditBackdrop}`}>
     <form className={styles.creditModal} onSubmit={saveCredit}>
      <div className={styles.modalHead}><h2>Avtalt verdi / motregning</h2>
       <button type="button" onClick={()=>setCreditEditor(null)}>×</button></div>
