@@ -85,6 +85,10 @@ async function applyCustomerSelection(s,values,customerRef){
  values.customer_label=resolved.customerLabel;
  return null;
 }
+function nextWorkUpdateAt(previous){
+ const prior=Date.parse(previous||"");
+ return new Date(Math.max(Date.now(),Number.isFinite(prior)?prior+1:0)).toISOString();
+}
 function commonValues(body){
  return {
   order_id:orderId(body.orderId),
@@ -315,7 +319,7 @@ export async function PATCH(req){
    return NextResponse.json({error:"Minustiden kan ikke være negativ eller overstige 100 000 minutter."},{status:400});
   values={deducted_minutes:deducted,
    lunch_days:delta===30?[...days,day]:days.filter(x=>x!==day),
-   updated_at:new Date().toISOString()};
+   updated_at:nextWorkUpdateAt(existing.updated_at)};
  }else if(action==="setDeduction"){
   // Explicitly set a negative starting balance while a timer is running,
   // including an already-started order. Preserve clock-in/out sessions.
@@ -328,7 +332,7 @@ export async function PATCH(req){
   const days=Array.isArray(existing.lunch_days)?existing.lunch_days:[];
   values={deducted_minutes:deducted,
    lunch_days:deducted>=30*days.length?days:[],
-   updated_at:new Date().toISOString()};
+   updated_at:nextWorkUpdateAt(existing.updated_at)};
  }else if(action==="resume"){
   // Re-use the *same row* only if it was a stopped timer without
   // a linked order. Preserve work date, labels, rates, km and toll.
