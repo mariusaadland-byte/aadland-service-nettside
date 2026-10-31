@@ -28,6 +28,24 @@ function dateLabel(value){
  const [y,m,d]=String(value).split("-").map(Number);
  return new Intl.DateTimeFormat("nb-NO",{weekday:"short",day:"2-digit",month:"short",year:"numeric",timeZone:"UTC"}).format(new Date(Date.UTC(y,m-1,d)));
 }
+function osloDateTimeLocal(iso){
+ if(!iso)return "";
+ const parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Oslo",
+  year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"
+ }).formatToParts(new Date(iso));
+ const get=type=>parts.find(item=>item.type===type)?.value||"";
+ return get("year")+"-"+get("month")+"-"+get("day")+"T"+get("hour")+":"+get("minute");
+}
+function fromOsloDateTimeLocal(local){
+ if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(local||""))return "";
+ const base=Date.parse(local+"Z");
+ if(!Number.isFinite(base))return "";
+ for(const h of [2,1]){
+  const candidate=new Date(base-h*3600000);
+  if(osloDateTimeLocal(candidate.toISOString())===local)return candidate.toISOString();
+ }
+ return "";
+}
 function number(value){
  const parsed=Number(String(value??"").replace(/\s/g,"").replace(",","."));
  return Number.isFinite(parsed)?Math.max(0,parsed):0;
@@ -201,17 +219,36 @@ export default function WorkClockClient({userName}){
    hourlyRate:String((entry.hourlyRateOre||0)/100).replace(".",","),
    distanceKm:String(entry.distanceKm||"").replace(".",","),
    kmRate:String((entry.kmRateOre||0)/100).replace(".",","),
-   toll:String((entry.tollOre||0)/100).replace(".",",")
+   toll:String((entry.tollOre||0)/100).replace(".",","),
+   stampEditorEnabled:Boolean(entry.startedAt&&entry.endedAt),
+   sessions:(entry.sessions||[]).map(item=>({
+    startedAt:item.startedAt?osloDateTimeLocal(item.startedAt):"",
+    endedAt:item.endedAt?osloDateTimeLocal(item.endedAt):"",
+    minutes:item.minutes,
+    historical:Boolean(item.historical)
+   }))
   });
  }
  async function saveEdit(event){
   event.preventDefault();
   if(!editing)return;
+  let sessions;
+  if(editing.stampEditorEnabled){
+   sessions=editing.sessions.map(item=>item.historical
+    ?{startedAt:null,endedAt:null,minutes:item.minutes,historical:true}
+    :{startedAt:fromOsloDateTimeLocal(item.startedAt),
+      endedAt:fromOsloDateTimeLocal(item.endedAt)});
+   if(sessions.some(item=>!item.historical&&(!item.startedAt||!item.endedAt))){
+    setError("Kontroller dato og klokkeslett. Enkelte klokkeslett finnes ikke ved sommertid.");
+    return;
+   }
+  }
   const data=await request("PATCH",{
    action:"update",id:editing.id,
    orderId:editing.orderId||null,
    workDate:editing.workDate,
    durationMinutes:minutesFromHours(editing.durationHours),
+   ...(sessions?{sessions}:{}),
    projectLabel:editing.projectLabel,
    customerLabel:editing.customerLabel,
    note:editing.note,
@@ -383,7 +420,11 @@ export default function WorkClockClient({userName}){
       const cost=entryCosts(entry);
       return <tr key={entry.id} className={activeRow?styles.activeRow:""}>
        <td>{dateLabel(entry.workDate)}</td>
-       <td><b>{entry.projectLabel||"Arbeid"}</b><small>{entry.customerLabel||entry.note||""}</small>
+       <td>{!activeRow
+        ?<button type="button" className={styles.entryNameButton} onClick={()=>openEdit(entry)} disabled={busy}
+          title="Åpne timeregistrering og rediger stemplingene">{entry.projectLabel||"Arbeid"}</button>
+        :<b>{entry.projectLabel||"Arbeid"}</b>}
+        <small>{entry.customerLabel||entry.note||""}</small>
         {!activeRow&&!entry.orderId&&Boolean(entry.startedAt&&entry.endedAt)&&
          <button type="button" className={styles.resumeButton} disabled={busy||Boolean(active)}
           title={active?"Stopp klokken som går før du fortsetter en annen.":"Fortsett på samme timeregistrering"}
@@ -408,7 +449,9 @@ export default function WorkClockClient({userName}){
      <p className={styles.modalHelp}>Endre dato for å flytte timene til en annen dag eller måned.</p>
      <div className={styles.formGrid}>
       <label>Dato<input type="date" value={editing.workDate} onChange={e=>setEditing(current=>({...current,workDate:e.target.value}))}/></label>
-      <label>Timer<input inputMode="decimal" value={editing.durationHours} onChange={e=>setEditing(current=>({...current,durationHours:e.target.value}))}/></label>
+      <label>Timer<input inputMode="decimal" value={editing.durationHours} onChange={e=>setEditing(current=>({...current,durationHours:e.target.value}))}
+       disabled={editing.stampEditorEnabled} title={editing.stampEditorEnabled
+        ?"Summen regnes automatisk fra stemplingene. Endre klokkeslettene nedenfor.":""}/></label>
       <label>Eksisterende oppdrag
        <select value={editing.orderId} onChange={e=>applyOrder(setEditing,e.target.value)}>
         <option value="">Ikke koblet til oppdrag</option>
@@ -423,6 +466,34 @@ export default function WorkClockClient({userName}){
       <label>Bom inkl. mva<div className={styles.money}><span>kr</span><input inputMode="decimal" value={editing.toll} onChange={e=>setEditing(current=>({...current,toll:e.target.value}))}/></div></label>
       <label className={styles.full}>Notat<input value={editing.note} onChange={e=>setEditing(current=>({...current,note:e.target.value}))}/></label>
      </div>
+     {editing.stampEditorEnabled&&<section className={styles.stampEditor}>
+      <h3>Inn- og utstemplinger</h3>
+      <p>Endre dato og klokkeslett for hver økt. Samlet tid regnes automatisk når du lagrer.</p>
+      {editing.sessions.map((stamp,index)=><div className={styles.stampLine} key={index}>
+       {stamp.historical?<div className={styles.stampLegacy}>
+        <strong>Historiske timer: {hours(stamp.minutes)} t</strong>
+        <span>Klokkeslettene ble ikke lagret tidligere. Timene beholdes uendret.</span>
+       </div>:<>
+        <label>Inn
+         <input type="datetime-local" value={stamp.startedAt} required
+          onChange={e=>setEditing(current=>({...current,sessions:current.sessions.map((item,i)=>
+           i===index?{...item,startedAt:e.target.value}:item)}))}/>
+        </label>
+        <label>Ut
+         <input type="datetime-local" value={stamp.endedAt} required
+          onChange={e=>setEditing(current=>({...current,sessions:current.sessions.map((item,i)=>
+           i===index?{...item,endedAt:e.target.value}:item)}))}/>
+        </label>
+        <button type="button" className={styles.removeStamp} onClick={()=>
+         setEditing(current=>({...current,sessions:current.sessions.filter((_,i)=>i!==index)}))}>
+         Fjern økt
+        </button>
+       </>}
+      </div>)}
+      <button type="button" className={styles.addStamp} onClick={()=>setEditing(current=>({
+       ...current,sessions:[...current.sessions,{startedAt:"",endedAt:"",minutes:0,historical:false}]
+      }))}>＋ Legg til stempling</button>
+     </section>}
      <div className={styles.modalActions}><button type="button" className={styles.deleteButton} onClick={removeEntry} disabled={busy}>Slett</button><div><button type="button" className={styles.cancelButton} onClick={()=>setEditing(null)}>Avbryt</button><button className={styles.saveButton} disabled={busy}>Lagre endringer</button></div></div>
     </form>
    </div>}

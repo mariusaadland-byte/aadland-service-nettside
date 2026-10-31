@@ -4,9 +4,10 @@ import {getAdminUser} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
 import {isValidDateInput,osloDateKey} from "../../../../lib/osloTime";
 import {accruedWorkMinutes} from "../../../../lib/workTimeAccumulation";
+import {storedWorkStamps,workStamp,normalizeStampEdit} from "../../../../lib/workTimeStamps";
 
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const SELECT_FIELDS="id,admin_user_id,order_id,work_date,project_label,customer_label,note,started_at,ended_at,duration_minutes,hourly_rate_ore,distance_km,km_rate_ore,toll_ore,created_at,updated_at";
+const SELECT_FIELDS="id,admin_user_id,order_id,work_date,project_label,customer_label,note,started_at,ended_at,duration_minutes,hourly_rate_ore,distance_km,km_rate_ore,toll_ore,work_sessions,created_at,updated_at";
 
 async function allowed(){
  const user=await getAdminUser();
@@ -46,6 +47,7 @@ function map(row){
   distanceKm:Number(row.distance_km)||0,
   kmRateOre:Number(row.km_rate_ore)||0,
   tollOre:Number(row.toll_ore)||0,
+  sessions:storedWorkStamps(row),
   createdAt:row.created_at,
   updatedAt:row.updated_at
  };
@@ -134,6 +136,7 @@ export async function POST(req){
   values.started_at=new Date().toISOString();
   values.ended_at=null;
   values.duration_minutes=0;
+  values.work_sessions=[];
  }else if(action==="manual"){
   const workDate=clean(body.workDate,10);
   const durationMinutes=integer(body.durationMinutes,0,100000);
@@ -143,6 +146,7 @@ export async function POST(req){
   values.started_at=null;
   values.ended_at=null;
   values.duration_minutes=durationMinutes;
+  values.work_sessions=[];
  }else{
   return NextResponse.json({error:"Ukjent handling."},{status:400});
  }
@@ -182,7 +186,10 @@ export async function PATCH(req){
   const endedAt=new Date();
   const durationMinutes=accruedWorkMinutes(existing.duration_minutes,existing.started_at,endedAt);
   if(durationMinutes===null)return NextResponse.json({error:"Tidsregistreringen kan ikke overstige 100 000 minutter. Kontroller registreringen."},{status:409});
-  values={ended_at:endedAt.toISOString(),duration_minutes:durationMinutes,updated_at:endedAt.toISOString()};
+  const lastStamp=workStamp(existing.started_at,endedAt);
+  if(!lastStamp)return NextResponse.json({error:"Klokkeslettene kan ikke brukes. Kontroller registreringen."},{status:409});
+  values={ended_at:endedAt.toISOString(),duration_minutes:durationMinutes,
+   work_sessions:[...storedWorkStamps(existing),lastStamp],updated_at:endedAt.toISOString()};
  }else if(action==="resume"){
   // Re-use the *same row* only if it was a stopped timer without
   // a linked order. Preserve work date, labels, rates, km and toll.
@@ -201,6 +208,19 @@ export async function PATCH(req){
   if(!isValidDateInput(workDate))return NextResponse.json({error:"Velg en gyldig dato."},{status:400});
   if(durationMinutes<1)return NextResponse.json({error:"Registrer minst ett minutt arbeidstid."},{status:400});
   values={...commonValues(body),work_date:workDate,duration_minutes:durationMinutes};
+  if(Array.isArray(body.sessions)){
+   if(!existing.started_at||!existing.ended_at)
+    return NextResponse.json({error:"Stemplinger kan bare redigeres når klokken er stoppet."},{status:409});
+   const result=normalizeStampEdit(body.sessions,existing);
+   if(result.error)return NextResponse.json({error:result.error},{status:400});
+   const stamped=result.stamps.filter(x=>x.startedAt&&x.endedAt);
+   const last=stamped[stamped.length-1];
+   values={...values,work_sessions:result.stamps,duration_minutes:result.minutes,
+    started_at:last?.startedAt||existing.started_at,ended_at:last?.endedAt||existing.ended_at};
+  }else if(storedWorkStamps(existing).some(x=>x.startedAt&&x.endedAt)&&
+   durationMinutes!==existing.duration_minutes){
+   return NextResponse.json({error:"Rediger inn- og utstemplingene for å justere timer på en registrering med klokkehistorikk."},{status:409});
+  }
  }else{
   return NextResponse.json({error:"Ukjent handling."},{status:400});
  }
@@ -209,14 +229,14 @@ export async function PATCH(req){
  if(action==="stop"){
   // Two simultaneous Stop requests must not add the same interval twice.
   mutation=mutation.is("ended_at",null).eq("started_at",existing.started_at)
-   .eq("duration_minutes",existing.duration_minutes);
+   .eq("duration_minutes",existing.duration_minutes).eq("updated_at",existing.updated_at);
  }else if(action==="resume"){
   // If this row was changed or resumed from another phone since GET,
   // the conditional update must not overwrite that work session.
   mutation=mutation.eq("ended_at",existing.ended_at).eq("started_at",existing.started_at)
-   .eq("duration_minutes",existing.duration_minutes).is("order_id",null);
+   .eq("duration_minutes",existing.duration_minutes).eq("updated_at",existing.updated_at).is("order_id",null);
  }else if(action==="update"){
-  mutation=mutation.eq("duration_minutes",existing.duration_minutes);
+  mutation=mutation.eq("duration_minutes",existing.duration_minutes).eq("updated_at",existing.updated_at);
   if(existing.started_at&&existing.ended_at)mutation=mutation.eq("ended_at",existing.ended_at);
   else mutation=mutation.is("started_at",null);
  }

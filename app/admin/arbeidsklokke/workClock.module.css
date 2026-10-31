@@ -6,3 +6,26 @@
  white-space:nowrap}
 .resumeButton:disabled{opacity:.46;cursor:not-allowed}
 .resumeButton:focus-visible{outline:3px solid #fff1c8;outline-offset:2px}
+
+/* Tap a stopped work entry to correct its own stamp-in/out history. */
+.entryNameButton{display:block;max-width:260px;text-align:left;padding:5px 0;background:transparent;
+ color:#f5d98f;border:0;border-bottom:1px dashed #a88c56;font:inherit;font-weight:800;cursor:pointer}
+.entryNameButton:disabled{opacity:.5}
+.entryNameButton:focus-visible{outline:2px solid #f5d98f;outline-offset:4px}
+.stampEditor{border-top:1px solid #41454c;margin:20px 0 10px;padding-top:20px}
+.stampEditor h3{margin:0 0 6px;font-size:19px;color:#f7e8c9}
+.stampEditor>p{margin:0 0 14px;color:#b9bec1;font-size:13px;line-height:1.5}
+.stampLine{display:flex;align-items:end;flex-wrap:wrap;gap:10px;padding:13px 0;border-bottom:1px solid #303640}
+.stampLine label{flex:1 1 205px;display:flex;flex-direction:column;gap:5px;
+ font-size:13px;font-weight:650;color:#eee}
+.stampLine input{display:block;box-sizing:border-box;width:100%;min-height:48px;
+ color:#fff;background:#11151c;border:1px solid #535b63;border-radius:9px;
+ padding:8px 11px;font:inherit}
+.stampLine input:focus{outline:2px solid #d7b76d;outline-offset:2px}
+.stampLegacy{display:flex;flex-direction:column;gap:4px;color:#e5dcc8}
+.stampLegacy span{font-size:12px;color:#c2c2c2}
+.addStamp,.removeStamp{min-height:44px;padding:8px 13px;border-radius:10px;
+ background:#272d35;border:1px solid #6a717b;color:#f6f1e9;font:inherit;font-weight:800;cursor:pointer}
+.addStamp{margin:14px 0 0;background:#d7b76d;border-color:#d7b76d;color:#16130d}
+.removeStamp{color:#ffc2c2;border-color:#83484a}
+@media(max-width:590px){.stampLine label{flex-basis:100%}.stampLine{align-items:stretch}.stampLine .removeStamp{width:100%}}
