@@ -5,9 +5,10 @@ import {db} from "../../../../lib/supabase";
 import {isValidDateInput,osloDateKey} from "../../../../lib/osloTime";
 import {accruedWorkMinutes} from "../../../../lib/workTimeAccumulation";
 import {storedWorkStamps,workStamp,normalizeStampEdit} from "../../../../lib/workTimeStamps";
+import {netWorkMinutes,validDeductedMinutes} from "../../../../lib/workTimeDeduction";
 
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const SELECT_FIELDS="id,admin_user_id,order_id,work_date,project_label,customer_label,note,started_at,ended_at,duration_minutes,hourly_rate_ore,distance_km,km_rate_ore,toll_ore,work_sessions,created_at,updated_at";
+const SELECT_FIELDS="id,admin_user_id,order_id,work_date,project_label,customer_label,note,started_at,ended_at,duration_minutes,hourly_rate_ore,distance_km,km_rate_ore,toll_ore,deducted_minutes,work_sessions,created_at,updated_at";
 
 async function allowed(){
  const user=await getAdminUser();
@@ -43,6 +44,8 @@ function map(row){
   startedAt:row.started_at||null,
   endedAt:row.ended_at||null,
   durationMinutes:Number(row.duration_minutes)||0,
+  deductedMinutes:Number(row.deducted_minutes)||0,
+  netDurationMinutes:Math.max(0,netWorkMinutes(Number(row.duration_minutes)||0,Number(row.deducted_minutes)||0)||0),
   hourlyRateOre:Number(row.hourly_rate_ore)||0,
   distanceKm:Number(row.distance_km)||0,
   kmRateOre:Number(row.km_rate_ore)||0,
@@ -136,6 +139,7 @@ export async function POST(req){
   values.started_at=new Date().toISOString();
   values.ended_at=null;
   values.duration_minutes=0;
+  values.deducted_minutes=0;
   values.work_sessions=[];
  }else if(action==="manual"){
   const workDate=clean(body.workDate,10);
@@ -146,6 +150,10 @@ export async function POST(req){
   values.started_at=null;
   values.ended_at=null;
   values.duration_minutes=durationMinutes;
+  const deducted=validDeductedMinutes(body.deductedMinutes??0);
+  if(deducted===null||deducted>durationMinutes)
+   return NextResponse.json({error:"Minustid kan ikke være større enn registrert arbeidstid."},{status:400});
+  values.deducted_minutes=deducted;
   values.work_sessions=[];
  }else{
   return NextResponse.json({error:"Ukjent handling."},{status:400});
@@ -186,10 +194,26 @@ export async function PATCH(req){
   const endedAt=new Date();
   const durationMinutes=accruedWorkMinutes(existing.duration_minutes,existing.started_at,endedAt);
   if(durationMinutes===null)return NextResponse.json({error:"Tidsregistreringen kan ikke overstige 100 000 minutter. Kontroller registreringen."},{status:409});
+  if(netWorkMinutes(durationMinutes,existing.deducted_minutes)<0)
+   return NextResponse.json({error:"Lunsj-/minustiden er større enn klokkens arbeidstid. Angre fratrekket eller la klokken gå lenger."},{status:409});
   const lastStamp=workStamp(existing.started_at,endedAt);
   if(!lastStamp)return NextResponse.json({error:"Klokkeslettene kan ikke brukes. Kontroller registreringen."},{status:409});
   values={ended_at:endedAt.toISOString(),duration_minutes:durationMinutes,
    work_sessions:[...storedWorkStamps(existing),lastStamp],updated_at:endedAt.toISOString()};
+ }else if(action==="deduct"){
+  // One-tap lunch deduction with client snapshot to reject accidental double
+  // taps, stale mobile sessions, and concurrent edits from another device.
+  if(!existing.started_at||existing.ended_at)
+   return NextResponse.json({error:"Lunsjknappen er bare tilgjengelig mens klokken går. Rediger minustid på en avsluttet registrering."},{status:409});
+  const delta=Number(body.deltaMinutes);
+  if(delta!==30&&delta!==-30)
+   return NextResponse.json({error:"Velg lunsjfratrekk på 30 minutter eller angre 30 minutter."},{status:400});
+  if(!body.expectedUpdatedAt||body.expectedUpdatedAt!==existing.updated_at)
+   return NextResponse.json({error:"Klokken ble endret. Last inn oppdatert tid før du prøver igjen."},{status:409});
+  const deducted=validDeductedMinutes(Number(existing.deducted_minutes||0)+delta);
+  if(deducted===null)
+   return NextResponse.json({error:"Minustiden kan ikke være negativ eller overstige 100 000 minutter."},{status:400});
+  values={deducted_minutes:deducted,updated_at:new Date().toISOString()};
  }else if(action==="resume"){
   // Re-use the *same row* only if it was a stopped timer without
   // a linked order. Preserve work date, labels, rates, km and toll.
@@ -208,6 +232,9 @@ export async function PATCH(req){
   if(!isValidDateInput(workDate))return NextResponse.json({error:"Velg en gyldig dato."},{status:400});
   if(durationMinutes<1)return NextResponse.json({error:"Registrer minst ett minutt arbeidstid."},{status:400});
   values={...commonValues(body),work_date:workDate,duration_minutes:durationMinutes};
+  const deducted=validDeductedMinutes(body.deductedMinutes??existing.deducted_minutes??0);
+  if(deducted===null)return NextResponse.json({error:"Oppgi gyldig minustid i hele minutter."},{status:400});
+  values.deducted_minutes=deducted;
   if(Array.isArray(body.sessions)){
    if(!existing.started_at||!existing.ended_at)
     return NextResponse.json({error:"Stemplinger kan bare redigeres når klokken er stoppet."},{status:409});
@@ -221,6 +248,8 @@ export async function PATCH(req){
    durationMinutes!==existing.duration_minutes){
    return NextResponse.json({error:"Rediger inn- og utstemplingene for å justere timer på en registrering med klokkehistorikk."},{status:409});
   }
+  if(netWorkMinutes(values.duration_minutes,values.deducted_minutes)<0)
+   return NextResponse.json({error:"Minustiden kan ikke overstige samlet registrert arbeidstid."},{status:400});
  }else{
   return NextResponse.json({error:"Ukjent handling."},{status:400});
  }
@@ -229,14 +258,19 @@ export async function PATCH(req){
  if(action==="stop"){
   // Two simultaneous Stop requests must not add the same interval twice.
   mutation=mutation.is("ended_at",null).eq("started_at",existing.started_at)
-   .eq("duration_minutes",existing.duration_minutes).eq("updated_at",existing.updated_at);
+   .eq("duration_minutes",existing.duration_minutes).eq("updated_at",existing.updated_at)
+   .eq("deducted_minutes",existing.deducted_minutes);
+ }else if(action==="deduct"){
+  mutation=mutation.eq("updated_at",existing.updated_at).is("ended_at",null)
+   .eq("deducted_minutes",existing.deducted_minutes);
  }else if(action==="resume"){
   // If this row was changed or resumed from another phone since GET,
   // the conditional update must not overwrite that work session.
   mutation=mutation.eq("ended_at",existing.ended_at).eq("started_at",existing.started_at)
    .eq("duration_minutes",existing.duration_minutes).eq("updated_at",existing.updated_at).is("order_id",null);
  }else if(action==="update"){
-  mutation=mutation.eq("duration_minutes",existing.duration_minutes).eq("updated_at",existing.updated_at);
+  mutation=mutation.eq("duration_minutes",existing.duration_minutes).eq("updated_at",existing.updated_at)
+   .eq("deducted_minutes",existing.deducted_minutes);
   if(existing.started_at&&existing.ended_at)mutation=mutation.eq("ended_at",existing.ended_at);
   else mutation=mutation.is("started_at",null);
  }
