@@ -12,7 +12,7 @@ const when=value=>{
  return new Intl.DateTimeFormat("nb-NO",{timeZone:"Europe/Oslo",dateStyle:"short",timeStyle:"short"}).format(date);
 };
 const labels={invoice:"Faktura",payment:"Betaling",reversal:"Justering",vipps:"Vipps",
- refund:"Tilbakebetaling",credit:"Kreditnota",email:"E-post",reminder:"Purring/varsel"};
+ refund:"Tilbakebetaling",credit:"Kreditnota",email:"E-post",reminder:"Purring/varsel",friendlyReminder:"Vennlig påminnelse"};
 
 export default function InvoiceActivityTimeline({invoice}){
  const [items,setItems]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
@@ -26,7 +26,7 @@ export default function InvoiceActivityTimeline({invoice}){
    .catch(e=>{if(active)setError(e.message||"Hendelseshistorikken kunne ikke hentes.");})
    .finally(()=>{if(active)setLoading(false);});
   return()=>{active=false};
- },[invoiceId,invoice.payment_updated_at,invoice.credited_ore,invoice.sent_at,retry]);
+ },[invoiceId,invoice.payment_updated_at,invoice.credited_ore,invoice.sent_at,invoice.friendlyReminder?.lastSentAt,invoice.friendlyReminder?.unconfirmedCount,retry]);
  const dated=items.filter(e=>Boolean(e.occurredAt)),undated=items.filter(e=>!e.occurredAt);
  const sorted=[...(ascending?dated.reverse():dated),...undated];
  const shown=expanded?sorted:sorted.slice(0,5);
