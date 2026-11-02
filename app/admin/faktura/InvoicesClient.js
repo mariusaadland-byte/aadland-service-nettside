@@ -10,6 +10,7 @@ import {invoiceFollowUpState} from "../../../lib/invoiceFollowUpState";
 import {parseInvoicePaymentAmountOre,invoicePaymentSuggestionOre,invoicePaymentAmountInput} from "../../../lib/invoicePartialPayments";
 import Link from "next/link";
 import InvoiceReminderPanel from "./InvoiceReminderPanel";
+import InvoiceFriendlyReminderPanel from "./InvoiceFriendlyReminderPanel";
 import InvoiceVippsPanel from "./InvoiceVippsPanel";
 import InvoiceCreditNotePanel from "./InvoiceCreditNotePanel";
 import InvoiceSettlementPanel from "./InvoiceSettlementPanel";
@@ -436,7 +437,7 @@ export default function InvoicesClient({archiveMode=false,isOwner=false}){
   Siste sendeforsøk: {p.receipt_delivery_error}
  </p>}
  {p.note&&<p style={{fontSize:13,margin:"6px 0 0"}}>{p.note}</p>}
- </div>)}</section>}{archiveMode&&<InvoiceCreditNotePanel key={form.id} invoice={form} disabled={busy} onRefresh={load}/>}{archiveMode&&<InvoiceReminderPanel key={form.id} invoice={form} disabled={busy} onRefresh={load}/>}{!archiveMode&&form.status==="draft"&&!form.split_group_id&&
+ </div>)}</section>}{archiveMode&&<InvoiceCreditNotePanel key={form.id} invoice={form} disabled={busy} onRefresh={load}/>}{archiveMode&&<InvoiceFriendlyReminderPanel key={form.id} invoice={form} disabled={busy} onRefresh={load}/>}{archiveMode&&<InvoiceReminderPanel key={form.id} invoice={form} disabled={busy} onRefresh={load}/>}{!archiveMode&&form.status==="draft"&&!form.split_group_id&&
  <InvoiceSplitPanel key={form.id} invoice={form} today={today} disabled={busy}
   onPrepare={()=>persist(form)}
   onCreated={async split=>{await load();setActive(split.firstId);
