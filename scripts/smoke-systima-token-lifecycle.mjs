@@ -50,13 +50,13 @@ const mockFetch=async(url,opts)=>{
  assert.equal(json.redirectUri,env.SYSTIMA_REDIRECT_URI);
  return {ok:true,async json(){return {accessToken:"MOCK_ACCESS_NEXT",
  refreshToken:"MOCK_REFRESH_NEXT",
- expiresAt:"2026-11-01T15:00:00Z",refreshTokenExpiresAt:"2026-12-01T15:00:00Z"};}};
+ expiresAt:"2030-11-01T15:00:00Z",refreshTokenExpiresAt:"2030-12-01T15:00:00Z"};}};
 };
 const updated=await refreshSystimaTokens(sealed,env,mockFetch);
 assert.equal(calls,1);
 assert.deepEqual(secureSystimaOpen(updated.encrypted,key),{
  accessToken:"MOCK_ACCESS_NEXT",refreshToken:"MOCK_REFRESH_NEXT",
- expiresAt:"2026-11-01T15:00:00Z",refreshTokenExpiresAt:"2026-12-01T15:00:00Z"
+ expiresAt:"2030-11-01T15:00:00Z",refreshTokenExpiresAt:"2030-12-01T15:00:00Z"
 });
 assert.equal(updated.health.status,"token_stored");
 assert.ok(!JSON.stringify(updated.health).includes("MOCK_ACCESS"));
