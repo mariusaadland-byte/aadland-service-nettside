@@ -39,6 +39,30 @@ export async function GET(){
    }
   }
  }
+ // Compact, read-only email follow-up metadata in the invoice archive.
+ // A friendly reminder never changes original due dates or legal reminder stages.
+ const friendlyRows=[];
+ for(let start=0;start<invoiceIds.length;start+=100){
+  const ids=invoiceIds.slice(start,start+100);
+  for(let offset=0;;offset+=500){
+   const result=await s.from("invoice_friendly_reminders")
+    .select("invoice_id,sent_at")
+    .in("invoice_id",ids).order("invoice_id",{ascending:true})
+    .order("created_at",{ascending:true}).order("id",{ascending:true}).range(offset,offset+499);
+   if(result.error)return fail("Historikken for vennlige betalingspåminnelser kunne ikke hentes.",503);
+   friendlyRows.push(...(result.data||[]));
+   if((result.data||[]).length<500)break;
+  }
+ }
+ const friendlyByInvoice=new Map();
+ for(const record of friendlyRows){
+  const state=friendlyByInvoice.get(record.invoice_id)||{sentCount:0,lastSentAt:null,unconfirmedCount:0};
+  if(record.sent_at){
+   state.sentCount++;
+   if(!state.lastSentAt||record.sent_at>state.lastSentAt)state.lastSentAt=record.sent_at;
+  }else state.unconfirmedCount++;
+  friendlyByInvoice.set(record.invoice_id,state);
+ }
  // Administrative closure is independent of the issued invoice and its ledger.
  // Fail closed when these records cannot be read; do not label unknown data as open.
  const closureRows=[];
@@ -57,7 +81,7 @@ export async function GET(){
   closedAt:c.closed_at,closeNote:c.close_note,lastChangedAt:c.last_changed_at,revision:c.revision
  }]));
  const invoicesWithActivity=summarizeInvoiceActivity(invoices,payments,credits)
-  .map(x=>({...x,adminClosure:closureMap.get(x.id)||null}));
+  .map(x=>({...x,adminClosure:closureMap.get(x.id)||null, friendlyReminder:friendlyByInvoice.get(x.id)||{sentCount:0,lastSentAt:null,unconfirmedCount:0}}));
  const contacts=[];
  if(invoices.some(x=>x.status==="draft")){
   for(let offset=0;;offset+=500){

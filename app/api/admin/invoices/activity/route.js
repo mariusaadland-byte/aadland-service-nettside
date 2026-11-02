@@ -23,7 +23,8 @@ export async function GET(req){
   ["invoice_vipps_payments","id,created_at,refunded_ore,delivery_method,receipt_sent_at"],
   ["invoice_vipps_refund_notices","id,payment_id,refunded_delta_ore,created_at,sent_at"],
   ["invoice_credit_notes","id,credit_number,issued_at,credit_date,total_ore,reason,sent_at"],
-  ["invoice_reminder_sends","id,kind,status,created_at,sent_at"]
+  ["invoice_reminder_sends","id,kind,status,created_at,sent_at"],
+  ["invoice_friendly_reminders","id,recipient,created_at,sent_at"]
  ];
  const responses=await Promise.all(sources.map(async([table,columns])=>{
   const r=await s.from(table).select(columns).eq("invoice_id",invoiceId).limit(HISTORY_LIMIT);
@@ -31,10 +32,10 @@ export async function GET(req){
  }));
  if(responses.some(r=>r.error||!Array.isArray(r.data)||r.data.length>=HISTORY_LIMIT))
   return reply({error:"Hendelseshistorikken er ufullstendig. Prøv å oppdatere eller kontakt administrator."},503);
- const [payments,vipps,refundNotices,creditNotes,reminders]=responses.map(x=>x.data);
+ const [payments,vipps,refundNotices,creditNotes,reminders,friendlyReminders]=responses.map(x=>x.data);
  const events=buildInvoiceActivityTimeline({
   invoice:found.data,payments,vipps,refundNotices,creditNotes,
-  reminders:reminders.map(r=>({...r,hasPdf:r.status==="sent"}))
+  reminders:reminders.map(r=>({...r,hasPdf:r.status==="sent"})),friendlyReminders
  });
  return reply({invoiceNumber:found.data.invoice_number,events});
 }

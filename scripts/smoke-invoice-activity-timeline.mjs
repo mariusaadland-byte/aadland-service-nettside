@@ -31,6 +31,15 @@ assert.ok(events.find(e=>e.id==="credit:credit-1").link.includes("documentId=cre
 assert.ok(events.find(e=>e.id==="reminder:reminder-1").link.includes("documentId=reminder-1"));
 assert.ok(events.find(e=>e.id==="refund-mail:refund-1"),"Refund receipt email event is included");
 assert.ok(events.find(e=>e.id==="credit-sent:credit-1"),"Credit emailed event is included");
+const friendly=build({invoice,friendlyReminders:[
+ {id:"friend-1",recipient:"test@example.invalid",sent_at:"2026-10-24T14:00:00Z"},
+ {id:"friend-2",recipient:"test@example.invalid",created_at:"2026-10-24T15:00:00Z",sent_at:null}
+]});
+assert.equal(friendly.filter(e=>e.kind==="friendlyReminder").length,2);
+assert.equal(friendly[0].id,"friendly-reminder:friend-2");
+assert.match(friendly.find(e=>e.id==="friendly-reminder:friend-1").detail,/ingen ny faktura/i);
+assert.ok(!friendly.find(e=>e.id==="friendly-reminder:friend-1").link);
+
 assert.deepEqual(build({invoice:{...invoice,status:"draft"},payments}),[]);
 assert.equal(build({invoice:{...invoice,sent_at:null},payments:[],vipps:[],refundNotices:[],creditNotes:[],reminders:[]}).length,1);
 const noteOnly=build({invoice,refundNotices:[{...refundNotices[0],refunded_delta_ore:7500}],vipps});
