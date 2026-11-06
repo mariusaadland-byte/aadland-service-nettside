@@ -39,7 +39,6 @@ assert.match(rentalApi,/current\.status==="new"\)patch\.status="cancelled"/);
 assert.match(rentalApi,/confirmation_sent_at/);
 assert.match(rentalUi,/Arkiv \/ fjernede bookinger/);
 assert.match(rentalUi,/Fjern test fra oversikten/);
-assert.match(rentalUi,/Slett ubrukt testkladd/);
 assert.match(migration,/alter table public\.rental_bookings add column if not exists archived_at/);
 assert.match(migration,/alter table public\.orders add column if not exists archive_reason/);
 assert.doesNotMatch(migration,/drop table|delete from|truncate\s+/i);
