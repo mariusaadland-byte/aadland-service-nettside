@@ -836,7 +836,7 @@ export default function AdminClient({ user }) {
         )}
 
         {tab === "rentalBookings" && canViewOrders && (
-          <RentalBookings bookings={rentalBookings} reload={load} setError={setError} canUpdate={canUpdateOrders} paymentSetupRequired={rentalPaymentSetupRequired} initialOpenId={focusedRentalBookingId} />
+          <RentalBookings bookings={rentalBookings} reload={load} setError={setError} canUpdate={canUpdateOrders} isOwner={user?.role==="owner"} paymentSetupRequired={rentalPaymentSetupRequired} initialOpenId={focusedRentalBookingId} />
         )}
 
         {tab === "projects" && canManageProducts && (
@@ -4465,7 +4465,7 @@ alter table public.rental_bookings add column if not exists deposit_received_at 
 alter table public.rental_bookings add column if not exists deposit_released_at timestamptz;
 alter table public.rental_bookings add column if not exists deposit_charged_ore integer not null default 0;`;
 
-function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired=false,initialOpenId=""}){
+function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymentSetupRequired=false,initialOpenId=""}){
  const statuses={new:"Ny",confirmed:"Bekreftet",active:"Utlevert",returned:"Returnert",completed:"Ferdig",cancelled:"Avbrutt"};
  const paymentLabels={unpaid:"Ikke betalt",pending:"Venter",authorized:"Reservert",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert",cancelled:"Kansellert"};
  const depositLabels={not_paid:"Ikke mottatt",held:"Holdes",released:"Frigitt",partially_charged:"Delvis brukt",charged:"Brukt"};
@@ -4510,13 +4510,46 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
  const [message,setMessage]=useState("");
  const [openId,setOpenId]=useState(null);
  const [migrationCopied,setMigrationCopied]=useState(false);
+ const [showArchivedBookings,setShowArchivedBookings]=useState(false);
  useEffect(()=>{
   if(!initialOpenId)return;
+  if(bookings.some(b=>b.id===initialOpenId&&b.archivedAt))setShowArchivedBookings(true);
   setOpenId(initialOpenId);
   const timer=window.setTimeout(()=>document.getElementById("rental-booking-"+initialOpenId)?.scrollIntoView({behavior:"smooth",block:"center"}),90);
   return ()=>window.clearTimeout(timer);
  },[initialOpenId]);
 
+ async function cleanupBooking(booking,restore=false){
+  const captured=Math.max(0,Number(booking.paymentCapturedOre)||0);
+  const refunded=Math.max(0,Number(booking.paymentRefundedOre)||0);
+  const held=Math.max(0,Number(booking.depositHeldOre)||0);
+  if(!restore&&!["new","cancelled","completed"].includes(booking.status)){
+   setError("Denne bookingen må avsluttes eller kanselleres med kundevarsel før den fjernes.");
+   return;
+  }
+  if(!restore&&(captured>refunded||held>0&&!booking.depositReleasedAt&&booking.depositStatus!=="charged")){
+   setError("Betalingen eller depositumet er ikke avklart. Avklar dette før du fjerner bookingen.");
+   return;
+  }
+  const question=restore
+   ?"Gjenopprette "+booking.bookingNumber+" i utleieoversikten? En tidligere kansellering blir ikke opphevet."
+   :"Fjerne "+booking.bookingNumber+" fra utleieoversikten? Den flyttes til arkivet, uten at betalingshistorikk slettes."+
+    (booking.status==="new"?" En helt ny, ubetalt testbooking blir samtidig kansellert uten e-post, slik at datoene frigjøres.":"");
+  if(!window.confirm(question))return;
+  setSavingId(booking.id);setError("");setMessage("");
+  try{
+   const r=await fetch("/api/admin/rental-bookings",{
+    method:"PATCH",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id:booking.id,action:restore?"restore-cleanup":"archive-cleanup",
+      reason:booking.status==="new"?"test":"ikke aktuell",confirm:true})
+   });
+   const d=await r.json().catch(()=>({}));
+   if(!r.ok)throw Error(d.error||"Oppryddingen kunne ikke lagres.");
+   setOpenId(null);setMessage(restore?"Bookingen er gjenopprettet.":"Bookingen er flyttet til arkivet.");
+   await reload();
+  }catch(e){setError(e.message||"Kunne ikke rydde bookingen.");}
+  finally{setSavingId("");}
+ }
  async function patch(id,changes){
   setMessage("");
   setSavingId(id);
@@ -4677,6 +4710,8 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
   }
  }
 
+ const visibleBookings=bookings.filter(booking=>Boolean(booking.archivedAt)===showArchivedBookings);
+ const archivedCount=bookings.filter(booking=>Boolean(booking.archivedAt)).length;
  const attentionBookings=bookings.filter(booking=>attentionIssue(booking));
  const attentionNetOre=attentionBookings.reduce((sum,booking)=>sum+Math.max(0,Number(booking.paymentCapturedOre||0)-Number(booking.paymentRefundedOre||0)),0);
 
@@ -4694,8 +4729,9 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
    </div>
   </div>}
   {message&&<p className="success">{message}</p>}
-  {!bookings.length?<div className="card"><h3>Ingen utleiebookinger ennå</h3><p className="muted">Nye bookinger fra utleiesiden vises her.</p></div>:
-  <div className="grid rentalBookingGrid">{bookings.map(b=>{
+  <div className="rentalBookingActions" style={{marginBottom:12}}><button type="button" className="btn alt" onClick={()=>{setShowArchivedBookings(v=>!v);setOpenId(null)}}>{showArchivedBookings?"Vis aktive bookinger":"Arkiv / fjernede bookinger ("+archivedCount+")"}</button><p className="muted" style={{fontSize:13}}>Fjern uaktuelle bookinger fra arbeidslisten uten å slette betalings- eller leiehistorikk. Kan gjenopprettes.</p></div>
+  {!visibleBookings.length?<div className="card"><h3>{showArchivedBookings?"Ingen arkiverte bookinger":"Ingen aktive utleiebookinger"}</h3><p className="muted">Bruk arkivet for å finne igjen tidligere fjernede bookinger.</p></div>:
+  <div className="grid rentalBookingGrid">{visibleBookings.map(b=>{
    const isOpen=openId===b.id;
    const issue=attentionIssue(b);
    const waitingForFinalConfirmation=b.status==="confirmed"&&!b.confirmationSentAt;
@@ -4804,6 +4840,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,paymentSetupRequired
     {b.status==="confirmed"&&b.confirmationSentAt&&<button className="btn" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>notify(b,"confirm-and-send")}>{savingId===b.id?"Sender …":"Send bekreftelse på nytt"}</button>}
     {b.status==="confirmed"&&!b.confirmationSentAt&&<p className="muted rentalAutoConfirmNote">Leiebekreftelsen sendes automatisk når betaling registreres, eller når kunden godkjennes for faktura/kreditt.</p>}
     {["new","confirmed"].includes(b.status)&&<button className="btn alt rentalCancelButton" type="button" disabled={savingId===b.id||!b.customer?.email} onClick={()=>notify(b,"cancel-and-send")}>{savingId===b.id?"Sender …":"Avbryt og varsle kunde"}</button>}
+    {isOwner&&<button type="button" className="btn alt" disabled={savingId===b.id} onClick={()=>cleanupBooking(b,Boolean(b.archivedAt))}>{savingId===b.id?"Behandler …":b.archivedAt?"Gjenopprett i oversikten":"Fjern fra oversikten"}</button>}
    </div>}
    </div>}
   </article>
