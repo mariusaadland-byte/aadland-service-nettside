@@ -1,4 +1,5 @@
 import Link from "next/link";
+import InvoicePaymentResult from "../InvoicePaymentResult";
 import {db} from "../../../../lib/supabase";
 import {invoiceVippsReference} from "../../../../lib/invoiceVipps";
 import {vippsCustomerOpenLink} from "../../../../lib/invoiceVippsLinks";
@@ -9,6 +10,7 @@ export const metadata={title:"Betal faktura med Vipps – Aadland Service",robot
 export default async function InvoiceVippsStart({searchParams}){
  const params=await searchParams;
  const reference=String(params?.reference||"");
+ const returning=params?.result==="1";
  let state="missing",amountOre=0,link=null;
  if(invoiceVippsReference(reference)){
   const s=db();
@@ -37,7 +39,7 @@ export default async function InvoiceVippsStart({searchParams}){
   :"Denne betalingslenken finnes ikke. Sjekk at du åpnet hele lenken fra Aadland Service.";
  return <main className="container" style={{maxWidth:620,padding:"48px 20px"}}>
   <h1>Betal med Vipps</h1>
-  {state==="ready"?<>
+  {returning&&invoiceVippsReference(reference)?<InvoicePaymentResult/>:state==="ready"?<>
    <p>Du skal betale <strong>{displayAmount}</strong> til Aadland Service.</p>
    <p>Trykk på knappen nedenfor for å åpne Vipps. Kontroller beløpet og godkjenn selv i Vipps-appen.</p>
    <a href={link} rel="noreferrer" referrerPolicy="no-referrer"
