@@ -37,9 +37,10 @@ export default async function InvoiceVippsStart({searchParams}){
   :state==="finished"?"Betalingsforsøket er allerede avsluttet. Kontroller kvitteringen din eller kontakt Aadland Service ved spørsmål."
   :state==="unavailable"?"Vi kunne ikke åpne betalingslenken akkurat nå. Prøv igjen senere eller kontakt Aadland Service."
   :"Denne betalingslenken finnes ikke. Sjekk at du åpnet hele lenken fra Aadland Service.";
+ if(returning&&invoiceVippsReference(reference))return <InvoicePaymentResult/>;
  return <main className="container" style={{maxWidth:620,padding:"48px 20px"}}>
   <h1>Betal med Vipps</h1>
-  {returning&&invoiceVippsReference(reference)?<InvoicePaymentResult/>:state==="ready"?<>
+  {state==="ready"?<>
    <p>Du skal betale <strong>{displayAmount}</strong> til Aadland Service.</p>
    <p>Trykk på knappen nedenfor for å åpne Vipps. Kontroller beløpet og godkjenn selv i Vipps-appen.</p>
    <a href={link} rel="noreferrer" referrerPolicy="no-referrer"
