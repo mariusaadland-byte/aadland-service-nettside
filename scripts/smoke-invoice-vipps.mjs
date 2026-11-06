@@ -31,7 +31,8 @@ try{
  assert.equal(invoice.paid_ore,12500,'Reconciliation must repair stale paid amount');
  assert.equal(created,0,'Do not create a second Vipps payment for a paid invoice');
  providerMode='missing';paymentExists=false;payment.state='pending';payment.captured_ore=0;invoice.paid_ore=0;invoice.sent_at=null;captured=0;payment.request_email_sent_at=null;payment.request_email_first_at=null;
- const started=await api.startInvoiceVipps(s,invoice,confirmationSnapshot(invoice));assert.equal(created,1);assert.equal(started.redirect_url,'https://example.invalid/pay');assert.ok(started.request_email_sent_at);assert.ok(invoice.sent_at);
+ const qrOnly=await api.startInvoiceVipps(s,invoice,confirmationSnapshot(invoice),{sendEmail:false});assert.equal(created,1);assert.equal(qrOnly.redirect_url,'https://example.invalid/pay');assert.equal(qrOnly.request_email_sent_at??null,null,'QR mode never emails the customer');assert.equal(invoice.sent_at,null,'QR mode does not pretend that an invoice was emailed');
+ const started=await api.startInvoiceVipps(s,invoice,confirmationSnapshot(invoice),{sendEmail:true});assert.equal(created,1,'Email after QR must reuse same Vipps request');assert.equal(started.reference,qrOnly.reference);assert.ok(started.request_email_sent_at);assert.ok(invoice.sent_at);
  const sentCount=mails.length;await api.startInvoiceVipps(s,invoice,confirmationSnapshot(invoice));assert.equal(created,1,'Retry must reuse existing provider reference');assert.equal(mails.length,sentCount,'Retry must not resend the payment email');
 
 }finally{for(const [key,value] of [['RESEND_API_KEY',oldKey],['VERCEL_ENV',oldEnv]]){if(value===undefined)delete process.env[key];else process.env[key]=value}}
