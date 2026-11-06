@@ -23,6 +23,7 @@ export default function QuotesClient(){
  const [followUpSetupRequired,setFollowUpSetupRequired]=useState(false);
  const [error,setError]=useState("");
  const [copyingId,setCopyingId]=useState(null);
+ const [deletingId,setDeletingId]=useState(null);
  const [filter,setFilter]=useState("all");
  const [showArchived,setShowArchived]=useState(false);
 
@@ -83,8 +84,21 @@ export default function QuotesClient(){
   finally{setCopyingId(null);}
  }
 
+ async function removeDraft(quote){
+  const typed=window.prompt("Permanent sletting av testkladd "+(quote.quoteNumber||"")+" («"+quote.title+"»). Dette kan ikke angres. Skriv SLETT for å fortsette:","");
+  if(typed!=="SLETT")return;
+  setDeletingId(quote.id);setError("");
+  try{
+   const r=await fetch("/api/admin/quotes",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:quote.id,confirm:typed})});
+   const d=await r.json().catch(()=>({}));
+   if(!r.ok)throw Error(d.error||"Testkladden kunne ikke slettes.");
+   await load();
+  }catch(e){setError(e.message||"Slettingen feilet. Du kan arkivere tilbudet i stedet.");}
+  finally{setDeletingId(null);}
+ }
+
  async function archive(id,restore=false){
-  if(!restore&&!window.confirm("Arkivere dette tilbudet?"))return;
+  if(!restore&&!window.confirm("Fjerne tilbudet fra den aktive oversikten? Det legges i arkivet og kan gjenopprettes. Ingen faktura eller betaling slettes."))return;
   const response=await fetch("/api/admin/quotes",{
    method:"PATCH",
    headers:{"Content-Type":"application/json"},
@@ -165,7 +179,8 @@ export default function QuotesClient(){
         <Link className="btn" href={"/admin/tilbud/"+quote.id}>Åpne</Link>
         <Link className="btn alt" href={"/admin/tilbud/"+quote.id+"/preview"}>Forhåndsvis</Link>
         <button type="button" className="btn alt" disabled={Boolean(copyingId)} onClick={()=>duplicate(quote)}>{copyingId===quote.id?"Kopierer …":"Kopier"}</button>
-        {showArchived?<button type="button" className="btn alt" onClick={()=>archive(quote.id,true)}>Gjenopprett</button>:<button type="button" className="btn alt" onClick={()=>archive(quote.id)}>Arkiver</button>}
+        {showArchived?<button type="button" className="btn alt" onClick={()=>archive(quote.id,true)}>Gjenopprett</button>:<button type="button" className="btn alt" onClick={()=>archive(quote.id)}>Fjern fra oversikten</button>}
+        {quote.status==="draft"&&!quote.sentAt&&!quote.sourceOrderId&&!quote.convertedOrderId&&!quote.revisedFromId&&!quote.supersededById&&Number(quote.revisionNumber||1)===1&&<button type="button" className="btn alt" disabled={Boolean(deletingId)} onClick={()=>removeDraft(quote)}>{deletingId===quote.id?"Sletter …":"Slett ubrukt testkladd"}</button>}
        </div>
       </article>)}
      </div>
