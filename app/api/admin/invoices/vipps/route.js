@@ -39,7 +39,7 @@ export async function POST(req){
   if(b.action==="start"){
    if(b.workCompleted!==true)return NextResponse.json({error:"Bekreft at arbeidet er ferdig før direkte betaling."},{status:400});
    p=await startInvoiceVipps(s,found.data,b.confirmedInvoice,{
-    deliveryMethod:b.deliveryMethod,phone:b.phone,
+    deliveryMethod:b.deliveryMethod,phone:b.phone,sendEmail:b.sendEmail!==false,
     customerPresent:b.customerPresent===true,customerConsent:b.customerConsent===true
    });
   }else if(b.action==="refund"){
