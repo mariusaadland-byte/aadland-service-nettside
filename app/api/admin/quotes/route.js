@@ -367,3 +367,40 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
  if(privateError)return NextResponse.json({error:"Tilbudslinjene er lagret, men interne kostnader ble ikke lagret. Prøv igjen.",quoteId:id},{status:500});
  return NextResponse.json({quote:mapQuote(data)});
 }
+
+ // Only genuinely unused, never-issued quote drafts may be permanently removed.
+ // Sent, accepted, revised, converted and financially-linked offers must be archived instead.
+export async function DELETE(req){
+ const originError=sameOriginGuard(req);if(originError)return originError;
+ const user=await getAdminUser();
+ if(user?.role!=="owner")return NextResponse.json({error:"Bare eieren kan slette testkladder."},{status:403});
+ const body=await req.json().catch(()=>({}));
+ const id=String(body.id||"");
+ if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)||body.confirm!=="SLETT")
+  return NextResponse.json({error:"Bekreft sletting ved å skrive SLETT."},{status:400});
+ const s=db();if(!s)return NextResponse.json({error:"Databasen er utilgjengelig."},{status:503});
+ const {data:q,error:readError}=await s.from("quotes")
+  .select("id,status,sent_at,accepted_at,paper_issued_at,source_order_id,converted_order_id,revised_from_id,superseded_by_id,revision_number")
+  .eq("id",id).maybeSingle();
+ if(readError)return NextResponse.json({error:"Tilbudet kunne ikke kontrolleres."},{status:503});
+ if(!q)return NextResponse.json({error:"Tilbudet finnes ikke."},{status:404});
+ if(q.status!=="draft"||q.sent_at||q.accepted_at||q.paper_issued_at||q.source_order_id||q.converted_order_id
+  ||q.revised_from_id||q.superseded_by_id||Number(q.revision_number||1)!==1)
+  return NextResponse.json({error:"Tilbudet er utstedt, koblet til en sak eller inngår i en revisjon. Bruk «Fjern fra oversikten» i stedet."},{status:409});
+ const checks=await Promise.all([
+  s.from("invoice_drafts").select("id").eq("source_quote_id",id).limit(1),
+  s.from("quote_send_log").select("id").eq("quote_id",id).limit(1),
+  s.from("quote_drawing_publications").select("quote_id").eq("quote_id",id).limit(1),
+  s.from("quotes").select("id").eq("revised_from_id",id).limit(1),
+  s.from("quotes").select("id").eq("superseded_by_id",id).limit(1)
+ ]);
+ if(checks.some(result=>result.error))return NextResponse.json({error:"Koblingene til tilbudet kunne ikke kontrolleres."},{status:503});
+ if(checks.some(result=>(result.data||[]).length>0))
+  return NextResponse.json({error:"Tilbudet har dokumenter, revisjoner, fakturaer eller utsendinger tilknyttet seg. Arkiver det i stedet."},{status:409});
+ const {data:deleted,error}=await s.from("quotes").delete()
+  .eq("id",id).eq("status","draft").is("sent_at",null).is("accepted_at",null)
+  .is("paper_issued_at",null).select("id").maybeSingle();
+ if(error)return NextResponse.json({error:"Sletting ble avvist. Arkiver tilbudet i stedet."},{status:409});
+ if(!deleted)return NextResponse.json({error:"Tilbudet ble endret under kontrollen. Oppdater siden."},{status:409});
+ return NextResponse.json({ok:true,permanent:true});
+}
