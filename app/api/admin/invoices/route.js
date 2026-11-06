@@ -154,3 +154,40 @@ export async function PATCH(req){
  if(!data)return fail("Kladden er endret eller allerede utstedt i en annen fane. Last inn fakturaen på nytt for å unngå å overskrive nye kundeopplysninger eller priser.",409);
  return NextResponse.json({ok:true,updatedAt:data.updated_at,savedCustomer:update.customer,savedDueDate});
 }
+
+// Unissued, unlinked test drafts only. Never remove an issued invoice, receipt,
+// Vipps transaction or accounting record to make a test disappear.
+export async function DELETE(req){
+ const origin=sameOriginGuard(req);if(origin)return origin;
+ const user=await getAdminUser();
+ if(user?.role!=="owner")return fail("Bare eieren kan slette testfakturakladder.",403);
+ const body=await req.json().catch(()=>({}));
+ if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[89ab0-9a-f]{12}$/i.test(String(body.id||""))||body.confirmation!=="SLETT KLADD")
+  return fail("Skriv SLETT KLADD for å bekrefte.",400);
+ const s=db();if(!s)return fail("Databasen er ikke tilgjengelig.",503);
+ const result=await s.from("invoice_drafts").select(
+  "id,status,invoice_number,issued_at,issued_date,sent_at,first_send_at,resend_id,pdf_base64,paid_ore,credited_ore,automatic_send,auto_send_state,split_group_id,planned_send_on"
+ ).eq("id",body.id).maybeSingle();
+ if(result.error)return fail("Kladdeopplysningene kunne ikke kontrolleres.",503);
+ const row=result.data;if(!row)return fail("Fakturakladden ble ikke funnet.",404);
+ if(row.status!=="draft"||row.invoice_number||row.issued_at||row.issued_date||
+  row.sent_at||row.first_send_at||row.resend_id||row.pdf_base64||
+  Number(row.paid_ore)!==0||Number(row.credited_ore)!==0||row.automatic_send||
+  row.auto_send_state||row.split_group_id||row.planned_send_on)
+   return fail("Denne fakturaen har historikk eller planlagt sending og kan ikke slettes. Utstedte fakturaer må korrigeres regnskapsmessig.",409);
+ const dependents=[
+  "invoice_payments","invoice_reminder_sends","invoice_vipps_payments",
+  "invoice_vipps_refund_notices","invoice_credit_notes","invoice_payment_statements",
+  "invoice_admin_closures","invoice_admin_closure_events","invoice_friendly_reminders"
+ ];
+ const checks=await Promise.all(dependents.map(table=>s.from(table).select("id").eq("invoice_id",row.id).limit(1)));
+ if(checks.some(x=>x.error))return fail("Tilknyttede betalinger og dokumenter kunne ikke kontrolleres.",503);
+ if(checks.some(x=>(x.data||[]).length))return fail("Kladder med tilknyttede betalinger eller dokumenter kan ikke slettes.",409);
+ const {data,error}=await s.from("invoice_drafts").delete()
+  .eq("id",row.id).eq("status","draft").eq("paid_ore",0).eq("credited_ore",0)
+  .eq("automatic_send",false).is("invoice_number",null).is("issued_at",null)
+  .is("sent_at",null).is("split_group_id",null).select("id").maybeSingle();
+ if(error)return fail("Sletting ble sperret av databasen. Ingen bokførte opplysninger ble endret.",409);
+ if(!data)return fail("Kladdeopplysningene er endret. Oppdater siden.",409);
+ return NextResponse.json({ok:true,deleted:true});
+}
