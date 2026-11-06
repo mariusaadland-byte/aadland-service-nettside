@@ -241,9 +241,14 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
         reserved=Math.max(0,Number(current.payment_reserved_ore)||0),
         held=Math.max(0,Number(current.deposit_held_ore)||0),
         charged=Math.max(0,Number(current.deposit_charged_ore)||0);
-  const unresolvedPayment=captured>refunded||
+  // Fully completed and fully paid rentals are allowed in the archive.
+  // Their real payment and receipt remain untouched; archiving is only visibility.
+  const completedSettled=current.status==="completed"&&
+    current.payment_status==="paid"&&
+    captured>=Math.max(0,Number(current.total_ore)||0)&&refunded===0;
+  const unresolvedPayment=(captured>refunded&&!completedSettled)||
      String(current.payment_status||"")==="authorized"||
-     (reserved>0&&!current.payment_cancelled_at);
+     (reserved>captured&&!current.payment_cancelled_at);
   const unresolvedDeposit=held>charged&&(!current.deposit_released_at);
   if(unresolvedPayment||unresolvedDeposit)
    return NextResponse.json({error:"Betaling, reservasjon eller depositum er ikke avklart. Avklar/refunder først; historikken kan ikke slettes."},{status:409});

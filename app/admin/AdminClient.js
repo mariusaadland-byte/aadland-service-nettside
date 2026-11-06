@@ -4547,8 +4547,14 @@ function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymen
    setError("Denne bookingen må avsluttes eller kanselleres med kundevarsel før den fjernes.");
    return;
   }
-  if(!restore&&(captured>refunded||held>0&&!booking.depositReleasedAt&&booking.depositStatus!=="charged")){
-   setError("Betalingen eller depositumet er ikke avklart. Avklar dette før du fjerner bookingen.");
+  const completedSettled=booking.status==="completed"&&booking.paymentStatus==="paid"&&
+   captured>=Math.max(0,Number(booking.totalOre)||0)&&refunded===0;
+  const reserved=Math.max(0,Number(booking.paymentReservedOre)||0);
+  if(!restore&&((captured>refunded&&!completedSettled)||
+   booking.paymentStatus==="authorized"||
+   (reserved>captured&&!booking.paymentCancelledAt)||
+   (held>0&&!booking.depositReleasedAt&&booking.depositStatus!=="charged"))){
+   setError("Betaling, reservasjon eller depositum er ikke avklart. Ferdige, oppgjorte utleier kan arkiveres uten at betalingen slettes.");
    return;
   }
   const question=restore
