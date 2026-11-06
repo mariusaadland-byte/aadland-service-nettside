@@ -75,6 +75,7 @@ const mapOrder = (o) => ({
   cancelledAt: o.cancelled_at || null,
   stockReleasedAt: o.stock_released_at || null,
   archivedAt: o.archived_at || null,
+  archiveReason: o.archive_reason || null,
 });
 
 export async function GET() {
@@ -180,7 +181,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     );
   }
 
-  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, cancellationReason, progressStatus, refundOre, refundReference, refundNote, deliveryWithinRadius } = await req.json();
+  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, cancellationReason, progressStatus, refundOre, refundReference, refundNote, deliveryWithinRadius, cleanupConfirmation } = await req.json();
   if(adminNote!==undefined&&String(adminNote||"").length>5000)return NextResponse.json({error:"Internt notat kan være maks 5000 tegn."},{status:400});
   if(paymentReference!==undefined&&String(paymentReference||"").length>120)return NextResponse.json({error:"Betalingsreferansen er for lang."},{status:400});
   if(cancellationReason!==undefined&&String(cancellationReason||"").length>1000)return NextResponse.json({error:"Kanselleringsårsaken kan være maks 1000 tegn."},{status:400});
@@ -386,6 +387,26 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     }
   }
 
+  if(action==="hide-test-order"){
+    if(currentUser.role!=="owner")return NextResponse.json({error:"Bare eieren kan skjule testbestillinger."},{status:403});
+    if(cleanupConfirmation!=="SKJUL TEST")return NextResponse.json({error:"Skriv SKJUL TEST for å bekrefte."},{status:400});
+    const {data:order,error:findError}=await s.from("orders")
+      .select("id,archived_at,payment_status,payment_captured_ore,payment_refunded_ore")
+      .eq("id",id).maybeSingle();
+    if(findError||!order)return NextResponse.json({error:"Bestillingen finnes ikke."},{status:404});
+    if(order.archived_at)return NextResponse.json({ok:true,alreadyArchived:true});
+    if(String(order.payment_status||"")==="authorized")
+      return NextResponse.json({error:"Betalingen er fortsatt reservert. Kanseller reservasjonen hos Vipps først."},{status:409});
+    // This does not cancel, refund, falsify, delete or alter any payment records.
+    const {data:updated,error}=await s.from("orders").update({
+      archived_at:new Date().toISOString(),archive_reason:"test",updated_at:new Date().toISOString()
+    }).eq("id",id).is("archived_at",null).select("id").maybeSingle();
+    if(error)return NextResponse.json({error:"Testordren kunne ikke flyttes til arkivet."},{status:503});
+    if(!updated)return NextResponse.json({error:"Ordren er endret i en annen fane. Oppdater siden."},{status:409});
+    return NextResponse.json({ok:true,hidden:true,paymentPreserved:true,
+      requiresFinancialReview:Number(order.payment_captured_ore||0)>Number(order.payment_refunded_ore||0)});
+  }
+
   if (action === "archive" || action === "restore") {
     if(action==="archive"){
       const {data:order,error:findError}=await s.from("orders")
@@ -434,7 +455,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
       }
     }
 
-    const {error:archiveError}=await s.from("orders").update({archived_at:action==="archive"?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("id",id);
+    const {error:archiveError}=await s.from("orders").update({archived_at:action==="archive"?new Date().toISOString():null,archive_reason:action==="archive"?"avsluttet":null,updated_at:new Date().toISOString()}).eq("id",id);
     if(archiveError)return NextResponse.json({error:"Arkivstatus kunne ikke lagres."},{status:500});
     return NextResponse.json({ok:true});
   }

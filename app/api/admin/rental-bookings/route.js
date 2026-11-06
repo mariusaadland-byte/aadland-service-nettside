@@ -39,6 +39,8 @@ const map=b=>({
  startDate:b.start_date,
  endDate:b.end_date,
  status:b.status,
+ archivedAt:b.archived_at||null,
+ archiveReason:b.archive_reason||null,
  totalOre:b.total_ore,
  depositOre:b.deposit_ore,
  paymentStatus:b.payment_status||"unpaid",
@@ -219,6 +221,49 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
  if(currentError||!current)return NextResponse.json({error:"Bookingen ble ikke funnet."},{status:404});
 
  const action=String(b.action||"");
+ if(action==="archive-cleanup"||action==="restore-cleanup"){
+  const owner=await getAdminUser();
+  if(owner?.role!=="owner")return NextResponse.json({error:"Bare eieren kan rydde bort utleiebookinger."},{status:403});
+  if(b.confirm!==true)return NextResponse.json({error:"Bekreft oppryddingen først."},{status:400});
+  const restore=action==="restore-cleanup";
+  if(restore){
+   const {data:restored,error}=await s.from("rental_bookings")
+    .update({archived_at:null,archive_reason:null,updated_at:new Date().toISOString()})
+    .eq("id",b.id).not("archived_at","is",null).select("id").maybeSingle();
+   if(error)return NextResponse.json({error:"Kunne ikke gjenopprette bookingen."},{status:503});
+   return NextResponse.json({ok:true,restored:Boolean(restored)});
+  }
+  if(current.archived_at)return NextResponse.json({ok:true,alreadyArchived:true});
+  if(!["new","cancelled","completed"].includes(current.status))
+   return NextResponse.json({error:"En aktiv eller bekreftet booking må fullføres eller kanselleres med kundevarsel før den kan ryddes bort."},{status:409});
+  const captured=Math.max(0,Number(current.payment_captured_ore)||0),
+        refunded=Math.max(0,Number(current.payment_refunded_ore)||0),
+        reserved=Math.max(0,Number(current.payment_reserved_ore)||0),
+        held=Math.max(0,Number(current.deposit_held_ore)||0),
+        charged=Math.max(0,Number(current.deposit_charged_ore)||0);
+  const unresolvedPayment=captured>refunded||
+     String(current.payment_status||"")==="authorized"||
+     (reserved>0&&!current.payment_cancelled_at);
+  const unresolvedDeposit=held>charged&&(!current.deposit_released_at);
+  if(unresolvedPayment||unresolvedDeposit)
+   return NextResponse.json({error:"Betaling, reservasjon eller depositum er ikke avklart. Avklar/refunder først; historikken kan ikke slettes."},{status:409});
+  if(current.status==="new"&&(
+    captured>0||refunded>0||reserved>0||
+    current.payment_reference||current.payment_psp_reference||current.payment_authorized_at||
+    current.vipps_checkout_started_at||current.confirmation_sent_at||current.reminder_sent_at||
+    current.receipt_sent_at||current.deposit_reference||current.deposit_received_at||
+    current.deposit_released_at||current.cancellation_sent_at))
+   return NextResponse.json({error:"Bookingen har betalings- eller kundeaktivitet. Kanseller og avklar den først."},{status:409});
+  const patch={archived_at:new Date().toISOString(),
+   archive_reason:b.reason==="test"?"test":"ikke aktuell",updated_at:new Date().toISOString()};
+  // An unsent, unpaid new test booking must stop reserving inventory.
+  if(current.status==="new")patch.status="cancelled";
+  const {data:archived,error}=await s.from("rental_bookings").update(patch)
+   .eq("id",b.id).is("archived_at",null).eq("status",current.status).select("id").maybeSingle();
+  if(error)return NextResponse.json({error:"Bookingen kunne ikke flyttes til arkivet."},{status:503});
+  if(!archived)return NextResponse.json({error:"Bookingen er endret. Oppdater før opprydding."},{status:409});
+  return NextResponse.json({ok:true,archived:true});
+ }
  if(action==="request-vipps-payment"){
   const result=await startRentalVippsPayment({s,booking:current,req,logContext:"admin-rental-push",userFlow:"PUSH_MESSAGE",customerConsent:b.customerConsent===true});
   return NextResponse.json(result.body,{status:result.status});
