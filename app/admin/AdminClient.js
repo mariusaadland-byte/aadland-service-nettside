@@ -864,7 +864,7 @@ export default function AdminClient({ user }) {
 function Archive({orders,reload,setError,canUpdate}){
  const archived=(orders||[]).filter(o=>o.archivedAt);
  async function restore(id){const r=await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,action:"restore"})}),d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Kunne ikke gjenopprette.");return;}await reload()}
- return <div className="orderCards">{archived.length?archived.map(o=><article className="card orderCard" key={o.id}><div className="kicker">{o.orderNumber}</div><h3>{o.customerName||"Ukjent kunde"}</h3><p>{o.orderType==="custom"?(o.sourceQuoteId?"Oppdrag":"Befaring/forespørsel"):"Bestilling"} · {nok(o.totalOre||0)}<br/><small className="muted">Arkivert {new Date(o.archivedAt).toLocaleString("nb-NO")}</small></p>{canUpdate&&<button className="btn alt" onClick={()=>restore(o.id)}>Gjenopprett</button>}</article>):<div className="card"><h3>Arkivet er tomt</h3><p className="muted">Ferdige eller avbrutte saker kan flyttes hit uten at historikken slettes.</p></div>}</div>
+ return <div className="orderCards">{archived.length?archived.map(o=><article className="card orderCard" key={o.id}><div className="kicker">{o.orderNumber}</div><h3>{o.customerName||"Ukjent kunde"}</h3><p>{o.orderType==="custom"?(o.sourceQuoteId?"Oppdrag":"Befaring/forespørsel"):"Bestilling"} · {nok(o.totalOre||0)}<br/><small className="muted">Arkivert {new Date(o.archivedAt).toLocaleString("nb-NO")}</small><br/>{o.archiveReason==="test"&&<strong>Testoppføring – skjult fra arbeidslisten</strong>}{Number(o.paymentCapturedOre||0)>Number(o.paymentRefundedOre||0)&&<><br/><strong>Betaling må fortsatt avstemmes: {nok(Number(o.paymentCapturedOre||0)-Number(o.paymentRefundedOre||0))}</strong></>}</p>{canUpdate&&<button className="btn alt" onClick={()=>restore(o.id)}>Gjenopprett</button>}</article>):<div className="card"><h3>Arkivet er tomt</h3><p className="muted">Ferdige eller avbrutte saker kan flyttes hit uten at historikken slettes.</p></div>}</div>
 }
 
 function customerQuoteHref(customer){
@@ -1058,8 +1058,27 @@ function Customers({orders,bookings,profiles,billingProfiles,quotes,canUpdate,re
   </>;
 }
 
-function Orders({ orders, status, canUpdateOrders, reload }) {
+function Orders({ orders, status, canUpdateOrders, isOwner=false, reload }) {
  const [openId,setOpenId]=useState(null),[savingId,setSavingId]=useState(null),[message,setMessage]=useState("");
+ async function hideTest(order){
+  if(!window.confirm("Skjule testbestillingen "+order.orderNumber+" fra den aktive listen?\n\nDette sletter eller refunderer IKKE penger hos Vipps eller i regnskapet. Betalingshistorikken blir liggende i arkivet."))return;
+  const typed=window.prompt("Skriv SKJUL TEST for å bekrefte at dette bare er en testbestilling:","");
+  if(typed!=="SKJUL TEST")return;
+  setSavingId(order.id);setMessage("");
+  try{
+   const r=await fetch("/api/admin/orders",{
+    method:"PATCH",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id:order.id,action:"hide-test-order",cleanupConfirmation:typed})
+   });
+   const d=await r.json().catch(()=>({}));
+   if(!r.ok)throw Error(d.error||"Testbestillingen kunne ikke flyttes til arkivet.");
+   setMessage(d.requiresFinancialReview
+    ?"Testbestillingen er skjult, men registrert betaling må fortsatt avstemmes i arkivet og hos Vipps."
+    :"Testbestillingen er skjult fra den aktive oversikten. Du kan gjenopprette den fra arkivet.");
+   setOpenId(null);if(typeof reload==="function")await reload();
+  }catch(e){setMessage(e.message||"Testbestillingen kunne ikke skjules.");}
+  finally{setSavingId(null);}
+ }
  async function archive(order){
   const captured=Math.max(0,Number(order.paymentCapturedOre)||0);
   const refunded=Math.max(0,Number(order.paymentRefundedOre)||0);
@@ -1479,6 +1498,7 @@ function Orders({ orders, status, canUpdateOrders, reload }) {
     );
     return <button className="btn alt" type="button" disabled={savingId===order.id||blocked} onClick={()=>archive(order)}>{blocked?"Arkivering sperret":"Arkiver"}</button>;
    })()}
+  {isOwner&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>hideTest(order)}>{savingId===order.id?"Behandler …":"Fjern test fra oversikten"}</button>}
   {order.orderType!=="custom"&&["in_progress","ready"].includes(order.status)&&["pickup","delivery"].includes(order.fulfillmentType)&&<button className="btn alt" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>markReady(order)}>{savingId===order.id?"Sender …":order.status==="ready"||order.readyNoticeSentAt?"Send klar-varsel på nytt":order.fulfillmentType==="pickup"?"Klar for henting + varsle":"Klar for levering + varsle"}</button>}
   {order.orderType!=="custom"&&order.fulfillmentType==="shipping"&&order.status==="in_progress"&&<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-dispatched")}>Sendt til kunde</button>}
   {order.orderType!=="custom"&&order.fulfillmentType!=="shipping"&&order.status==="ready"&&<button className="btn" type="button" disabled={savingId===order.id} onClick={()=>finish(order,"mark-delivered")}>Levert til kunde</button>}
