@@ -1,4 +1,5 @@
 import Link from "next/link";
+import InvoicePaymentResult from "../InvoicePaymentResult";
 import {db} from "../../../../lib/supabase";
 import {invoiceVippsReference} from "../../../../lib/invoiceVipps";
 import {vippsCustomerOpenLink} from "../../../../lib/invoiceVippsLinks";
@@ -9,6 +10,7 @@ export const metadata={title:"Betal faktura med Vipps – Aadland Service",robot
 export default async function InvoiceVippsStart({searchParams}){
  const params=await searchParams;
  const reference=String(params?.reference||"");
+ const returning=params?.result==="1";
  let state="missing",amountOre=0,link=null;
  if(invoiceVippsReference(reference)){
   const s=db();
@@ -35,6 +37,7 @@ export default async function InvoiceVippsStart({searchParams}){
   :state==="finished"?"Betalingsforsøket er allerede avsluttet. Kontroller kvitteringen din eller kontakt Aadland Service ved spørsmål."
   :state==="unavailable"?"Vi kunne ikke åpne betalingslenken akkurat nå. Prøv igjen senere eller kontakt Aadland Service."
   :"Denne betalingslenken finnes ikke. Sjekk at du åpnet hele lenken fra Aadland Service.";
+ if(returning&&invoiceVippsReference(reference))return <InvoicePaymentResult/>;
  return <main className="container" style={{maxWidth:620,padding:"48px 20px"}}>
   <h1>Betal med Vipps</h1>
   {state==="ready"?<>

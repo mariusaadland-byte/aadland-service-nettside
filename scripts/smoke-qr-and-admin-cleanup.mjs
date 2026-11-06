@@ -1,0 +1,41 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import qrcode from "../lib/vendor/qrcode.mjs";
+
+const read=p=>readFileSync(p,"utf8");
+const linkSource=read("lib/invoiceVippsLinks.js").replace(/^export /gm,"");
+const buildLink=new Function(linkSource+";return invoiceVippsShortUrl;")();
+const link=buildLink("INV-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+assert.equal(link,"https://www.aadland-service.no/betaling/faktura/start?reference=INV-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+const qr=qrcode(0,"M");
+qr.addData(link,"Byte");qr.make();
+assert.ok(qr.getModuleCount()>=29);
+let dark=0;for(let y=0;y<qr.getModuleCount();y++)for(let x=0;x<qr.getModuleCount();x++)if(qr.isDark(y,x))dark++;
+assert.ok(dark>100,"QR code actually encodes URL as a matrix");
+const qrUI=read("app/admin/faktura/InvoicePaymentQr.js");
+assert.ok(qrUI.includes('url.pathname!=="/betaling/faktura/start"'),"Reject arbitrary QR hosts/paths");
+assert.ok(qrUI.includes("qr.isDark(y,x)"),"Render the locally encoded QR, not a third-party QR API");
+assert.ok(!qrUI.includes("quickchart.io")&&!qrUI.includes("api.qrserver.com"),"Never leak payment reference to third-party generator");
+
+const payment=read("lib/invoiceVipps.js"), panel=read("app/admin/faktura/InvoiceVippsPanel.js");
+assert.ok(payment.includes('opts.sendEmail!==false&&!p.request_email_sent_at'),"QR mode must not send email");
+assert.ok(payment.includes('returnUrl:shortPaymentUrl(p.reference)+"&result=1"'),"Customer returns to shared payment page");
+assert.ok(payment.includes("const paymentLink=shortPaymentUrl(p.reference)"),"Email uses same short URL");
+assert.ok(panel.includes('sendEmail,')&&panel.includes("InvoicePaymentQr"),"Admin passes selected channel and renders QR");
+assert.ok(panel.includes("Send samme lenke på e-post"),"QR can be emailed later");
+assert.ok(read("app/betaling/faktura/start/page.js").includes("return <InvoicePaymentResult/>"),"Return page verifies status before claiming paid");
+
+const quotes=read("app/api/admin/quotes/route.js");
+assert.ok(quotes.includes('export async function DELETE(req)'),"Unused quote drafts can be deleted");
+assert.ok(quotes.includes('body.confirm!=="SLETT"')&&quotes.includes('q.status!=="draft"'),"Reject accidental or non-draft quote deletes");
+assert.ok(quotes.includes('"invoice_drafts"')&&quotes.includes('"quote_send_log"'),"Prevent erasing issued or linked offers");
+const order=read("app/api/admin/orders/route.js");
+assert.ok(order.includes('action==="hide-test-order"')&&order.includes('"SKJUL TEST"'),"Explicitly confirm test-order hiding");
+assert.ok(order.includes('archive_reason:"test"')&&!order.includes('delete().eq("id",id)'),"Preserve financial history");
+const rental=read("app/api/admin/rental-bookings/route.js");
+assert.ok(rental.includes('"archive-cleanup"')&&rental.includes('"restore-cleanup"'),"Rental bookings are reversible");
+assert.ok(rental.includes('unresolvedPayment||unresolvedDeposit'),"Never archive unsettled rental payments");
+assert.ok(rental.includes('patch.status="cancelled"'),"Unused booking releases the inventory");
+const migration=read("supabase/migrations/20261106033000_admin_safe_cleanup.sql");
+assert.ok(migration.includes("rental_bookings add column if not exists archived_at"));
+console.log("QR + sikker administrativ opprydding bestått: én betalingslenke, ingen uønsket e-post, verifisert status, reversible arkiv og vernet betalingshistorikk.");
