@@ -180,7 +180,7 @@ export async function DELETE(req){
   "invoice_vipps_refund_notices","invoice_credit_notes","invoice_payment_statements",
   "invoice_admin_closures","invoice_admin_closure_events","invoice_friendly_reminders"
  ];
- const checks=await Promise.all(dependents.map(table=>s.from(table).select("id").eq("invoice_id",row.id).limit(1)));
+ const checks=await Promise.all(dependents.map(table=>s.from(table).select("invoice_id").eq("invoice_id",row.id).limit(1)));
  if(checks.some(x=>x.error))return fail("Tilknyttede betalinger og dokumenter kunne ikke kontrolleres.",503);
  if(checks.some(x=>(x.data||[]).length))return fail("Kladder med tilknyttede betalinger eller dokumenter kan ikke slettes.",409);
  const {data,error}=await s.from("invoice_drafts").delete()
