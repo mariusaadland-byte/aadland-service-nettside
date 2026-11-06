@@ -9,6 +9,7 @@ export default function NewRentalItemClient({itemId=null}){
  const [categories,setCategories]=useState([]);
  const [loading,setLoading]=useState(true);
  const [saving,setSaving]=useState(false);
+ const [deleting,setDeleting]=useState(false);
  const [uploading,setUploading]=useState(false);
  const [error,setError]=useState("");
  const [originalName,setOriginalName]=useState("");
@@ -107,7 +108,24 @@ export default function NewRentalItemClient({itemId=null}){
   router.refresh();
  }
 
- return <main className="admin rentalNewItemPage">
+ async function deleteUnusedItem(){
+  if(!itemId||!itemLoaded||saving||deleting)return;
+  const typed=window.prompt("Slette testutstyret «"+originalName+"» permanent? Bare utstyr uten bookinger eller kalenderblokker kan slettes. Hvis det har historikk, velg Skjult i stedet.\n\nSkriv SLETT UTSTYR for å bekrefte:","");
+  if(typed!=="SLETT UTSTYR")return;
+  setDeleting(true);setError("");
+  try{
+   const r=await fetch("/api/admin/rental",{
+    method:"DELETE",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id:itemId,confirmation:typed})
+   });
+   const data=await r.json().catch(()=>({}));
+   if(!r.ok)throw Error(data.error||"Utstyret kunne ikke slettes.");
+   router.push("/admin/utleie");router.refresh();
+  }catch(e){setError(e.message||"Sletting mislyktes. Prøv å skjule utstyret.");}
+  finally{setDeleting(false);}
+ }
+
+  return <main className="admin rentalNewItemPage">
   <section className="adminmain rentalNewItemMain">
    <div className="kicker">Aadland Service / Back office</div>
    <div className="rentalNewItemHeader">
@@ -157,6 +175,7 @@ export default function NewRentalItemClient({itemId=null}){
     <div className="rentalNewItemActions">
      <button className="btn" disabled={saving||uploading||loading||(itemId&&!itemLoaded)}>{saving?"Lagrer …":itemId?"Lagre endringene":"Lagre utleieprodukt"}</button>
      <Link className="btn alt" href="/admin/utleie">Avbryt</Link>
+     {itemId&&itemLoaded&&<button className="btn alt" type="button" disabled={saving||uploading||deleting} onClick={deleteUnusedItem}>{deleting?"Sletter …":"Slett ubrukt testutstyr"}</button>}
     </div>
    </form>}
   </section>
