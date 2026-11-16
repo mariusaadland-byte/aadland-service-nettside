@@ -22,7 +22,7 @@ const attachment={id:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
 assert.equal(normalizeTripletexInbox("  FirMa+1@EBILAG.COM "),"firma+1@ebilag.com");
 for(const invalid of ["", "user@gmail.com", "hello@ebilag.com.evil.com",
  "user@ebilag.com\nBcc:a@b.no","x@y@ebilag.com","other@fake-ebilag.com"])
- assert.equal(normalizeTripletexInbox(invalid),"Never send to "+invalid);
+ assert.equal(normalizeTripletexInbox(invalid),"","Never send to "+invalid);
 const email=tripletexReceiptEmail(receipt,attachment,"firma@ebilag.com");
 assert.equal(email.to,"firma@ebilag.com");
 assert.match(email.subject,/Bilag til Tripletex/);
