@@ -1,0 +1,30 @@
+.shell{display:grid;gap:20px;min-width:0;color:#24221e}
+.head h1{font-size:clamp(24px,4.5vw,33px);margin:0 0 8px;letter-spacing:-.025em}
+.head p{font-size:14px;color:#5d5850;line-height:1.6;margin:0}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.stat{border-top:2px solid #d6c9b9;padding-top:8px;min-width:0}
+.stat strong{display:block;font-size:27px;letter-spacing:-.03em}
+.stat span{font-size:12px;color:#666056}
+.section{border-top:1px solid #e3dfd9;padding-top:19px}
+.section h2{font-size:19px;margin:0 0 8px}
+.hint{font-size:13px;color:#635d54;line-height:1.55}
+.inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:15px 0}
+.inputs label{min-width:0;display:grid;gap:5px;font-weight:650;font-size:13px}
+.inputs input{appearance:auto;width:100%;min-width:0;max-width:100%;min-height:47px;background:#fff!important;color:#272420!important;-webkit-text-fill-color:#272420!important;color-scheme:light;border:1px solid #cfc8be;border-radius:9px;padding:10px 12px;font-size:16px}
+.check{display:flex;align-items:flex-start;gap:10px;line-height:1.45;font-size:13px;margin:10px 0}
+.check input{width:20px;height:20px;min-width:20px;flex:0 0 20px;accent-color:#62482c}
+.primary{background:#29231d!important;color:#fff!important;border:0!important;border-radius:9px!important;min-height:48px!important;padding:10px 17px!important;font-weight:750;font-size:15px!important}
+.primary:disabled{opacity:.43;cursor:not-allowed}
+.actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:14px 0}
+.link{color:#644b30;text-decoration:underline;text-underline-offset:3px;font-size:13px}
+.progress{font-size:13px;background:#f5f3ef;border-radius:9px;padding:12px;line-height:1.55}
+.error{color:#982c21;font-size:13px;font-weight:650}
+.list{display:grid;gap:0}
+.item{border-bottom:1px solid #e5e2dd;padding:12px 0;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.itemInfo{min-width:0;overflow-wrap:anywhere;font-size:13px}
+.itemInfo strong{display:block;font-size:14px}
+.itemInfo small{display:block;line-height:1.55;color:#676057}
+.itemLinks{flex:0 0 auto}
+.itemLinks a{color:#674e2f;text-decoration:underline;font-size:12px}
+.status{font-size:12px;color:#55524d;font-weight:650}
+@media(max-width:650px){.inputs{grid-template-columns:1fr}.stats{gap:8px}.stat strong{font-size:24px}.item{align-items:flex-start;gap:7px}}
