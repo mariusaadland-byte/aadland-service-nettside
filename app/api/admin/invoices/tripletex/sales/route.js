@@ -76,6 +76,13 @@ export async function GET(req){
   const issued=await fetchIssued(s);
   const overview=salesInvoiceExportOverview(issued,osloDateKey(new Date()));
   if(format==="tripletex"){
+   if(options.includePaid){
+    const paid=overview.rows.filter(item=>item.state==="paid");
+    const valid=value=>/^[A-Za-z0-9_-]{1,32}$/.test(value);
+    if(paid.some(item=>item.paymentSource==="vipps"&&!valid(options.paymentTypeVipps)||
+      item.paymentSource==="other"&&!valid(options.paymentTypeOther)))
+     return json({error:"Oppgi riktig Import-ID for hver betalingstype i Tripletex før eksport av betalte fakturaer."},400);
+   }
    const output=tripletexSalesInvoiceCsv(overview,options);
    return outCsv(output.csv,"Tripletex-fakturaimport-Aadland-Service.csv");
   }
