@@ -72,7 +72,8 @@ export async function GET(req){
     "Content-Disposition":'attachment; filename="Aadland-Tripletex-bilagsoversikt.csv"',
     "X-Content-Type-Options":"nosniff"
    }});
-  return json({ok:true,summary:summary(rows),
+  const usedRecipients=[...new Set(rows.map(row=>row.transfer?.recipient).filter(Boolean))];
+  return json({ok:true,summary:summary(rows),preferredRecipient:usedRecipients.length===1?usedRecipients[0]:null,
    rows:rows.map(({document,attachment,transfer})=>({
     document,attachment:attachment?{
      id:attachment.id,original_filename:attachment.original_filename,
@@ -106,14 +107,20 @@ export async function POST(req){
  if(!process.env.RESEND_API_KEY)return json({error:"E-posttjenesten er ikke konfigurert."},503);
  const s=db();if(!s)return json({error:"Databasen er utilgjengelig."},503);
 
- const [docResult,fileResult,priorResult]=await Promise.all([
+ const [docResult,fileResult,priorResult,existingRecipients]=await Promise.all([
   s.from("vat_purchase_documents").select(docColumns)
    .eq("id",input.documentId).is("voided_at",null).maybeSingle(),
   s.from(filesTable).select(fileColumns).eq("purchase_document_id",input.documentId).maybeSingle(),
-  s.from(transfersTable).select(sendColumns).eq("purchase_document_id",input.documentId).maybeSingle()
+  s.from(transfersTable).select(sendColumns).eq("purchase_document_id",input.documentId).maybeSingle(),
+  s.from(transfersTable).select("recipient").order("id",{ascending:true}).range(0,4999)
  ]);
- if(docResult.error||fileResult.error||priorResult.error)
-  return json({error:"Kunne ikke kontrollere bilag, originalfil og sendestatus."},503);
+ if(docResult.error||fileResult.error||priorResult.error||existingRecipients.error||
+  !Array.isArray(existingRecipients.data)||existingRecipients.data.length>=5000)
+  return json({error:"Kunne ikke kontrollere bilag, originalfil og tidligere mottakeradresse."},503);
+ // Once a transfer has begun, lock the destination across all subsequent
+ // sends, including after the user switches phone or browser.
+ if(existingRecipients.data.some(row=>row.recipient!==recipient))
+  return json({error:"Dette bilagsarkivet er allerede overført eller forsøkt overført til en annen Tripletex-adresse. Kontroller mottakeren før videre overføring."},409);
  const document=docResult.data,attachment=fileResult.data;
  if(!document||!attachment)
   return json({error:"Bilaget eller originalvedlegget mangler og kan ikke sendes."},409);
