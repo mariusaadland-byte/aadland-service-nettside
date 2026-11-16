@@ -149,7 +149,12 @@ export default function InvoiceVatTermClient(){
      onChanged={onDocumentSaved}/>
    </div>
    {view==="more"&&<div id="flere-funksjoner">
-    <p className={styles.moreIntro}>Importer eldre kundefakturaer og leverandørbilag, eller kontroller Systima-tilkoblingen.</p>
+    <section style={{padding:"14px 0 20px",borderBottom:"1px solid #e7e2da",marginBottom:16}}>
+     <h2 style={{fontSize:19,margin:"0 0 8px"}}>Tripletex – nytt regnskapssystem</h2>
+     <p className={styles.moreIntro}>Overfør alle registrerte kvitteringer med originalvedlegg til bilagsmottaket i Tripletex. Se tidligere sendeforsøk, kontroller mottakeradresse og last ned komplett bilagsoversikt.</p>
+     <Link className={styles.secondaryLink} href="/admin/faktura/mva/tripletex">Åpne overføring til Tripletex</Link>
+    </section>
+    <p className={styles.moreIntro}>Andre funksjoner: importer eldre kundefakturaer og leverandørbilag eller kontroller Systima-tilkoblingen.</p>
     <p><Link className={styles.secondaryLink} href="/admin/faktura/systima">Systima: tilkobling og API-oppsett</Link></p>
     <ExternalVatSalesClient onChanged={onDocumentSaved}/>
    </div>}
