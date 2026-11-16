@@ -96,6 +96,7 @@ function tableQuery(table,op="select",data=null){
    assert.ok(list);
    list=list.filter(row=>eq.every(([key,v])=>row[key]===v)&&
     is.every(([key,v])=>v===null?row[key]==null:row[key]===v));
+   if(op==="update")for(const row of list)Object.assign(row,data);
    return Promise.resolve({data:list.slice(start,end+1),error:null}).then(success,failure);
   }
  };
