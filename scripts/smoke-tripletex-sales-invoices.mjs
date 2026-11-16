@@ -11,7 +11,7 @@ const {invoiceSettlementInfo,summarizeInvoiceActivity}=new Function("invoicePaym
 const exportSrc=read("lib/tripletexSalesInvoiceExport.js")
  .replace(/^import .*;\n/gm,"").replace(/^export /gm,"");
 const {inspectSalesInvoice,salesInvoiceExportOverview,tripletexSalesInvoiceCsv,
- salesInvoiceArchiveCsv,importHeaders}=new Function("invoiceGrossOre","invoicePaymentState","invoiceSettlementInfo",
+ salesInvoiceArchiveCsv,importHeaders,auditInvoicePaymentEntries}=new Function("invoiceGrossOre","invoicePaymentState","invoiceSettlementInfo",
  exportSrc+";return {inspectSalesInvoice,salesInvoiceExportOverview,tripletexSalesInvoiceCsv,salesInvoiceArchiveCsv,importHeaders};")(
  invoiceGrossOre,invoicePaymentState,invoiceSettlementInfo
 );
@@ -41,6 +41,23 @@ const rows=[
  invoice("6",0,25,{status:"draft",invoice_number:null}),
  invoice("7",0,25,{sent_at:null})
 ];
+const payments=[
+ {id:"p2",invoice_id:"2",amount_ore:25000,vipps_reference:"test-vipps-2",reversed_at:null},
+ {id:"p3",invoice_id:"3",amount_ore:10000,vipps_reference:null,reversed_at:null}
+];
+const captures=[
+ {id:"c2",invoice_id:"2",state:"captured",captured_ore:25000,refunded_ore:0}
+];
+rows[1].activity={vippsCapturedOre:25000,vippsRefundedOre:0,creditDocumentsOre:0,vippsActiveCount:0};
+rows[1].paymentAudit=auditInvoicePaymentEntries(rows[1],[payments[0]]);
+rows[2].activity={vippsCapturedOre:0,vippsRefundedOre:0,creditDocumentsOre:0,vippsActiveCount:0};
+rows[2].paymentAudit=auditInvoicePaymentEntries(rows[2],[payments[1]]);
+assert.equal(rows[1].paymentAudit.matched,true);
+assert.equal(rows[1].paymentAudit.source,"vipps");
+assert.equal(rows[2].paymentAudit.source,"other");
+assert.equal(auditInvoicePaymentEntries(rows[1],[]).matched,false);
+assert.equal(auditInvoicePaymentEntries(rows[1],[{...payments[0],amount_ore:24000}]).matched,false);
+assert.equal(auditInvoicePaymentEntries(rows[1],[{...payments[0],amount_ore:20000},{...payments[1],invoice_id:"2",amount_ore:5000}]).source,"mixed");
 const overview=salesInvoiceExportOverview(rows,"2026-11-16");
 assert.equal(overview.summary.total,6);
 assert.equal(overview.summary.unpaid,1);
@@ -65,11 +82,17 @@ assert.ok(pending.csv.includes('"80000000"'));
 assert.ok(pending.csv.includes("Opprinnelig fakturanr AS-2026-1"));
 assert.ok(!pending.csv.includes('"AS-2026-2"')&&!pending.csv.includes("Opprinnelig fakturanr AS-2026-2"));
 assert.deepEqual(importHeaders.slice(0,3),["INVOICE NO","INVOICE DATE","DUE DATE"]);
-const withPayment=tripletexSalesInvoiceCsv(overview,{startNumber:80000000,includePaid:true,paymentType:"BANK"});
+assert.throws(()=>tripletexSalesInvoiceCsv(overview,{includePaid:true,paymentTypeOther:"BANK"}),/Import-ID/);
+assert.throws(()=>tripletexSalesInvoiceCsv(overview,{includePaid:true,paymentTypeVipps:"VIPPS"}),/Import-ID/);
+const withPayment=tripletexSalesInvoiceCsv(overview,{startNumber:80000000,includePaid:true,
+ paymentTypeVipps:"VIPPS",paymentTypeOther:"BANK"});
 assert.equal(withPayment.accepted.length,3);
 assert.ok(withPayment.csv.includes('"80000001"'));
 assert.ok(withPayment.csv.includes('"250,00"'));
 assert.ok(withPayment.csv.includes('"BANK"'));
+assert.ok(withPayment.csv.includes('"VIPPS"'));
+assert.ok(withPayment.csv.includes('"250,00"'));
+assert.ok(withPayment.csv.includes('"100,00"'));
 assert.ok(!withPayment.csv.includes("Opprinnelig fakturanr AS-2026-4"));
 const archive=salesInvoiceArchiveCsv(overview,{startNumber:80000000});
 for(const id of ["1","2","3","4","5","7"])assert.ok(archive.includes("AS-2026-"+id),"All originals in archive");
@@ -98,8 +121,9 @@ const handler=routeSrc.replace(/^import .*;\n/gm,"").replace(/^export const .*;\
 let role="owner",forcedError=false;
 const records={
  invoice_drafts:rows.filter(r=>r.status==="sent"),
- invoice_vipps_payments:[],
- invoice_credit_notes:[]
+ invoice_vipps_payments:captures,
+ invoice_credit_notes:[],
+ invoice_payments:payments
 };
 function tableQuery(table){
  const eqs=[],ins=[];
@@ -120,10 +144,10 @@ function tableQuery(table){
 }
 const mockedDb=()=>({from:tableQuery});
 const NextResponse=class extends Response{static json(data,opts={}){return Response.json(data,opts)}};
-const GET=new Function("NextResponse","getAdminUser","db","summarizeInvoiceActivity",
+const GET=new Function("NextResponse","getAdminUser","db","summarizeInvoiceActivity","auditInvoicePaymentEntries",
  "osloDateKey","salesInvoiceExportOverview","tripletexSalesInvoiceCsv","salesInvoiceArchiveCsv",
  "zipFrozenInvoicePdfs","process",handler+";return GET;")(
- NextResponse,async()=>({role}),mockedDb,summarizeInvoiceActivity,
+ NextResponse,async()=>({role}),mockedDb,summarizeInvoiceActivity,auditInvoicePaymentEntries,
  ()=>"2026-11-16",salesInvoiceExportOverview,tripletexSalesInvoiceCsv,salesInvoiceArchiveCsv,
  zipFrozenInvoicePdfs,{env:{}}
 );
@@ -140,9 +164,11 @@ r=await GET(request("?format=tripletex"));
 assert.equal(r.status,200);
 assert.match(r.headers.get("content-type"),/text\/csv/);
 assert.match(await r.text(),/AS-2026-1/);
-r=await GET(request("?format=tripletex&includePaid=1&paymentType=BANK"));
+r=await GET(request("?format=tripletex&includePaid=1&paymentTypeVipps=VIPPS&paymentTypeOther=BANK"));
 assert.equal(r.status,200);
-assert.match(await r.text(),/AS-2026-3/);
+const paidCsv=await r.text();
+assert.match(paidCsv,/AS-2026-3/);
+assert.ok(paidCsv.includes('"VIPPS"')&&paidCsv.includes('"BANK"'));
 r=await GET(request("?format=archive"));
 assert.equal(r.status,200);
 assert.match(await r.text(),/AS-2026-5/);
@@ -159,5 +185,6 @@ assert.ok(page.includes("TripletexSalesClient"));
 assert.ok(ui.includes('url("pdfzip"'));
 assert.ok(ui.includes('url("archive"'));
 assert.ok(ui.includes('link("tripletex")'));
+assert.ok(ui.includes("paymentTypeVipps")&&ui.includes("paymentTypeOther"));
 assert.ok(ui.includes("Jeg har kontrollert at importnumrene"));
 console.log("Tripletex utgående fakturaer bestått: ekte importkolonner, mva-koder, betalte/ubetalte, kreditt/kontrollsperre, nummerreferanse, CSV, original-PDF ZIP, eier og kun lesing.");
