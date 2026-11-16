@@ -94,7 +94,7 @@ export default function TripletexReceiptsClient(){
  };
  return <div className={styles.shell}>
   <header className={styles.head}>
-   <h1>Overfør kvitteringer til Tripletex</h1>
+   <h2 style={{fontSize:22}}>Inngående kvitteringer og leverandørbilag</h2>
    <p>Alle registrerte, aktive leverandørbilag fra alle terminer. Originalene sendes til Tripletex sitt bilagsmottak – ingen kostnader eller MVA bokføres automatisk.</p>
   </header>
   {summary&&<div className={styles.stats}>
