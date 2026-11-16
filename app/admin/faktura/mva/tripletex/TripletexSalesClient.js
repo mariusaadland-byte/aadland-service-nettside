@@ -5,20 +5,25 @@ const base="/api/admin/invoices/tripletex/sales";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(Number(n||0)/100);
 const moneyKind=s=>s==="unpaid"?"Klar for ubetalt fakturaimport":
  s==="paid"?"Har betalinger – krever betalingsoppsett":s==="review"?"Kontroller før import":"Ikke utstedt";
-const url=(format,startNumber,includePaid,paymentType)=>{
+const url=(format,startNumber,includePaid,paymentTypeVipps,paymentTypeOther)=>{
  const query=new URLSearchParams({format,startNumber:String(startNumber)});
- if(includePaid){query.set("includePaid","1");query.set("paymentType",paymentType.trim());}
+ if(includePaid){query.set("includePaid","1");query.set("paymentTypeVipps",paymentTypeVipps.trim());query.set("paymentTypeOther",paymentTypeOther.trim());}
  return base+"?"+query.toString();
 };
 export default function TripletexSalesClient(){
  const [rows,setRows]=useState([]),[summary,setSummary]=useState(null);
  const [error,setError]=useState(""),[loading,setLoading]=useState(true);
  const [startNumber,setStartNumber]=useState("80000000");
- const [includePaid,setIncludePaid]=useState(false),[paymentType,setPaymentType]=useState("");
+ const [includePaid,setIncludePaid]=useState(false);
+ const [paymentTypeVipps,setPaymentTypeVipps]=useState(""),[paymentTypeOther,setPaymentTypeOther]=useState("");
  const [ack,setAck]=useState(false);
  const chosenNumber=Number(startNumber),numberValid=Number.isSafeInteger(chosenNumber)&&
   chosenNumber>=10001&&chosenNumber<=999999000;
- const paidValid=!includePaid||/^[A-Za-z0-9_-]{1,32}$/.test(paymentType.trim());
+ const needsVipps=rows.some(r=>r.state==="paid"&&r.paymentSource==="vipps");
+ const needsOther=rows.some(r=>r.state==="paid"&&r.paymentSource==="other");
+ const validType=value=>/^[A-Za-z0-9_-]{1,32}$/.test(value.trim());
+ const paidValid=!includePaid||(!needsVipps||validType(paymentTypeVipps))&&
+  (!needsOther||validType(paymentTypeOther));
  const downloadAllowed=numberValid&&paidValid&&ack;
  const load=useCallback(async()=>{
   const response=await fetch(base,{cache:"no-store"});
@@ -30,7 +35,7 @@ export default function TripletexSalesClient(){
   .finally(()=>{if(active)setLoading(false)});return()=>{active=false};},[load]);
  const downloadable=rows.filter(r=>r.state==="unpaid"||
   includePaid&&r.state==="paid").length;
- const link=(format)=>url(format,startNumber,includePaid,paymentType);
+ const link=(format)=>url(format,startNumber,includePaid,paymentTypeVipps,paymentTypeOther);
  return <section className={styles.section} style={{marginBottom:24}}>
   <h2 style={{fontSize:22,marginBottom:8}}>Utgående fakturaer – allerede sendt fra appen</h2>
   <p className={styles.hint}>Ta med fakturanummer, kunder, dato, beløp, ordrelinjer og MVA til Tripletex.
@@ -48,8 +53,8 @@ export default function TripletexSalesClient(){
     <p className={styles.hint}>To filer gir deg en samlet sikkerhetskopi: original-PDF-ene
      i én ZIP-fil og fullstendig faktura- og betalingsoversikt som CSV.</p>
     <div className={styles.actions}>
-     <a className={styles.link} href={url("pdfzip",startNumber,false,"")}>Last ned alle originale faktura-PDF-er (ZIP)</a>
-     <a className={styles.link} href={url("archive",startNumber,false,"")}>Last ned alle faktura- og betalingsopplysninger (CSV)</a>
+     <a className={styles.link} href={url("pdfzip",startNumber,false,"","")}>Last ned alle originale faktura-PDF-er (ZIP)</a>
+     <a className={styles.link} href={url("archive",startNumber,false,"","")}>Last ned alle faktura- og betalingsopplysninger (CSV)</a>
     </div>
    </div>
    <div style={{borderTop:"1px solid #e6dfd5",paddingTop:16,marginTop:12}}>
@@ -68,15 +73,23 @@ export default function TripletexSalesClient(){
      onChange={e=>{setIncludePaid(e.target.checked);setAck(false);}}/>
      <span>Ta også med fakturaer som er betalt eller delbetalt.</span>
     </label>
-    {includePaid&&<div className={styles.inputs}>
-     <label>Betalingstype «Import-ID» fra Tripletex
-      <input type="text" autoComplete="off" placeholder="Import-ID for betalingsmåten"
-       value={paymentType} maxLength={32}
-       onChange={e=>{setPaymentType(e.target.value);setAck(false);}}/>
-     </label>
-     <p className={styles.hint}>Denne ID-en må allerede være opprettet under
+    {includePaid&&<div>
+     <div className={styles.inputs}>
+      {needsVipps&&<label>Vipps – betalingstype «Import-ID»
+       <input type="text" autoComplete="off" placeholder="Import-ID for Vipps"
+        value={paymentTypeVipps} maxLength={32}
+        onChange={e=>{setPaymentTypeVipps(e.target.value);setAck(false);}}/>
+      </label>}
+      {needsOther&&<label>Andre/bank – betalingstype «Import-ID»
+       <input type="text" autoComplete="off" placeholder="Import-ID for annen innbetaling"
+        value={paymentTypeOther} maxLength={32}
+        onChange={e=>{setPaymentTypeOther(e.target.value);setAck(false);}}/>
+      </label>}
+     </div>
+     <p className={styles.hint}>Finn betalingsformene i
       <strong> Regnskap → Innstillinger → Betalingstyper</strong> i Tripletex.
-      Kontroller at den representerer riktig mottakskonto og betalingstype for fakturaene.</p>
+      Vipps og manuelle innbetalinger må bruke riktige, separate kontoer.
+      Dersom en faktura har flere betalingsmåter eller uklart oppgjør, stoppes den for kontroll.</p>
     </div>}
     <p className={styles.hint}><strong>{downloadable}</strong> av {summary.total} sendte fakturaer
      blir tatt med i den valgte importen.
@@ -107,7 +120,7 @@ export default function TripletexSalesClient(){
       <div className={styles.itemInfo}>
        <strong>{r.originalNumber} · {r.customerName}</strong>
        <small>{r.issuedDate} · {money(r.grossOre)} · Betalt {money(r.paidOre)} · Gjenstår {money(r.outstandingOre)}</small>
-       <small className={styles.status}>{moneyKind(r.state)}. {r.reason}</small>
+       <small className={styles.status}>{moneyKind(r.state)}. {r.reason}{r.paymentSource==="vipps"?" (Vipps)":r.paymentSource==="other"?" (Annen/bank)":""}</small>
        <small>Foreslått importnummer: {numberValid?chosenNumber+rows.findIndex(x=>x.id===r.id):"–"}</small>
       </div>
       <div className={styles.itemLinks}>
