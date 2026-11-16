@@ -12,7 +12,7 @@ const exportSrc=read("lib/tripletexSalesInvoiceExport.js")
  .replace(/^import .*;\n/gm,"").replace(/^export /gm,"");
 const {inspectSalesInvoice,salesInvoiceExportOverview,tripletexSalesInvoiceCsv,
  salesInvoiceArchiveCsv,importHeaders,auditInvoicePaymentEntries}=new Function("invoiceGrossOre","invoicePaymentState","invoiceSettlementInfo",
- exportSrc+";return {inspectSalesInvoice,salesInvoiceExportOverview,tripletexSalesInvoiceCsv,salesInvoiceArchiveCsv,importHeaders};")(
+ exportSrc+";return {inspectSalesInvoice,salesInvoiceExportOverview,tripletexSalesInvoiceCsv,salesInvoiceArchiveCsv,importHeaders,auditInvoicePaymentEntries};")(
  invoiceGrossOre,invoicePaymentState,invoiceSettlementInfo
 );
 const zipSrc=read("lib/zipFrozenInvoices.js").replace(/^export /gm,"");
