@@ -171,6 +171,13 @@ response=await POST(reqPost(command));assert.equal(response.status,409);
 assert.equal(providerCalls,1,"Duplicate requests never resend");
 overview=await (await GET(reqGet())).json();
 assert.equal(overview.summary.acceptedByEmailProvider,1);
+assert.equal(overview.preferredRecipient,"firma@ebilag.com");
+transfers=[{id:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",purchase_document_id:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+ recipient:"other@ebilag.com",status:"accepted"}];
+const providerBeforeWrongRecipient=providerCalls;
+response=await POST(reqPost(command));
+assert.equal(response.status,409,"Block sending to a different destination after the first transfer");
+assert.equal(providerCalls,providerBeforeWrongRecipient);
 transfers=[];providerFail=true;
 response=await POST(reqPost(command));assert.equal(response.status,502);
 assert.equal(transfers[0].status,"needs_review");
@@ -189,5 +196,10 @@ assert.ok(ui.includes("window.confirm("));
 assert.ok(ui.includes("recipientConfirmation:recipient,confirmed:true"));
 assert.ok(ui.includes("stop.current=true"));
 assert.ok(ui.includes("!row.transfer"));
+assert.ok(ui.includes('window.localStorage.setItem(addressKey,recipient)'),"Remember non-secret destination");
+assert.ok(ui.includes('setLockedRecipient(saved)'),"Use previously used company inbox");
+assert.ok(route.includes("existingRecipients.data.some(row=>row.recipient!==recipient)"),
+ "Do not allow silent change of accounting company");
+
 assert.ok(nav.includes('href="/admin/faktura/mva/tripletex"'));
 console.log("Tripletex overføring bestått: 18-bilag-vennlig CSV, eier/CSRF/test-sperre, ekte original-kontrollsum, ingen duplikat, usikker sending låst, status og brukerbekreftelse. Ingen e-post sendt.");
