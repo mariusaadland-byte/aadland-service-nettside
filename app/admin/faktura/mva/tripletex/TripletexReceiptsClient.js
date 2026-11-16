@@ -17,6 +17,7 @@ export default function TripletexReceiptsClient(){
  const [address,setAddress]=useState("");
  const [remember,setRemember]=useState(true);
  const [confirmed,setConfirmed]=useState(false);
+ const [lockedRecipient,setLockedRecipient]=useState("");
  const [error,setError]=useState(""),[info,setInfo]=useState("");
  const [progress,setProgress]=useState({done:0,total:0});
  const stop=useRef(false);
@@ -24,7 +25,7 @@ export default function TripletexReceiptsClient(){
   // Only a non-secret recipient address is cached in this browser.
   try{
    const saved=window.localStorage.getItem(addressKey)||"";
-   if(validRecipient(saved))setAddress(senderAddress(saved));
+   if(validRecipient(saved))setAddress(previous=>previous||senderAddress(saved));
   }catch{}
  },[]);
  const load=useCallback(async()=>{
@@ -32,6 +33,10 @@ export default function TripletexReceiptsClient(){
   const data=await response.json().catch(()=>({}));
   if(!response.ok)throw Error(data.error||"Kunne ikke hente kvitteringene.");
   setRows(data.rows||[]);setSummary(data.summary);
+  if(validRecipient(data.preferredRecipient)){
+   const saved=senderAddress(data.preferredRecipient);
+   setLockedRecipient(saved);setAddress(saved);
+  }
   return data;
  },[]);
  useEffect(()=>{
@@ -122,9 +127,10 @@ export default function TripletexReceiptsClient(){
      <label>E-bilagsadresse
       <input type="email" autoComplete="off" spellCheck={false}
        placeholder="dittfirma@ebilag.com" value={address}
-       onChange={e=>{setAddress(e.target.value);setConfirmed(false);}} disabled={busy}/>
+       onChange={e=>{setAddress(e.target.value);setConfirmed(false);}} disabled={busy||Boolean(lockedRecipient)}/>
      </label>
     </div>
+    {lockedRecipient&&<p className={styles.hint}>Denne adressen er allerede brukt på tidligere sendinger og er låst mot utilsiktet bytte: <strong>{lockedRecipient}</strong>.</p>}
     {address&&!validRecipient(address)&&<p className={styles.error}>Bruk e-bilagsadressen fra Tripletex (@ebilag.com).</p>}
     <label className={styles.check}><input type="checkbox" checked={remember}
      onChange={e=>setRemember(e.target.checked)} disabled={busy}/>
