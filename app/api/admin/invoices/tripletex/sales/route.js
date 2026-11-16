@@ -3,7 +3,7 @@ import {getAdminUser} from "../../../../../../lib/auth";
 import {db} from "../../../../../../lib/supabase";
 import {summarizeInvoiceActivity} from "../../../../../../lib/invoiceSettlementInfo";
 import {osloDateKey} from "../../../../../../lib/osloTime";
-import {salesInvoiceExportOverview,tripletexSalesInvoiceCsv,salesInvoiceArchiveCsv} from "../../../../../../lib/tripletexSalesInvoiceExport";
+import {salesInvoiceExportOverview,tripletexSalesInvoiceCsv,salesInvoiceArchiveCsv,auditInvoicePaymentEntries} from "../../../../../../lib/tripletexSalesInvoiceExport";
 import {zipFrozenInvoicePdfs} from "../../../../../../lib/zipFrozenInvoices";
 
 export const runtime="nodejs";
@@ -26,7 +26,7 @@ async function allRows(s,table,columns,filter){
 }
 async function fetchIssued(s){
  const invoices=await allRows(s,"invoice_drafts",invoiceColumns,q=>q.eq("status","sent"));
- const payments=[],credits=[];
+ const payments=[],credits=[],recordedPayments=[];
  for(let start=0;start<invoices.length;start+=100){
   const ids=invoices.slice(start,start+100).map(i=>i.id);
   for(const [table,columns,target] of [
@@ -36,16 +36,27 @@ async function fetchIssued(s){
    const rows=await allRows(s,table,columns,q=>q.in("invoice_id",ids));
    target.push(...rows);
   }
+  const manual=await allRows(s,"invoice_payments",
+   "id,invoice_id,amount_ore,reversed_at,vipps_reference",q=>q.in("invoice_id",ids));
+  recordedPayments.push(...manual);
  }
- return summarizeInvoiceActivity(invoices,payments,credits);
+ const byInvoice=new Map();
+ for(const p of recordedPayments){
+  if(!byInvoice.has(p.invoice_id))byInvoice.set(p.invoice_id,[]);
+  byInvoice.get(p.invoice_id).push(p);
+ }
+ return summarizeInvoiceActivity(invoices,payments,credits).map(invoice=>({
+  ...invoice,paymentAudit:auditInvoicePaymentEntries(invoice,byInvoice.get(invoice.id)||[])
+ }));
 }
 function importOptions(url){
  const from=Number(url.searchParams.get("startNumber")||"80000000");
  if(!Number.isSafeInteger(from)||from<10001||from>999999000)return null;
  const includePaid=url.searchParams.get("includePaid")==="1";
- const paymentType=String(url.searchParams.get("paymentType")||"").trim();
- if(includePaid&&!/^[A-Za-z0-9_-]{1,32}$/.test(paymentType))return null;
- return {startNumber:from,includePaid,paymentType};
+ const paymentTypeVipps=String(url.searchParams.get("paymentTypeVipps")||"").trim();
+ const paymentTypeOther=String(url.searchParams.get("paymentTypeOther")||"").trim();
+ if([paymentTypeVipps,paymentTypeOther].some(v=>v&&!/^[A-Za-z0-9_-]{1,32}$/.test(v)))return null;
+ return {startNumber:from,includePaid,paymentTypeVipps,paymentTypeOther};
 }
 const outCsv=(content,filename)=>new NextResponse(content,{headers:{
  ...headers,"Content-Type":"text/csv; charset=utf-8",
@@ -65,6 +76,13 @@ export async function GET(req){
   const issued=await fetchIssued(s);
   const overview=salesInvoiceExportOverview(issued,osloDateKey(new Date()));
   if(format==="tripletex"){
+   if(options.includePaid){
+    const paid=overview.rows.filter(item=>item.state==="paid");
+    const valid=value=>/^[A-Za-z0-9_-]{1,32}$/.test(value);
+    if(paid.some(item=>item.paymentSource==="vipps"&&!valid(options.paymentTypeVipps)||
+      item.paymentSource==="other"&&!valid(options.paymentTypeOther)))
+     return json({error:"Oppgi riktig Import-ID for hver betalingstype i Tripletex før eksport av betalte fakturaer."},400);
+   }
    const output=tripletexSalesInvoiceCsv(overview,options);
    return outCsv(output.csv,"Tripletex-fakturaimport-Aadland-Service.csv");
   }
@@ -91,7 +109,7 @@ export async function GET(req){
     issuedDate:item.invoice.issued_date,dueDate:item.invoice.due_date,
     grossOre:item.payment?.gross||0,paidOre:item.payment?.paid||0,
     outstandingOre:item.payment?.outstanding||0,
-    state:item.state,reason:item.reason,
+    state:item.state,reason:item.reason,paymentSource:item.paymentSource||null,
     hasPdf:Boolean(item.invoice.pdf_base64)
    }))});
  }catch(error){
