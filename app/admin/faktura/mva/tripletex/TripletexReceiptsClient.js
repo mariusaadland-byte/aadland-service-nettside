@@ -2,6 +2,7 @@
 import {useCallback,useEffect,useRef,useState} from "react";
 import styles from "./TripletexReceipts.module.css";
 const endpoint="/api/admin/invoices/tripletex";
+const addressKey="aadland-tripletex-ebilag-recipient-v1";
 const senderAddress=s=>String(s||"").trim().toLowerCase();
 const validRecipient=s=>/^[a-z0-9._%+-]+@ebilag\.com$/.test(senderAddress(s));
 const size=n=>new Intl.NumberFormat("nb-NO",{maximumFractionDigits:1}).format(Number(n||0)/1024/1024)+" MB";
@@ -13,11 +14,19 @@ const messageState=state=>state==="accepted"?
 export default function TripletexReceiptsClient(){
  const [rows,setRows]=useState([]),[summary,setSummary]=useState(null);
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
- const [address,setAddress]=useState(""),[repeated,setRepeated]=useState("");
+ const [address,setAddress]=useState("");
+ const [remember,setRemember]=useState(true);
  const [confirmed,setConfirmed]=useState(false);
  const [error,setError]=useState(""),[info,setInfo]=useState("");
  const [progress,setProgress]=useState({done:0,total:0});
  const stop=useRef(false);
+ useEffect(()=>{
+  // Only a non-secret recipient address is cached in this browser.
+  try{
+   const saved=window.localStorage.getItem(addressKey)||"";
+   if(validRecipient(saved))setAddress(senderAddress(saved));
+  }catch{}
+ },[]);
  const load=useCallback(async()=>{
   const response=await fetch(endpoint,{cache:"no-store"});
   const data=await response.json().catch(()=>({}));
@@ -30,7 +39,7 @@ export default function TripletexReceiptsClient(){
   load().catch(e=>{if(active)setError(e.message)}).finally(()=>{if(active)setLoading(false)});
   return()=>{active=false;stop.current=true};
  },[load]);
- const canSend=validRecipient(address)&&senderAddress(address)===senderAddress(repeated)&&confirmed;
+ const canSend=validRecipient(address)&&confirmed;
  const pending=rows.filter(row=>!row.transfer&&Boolean(row.attachment));
  const unsupported=rows.filter(row=>row.attachment&&
   !["application/pdf","image/jpeg","image/png"].includes(row.attachment.mime_type));
@@ -43,6 +52,10 @@ export default function TripletexReceiptsClient(){
   const approved=window.confirm("Overføre "+count+" originalbilag til "+recipient+
    "?\n\nDette sender ekte dokumenter til bilagsmottaket i Tripletex. Hver sending er låst mot duplikater. Du må deretter kontrollere bilagene i Tripletex før bokføring.");
   if(!approved)return;
+  try{
+   if(remember)window.localStorage.setItem(addressKey,recipient);
+   else window.localStorage.removeItem(addressKey);
+  }catch{}
   setBusy(true);stop.current=false;setError("");setInfo("");
   setProgress({done:0,total:count});
   let completed=0;
@@ -70,8 +83,8 @@ export default function TripletexReceiptsClient(){
    }
   }
   try{await load();}catch(e){setError(e.message);}
-  if(!stop.current)setInfo(completed+" bilag er akseptert av e-posttjenesten. Kontroller bilagsmottaket i Tripletex før bokføring.");
-  else if(!error&&completed>0)setInfo(completed+" sendinger ble startet før stopp.");
+  if(!stop.current)setInfo(completed+" bilag er akseptert av e-posttjenesten. Kontroller at alle vises i Tripletex før du bokfører.");
+  else if(completed>0)setInfo(completed+" bilag ble akseptert før overføringen stoppet.");
   setBusy(false);
  };
  return <div className={styles.shell}>
@@ -89,7 +102,7 @@ export default function TripletexReceiptsClient(){
   {info&&<p role="status" className={styles.progress}>{info}</p>}
   {!loading&&<>
    <section className={styles.section}>
-    <h2>1. Kontroller bilagene</h2>
+    <h2>1. Klar for overføring</h2>
     <p className={styles.hint}>Vi har {summary?.withOriginal??0} originalfiler ({size(summary?.totalBytes)}) klare for overføring.
      {" "}Du kan ta ut en samlet CSV-oversikt før du sender. CSV-filen er en kontrolliste, <strong>ikke en ferdig bokføringsimport</strong> – konto og MVA-kode må kontrolleres i Tripletex.</p>
     <div className={styles.actions}>
@@ -99,7 +112,7 @@ export default function TripletexReceiptsClient(){
      {summary.missingOriginal} bilag mangler originalfil. Disse blir ikke sendt før vedlegget er lagt til.</p>}
    </section>
    <section className={styles.section}>
-    <h2>2. Legg inn e-bilagsadressen</h2>
+    <h2>2. Velg mottaker én gang</h2>
     <p className={styles.hint}>Finn adressen i Tripletex under <strong>Bilag → Innstillinger → Bilagsmottak</strong>.
      Bruk adressen som slutter på <strong>@ebilag.com</strong>.
      {" "}<a className={styles.link} target="_blank" rel="noreferrer"
@@ -111,14 +124,12 @@ export default function TripletexReceiptsClient(){
        placeholder="dittfirma@ebilag.com" value={address}
        onChange={e=>{setAddress(e.target.value);setConfirmed(false);}} disabled={busy}/>
      </label>
-     <label>Gjenta e-bilagsadressen
-      <input type="email" autoComplete="off" spellCheck={false}
-       placeholder="Skriv adressen én gang til" value={repeated}
-       onChange={e=>{setRepeated(e.target.value);setConfirmed(false);}} disabled={busy}/>
-     </label>
     </div>
     {address&&!validRecipient(address)&&<p className={styles.error}>Bruk e-bilagsadressen fra Tripletex (@ebilag.com).</p>}
-    {repeated&&senderAddress(address)!==senderAddress(repeated)&&<p className={styles.error}>Adressene er forskjellige.</p>}
+    <label className={styles.check}><input type="checkbox" checked={remember}
+     onChange={e=>setRemember(e.target.checked)} disabled={busy}/>
+     <span>Husk e-bilagsadressen i denne nettleseren til neste gang.</span>
+    </label>
     <label className={styles.check}><input type="checkbox" checked={confirmed}
      onChange={e=>setConfirmed(e.target.checked)} disabled={busy}/>
      <span>Jeg har kopiert adressen fra Tripletex og kontrollert at den tilhører firmaets bilagsmottak. Jeg forstår at e-postleverandørens bekreftelse ikke betyr at bilaget er bokført.</span>
@@ -136,7 +147,7 @@ export default function TripletexReceiptsClient(){
     <p className={styles.hint}>Bilag som allerede er sendt eller har uklar sendestatus blir hoppet over. Hvis du avbryter, kan du fortsette med de resterende senere.</p>
    </section>
    <section className={styles.section}>
-    <h2>3. Se hvilke kvitteringer det gjelder</h2>
+    <h2>3. Kvitteringene og status</h2>
     <div className={styles.list}>{rows.map(row=><div key={row.document.id} className={styles.item}>
      <div className={styles.itemInfo}>
       <strong>{row.document.supplier_name}</strong>
