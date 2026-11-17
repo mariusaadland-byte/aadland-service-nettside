@@ -3,8 +3,8 @@ import crypto from "node:crypto";
 import {readFileSync} from "node:fs";
 const read=path=>readFileSync(path,"utf8");
 const source=read("lib/tripletexReceiptTransfer.js").replace(/^export /gm,"");
-const {normalizeTripletexInbox,tripletexReceiptEmail,tripletexReceiptCsv}=
- new Function(source+";return {normalizeTripletexInbox,tripletexReceiptEmail,tripletexReceiptCsv};")();
+const {normalizeTripletexInbox,tripletexReceiptEmail,tripletexReceiptCsv,tripletexPendingReceipts}=
+ new Function(source+";return {normalizeTripletexInbox,tripletexReceiptEmail,tripletexReceiptCsv,tripletexPendingReceipts};")();
 const id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const file=Buffer.from("%PDF-1.4\nFake test-only invoice bytes\n%%EOF");
 const sha=crypto.createHash("sha256").update(file).digest("hex");
@@ -193,9 +193,23 @@ const ui=read("app/admin/faktura/mva/tripletex/TripletexReceiptsClient.js");
 const nav=read("app/admin/faktura/mva/InvoiceVatTermClient.js");
 assert.ok(page.includes('admin.role!=="owner"'));
 assert.ok(ui.includes("window.confirm("));
+assert.ok(ui.includes('Overfør én kvittering først'),"Offer initial one-receipt send");
+assert.ok(ui.includes("confirmedFirstInTripletex"),"Require explicit inbox confirmation");
+assert.ok(ui.includes("acceptedByEmailProvider"),"Bulk is gated behind a successful single submission");
+assert.ok(ui.includes("tripletexPendingReceipts(rows,firstOnly)"),"Send loop limited to first receipt in trial mode");
+assert.ok(ui.includes('pending.length>1&&(!summary?.acceptedByEmailProvider||!confirmedFirstInTripletex)'),
+ "Server-success alone must not permit mass send");
 assert.ok(ui.includes("recipientConfirmation:recipient,confirmed:true"));
 assert.ok(ui.includes("stop.current=true"));
-assert.ok(ui.includes("!row.transfer"));
+const selected=[{document:receipt,attachment,transfer:null},
+ {document:{...receipt,id:"second"},attachment:{...attachment,mime_type:"image/jpeg"},transfer:null},
+ {document:{...receipt,id:"sent"},attachment,transfer:{status:"accepted"}},
+ {document:{...receipt,id:"pdf-error"},attachment:{...attachment,mime_type:"image/webp"},transfer:null},
+ {document:{...receipt,id:"missing"},attachment:null,transfer:null}];
+assert.equal(tripletexPendingReceipts(selected).length,2);
+assert.equal(tripletexPendingReceipts(selected,true).length,1);
+assert.equal(tripletexPendingReceipts(selected,true)[0].document.id,receipt.id);
+assert.ok(source.includes("!row.transfer"),"Only new receipts may be selected");
 assert.ok(ui.includes('window.localStorage.setItem(addressKey,recipient)'),"Remember non-secret destination");
 assert.ok(ui.includes('setLockedRecipient(saved)'),"Use previously used company inbox");
 assert.ok(route.includes("existingRecipients.data.some(row=>row.recipient!==recipient)"),
