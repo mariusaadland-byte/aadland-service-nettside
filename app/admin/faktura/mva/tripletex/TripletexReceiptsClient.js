@@ -1,6 +1,7 @@
 "use client";
 import {useCallback,useEffect,useRef,useState} from "react";
 import styles from "./TripletexReceipts.module.css";
+import {tripletexPendingReceipts} from "../../../../../lib/tripletexReceiptTransfer";
 const endpoint="/api/admin/invoices/tripletex";
 const addressKey="aadland-tripletex-ebilag-recipient-v1";
 const senderAddress=s=>String(s||"").trim().toLowerCase();
@@ -17,6 +18,7 @@ export default function TripletexReceiptsClient(){
  const [address,setAddress]=useState("");
  const [remember,setRemember]=useState(true);
  const [confirmed,setConfirmed]=useState(false);
+ const [confirmedFirstInTripletex,setConfirmedFirstInTripletex]=useState(false);
  const [lockedRecipient,setLockedRecipient]=useState("");
  const [error,setError]=useState(""),[info,setInfo]=useState("");
  const [progress,setProgress]=useState({done:0,total:0});
@@ -45,17 +47,20 @@ export default function TripletexReceiptsClient(){
   return()=>{active=false;stop.current=true};
  },[load]);
  const canSend=validRecipient(address)&&confirmed;
- const pending=rows.filter(row=>!row.transfer&&Boolean(row.attachment));
+ const pending=tripletexPendingReceipts(rows);
  const unsupported=rows.filter(row=>row.attachment&&
   !["application/pdf","image/jpeg","image/png"].includes(row.attachment.mime_type));
- const transfer=async()=>{
+ const transfer=async({firstOnly=false}={})=>{
   if(busy||!canSend||pending.length===0)return;
+  if(!firstOnly&&pending.length>1&&(!summary?.acceptedByEmailProvider||!confirmedFirstInTripletex))return;
+  const selected=tripletexPendingReceipts(rows,firstOnly);
   const recipient=senderAddress(address);
-  const count=pending.filter(row=>["application/pdf","image/jpeg","image/png"]
-   .includes(row.attachment.mime_type)).length;
-  if(count===0)return;
-  const approved=window.confirm("Overføre "+count+" originalbilag til "+recipient+
-   "?\n\nDette sender ekte dokumenter til bilagsmottaket i Tripletex. Hver sending er låst mot duplikater. Du må deretter kontrollere bilagene i Tripletex før bokføring.");
+  const count=selected.length;
+  if(!count)return;
+  const receiptLabel=firstOnly?"\nFørste bilag: "+selected[0].document.supplier_name+
+   " – "+selected[0].document.supplier_document_number+" ("+selected[0].document.document_date+").":"";
+  const approved=window.confirm("Overføre "+count+" originalbilag til "+recipient+"?"+receiptLabel+
+   "\n\nDette sender ekte dokumenter til bilagsmottaket i Tripletex. Hver sending er låst mot duplikater. Kontroller at bilaget vises i Tripletex før resten overføres.");
   if(!approved)return;
   try{
    if(remember)window.localStorage.setItem(addressKey,recipient);
@@ -64,7 +69,7 @@ export default function TripletexReceiptsClient(){
   setBusy(true);stop.current=false;setError("");setInfo("");
   setProgress({done:0,total:count});
   let completed=0;
-  for(const row of pending){
+  for(const row of selected){
    if(stop.current)break;
    if(!["application/pdf","image/jpeg","image/png"].includes(row.attachment.mime_type))continue;
    try{
@@ -88,7 +93,9 @@ export default function TripletexReceiptsClient(){
    }
   }
   try{await load();}catch(e){setError(e.message);}
-  if(!stop.current)setInfo(completed+" bilag er akseptert av e-posttjenesten. Kontroller at alle vises i Tripletex før du bokfører.");
+  if(!stop.current)setInfo(firstOnly?
+   "Ett bilag er akseptert av e-posttjenesten. Åpne bilagsmottaket i Tripletex, kontroller at det er mottatt, og bekreft dette før resten sendes.":
+   completed+" bilag er akseptert av e-posttjenesten. Kontroller at alle vises i Tripletex før du bokfører.");
   else if(completed>0)setInfo(completed+" bilag ble akseptert før overføringen stoppet.");
   setBusy(false);
  };
@@ -141,8 +148,22 @@ export default function TripletexReceiptsClient(){
      <span>Jeg har kopiert adressen fra Tripletex og kontrollert at den tilhører firmaets bilagsmottak. Jeg forstår at e-postleverandørens bekreftelse ikke betyr at bilaget er bokført.</span>
     </label>
     <div className={styles.actions}>
-     <button type="button" className={styles.primary} disabled={!canSend||!pending.length||busy}
-      onClick={transfer}>{busy?"Sender bilag …":"Overfør "+pending.length+" usendte bilag til Tripletex"}</button>
+     {pending.length>0&&!summary?.acceptedByEmailProvider&&
+      <button type="button" className={styles.primary} disabled={!canSend||busy}
+       onClick={()=>transfer({firstOnly:true})}>
+       Overfør én kvittering først
+      </button>}
+     {pending.length>1&&summary?.acceptedByEmailProvider>0&&
+      <label className={styles.check}><input type="checkbox" checked={confirmedFirstInTripletex}
+       disabled={busy} onChange={e=>setConfirmedFirstInTripletex(e.target.checked)}/>
+       <span>Jeg har sett at den første kvitteringen faktisk er mottatt i Tripletex sitt bilagsmottak.</span>
+      </label>}
+     <button type="button" className={styles.primary}
+      disabled={!canSend||!pending.length||busy||
+       pending.length>1&&(!summary?.acceptedByEmailProvider||!confirmedFirstInTripletex)}
+      onClick={()=>transfer({firstOnly:false})}>
+      {busy?"Sender bilag …":"Overfør "+pending.length+" usendte bilag til Tripletex"}
+     </button>
      {busy&&<button type="button" onClick={()=>{stop.current=true;setInfo("Stopper etter pågående bilag …");}}>
       Stopp etter dette bilaget</button>}
     </div>
@@ -150,7 +171,9 @@ export default function TripletexReceiptsClient(){
     {summary?.requiresReview>0&&<p role="alert" className={styles.error}>
      {summary.requiresReview} bilag har uklar sendestatus. De blir aldri sendt automatisk på nytt. Kontroller Tripletex og sendeloggen først.</p>}
     {unsupported.length>0&&<p className={styles.error}>{unsupported.length} vedlegg har et format Tripletex ikke godtar. Last ned og konverter disse før overføring.</p>}
-    <p className={styles.hint}>Bilag som allerede er sendt eller har uklar sendestatus blir hoppet over. Hvis du avbryter, kan du fortsette med de resterende senere.</p>
+    <p className={styles.hint}>Start med én ekte kvittering. Når du har sett den i Tripletex, kan du overføre resten med én knapp.
+     Bilag som allerede er forsøkt sendt, blir hoppet over; uklare sendinger krever kontroll.
+     Hvis du avbryter, kan du fortsette med de resterende senere.</p>
    </section>
    <section className={styles.section}>
     <h2>3. Kvitteringene og status</h2>
