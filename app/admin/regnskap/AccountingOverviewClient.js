@@ -4,6 +4,7 @@ import Link from "next/link";
 import styles from "./AccountingOverview.module.css";
 import TripletexReceiptsClient from "../faktura/mva/tripletex/TripletexReceiptsClient";
 import TripletexSalesClient from "../faktura/mva/tripletex/TripletexSalesClient";
+import TripletexApiConnectClient from "../faktura/mva/tripletex/TripletexApiConnectClient";
 const views={oversikt:"Oversikt",betalt:"Betalte fakturaer",ubetalt:"Ubetalte fakturaer",bilag:"Utgifter",mva:"MVA",regnskapsark:"Regnskapsark",overforinger:"Tripletex-overføringer"};
 const kroner=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(Number(n||0)/100);
 const currentYear=()=>new Intl.DateTimeFormat("en-GB",{year:"numeric",timeZone:"Europe/Oslo"}).format(new Date());
@@ -124,6 +125,7 @@ export default function AccountingOverviewClient({initialView="oversikt"}){
    </>)}
    {view==="overforinger"&&block("Tripletex – overføringsliste",<>
     <p className={styles.intro}>Her finner du både kundefakturaer og leverandørbilag som gjenstår. Ferdig importerte kundefakturaer ligger i historikken; kvitteringer flyttes når e-postleverandøren har akseptert sendingen.</p>
+    <div style={{marginTop:20}}><TripletexApiConnectClient/></div>
     <div style={{marginTop:20}}><TripletexSalesClient/></div>
     <div style={{marginTop:28,borderTop:"2px solid #e3ddd3",paddingTop:15}}><TripletexReceiptsClient/></div>
    </>)}
