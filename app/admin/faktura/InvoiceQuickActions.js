@@ -4,11 +4,7 @@ import {invoiceFollowUpState} from "../../../lib/invoiceFollowUpState";
 import styles from "./InvoiceWorkspace.module.css";
 const money=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"})
  .format((Number(ore)||0)/100);
-const goto=id=>{
- const target=document.getElementById(id);
- if(target)target.scrollIntoView({behavior:"smooth",block:"start"});
-};
-export default function InvoiceQuickActions({invoice,today,onSwitch,onPrint,disabled=false}){
+export default function InvoiceQuickActions({invoice,today,onSwitch,onPrint,onSelectAction,selectedAction=null,disabled=false}){
  const payment=invoicePaymentState(invoice,today);
  const follow=invoiceFollowUpState(invoice,today);
  const pending=payment.outstanding>0;
@@ -47,8 +43,9 @@ export default function InvoiceQuickActions({invoice,today,onSwitch,onPrint,disa
   <div className={styles.actionGrid}>
    {options.map(({label,target,primary})=><button type="button" key={target}
     className={styles.actionButton+(primary?" "+styles.actionPrimary:"")}
-    onClick={()=>goto(target)}>
-    {label}<span aria-hidden="true" className={styles.arrow}>›</span>
+    aria-pressed={selectedAction===target}
+    onClick={()=>onSelectAction(selectedAction===target?null:target)}>
+    {label}<span aria-hidden="true" className={styles.arrow}>{selectedAction===target?"−":"›"}</span>
    </button>)}
    <a className={styles.actionButton}
     href="/admin/faktura/mva/tripletex#tripletex-fakturaer">
@@ -64,12 +61,20 @@ export default function InvoiceQuickActions({invoice,today,onSwitch,onPrint,disa
    </button>
   </div>
   <div className={styles.secondaryActions}>
-   <a href="#invoice-settlement">Oppgjør og korrigeringer</a>
-   <a href="#invoice-activity-timeline">Hendelseslogg</a>
-   <a href="#invoice-administrative-close">Avslutt faktura administrativt</a>
+   {[
+    ["invoice-details","Fakturadetaljer"],
+    ["invoice-followup-status","Oppfølgingsstatus"],
+    ["invoice-settlement","Oppgjør og korrigeringer"],
+    ["invoice-activity-timeline","Hendelseslogg"],
+    ["invoice-administrative-close","Avslutt faktura administrativt"]
+   ].map(([target,label])=><button key={target} type="button"
+    aria-pressed={selectedAction===target}
+    onClick={()=>onSelectAction(selectedAction===target?null:target)}>
+    {label} {selectedAction===target?"−":"›"}
+   </button>)}
   </div>
   <p style={{color:"#675e51",fontSize:12,lineHeight:1.6,margin:"15px 0 0"}}>
-   Knappene åpner riktig handling nedenfor. Ingenting sendes, registreres eller krediteres før du bekrefter handlingen.
+   Velg én handling. Bare den valgte åpnes under knappene. Ingenting sendes, registreres eller krediteres før du bekrefter det.
   </p>
  </section>;
 }

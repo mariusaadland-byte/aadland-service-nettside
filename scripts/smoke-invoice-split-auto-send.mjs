@@ -26,7 +26,7 @@ assert.ok(config.crons.some(x=>x.path==="/api/cron/scheduled-invoices"));
 assert.ok(page.includes("<InvoiceSplitPanel"));
 assert.ok(page.includes("Avbryt autosending av del 2"));
 assert.ok(page.includes("!form.split_group_id)await persist(form)"));
-assert.ok(page.includes("!form.split_group_id&&<InvoiceVippsPanel"));
+assert.ok(page.includes('!form.split_group_id&&(!archiveMode||selectedInvoiceAction==="invoice-vipps-payment")&&<InvoiceVippsPanel'),"Vipps remains available on drafts and chosen invoice action");
 assert.ok(page.includes("Boolean(form.split_group_id)"));
 assert.ok(panel.includes("Del faktura i 2"));
 assert.ok(panel.includes("autoSendSecond"));

@@ -44,7 +44,8 @@ assert.ok(invoice.includes('id="invoice-archive-list"'));
 assert.ok(invoice.includes('id="invoice-main-actions"'));
 assert.ok(invoice.includes('aria-expanded={invoiceListOpen}'));
 assert.ok(invoice.includes('(!archiveMode||invoiceListOpen)'));
-assert.ok(invoice.includes('if(archiveMode)setInvoiceListOpen(false)'));
+assert.ok(invoice.includes('if(archiveMode){setInvoiceListOpen(false);setSelectedInvoiceAction(null);}'),
+ "New invoice selection must close the previous action and invoice list");
 assert.ok(invoice.includes('if(!archiveMode||!form?.id)return;'));
 assert.ok(invoice.includes('invoice-main-actions")'));
 assert.ok(invoice.includes('archiveMode&&<InvoiceQuickActions'));
