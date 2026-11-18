@@ -195,6 +195,28 @@ invoices[1].paid_ore=10000;
 response=await GET(get("?format=csv&batchId="+prepared2.batchId));
 assert.equal(response.status,409,"Changed payment amount must block stale invoice export");
 invoices[1].paid_ore=25000;
+records.invoice_tripletex_transfers.length=0;
+response=await POST(post({
+ action:"prepare",invoiceIds:[id1,id2],startNumber:80000100,paymentTypeOther:"BANK"
+}));
+assert.equal(response.status,200);
+const batch=await response.json();
+assert.equal(batch.invoiceIds.length,2);
+response=await GET(get("?format=csv&batchId="+batch.batchId));
+assert.equal(response.status,200);
+exported=await response.text();
+assert.ok(exported.includes("AS-2026-1")&&exported.includes("AS-2026-2"));
+response=await POST(post({action:"confirm",invoiceId:id1,confirmed:true,importNumbers:[80000100]}));
+assert.equal(response.status,200);
+response=await GET(get("?format=csv&batchId="+batch.batchId));
+assert.equal(response.status,200);
+exported=await response.text();
+assert.ok(!exported.includes("AS-2026-1"),"Never re-export a confirmed invoice in partially completed batch");
+assert.ok(exported.includes("AS-2026-2"));
+response=await POST(post({action:"confirm",invoiceId:id2,confirmed:true,importNumbers:[80000101]}));
+assert.equal(response.status,200);
+response=await GET(get("?format=csv&batchId="+batch.batchId));
+assert.equal(response.status,409,"Fully confirmed batch cannot be downloaded for accidental duplicate import");
 failDb=true;response=await GET(get());assert.equal(response.status,503);
 
 const ui=read("app/admin/faktura/mva/tripletex/TripletexSalesClient.js");
