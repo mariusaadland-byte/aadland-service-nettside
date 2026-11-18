@@ -134,6 +134,11 @@ export async function POST(req){
  const s=db();if(!s)return json({error:"Databasen er utilgjengelig."},503);
  try{
   if(body.action==="prepare"){
+   const mode=body.mode;
+   if(!["paid-batch","unpaid-single"].includes(mode))
+    return json({error:"Velg enten samlet overføring av fakturaer med innbetaling eller én ubetalt faktura."},400);
+   if(mode==="unpaid-single"&&ids.length!==1)
+    return json({error:"Fakturaer uten innbetaling må velges én og én."},400);
    const start=validateTripletexImportNumber(body.startNumber);
    if(start===null||start+ids.length-1>999999999)
     return json({error:"Velg ledige numeriske fakturanumre for Tripletex."},400);
@@ -150,6 +155,10 @@ export async function POST(req){
     const row=byId.get(id);
     if(!row||!["unpaid","paid"].includes(row.state))
      return json({error:"Denne fakturaen krever kontroll før overføring: "+(row?.reason||"Finnes ikke som utsendt faktura.")},409);
+    if(mode==="paid-batch"&&!(row.state==="paid"&&row.payment.paid>0))
+     return json({error:"Samlet overføring er kun for fakturaer med registrert og avstemt innbetaling."},409);
+    if(mode==="unpaid-single"&&!(row.state==="unpaid"&&row.payment.paid===0))
+     return json({error:"Denne knappen er kun for én faktura uten registrert innbetaling."},409);
     const paymentType=tripletexPaymentTypeFor(row,
      String(body.paymentTypeVipps||"").trim(),String(body.paymentTypeOther||"").trim());
     newRows.push({
