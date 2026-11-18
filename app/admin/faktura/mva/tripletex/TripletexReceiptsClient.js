@@ -1,7 +1,7 @@
 "use client";
 import {useCallback,useEffect,useRef,useState} from "react";
 import styles from "./TripletexReceipts.module.css";
-import {DEFAULT_TRIPLETEX_INBOX,tripletexPendingReceipts} from "../../../../../lib/tripletexReceiptTransfer";
+import {DEFAULT_TRIPLETEX_INBOX,tripletexPendingReceipts,tripletexReceiptQueue} from "../../../../../lib/tripletexReceiptTransfer";
 
 const endpoint="/api/admin/invoices/tripletex";
 const addressKey="aadland-tripletex-ebilag-recipient-v1";
@@ -47,10 +47,7 @@ export default function TripletexReceiptsClient(){
  },[load]);
 
  // Only documents with no prior attempt belong to the live work queue.
- const remaining=rows.filter(row=>!row.transfer);
- const eligible=tripletexPendingReceipts(rows);
- const needsReview=rows.filter(row=>row.transfer&&row.transfer.status!=="accepted");
- const sent=rows.filter(row=>row.transfer?.status==="accepted");
+ const {remaining,eligible,needsReview,sent}=tripletexReceiptQueue(rows);
  const canSend=validAddress(address)&&(!lockedRecipient||cleanAddress(address)===lockedRecipient);
  const bulkPermitted=eligible.length<=1||
   (summary?.acceptedByEmailProvider>0&&confirmedFirstInTripletex);
