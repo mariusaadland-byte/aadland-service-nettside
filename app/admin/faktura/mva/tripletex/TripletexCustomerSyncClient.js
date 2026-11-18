@@ -123,7 +123,7 @@ export default function TripletexCustomerSyncClient(){
         onClick={()=>single(customer)}>
         {busyId===customer.sourceType+":"+customer.id?"Overfører …":"Overfør"}
        </button>:
-       customer.status==="needs_review"?
+       (customer.status==="needs_review"||customer.status==="processing")?
        <button type="button" disabled={busy}
         onClick={()=>single(customer,"check")}>Kontroller</button>:
        null}
