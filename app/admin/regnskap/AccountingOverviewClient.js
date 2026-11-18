@@ -3,6 +3,7 @@ import {useCallback,useEffect,useState} from "react";
 import Link from "next/link";
 import styles from "./AccountingOverview.module.css";
 import TripletexReceiptsClient from "../faktura/mva/tripletex/TripletexReceiptsClient";
+import TripletexSalesClient from "../faktura/mva/tripletex/TripletexSalesClient";
 const views={oversikt:"Oversikt",betalt:"Betalte fakturaer",ubetalt:"Ubetalte fakturaer",bilag:"Utgifter",mva:"MVA",regnskapsark:"Regnskapsark",overforinger:"Tripletex-overføringer"};
 const kroner=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(Number(n||0)/100);
 const currentYear=()=>new Intl.DateTimeFormat("en-GB",{year:"numeric",timeZone:"Europe/Oslo"}).format(new Date());
@@ -122,9 +123,9 @@ export default function AccountingOverviewClient({initialView="oversikt"}){
     </table>{!ledger.length&&<p className={styles.empty}>Ingen registreringer.</p>}</div>
    </>)}
    {view==="overforinger"&&block("Tripletex – overføringsliste",<>
-    <p className={styles.intro}>Her kan du sende registrerte kvitteringer direkte til bilagsmottaket i Tripletex. Bare bilag som ikke er sendt, vises i arbeidslisten. E-postbekreftelse betyr ikke at bilaget er bokført.</p>
-    <div style={{marginTop:20}}><TripletexReceiptsClient/></div>
-    <div className={styles.actions}>{link("/admin/faktura/mva/tripletex#tripletex-fakturaer","Kundefakturaer – egen Tripletex-import")}</div>
+    <p className={styles.intro}>Her finner du både kundefakturaer og leverandørbilag som gjenstår. Ferdig importerte kundefakturaer ligger i historikken; kvitteringer flyttes når e-postleverandøren har akseptert sendingen.</p>
+    <div style={{marginTop:20}}><TripletexSalesClient/></div>
+    <div style={{marginTop:28,borderTop:"2px solid #e3ddd3",paddingTop:15}}><TripletexReceiptsClient/></div>
    </>)}
       <div className={styles.warning}>{data.warnings.map((s,i)=><p key={i}>{s}</p>)}</div>
   </>}
