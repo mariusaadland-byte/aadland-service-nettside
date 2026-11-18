@@ -237,7 +237,7 @@ export default function TripletexSalesClient(){
        <small>Tripletex fakturanr. {x.transfer.import_number} · Bekreftet {new Date(x.transfer.confirmed_at).toLocaleDateString("nb-NO")}</small>
       </div>
       <div className={styles.itemLinks}>
-       <a className={styles.link} href={transferApi+"?format=csv&batchId="+x.transfer.batch_id}>Importfil (CSV)</a>
+       <span className={styles.hint}>Import bekreftet</span>
        {x.hasPdf&&<a className={styles.link} href={"/api/admin/invoices/pdf?id="+encodeURIComponent(x.id)}>Original-PDF</a>}
       </div>
      </div>)}
