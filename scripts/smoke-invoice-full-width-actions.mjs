@@ -61,7 +61,18 @@ assert.ok(css.includes(".archiveDetail{order:0;width:100%"));
 assert.ok(css.includes(".archiveList{order:1;width:100%"));
 assert.ok(css.includes(".archiveNoSelection .archiveList{order:0"));
 assert.ok(css.includes(".draftWorkspace{display:grid"),"Preserve draft layout");
-assert.ok(css.includes("grid-template-columns:repeat(3,minmax(0,1fr))"));
+assert.ok(css.includes("grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr))"),
+ "Buttons must auto-size and not squash into letter-width columns");
+assert.ok(css.includes("word-break:normal"),"Text cannot break letter by letter");
+const globalCss=read("app/globals.css");
+assert.ok(globalCss.includes(".admin{display:grid;grid-template-columns:248px 1fr;"),
+ "Regression relies on detecting the global two-column admin shell");
+assert.ok(invoice.includes('className="admin" style={{display:"block",width:"100%",minWidth:0,'),
+ "The standalone invoice page must explicitly override the global 248px admin grid");
+assert.ok(css.includes(".archiveWorkspace{display:flex;flex-direction:column;gap:20px;align-items:stretch;width:100%"),
+ "Invoice archive must span its page");
+assert.ok(css.includes(".archiveDetail{order:0;width:100%;min-width:0;max-width:100%"),
+ "Selected invoice card must occupy entire available page width");
 assert.ok(css.includes("@media(max-width:510px)"));
 const archivePage=read("app/admin/faktura/arkiv/page.js");
 assert.ok(archivePage.includes("archiveMode"));
