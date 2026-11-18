@@ -17,9 +17,9 @@ const {salesInvoiceExportOverview,tripletexSalesInvoiceCsv,auditInvoicePaymentEn
  invoiceGrossOre,invoicePaymentState,invoiceSettlementInfo
 );
 const queueJs=read("lib/tripletexCustomerInvoiceQueue.js").replace(/^export /gm,"");
-const {tripletexCustomerInvoiceQueue,validateTripletexImportNumber,tripletexPaymentTypeFor}=
+const {tripletexCustomerInvoiceQueue,tripletexCustomerInvoiceSelections,validateTripletexImportNumber,tripletexPaymentTypeFor}=
  new Function(queueJs+
- ";return {tripletexCustomerInvoiceQueue,validateTripletexImportNumber,tripletexPaymentTypeFor};")();
+ ";return {tripletexCustomerInvoiceQueue,tripletexCustomerInvoiceSelections,validateTripletexImportNumber,tripletexPaymentTypeFor};")();
 const id1="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const id2="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const ownerId="dddddddd-dddd-4ddd-8ddd-dddddddddddd";
@@ -56,6 +56,12 @@ assert.equal(initial.pending.length,2);
 assert.equal(initial.needsReview.length,1);
 assert.equal(initial.prepared.length,0);
 assert.equal(initial.confirmed.length,0);
+const selections=tripletexCustomerInvoiceSelections(initial);
+assert.equal(selections.withPayment.length,1);
+assert.equal(selections.withoutPayment.length,1);
+assert.equal(selections.needsReview.length,1);
+assert.equal(selections.withPayment[0].id,id2);
+assert.equal(selections.withoutPayment[0].id,id1);
 assert.throws(()=>tripletexPaymentTypeFor({state:"paid",paymentSource:"other"},"",""),
  /Oppgi riktig/);
 assert.equal(tripletexPaymentTypeFor({state:"paid",paymentSource:"other"},"","BANK"),"BANK");
@@ -127,7 +133,7 @@ const get=(q="")=>new Request("https://example.invalid/api/admin/invoices/triple
 const post=body=>new Request("https://example.invalid/api/admin/invoices/tripletex/sales/transfer",{
  method:"POST",headers:{origin:"https://example.invalid","content-type":"application/json"},
  body:JSON.stringify(body)});
-const prepareOne={action:"prepare",invoiceId:id1,startNumber:80000000};
+const prepareOne={action:"prepare",mode:"unpaid-single",invoiceId:id1,startNumber:80000000};
 let response=await GET(get());
 assert.equal(response.status,200);
 assert.deepEqual((await response.json()).transfers,[]);
@@ -140,6 +146,12 @@ response=await POST(post({...prepareOne,startNumber:1}));assert.equal(response.s
 response=await POST(post({...prepareOne,invoiceId:"bad"}));assert.equal(response.status,400);
 assert.equal(records.invoice_tripletex_transfers.length,0);
 
+response=await POST(post({action:"prepare",invoiceId:id1,startNumber:80000000}));
+assert.equal(response.status,400,"Explicit paid-batch or unpaid-single mode is mandatory");
+response=await POST(post({action:"prepare",mode:"paid-batch",invoiceIds:[id1],startNumber:80000000}));
+assert.equal(response.status,409,"Cannot include unpaid invoice in paid batch");
+response=await POST(post({action:"prepare",mode:"unpaid-single",invoiceIds:[id1,id2],startNumber:80000000}));
+assert.equal(response.status,400,"Unpaid invoices cannot be batched");
 response=await POST(post(prepareOne));
 assert.equal(response.status,200);
 let prepared=await response.json();
@@ -159,11 +171,11 @@ let exported=await response.text();
 assert.ok(exported.includes('"80000000"')&&exported.includes("AS-2026-1"));
 assert.ok(!exported.includes("AS-2026-2"));
 response=await POST(post(prepareOne));assert.equal(response.status,409);
-response=await POST(post({action:"prepare",invoiceId:id2,startNumber:80000000,paymentTypeOther:"BANK"}));
+response=await POST(post({action:"prepare",mode:"paid-batch",invoiceId:id2,startNumber:80000000,paymentTypeOther:"BANK"}));
 assert.equal(response.status,409,"Never reuse an import number");
-response=await POST(post({action:"prepare",invoiceId:id2,startNumber:80000001}));
+response=await POST(post({action:"prepare",mode:"paid-batch",invoiceId:id2,startNumber:80000001}));
 assert.equal(response.status,400,"Paid invoice requires payment type");
-response=await POST(post({action:"prepare",invoiceId:id2,startNumber:80000001,paymentTypeOther:"BANK"}));
+response=await POST(post({action:"prepare",mode:"paid-batch",invoiceId:id2,startNumber:80000001,paymentTypeOther:"BANK"}));
 assert.equal(response.status,200);
 const prepared2=await response.json();
 response=await GET(get("?format=csv&batchId="+prepared2.batchId));
@@ -197,7 +209,18 @@ assert.equal(response.status,409,"Changed payment amount must block stale invoic
 invoices[1].paid_ore=25000;
 records.invoice_tripletex_transfers.length=0;
 response=await POST(post({
- action:"prepare",invoiceIds:[id1,id2],startNumber:80000100,paymentTypeOther:"BANK"
+ action:"prepare",mode:"paid-batch",invoiceIds:[id1,id2],startNumber:80000100,paymentTypeOther:"BANK"
+}));
+assert.equal(response.status,409,"Bulk paid action must reject even one unpaid invoice");
+const id3="cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+invoices.push({...invoices[1],id:id3,invoice_number:"AS-2026-3",
+ line_items:[{description:"Ekstra arbeid",quantity:1,unitPriceOre:10000,vatRate:25}],
+ paid_ore:12500,issued_date:"2026-10-14",due_date:"2026-11-16",
+ issued_at:"2026-10-14T10:00:00Z",sent_at:"2026-10-14T11:00:00Z"});
+records.invoice_payments.push({id:"payment3",invoice_id:id3,amount_ore:12500,
+ reversed_at:null,vipps_reference:null});
+response=await POST(post({
+ action:"prepare",mode:"paid-batch",invoiceIds:[id2,id3],startNumber:80000100,paymentTypeOther:"BANK"
 }));
 assert.equal(response.status,200);
 const batch=await response.json();
@@ -205,30 +228,38 @@ assert.equal(batch.invoiceIds.length,2);
 response=await GET(get("?format=csv&batchId="+batch.batchId));
 assert.equal(response.status,200);
 exported=await response.text();
-assert.ok(exported.includes("AS-2026-1")&&exported.includes("AS-2026-2"));
-response=await POST(post({action:"confirm",invoiceId:id1,confirmed:true,importNumbers:[80000100]}));
+assert.ok(exported.includes("AS-2026-2")&&exported.includes("AS-2026-3"));
+assert.ok(!exported.includes("AS-2026-1"),"Paid batch must leave unpaid invoices untouched");
+response=await POST(post({action:"confirm",invoiceId:id2,confirmed:true,importNumbers:[80000100]}));
 assert.equal(response.status,200);
 response=await GET(get("?format=csv&batchId="+batch.batchId));
 assert.equal(response.status,200);
 exported=await response.text();
-assert.ok(!exported.includes("AS-2026-1"),"Never re-export a confirmed invoice in partially completed batch");
-assert.ok(exported.includes("AS-2026-2"));
-response=await POST(post({action:"confirm",invoiceId:id2,confirmed:true,importNumbers:[80000101]}));
+assert.ok(!exported.includes("AS-2026-2"),"Never re-export a confirmed invoice in partially completed batch");
+assert.ok(exported.includes("AS-2026-3"));
+response=await POST(post({action:"confirm",invoiceId:id3,confirmed:true,importNumbers:[80000101]}));
 assert.equal(response.status,200);
 response=await GET(get("?format=csv&batchId="+batch.batchId));
 assert.equal(response.status,409,"Fully confirmed batch cannot be downloaded for accidental duplicate import");
 failDb=true;response=await GET(get());assert.equal(response.status,503);
 
 const ui=read("app/admin/faktura/mva/tripletex/TripletexSalesClient.js");
-for(const phrase of ["Ikke overført","Overfør til Tripletex","Bekreft importert",
- "Overføringshistorikk","importNumbers:numbers","tripletexCustomerInvoiceQueue",
+for(const phrase of ["Fakturaer med innbetaling","Fakturaer uten innbetaling",
+ "Overfør fakturaer med innbetaling","Overfør denne fakturaen",
+ "Bekreft importert","Overføringshistorikk","importNumbers:numbers",
+ "tripletexCustomerInvoiceQueue","tripletexCustomerInvoiceSelections",
  "window.confirm(","downloadUrl","Fakturaoversikt"]){
  assert.ok(ui.includes(phrase),"Missing sales invoice transfer workflow "+phrase);
 }
-assert.ok(ui.includes('x.transfer?.status==="prepared"'),"Prepared must remain in work list");
+assert.ok(ui.includes("queue.prepared.filter(matches)"),"Prepared must remain in work list");
 assert.ok(ui.includes("queue.confirmed"),"Confirmed only in history");
 assert.ok(ui.includes('window.confirm('),"No silent accounting import action");
 assert.ok(ui.includes("paymentTypeVipps")&&ui.includes("paymentTypeOther"));
+assert.ok(ui.includes('prepare(withPayment.map(x=>x.id),"paid-batch")'),
+ "Only verified paid invoices may be collected by bulk button");
+assert.ok(ui.includes('prepare([x.id],"unpaid-single")'),
+ "Unpaid invoice transfer must be a per-invoice action");
+assert.ok(!ui.includes("includePaid"),"No switch that silently imports unpaid invoices in a paid batch");
 assert.ok(read("supabase/migrations/20261118214500_invoice_tripletex_transfer_log.sql")
  .includes("invoice_id uuid not null unique"),"Only one transfer per original invoice");
 console.log("Tripletex kundefakturaer bestått: eier, CSRF, testgren-sperre, ledige importnumre, én faktura eller flere, Vipps/bank, låst klargjøring, kontrollerte CSV-filer, eksplisitt importbekreftelse, historikk og dataintegritet. Ingen faktiske importhandlinger utført.");
