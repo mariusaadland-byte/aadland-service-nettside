@@ -1,195 +1,200 @@
 "use client";
 import {useCallback,useEffect,useRef,useState} from "react";
 import styles from "./TripletexReceipts.module.css";
-import {tripletexPendingReceipts} from "../../../../../lib/tripletexReceiptTransfer";
+import {DEFAULT_TRIPLETEX_INBOX,tripletexPendingReceipts} from "../../../../../lib/tripletexReceiptTransfer";
+
 const endpoint="/api/admin/invoices/tripletex";
 const addressKey="aadland-tripletex-ebilag-recipient-v1";
-const senderAddress=s=>String(s||"").trim().toLowerCase();
-const validRecipient=s=>/^[a-z0-9._%+-]+@ebilag\.com$/.test(senderAddress(s));
-const size=n=>new Intl.NumberFormat("nb-NO",{maximumFractionDigits:1}).format(Number(n||0)/1024/1024)+" MB";
-const messageState=state=>state==="accepted"?
- "Akseptert av e-posttjenesten – sjekk Tripletex":state==="sending"?
- "Påbegynt – kontroller Tripletex før nytt forsøk":state==="needs_review"?
- "Uklart resultat – kontroller før nytt forsøk":"Ikke overført";
+const cleanAddress=value=>String(value||"").trim().toLowerCase();
+const validAddress=value=>/^[a-z0-9._%+-]+@ebilag\.com$/.test(cleanAddress(value));
+const sizes=bytes=>new Intl.NumberFormat("nb-NO",{maximumFractionDigits:1}).format(Number(bytes||0)/1048576)+" MB";
+const supported=file=>file&&["application/pdf","image/jpeg","image/png"].includes(file.mime_type);
+const description=row=>(row.document.supplier_name||"Ukjent leverandør")+" · "+
+ (row.document.supplier_document_number||"Uten nummer")+" · "+row.document.document_date;
 
 export default function TripletexReceiptsClient(){
  const [rows,setRows]=useState([]),[summary,setSummary]=useState(null);
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
- const [address,setAddress]=useState("");
- const [remember,setRemember]=useState(true);
- const [confirmed,setConfirmed]=useState(false);
- const [confirmedFirstInTripletex,setConfirmedFirstInTripletex]=useState(false);
+ const [address,setAddress]=useState(DEFAULT_TRIPLETEX_INBOX);
  const [lockedRecipient,setLockedRecipient]=useState("");
+ const [confirmedFirstInTripletex,setConfirmedFirstInTripletex]=useState(false);
  const [error,setError]=useState(""),[info,setInfo]=useState("");
  const [progress,setProgress]=useState({done:0,total:0});
  const stop=useRef(false);
+
  useEffect(()=>{
-  // Only a non-secret recipient address is cached in this browser.
   try{
-   const saved=window.localStorage.getItem(addressKey)||"";
-   if(validRecipient(saved))setAddress(previous=>previous||senderAddress(saved));
+   const saved=window.localStorage.getItem(addressKey);
+   if(validAddress(saved))setAddress(previous=>previous===DEFAULT_TRIPLETEX_INBOX?cleanAddress(saved):previous);
   }catch{}
  },[]);
  const load=useCallback(async()=>{
-  const response=await fetch(endpoint,{cache:"no-store"});
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw Error(data.error||"Kunne ikke hente kvitteringene.");
-  setRows(data.rows||[]);setSummary(data.summary);
-  if(validRecipient(data.preferredRecipient)){
-   const saved=senderAddress(data.preferredRecipient);
-   setLockedRecipient(saved);setAddress(saved);
+  const res=await fetch(endpoint,{cache:"no-store"});
+  const body=await res.json().catch(()=>({}));
+  if(!res.ok)throw Error(body.error||"Kunne ikke hente bilag fra Aadland Service.");
+  setRows(body.rows||[]);setSummary(body.summary||null);
+  if(validAddress(body.preferredRecipient)){
+   const remembered=cleanAddress(body.preferredRecipient);
+   setAddress(remembered);setLockedRecipient(remembered);
   }
-  return data;
+  return body;
  },[]);
  useEffect(()=>{
   let active=true;
-  load().catch(e=>{if(active)setError(e.message)}).finally(()=>{if(active)setLoading(false)});
+  load().catch(err=>{if(active)setError(err.message)})
+   .finally(()=>{if(active)setLoading(false)});
   return()=>{active=false;stop.current=true};
  },[load]);
- const canSend=validRecipient(address)&&confirmed;
- const pending=tripletexPendingReceipts(rows);
- const unsupported=rows.filter(row=>row.attachment&&
-  !["application/pdf","image/jpeg","image/png"].includes(row.attachment.mime_type));
- const transfer=async({firstOnly=false}={})=>{
-  if(busy||!canSend||pending.length===0)return;
-  if(!firstOnly&&pending.length>1&&(!summary?.acceptedByEmailProvider||!confirmedFirstInTripletex))return;
-  const selected=tripletexPendingReceipts(rows,firstOnly);
-  const recipient=senderAddress(address);
-  const count=selected.length;
-  if(!count)return;
-  const receiptLabel=firstOnly?"\nFørste bilag: "+selected[0].document.supplier_name+
-   " – "+selected[0].document.supplier_document_number+" ("+selected[0].document.document_date+").":"";
-  const approved=window.confirm("Overføre "+count+" originalbilag til "+recipient+"?"+receiptLabel+
-   "\n\nDette sender ekte dokumenter til bilagsmottaket i Tripletex. Hver sending er låst mot duplikater. Kontroller at bilaget vises i Tripletex før resten overføres.");
-  if(!approved)return;
-  try{
-   if(remember)window.localStorage.setItem(addressKey,recipient);
-   else window.localStorage.removeItem(addressKey);
-  }catch{}
+
+ // Only documents with no prior attempt belong to the live work queue.
+ const remaining=rows.filter(row=>!row.transfer);
+ const eligible=tripletexPendingReceipts(rows);
+ const needsReview=rows.filter(row=>row.transfer&&row.transfer.status!=="accepted");
+ const sent=rows.filter(row=>row.transfer?.status==="accepted");
+ const canSend=validAddress(address)&&(!lockedRecipient||cleanAddress(address)===lockedRecipient);
+ const bulkPermitted=eligible.length<=1||
+  (summary?.acceptedByEmailProvider>0&&confirmedFirstInTripletex);
+
+ async function transfer({documentId=null,firstOnly=false}={}){
+  if(busy||!canSend||!eligible.length)return;
+  const individual=Boolean(documentId)||firstOnly;
+  if(!individual&&!bulkPermitted)return;
+  const selection=documentId?eligible.filter(r=>r.document.id===documentId):
+   tripletexPendingReceipts(rows,firstOnly);
+  if(!selection.length)return;
+
+  const recipient=cleanAddress(address);
+  const hint=selection.length===1?"\n\nBilag: "+description(selection[0]):"";
+  if(!window.confirm("Overfør "+selection.length+" bilag til "+recipient+"?"+hint+
+   "\n\nOriginalbilagene sendes til bilagsmottaket i Tripletex. Dette bokfører ikke bilagene. Kontroller dem der før godkjenning."))return;
+  try{window.localStorage.setItem(addressKey,recipient);}catch{}
   setBusy(true);stop.current=false;setError("");setInfo("");
-  setProgress({done:0,total:count});
-  let completed=0;
-  for(const row of selected){
+  setProgress({done:0,total:selection.length});
+  let done=0,failed=false;
+  for(const row of selection){
    if(stop.current)break;
-   if(!["application/pdf","image/jpeg","image/png"].includes(row.attachment.mime_type))continue;
    try{
-    const response=await fetch(endpoint,{
+    const res=await fetch(endpoint,{
      method:"POST",headers:{"Content-Type":"application/json"},
      body:JSON.stringify({action:"send-document",documentId:row.document.id,
       recipient,recipientConfirmation:recipient,confirmed:true})
     });
-    const data=await response.json().catch(()=>({}));
-    if(!response.ok)throw Error(data.error||"Uklart resultat for bilaget.");
-    completed++;
-    setProgress({done:completed,total:count});
-    // Refresh state from server after each successful action; never trust
-    // the local state as proof that the external inbox received the file.
+    const reply=await res.json().catch(()=>({}));
+    if(!res.ok)throw Error(reply.error||"Sendestatus er ukjent.");
+    done++;
+    setProgress({done,total:selection.length});
+    // Accepted documents disappear from the pending queue after a server refresh.
+    // "Accepted" does NOT claim that Tripletex has imported the document.
     await load();
    }catch(e){
-    setError("Overføringen ble stoppet: "+(e.message||"Ukjent feil.")+
-     " Sjekk Tripletex og statuslisten før du fortsetter.");
-    stop.current=true;
-    break;
+    setError("Overføringen stoppet ved "+description(row)+": "+
+     (e.message||"Ukjent feil.")+" Kontroller Tripletex før du forsøker noe mer.");
+    failed=true;stop.current=true;break;
    }
   }
   try{await load();}catch(e){setError(e.message);}
-  if(!stop.current)setInfo(firstOnly?
-   "Ett bilag er akseptert av e-posttjenesten. Åpne bilagsmottaket i Tripletex, kontroller at det er mottatt, og bekreft dette før resten sendes.":
-   completed+" bilag er akseptert av e-posttjenesten. Kontroller at alle vises i Tripletex før du bokfører.");
-  else if(completed>0)setInfo(completed+" bilag ble akseptert før overføringen stoppet.");
+  if(!failed&&done>0){
+   setInfo(done+" bilag akseptert av e-posttjenesten og fjernet fra listen «Ikke overført». "+
+    "Kontroller at "+(done===1?"det":"de")+" er mottatt i Tripletex før bokføring.");
+  }else if(failed&&done>0){
+   setInfo(done+" bilag ble akseptert før sendingen stoppet. De er flyttet til sendingshistorikken.");
+  }
   setBusy(false);
- };
- return <div className={styles.shell}>
+ }
+
+ const originalLink=row=>row.attachment?
+  <a className={styles.link} href={"/api/admin/invoices/vat-attachments?documentId="+
+   encodeURIComponent(row.document.id)+"&download=1"}>Vis original</a>:null;
+ return <div className={styles.shell} id="tripletex-kvitteringer">
   <header className={styles.head}>
-   <h2 style={{fontSize:22}}>Inngående kvitteringer og leverandørbilag</h2>
-   <p>Alle registrerte, aktive leverandørbilag fra alle terminer. Originalene sendes til Tripletex sitt bilagsmottak – ingen kostnader eller MVA bokføres automatisk.</p>
+   <h2 style={{fontSize:22,margin:"0 0 7px"}}>Kvitteringer og leverandørbilag</h2>
+   <p>Kun bilag som ikke er sendt ligger i arbeidslisten. Sendte bilag tas vare på i historikken.</p>
   </header>
   {summary&&<div className={styles.stats}>
-   <div className={styles.stat}><strong>{summary.total}</strong><span>Registrerte bilag</span></div>
-   <div className={styles.stat}><strong>{summary.withOriginal}</strong><span>Med originalfil</span></div>
-   <div className={styles.stat}><strong>{summary.acceptedByEmailProvider}</strong><span>Akseptert av e-posttjenesten</span></div>
+   <div className={styles.stat}><strong>{remaining.length}</strong><span>Ikke overført</span></div>
+   <div className={styles.stat}><strong>{sent.length}</strong><span>Sendt til e-bilagsmottak</span></div>
+   <div className={styles.stat}><strong>{needsReview.length}</strong><span>Trenger kontroll</span></div>
   </div>}
-  {loading&&<p role="status">Henter registrerte kvitteringer …</p>}
-  {error&&<p role="alert" className={styles.error}>{error}</p>}
+  {loading&&<p role="status">Henter kvitteringer …</p>}
+  {error&&<p className={styles.error} role="alert">{error}</p>}
   {info&&<p role="status" className={styles.progress}>{info}</p>}
   {!loading&&<>
    <section className={styles.section}>
-    <h2>1. Klar for overføring</h2>
-    <p className={styles.hint}>Vi har {summary?.withOriginal??0} originalfiler ({size(summary?.totalBytes)}) klare for overføring.
-     {" "}Du kan ta ut en samlet CSV-oversikt før du sender. CSV-filen er en kontrolliste, <strong>ikke en ferdig bokføringsimport</strong> – konto og MVA-kode må kontrolleres i Tripletex.</p>
-    <div className={styles.actions}>
-     <a className={styles.link} href={endpoint+"?format=csv"}>Last ned alle bilagsopplysninger (CSV)</a>
-    </div>
-    {summary?.missingOriginal>0&&<p role="alert" className={styles.error}>
-     {summary.missingOriginal} bilag mangler originalfil. Disse blir ikke sendt før vedlegget er lagt til.</p>}
-   </section>
-   <section className={styles.section}>
-    <h2>2. Velg mottaker én gang</h2>
-    <p className={styles.hint}>Finn adressen i Tripletex under <strong>Bilag → Innstillinger → Bilagsmottak</strong>.
-     Bruk adressen som slutter på <strong>@ebilag.com</strong>.
-     {" "}<a className={styles.link} target="_blank" rel="noreferrer"
-      href="https://hjelp.tripletex.no/hc/no/articles/17758675898129-Slik-legger-du-inn-e-postadresse-for-bilagsmottaket">Hjelp fra Tripletex</a>
-    </p>
-    <div className={styles.inputs}>
+    <h2>Mottaker i Tripletex</h2>
+    <div className={styles.recipientRow}>
      <label>E-bilagsadresse
-      <input type="email" autoComplete="off" spellCheck={false}
-       placeholder="dittfirma@ebilag.com" value={address}
-       onChange={e=>{setAddress(e.target.value);setConfirmed(false);}} disabled={busy||Boolean(lockedRecipient)}/>
+      <input type="email" spellCheck={false} autoComplete="off" value={address}
+       disabled={busy||Boolean(lockedRecipient)} onChange={e=>setAddress(e.target.value)}/>
      </label>
+     {lockedRecipient&&<p className={styles.hint}>Tidligere benyttet adresse – låst for å unngå feil mottaker.</p>}
     </div>
-    {lockedRecipient&&<p className={styles.hint}>Denne adressen er allerede brukt på tidligere sendinger og er låst mot utilsiktet bytte: <strong>{lockedRecipient}</strong>.</p>}
-    {address&&!validRecipient(address)&&<p className={styles.error}>Bruk e-bilagsadressen fra Tripletex (@ebilag.com).</p>}
-    <label className={styles.check}><input type="checkbox" checked={remember}
-     onChange={e=>setRemember(e.target.checked)} disabled={busy}/>
-     <span>Husk e-bilagsadressen i denne nettleseren til neste gang.</span>
-    </label>
-    <label className={styles.check}><input type="checkbox" checked={confirmed}
-     onChange={e=>setConfirmed(e.target.checked)} disabled={busy}/>
-     <span>Jeg har kopiert adressen fra Tripletex og kontrollert at den tilhører firmaets bilagsmottak. Jeg forstår at e-postleverandørens bekreftelse ikke betyr at bilaget er bokført.</span>
-    </label>
-    <div className={styles.actions}>
-     {pending.length>0&&!summary?.acceptedByEmailProvider&&
-      <button type="button" className={styles.primary} disabled={!canSend||busy}
-       onClick={()=>transfer({firstOnly:true})}>
-       Overfør én kvittering først
-      </button>}
-     {pending.length>1&&summary?.acceptedByEmailProvider>0&&
-      <label className={styles.check}><input type="checkbox" checked={confirmedFirstInTripletex}
-       disabled={busy} onChange={e=>setConfirmedFirstInTripletex(e.target.checked)}/>
-       <span>Jeg har sett at den første kvitteringen faktisk er mottatt i Tripletex sitt bilagsmottak.</span>
-      </label>}
-     <button type="button" className={styles.primary}
-      disabled={!canSend||!pending.length||busy||
-       pending.length>1&&(!summary?.acceptedByEmailProvider||!confirmedFirstInTripletex)}
-      onClick={()=>transfer({firstOnly:false})}>
-      {busy?"Sender bilag …":"Overfør "+pending.length+" usendte bilag til Tripletex"}
-     </button>
-     {busy&&<button type="button" onClick={()=>{stop.current=true;setInfo("Stopper etter pågående bilag …");}}>
-      Stopp etter dette bilaget</button>}
-    </div>
-    {busy&&<p role="status" className={styles.progress}>{progress.done} av {progress.total} bekreftet av e-posttjenesten. Ikke lukk siden før overføringen er ferdig.</p>}
-    {summary?.requiresReview>0&&<p role="alert" className={styles.error}>
-     {summary.requiresReview} bilag har uklar sendestatus. De blir aldri sendt automatisk på nytt. Kontroller Tripletex og sendeloggen først.</p>}
-    {unsupported.length>0&&<p className={styles.error}>{unsupported.length} vedlegg har et format Tripletex ikke godtar. Last ned og konverter disse før overføring.</p>}
-    <p className={styles.hint}>Start med én ekte kvittering. Når du har sett den i Tripletex, kan du overføre resten med én knapp.
-     Bilag som allerede er forsøkt sendt, blir hoppet over; uklare sendinger krever kontroll.
-     Hvis du avbryter, kan du fortsette med de resterende senere.</p>
+    {!canSend&&<p className={styles.error}>Bruk riktig adresse fra bilagsmottaket (@ebilag.com).</p>}
+    <p className={styles.hint}>Adressen er ferdig utfylt. Ved overføring bekrefter du selve sendingen én gang. Dette sender originalen til bilagsmottaket, men bokfører ikke kjøpet.</p>
    </section>
    <section className={styles.section}>
-    <h2>3. Kvitteringene og status</h2>
-    <div className={styles.list}>{rows.map(row=><div key={row.document.id} className={styles.item}>
-     <div className={styles.itemInfo}>
-      <strong>{row.document.supplier_name}</strong>
-      <small>{row.document.document_date} · {row.document.supplier_document_number}
-       {row.document.kind==="credit"?" · Kreditnota":""}</small>
-      <small className={styles.status}>{row.attachment?messageState(row.transfer?.status):"Mangler originalfil"}</small>
-      <small>{row.attachment?.original_filename||"Ingen vedlagt fil"}</small>
+    <h2>Ikke overført ({remaining.length})</h2>
+    {remaining.length===0?<p className={styles.empty}>Ingen usendte kvitteringer. Alle bilag er enten sendt eller ligger til kontroll.</p>:<>
+     <p className={styles.hint}>Velg «Overfør til Tripletex» på et enkelt bilag, eller overfør resten samlet når du har kontrollert at en prøvekvittering er mottatt.</p>
+     <div className={styles.actions}>
+      {eligible.length>1&&summary?.acceptedByEmailProvider>0&&
+       <label className={styles.check}><input type="checkbox" checked={confirmedFirstInTripletex}
+        disabled={busy} onChange={e=>setConfirmedFirstInTripletex(e.target.checked)}/>
+        <span>Jeg har kontrollert at en prøvekvittering faktisk vises i Tripletex sitt bilagsmottak.</span>
+       </label>}
+      {eligible.length>1&&!summary?.acceptedByEmailProvider&&
+       <p className={styles.hint}>Start med én kvittering. Når den vises i Tripletex, kan du overføre resten samlet.</p>}
+      <button type="button" className={styles.primary} disabled={!canSend||!eligible.length||busy||!bulkPermitted}
+       onClick={()=>transfer({firstOnly:false})}>
+       {busy?"Overfører …":"Overfør "+eligible.length+" usendte bilag til Tripletex"}
+      </button>
+      {busy&&<button type="button" onClick={()=>{stop.current=true;setInfo("Stopper etter pågående bilag …");}}>
+       Stopp etter dette bilaget
+      </button>}
      </div>
-     <div className={styles.itemLinks}>
-      {row.attachment&&<a href={"/api/admin/invoices/vat-attachments?documentId="+encodeURIComponent(row.document.id)+"&download=1"}>
-       Åpne original</a>}
+     {busy&&<p role="status" className={styles.progress}>{progress.done} av {progress.total} akseptert av e-posttjenesten.</p>}
+     <div className={styles.list}>{remaining.map(row=><div key={row.document.id} className={styles.item}>
+      <div className={styles.itemInfo}>
+       <strong>{row.document.supplier_name||"Ukjent leverandør"}</strong>
+       <small>{row.document.document_date} · {row.document.supplier_document_number}
+        {row.document.kind==="credit"?" · Kreditnota":""}</small>
+       <small>{row.attachment?.original_filename||"Original mangler"}</small>
+       {!supported(row.attachment)&&<small className={styles.error}>
+        {row.attachment?"Formatet må være PDF/JPG/PNG":"Mangler originalvedlegg"}</small>}
+      </div>
+      <div className={styles.itemLinks}>
+       <button type="button" className={styles.primary} disabled={busy||!canSend||!supported(row.attachment)}
+        onClick={()=>transfer({documentId:row.document.id})}>Overfør til Tripletex</button>
+       {originalLink(row)}
+      </div>
+     </div>)}</div>
+    </>}
+   </section>
+   {needsReview.length>0&&<section className={styles.section}>
+    <h2>Må kontrolleres ({needsReview.length})</h2>
+    <p role="alert" className={styles.error}>Disse har et sendeforsøk med ukjent utfall. De sendes aldri automatisk på nytt. Kontroller e-bilagsmottaket og e-postloggen.</p>
+    <div className={styles.list}>{needsReview.map(row=><div className={styles.item} key={row.document.id}>
+     <div className={styles.itemInfo}><strong>{description(row)}</strong>
+      <small>{row.transfer.status==="sending"?"Sendeforsøk pågår eller ble avbrutt":"Uklart sendeforsøk"}</small>
      </div>
+     <div className={styles.itemLinks}>{originalLink(row)}</div>
     </div>)}</div>
+   </section>}
+   <section className={styles.section}>
+    <details>
+     <summary className={styles.historyToggle}>Sendingshistorikk ({sent.length})</summary>
+     <p className={styles.hint}>«Sendt» betyr at e-posttjenesten aksepterte bilaget. Mottak og bokføring må bekreftes i Tripletex.</p>
+     {sent.length? <div className={styles.list}>{sent.map(row=><div className={styles.item} key={row.document.id}>
+      <div className={styles.itemInfo}><strong>{row.document.supplier_name}</strong>
+       <small>{row.document.document_date} · {row.document.supplier_document_number}</small>
+       <small>Akseptert av e-posttjenesten · {row.transfer.recipient}</small>
+      </div>
+      <div className={styles.itemLinks}>{originalLink(row)}</div>
+     </div>)}</div>:<p className={styles.empty}>Ingen bilag sendt ennå.</p>}
+    </details>
+    <div className={styles.actions}>
+     <a className={styles.link} href={endpoint+"?format=csv"}>Last ned komplett bilagsoversikt (CSV)</a>
+    </div>
+    <p className={styles.hint}>Oversikten inkluderer alle bilag, også de som er sendt. Slik kan du alltid ettergå historikken.</p>
    </section>
   </>}
  </div>;
