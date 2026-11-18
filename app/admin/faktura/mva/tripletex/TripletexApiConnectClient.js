@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useState} from "react";
 import styles from "./TripletexReceipts.module.css";
+import TripletexCustomerSyncClient from "./TripletexCustomerSyncClient";
 
 const url="/api/admin/tripletex/connection";
 const empty={configured:false,environment:null,verifiedAt:null,directInvoiceTransferEnabled:false};
@@ -127,6 +128,7 @@ export default function TripletexApiConnectClient(){
     {" "}Kunder {access.customer?"✓":"mangler"} · Fakturaer {access.invoices?"✓":"mangler"} ·
     Betalingstyper {access.paymentTypes?"✓":"mangler"} · MVA-koder {access.vatTypes?"✓":"mangler"}.
    </p>}
+   {state.configured&&<TripletexCustomerSyncClient/>}
    {state.configured&&<div style={{borderTop:"1px solid #e3dfd9",paddingTop:14,marginTop:16}}>
     <h3 style={{fontSize:17,margin:"0 0 8px"}}>Forhåndskontroller én kundefaktura</h3>
     <p className={styles.hint}>Sjekker kunden, MVA-kodene og hva som gjenstår før en sikker direkteoverføring.
