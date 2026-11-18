@@ -347,7 +347,7 @@ export default function InvoicesClient({archiveMode=false,isOwner=false}){
  }
  function exportCsv(){if(!form)return;const esc=v=>'"'+String(v??"").replaceAll('"','""')+'"';const rows=[["Beskrivelse","Antall","Enhet","Enhetspris eks MVA (kr)","MVA %"],...form.line_items.map(l=>[l.description,l.quantity,l.unit,(Number(l.unitPriceOre)/100).toFixed(2),l.vatRate])];const csv="\uFEFF"+rows.map(row=>row.map(esc).join(";")).join("\r\n");const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download="fakturakladd-"+form.id+".csv";a.click();URL.revokeObjectURL(url);}
  return <main className="admin" style={{display:"block",width:"100%",minWidth:0,maxWidth:archiveMode?1360:1100,margin:"0 auto",padding:"clamp(14px,2vw,24px)"}}><Link href="/admin">← Admin</Link><h1>{archiveMode?"Fakturaarkiv":"Fakturakladder"}</h1><nav aria-label="Fakturaoversikt" style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:18}}><Link href="/admin/faktura" aria-current={!archiveMode?"page":undefined}>Kladder</Link><Link href="/admin/faktura/arkiv" aria-current={archiveMode?"page":undefined}>Fakturaarkiv – betalinger</Link>{!archiveMode&&isOwner&&<Link href="/admin/faktura/test">Prøvekjør fakturadeling</Link>}{archiveMode&&<Link href="/admin/faktura/rapport">Rapport og CSV – avsluttede fakturaer</Link>}{archiveMode&&<Link href="/admin/faktura/mva">MVA-avstemming per termin</Link>}{archiveMode&&isOwner&&<Link href="/admin/faktura/mva/tripletex">Overfør fakturaer til Tripletex</Link>}</nav><p>{archiveMode?"Her finner du alle utstedte fakturaer. Registrer innbetalinger og se hva som gjenstår. Oversikten bygger på betalingene du registrerer her.":"Opprett og kontroller fakturakladder. Utstedte fakturaer flyttes automatisk til fakturaarkivet."}</p>
- {error&&<p role="alert" style={{color:"crimson"}}>{error} {error.includes("en annen fane")&&<button type="button" disabled={busy} onClick={reloadAfterConflict}>Hent siste fakturakladd</button>}</p>}{printHref&&<p><a href={printHref} target="_blank" rel="noreferrer">Åpne faktura for utskrift →</a></p>}
+ {error&&<p role="alert" style={{color:"crimson"}}>{error} {error.includes("en annen fane")&&<button type="button" disabled={busy} onClick={reloadAfterConflict}>Hent siste fakturakladd</button>}</p>}{archiveMode&&saved&&<p role="status" className={workspaceStyles.savedNotice}>{saved}</p>}{printHref&&<p><a href={printHref} target="_blank" rel="noreferrer">Åpne faktura for utskrift →</a></p>}
  {!archiveMode&&items.some(x=>x.auto_send_state==="needs_review"||x.auto_send_state==="processing")&&
  <p role="alert" style={{padding:12,border:"1px solid #cc9980",borderRadius:8}}>
   <strong>Planlagte fakturaer trenger oppfølging:</strong> {items.filter(x=>x.auto_send_state==="needs_review").length} stoppet for kontroll,
@@ -363,7 +363,9 @@ export default function InvoicesClient({archiveMode=false,isOwner=false}){
   <p style={{fontSize:12,marginBottom:0}}>Automatisk sending kjøres daglig kl. 10:20 UTC (normalt ca. 11:20 norsk vintertid / 12:20 sommertid). En sendingsdato er ikke et løfte om klokkeslett.</p>
  </section>}
  {!archiveMode&&<section className="card" style={{padding:18,marginBottom:20}}><h2>Opprett fakturakladd</h2><p>Godkjente tilbud får egne kladder for forskudd, delbetaling og sluttoppgjør etter tilbudets betalingsplan. Faktura- og forfallsdato beregnes automatisk når du fakturerer, etter betalingsfristen på kundekortet.</p><button disabled={busy} onClick={()=>create(null)}>Ny tom kladd</button> <select id="invoiceQuote" defaultValue=""><option value="">Velg godkjent tilbud</option>{quotes.map(q=><option key={q.id} value={q.id}>{q.quoteNumber} – {q.title}</option>)}</select> <button disabled={busy} onClick={()=>{const id=document.getElementById("invoiceQuote").value;if(id)create(id);else setError("Velg et godkjent tilbud.");}}>Hent betalingsplan fra tilbud</button></section>}
- {archiveMode&&<InvoiceFollowUpDashboard invoices={items} today={today} activeFilter={filter} onFilterChange={setFilter} loading={loadingInvoices}/>}
+ {archiveMode&&<details className={workspaceStyles.overviewDisclosure}>
+ <summary>Vis samlet oppfølgings- og betalingsoversikt</summary>
+ <InvoiceFollowUpDashboard invoices={items} today={today} activeFilter={filter} onFilterChange={setFilter} loading={loadingInvoices}/>
  {archiveMode&&<section className="card" style={{padding:18,marginBottom:20}}>
   <div style={{display:"flex",flexWrap:"wrap",justifyContent:"space-between",gap:12,alignItems:"center",marginBottom:14}}>
    <div><h2 style={{margin:"0 0 5px"}}>Betalingsoversikt</h2><p className="muted" style={{margin:0}}>Basert på registrerte innbetalinger. Sjekk bank/Vipps før purring.</p></div>
@@ -384,6 +386,7 @@ export default function InvoicesClient({archiveMode=false,isOwner=false}){
   </div>
   <p className="muted" style={{fontSize:12,margin:"12px 0 0"}}>Delbetalinger regnes bare med restbeløpet. «14 dager forfalt» betyr minst 14 hele kalenderdager etter forfallsdatoen. Ingen purringer sendes fra denne oversikten.</p>
  </section>}
+ </details>}
  <div className={archiveMode?(form?workspaceStyles.archiveWorkspace:workspaceStyles.archiveWorkspace+" "+workspaceStyles.archiveNoSelection):workspaceStyles.draftWorkspace}>
  <section id="invoice-archive-list" className={"card"+(archiveMode?" "+workspaceStyles.archiveList:"")} style={{padding:16}}>
  {archiveMode&&<button type="button" className={workspaceStyles.choiceToggle}
