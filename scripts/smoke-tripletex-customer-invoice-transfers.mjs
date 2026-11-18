@@ -50,7 +50,9 @@ assert.equal(validateTripletexImportNumber("80000000"),80000000);
 assert.equal(validateTripletexImportNumber("0"),null);
 assert.equal(validateTripletexImportNumber("not a number"),null);
 const initial=tripletexCustomerInvoiceQueue([
- {id:id1,state:"unpaid"},{id:id2,state:"paid"},{id:"review",state:"review"}
+ {id:id1,state:"unpaid",paidOre:0},
+ {id:id2,state:"paid",paidOre:25000},
+ {id:"review",state:"review",paidOre:1000}
 ],[]);
 assert.equal(initial.pending.length,2);
 assert.equal(initial.needsReview.length,1);
