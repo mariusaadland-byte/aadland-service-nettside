@@ -257,6 +257,25 @@ assert.ok(ui.includes("queue.prepared.filter(matches)"),"Prepared must remain in
 assert.ok(ui.includes("queue.confirmed"),"Confirmed only in history");
 assert.ok(ui.includes('window.confirm('),"No silent accounting import action");
 assert.ok(ui.includes("paymentTypeVipps")&&ui.includes("paymentTypeOther"));
+assert.ok(ui.includes("Avansert – manuell CSV-import"),
+ "Technical CSV fields must be behind an Advanced disclosure");
+assert.ok(ui.includes('<details className={styles.importSettings} ref={csvSettingsRef}>'),
+ "CSV settings must be collapsed initially regardless of paid invoice count");
+assert.ok(!ui.includes("open={withPayment.length>0}"),
+ "Never auto-expand the confusing CSV fields when paid invoices exist");
+assert.ok(ui.includes("csvSettingsRef.current.open=true"),
+ "Attempting paid export without payment type should open Advanced to show missing fields");
+assert.ok(ui.includes("Overfør fakturaer med innbetaling (")&&
+ ui.includes("Overfør denne fakturaen – CSV"),
+ "Simple transfer controls must remain visible and clearly state CSV fallback");
+const page=read("app/admin/faktura/mva/tripletex/page.js");
+assert.ok(page.indexOf("<TripletexApiConnectClient/>")<
+ page.indexOf("<TripletexSalesClient/>")&&
+ page.indexOf("<TripletexSalesClient/>")<page.indexOf("<TripletexReceiptsClient/>"),
+ "API setup must precede outgoing invoices and supplier receipts");
+const styles=read("app/admin/faktura/mva/tripletex/TripletexReceipts.module.css");
+assert.ok(styles.includes(".apiConnection{")&&styles.includes(".importSettings{"),
+ "API primary step and manual CSV disclosure must be styled");
 assert.ok(ui.includes('prepare(withPayment.map(x=>x.id),"paid-batch")'),
  "Only verified paid invoices may be collected by bulk button");
 assert.ok(ui.includes('prepare([x.id],"unpaid-single")'),

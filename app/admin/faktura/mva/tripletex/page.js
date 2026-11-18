@@ -15,9 +15,11 @@ export default async function TripletexReceiptsPage(){
   <h1 style={{fontSize:"clamp(24px,4vw,32px)",margin:"12px 0 7px"}}>Tripletex – overfør fakturaer og kvitteringer</h1>
   <p style={{fontSize:13,color:"#635d54",lineHeight:1.5,marginBottom:20}}>Fakturaer som du har sendt til kunder og kvitteringer du har mottatt fra leverandører, overføres på forskjellige måter for å unngå dobbelt bokføring.</p>
   <TripletexApiConnectClient/>
-  <TripletexReceiptsClient/>
-  <section id="tripletex-fakturaer" style={{marginTop:38,borderTop:"2px solid #dfd8ce",paddingTop:17}}>
+  <section style={{marginTop:28,borderTop:"2px solid #dfd8ce",paddingTop:17}}>
    <TripletexSalesClient/>
+  </section>
+  <section style={{marginTop:28,borderTop:"2px solid #dfd8ce",paddingTop:17}}>
+   <TripletexReceiptsClient/>
   </section>
  </main>;
 }
