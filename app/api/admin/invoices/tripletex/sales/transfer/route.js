@@ -79,8 +79,14 @@ export async function GET(req){
   }))});
   const batchId=url.searchParams.get("batchId");
   if(!uuid(batchId))return json({error:"Ugyldig eksportreferanse."},400);
-  const selected=transfers.filter(x=>x.batch_id===batchId);
-  if(!selected.length)return json({error:"Fant ingen klargjort fakturaimport."},404);
+  const batchRows=transfers.filter(x=>x.batch_id===batchId);
+  if(!batchRows.length)return json({error:"Fant ingen klargjort fakturaimport."},404);
+  // If only some rows were imported, a second download must NEVER include
+  // already-confirmed invoices. This prevents duplicate booking in Tripletex.
+  const selected=batchRows.filter(x=>x.status==="prepared");
+  if(!selected.length)return json({
+   error:"Alle fakturaene i denne importen er allerede bekreftet importert. Ingen ny importfil er tilgjengelig."
+  },409);
   if(selected.length>100)return json({error:"For mange fakturaer i eksporten."},409);
   const rows=salesInvoiceExportOverview(await issued(s),osloDateKey(new Date())).rows;
   const byId=new Map(rows.map(x=>[x.invoice.id,x]));
