@@ -10,6 +10,8 @@ export default function TripletexApiConnectClient(){
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
  const [key,setKey]=useState(""),[environment,setEnvironment]=useState("production");
  const [error,setError]=useState(""),[info,setInfo]=useState(""),[access,setAccess]=useState(null);
+ const [invoiceOptions,setInvoiceOptions]=useState([]),[selectedInvoice,setSelectedInvoice]=useState("");
+ const [preflight,setPreflight]=useState(null);
  useEffect(()=>{
   let active=true;
   fetch(url,{cache:"no-store"}).then(async r=>{
@@ -44,6 +46,36 @@ export default function TripletexApiConnectClient(){
   }catch(e){setError(e.message||"Kunne ikke gjennomføre handlingen.")}
   finally{setBusy(false);}
  }
+ async function checkInvoiceMapping(){
+  if(busy||!selectedInvoice)return;
+  setBusy(true);setError("");setPreflight(null);
+  try{
+   const r=await fetch("/api/admin/tripletex/preview",{
+    method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({invoiceIds:[selectedInvoice]})
+   });
+   const out=await r.json().catch(()=>({}));
+   if(!r.ok)throw Error(out.error||"Kunne ikke kontrollere fakturaen.");
+   setPreflight(out);
+  }catch(e){setError(e.message||"Fakturakontroll feilet.")}
+  finally{setBusy(false);}
+ }
+ useEffect(()=>{
+  if(!state.configured)return;
+  let active=true;
+  fetch("/api/admin/invoices/tripletex/sales",{cache:"no-store"})
+   .then(async r=>{const v=await r.json().catch(()=>({}));
+    if(!r.ok)throw Error(v.error||"Kunne ikke hente fakturaer.");
+    if(active){
+     const arr=(v.rows||[]).filter(x=>x.state==="paid"||x.state==="unpaid")
+      .map(x=>({id:x.id,label:String(x.originalNumber||"Faktura")+" · "+
+       String(x.customerName||"Kunde").slice(0,80)}));
+     setInvoiceOptions(arr);
+     setSelectedInvoice(old=>arr.some(x=>x.id===old)?old:(arr[0]?.id||""));
+    }
+   }).catch(()=>{});
+  return()=>{active=false};
+ },[state.configured]);
  const status=state.configured?"Tilkoblet":"Ikke koblet til";
  return <section className={styles.section} id="tripletex-api">
   <h2 style={{fontSize:22,margin:"0 0 8px"}}>Direktekobling til Tripletex (API)</h2>
@@ -95,6 +127,27 @@ export default function TripletexApiConnectClient(){
     {" "}Kunder {access.customer?"✓":"mangler"} · Fakturaer {access.invoices?"✓":"mangler"} ·
     Betalingstyper {access.paymentTypes?"✓":"mangler"} · MVA-koder {access.vatTypes?"✓":"mangler"}.
    </p>}
+   {state.configured&&<div style={{borderTop:"1px solid #e3dfd9",paddingTop:14,marginTop:16}}>
+    <h3 style={{fontSize:17,margin:"0 0 8px"}}>Forhåndskontroller én kundefaktura</h3>
+    <p className={styles.hint}>Sjekker kunden, MVA-kodene og hva som gjenstår før en sikker direkteoverføring.
+     Dette er bare lesing fra Tripletex og kan ikke bokføre noe.</p>
+    <div className={styles.inputs}>
+     <label>Faktura
+      <select value={selectedInvoice} disabled={busy}
+       onChange={e=>{setSelectedInvoice(e.target.value);setPreflight(null)}}>
+       {invoiceOptions.map(x=><option key={x.id} value={x.id}>{x.label}</option>)}
+      </select>
+     </label>
+    </div>
+    <div className={styles.actions}>
+     <button type="button" disabled={busy||!selectedInvoice} onClick={checkInvoiceMapping}>
+      {busy?"Kontrollerer …":"Kontroller fakturakoblingen"}
+     </button>
+    </div>
+    {preflight?.results?.map(x=><p className={styles.hint} key={x.id} role="status">
+     <strong>{x.ready?"Kunde/MVA mappet ✓":"Må avklares"}:</strong> {x.reason}
+    </p>)}
+   </div>}
    {state.configured&&<p className={styles.hint}>Sist bekreftet:
     {" "}{state.verifiedAt?new Date(state.verifiedAt).toLocaleString("nb-NO"):"–"}.
     API-et kan nå testes. Direkte opprettelse av regnskapsfakturaer er fortsatt sperret
