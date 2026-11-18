@@ -4,7 +4,6 @@ import styles from "./TripletexReceipts.module.css";
 import {DEFAULT_TRIPLETEX_INBOX,tripletexPendingReceipts,tripletexReceiptQueue} from "../../../../../lib/tripletexReceiptTransfer";
 
 const endpoint="/api/admin/invoices/tripletex";
-const addressKey="aadland-tripletex-ebilag-recipient-v1";
 const cleanAddress=value=>String(value||"").trim().toLowerCase();
 const validAddress=value=>/^[a-z0-9._%+-]+@ebilag\.com$/.test(cleanAddress(value));
 const sizes=bytes=>new Intl.NumberFormat("nb-NO",{maximumFractionDigits:1}).format(Number(bytes||0)/1048576)+" MB";
@@ -22,12 +21,6 @@ export default function TripletexReceiptsClient(){
  const [progress,setProgress]=useState({done:0,total:0});
  const stop=useRef(false);
 
- useEffect(()=>{
-  try{
-   const saved=window.localStorage.getItem(addressKey);
-   if(validAddress(saved))setAddress(previous=>previous===DEFAULT_TRIPLETEX_INBOX?cleanAddress(saved):previous);
-  }catch{}
- },[]);
  const load=useCallback(async()=>{
   const res=await fetch(endpoint,{cache:"no-store"});
   const body=await res.json().catch(()=>({}));
@@ -64,7 +57,6 @@ export default function TripletexReceiptsClient(){
   const hint=selection.length===1?"\n\nBilag: "+description(selection[0]):"";
   if(!window.confirm("Overfør "+selection.length+" bilag til "+recipient+"?"+hint+
    "\n\nOriginalbilagene sendes til bilagsmottaket i Tripletex. Dette bokfører ikke bilagene. Kontroller dem der før godkjenning."))return;
-  try{window.localStorage.setItem(addressKey,recipient);}catch{}
   setBusy(true);stop.current=false;setError("");setInfo("");
   setProgress({done:0,total:selection.length});
   let done=0,failed=false;
