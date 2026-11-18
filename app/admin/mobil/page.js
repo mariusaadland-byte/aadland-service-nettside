@@ -18,6 +18,7 @@ const links=[
  {name:"Utleiebookinger",subtitle:"Kalender og bestillinger",href:"/admin",emoji:"📅",access:"orders"},
  {name:"Returkontroll og depositum",subtitle:"Skadesjekk, depositum og kontrollhistorikk",href:"/admin/utleie/depositum",emoji:"🔎",access:"orders"},
  {name:"Vipps",subtitle:"Betaling og oppgjør",href:"/admin/vipps",emoji:"💳",access:"owner"},
+ {name:"Regnskap",subtitle:"Oversikt, betalt, MVA og Tripletex",href:"/admin/regnskap",emoji:"📊",access:"owner"},
  {name:"MVA og bilag",subtitle:"Leverandørbilag og MVA-oversikt",href:"/admin/faktura/mva",emoji:"📸",access:"owner"},
 ];
 export default async function MobileAdmin(){

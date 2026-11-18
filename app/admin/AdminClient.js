@@ -33,6 +33,7 @@ const labels = {
 
 const ADMIN_NAV_GROUPS=[
   {id:"sales",title:"Salg og kunder",icon:"◎",ids:["orders","surveys","customers","drawings","quotes","invoices","invoiceArchive","reminders","archive"]},
+  {id:"accounting",title:"Regnskap",icon:"▥",ids:["accounting","accountPaid","accountUnpaid","accountExpenses","accountVat","accountLedger","accountTransfers"]},
   {id:"jobs",title:"Oppdrag og planlegging",icon:"▤",ids:["jobs","jobCalendar","workClock","drawing"]},
   {id:"shop",title:"Produkter og tjenester",icon:"◫",ids:["products","categories","services"]},
   {id:"rental",title:"Utleie",icon:"▣",ids:["rental","rentalCalendar","rentalBookings"]},
@@ -43,7 +44,7 @@ const ADMIN_NAV_GROUPS=[
 export default function AdminClient({ user }) {
   const [tab, setTab] = useState("overview");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuGroupId,setMenuGroupId]=useState("sales");
+  const [menuGroupId,setMenuGroupId]=useState(user?.role==="owner"?"accounting":"sales");
   const [menuSearch,setMenuSearch]=useState("");
   const [orders, setOrders] = useState([]);
   const [customerProfiles, setCustomerProfiles] = useState([]);
@@ -499,7 +500,16 @@ export default function AdminClient({ user }) {
   tabs.push(["drawing", "Tegning & visualisering"]);
   if (canManageUsers) tabs.push(["users", "Brukere"]);
   if (canUpdateOrders || canManageProducts) tabs.push(["quotes", "Tilbud"],["invoices", "Fakturakladder"],["invoiceArchive", "Fakturaoversikt"]);
-  if (user?.role === "owner") tabs.push(["roadmap", "Utviklingsplan"]);
+  if (user?.role === "owner") tabs.push(
+    ["accounting","Regnskapsoversikt"],
+    ["accountPaid","Betalte fakturaer"],
+    ["accountUnpaid","Ubetalte fakturaer"],
+    ["accountExpenses","Utgifter og bilag"],
+    ["accountVat","MVA og terminer"],
+    ["accountLedger","Regnskapsark"],
+    ["accountTransfers","Tripletex-overføring"],
+    ["roadmap", "Utviklingsplan"]
+  );
   const navLabels=new Map(tabs);
   const searchText=menuSearch.trim().toLocaleLowerCase("nb-NO");
   const groupedNav=ADMIN_NAV_GROUPS.map(group=>({
@@ -514,6 +524,17 @@ export default function AdminClient({ user }) {
     if (id === "quotes") {setMenuOpen(false);router.push("/admin/tilbud");return;}
     if (id === "invoices") {setMenuOpen(false);router.push("/admin/faktura");return;}
     if (id === "invoiceArchive") {setMenuOpen(false);router.push("/admin/faktura/arkiv");return;}
+    const accountRoutes={
+     accounting:"oversikt",accountPaid:"betalt",accountUnpaid:"ubetalt",
+     accountExpenses:"bilag",accountVat:"mva",accountLedger:"regnskapsark",
+     accountTransfers:"overforinger"
+    };
+    if (Object.prototype.hasOwnProperty.call(accountRoutes,id)){
+     if(user?.role!=="owner")return;
+     setMenuOpen(false);
+     router.push("/admin/regnskap?vis="+accountRoutes[id]);
+     return;
+    }
     if (id === "roadmap") {setMenuOpen(false);router.push("/admin/utviklingsplan");return;}
     if (id === "drawing") { setMenuOpen(false); router.push("/admin/tegning"); return; }
     if (id === "drawings") { setMenuOpen(false); router.push("/admin/tegninger"); return; }
