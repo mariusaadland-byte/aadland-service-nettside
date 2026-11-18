@@ -239,7 +239,8 @@ assert.ok(tripletexPage.indexOf("<TripletexReceiptsClient/>")<
  "Simple receipt transfer must be shown before complex outgoing invoice CSV import");
 
 assert.ok(source.includes("!row.transfer"),"Only new receipts may be selected");
-assert.ok(ui.includes('window.localStorage.setItem(addressKey,recipient)'),"Remember non-secret destination");
+assert.ok(ui.includes("useState(DEFAULT_TRIPLETEX_INBOX)"),"Use confirmed company inbox without typing");
+assert.ok(!ui.includes("localStorage.getItem"),"Do not override user's confirmed address with old browser data");
 assert.ok(ui.includes('setLockedRecipient(remembered)'),"Lock previously used company inbox");
 assert.ok(route.includes("existingRecipients.data.some(row=>row.recipient!==recipient)"),
  "Do not allow silent change of accounting company");
