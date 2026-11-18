@@ -39,3 +39,17 @@
 .archiveDetail :is(#invoice-payment-actions,#invoice-friendly-reminder,#invoice-reminder-actions,#invoice-credit-note,#invoice-vipps-payment,#invoice-payment-statement,#invoice-settlement,#invoice-administrative-close,#invoice-activity-timeline){scroll-margin-top:22px}
 @media(max-width:820px){.actionGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.archiveWorkspace{gap:14px}}
 @media(max-width:510px){.actionGrid{grid-template-columns:1fr}.summary{gap:8px}.summary strong{font-size:19px}.actionButton{min-height:53px;padding:12px!important}.heroHeading h2{font-size:27px}.archiveDetail{padding:15px!important}}
+
+/* The invoice archive is an action chooser, not an endless stack of forms. */
+.overviewDisclosure{margin:10px 0 18px;border:1px solid #ded6c9;border-radius:10px;padding:12px 16px;background:#faf8f3}
+.overviewDisclosure summary{font-weight:700;cursor:pointer;color:#655037;font-size:14px}
+.overviewDisclosure[open]>summary{margin-bottom:16px}
+.activeActionHeader{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 15px;border:1px solid #cbb58f;border-radius:10px;background:#f9f2e5;margin:2px 0 15px;scroll-margin-top:16px}
+.activeActionHeader strong{font-size:16px;color:#362a19}
+.activeActionHeader button{background:#fff!important;color:#4c3821!important;border:1px solid #cdbba3!important;border-radius:8px;padding:10px 14px!important;font-weight:750}
+.activeActionHeader button:hover{background:#f4e6cb!important}
+.actionButton[aria-pressed="true"]{background:#f5e4c6!important;border:2px solid #a97a35!important;color:#38250b!important}
+.secondaryActions button{border:0;background:transparent;padding:7px 0;color:#654a2c;text-decoration:underline;text-underline-offset:3px;font-size:13px;font-weight:700;text-align:left}
+.secondaryActions button[aria-pressed="true"]{color:#2e2112;text-decoration-thickness:2px}
+.secondaryActions button:hover{text-decoration-thickness:2px}
+@media(max-width:510px){.activeActionHeader{flex-wrap:wrap}.activeActionHeader button{min-height:42px}}
