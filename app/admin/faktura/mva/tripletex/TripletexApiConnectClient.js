@@ -77,7 +77,7 @@ export default function TripletexApiConnectClient(){
   return()=>{active=false};
  },[state.configured]);
  const status=state.configured?"Tilkoblet":"Ikke koblet til";
- return <section className={styles.section} id="tripletex-api">
+ return <section className={styles.apiConnection} id="tripletex-api">
   <h2 style={{fontSize:22,margin:"0 0 8px"}}>Direktekobling til Tripletex (API)</h2>
   <p className={styles.hint}>Med API slipper du etter hvert å laste opp CSV-filer.
    Tilkoblingen settes opp først, og deretter kontrollerer vi kunder, avgiftskoder og betalinger
