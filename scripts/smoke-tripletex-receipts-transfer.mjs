@@ -3,8 +3,9 @@ import crypto from "node:crypto";
 import {readFileSync} from "node:fs";
 const read=path=>readFileSync(path,"utf8");
 const source=read("lib/tripletexReceiptTransfer.js").replace(/^export /gm,"");
-const {normalizeTripletexInbox,tripletexReceiptEmail,tripletexReceiptCsv,tripletexPendingReceipts}=
- new Function(source+";return {normalizeTripletexInbox,tripletexReceiptEmail,tripletexReceiptCsv,tripletexPendingReceipts};")();
+const {normalizeTripletexInbox,tripletexReceiptEmail,tripletexReceiptCsv,tripletexPendingReceipts,tripletexReceiptQueue,DEFAULT_TRIPLETEX_INBOX}=
+ new Function(source+";return {normalizeTripletexInbox,tripletexReceiptEmail,tripletexReceiptCsv,tripletexPendingReceipts,tripletexReceiptQueue,DEFAULT_TRIPLETEX_INBOX};")();
+assert.equal(DEFAULT_TRIPLETEX_INBOX,"aadlandservice@ebilag.com");
 const id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const file=Buffer.from("%PDF-1.4\nFake test-only invoice bytes\n%%EOF");
 const sha=crypto.createHash("sha256").update(file).digest("hex");
@@ -193,11 +194,12 @@ const ui=read("app/admin/faktura/mva/tripletex/TripletexReceiptsClient.js");
 const nav=read("app/admin/faktura/mva/InvoiceVatTermClient.js");
 assert.ok(page.includes('admin.role!=="owner"'));
 assert.ok(ui.includes("window.confirm("));
-assert.ok(ui.includes('Overfør én kvittering først'),"Offer initial one-receipt send");
+assert.ok(ui.includes("Start med én kvittering"),"Ask owner to verify first receipt");
+assert.ok(ui.includes("Overfør til Tripletex"),"Every pending receipt gets one-click transfer");
 assert.ok(ui.includes("confirmedFirstInTripletex"),"Require explicit inbox confirmation");
 assert.ok(ui.includes("acceptedByEmailProvider"),"Bulk is gated behind a successful single submission");
 assert.ok(ui.includes("tripletexPendingReceipts(rows,firstOnly)"),"Send loop limited to first receipt in trial mode");
-assert.ok(ui.includes('pending.length>1&&(!summary?.acceptedByEmailProvider||!confirmedFirstInTripletex)'),
+assert.ok(ui.includes("summary?.acceptedByEmailProvider>0&&confirmedFirstInTripletex"),
  "Server-success alone must not permit mass send");
 assert.ok(ui.includes("recipientConfirmation:recipient,confirmed:true"));
 assert.ok(ui.includes("stop.current=true"));
@@ -209,9 +211,36 @@ const selected=[{document:receipt,attachment,transfer:null},
 assert.equal(tripletexPendingReceipts(selected).length,2);
 assert.equal(tripletexPendingReceipts(selected,true).length,1);
 assert.equal(tripletexPendingReceipts(selected,true)[0].document.id,receipt.id);
+const classified=tripletexReceiptQueue([...selected,
+ {document:{...receipt,id:"unknown"},attachment,
+ transfer:{status:"needs_review",recipient:"firma@ebilag.com"}}]);
+assert.equal(classified.remaining.length,4,"Only never-attempted receipts appear in pending list");
+assert.equal(classified.eligible.length,2,"Only allowed attachments can be sent");
+assert.equal(classified.sent.length,1,"Email-accepted receipt is hidden from pending");
+assert.equal(classified.needsReview.length,1,"Uncertain sends must be visible but never resent");
+assert.ok(!classified.remaining.some(x=>x.document.id==="sent"));
+assert.ok(!classified.remaining.some(x=>x.document.id==="unknown"));
+assert.ok(ui.includes("remaining.map(row=>"),"Visible queue excludes completed receipts");
+assert.ok(ui.includes("needsReview.map(row=>"),"Separate review section for ambiguous sends");
+assert.ok(ui.includes("sent.map(row=>"),"History preserves accepted receipts");
+assert.ok(ui.includes("documentId:row.document.id"),"Single receipt action sends only selected ID");
+assert.ok(ui.includes('recipientConfirmation:recipient,confirmed:true'));
+assert.ok(ui.includes("window.confirm("),"Explicit confirmation for real sending");
+assert.ok(!ui.includes("setConfirmed("),"No repeated confirmation checkbox");
+const accounting=read("app/admin/regnskap/AccountingOverviewClient.js");
+assert.ok(accounting.includes("<TripletexReceiptsClient/>"),
+ "Regnskap transfer list must expose working send buttons directly");
+const quick=read("app/admin/faktura/InvoiceQuickActions.js");
+assert.ok(quick.includes('href="/admin/faktura/mva/tripletex#tripletex-fakturaer"'),
+ "Outgoing invoice has direct shortcut to separate invoice import");
+const tripletexPage=read("app/admin/faktura/mva/tripletex/page.js");
+assert.ok(tripletexPage.indexOf("<TripletexReceiptsClient/>")<
+ tripletexPage.indexOf("<TripletexSalesClient/>"),
+ "Simple receipt transfer must be shown before complex outgoing invoice CSV import");
+
 assert.ok(source.includes("!row.transfer"),"Only new receipts may be selected");
 assert.ok(ui.includes('window.localStorage.setItem(addressKey,recipient)'),"Remember non-secret destination");
-assert.ok(ui.includes('setLockedRecipient(saved)'),"Use previously used company inbox");
+assert.ok(ui.includes('setLockedRecipient(remembered)'),"Lock previously used company inbox");
 assert.ok(route.includes("existingRecipients.data.some(row=>row.recipient!==recipient)"),
  "Do not allow silent change of accounting company");
 
