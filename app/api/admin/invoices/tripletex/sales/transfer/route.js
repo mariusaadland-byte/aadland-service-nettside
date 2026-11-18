@@ -193,7 +193,8 @@ export async function POST(req){
    message:"Fakturaene er flyttet til historikken etter at du bekreftet importen i Tripletex."});
  }catch(error){
   console.error("TRIPLETEX CUSTOMER INVOICE ACTION",error?.message);
-  return json({error:error?.message?.startsWith("Oppgi riktig Tripletex Import-ID")?
-   error.message:"Kunne ikke fullføre handlingen. Ingen fakturaer er sendt til kunden eller bokført av Aadland Service."},503);
+  if(error?.message?.startsWith("Oppgi riktig Tripletex Import-ID"))
+   return json({error:error.message},400);
+  return json({error:"Kunne ikke fullføre handlingen. Ingen fakturaer er sendt til kunden eller bokført av Aadland Service."},503);
  }
 }
