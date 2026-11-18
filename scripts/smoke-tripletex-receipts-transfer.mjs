@@ -234,9 +234,11 @@ const quick=read("app/admin/faktura/InvoiceQuickActions.js");
 assert.ok(quick.includes('href="/admin/faktura/mva/tripletex#tripletex-fakturaer"'),
  "Outgoing invoice has direct shortcut to separate invoice import");
 const tripletexPage=read("app/admin/faktura/mva/tripletex/page.js");
-assert.ok(tripletexPage.indexOf("<TripletexReceiptsClient/>")<
- tripletexPage.indexOf("<TripletexSalesClient/>"),
- "Simple receipt transfer must be shown before complex outgoing invoice CSV import");
+assert.ok(tripletexPage.indexOf("<TripletexApiConnectClient/>")<
+ tripletexPage.indexOf("<TripletexSalesClient/>")&&
+ tripletexPage.indexOf("<TripletexSalesClient/>")<
+ tripletexPage.indexOf("<TripletexReceiptsClient/>"),
+ "Simplified Tripletex flow shows API first, customer invoices next and receipts last");
 
 assert.ok(source.includes("!row.transfer"),"Only new receipts may be selected");
 assert.ok(ui.includes("useState(DEFAULT_TRIPLETEX_INBOX)"),"Use confirmed company inbox without typing");
