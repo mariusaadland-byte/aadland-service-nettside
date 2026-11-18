@@ -1,5 +1,5 @@
 "use client";
-import {useCallback,useEffect,useMemo,useState} from "react";
+import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import styles from "./TripletexReceipts.module.css";
 import {tripletexCustomerInvoiceQueue,tripletexCustomerInvoiceSelections} from "../../../../../lib/tripletexCustomerInvoiceQueue";
 
@@ -22,6 +22,7 @@ export default function TripletexSalesClient(){
  const [paymentTypeOther,setPaymentTypeOther]=useState("");
  const [showHistory,setShowHistory]=useState(false);
  const [search,setSearch]=useState("");
+ const csvSettingsRef=useRef(null);
 
  const reload=useCallback(async()=>{
   const [list,history]=await Promise.all([
@@ -80,11 +81,16 @@ export default function TripletexSalesClient(){
   if(mode==="paid-batch"&&selected.some(x=>
    x.paymentSource==="vipps"&&!validType(paymentTypeVipps)||
    x.paymentSource==="other"&&!validType(paymentTypeOther))){
-   setError("Fyll inn de riktige betalingstype-ID-ene fra Tripletex for Vipps og/eller bank før du overfører fakturaer med innbetaling.");
+   setError("Fyll inn riktig betalingstype-ID for Vipps og/eller bank i «Avansert – manuell CSV-import» først.");
+   csvSettingsRef.current.open=true;
+   window.requestAnimationFrame(()=>csvSettingsRef.current?.scrollIntoView({behavior:"smooth",block:"start"}));
    return;
   }
   if(nextNumber+ids.length-1>999999999){
-   setError("Velg en lavere importnummerserie.");return;
+   setError("Velg en lavere importnummerserie under «Avansert – manuell CSV-import».");
+   csvSettingsRef.current.open=true;
+   window.requestAnimationFrame(()=>csvSettingsRef.current?.scrollIntoView({behavior:"smooth",block:"start"}));
+   return;
   }
   const description=mode==="paid-batch"?
    ids.length+" fakturaer med registrert innbetaling":
@@ -139,7 +145,8 @@ export default function TripletexSalesClient(){
   <p className={styles.hint}>Fakturaene er allerede sendt til kundene fra Aadland Service.
    Du kan overføre <strong>alle med registrert innbetaling samlet</strong>, mens du selv velger
    hvilke <strong>uten innbetaling</strong> du vil klargjøre én og én.
-   Importen skjer fortsatt via CSV i Tripletex, ikke via bilagsmottakerens e-postadresse.</p>
+   <strong>Direkte API-overføring er ikke aktiv ennå.</strong> Knappene under klargjør derfor en CSV-fil
+   som du importerer manuelt i Tripletex. Oppsettet for denne filen ligger skjult under «Avansert».</p>
   {loading&&<p role="status">Henter fakturaer og overføringsstatus …</p>}
   {error&&<p role="alert" className={styles.error}>{error}</p>}
   {message&&<p role="status" className={styles.progress}>{message}</p>}
@@ -151,8 +158,8 @@ export default function TripletexSalesClient(){
    </div>
 
    <div className={styles.section}>
-    <details className={styles.importSettings} open={withPayment.length>0}>
-     <summary className={styles.historyToggle}>Importoppsett – fakturanumre og betalingsmåter</summary>
+    <details className={styles.importSettings} ref={csvSettingsRef}>
+     <summary className={styles.historyToggle}>Avansert – manuell CSV-import</summary>
      <p className={styles.hint}>Du bruker en ledig numerisk nummerserie i Tripletex.
       De opprinnelige Aadland-fakturanumrene endres ikke. Kontroller at importnumrene ikke er brukt der fra før.</p>
      <div className={styles.inputs}>
@@ -181,13 +188,14 @@ export default function TripletexSalesClient(){
    <div className={styles.section}>
     <h3 style={{fontSize:20,margin:"0 0 8px"}}>Fakturaer med innbetaling ({withPayment.length})</h3>
     <p className={styles.hint}>Alle fakturaer med registrert og avstemt betaling – også delbetalte – samles
-     i én fil. Fakturaer med usikkert oppgjør holdes utenfor.</p>
+     i én CSV-fil. Fakturaer med usikkert oppgjør holdes utenfor. Når Tripletex API er klart,
+     kan vi erstatte den manuelle importen.</p>
     <div className={styles.actions}>
      <button type="button" className={styles.primary}
       disabled={!canPrepare||!withPayment.length}
       onClick={()=>prepare(withPayment.map(x=>x.id),"paid-batch")}>
       {busy?"Klargjør fakturaer …":
-       "Overfør fakturaer med innbetaling ("+withPayment.length+")"}
+       "Overfør fakturaer med innbetaling ("+withPayment.length+") – CSV"}
      </button>
     </div>
     <div className={styles.list}>
@@ -203,14 +211,14 @@ export default function TripletexSalesClient(){
 
    <div className={styles.section}>
     <h3 style={{fontSize:20,margin:"0 0 8px"}}>Fakturaer uten innbetaling ({withoutPayment.length})</h3>
-    <p className={styles.hint}>Disse overføres <strong>ikke automatisk</strong>. Trykk
-     «Overfør denne fakturaen» kun på de du selv ønsker å importere.</p>
+    <p className={styles.hint}>Disse tas <strong>ikke med i samlefilen</strong>. Velg en faktura om gangen.
+     Foreløpig klargjøres en manuell CSV-import.</p>
     <div className={styles.list}>
      {withoutPayment.map(x=><div key={x.id} className={styles.item}>
       <div className={styles.itemInfo}>{invoiceSummary(x)}</div>
       <div className={styles.itemLinks}>
        <button className={styles.primary} disabled={!canPrepare} type="button"
-        onClick={()=>prepare([x.id],"unpaid-single")}>Overfør denne fakturaen</button>
+        onClick={()=>prepare([x.id],"unpaid-single")}>Overfør denne fakturaen – CSV</button>
        {originalLink(x)}
       </div>
      </div>)}
