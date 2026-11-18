@@ -51,6 +51,11 @@ export default function InvoiceQuickActions({invoice,today,onSwitch,onPrint,disa
     {label}<span aria-hidden="true" className={styles.arrow}>›</span>
    </button>)}
    <a className={styles.actionButton}
+    href="/admin/faktura/mva/tripletex#tripletex-fakturaer">
+    Tripletex – klargjør fakturaimport
+    <span aria-hidden="true" className={styles.arrow}>↗</span>
+   </a>
+   <a className={styles.actionButton}
     href={"/api/admin/invoices/pdf?id="+encodeURIComponent(invoice.id)}
     target="_blank" rel="noreferrer">Åpne faktura (PDF)
     <span aria-hidden="true" className={styles.arrow}>↗</span></a>
