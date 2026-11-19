@@ -79,7 +79,11 @@ export default function VippsTripletexTransferPanel({row,unit}){
    {preview?.ready&&<div style={{display:"grid",gap:9,fontSize:13}}>
     <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:5}}>
      <span>Fakturaer betalt via Vipps</span><b>{amount(preview.plan.grossOre)}</b>
-     <span>Vipps-gebyr (uten MVA)</span><b>{amount(preview.plan.feeOre)}</b>
+     <span>Vipps-gebyr totalt trukket</span><b>{amount(preview.plan.feeOre)}</b>
+     <span>Gebyr bokført tidligere uten utbetaling</span>
+     <b>−{amount(preview.plan.previouslyBookedFeeOre||0)}</b>
+     <span>Gebyr som føres i dette bilaget</span>
+     <b>{amount(preview.plan.feeOre-(preview.plan.previouslyBookedFeeOre||0))}</b>
      <span>Netto til bankkonto</span><b>{amount(preview.plan.payoutOre)}</b>
     </div>
     <p style={{margin:0}}>

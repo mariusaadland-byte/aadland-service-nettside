@@ -9,7 +9,7 @@ const funds=[
  {date,type:"capture",reference:"invoice-epay-1",amountOre:10000,
   balanceBefore:0,balanceAfter:10000,pspReference:"a"},
  {date,type:"fees-retained",reference:"",amountOre:-200,
-  balanceBefore:10000,balanceAfter:9800,pspReference:"b"},
+  balanceBefore:10000,balanceAfter:9800,pspReference:"fee-retained-1"},
  {date,type:"payout-scheduled",reference:"",amountOre:-9800,
   balanceBefore:9800,balanceAfter:0,pspReference:id}
 ];

@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from "react";
 import styles from "./TripletexReceipts.module.css";
 import VippsTripletexTransferPanel from "./VippsTripletexTransferPanel";
+import VippsRetainedFeeTransferPanel from "./VippsRetainedFeeTransferPanel";
 import {vippsPeriodBatches,combineVippsPeriodResponses} from "../../../../../lib/vippsSettlementPeriod";
 const dateAtOffset=days=>{
  const date=new Date(Date.now()+days*86400000);
@@ -138,6 +139,16 @@ export default function VippsSettlementClient(){
      <strong>{value}</strong>
     </div>)}
    </div>
+   {Number.isSafeInteger(result.lastVippsBalanceOre)&&result.lastVippsBalanceDate&&
+    <p style={{margin:"10px 0",fontSize:14}}>
+     <strong>Saldo hos Vipps etter siste registrerte post ({result.lastVippsBalanceDate}):
+      {" "}{kroner(result.lastVippsBalanceOre)}</strong>
+     <span style={{display:"block",fontSize:12,opacity:0.8}}>
+      {result.lastVippsBalanceOre<0?
+       "Negativ saldo betyr at Vipps har trukket mer enn saldoen, eller at andre poster har redusert den. Dette er ikke en bankutbetaling.":
+       "Dette er saldo på Vipps oppgjørskonto, ikke bekreftet saldo i banken."}
+     </span>
+    </p>}
    <p className={styles.hint}>{result.warning}</p>
    {result.unknownEntryTypes>0&&<p className={styles.error} role="alert">
     Rapporten inneholder {result.unknownEntryTypes} ukjente posttyper.
@@ -149,6 +160,29 @@ export default function VippsSettlementClient(){
    {result.unreferencedCaptures>0&&<p className={styles.hint}>
     {result.unreferencedCaptures} betalinger mangler Vipps-referanse
     og kan ikke kobles automatisk til en faktura.</p>}
+   <details style={{marginTop:12}} open={!result.payoutRows.length&&Boolean(result.feeRows?.length)}>
+    <summary>Gebyrer trukket fra Vipps-saldo ({result.feeRows?.length||0})</summary>
+    {!result.feeRows?.length?<p className={styles.hint}>
+     Ingen gebyrer er registrert som trukket fra Vipps-saldoen i perioden.
+     Gebyrer som bare er spesifisert, men ikke trukket, må kontrolleres mot
+     eventuelle separate gebyrfakturaer.</p>:
+     <div style={{overflowX:"auto"}}>
+      <p className={styles.hint}>Disse gebyrene kan være trukket selv om Vipps ikke har
+       utbetalt noe til banken. Kontroller ett gebyr om gangen. Ingen fiktiv
+       bankinnbetaling blir opprettet.</p>
+      <table style={{width:"100%",marginTop:8}}>
+       <thead><tr><th>Dato</th><th>Trukket gebyr</th><th>Referanse og bokføring</th></tr></thead>
+       <tbody>{result.feeRows.map((row,i)=><tr key={row.date+"-"+row.pspReference+"-"+i}>
+        <td>{row.date}</td><td>{kroner(row.amountOre)}</td>
+        <td>{row.pspReference||"Ingen gebyrreferanse"}
+         {row.kind==="trukket"?
+          <VippsRetainedFeeTransferPanel row={row} unit={result.unit}/>:
+          <small>Gebyrkorrigering – må kontrolleres manuelt</small>}
+        </td>
+       </tr>)}</tbody>
+      </table>
+     </div>}
+   </details>
    <details style={{marginTop:12}}>
     <summary>Planlagte utbetalinger ({result.payoutRows.length})</summary>
     {!result.payoutRows.length?<p className={styles.hint}>Ingen planlagte utbetalinger i perioden.</p>:
@@ -181,9 +215,12 @@ export default function VippsSettlementClient(){
    <p className={styles.hint} style={{marginTop:12}}>
     <strong>Overføring til Tripletex:</strong> Under «Planlagte utbetalinger» kan du
     kontrollere ett oppgjør om gangen og overføre det med en knapp.
-    Kun komplette oppgjør der hver fakturabetaling allerede er bekreftet i Tripletex,
-    blir tilbudt for bokføring. Bekreft bankinnbetaling og riktig konto først.
-    Åpne poster på Vipps oppgjørskunde må lukkes i kundereskontroen.
+    Gebyrer trukket fra Vipps kan bokføres separat ovenfor, også når ingen
+    bankutbetaling har skjedd. For ordinære bankutbetalinger må hver
+    fakturabetaling allerede være bekreftet i Tripletex og riktig bankkonto
+    kontrollert. Gebyrer som er bokført separat, blir ikke bokført dobbelt
+    ved senere bankoppgjør. Åpne poster på Vipps oppgjørskunde må fremdeles
+    lukkes i kundereskontroen.
    </p>
   </div>}
  </section>;
