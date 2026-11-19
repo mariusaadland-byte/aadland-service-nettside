@@ -5,6 +5,7 @@ import VippsTripletexTransferPanel from "./VippsTripletexTransferPanel";
 import VippsRetainedFeeTransferPanel from "./VippsRetainedFeeTransferPanel";
 import VippsReconcilePanel from "./VippsReconcilePanel";
 import VippsFeeQueuePanel from "./VippsFeeQueuePanel";
+import VippsPayoutQueuePanel from "./VippsPayoutQueuePanel";
 import {vippsPeriodBatches} from "../../../../../lib/vippsSettlementPeriod";
 import {chunkVippsDays} from "../../../../../lib/vippsReportCache";
 const dateAtOffset=days=>{
@@ -38,6 +39,7 @@ export default function VippsSettlementClient(){
  const [yearPreset,setYearPreset]=useState("");
  const [reconcileAutoRunKey,setReconcileAutoRunKey]=useState(0);
  const [feeBatchBusy,setFeeBatchBusy]=useState(false);
+ const [payoutBatchBusy,setPayoutBatchBusy]=useState(false);
  const abortRef=useRef(null);
  useEffect(()=>()=>abortRef.current?.abort(),[]);
  const currentYear=Number(dateAtOffset(0).slice(0,4));
@@ -147,7 +149,7 @@ export default function VippsSettlementClient(){
   <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"end",margin:"12px 0"}}>
    <label style={{display:"grid",gap:4,fontSize:13}}>
     Salgssted
-    <select value={unit} disabled={loading||feeBatchBusy} onChange={event=>{
+    <select value={unit} disabled={loading||feeBatchBusy||payoutBatchBusy} onChange={event=>{
      setUnit(event.target.value);setResult(null);}}>
      <option value="service">Aadland Service</option>
      <option value="rental">Aadland Utleie</option>
@@ -155,7 +157,7 @@ export default function VippsSettlementClient(){
    </label>
    <label style={{display:"grid",gap:4,fontSize:13}}>
     Velg regnskapsår
-    <select value={yearPreset} disabled={loading||feeBatchBusy} onChange={event=>chooseYear(event.target.value)}>
+    <select value={yearPreset} disabled={loading||feeBatchBusy||payoutBatchBusy} onChange={event=>chooseYear(event.target.value)}>
      <option value="">Egendefinert periode</option>
      {yearOptions.map(year=><option key={year} value={String(year)}>
       {year===currentYear?year+" – hittil i år":year+" – hele året"}
@@ -164,20 +166,20 @@ export default function VippsSettlementClient(){
    </label>
    <label style={{display:"grid",gap:4,fontSize:13}}>
     Fra dato
-    <input type="date" value={from} disabled={loading||feeBatchBusy}
+    <input type="date" value={from} disabled={loading||feeBatchBusy||payoutBatchBusy}
      onChange={event=>{setFrom(event.target.value);setYearPreset("");setCacheInfo(null);setLastCheck(null);setResult(null);}}/>
    </label>
    <label style={{display:"grid",gap:4,fontSize:13}}>
     Til dato
-    <input type="date" value={to} disabled={loading||feeBatchBusy}
+    <input type="date" value={to} disabled={loading||feeBatchBusy||payoutBatchBusy}
      onChange={event=>{setTo(event.target.value);setYearPreset("");setCacheInfo(null);setLastCheck(null);setResult(null);}}/>
    </label>
-   <button type="button" className={styles.primary} disabled={loading||loadingSaved||feeBatchBusy}
+   <button type="button" className={styles.primary} disabled={loading||loadingSaved||feeBatchBusy||payoutBatchBusy}
     onClick={()=>load()}>{loading?"Sjekker endringer …":"Sjekk hva som er nytt fra Vipps"}</button>
-    <button type="button" disabled={loading||loadingSaved||feeBatchBusy||unit!=="service"}
+    <button type="button" disabled={loading||loadingSaved||feeBatchBusy||payoutBatchBusy||unit!=="service"}
      onClick={()=>load({reconcileAfter:true})}>
      {loading?"Kontrollerer Vipps …":"Sjekk Vipps og avstem mot Tripletex"}</button>
-   <button type="button" disabled={loading||loadingSaved||feeBatchBusy} onClick={reloadSaved}>
+   <button type="button" disabled={loading||loadingSaved||feeBatchBusy||payoutBatchBusy} onClick={reloadSaved}>
     Vis lagrede rapporter
    </button>
    {loading&&<button type="button" onClick={cancelLoad} style={{padding:"10px 14px",borderRadius:8}}>
@@ -255,10 +257,19 @@ export default function VippsSettlementClient(){
      </span>
     </p>}
    <p className={styles.hint}>{result.warning}</p>
+   <VippsPayoutQueuePanel unit={result.unit} from={result.from} to={result.to}
+    payoutRows={result.payoutRows||[]} complete={Boolean(cacheInfo?.complete)}
+    unknownEntryTypes={result.unknownEntryTypes||0}
+    onBusyChange={setPayoutBatchBusy}
+    externallyDisabled={loading||loadingSaved||feeBatchBusy}
+    onRefresh={async()=>{
+     await reloadSaved();
+     setReconcileAutoRunKey(n=>n+1);
+    }}/>
    <VippsFeeQueuePanel unit={result.unit} from={result.from} to={result.to}
     feeRows={result.feeRows||[]} complete={Boolean(cacheInfo?.complete)}
     unknownEntryTypes={result.unknownEntryTypes||0}
-    onBusyChange={setFeeBatchBusy} externallyDisabled={loading||loadingSaved}
+    onBusyChange={setFeeBatchBusy} externallyDisabled={loading||loadingSaved||payoutBatchBusy}
     onRefresh={async()=>{
      await reloadSaved();
      setReconcileAutoRunKey(n=>n+1);
