@@ -70,14 +70,16 @@ async function localMatches(s){
  }
  return {rows,transfers:transfers.data||[],tripletexConnected:!!connection};
 }
-async function transferStatuses(s,unit,from,to){
+async function transferStatuses(s,unit,from,to,ledgerId){
  const [payouts,fees]=await Promise.all([
   s.from("tripletex_vipps_settlement_transfers")
    .select("payout_psp_reference,payout_date,status,payout_ore")
-   .eq("unit",unit).gte("payout_date",from).lte("payout_date",to).limit(2001),
+   .eq("unit",unit).eq("environment","production")
+   .gte("payout_date",from).lte("payout_date",to).limit(2001),
   s.from("tripletex_vipps_fee_transfers")
    .select("fee_psp_reference,ledger_date,status,amount_ore")
-   .eq("unit",unit).gte("ledger_date",from).lte("ledger_date",to).limit(2001)
+   .eq("unit",unit).eq("environment","production").eq("ledger_id",ledgerId)
+   .gte("ledger_date",from).lte("ledger_date",to).limit(2001)
  ]);
  if([payouts,fees].some(x=>x.error||!Array.isArray(x.data)||x.data.length>2000))
   throw Error("Tripletex-overføringsstatus kunne ikke hentes fullstendig.");
@@ -107,7 +109,7 @@ export async function GET(req){
   let result=null;
   if(cached.length){
    const [local,statuses]=await Promise.all([
-    localMatches(s),transferStatuses(s,unit,from,to)
+    localMatches(s),transferStatuses(s,unit,from,to,cached[0].ledger_id)
    ]);
    const funds=cached.flatMap(x=>x.funds),fees=cached.flatMap(x=>x.fees);
    const report=vippsSettlementSummary(funds,fees,local.rows,local.transfers);
