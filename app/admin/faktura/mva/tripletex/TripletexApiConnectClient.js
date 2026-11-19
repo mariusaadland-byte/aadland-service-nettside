@@ -2,6 +2,7 @@
 import {useEffect,useState} from "react";
 import styles from "./TripletexReceipts.module.css";
 import TripletexCustomerSyncClient from "./TripletexCustomerSyncClient";
+import {transferTripletexInvoiceAsPaid} from "../../../../../lib/tripletexPaidInvoiceFlow";
 
 const url="/api/admin/tripletex/connection";
 const empty={configured:false,environment:null,verifiedAt:null,directInvoiceTransferEnabled:false};
@@ -53,51 +54,75 @@ export default function TripletexApiConnectClient(){
  }
  async function checkDirectPilot(action){
   if(busy||!selectedInvoice)return;
+  const pilot=directPilot,invoiceId=selectedInvoice;
   const paidFlow=action==="transferPaid";
   const transfer=action==="transfer"||paidFlow;
-  const pilot=directPilot;
-  const invoiceId=selectedInvoice;
-  const types={...paymentTypeIds};
+  const paymentChoice={...paymentTypeIds};
   if(transfer){
    if(!pilot?.ready||pilot.invoiceId!==invoiceId)return;
    if(paidFlow){
     if(pilot.paidOre<=0||pilot.paymentCount<1||pilot.paymentCount>10){
      setError("Samlet betalingsoverføring krever 1–10 registrerte innbetalinger.");return;
     }
-    const sources=pilot.paymentSources||[];
-    if(!sources.length||sources.some(source=>!paymentTypes.some(x=>
-     x.id===Number(types[source])))){
-     setError("Velg riktig Tripletex-betalingstype for alle registrerte betalingsmåter.");return;
+    if(!(pilot.paymentSources||[]).length||
+     (pilot.paymentSources||[]).some(source=>
+      !paymentTypes.some(x=>x.id===Number(paymentChoice[source])))){
+     setError("Velg riktig Tripletex-betalingstype for bank/Vipps før overføring.");
+     return;
     }
    }
-   const money=new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"})
-    .format(Number(pilot.grossOre||0)/100);
+   const money=new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"});
    const prompt=paidFlow?
     "OVERFØRE FAKTURAEN SOM BETALT TIL TRIPLETEX?"+
-    "\n\nOpprinnelig faktura: "+pilot.sourceNumber+
-    "\nFakturabeløp: "+money+
-    "\nRegistrert betalt: "+
-      new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"})
-       .format(Number(pilot.paidOre||0)/100)+
-    "\nInnbetalinger: "+pilot.paymentCount+
-    "\n\nAadland Service oppretter først regnskapsfakturaen i Tripletex uten"+
-    " å sende den til kunden på nytt. Deretter bokføres innbetalingene "+
-    "med opprinnelig betalingsdato og valgt betalingstype."+
-    "\n\nDette er ekte bokføring. Hvis en del feiler, stoppes resten og"+
-    " resultatet må kontrolleres i overføringshistorikken."+
-    "\n\nBekrefter du at faktura og betalinger ikke er registrert i Tripletex fra før?":
-    "OPPRETTE EN EKTE REGNSKAPSFØRT FAKTURA I TRIPLETEX?"+
-    "\n\nOpprinnelig faktura: "+pilot.sourceNumber+
-    "\nBeløp inkl. MVA: "+money+
-    "\nFakturadato: "+pilot.issuedDate+
+    "\n\nFaktura: "+pilot.sourceNumber+
+    "\nTotalbeløp: "+money.format(Number(pilot.grossOre)/100)+
+    "\nRegistrert betalt: "+money.format(Number(pilot.paidOre)/100)+
+    "\nRegistrerte innbetalinger: "+pilot.paymentCount+
+    "\n\nAadland Service bokfører fakturaen uten å sende den til kunden"+
+    " og registrerer så innbetalingene med opprinnelige betalingsdatoer."+
+    "\n\nDu har valgt riktig bank-/Vipps-konto i Tripletex. Bekreft at"+
+    " verken fakturaen eller betalingene allerede er bokført der."+
+    "\nVed uavklart feil stopper overføringen og må kontrolleres manuelt.":
+    "OPPRETTE EN EKTE FAKTURA I TRIPLETEX?"+
+    "\n\nFaktura: "+pilot.sourceNumber+
+    "\nTotalbeløp: "+money.format(Number(pilot.grossOre)/100)+
     "\n\nFakturaen sendes IKKE til kunden på nytt."+
-    "\nTripletex lager et eget regnskapsnummer."+
-    "\n\nDette påvirker regnskapet og MVA. Bekreft bare hvis fakturaen ikke finnes der fra før.";
+    (pilot.paidOre>0?"\nInnbetalinger må deretter registreres separat.":"")+
+    "\n\nDette påvirker regnskap og MVA. Fortsett bare hvis fakturaen ikke finnes der fra før.";
    if(!window.confirm(prompt))return;
   }
   setBusy(true);setError("");setInfo("");
-  let invoiceCreated=false,createdNumber=null;
-  let posted=0;
+  if(paidFlow){
+   try{
+    const outcome=await transferTripletexInvoiceAsPaid({
+     invoiceId,digest:pilot.digest,paymentCount:pilot.paymentCount,
+     paymentTypesBySource:paymentChoice,
+     onCreated:created=>{
+      // The accounting invoice now exists regardless of what happens to
+      // its payments. Remove it from all possible invoice-create actions.
+      setDirectPilot(null);setPreflight(null);
+      setInvoiceOptions(old=>old.filter(x=>x.id!==invoiceId));
+      setSelectedInvoice("");
+      setInfo("Faktura "+created.tripletexInvoiceNumber+
+       " er opprettet. Registrerer "+pilot.paymentCount+" innbetaling(er) …");
+     },
+     onPayment:(count,total)=>setInfo("Fakturaen er opprettet. "+
+      count+" av "+total+" innbetalinger er bekreftet i Tripletex.")
+    });
+    setInfo("Faktura "+pilot.sourceNumber+" er overført som betalt. "+
+     outcome.posted+" innbetaling(er) er bokført med originale datoer."+
+     " Tripletex-fakturanummer: "+outcome.created.tripletexInvoiceNumber+
+     ". Restbeløpene stemmer i begge systemer.");
+   }catch(error){
+    if(error.invoiceAttempted){
+     setDirectPilot(null);setPreflight(null);
+     setInvoiceOptions(old=>old.filter(x=>x.id!==invoiceId));
+     setSelectedInvoice("");
+    }
+    setError(error.message||"Overføringen er uavklart. Kontroller Tripletex.");
+   }finally{setBusy(false);}
+   return;
+  }
   try{
    const resp=await fetch("/api/admin/tripletex/invoices/direct",{
     method:"POST",headers:{"Content-Type":"application/json"},
@@ -110,82 +135,24 @@ export default function TripletexApiConnectClient(){
     setDirectPilot(result);setPaymentTypes([]);setPaymentTypeIds({bank:"",vipps:""});
     setPaymentTypeError("");
     if(result.paidOre>0&&result.paymentCount<=10){
-     const options=await fetch("/api/admin/tripletex/invoices/payment-types",{
-      cache:"no-store"
-     });
-     const types=await options.json().catch(()=>({}));
-     if(!options.ok){
-      setPaymentTypeError(types.error||"Kunne ikke hente betalingstyper fra Tripletex.");
-     }else setPaymentTypes(types.types||[]);
-    }
-    return;
-   }
-   invoiceCreated=true;
-   createdNumber=result.tripletexInvoiceNumber;
-   // This invoice exists in the real ledger now, whether the browser succeeds
-   // in posting the subsequent payments or not. Never show it as transferable.
-   setDirectPilot(null);setPreflight(null);
-   setInvoiceOptions(old=>old.filter(x=>x.id!==invoiceId));
-   setSelectedInvoice("");
-   if(paidFlow){
-    // Each payment POST has a unique database claim and a fresh balance check.
-    // Browser interruption is recoverable manually in transfer history;
-    // NEVER automatically retry an uncertain payment.
-    for(let i=0;i<pilot.paymentCount;i++){
-     const reviewResponse=await fetch(
-      "/api/admin/tripletex/invoices/payments?invoiceId="+encodeURIComponent(invoiceId),
+     const response=await fetch("/api/admin/tripletex/invoices/payment-types",
       {cache:"no-store"});
-     const review=await reviewResponse.json().catch(()=>({}));
-     if(!reviewResponse.ok||!review.ready||!review.next)
-      throw Error(review.reason||review.error||
-       "Neste betaling er ikke klar for bokføring.");
-     const paymentTypeId=Number(types[review.next.source]);
-     if(!paymentTypes.some(type=>type.id===paymentTypeId))
-      throw Error("Betalingstypen kan ikke bekreftes.");
-     const response=await fetch("/api/admin/tripletex/invoices/payments",{
-      method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({action:"record",confirmed:true,invoiceId,
-       paymentId:review.next.id,paymentTypeId,
-       expectedRemoteOutstandingOre:review.remoteOutstandingOre})
-     });
-     const booked=await response.json().catch(()=>({}));
-     if(!response.ok||!booked.ok)
-      throw Error(booked.error||"Innbetalingen ble ikke bekreftet i Tripletex.");
-     posted++;
-     setInfo("Fakturaen er opprettet. "+posted+" av "+pilot.paymentCount+
-      " betalinger er bekreftet i Tripletex.");
+     const types=await response.json().catch(()=>({}));
+     if(!response.ok)
+      setPaymentTypeError(types.error||"Kunne ikke hente betalingstyper fra Tripletex.");
+     else setPaymentTypes(types.types||[]);
     }
-    const checkedResponse=await fetch(
-     "/api/admin/tripletex/invoices/payments?invoiceId="+encodeURIComponent(invoiceId),
-     {cache:"no-store"});
-    const checked=await checkedResponse.json().catch(()=>({}));
-    if(!checkedResponse.ok||checked.remainingCount!==0||
-     checked.remoteOutstandingOre!==checked.localOutstandingOre)
-     throw Error("Betalingene er sendt, men sluttavstemmingen må kontrolleres.");
-    const reconcileResponse=await fetch("/api/admin/tripletex/invoices/reconcile",{
-     method:"POST",headers:{"Content-Type":"application/json"},
-     body:JSON.stringify({invoiceId,action:"check"})
-    });
-    const reconciled=await reconcileResponse.json().catch(()=>({}));
-    if(!reconcileResponse.ok||reconciled.comparison!=="match")
-     throw Error("Betalingene er bokført, men sluttavstemmingen må kontrolleres.");
-    setInfo("Faktura "+result.sourceNumber+" er overført som betalt. "+
-     posted+" innbetaling(er) er bekreftet med opprinnelige datoer. "+
-     "Restbeløpet stemmer i begge systemer. Tripletex-fakturanummer: "+createdNumber+".");
    }else{
-    setInfo(result.message+" Tripletex-fakturanummer: "+createdNumber+
+    setDirectPilot(null);setPreflight(null);
+    setInfo(result.message+" Tripletex-fakturanummer: "+result.tripletexInvoiceNumber+
      ". Fakturaen er fjernet fra listen over gjenstående.");
+    setInvoiceOptions(old=>old.filter(x=>x.id!==invoiceId));
+    setSelectedInvoice("");
    }
   }catch(e){
    if(transfer)setDirectPilot(null);
-   const reason=e.message||"Fakturaoverføringen kunne ikke fullføres.";
-   if(invoiceCreated){
-    setError("Fakturaen er opprettet i Tripletex (nr. "+createdNumber+
-     "), men bare "+posted+" av "+pilot.paymentCount+
-     " innbetaling(er) er bekreftet i denne overføringen. "+
-     reason+" Ikke opprett fakturaen på nytt. "+
-     "Åpne overføringshistorikken og kontroller før du eventuelt fortsetter.");
-   }else setError(reason);
+   setError(e.message||"Fakturaoverføringen kunne ikke fullføres."+
+    " Kontroller historikken før et nytt forsøk.");
   }finally{setBusy(false);}
  }
  async function checkInvoiceMapping(){
