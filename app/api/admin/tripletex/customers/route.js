@@ -3,8 +3,8 @@ import {getAdminUser} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
 import {sameOriginGuard} from "../../../../../lib/requestGuard";
 import {storedTripletexConnection,unprotectTripletexToken} from "../../../../../lib/tripletexCredentials";
-import {tripletexOpenSession,tripletexRead,tripletexCreateCustomer} from "../../../../../lib/tripletexApi";
-import {customerTransferKey,findTripletexCustomerForTransfer,tripletexCustomerPayload} from "../../../../../lib/tripletexCustomerSync";
+import {tripletexOpenSession,tripletexRead,tripletexCreateCustomer,tripletexUpdateCustomer} from "../../../../../lib/tripletexApi";
+import {customerTransferKey,findTripletexCustomerForTransfer,tripletexCustomerPayload,tripletexCustomerCorrection} from "../../../../../lib/tripletexCustomerSync";
 
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
@@ -13,15 +13,15 @@ const headers={"Cache-Control":"private, no-store","X-Robots-Tag":"noindex,nofol
 const json=(body,status=200)=>NextResponse.json(body,{status,headers});
 const uuid=s=>typeof s==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
 const cols={
- contact:"id,name,email,phone,address,customer_type,organization_number",
- profile:"id,name,email,phone,address"
+ contact:"id,name,email,phone,address,customer_type,organization_number,updated_at",
+ profile:"id,name,email,phone,address,updated_at"
 };
 const sourceTable={contact:"admin_customer_contacts",profile:"customer_profiles"};
 function fromLocal(sourceType,row){
  return {
   sourceType,id:row.id,name:String(row.name||"").trim().slice(0,255),
   email:String(row.email||"").trim(),phone:String(row.phone||"").trim(),
-  address:String(row.address||"").trim(),
+  address:String(row.address||"").trim(),updatedAt:row.updated_at||null,
   customerType:sourceType==="contact"&&row.customer_type==="business"?"business":"private",
   organizationNumber:sourceType==="contact"?String(row.organization_number||""):""
  };
@@ -40,7 +40,7 @@ async function allSources(s,sourceType){
 }
 async function getLink(s,customer,environment){
  const {data,error}=await s.from("tripletex_customer_links")
-  .select("status,tripletex_customer_id,last_error")
+  .select("status,tripletex_customer_id,last_error,linked_at")
   .eq("source_type",customer.sourceType).eq("source_id",customer.id)
   .eq("environment",environment).maybeSingle();
  if(error)throw Error("Kunne ikke kontrollere tidligere kundeoverføringer.");
@@ -84,7 +84,7 @@ export async function GET(req){
   const [contacts,profiles,linksQuery]=await Promise.all([
    allSources(s,"contact"),allSources(s,"profile"),
    s.from("tripletex_customer_links")
-    .select("source_type,source_id,status,tripletex_customer_id,last_error")
+    .select("source_type,source_id,status,tripletex_customer_id,last_error,linked_at")
     .eq("environment",connection.environment).limit(5000)
   ]);
   if(linksQuery.error)throw Error("Overføringsloggen kan ikke leses.");
@@ -95,10 +95,15 @@ export async function GET(req){
   return json({configured:true,environment:connection.environment,
    customers:unique.map(x=>{
     const link=links.get(x.sourceType+":"+x.id);
-    return {...x,address:undefined,phone:undefined,hasPhone:Boolean(x.phone),organizationNumber:x.organizationNumber,
-     status:link?.status||"pending",tripletexCustomerId:link?.tripletex_customer_id||null,
+    const hasDetails=Boolean(x.email||x.phone||x.address||x.organizationNumber);
+    const needsUpdate=link?.status==="linked"&&Boolean(
+     x.updatedAt&&link.linked_at&&Date.parse(x.updatedAt)>Date.parse(link.linked_at)+500
+    );
+    return {...x,phone:undefined,hasPhone:Boolean(x.phone),hasDetails,
+     status:link?.status||"pending",needsUpdate,
+     tripletexCustomerId:link?.tripletex_customer_id||null,
      problem:link?.status==="needs_review"?
-      "Krever kontroll i Tripletex før du forsøker på nytt.":""
+      "Forrige handling må kontrolleres i Tripletex før du forsøker på nytt.":""
     };
    }).sort((a,b)=>a.name.localeCompare(b.name,"nb-NO"))
   });
@@ -108,11 +113,12 @@ export async function POST(req){
  const denied=await canAccess(req,true);if(denied)return denied;
  const body=await req.json().catch(()=>({}));
  const sourceType=body.sourceType,sourceId=body.sourceId;
- const action=body.action==="check"?"check":"transfer";
+ const action=["check","transfer","update","retryUpdate","saveProfile"].includes(body.action)?
+  body.action:"transfer";
  if(!Object.hasOwn(sourceTable,sourceType)||!uuid(sourceId))
   return json({error:"Velg en gyldig kunde fra listen."},400);
  const s=db();if(!s)return json({error:"Databasen er utilgjengelig."},503);
- let claimed=false,customer=null,environment=null;
+ let claimed=false,customer=null,environment=null,isCorrection=false;
  try{
   const connection=await storedTripletexConnection(s);
   if(!connection)return json({error:"Tripletex må kobles til først."},409);
