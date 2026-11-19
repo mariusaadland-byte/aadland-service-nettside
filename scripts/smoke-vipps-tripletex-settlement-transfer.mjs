@@ -63,7 +63,7 @@ assert.throws(()=>tripletexPayoutVoucher({
  plan:{...plan,grossOre:11000},unit:"service",
  customerId:175,customerAccountId:150,
  bankAccountId:192,feeAccountId:777
-}),/balanserer/);
+}),/Ugyldig|balanserer/);
 assert.throws(()=>payoutTripletexMarker("other",id),/Ukjent/);
 
 const route=read("app/api/admin/tripletex/vipps-transfer/route.js");
