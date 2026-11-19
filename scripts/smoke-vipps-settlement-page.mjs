@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const read=p=>readFileSync(p,"utf8");
+const page=read("app/admin/vipps-oppgjor/page.js");
+assert.ok(page.includes('if(!user)redirect("/admin/login")'));
+assert.ok(page.includes('if(user.role!=="owner")redirect("/admin")'));
+assert.ok(page.includes("<VippsSettlementClient/>"));
+assert.ok(page.includes("Vipps-oppgjør"));
+const main=read("app/admin/AdminClient.js");
+assert.ok(main.includes('["vippsSettlement","Vipps-oppgjør og avstemming"]'));
+assert.ok(main.includes('router.push("/admin/vipps-oppgjor")'));
+const setup=read("app/admin/vipps/VippsStatusClient.js");
+assert.ok(setup.includes('href="/admin/vipps-oppgjor"'));
+const tripletex=read("app/admin/faktura/mva/tripletex/page.js");
+assert.ok(tripletex.includes('href="/admin/vipps-oppgjor"'));
+const api=read("app/api/admin/tripletex/vipps-settlement/route.js");
+assert.ok(!api.includes("export async function POST"));
+console.log("Vipps-oppgjør egen side bestått: eiertilgang, direkte adresse og navlenker. Ingen bokføring.");
