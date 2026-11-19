@@ -18,6 +18,12 @@ const labels={
  "ingen-sikker-kobling":"Må matches mot faktura",
  "flere-mulige-betalinger":"Flere mulige lokale betalinger"
 };
+const statusFor=row=>row.transferMismatch?
+ "Beløpsavvik mot Tripletex – manuell kontroll":
+ row.tripletexStatus==="confirmed"?"Bokført via Aadland Service":
+ row.tripletexStatus==="needs_review"||row.tripletexStatus==="processing"?
+ "Overføring må kontrolleres – ikke prøv på nytt":
+ "Ingen registrert overføring via Aadland Service";
 export default function VippsSettlementClient(){
  const [unit,setUnit]=useState("service");
  const [from,setFrom]=useState(()=>dateAtOffset(-30));
@@ -266,9 +272,12 @@ export default function VippsSettlementClient(){
        <tbody>{result.feeRows.map((row,i)=><tr key={row.date+"-"+row.pspReference+"-"+i}>
         <td>{row.date}</td><td>{kroner(row.amountOre)}</td>
         <td>{row.pspReference||"Ingen gebyrreferanse"}
-         {row.kind==="trukket"?
+         <small style={{display:"block",margin:"4px 0",fontWeight:600}}>
+          {statusFor(row)}</small>
+         {row.kind==="trukket"&&row.tripletexStatus==="not_transferred"?
           <VippsRetainedFeeTransferPanel row={row} unit={result.unit}/>:
-          <small>Gebyrkorrigering – må kontrolleres manuelt</small>}
+          row.kind!=="trukket"?
+          <small>Gebyrkorrigering – må kontrolleres manuelt</small>:null}
         </td>
        </tr>)}</tbody>
       </table>
@@ -283,7 +292,10 @@ export default function VippsSettlementClient(){
        <tbody>{result.payoutRows.map((row,i)=><tr key={row.reference+"-"+i}>
         <td>{row.date}</td><td>{kroner(row.amountOre)}</td>
         <td>{row.reference||"Ingen bankreferanse fra Vipps"}
-         <VippsTripletexTransferPanel row={row} unit={result.unit}/>
+         <small style={{display:"block",margin:"4px 0",fontWeight:600}}>
+          {statusFor(row)}</small>
+         {row.tripletexStatus==="not_transferred"&&
+          <VippsTripletexTransferPanel row={row} unit={result.unit}/>}
         </td>
        </tr>)}</tbody>
       </table>
