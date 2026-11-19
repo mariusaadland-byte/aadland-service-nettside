@@ -144,6 +144,37 @@ export default function TripletexSalesClient(){
    await reload().catch(()=>{});
   }finally{setBusy(false);}
  }
+ function paymentPanelContent(row){
+  if(paymentPanel?.invoiceId!==row.id)return null;
+  return <div style={{
+        padding:12,border:"1px solid #d5cfc5",borderRadius:8,
+        width:"100%",display:"grid",gap:8}}>
+        {paymentPanel.loading?<small>Henter registrerte betalinger og betalingstyper …</small>:
+         paymentPanel.ready&&paymentPanel.next?<>
+          <strong>Innbetaling klar til kontroll</strong>
+          <small>Betalingsdato {paymentPanel.next.paidOn}
+           {" · "}{money(paymentPanel.next.amountOre)}
+           {" · "}{paymentPanel.next.source==="vipps"?"Vipps":"Bank/annen"}
+           {" · "}{paymentPanel.remainingCount} gjenstår</small>
+          <small>Restbeløp i Tripletex før innbetaling: {money(paymentPanel.remoteOutstandingOre)}</small>
+          <label style={{display:"grid",gap:5,fontSize:13}}>
+           Betalingstype i Tripletex
+           <select value={selectedPaymentType} disabled={busy}
+            onChange={event=>setSelectedPaymentType(event.target.value)}
+            style={{padding:10,borderRadius:8}}>
+            <option value="">Velg korrekt konto/betalingstype</option>
+            {(paymentPanel.types||[]).map(type=><option key={type.id} value={type.id}>
+             {type.label} (ID {type.id})</option>)}
+           </select>
+          </label>
+          <small>Dette bokfører en innbetaling. Kontroller at riktig betalingstype er knyttet
+           til bank/Vipps i Tripletex. Betalingen sendes ikke uten bekreftelse.</small>
+          <button type="button" className={styles.primary}
+           disabled={busy||!selectedPaymentType}
+           onClick={()=>recordPayment(row)}>Bokfør denne innbetalingen i Tripletex</button>
+         </>:<small>{paymentPanel.reason||"Ingen innbetalinger klare for overføring."}</small>}
+  </div>;
+ }
  async function post(payload){
   const response=await fetch(transferApi,{
    method:"POST",headers:{"Content-Type":"application/json"},
@@ -368,8 +399,26 @@ export default function TripletexSalesClient(){
          Allerede sendt fra Aadland Service – ikke sendt på nytt fra Tripletex</small>
        </div>
        <div className={styles.itemLinks}>
+        {x.initialPaidOre>0&&<small>
+         Innbetalt i Aadland Service: {money(x.initialPaidOre)} ·
+         {x.paymentCount} innbetaling(er) skal kontrolleres i Tripletex
+        </small>}
+        {linksByInvoice.get(x.invoiceId)&&<small>
+         Restbeløp i Tripletex: {money(linksByInvoice.get(x.invoiceId).remoteOutstandingOre)}
+         {" · "}Restbeløp i Aadland: {money(linksByInvoice.get(x.invoiceId).localOutstandingOre)}
+         {" · "}{linksByInvoice.get(x.invoiceId).comparison==="match"?
+          "Saldo stemmer":"Innbetalinger gjenstår / må avstemmes"}
+        </small>}
+        <button type="button" disabled={busy}
+         onClick={()=>paymentPanel?.invoiceId===x.invoiceId?setPaymentPanel(null):
+          showPaymentReview({id:x.invoiceId,originalNumber:x.sourceNumber})}>
+         {paymentPanel?.invoiceId===x.invoiceId?"Skjul betalingskontroll":
+          x.initialPaidOre>0?"Kontroller og bokfør historiske innbetalinger":
+          "Kontroller og bokfør innbetaling"}
+        </button>
         <a className={styles.link} href={"/admin/faktura/arkiv?id="+encodeURIComponent(x.invoiceId)}>
          Se originalfaktura</a>
+        {paymentPanelContent({id:x.invoiceId,originalNumber:x.sourceNumber})}
        </div>
       </div>)}
       {completed.map(x=><div className={styles.item} key={x.id}>
@@ -392,34 +441,7 @@ export default function TripletexSalesClient(){
         {paymentPanel?.invoiceId===x.id?"Skjul betalingskontroll":"Kontroller og bokfør innbetaling"}
        </button>}
        {originalLink(x)}
-       {paymentPanel?.invoiceId===x.id&&<div style={{
-        padding:12,border:"1px solid #d5cfc5",borderRadius:8,
-        width:"100%",display:"grid",gap:8}}>
-        {paymentPanel.loading?<small>Henter registrerte betalinger og betalingstyper …</small>:
-         paymentPanel.ready&&paymentPanel.next?<>
-          <strong>Innbetaling klar til kontroll</strong>
-          <small>Betalingsdato {paymentPanel.next.paidOn}
-           {" · "}{money(paymentPanel.next.amountOre)}
-           {" · "}{paymentPanel.next.source==="vipps"?"Vipps":"Bank/annen"}
-           {" · "}{paymentPanel.remainingCount} gjenstår</small>
-          <small>Restbeløp i Tripletex før innbetaling: {money(paymentPanel.remoteOutstandingOre)}</small>
-          <label style={{display:"grid",gap:5,fontSize:13}}>
-           Betalingstype i Tripletex
-           <select value={selectedPaymentType} disabled={busy}
-            onChange={event=>setSelectedPaymentType(event.target.value)}
-            style={{padding:10,borderRadius:8}}>
-            <option value="">Velg korrekt konto/betalingstype</option>
-            {(paymentPanel.types||[]).map(type=><option key={type.id} value={type.id}>
-             {type.label} (ID {type.id})</option>)}
-           </select>
-          </label>
-          <small>Dette bokfører en innbetaling. Kontroller at riktig betalingstype er knyttet
-           til bank/Vipps i Tripletex. Betalingen sendes ikke uten bekreftelse.</small>
-          <button type="button" className={styles.primary}
-           disabled={busy||!selectedPaymentType}
-           onClick={()=>recordPayment(x)}>Bokfør denne innbetalingen i Tripletex</button>
-         </>:<small>{paymentPanel.reason||"Ingen innbetalinger klare for overføring."}</small>}
-       </div>}
+       {paymentPanelContent(x)}
       </div>
      </div>)}
      {!completed.length&&!directConfirmed.length&&

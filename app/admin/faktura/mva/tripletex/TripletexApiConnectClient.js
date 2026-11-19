@@ -62,6 +62,11 @@ export default function TripletexApiConnectClient(){
     "\n\nTripletex tildeler sitt eget fakturanummer."+
     "\nDen opprinnelige fakturaen i Aadland Service er allerede sendt til kunden."+
     "\nTripletex skal IKKE sende den på nytt."+
+    (directPilot.paidOre>0?
+      "\n\nVIKTIG: Fakturaen opprettes først som UBETALT i Tripletex. "+
+      directPilot.paymentCount+" tidligere innbetaling(er) må deretter bokføres enkeltvis "+
+      "med opprinnelig betalingsdato og riktig bank-/Vipps-type. "+
+      "Ikke betrakt overføringen som fullført før saldoene stemmer.":"")+
     "\n\nDette kan påvirke regnskapet og MVA. Fortsett bare dersom fakturaen ikke finnes i Tripletex fra før."
    ))return;
   }
@@ -195,12 +200,13 @@ export default function TripletexApiConnectClient(){
     {preflight?.results?.map(x=><p className={styles.hint} key={x.id} role="status">
      <strong>{x.ready?"Kunde/MVA mappet ✓":"Må avklares"}:</strong> {x.reason}
      {x.ready&&x.needsPaymentMapping&&
-      " Direktepiloten gjelder foreløpig bare helt ubetalte fakturaer."}
+      " Fakturaen kan opprettes direkte, men registrerte innbetalinger må deretter føres én og én med riktig dato og betalingstype."}
     </p>)}
-    {preflight?.results?.some(x=>x.id===selectedInvoice&&x.ready&&!x.needsPaymentMapping)&&<div>
-     <p className={styles.hint}><strong>Direkte pilot:</strong> Kun én helt ubetalt faktura.
-      Tripletex lager et eget fakturanummer, men sender ingenting til kunden.
-      Betalte fakturaer må fortsatt håndteres separat.</p>
+    {preflight?.results?.some(x=>x.id===selectedInvoice&&x.ready)&&<div>
+     <p className={styles.hint}><strong>Direkte pilot:</strong> Én faktura om gangen.
+      Tripletex lager sitt eget regnskapsnummer, men sender ingenting til kunden.
+      Fakturaer som allerede har innbetalinger, opprettes først som ubetalte i Tripletex;
+      innbetalingene bokføres deretter separat med riktig dato og betalingstype.</p>
      <div className={styles.actions}>
       <button type="button" disabled={busy} onClick={()=>checkDirectPilot("check")}>
        {busy?"Kontrollerer …":"Kontroller direkteoverføring (kun lesing)"}
@@ -208,19 +214,26 @@ export default function TripletexApiConnectClient(){
       {directPilot?.ready&&directPilot.invoiceId===selectedInvoice&&
        <button type="button" disabled={busy} className={styles.primary}
         onClick={()=>checkDirectPilot("transfer")}>
-        Opprett denne ubetalte fakturaen i Tripletex
+        {directPilot.paidOre>0?"Opprett faktura (bokfør innbetalinger etterpå)":
+         "Opprett denne ubetalte fakturaen i Tripletex"}
        </button>}
      </div>
      {directPilot?.ready&&<p className={styles.hint}>Klart for én kontrollert
       overføring. Beløp: {(Number(directPilot.grossOre)/100).toLocaleString("nb-NO",{style:"currency",currency:"NOK"})}.
+      {directPilot.paidOre>0&&<>
+       {" "}Registrert betalt i Aadland Service:
+       {" "}{(Number(directPilot.paidOre)/100).toLocaleString("nb-NO",{style:"currency",currency:"NOK"})}
+       {" · "}{directPilot.paymentCount} innbetaling(er) må overføres separat.
+      </>}
       Dette er en ekte bokføring først når du trykker opprett og bekrefter.</p>}
     </div>}
    </div>}
    {state.configured&&<p className={styles.hint}>Sist bekreftet:
     {" "}{state.verifiedAt?new Date(state.verifiedAt).toLocaleString("nb-NO"):"–"}.
-    API-et kan testes. Én ubetalt faktura kan nå overføres som kontrollert pilot
-    etter særskilt bekreftelse. For øvrige fakturaer er direkte bokføring fortsatt sperret,
-    og CSV-importen er tilgjengelig.</p>}
+    API-et kan testes. En utsendt faktura om gangen kan overføres direkte
+    etter egen kontroll og bekreftelse. For allerede betalte fakturaer overføres
+    innbetalingene separat med originale datoer. Samlet automatisk bokføring er
+    fortsatt ikke aktiv; CSV-importen er tilgjengelig.</p>}
   </>}
  </section>;
 }

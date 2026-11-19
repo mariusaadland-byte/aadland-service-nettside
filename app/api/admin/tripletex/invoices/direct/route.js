@@ -4,7 +4,7 @@ import {db} from "../../../../../../lib/supabase";
 import {sameOriginGuard} from "../../../../../../lib/requestGuard";
 import {storedTripletexConnection,unprotectTripletexToken} from "../../../../../../lib/tripletexCredentials";
 import {tripletexOpenSession,tripletexRead,tripletexCreateUnsentedInvoice} from "../../../../../../lib/tripletexApi";
-import {directInvoiceDigest,directInvoicePilotPreview,directInvoiceSearchPath,
+import {directInvoiceDigest,directInvoicePilotPreview,directPaidPaymentPlan,directInvoiceSearchPath,
  duplicateDirectInvoiceSearch,directInvoiceVerification} from "../../../../../../lib/tripletexDirectInvoicePilot";
 import {positiveId} from "../../../../../../lib/tripletexInvoiceReconciliation";
 
@@ -31,12 +31,13 @@ export async function GET(req){
   const connection=await storedTripletexConnection(s);
   if(!connection)return json({ok:true,configured:false,claims:[]});
   const {data,error}=await s.from("tripletex_direct_invoice_claims")
-   .select("invoice_id,status,tripletex_invoice_id,tripletex_invoice_number,source_number,created_at")
+   .select("invoice_id,status,tripletex_invoice_id,tripletex_invoice_number,source_number,initial_paid_ore,initial_payment_count,created_at")
    .eq("environment",connection.environment).order("created_at",{ascending:false}).limit(5000);
   if(error)throw Error("Ingen overføringslogg");
   return json({ok:true,configured:true,claims:(data||[]).map(x=>({
    invoiceId:x.invoice_id,status:x.status,tripletexInvoiceId:x.tripletex_invoice_id,
-   tripletexInvoiceNumber:x.tripletex_invoice_number,sourceNumber:x.source_number
+   tripletexInvoiceNumber:x.tripletex_invoice_number,sourceNumber:x.source_number,
+   initialPaidOre:x.initial_paid_ore||0,paymentCount:x.initial_payment_count||0
   }))});
  }catch{return json({error:"Kunne ikke lese API-overføringene."},503);}
 }
@@ -48,16 +49,21 @@ async function invoiceState(s,invoiceId,connection){
   s.from("invoice_tripletex_transfers").select("status").eq("invoice_id",invoiceId).maybeSingle(),
   s.from("tripletex_invoice_api_links").select("tripletex_invoice_id").eq("invoice_id",invoiceId).maybeSingle(),
   s.from("tripletex_direct_invoice_claims").select("status").eq("invoice_id",invoiceId).maybeSingle(),
-  s.from("invoice_payments").select("id").eq("invoice_id",invoiceId).limit(1),
+  s.from("invoice_payments").select(
+   "id,amount_ore,paid_on,recorded_at,reversed_at,vipps_reference")
+   .eq("invoice_id",invoiceId).order("recorded_at",{ascending:true}).limit(101),
   s.from("invoice_credit_notes").select("id").eq("invoice_id",invoiceId).limit(1),
-  s.from("invoice_vipps_payments").select("id").eq("invoice_id",invoiceId).limit(1)
+  s.from("invoice_vipps_payments").select("id,state,captured_ore,refunded_ore")
+   .eq("invoice_id",invoiceId).limit(1001)
  ]);
  if([inv,exported,apiLinked,claim,payments,credits,vipps].some(x=>x.error))
   throw Error("Fakturaen og historikken kunne ikke leses sikkert.");
  if(exported.data||apiLinked.data||claim.data)
   return {error:"Fakturaen er allerede klargjort, importert eller har et tidligere API-forsøk. Ingen ny faktura opprettes."};
- if((payments.data||[]).length||(credits.data||[]).length||(vipps.data||[]).length)
-  return {error:"Fakturaen har betalings- eller kreditthistorikk og må avstemmes før direkteoverføring."};
+ if((credits.data||[]).length)
+  return {error:"Fakturaen har kreditnota og kan ikke overføres direkte uten egen avstemming."};
+ if((payments.data||[]).length>100||(vipps.data||[]).length>1000)
+  return {error:"Betalingshistorikken er for lang til en sikker direkteoverføring."};
  const invoice=inv.data;
  if(!invoice||!uuid(invoice.customer?.contactId))
   return {error:"Fakturaen trenger et lagret kundekort før overføring."};
@@ -67,7 +73,9 @@ async function invoiceState(s,invoiceId,connection){
   .eq("environment",connection.environment).maybeSingle();
  if(error||linked?.status!=="linked"||!positiveId(linked.tripletex_customer_id))
   return {error:"Kunden er ikke koblet til Tripletex. Overfør kunden først."};
- return {invoice,customerId:Number(linked.tripletex_customer_id)};
+ const plan=directPaidPaymentPlan(invoice,payments.data||[],vipps.data||[]);
+ if(!plan.ready)return {error:plan.reason};
+ return {invoice,customerId:Number(linked.tripletex_customer_id),plan};
 }
 async function control(s,invoiceId,connection){
  const context=await invoiceState(s,invoiceId,connection);
@@ -76,7 +84,7 @@ async function control(s,invoiceId,connection){
  const vat=await tripletexRead("/ledger/vatType?count=500&typeOfVat=OUTGOING",session,connection.environment);
  if(!Array.isArray(vat.values)||vat.values.length>=500)
   return {error:"MVA-listen fra Tripletex er ufullstendig. Ingen faktura kan overføres."};
- const preview=directInvoicePilotPreview(context.invoice,context.customerId,vat.values);
+ const preview=directInvoicePilotPreview(context.invoice,context.customerId,vat.values,context.plan);
  if(!preview.ready)return {error:preview.reason};
  const search=await tripletexRead(directInvoiceSearchPath(context.invoice.issued_date,context.customerId),
   session,connection.environment);
@@ -104,6 +112,7 @@ export async function POST(req){
   if(body.action==="check")return json({ok:true,ready:true,invoiceId:invoice.id,
    sourceNumber:invoice.invoice_number,issuedDate:invoice.issued_date,
    grossOre:preview.grossOre,digest:preview.digest,environment:connection.environment,
+   paidOre:preview.paidOre,paymentCount:preview.paymentCount,mode:preview.mode,
    message:"Fakturaen er kontrollert mot kundekobling, MVA og mulige duplikater. Ingen bokføring er utført."
   });
   if(body.digest!==preview.digest)
@@ -111,7 +120,9 @@ export async function POST(req){
   const saved=await s.from("tripletex_direct_invoice_claims").insert({
    invoice_id:invoice.id,environment:connection.environment,status:"processing",
    source_number:invoice.invoice_number,issued_date:invoice.issued_date,
-   snapshot_gross_ore:preview.grossOre,snapshot_digest:preview.digest
+   snapshot_gross_ore:preview.grossOre,snapshot_digest:preview.digest,
+   initial_paid_ore:preview.paidOre,initial_payment_count:preview.paymentCount,
+   initial_payment_digest:preview.paymentDigest||null
   }).select("invoice_id").maybeSingle();
   if(saved.error||!saved.data)
    return json({error:"Fakturaen er allerede under behandling eller koblet. Oppdater listen før du gjør noe mer."},409);
@@ -121,15 +132,23 @@ export async function POST(req){
   const again=await s.from("invoice_drafts").select(
    "id,status,invoice_number,issued_date,due_date,sent_at,paid_ore,credited_ore,customer,line_items,pdf_base64")
    .eq("id",invoice.id).maybeSingle();
-  if(again.error||!again.data||directInvoiceDigest(again.data,customerId)!==preview.digest)
-   throw Error("Fakturaen endret seg etter at overføringen ble låst.");
   const [paymentAgain,creditAgain,vippsAgain]=await Promise.all([
-   s.from("invoice_payments").select("id").eq("invoice_id",invoice.id).limit(1),
+   s.from("invoice_payments").select(
+    "id,amount_ore,paid_on,recorded_at,reversed_at,vipps_reference")
+    .eq("invoice_id",invoice.id).order("recorded_at",{ascending:true}).limit(101),
    s.from("invoice_credit_notes").select("id").eq("invoice_id",invoice.id).limit(1),
-   s.from("invoice_vipps_payments").select("id").eq("invoice_id",invoice.id).limit(1)
+   s.from("invoice_vipps_payments").select("id,state,captured_ore,refunded_ore")
+    .eq("invoice_id",invoice.id).limit(1001)
   ]);
-  if([paymentAgain,creditAgain,vippsAgain].some(x=>x.error||(x.data||[]).length))
-   throw Error("Betalings- eller kreditthistorikken endret seg etter at overføringen ble låst.");
+  if(again.error||!again.data||
+   [paymentAgain,creditAgain,vippsAgain].some(x=>x.error)||
+   (creditAgain.data||[]).length||
+   (paymentAgain.data||[]).length>100||(vippsAgain.data||[]).length>1000)
+   throw Error("Faktura- eller betalingshistorikken endret seg etter at overføringen ble låst.");
+  const planAgain=directPaidPaymentPlan(again.data,paymentAgain.data||[],vippsAgain.data||[]);
+  if(!planAgain.ready||
+   directInvoiceDigest(again.data,customerId,planAgain.paymentDigest)!==preview.digest)
+   throw Error("Fakturaen eller innbetalingene endret seg etter at overføringen ble låst.");
   const latest=await tripletexRead(directInvoiceSearchPath(invoice.issued_date,customerId),
    session,connection.environment);
   const matches=duplicateDirectInvoiceSearch(latest?.values,customerId,invoice.issued_date,preview.grossOre);
@@ -151,7 +170,12 @@ export async function POST(req){
    tripletex_customer_id:customerId,source_invoice_number:invoice.invoice_number,
    invoice_date:invoice.issued_date,invoice_gross_ore:preview.grossOre,
    remote_outstanding_ore:preview.grossOre,local_outstanding_ore:preview.grossOre,
-   matched_outstanding_ore:preview.grossOre,matched_at:now,
+   ...(preview.mode==="paid"?{
+    initial_import_checkpoint_at:preview.checkpointAt,
+    initial_import_outstanding_ore:preview.grossOre
+   }:{
+    matched_outstanding_ore:preview.grossOre,matched_at:now
+   }),
    remote_is_credited:false,last_checked_at:now
   });
   if(linked.error)throw Error("Tripletex har bokført fakturaen, men lokal kobling mangler.");
@@ -164,7 +188,11 @@ export async function POST(req){
   claimed=false;
   return json({ok:true,status:"confirmed",sourceNumber:invoice.invoice_number,
    tripletexInvoiceNumber:verified.invoiceNumber,tripletexInvoiceId:verified.id,
-   message:"Fakturaen er kontrollert og bokført i Tripletex uten ny utsending til kunden."});
+   paymentCount:preview.paymentCount,paidOre:preview.paidOre,
+   message:preview.mode==="paid"?
+    "Fakturaen er bokført i Tripletex uten ny kundesending. "+
+    preview.paymentCount+" tidligere innbetaling(er) gjenstår å bokføre enkeltvis med riktig dato og betalingstype.":
+    "Fakturaen er kontrollert og bokført i Tripletex uten ny utsending til kunden."});
  }catch(error){
   if(claimed){
    await s.from("tripletex_direct_invoice_claims").update({
