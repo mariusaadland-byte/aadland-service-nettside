@@ -33,7 +33,7 @@ const labels = {
 
 const ADMIN_NAV_GROUPS=[
   {id:"sales",title:"Salg og kunder",icon:"◎",ids:["orders","surveys","customers","drawings","quotes","invoices","invoiceArchive","reminders","archive"]},
-  {id:"accounting",title:"Regnskap",icon:"▥",ids:["accounting","accountPaid","accountUnpaid","accountExpenses","accountVat","accountLedger","accountTransfers"]},
+  {id:"accounting",title:"Regnskap",icon:"▥",ids:["accounting","accountPaid","accountUnpaid","accountExpenses","accountVat","accountLedger","accountTransfers","vippsSettlement"]},
   {id:"jobs",title:"Oppdrag og planlegging",icon:"▤",ids:["jobs","jobCalendar","workClock","drawing"]},
   {id:"shop",title:"Produkter og tjenester",icon:"◫",ids:["products","categories","services"]},
   {id:"rental",title:"Utleie",icon:"▣",ids:["rental","rentalCalendar","rentalBookings"]},
@@ -508,6 +508,7 @@ export default function AdminClient({ user }) {
     ["accountVat","MVA og terminer"],
     ["accountLedger","Regnskapsark"],
     ["accountTransfers","Tripletex-overføring"],
+    ["vippsSettlement","Vipps-oppgjør og avstemming"],
     ["roadmap", "Utviklingsplan"]
   );
   const navLabels=new Map(tabs);
@@ -524,6 +525,12 @@ export default function AdminClient({ user }) {
     if (id === "quotes") {setMenuOpen(false);router.push("/admin/tilbud");return;}
     if (id === "invoices") {setMenuOpen(false);router.push("/admin/faktura");return;}
     if (id === "invoiceArchive") {setMenuOpen(false);router.push("/admin/faktura/arkiv");return;}
+    if(id==="vippsSettlement"){
+     if(user?.role!=="owner")return;
+     setMenuOpen(false);
+     router.push("/admin/vipps-oppgjor");
+     return;
+    }
     const accountRoutes={
      accounting:"oversikt",accountPaid:"betalt",accountUnpaid:"ubetalt",
      accountExpenses:"bilag",accountVat:"mva",accountLedger:"regnskapsark",
