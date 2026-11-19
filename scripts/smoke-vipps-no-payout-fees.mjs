@@ -97,6 +97,14 @@ assert.ok(api.includes("tripletexCreateVippsSettlementVoucher"));
 const payoutRoute=read("app/api/admin/tripletex/vipps-transfer/route.js");
 assert.ok(payoutRoute.includes("previouslyBookedFeeOre"));
 assert.ok(payoutRoute.includes("acquireVippsAccountingLock"));
+// Regression: Tripletex filters by customerAccountNumber but returns customerNumber.
+for(const source of [api,payoutRoute]){
+ assert.ok(source.includes('customerAccountNumber=10009&count=10&fields=id,name,customerNumber'));
+ assert.ok(source.includes('Number(customer.customerNumber)!==10009'));
+ assert.ok(!source.includes('Number(customer.customerAccountNumber)!==10009'));
+ assert.ok(source.includes('!/vipps/i.test(String(customer.name||""))'),
+  "Do not accept another customer or bypass the dedicated Vipps customer check");
+}
 const provider=read("lib/tripletexApi.js");
 assert.ok(provider.includes("gebyr ASVF-"));
 const migration=read("supabase/migrations/20261119190000_tripletex_vipps_retained_fees.sql");
