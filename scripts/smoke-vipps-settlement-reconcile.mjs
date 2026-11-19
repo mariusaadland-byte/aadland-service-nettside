@@ -53,6 +53,18 @@ assert.equal(summary.totals.numberOfPayouts,1);
 assert.equal(summary.matching.find(x=>x.reference==="pay-first").status,"tripletex-bekreftet");
 assert.equal(summary.matching.find(x=>x.reference==="pay-second").status,"funnet-i-aadland");
 assert.match(summary.payoutRows[0].note,/ikke bekreftet bankinnskudd/);
+assert.equal(summary.matchingLimited,false);
+const lots=Array.from({length:251},(_,i)=>({
+ topic:"funds",type:"capture",amountOre:100,date:"2026-11-18",
+ reference:"annual-ref-"+i,pspReference:"",row:i
+}));
+const large=vippsSettlementSummary(lots,[]);
+assert.equal(large.totals.capturesOre,25100,
+ "Yearly settlement totals must include all report entries");
+assert.equal(large.matching.length,250,
+ "Server should keep the detail-view size bounded");
+assert.equal(large.matchingLimited,true,
+ "The UI must disclose that some references were hidden");
 assert.equal(vippsSettlementSummary([
  ...funds,{type:"future-unknown-type",amountOre:100,date:"2026-11-18",
  reference:"",pspReference:"",topic:"funds"}],fees).unknownEntryTypes,1);
