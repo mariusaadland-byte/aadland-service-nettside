@@ -3,6 +3,7 @@ import {useEffect,useRef,useState} from "react";
 import styles from "./TripletexReceipts.module.css";
 import VippsTripletexTransferPanel from "./VippsTripletexTransferPanel";
 import VippsRetainedFeeTransferPanel from "./VippsRetainedFeeTransferPanel";
+import VippsReconcilePanel from "./VippsReconcilePanel";
 import {vippsPeriodBatches} from "../../../../../lib/vippsSettlementPeriod";
 import {chunkVippsDays} from "../../../../../lib/vippsReportCache";
 const dateAtOffset=days=>{
@@ -34,6 +35,7 @@ export default function VippsSettlementClient(){
  const [loadingSaved,setLoadingSaved]=useState(false);
  const [lastCheck,setLastCheck]=useState(null);
  const [yearPreset,setYearPreset]=useState("");
+ const [reconcileAutoRunKey,setReconcileAutoRunKey]=useState(0);
  const abortRef=useRef(null);
  useEffect(()=>()=>abortRef.current?.abort(),[]);
  const currentYear=Number(dateAtOffset(0).slice(0,4));
@@ -77,7 +79,7 @@ export default function VippsSettlementClient(){
   return ()=>controller.abort();
  },[unit,from,to]);
  function cancelLoad(){abortRef.current?.abort();}
- async function load(){
+ async function load({reconcileAfter=false}={}){
   if(loading)return;
   const controller=new AbortController();
   abortRef.current=controller;
@@ -112,6 +114,7 @@ export default function VippsSettlementClient(){
    const after=await fetchSaved(controller.signal);
    if(controller.signal.aborted)throw Error("Hentingen ble avbrutt.");
    setCacheInfo(after);setResult(asReport(after));setLastCheck(totals);
+   if(reconcileAfter)setReconcileAutoRunKey(n=>n+1);
   }catch(err){
    setError(controller.signal.aborted||err?.name==="AbortError"?
     "Kontrollen ble avbrutt. Dager som allerede er lagret, beholdes; du kan fortsette senere.":
@@ -168,7 +171,10 @@ export default function VippsSettlementClient(){
      onChange={event=>{setTo(event.target.value);setYearPreset("");setCacheInfo(null);setLastCheck(null);setResult(null);}}/>
    </label>
    <button type="button" className={styles.primary} disabled={loading||loadingSaved}
-    onClick={load}>{loading?"Sjekker endringer …":"Sjekk hva som er nytt fra Vipps"}</button>
+    onClick={()=>load()}>{loading?"Sjekker endringer …":"Sjekk hva som er nytt fra Vipps"}</button>
+    <button type="button" disabled={loading||loadingSaved||unit!=="service"}
+     onClick={()=>load({reconcileAfter:true})}>
+     {loading?"Kontrollerer Vipps …":"Sjekk Vipps og avstem mot Tripletex"}</button>
    <button type="button" disabled={loading||loadingSaved} onClick={reloadSaved}>
     Vis lagrede rapporter
    </button>
@@ -206,6 +212,8 @@ export default function VippsSettlementClient(){
     Tallene nedenfor gjelder bare lagrede dager, ikke hele den valgte perioden.
    </p>}
   </div>}
+  <VippsReconcilePanel unit={unit} from={from} to={to}
+   cacheInfo={cacheInfo} autoRunKey={reconcileAutoRunKey}/>
   {lastCheck&&<p role="status" className={styles.progress}>
    Kontroll ferdig: {lastCheck.newDays} nye dager lagret, {lastCheck.changedDays} dager
    med endret innhold, {lastCheck.unchangedDays} uendrede kontrollerte dager
