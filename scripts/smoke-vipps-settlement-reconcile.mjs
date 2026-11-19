@@ -85,7 +85,7 @@ assert.ok(client.includes("REPORT_NO_ACCESS"));
 assert.ok(client.includes('accessToken(unit,{allowDisabled:true})'));
 assert.ok(client.includes('config.environment!=="production"'));
 const ui=read("app/admin/faktura/mva/tripletex/VippsSettlementClient.js");
-assert.ok(ui.includes("Hent Vipps-oppgjør"));
+assert.ok(ui.includes("Sjekk hva som er nytt fra Vipps"));
 assert.ok(ui.includes("Ingen nye bilag er bokført"));
 const page=read("app/admin/faktura/mva/tripletex/page.js");
 assert.ok(page.includes("<VippsSettlementClient/>"));
