@@ -76,10 +76,14 @@ assert.ok(ui.includes("366 dager"));
 assert.ok(ui.includes("Velg regnskapsår"));
 assert.ok(ui.includes("Avbryt henting"));
 assert.ok(ui.includes("controller.signal"));
-assert.ok(ui.includes("Henter uke "));
-assert.ok(ui.includes("parts.push(data)"));
-assert.ok(ui.includes("combineVippsPeriodResponses(parts,batches,unit)"));
-assert.ok(ui.includes("Ingen samlet rapport blir vist"));
+assert.ok(ui.includes("Sjekk hva som er nytt fra Vipps"));
+assert.ok(ui.includes("Vis lagrede rapporter"));
+assert.ok(ui.includes("chunkVippsDays(before.checkDays||[])"));
+assert.ok(ui.includes('action:"check-new"'));
+assert.ok(ui.includes("fetchSaved(controller.signal)"));
+assert.ok(ui.includes("Dager som allerede er lagret"));
+assert.ok(!ui.includes('fetch("/api/admin/tripletex/vipps-settlement?"+params'),
+ "UI must no longer download an entire report from Vipps every time");
 const api=readFileSync("app/api/admin/tripletex/vipps-settlement/route.js","utf8");
 assert.ok(api.includes("vippsRange(start,end,7)"),
  "Server should retain safe seven-day read-only limit");
