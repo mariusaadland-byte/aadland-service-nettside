@@ -142,6 +142,14 @@ export async function POST(req){
    const start=validateTripletexImportNumber(body.startNumber);
    if(start===null||start+ids.length-1>999999999)
     return json({error:"Velg ledige numeriske fakturanumre for Tripletex."},400);
+   const [directCheck,apiCheck]=await Promise.all([
+    s.from("tripletex_direct_invoice_claims").select("invoice_id").in("invoice_id",ids),
+    s.from("tripletex_invoice_api_links").select("invoice_id").in("invoice_id",ids)
+   ]);
+   if(directCheck.error||apiCheck.error)
+    return json({error:"Kunne ikke kontrollere tidligere direkteoverføringer. Ingen CSV er klargjort."},503);
+   if((directCheck.data||[]).length||(apiCheck.data||[]).length)
+    return json({error:"En eller flere fakturaer er allerede forsøkt overført via Tripletex API. CSV-import er sperret for å unngå dobbeltføring."},409);
    const history=await all(s,"invoice_tripletex_transfers",transferFields);
    if(ids.some(id=>history.some(t=>t.invoice_id===id)))
     return json({error:"En eller flere fakturaer er allerede klargjort eller markert importert. Åpne eksisterende import i listen for å unngå duplikater."},409);
