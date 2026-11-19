@@ -128,6 +128,21 @@ export default function InvoicesClient({archiveMode=false,isOwner=false}){
   fetch("/api/admin/invoices/payments?invoiceId="+encodeURIComponent(form.id)).then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error);if(!ignore){setPayments(data.payments||[]);setCanSendManualReceipts(data.canSendManualReceipts===true)}}).catch(e=>{if(!ignore)setError(e.message)});
   return ()=>{ignore=true};
  },[archiveMode,form?.id,form?.payment_updated_at]);
+ // After the LOCAL payment was confirmed, only READ Tripletex. Never treat
+ // a balance comparison as permission to record a second accounting payment.
+ async function checkTripletexAfterPayment(invoiceId){
+  try{
+   const response=await fetch("/api/admin/tripletex/invoices/reconcile",{
+    method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({action:"check",invoiceId})
+   });
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok)return "";
+   return result.comparison==="match"?
+    " Restbeløpet stemmer med Tripletex (kun kontroll).":
+    " Tripletex viser et annet restbeløp. Kontroller overføringen før du bokfører betaling der.";
+  }catch{return "";}
+ }
  async function registerPayment(full=false){
   if(!form||busy||!paymentInfo?.outstanding||manualPaymentBlocked)return;
   let amountOre;
@@ -149,9 +164,13 @@ export default function InvoicesClient({archiveMode=false,isOwner=false}){
    const response=await fetch("/api/admin/invoices/payments",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...body,requestId:paymentRequest.current.id})});
    const data=await response.json();if(!response.ok)throw Error(data.error||"Innbetalingen kunne ikke registreres.");
    await load();paymentRequest.current=null;setPaymentAmount("");
-   setSaved(data.alreadyRecorded?"Denne innbetalingen er allerede registrert. Ingen ny registrering ble opprettet.":
+   const localMessage=data.alreadyRecorded?
+    "Denne innbetalingen er allerede registrert. Ingen ny registrering ble opprettet.":
     data.outstandingOre===0?"Hele fakturabeløpet er registrert som betalt.":
-    "Delbetaling på "+money(amountOre)+" er registrert. Gjenstående beløp: "+money(data.outstandingOre)+".");
+    "Delbetaling på "+money(amountOre)+" er registrert. Gjenstående beløp: "+money(data.outstandingOre)+".";
+   setSaved(localMessage);
+   const tripletexReview=await checkTripletexAfterPayment(form.id);
+   if(tripletexReview)setSaved(localMessage+tripletexReview);
   }catch(e){await load();setError(e.message||"Betalingen kunne ikke bekreftes.")}finally{setBusy(false)}
  }
  async function sendManualReceipt(payment){
@@ -183,7 +202,9 @@ export default function InvoicesClient({archiveMode=false,isOwner=false}){
    "Kvittering for denne innbetalingen er sendt til kunden. Hvis du angrer betalingen, må du også informere kunden om at kvitteringen ikke lenger er gyldig. Fortsette?":
    "Angre denne manuelle betalingsregistreringen? Den blir bevart i historikken, men teller ikke lenger som innbetalt."))return;
   setBusy(true);setError("");setSaved("");
-  try{const r=await fetch("/api/admin/invoices/payments",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({paymentId})});const data=await r.json();if(!r.ok)throw Error(data.error);await load();setSaved("Betalingsregistreringen er angret.");}
+  try{const r=await fetch("/api/admin/invoices/payments",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({paymentId})});const data=await r.json();if(!r.ok)throw Error(data.error);await load();setSaved("Betalingsregistreringen er angret.");
+   const tripletexReview=await checkTripletexAfterPayment(form.id);
+   if(tripletexReview)setSaved("Betalingsregistreringen er angret."+tripletexReview);}
   catch(e){setError(e.message)}finally{setBusy(false)}
  }
 
