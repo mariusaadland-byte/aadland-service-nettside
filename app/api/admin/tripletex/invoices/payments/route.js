@@ -37,7 +37,7 @@ async function loadContext(s,invoiceId,connection){
    "invoice_id,status,tripletex_invoice_number,source_number,issued_date,snapshot_gross_ore")
    .eq("invoice_id",invoiceId).maybeSingle(),
   s.from("tripletex_invoice_api_links").select(
-   "invoice_id,environment,tripletex_invoice_id,tripletex_invoice_number,tripletex_customer_id,invoice_gross_ore,matched_outstanding_ore,matched_at")
+   "invoice_id,environment,tripletex_invoice_id,tripletex_invoice_number,tripletex_customer_id,invoice_gross_ore,matched_outstanding_ore,matched_at,initial_import_checkpoint_at,initial_import_outstanding_ore")
    .eq("invoice_id",invoiceId).maybeSingle(),
   s.from("invoice_payments").select(
    "id,invoice_id,amount_ore,paid_on,recorded_at,reversed_at,vipps_reference")
