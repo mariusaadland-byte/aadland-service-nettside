@@ -54,6 +54,10 @@ export default function TripletexCustomerSyncClient(){
    " til samme kunde i Tripletex? Ingen ny kunde opprettes."))return;
   if(action==="retryUpdate"&&!window.confirm(
    "Kontroller først kunden i Tripletex. Vil du forsøke å sende korrigeringen på nytt til samme kunde-ID?"))return;
+  if(action==="retryCreate"&&!window.confirm(
+   "Vi kontrollerer først om "+customer.name+
+   " finnes i Tripletex. Bare hvis ingen tilsvarende kunde finnes, forsøker vi opprettelse på nytt. "+
+   "Ingen fakturaer blir sendt. Fortsette?"))return;
   setBusy(true);setBusyId(customer.sourceType+":"+customer.id);setError("");setNotice("");
   try{
    const result=await transferOne(customer,action);
@@ -124,7 +128,8 @@ export default function TripletexCustomerSyncClient(){
     Nye kunder blir først kontrollert mot Tripletex for å unngå duplikater.
     <strong> Kunder kan overføres med bare navn, og kontaktopplysninger kan fylles inn senere.</strong>
     Oppdater kundekortet i Aadland Service og send deretter en korrigering til samme kunde i Tripletex.
-    <strong> Ingen fakturaer opprettes ved kundeoverføring.</strong></p>
+    <strong> Ingen fakturaer opprettes ved kundeoverføring.</strong>
+    Har en overføring stoppet, bruk «Kontroller og prøv igjen». Den søker etter kunden i Tripletex før en eventuell ny opprettelse.</p>
    {loading&&<p role="status">Henter kunder …</p>}
    {error&&<p className={styles.error} role="alert">{error}</p>}
    {notice&&<p className={styles.progress} role="status">{notice}</p>}
@@ -178,9 +183,11 @@ export default function TripletexCustomerSyncClient(){
        customer.status==="needs_review"&&customer.tripletexCustomerId?
        <button type="button" disabled={busy}
         onClick={()=>single(customer,"retryUpdate")}>Prøv korrigering igjen</button>:
-       (customer.status==="needs_review"||customer.status==="processing")?
+       customer.status==="needs_review"?
        <button type="button" disabled={busy}
-        onClick={()=>single(customer,"check")}>Kontroller</button>:
+        onClick={()=>single(customer,"retryCreate")}>Kontroller og prøv igjen</button>:
+       customer.status==="processing"?
+       <span className={styles.hint}>Pågår – oppdater listen</span>:
        null}
       {customer.sourceType==="contact"?
        <a href={"/admin/kunder/"+encodeURIComponent(customer.id)}

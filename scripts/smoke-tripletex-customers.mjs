@@ -29,8 +29,8 @@ assert.equal(Object.hasOwn(withoutEmailPayload,"email"),false);
 assert.equal(withoutEmailPayload.phoneNumber,"90505050");
 assert.equal(Object.hasOwn(tripletexCustomerPayload({...noEmail,email:"undefined"}),"email"),false);
 
-assert.equal(tripletexCustomerPayload(noEmail).invoiceSendMethod,"PAPER",
- "Name-only customer gets a non-email delivery preference, not a fake address");
+assert.equal(tripletexCustomerPayload(noEmail).invoiceSendMethod,"MANUAL",
+ "Name-only customer must not be registered for postal delivery without a valid postal address");
 const remote={id:77,version:3,name:"Kari Utenepost",email:"",phoneNumber:""};
 const correction=tripletexCustomerCorrection(
  {...noEmail,email:"kari@example.no",address:"Veien 2, 5000 Bergen"},remote);
@@ -53,6 +53,10 @@ assert.ok(api.includes('user?.role!=="owner"')&&api.includes("sameOriginGuard(re
 assert.ok(api.includes('status:"processing"')&&api.includes('status:"needs_review"'));
 assert.ok(api.indexOf('.insert({')<api.indexOf("tripletexCreateCustomer("));
 assert.ok(api.includes('action==="check"'));
+assert.ok(api.includes('action==="retryCreate"'));
+assert.ok(api.includes('status:"processing"'));
+assert.ok(api.includes('eq("status","needs_review")'));
+assert.ok(api.includes('match.state!=="new"'));
 assert.ok(api.includes('action==="update"')&&api.includes('action==="retryUpdate"'));
 assert.ok(api.includes('tripletexUpdateCustomer(customerId,correction.payload'));
 assert.ok(api.includes('eq("tripletex_customer_id",customerId)'));
@@ -62,6 +66,8 @@ assert.ok(client.includes("Overfør alle nye kunder")&&client.includes("Kontroll
 assert.ok(client.includes("Send alle korrigeringer")&&client.includes("Oppdater i Tripletex"));
 assert.ok(client.includes("Kun navn – kontaktopplysninger kan fylles inn senere"));
 assert.ok(client.includes("Rett kundekort"));
+assert.ok(client.includes("Kontroller og prøv igjen"));
+assert.ok(client.includes('single(customer,"retryCreate")'));
 assert.ok(client.includes('E-post ikke oppgitt')&&client.includes('String(c.name||"").trim()'));
 assert.ok(read("app/admin/faktura/mva/tripletex/TripletexApiConnectClient.js")
  .includes("<TripletexCustomerSyncClient/>"));
