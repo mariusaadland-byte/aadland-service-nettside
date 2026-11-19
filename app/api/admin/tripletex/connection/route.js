@@ -26,6 +26,7 @@ function publicState(connection){
  return {configured:Boolean(connection),environment:connection?.environment||null,
   verifiedAt:connection?.verified_at||null,
   directInvoiceTransferEnabled:false,
+  directInvoicePilotEnabled:Boolean(connection),
   needsMappingAndPilot:true};
 }
 export async function GET(req){
@@ -88,7 +89,7 @@ export async function POST(req){
   const removed=await s.from("tripletex_api_connections").delete().eq("id","primary");
   if(removed.error)throw Error("Disconnect failed");
   return json({ok:true,configured:false,environment:null,verifiedAt:null,
-   directInvoiceTransferEnabled:false,
+   directInvoiceTransferEnabled:false,directInvoicePilotEnabled:false,
    message:"API-tilkoblingen er fjernet. Tidligere fakturaoverføringer er bevart."});
  }catch(error){
   // Never log JWT, decrypted secrets, provider bodies or sensitive invoice details.
