@@ -83,7 +83,7 @@ async function prepare(s,day,payoutId){
  const session=await tripletexOpenSession(unprotectTripletexToken(conn),conn.environment);
  const [accounts,customers,types]=await Promise.all([
   tripletexRead("/ledger/account?count=1000",session,conn.environment),
-  tripletexRead("/customer?customerAccountNumber=10009&count=10",session,conn.environment),
+  tripletexRead("/customer?customerAccountNumber=10009&count=10&fields=id,name,customerNumber",session,conn.environment),
   tripletexRead("/invoice/paymentType?count=1000",session,conn.environment)
  ]);
  if(!Array.isArray(accounts.values)||accounts.values.length>=1000||
@@ -91,9 +91,9 @@ async function prepare(s,day,payoutId){
   !Array.isArray(types.values)||types.values.length>=1000)
   throw Error("Tripletex-kontoene eller Vipps-oppgjørskunden kan ikke identifiseres sikkert.");
  const customer=customers.values[0];
- if(!positive(customer.id)||Number(customer.customerAccountNumber)!==10009||
+ if(!positive(customer.id)||Number(customer.customerNumber)!==10009||
   !/vipps/i.test(String(customer.name||"")))
-  throw Error("Kunden 10009 er ikke bekreftet som Vipps oppgjørskunde.");
+  throw Error("Kontroller at kunde 10009 finnes i Tripletex og at kundenavnet inneholder «Vipps». Ingen bilag er sendt.");
  const vippsTypes=types.values.filter(x=>/vipps/i.test(
   String(x.description||x.name||""))&&!x.isInactive);
  if(vippsTypes.length!==1||!positive(vippsTypes[0].id))
