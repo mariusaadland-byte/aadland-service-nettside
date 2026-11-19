@@ -8,7 +8,8 @@ const kr=ore=>new Intl.NumberFormat("nb-NO",{
  style:"currency",currency:"NOK"}).format(Number(ore||0)/100);
 const errorText=e=>e?.message||"Kontrollen kunne ikke fullføres.";
 export default function VippsFeeQueuePanel({
- unit,from,to,feeRows,complete,unknownEntryTypes,onBusyChange,onRefresh
+ unit,from,to,feeRows,complete,unknownEntryTypes,onBusyChange,onRefresh,
+ externallyDisabled=false
 }){
  const [selected,setSelected]=useState([]);
  const [busy,setBusy]=useState(false);
@@ -24,7 +25,7 @@ export default function VippsFeeQueuePanel({
  }),[unit,feeRows,complete,unknownEntryTypes]);
  const keys=queue.eligible.map(feeQueueKey);
  const selectedRows=queue.eligible.filter(r=>selected.includes(feeQueueKey(r)));
- const disable=busy||unit!=="service";
+ const disable=busy||externallyDisabled||unit!=="service";
  const changeSelection=(key,checked)=>{
   if(busy)return;
   setPrepared(null);setAccepted(false);setError("");
@@ -39,7 +40,7 @@ export default function VippsFeeQueuePanel({
  },[unit,from,to]);
  useEffect(()=>()=>checking.current?.abort(),[]);
  async function checkSelected(){
-  if(busy||!selectedRows.length||selectedRows.length>MAX_VIPPS_FEE_BATCH)return;
+  if(busy||externallyDisabled||!selectedRows.length||selectedRows.length>MAX_VIPPS_FEE_BATCH)return;
   const controller=new AbortController();
   checking.current=controller;
   setBusy(true);onBusyChange?.(true);setError("");setProgress("");
@@ -75,7 +76,7 @@ export default function VippsFeeQueuePanel({
   }
  }
  async function transfer(){
-  if(busy||!prepared?.entries?.length||!accepted)return;
+  if(busy||externallyDisabled||!prepared?.entries?.length||!accepted)return;
   const list=prepared.entries;
   if(!window.confirm("Du er i ferd med å bokføre "+list.length+
    " bekreftede Vipps-gebyrer på til sammen "+kr(prepared.amountOre)+
@@ -102,7 +103,7 @@ export default function VippsFeeQueuePanel({
      })
     });
     const data=await response.json().catch(()=>({}));
-    if(!response.ok||!data.ok||!Number.isSafeInteger(Number(data.voucherId)))
+    if(!response.ok||!data.ok||!Number.isSafeInteger(Number(data.voucherId))||Number(data.voucherId)<=0)
      throw Error("Stoppet på "+item.row.date+": "+(data.error||
       "Tripletex-bokføringen er uavklart. Ikke forsøk samme gebyr på nytt før det er kontrollert."));
     added++;
@@ -154,7 +155,7 @@ export default function VippsFeeQueuePanel({
    <p className={styles.hint}>Velg inntil {MAX_VIPPS_FEE_BATCH} gebyrer. Det gjøres en
     separat sikker forhåndskontroll for hvert gebyr før noe bokføres. Bilagene
     sendes ett om gangen og køen stopper ved første feil.</p>
-   <button type="button" disabled={busy} onClick={()=>{
+   <button type="button" disabled={disable} onClick={()=>{
     setSelected(keys.slice(0,MAX_VIPPS_FEE_BATCH));
     setPrepared(null);setAccepted(false);setError("");
    }} style={{marginBottom:8}}>Velg opptil {MAX_VIPPS_FEE_BATCH} nye</button>
@@ -172,7 +173,7 @@ export default function VippsFeeQueuePanel({
     </label>)}
    </div>
    <p>Valgt: <strong>{selectedRows.length}</strong> · {kr(selectedRows.reduce((s,x)=>s+x.amountOre,0))}</p>
-   <button type="button" disabled={busy||!selectedRows.length}
+   <button type="button" disabled={disable||!selectedRows.length}
     onClick={checkSelected} className={styles.primary}>
     Kontroller {selectedRows.length} valgte mot Tripletex
    </button>
@@ -187,7 +188,7 @@ export default function VippsFeeQueuePanel({
      Jeg har kontrollert at alle valgte gebyrer faktisk er trukket av Vipps,
      og at ingen er bokført eller fakturert separat i Tripletex.
     </label>
-    <button type="button" disabled={busy||!accepted} onClick={transfer}
+    <button type="button" disabled={disable||!accepted} onClick={transfer}
      style={{background:"#23394c",color:"white",fontWeight:700,
       padding:"12px 15px",borderRadius:8}}>
      Bokfør {prepared.entries.length} godkjente gebyrer i Tripletex
