@@ -6,6 +6,7 @@ import {tripletexCustomerInvoiceQueue,tripletexCustomerInvoiceSelections} from "
 const base="/api/admin/invoices/tripletex/sales";
 const transferApi=base+"/transfer";
 const reconcileApi="/api/admin/tripletex/invoices/reconcile";
+const paymentApi="/api/admin/tripletex/invoices/payments";
 const money=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(Number(ore||0)/100);
 const validType=value=>/^[A-Za-z0-9_-]{1,32}$/.test(String(value||"").trim());
 const fileDownload=url=>{
@@ -24,6 +25,8 @@ export default function TripletexSalesClient(){
  const [paymentTypeOther,setPaymentTypeOther]=useState("");
  const [showHistory,setShowHistory]=useState(false);
  const [search,setSearch]=useState("");
+ const [paymentPanel,setPaymentPanel]=useState(null);
+ const [selectedPaymentType,setSelectedPaymentType]=useState("");
  const csvSettingsRef=useRef(null);
 
  const reload=useCallback(async()=>{
@@ -84,6 +87,55 @@ export default function TripletexSalesClient(){
    await reload();
   }catch(err){setError(err.message||"Fakturaavstemming mislyktes.");}
   finally{setBusy(false);}
+ }
+ async function showPaymentReview(row){
+  if(busy||!linksByInvoice.has(row.id))return;
+  setBusy(true);setError("");setMessage("");setSelectedPaymentType("");
+  setPaymentPanel({invoiceId:row.id,loading:true});
+  try{
+   const response=await fetch(paymentApi+"?invoiceId="+encodeURIComponent(row.id),
+    {cache:"no-store"});
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(result.error||"Kunne ikke kontrollere innbetalingene.");
+   setPaymentPanel({...result,invoiceId:row.id,loading:false});
+  }catch(err){
+   setPaymentPanel({invoiceId:row.id,loading:false,ready:false,
+    reason:err.message||"Tripletex kunne ikke kontrollere innbetalingene."});
+  }finally{setBusy(false);}
+ }
+ async function recordPayment(row){
+  const review=paymentPanel;
+  if(busy||!review?.ready||review.invoiceId!==row.id||!review.next)return;
+  const type=review.types?.find(t=>t.id===Number(selectedPaymentType));
+  if(!type){setError("Velg korrekt betalingstype fra Tripletex.");return;}
+  const confirmation="Bokføre denne ekte innbetalingen i Tripletex?"+
+   "\n\nFaktura: "+row.originalNumber+
+   "\nBetaling: "+money(review.next.amountOre)+
+   "\nBetalingsdato: "+review.next.paidOn+
+   "\nBetalingstype: "+type.label+
+   "\nTripletex-restbeløp før: "+money(review.remoteOutstandingOre)+
+   "\n\nDette oppretter en regnskapsmessig innbetaling. Det sender IKKE fakturaen på nytt."+
+   "\nKontroller at betalingen ikke allerede finnes i Tripletex.";
+  if(!window.confirm(confirmation))return;
+  setBusy(true);setError("");setMessage("");
+  try{
+   const response=await fetch(paymentApi,{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({action:"record",confirmed:true,invoiceId:row.id,
+     paymentId:review.next.id,paymentTypeId:type.id,
+     expectedRemoteOutstandingOre:review.remoteOutstandingOre})
+   });
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(result.error||"Tripletex bekreftet ikke betalingen.");
+   setPaymentPanel(null);setSelectedPaymentType("");
+   await reload();
+   setMessage(result.message||"Tripletex bekreftet innbetalingen.");
+  }catch(err){
+   setPaymentPanel(null);
+   setError((err.message||"Betalingsstatus er uavklart.")+
+    " Kontroller Tripletex før et nytt forsøk.");
+   await reload().catch(()=>{});
+  }finally{setBusy(false);}
  }
  async function post(payload){
   const response=await fetch(transferApi,{
@@ -310,7 +362,39 @@ export default function TripletexSalesClient(){
        <button type="button" disabled={busy} onClick={()=>checkImportedInvoice(x)}>
         {linksByInvoice.has(x.id)?"Oppdater betalingskontroll":"Kontroller i Tripletex"}
        </button>
+       {linksByInvoice.has(x.id)&&<button type="button" disabled={busy}
+        onClick={()=>paymentPanel?.invoiceId===x.id?setPaymentPanel(null):showPaymentReview(x)}>
+        {paymentPanel?.invoiceId===x.id?"Skjul betalingskontroll":"Kontroller og bokfør innbetaling"}
+       </button>}
        {originalLink(x)}
+       {paymentPanel?.invoiceId===x.id&&<div style={{
+        padding:12,border:"1px solid #d5cfc5",borderRadius:8,
+        width:"100%",display:"grid",gap:8}}>
+        {paymentPanel.loading?<small>Henter registrerte betalinger og betalingstyper …</small>:
+         paymentPanel.ready&&paymentPanel.next?<>
+          <strong>Innbetaling klar til kontroll</strong>
+          <small>Betalingsdato {paymentPanel.next.paidOn}
+           {" · "}{money(paymentPanel.next.amountOre)}
+           {" · "}{paymentPanel.next.source==="vipps"?"Vipps":"Bank/annen"}
+           {" · "}{paymentPanel.remainingCount} gjenstår</small>
+          <small>Restbeløp i Tripletex før innbetaling: {money(paymentPanel.remoteOutstandingOre)}</small>
+          <label style={{display:"grid",gap:5,fontSize:13}}>
+           Betalingstype i Tripletex
+           <select value={selectedPaymentType} disabled={busy}
+            onChange={event=>setSelectedPaymentType(event.target.value)}
+            style={{padding:10,borderRadius:8}}>
+            <option value="">Velg korrekt konto/betalingstype</option>
+            {(paymentPanel.types||[]).map(type=><option key={type.id} value={type.id}>
+             {type.label} (ID {type.id})</option>)}
+           </select>
+          </label>
+          <small>Dette bokfører en innbetaling. Kontroller at riktig betalingstype er knyttet
+           til bank/Vipps i Tripletex. Betalingen sendes ikke uten bekreftelse.</small>
+          <button type="button" className={styles.primary}
+           disabled={busy||!selectedPaymentType}
+           onClick={()=>recordPayment(x)}>Bokfør denne innbetalingen i Tripletex</button>
+         </>:<small>{paymentPanel.reason||"Ingen innbetalinger klare for overføring."}</small>}
+       </div>}
       </div>
      </div>)}
      {!completed.length&&<p className={styles.empty}>Ingen bekreftede fakturaimporter ennå.</p>}
