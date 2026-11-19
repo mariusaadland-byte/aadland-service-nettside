@@ -18,6 +18,9 @@ assert.equal(findTripletexCustomerForTransfer(privateCustomer,[]).state,"new");
 const noEmail={name:"Kari Utenepost",customerType:"private",email:"",phone:"90505050"};
 assert.equal(customerTransferKey(noEmail).kind,"name");
 assert.equal(findTripletexCustomerForTransfer(noEmail,[]).state,"new");
+assert.equal(findTripletexCustomerForTransfer(noEmail,[{id:70,name:"Annen Kunde"}]).state,"new");
+assert.equal(findTripletexCustomerForTransfer(noEmail,
+ Array.from({length:1000},(_,i)=>({id:i+1,name:"Annen Kunde "+i}))).state,"review");
 assert.equal(findTripletexCustomerForTransfer(noEmail,[{id:71,name:"Kari Utenepost"}]).state,"review",
  "Never guess whether a name-only match is the same customer");
 assert.equal(findTripletexCustomerForTransfer({name:""},[]).state,"invalid");
