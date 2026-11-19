@@ -6,7 +6,8 @@ import {storedTripletexConnection,unprotectTripletexToken}
 import {tripletexOpenSession,tripletexRead}
  from "../../../../../lib/tripletexApi";
 import {vippsRange} from "../../../../../lib/vippsSettlementReconcile";
-import {bankMatchDateSpan,normalizeBankStatementTransactions,vippsBankCandidates}
+import {bankMatchDateSpan,normalizeBankStatementTransactions,vippsBankCandidates,
+ bankStatementCoverage}
  from "../../../../../lib/vippsTripletexBankMatch";
 
 export const runtime="nodejs";
@@ -111,8 +112,9 @@ export async function GET(req){
   const allStatements=statementResponse.values;
   // Statement dates are necessary to distinguish "not found" from no bank coverage.
   if(allStatements.some(x=>!idOk(x?.id)||
-   Number(x.accountId??x.account?.id)!==accountId||
-   !dateOk(x.fromDate)||!dateOk(x.toDate)))
+   ((x.accountId??x.account?.id)!=null&&
+    Number(x.accountId??x.account?.id)!==accountId)||
+   !dateOk(x.fromDate)||!dateOk(x.toDate)||x.fromDate>=x.toDate))
    throw Error("Tripletex returnerte kontoutskrifter med ukjent konto eller dato. Ingen sikker bankmatch.");
   const relevant=allStatements.filter(x=>
    x.fromDate<=windowTo&&x.toDate>windowFrom);
@@ -131,10 +133,11 @@ export async function GET(req){
    pages.flat(),accountId);
   const matches=vippsBankCandidates(payouts,allTransactions,{from,to})
    .map(m=>{
-    const dateStart=move(m.date,-1),dateEnd=move(m.date,8);
-    const covered=relevant.some(x=>x.fromDate<=dateStart&&x.toDate>=dateEnd);
-    return !covered&&m.status==="not_found"?{
-     ...m,status:"no_statement_coverage"}:m;
+    const coverage=bankStatementCoverage(relevant,move(m.date,-1),move(m.date,8));
+    const status=m.status!=="not_found"?m.status:
+     coverage==="complete"?"not_found":
+     coverage==="partial"?"partial_statement_coverage":"no_statement_coverage";
+    return {...m,status,statementCoverage:coverage};
    });
   return json({ok:true,bankAccount:account,from,to,payoutCount:matches.length,
    bankStatementsRead:relevant.length,matches,
