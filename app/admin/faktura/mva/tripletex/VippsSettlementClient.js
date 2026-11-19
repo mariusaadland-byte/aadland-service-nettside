@@ -247,7 +247,7 @@ export default function VippsSettlementClient(){
    <p className={styles.hint}>{result.warning}</p>
    {!cacheInfo?.complete&&<p className={styles.hint} style={{fontWeight:700}}>
     Delvis oversikt: kontrollér manglende datoer før perioden brukes som komplett regnskapsgrunnlag.
-   </p>
+   </p>}
    {result.unknownEntryTypes>0&&<p className={styles.error} role="alert">
     Rapporten inneholder {result.unknownEntryTypes} ukjente posttyper.
     Disse må vurderes før bokføring.</p>}
