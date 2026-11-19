@@ -3,8 +3,8 @@ import {readFileSync} from "node:fs";
 const read=p=>readFileSync(p,"utf8");
 const source=read("lib/vippsTripletexBankMatch.js").replace(/^export /gm,"");
 const {BANK_MATCH_MAX_DAYS,bankMatchDateSpan,decimalToOre,
- normalizeBankStatementTransactions,vippsBankCandidates}=new Function(source+
- ";return {BANK_MATCH_MAX_DAYS,bankMatchDateSpan,decimalToOre,normalizeBankStatementTransactions,vippsBankCandidates};")();
+ normalizeBankStatementTransactions,vippsBankCandidates,bankStatementCoverage}=new Function(source+
+ ";return {BANK_MATCH_MAX_DAYS,bankMatchDateSpan,decimalToOre,normalizeBankStatementTransactions,vippsBankCandidates,bankStatementCoverage};")();
 assert.equal(BANK_MATCH_MAX_DAYS,31);
 assert.equal(bankMatchDateSpan("2026-10-01","2026-10-31"),31);
 assert.equal(bankMatchDateSpan("2026-10-01","2026-11-01"),null);
@@ -22,6 +22,19 @@ const raw=[
   description:"Gebyr"}
 ];
 const trans=normalizeBankStatementTransactions(statements,raw,192);
+assert.equal(normalizeBankStatementTransactions([{id:92,fromDate:"2026-11-01",
+ toDate:"2026-12-01"}],raw,192).length,3,
+ "Tripletex BankStatement responses do not have to include accountId");
+assert.equal(bankStatementCoverage(statements,"2026-11-19","2026-11-25"),"complete");
+assert.equal(bankStatementCoverage([
+ {id:93,fromDate:"2026-11-19",toDate:"2026-11-22"},
+ {id:94,fromDate:"2026-11-22",toDate:"2026-11-25"}],
+ "2026-11-19","2026-11-25"),"complete",
+ "several adjacent daily statement windows constitute full coverage");
+assert.equal(bankStatementCoverage([
+ {id:93,fromDate:"2026-11-19",toDate:"2026-11-22"}
+ ],"2026-11-19","2026-11-25"),"partial");
+assert.equal(bankStatementCoverage([],"2026-11-19","2026-11-25"),"missing");
 assert.equal(trans.length,3);
 assert.equal(trans[2].amountOre,-103);
 assert.throws(()=>normalizeBankStatementTransactions(statements,
@@ -53,6 +66,8 @@ assert.ok(route.includes('user?.role!=="owner"'));
 assert.ok(route.includes('mode==="accounts"'));
 assert.ok(route.includes('tripletexRead("/bank/statement?accountId="'));
 assert.ok(route.includes('"/bank/statement/transaction?bankStatementId="'));
+assert.ok(route.includes("bankStatementCoverage"));
+assert.ok(route.includes("(x.accountId??x.account?.id)!=null"));
 assert.ok(route.includes("vippsBankCandidates"));
 assert.ok(route.includes('unit","service"'));
 assert.ok(!route.includes("export async function POST"));
