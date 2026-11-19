@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import styles from "./TripletexReceipts.module.css";
+import VippsTripletexTransferPanel from "./VippsTripletexTransferPanel";
 import {vippsPeriodBatches,combineVippsPeriodResponses} from "../../../../../lib/vippsSettlementPeriod";
 const dateAtOffset=days=>{
  const date=new Date(Date.now()+days*86400000);
@@ -153,10 +154,12 @@ export default function VippsSettlementClient(){
     {!result.payoutRows.length?<p className={styles.hint}>Ingen planlagte utbetalinger i perioden.</p>:
      <div style={{overflowX:"auto"}}>
       <table style={{width:"100%",marginTop:8}}>
-       <thead><tr><th>Dato</th><th>Beløp</th><th>Referanse</th></tr></thead>
+       <thead><tr><th>Dato</th><th>Beløp</th><th>Referanse og overføring</th></tr></thead>
        <tbody>{result.payoutRows.map((row,i)=><tr key={row.reference+"-"+i}>
         <td>{row.date}</td><td>{kroner(row.amountOre)}</td>
-        <td>{row.reference||"Ingen bankreferanse fra Vipps"}</td>
+        <td>{row.reference||"Ingen bankreferanse fra Vipps"}
+         <VippsTripletexTransferPanel row={row} unit={result.unit}/>
+        </td>
        </tr>)}</tbody>
       </table>
      </div>}
@@ -176,10 +179,11 @@ export default function VippsSettlementClient(){
      </div>}
    </details>
    <p className={styles.hint} style={{marginTop:12}}>
-    <strong>Neste del:</strong> Når riktig Vipps-oppgjørskunde, gebyrkonto
-    og bankkonto er kontrollert, kan vi koble dette til automatisk
-    bilagsføring i Tripletex. Foreløpig er dette en lesekontroll, ikke
-    en bekreftelse på at pengene har kommet inn på bankkontoen.
+    <strong>Overføring til Tripletex:</strong> Under «Planlagte utbetalinger» kan du
+    kontrollere ett oppgjør om gangen og overføre det med en knapp.
+    Kun komplette oppgjør der hver fakturabetaling allerede er bekreftet i Tripletex,
+    blir tilbudt for bokføring. Bekreft bankinnbetaling og riktig konto først.
+    Åpne poster på Vipps oppgjørskunde må lukkes i kundereskontroen.
    </p>
   </div>}
  </section>;
