@@ -78,7 +78,7 @@ async function prepare(s,day,payoutId){
  const vippsTypeId=Number(vippsTypes[0].id);
  const linkedPaymentIds=new Set(loc.data.filter(p=>p.vipps_reference&&p.reversed_at==null)
   .map(p=>p.id));
- const refs=new Set(funds.filter(x=>x.type==="capture").map(x=>x.reference));
+ const refs=new Set(plan.references);
  const relevant=loc.data.filter(p=>refs.has(p.vipps_reference)&&linkedPaymentIds.has(p.id));
  if(relevant.some(p=>{
   const rows=(paid.data||[]).filter(x=>x.payment_id===p.id&&x.status==="confirmed");
@@ -93,11 +93,11 @@ async function prepare(s,day,payoutId){
  if(customerAccounts.length!==1||!feeAccounts.length||!banks.length)
   throw Error("Kontroller kontoplanen i Tripletex: krever kundereskontro 1500, gebyrkonto 7770 og minst én bankkonto.");
  const marker=payoutTripletexMarker("service",payoutId);
- await reviewVoucherDuplicate(session,conn.environment,day,marker);
  const duplicate=await s.from("tripletex_vipps_settlement_transfers")
   .select("status,tripletex_voucher_id").eq("environment",conn.environment)
   .eq("unit","service").eq("payout_psp_reference",payoutId).maybeSingle();
  if(duplicate.error)throw Error("Kunne ikke sjekke tidligere Vipps-overføringer.");
+ if(!duplicate.data)await reviewVoucherDuplicate(session,conn.environment,day,marker);
  const digest=hash({unit:"service",payoutId,plan,
   customerId:Number(customer.id),typeId:vippsTypeId});
  return {plan,digest,marker,conn,session,
