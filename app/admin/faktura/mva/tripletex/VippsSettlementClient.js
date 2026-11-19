@@ -258,7 +258,7 @@ export default function VippsSettlementClient(){
    <VippsFeeQueuePanel unit={result.unit} from={result.from} to={result.to}
     feeRows={result.feeRows||[]} complete={Boolean(cacheInfo?.complete)}
     unknownEntryTypes={result.unknownEntryTypes||0}
-    onBusyChange={setFeeBatchBusy}
+    onBusyChange={setFeeBatchBusy} externallyDisabled={loading||loadingSaved}
     onRefresh={async()=>{
      await reloadSaved();
      setReconcileAutoRunKey(n=>n+1);
