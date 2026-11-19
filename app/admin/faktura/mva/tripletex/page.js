@@ -16,7 +16,7 @@ export default async function TripletexReceiptsPage(){
   <h1 style={{fontSize:"clamp(24px,4vw,32px)",margin:"12px 0 7px"}}>Tripletex – overfør fakturaer og kvitteringer</h1>
   <p style={{fontSize:13,color:"#635d54",lineHeight:1.5,marginBottom:20}}>Fakturaer som du har sendt til kunder og kvitteringer du har mottatt fra leverandører, overføres på forskjellige måter for å unngå dobbelt bokføring.</p>
   <nav aria-label="Gå direkte til regnskapsfunksjon" style={{display:"flex",gap:10,flexWrap:"wrap",margin:"0 0 20px"}}>
-   <a href="#vipps-oppgjor" style={{display:"inline-flex",alignItems:"center",padding:"12px 16px",borderRadius:9,
+   <a href="/admin/vipps-oppgjor" style={{display:"inline-flex",alignItems:"center",padding:"12px 16px",borderRadius:9,
     background:"#23394c",color:"#fff",fontSize:15,fontWeight:700,textDecoration:"none"}}>
     Vipps-oppgjør og avstemming
    </a>
