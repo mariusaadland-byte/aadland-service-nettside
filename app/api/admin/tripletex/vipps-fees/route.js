@@ -78,15 +78,15 @@ async function prepare(s,day,feeId){
   unprotectTripletexToken(connection),connection.environment);
  const [accounts,customers]=await Promise.all([
   tripletexRead("/ledger/account?count=1000",session,connection.environment),
-  tripletexRead("/customer?customerAccountNumber=10009&count=10",session,connection.environment)
+  tripletexRead("/customer?customerAccountNumber=10009&count=10&fields=id,name,customerNumber",session,connection.environment)
  ]);
  if(!Array.isArray(accounts?.values)||accounts.values.length>=1000||
   !Array.isArray(customers?.values)||customers.values.length!==1)
   throw Error("Kontoplan eller Vipps oppgjørskunde kunne ikke leses fra Tripletex.");
  const customer=customers.values[0];
- if(!positive(customer.id)||Number(customer.customerAccountNumber)!==10009||
+ if(!positive(customer.id)||Number(customer.customerNumber)!==10009||
   !/vipps/i.test(String(customer.name||"")))
-  throw Error("Kunden 10009 er ikke bekreftet som Vipps oppgjørskunde.");
+  throw Error("Kontroller at kunde 10009 finnes i Tripletex og at kundenavnet inneholder «Vipps». Ingen bilag er sendt.");
  const active=accounts.values.filter(x=>positive(x.id)&&!x.isInactive);
  const customerAccounts=active.filter(a=>Number(a.number)===1500&&
   a.ledgerType==="CUSTOMER");
