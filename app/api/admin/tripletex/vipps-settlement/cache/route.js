@@ -171,7 +171,7 @@ export async function POST(req){
   const pending=cacheDaysToSync(days,existing,localDay(),stamp());
   if(!pending.length)
    return json({ok:true,checkedDays:0,newDays:0,changedDays:0,
-    unchangedDays:days.length,skippedDays:days.length,
+    unchangedDays:0,skippedDays:days.length,
     message:"Alle datoene er allerede lagret og nylig kontrollert."});
   const config=vippsUnitConfig(unit);
   if(!config.configured||config.environment!=="production")
