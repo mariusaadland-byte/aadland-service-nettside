@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import styles from "./TripletexReceipts.module.css";
+import {vippsBankReviewTasks} from "../../../../../lib/vippsTripletexBankMatch";
 const money=ore=>new Intl.NumberFormat("nb-NO",{
  style:"currency",currency:"NOK"}).format(Number(ore||0)/100);
 const minusDays=(day,n)=>new Date(Date.parse(day+"T00:00:00Z")-
@@ -35,6 +36,7 @@ export default function VippsBankMatchPanel({unit,from,to,cacheInfo}){
  const validRange=matchFrom>=from&&matchTo<=to&&matchFrom<=matchTo&&
   Number.isFinite(Date.parse(matchFrom))&&Number.isFinite(Date.parse(matchTo))&&
   (Date.parse(matchTo)-Date.parse(matchFrom))/86400000<31;
+ const tasks=match?.matches?.length?vippsBankReviewTasks(match.matches):[];
  async function checkAccess(selectedAccountId=null){
   if(checking||unit!=="service")return;
   requestRef.current?.abort();
@@ -161,6 +163,20 @@ export default function VippsBankMatchPanel({unit,from,to,cacheInfo}){
      Bankkonto {match.bankAccount.number} – {match.bankAccount.name}.
      {" "}{match.bankStatementsRead} kontoutskrifter undersøkt.
     </p>
+    {tasks.length>0&&<details style={{margin:"10px 0",border:"1px solid #d7dfe2",
+     borderRadius:8,padding:10}}>
+     <summary style={{fontWeight:700,cursor:"pointer"}}>
+      Vis hva som må følges opp ({tasks.length})
+     </summary>
+     <ol style={{paddingLeft:22,margin:"10px 0 0"}}>
+      {tasks.map(t=><li key={t.date+"|"+t.reference}
+       style={{padding:"4px 0"}}>
+       <strong>{t.date} · {money(t.amountOre)}</strong>
+       {" "}{t.priority<=1?"– Må kontrolleres før bokføring":"– Kontrollpunkt"}
+       <p style={{margin:"4px 0",fontSize:13}}>{t.message}</p>
+      </li>)}
+     </ol>
+    </details>}
     {match.matches.length>0&&<div style={{overflowX:"auto"}}>
      <table style={{width:"100%",marginTop:8}}>
       <thead><tr><th>Vipps-dato</th><th>Utbetaling</th><th>Bankmatch</th></tr></thead>
