@@ -104,11 +104,17 @@ export default function TripletexApiConnectClient(){
  useEffect(()=>{
   if(!state.configured)return;
   let active=true;
-  fetch("/api/admin/invoices/tripletex/sales",{cache:"no-store"})
-   .then(async r=>{const v=await r.json().catch(()=>({}));
-    if(!r.ok)throw Error(v.error||"Kunne ikke hente fakturaer.");
+  Promise.all([
+   fetch("/api/admin/invoices/tripletex/sales",{cache:"no-store"}),
+   fetch("/api/admin/tripletex/invoices/direct",{cache:"no-store"})
+  ]).then(async ([r,direct])=>{
+    const [v,log]=await Promise.all([
+     r.json().catch(()=>({})),direct.json().catch(()=>({}))
+    ]);
+    if(!r.ok||!direct.ok)throw Error(v.error||log.error||"Kunne ikke hente fakturaer.");
     if(active){
-     const arr=(v.rows||[]).filter(x=>x.state==="paid"||x.state==="unpaid")
+     const previously=new Set((log.claims||[]).map(x=>x.invoiceId));
+     const arr=(v.rows||[]).filter(x=>(x.state==="paid"||x.state==="unpaid")&&!previously.has(x.id))
       .map(x=>({id:x.id,label:String(x.originalNumber||"Faktura")+" · "+
        String(x.customerName||"Kunde").slice(0,80)}));
      setInvoiceOptions(arr);
@@ -131,7 +137,7 @@ export default function TripletexApiConnectClient(){
     <div className={styles.stat}><strong style={{fontSize:18}}>{status}</strong><span>API-forbindelse</span></div>
     <div className={styles.stat}><strong style={{fontSize:18}}>{state.environment==="production"?"Produksjon":
      state.environment==="test"?"Test":"–"}</strong><span>Tripletex-miljø</span></div>
-    <div className={styles.stat}><strong style={{fontSize:18}}>{state.directInvoiceTransferEnabled?"Klar":"Sperret"}</strong>
+    <div className={styles.stat}><strong style={{fontSize:18}}>{state.directInvoiceTransferEnabled?"Klar":state.directInvoicePilotEnabled?"Pilot":"Sperret"}</strong>
      <span>Direkte fakturabokføring (generell)</span></div>
    </div>
    {state.configured?<div className={styles.actions}>
@@ -190,7 +196,7 @@ export default function TripletexApiConnectClient(){
      <strong>{x.ready?"Kunde/MVA mappet ✓":"Må avklares"}:</strong> {x.reason}
     </p>)}
     {preflight?.results?.some(x=>x.id===selectedInvoice&&x.ready)&&<div>
-     <p className={styles.hint}>**Direkte pilot:** Kun én helt ubetalt faktura.
+     <p className={styles.hint}><strong>Direkte pilot:</strong> Kun én helt ubetalt faktura.
       Tripletex lager et eget fakturanummer, men sender ingenting til kunden.
       Betalte fakturaer må fortsatt håndteres separat.</p>
      <div className={styles.actions}>
