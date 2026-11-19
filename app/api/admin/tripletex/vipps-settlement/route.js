@@ -1,11 +1,11 @@
 import {NextResponse} from "next/server";
-import {getAdminUser} from "../../../../../../lib/auth";
-import {db} from "../../../../../../lib/supabase";
-import {vippsUnitConfig} from "../../../../../../lib/vippsConfig";
-import {vippsSettlementLedgers,vippsSettlementEntries} from "../../../../../../lib/vippsClient";
+import {getAdminUser} from "../../../../../lib/auth";
+import {db} from "../../../../../lib/supabase";
+import {vippsUnitConfig} from "../../../../../lib/vippsConfig";
+import {vippsSettlementLedgers,vippsSettlementEntries} from "../../../../../lib/vippsClient";
 import {vippsRange,matchingLedger,normalizeReportEntries,
- vippsSettlementSummary} from "../../../../../../lib/vippsSettlementReconcile";
-import {storedTripletexConnection} from "../../../../../../lib/tripletexCredentials";
+ vippsSettlementSummary} from "../../../../../lib/vippsSettlementReconcile";
+import {storedTripletexConnection} from "../../../../../lib/tripletexCredentials";
 
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
@@ -22,7 +22,7 @@ export async function GET(req){
  const start=url.searchParams.get("from"),end=url.searchParams.get("to");
  const days=vippsRange(start,end,7);
  if(!days)return json({error:"Velg en gyldig periode på maksimalt 7 dager."},400);
- if(days.some(day=>day>new Date().toISOString().slice(0,10)))
+ if(days.some(day=>day>new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Oslo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())))
   return json({error:"Kan ikke hente oppgjør for fremtidige datoer."},400);
  const config=vippsUnitConfig(unit);
  if(!config.configured)return json({error:"Vipps-nøkler er ikke konfigurert for valgt salgssted."},409);
