@@ -49,7 +49,7 @@ assert.ok(panel.includes('method:"POST"'));
 assert.ok(panel.includes("notImportedPreviously:true"));
 assert.ok(panel.includes("window.confirm"));
 assert.ok(panel.includes("checked={accepted}"));
-assert.ok(panel.includes("if(busy||!prepared?.entries?.length||!accepted)return;"));
+assert.ok(panel.includes("if(busy||externallyDisabled||!prepared?.entries?.length||!accepted)return;"));
 assert.ok(panel.includes("for(let i=0;i<list.length;i++)"));
 assert.ok(panel.includes("No automatic")||panel.includes("Ingen automatisk"));
 assert.ok(!panel.includes("Promise.all(list.map"),"no simultaneous accounting writes");
