@@ -15,8 +15,18 @@ assert.deepEqual(vippsPeriodBatches("2026-02-01","2026-02-28").length,4);
 assert.deepEqual(vippsPeriodBatches("2026-02-26","2026-03-04"),[
  {from:"2026-02-26",to:"2026-03-04"}
 ]);
-assert.equal(vippsPeriodBatches("2026-10-01","2026-11-01"),null,
- "32 days cannot be fetched in one lookup");
+assert.equal(vippsPeriodBatches("2026-10-01","2026-11-01").length,5,
+ "More than one month is supported through weekly batches");
+const fullYear2026=vippsPeriodBatches("2026-01-01","2026-12-31");
+assert.equal(fullYear2026.length,53,"365 days should be fetched in 53 seven-day chunks");
+assert.deepEqual(fullYear2026.at(-1),{from:"2026-12-31",to:"2026-12-31"});
+const leapYear2024=vippsPeriodBatches("2024-01-01","2024-12-31");
+assert.equal(leapYear2024.length,53,"Leap year with 366 days must be supported");
+assert.deepEqual(leapYear2024.at(-1),{from:"2024-12-30",to:"2024-12-31"});
+assert.equal(vippsPeriodBatches("2026-01-01","2027-01-02"),null,
+ "367 days must be rejected");
+assert.equal(vippsPeriodBatches("2026-01-01","2026-01-01",{limitDays:500}),null,
+ "The optional limitDays cannot remove the absolute one-year bound");
 assert.equal(vippsPeriodBatches("2026-02-30","2026-03-01"),null);
 assert.equal(vippsPeriodBatches("2026-11-18","2026-11-12"),null);
 const totals={
@@ -45,6 +55,11 @@ assert.equal(combined.matching.find(x=>x.reference==="ref-2").status,"tripletex-
 assert.equal(combined.from,"2026-10-01");
 assert.equal(combined.to,"2026-10-31");
 assert.equal(combined.postingEnabled,false);
+assert.equal(combined.matchingLimited,false);
+assert.equal(combineVippsPeriodResponses(
+ parts.map((p,i)=>i===2?{...p,matchingLimited:true}:p),
+ batches,"service").matchingLimited,true,
+ "Hidden detailed references must be disclosed for a large report");
 assert.throws(()=>combineVippsPeriodResponses(parts.slice(0,4),batches,"service"),
  /Ufullstendige/);
 assert.throws(()=>combineVippsPeriodResponses(
@@ -57,7 +72,11 @@ assert.throws(()=>combineVippsPeriodResponses(
  batches,"service"),/Ugyldig summering/);
 const ui=readFileSync("app/admin/faktura/mva/tripletex/VippsSettlementClient.js","utf8");
 assert.ok(ui.includes('vippsPeriodBatches(from,to)'));
-assert.ok(ui.includes("31 dager"));
+assert.ok(ui.includes("366 dager"));
+assert.ok(ui.includes("Velg regnskapsår"));
+assert.ok(ui.includes("Avbryt henting"));
+assert.ok(ui.includes("controller.signal"));
+assert.ok(ui.includes("Henter uke "));
 assert.ok(ui.includes("parts.push(data)"));
 assert.ok(ui.includes("combineVippsPeriodResponses(parts,batches,unit)"));
 assert.ok(ui.includes("Ingen samlet rapport blir vist"));
@@ -65,4 +84,4 @@ const api=readFileSync("app/api/admin/tripletex/vipps-settlement/route.js","utf8
 assert.ok(api.includes("vippsRange(start,end,7)"),
  "Server should retain safe seven-day read-only limit");
 assert.ok(!api.includes("export async function POST"));
-console.log("Vipps månedsoppgjør bestått: 31 dager i fem sikre API-bolker, eksakte ørebeløp, ingen delvise rapporter eller falske bekreftelser.");
+console.log("Vipps årsoppgjør bestått: 365/366 dager i 53 sikre API-bolker, kansellering, eksakte ørebeløp og ingen delvise rapporter.");
