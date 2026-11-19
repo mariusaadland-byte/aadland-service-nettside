@@ -2,6 +2,7 @@
 import {useEffect,useState} from "react";
 import styles from "./TripletexReceipts.module.css";
 import TripletexCustomerSyncClient from "./TripletexCustomerSyncClient";
+import {transferTripletexInvoiceAsPaid} from "../../../../../lib/tripletexPaidInvoiceFlow";
 
 const url="/api/admin/tripletex/connection";
 const empty={configured:false,environment:null,verifiedAt:null,directInvoiceTransferEnabled:false};
@@ -14,6 +15,9 @@ export default function TripletexApiConnectClient(){
  const [invoiceOptions,setInvoiceOptions]=useState([]),[selectedInvoice,setSelectedInvoice]=useState("");
  const [preflight,setPreflight]=useState(null);
  const [directPilot,setDirectPilot]=useState(null);
+ const [paymentTypes,setPaymentTypes]=useState([]);
+ const [paymentTypeIds,setPaymentTypeIds]=useState({bank:"",vipps:""});
+ const [paymentTypeError,setPaymentTypeError]=useState("");
  useEffect(()=>{
   let active=true;
   fetch(url,{cache:"no-store"}).then(async r=>{
@@ -50,51 +54,111 @@ export default function TripletexApiConnectClient(){
  }
  async function checkDirectPilot(action){
   if(busy||!selectedInvoice)return;
-  if(action==="transfer"){
-   if(!directPilot?.ready||directPilot.invoiceId!==selectedInvoice)return;
-   const money=new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"})
-    .format(Number(directPilot.grossOre||0)/100);
-   if(!window.confirm(
-    "OPPRETTE EN EKTE REGNSKAPSFØRT FAKTURA I TRIPLETEX?"+
-    "\n\nOpprinnelig faktura: "+directPilot.sourceNumber+
-    "\nBeløp inkl. MVA: "+money+
-    "\nFakturadato: "+directPilot.issuedDate+
-    "\n\nTripletex tildeler sitt eget fakturanummer."+
-    "\nDen opprinnelige fakturaen i Aadland Service er allerede sendt til kunden."+
-    "\nTripletex skal IKKE sende den på nytt."+
-    (directPilot.paidOre>0?
-      "\n\nVIKTIG: Fakturaen opprettes først som UBETALT i Tripletex. "+
-      directPilot.paymentCount+" tidligere innbetaling(er) må deretter bokføres enkeltvis "+
-      "med opprinnelig betalingsdato og riktig bank-/Vipps-type. "+
-      "Ikke betrakt overføringen som fullført før saldoene stemmer.":"")+
-    "\n\nDette kan påvirke regnskapet og MVA. Fortsett bare dersom fakturaen ikke finnes i Tripletex fra før."
-   ))return;
+  const pilot=directPilot,invoiceId=selectedInvoice;
+  const paidFlow=action==="transferPaid";
+  const transfer=action==="transfer"||paidFlow;
+  const paymentChoice={...paymentTypeIds};
+  if(transfer){
+   if(!pilot?.ready||pilot.invoiceId!==invoiceId)return;
+   if(paidFlow){
+    if(pilot.paidOre<=0||pilot.paymentCount<1||pilot.paymentCount>10){
+     setError("Samlet betalingsoverføring krever 1–10 registrerte innbetalinger.");return;
+    }
+    if(!(pilot.paymentSources||[]).length||
+     (pilot.paymentSources||[]).some(source=>
+      !paymentTypes.some(x=>x.id===Number(paymentChoice[source])))){
+     setError("Velg riktig Tripletex-betalingstype for bank/Vipps før overføring.");
+     return;
+    }
+   }
+   const money=new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"});
+   const prompt=paidFlow?
+    "OVERFØRE FAKTURAEN SOM BETALT TIL TRIPLETEX?"+
+    "\n\nFaktura: "+pilot.sourceNumber+
+    "\nTotalbeløp: "+money.format(Number(pilot.grossOre)/100)+
+    "\nRegistrert betalt: "+money.format(Number(pilot.paidOre)/100)+
+    "\nRegistrerte innbetalinger: "+pilot.paymentCount+
+    "\n\nAadland Service bokfører fakturaen uten å sende den til kunden"+
+    " og registrerer så innbetalingene med opprinnelige betalingsdatoer."+
+    "\n\nDu har valgt riktig bank-/Vipps-konto i Tripletex. Bekreft at"+
+    " verken fakturaen eller betalingene allerede er bokført der."+
+    "\nVed uavklart feil stopper overføringen og må kontrolleres manuelt.":
+    "OPPRETTE EN EKTE FAKTURA I TRIPLETEX?"+
+    "\n\nFaktura: "+pilot.sourceNumber+
+    "\nTotalbeløp: "+money.format(Number(pilot.grossOre)/100)+
+    "\n\nFakturaen sendes IKKE til kunden på nytt."+
+    (pilot.paidOre>0?"\nInnbetalinger må deretter registreres separat.":"")+
+    "\n\nDette påvirker regnskap og MVA. Fortsett bare hvis fakturaen ikke finnes der fra før.";
+   if(!window.confirm(prompt))return;
   }
   setBusy(true);setError("");setInfo("");
+  if(paidFlow){
+   try{
+    const outcome=await transferTripletexInvoiceAsPaid({
+     invoiceId,digest:pilot.digest,paymentCount:pilot.paymentCount,
+     paymentTypesBySource:paymentChoice,
+     onCreated:created=>{
+      // The accounting invoice now exists regardless of what happens to
+      // its payments. Remove it from all possible invoice-create actions.
+      setDirectPilot(null);setPreflight(null);
+      setInvoiceOptions(old=>old.filter(x=>x.id!==invoiceId));
+      setSelectedInvoice("");
+      setInfo("Faktura "+created.tripletexInvoiceNumber+
+       " er opprettet. Registrerer "+pilot.paymentCount+" innbetaling(er) …");
+     },
+     onPayment:(count,total)=>setInfo("Fakturaen er opprettet. "+
+      count+" av "+total+" innbetalinger er bekreftet i Tripletex.")
+    });
+    setInfo("Faktura "+pilot.sourceNumber+" er overført som betalt. "+
+     outcome.posted+" innbetaling(er) er bokført med originale datoer."+
+     " Tripletex-fakturanummer: "+outcome.created.tripletexInvoiceNumber+
+     ". Restbeløpene stemmer i begge systemer.");
+   }catch(error){
+    if(error.invoiceAttempted){
+     setDirectPilot(null);setPreflight(null);
+     setInvoiceOptions(old=>old.filter(x=>x.id!==invoiceId));
+     setSelectedInvoice("");
+    }
+    setError(error.message||"Overføringen er uavklart. Kontroller Tripletex.");
+   }finally{setBusy(false);}
+   return;
+  }
   try{
    const resp=await fetch("/api/admin/tripletex/invoices/direct",{
     method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({action,invoiceId:selectedInvoice,
-     ...(action==="transfer"?{confirmed:true,digest:directPilot.digest}:{})})
+    body:JSON.stringify({action:transfer?"transfer":"check",invoiceId,
+     ...(transfer?{confirmed:true,digest:pilot.digest}:{})})
    });
    const result=await resp.json().catch(()=>({}));
    if(!resp.ok)throw Error(result.error||"Direkte fakturakontroll feilet.");
-   if(action==="check")setDirectPilot(result);
-   else{
+   if(!transfer){
+    setDirectPilot(result);setPaymentTypes([]);setPaymentTypeIds({bank:"",vipps:""});
+    setPaymentTypeError("");
+    if(result.paidOre>0&&result.paymentCount<=10){
+     const response=await fetch("/api/admin/tripletex/invoices/payment-types",
+      {cache:"no-store"});
+     const types=await response.json().catch(()=>({}));
+     if(!response.ok)
+      setPaymentTypeError(types.error||"Kunne ikke hente betalingstyper fra Tripletex.");
+     else setPaymentTypes(types.types||[]);
+    }
+   }else{
     setDirectPilot(null);setPreflight(null);
     setInfo(result.message+" Tripletex-fakturanummer: "+result.tripletexInvoiceNumber+
-     ". Den er fjernet fra listen over gjenstående fakturaer.");
-    setInvoiceOptions(old=>old.filter(x=>x.id!==selectedInvoice));
+     ". Fakturaen er fjernet fra listen over gjenstående.");
+    setInvoiceOptions(old=>old.filter(x=>x.id!==invoiceId));
     setSelectedInvoice("");
    }
   }catch(e){
-   if(action==="transfer")setDirectPilot(null);
-   setError(e.message||"Fakturaoverføringen kunne ikke fullføres.");
+   if(transfer)setDirectPilot(null);
+   setError(e.message||"Fakturaoverføringen kunne ikke fullføres."+
+    " Kontroller historikken før et nytt forsøk.");
   }finally{setBusy(false);}
  }
  async function checkInvoiceMapping(){
   if(busy||!selectedInvoice)return;
   setBusy(true);setError("");setPreflight(null);setDirectPilot(null);
+  setPaymentTypes([]);setPaymentTypeIds({bank:"",vipps:""});setPaymentTypeError("");
   try{
    const r=await fetch("/api/admin/tripletex/preview",{
     method:"POST",headers:{"Content-Type":"application/json"},
@@ -187,7 +251,9 @@ export default function TripletexApiConnectClient(){
     <div className={styles.inputs}>
      <label>Faktura
       <select value={selectedInvoice} disabled={busy}
-       onChange={e=>{setSelectedInvoice(e.target.value);setPreflight(null);setDirectPilot(null)}}>
+       onChange={e=>{setSelectedInvoice(e.target.value);setPreflight(null);
+        setDirectPilot(null);setPaymentTypes([]);setPaymentTypeError("");
+        setPaymentTypeIds({bank:"",vipps:""})}}>
        {invoiceOptions.map(x=><option key={x.id} value={x.id}>{x.label}</option>)}
       </select>
      </label>
@@ -204,36 +270,71 @@ export default function TripletexApiConnectClient(){
     </p>)}
     {preflight?.results?.some(x=>x.id===selectedInvoice&&x.ready)&&<div>
      <p className={styles.hint}><strong>Direkte pilot:</strong> Én faktura om gangen.
-      Tripletex lager sitt eget regnskapsnummer, men sender ingenting til kunden.
-      Fakturaer som allerede har innbetalinger, opprettes først som ubetalte i Tripletex;
-      innbetalingene bokføres deretter separat med riktig dato og betalingstype.</p>
+      Fakturaer sendes ikke til kunden på nytt.
+      For fakturaer med opptil 10 registrerte innbetalinger kan du velge
+      betalingstype og trykke «Overfør som betalt». Da ordner Aadland Service både
+      faktura og innbetalinger med originale datoer i én bekreftet arbeidsflyt.</p>
      <div className={styles.actions}>
       <button type="button" disabled={busy} onClick={()=>checkDirectPilot("check")}>
        {busy?"Kontrollerer …":"Kontroller direkteoverføring (kun lesing)"}
       </button>
       {directPilot?.ready&&directPilot.invoiceId===selectedInvoice&&
-       <button type="button" disabled={busy} className={styles.primary}
-        onClick={()=>checkDirectPilot("transfer")}>
-        {directPilot.paidOre>0?"Opprett faktura (bokfør innbetalinger etterpå)":
-         "Opprett denne ubetalte fakturaen i Tripletex"}
-       </button>}
+       (directPilot.paidOre===0?
+        <button type="button" disabled={busy} className={styles.primary}
+         onClick={()=>checkDirectPilot("transfer")}>
+         Opprett denne ubetalte fakturaen i Tripletex
+        </button>:
+        directPilot.paymentCount<=10?
+        <button type="button" disabled={busy||!paymentTypes.length||
+         (directPilot.paymentSources||[]).some(source=>!paymentTypeIds[source])}
+         className={styles.primary} onClick={()=>checkDirectPilot("transferPaid")}>
+         Overfør som betalt
+        </button>:
+        <button type="button" disabled={busy} className={styles.primary}
+         onClick={()=>checkDirectPilot("transfer")}>
+         Opprett faktura (bokfør betalingene separat)
+        </button>)
+      }
      </div>
-     {directPilot?.ready&&<p className={styles.hint}>Klart for én kontrollert
-      overføring. Beløp: {(Number(directPilot.grossOre)/100).toLocaleString("nb-NO",{style:"currency",currency:"NOK"})}.
-      {directPilot.paidOre>0&&<>
-       {" "}Registrert betalt i Aadland Service:
-       {" "}{(Number(directPilot.paidOre)/100).toLocaleString("nb-NO",{style:"currency",currency:"NOK"})}
-       {" · "}{directPilot.paymentCount} innbetaling(er) må overføres separat.
-      </>}
-      Dette er en ekte bokføring først når du trykker opprett og bekrefter.</p>}
+     {directPilot?.ready&&<div>
+      <p className={styles.hint}>Klart for én kontrollert overføring.
+       Fakturabeløp: {(Number(directPilot.grossOre)/100).toLocaleString("nb-NO",{style:"currency",currency:"NOK"})}.
+       {directPilot.paidOre>0&&<>
+        {" "}Allerede registrert betalt:
+        {" "}{(Number(directPilot.paidOre)/100).toLocaleString("nb-NO",{style:"currency",currency:"NOK"})}
+        {" · "}{directPilot.paymentCount} innbetaling(er).
+       </>}
+       Det opprettes ikke noe i Tripletex før du godkjenner bokføringen.</p>
+      {directPilot.paidOre>0&&directPilot.paymentCount<=10&&
+       <div style={{display:"grid",gap:10,margin:"12px 0"}}>
+        <p className={styles.hint}><strong>Velg hvordan innbetalingen ble mottatt.</strong>
+         Dette bestemmer hvilken betalingstype/konto som brukes i Tripletex.
+         Betalingsdato og beløp hentes automatisk fra Aadland Service.</p>
+        {paymentTypeError&&<p role="alert" className={styles.error}>{paymentTypeError}</p>}
+        {(directPilot.paymentSources||[]).map(source=>
+         <label key={source} style={{display:"grid",gap:5}}>
+          {source==="vipps"?"Vipps – betalingstype i Tripletex":
+           "Bank/annen betaling – betalingstype i Tripletex"}
+          <select value={paymentTypeIds[source]||""} disabled={busy||!paymentTypes.length}
+           onChange={e=>setPaymentTypeIds(old=>({...old,[source]:e.target.value}))}>
+           <option value="">Velg riktig betalingstype</option>
+           {paymentTypes.map(type=><option key={type.id} value={String(type.id)}>
+            {type.label} (ID {type.id})
+           </option>)}
+          </select>
+         </label>
+        )}
+       </div>}
+     </div>}
     </div>}
    </div>}
    {state.configured&&<p className={styles.hint}>Sist bekreftet:
     {" "}{state.verifiedAt?new Date(state.verifiedAt).toLocaleString("nb-NO"):"–"}.
     API-et kan testes. En utsendt faktura om gangen kan overføres direkte
-    etter egen kontroll og bekreftelse. For allerede betalte fakturaer overføres
-    innbetalingene separat med originale datoer. Samlet automatisk bokføring er
-    fortsatt ikke aktiv; CSV-importen er tilgjengelig.</p>}
+    etter kontroll og bekreftelse. Når betalingstype er valgt, kan faktura og
+    registrerte innbetalinger overføres som betalt med én bekreftelse.
+    Hver innbetaling bokføres med original dato. Samlet overføring av alle
+    fakturaer er fortsatt ikke aktiv; CSV-importen er tilgjengelig.</p>}
   </>}
  </section>;
 }

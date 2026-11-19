@@ -113,6 +113,7 @@ export async function POST(req){
    sourceNumber:invoice.invoice_number,issuedDate:invoice.issued_date,
    grossOre:preview.grossOre,digest:preview.digest,environment:connection.environment,
    paidOre:preview.paidOre,paymentCount:preview.paymentCount,mode:preview.mode,
+   paymentSources:preview.paymentSources,
    message:"Fakturaen er kontrollert mot kundekobling, MVA og mulige duplikater. Ingen bokføring er utført."
   });
   if(body.digest!==preview.digest)
