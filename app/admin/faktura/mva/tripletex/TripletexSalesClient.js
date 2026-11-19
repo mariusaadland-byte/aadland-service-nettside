@@ -5,6 +5,7 @@ import {tripletexCustomerInvoiceQueue,tripletexCustomerInvoiceSelections} from "
 
 const base="/api/admin/invoices/tripletex/sales";
 const transferApi=base+"/transfer";
+const reconcileApi="/api/admin/tripletex/invoices/reconcile";
 const money=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(Number(ore||0)/100);
 const validType=value=>/^[A-Za-z0-9_-]{1,32}$/.test(String(value||"").trim());
 const fileDownload=url=>{
@@ -15,6 +16,7 @@ const fileDownload=url=>{
 
 export default function TripletexSalesClient(){
  const [invoices,setInvoices]=useState([]),[transfers,setTransfers]=useState([]);
+ const [invoiceLinks,setInvoiceLinks]=useState([]),[reconcileError,setReconcileError]=useState("");
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
  const [error,setError]=useState(""),[message,setMessage]=useState("");
  const [startNumber,setStartNumber]=useState("80000000");
@@ -25,15 +27,19 @@ export default function TripletexSalesClient(){
  const csvSettingsRef=useRef(null);
 
  const reload=useCallback(async()=>{
-  const [list,history]=await Promise.all([
-   fetch(base,{cache:"no-store"}),fetch(transferApi,{cache:"no-store"})
+  const [list,history,reconciled]=await Promise.all([
+   fetch(base,{cache:"no-store"}),fetch(transferApi,{cache:"no-store"}),
+   fetch(reconcileApi,{cache:"no-store"})
   ]);
-  const [data,log]=await Promise.all([
-   list.json().catch(()=>({})),history.json().catch(()=>({}))
+  const [data,log,checks]=await Promise.all([
+   list.json().catch(()=>({})),history.json().catch(()=>({})),
+   reconciled.json().catch(()=>({}))
   ]);
   if(!list.ok||!history.ok)
    throw Error(data.error||log.error||"Kunne ikke hente komplett overføringsstatus.");
   setInvoices(data.rows||[]);setTransfers(log.transfers||[]);
+  setInvoiceLinks(reconciled.ok&&checks.configured?(checks.links||[]):[]);
+  setReconcileError(reconciled.ok?"":"Kunne ikke hente direkte API-avstemming. CSV-overføring er fortsatt tilgjengelig.");
  },[]);
  useEffect(()=>{
   let active=true;
@@ -62,7 +68,23 @@ export default function TripletexSalesClient(){
  const preparedVisible=queue.prepared.filter(matches);
  const reviewVisible=queue.needsReview.filter(matches);
  const completed=queue.confirmed.filter(matches);
+ const linksByInvoice=useMemo(()=>new Map(invoiceLinks.map(x=>[x.invoiceId,x])),[invoiceLinks]);
 
+ async function checkImportedInvoice(row){
+  if(busy||!row?.id||!row.transfer||row.transfer.status!=="confirmed")return;
+  const existing=linksByInvoice.get(row.id);
+  setBusy(true);setError("");setMessage("");
+  try{
+   const response=await fetch(reconcileApi,{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({invoiceId:row.id,action:existing?"check":"link"})});
+   const outcome=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(outcome.error||"Tripletex kunne ikke bekrefte fakturaen.");
+   setMessage(outcome.message||"Tripletex-fakturaen er kontrollert.");
+   await reload();
+  }catch(err){setError(err.message||"Fakturaavstemming mislyktes.");}
+  finally{setBusy(false);}
+ }
  async function post(payload){
   const response=await fetch(transferApi,{
    method:"POST",headers:{"Content-Type":"application/json"},
@@ -150,6 +172,7 @@ export default function TripletexSalesClient(){
   {loading&&<p role="status">Henter fakturaer og overføringsstatus …</p>}
   {error&&<p role="alert" className={styles.error}>{error}</p>}
   {message&&<p role="status" className={styles.progress}>{message}</p>}
+  {reconcileError&&<p role="status" className={styles.hint}>{reconcileError}</p>}
   {!loading&&<>
    <div className={styles.stats}>
     <div className={styles.stat}><strong>{allPending}</strong><span>Gjenstår å importere eller kontrollere</span></div>
@@ -268,13 +291,27 @@ export default function TripletexSalesClient(){
     <details open={showHistory} onToggle={e=>setShowHistory(e.currentTarget.open)}>
      <summary className={styles.historyToggle}>Overføringshistorikk ({queue.confirmed.length})</summary>
      <p className={styles.hint}>Her vises bare fakturaer du har bekreftet importert.
-      Statusen er din bekreftelse, ikke en automatisk API-kontroll fra Tripletex.</p>
+      Du kan nå trykke «Kontroller i Tripletex» for å bekrefte kunde, fakturanummer,
+      dato og beløp mot Tripletex-API-et. Restbeløpene sammenlignes uten å
+      opprette nye fakturaer eller bokføre betalinger. En manuell importbekreftelse
+      alene er ikke en API-bekreftelse.</p>
      <div className={styles.list}>{completed.map(x=><div className={styles.item} key={x.id}>
       <div className={styles.itemInfo}><strong>{x.originalNumber} · {x.customerName}</strong>
        <small>Tripletex-fakturanr. {x.transfer.import_number}
         {" · "}Bekreftet {new Date(x.transfer.confirmed_at).toLocaleDateString("nb-NO")}</small>
       </div>
-      <div className={styles.itemLinks}>{originalLink(x)}</div>
+      <div className={styles.itemLinks}>
+       {linksByInvoice.get(x.id)?<>
+        <small>Kontrollert i Tripletex · Faktura {linksByInvoice.get(x.id).invoiceNumber}
+         {" · "}Gjenstår der {money(linksByInvoice.get(x.id).remoteOutstandingOre)}
+         {" · "}Gjenstår her {money(linksByInvoice.get(x.id).localOutstandingOre)}
+         {" · "}{linksByInvoice.get(x.id).comparison==="match"?"Beløpene stemmer":"Avvik – kontroller betalinger"}</small>
+       </>:<small>Import bekreftet av deg · API-kontroll mangler</small>}
+       <button type="button" disabled={busy} onClick={()=>checkImportedInvoice(x)}>
+        {linksByInvoice.has(x.id)?"Oppdater betalingskontroll":"Kontroller i Tripletex"}
+       </button>
+       {originalLink(x)}
+      </div>
      </div>)}
      {!completed.length&&<p className={styles.empty}>Ingen bekreftede fakturaimporter ennå.</p>}
      </div>
