@@ -76,6 +76,10 @@ assert.ok(api.indexOf('.insert({')<api.indexOf('await tripletexRecordInvoicePaym
  "Claim must exist before irreversible remote PUT");
 assert.ok(api.includes('status:"needs_review"')&&api.includes('error_code:"provider_outcome_unknown"'));
 assert.ok(api.includes('verified.outstandingOre!==expected'));
+assert.ok(api.includes('const justBefore=await tripletexRead('));
+assert.ok(api.indexOf('const justBefore=await tripletexRead(')<
+ api.indexOf('await tripletexRecordInvoicePayment('),
+ "A fresh remote balance check must precede every irreversible payment");
 assert.ok(!api.includes("tripletexCreateInvoice"),"Do not accidentally create a second invoice");
 const helper=read("lib/tripletexApi.js");
 assert.ok(helper.includes('"/:payment?paymentDate="')&&helper.includes('method:"PUT",sessionToken'));
@@ -90,4 +94,26 @@ const migration=read("supabase/migrations/20261119040000_tripletex_invoice_payme
 assert.ok(migration.includes("tripletex_payment_one_unresolved_invoice"));
 assert.ok(migration.includes("enable row level security"));
 assert.ok(migration.includes("revoke all"));
-console.log("Direkte Tripletex-betalinger bestått: importhistorikk, Vipps, beløp, sekvens, ukjent utfall, påkrevd bekreftelse, eier og RLS.");
+// Validate the actual URL, HTTP method and body-less success on a fake
+// provider. No real network request, credentials or accounting write.
+const apiSource=read("lib/tripletexApi.js")
+ .replace(/^import "server-only";\s*/,"").replace(/^export /gm,"");
+const {tripletexRecordInvoicePayment}=new Function(
+ apiSource+";return {tripletexRecordInvoicePayment};")();
+const requests=[];
+const fakeFetch=async(url,options)=>{
+ requests.push({url,options});
+ return {ok:true,status:200};
+};
+const result=await tripletexRecordInvoicePayment(9876,"2026-11-19",42,12950,
+ "mock-session-token","test",{fetcher:fakeFetch});
+assert.equal(result.accepted,true);
+assert.equal(requests.length,1);
+assert.equal(requests[0].options.method,"PUT");
+assert.ok(requests[0].url.endsWith(
+ "/invoice/9876/:payment?paymentDate=2026-11-19&paymentTypeId=42&paidAmount=129.50"));
+assert.equal(requests[0].options.body,undefined);
+await assert.rejects(()=>tripletexRecordInvoicePayment(-1,"2026-11-19",42,12950,
+ "mock-session-token","test",{fetcher:fakeFetch}));
+assert.equal(requests.length,1,"Invalid payment must not contact Tripletex");
+console.log("Direkte Tripletex-betalinger bestått: importhistorikk, Vipps, beløp, sekvens, ukjent utfall, påkrevd bekreftelse, eier, RLS og mock API uten ekte føring.");
