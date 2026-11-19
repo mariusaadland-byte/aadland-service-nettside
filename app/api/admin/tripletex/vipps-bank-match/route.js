@@ -59,10 +59,13 @@ export async function GET(req){
    if(!accounts.length)return json({ok:true,bankReadAccess:false,
     bankAccounts:[],hasStatementData:false,
     reason:"Ingen aktiv bankkonto er merket som bankkonto i Tripletex. Kontroller kontoplanen."});
+   const selectedId=q.get("accountId");
+   const selected=selectedId===null?accounts[0]:
+    accounts.find(a=>String(a.id)===selectedId);
+   if(!selected)return json({error:"Bankkontoen kan ikke kontrolleres med dette Tripletex-oppsettet."},400);
    try{
-    // Read one statement for one trusted, active bank account; an unfiltered
-    // probe could accidentally claim access based on another company's data.
-    const selected=accounts[0];
+    // Probe the selected trusted account, never infer rights for other bank
+    // accounts from one successful statement request.
     const statements=await tripletexRead("/bank/statement?accountId="+
      selected.id+"&count=1",session,conn.environment);
     if(!Array.isArray(statements?.values))
@@ -78,7 +81,7 @@ export async function GET(req){
       transactionReadAccess=Array.isArray(bankRows?.values);
      }catch{transactionReadAccess=false;}
     }
-    return json({ok:true,
+    return json({ok:true,checkedAccountId:selected.id,
      bankReadAccess:transactionReadAccess!==false,
      transactionReadAccess,bankAccounts:accounts,
      hasStatementData:statements.values.length>0,
@@ -88,7 +91,7 @@ export async function GET(req){
      note:"Dette sjekker lesetilgang, ikke om banken har sendt oppdaterte kontoutskrifter."});
    }catch(error){
     const denied=[401,403,404].includes(Number(error?.status));
-    return json({ok:true,bankReadAccess:false,bankAccounts:accounts,
+    return json({ok:true,bankReadAccess:false,checkedAccountId:selected.id,bankAccounts:accounts,
      reason:denied?"Tripletex-tilgangen gir ikke lesbare kontoutskrifter. Kontroller API-rettigheter og bankintegrasjon.":
       "Kontoutskrifter kunne ikke leses fra Tripletex. Det er ikke bekreftet om bankdata er tilgjengelige."});
    }
