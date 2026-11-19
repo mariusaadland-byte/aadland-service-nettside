@@ -2,14 +2,38 @@
 import {useState} from "react";
 import Link from "next/link";
 import CompanyRegistryCardUpdater from "./CompanyRegistryCardUpdater";
-export default function CustomerCardClient({contact,invoiceId}){
+export default function CustomerCardClient({contact,invoiceId,autoSyncTripletex=false}){
  const [form,setForm]=useState({...contact,paymentTermsDays:contact.paymentTermsDays??14}),[busy,setBusy]=useState(false),[error,setError]=useState(""),[saved,setSaved]=useState(false);
+ const [tripletexStatus,setTripletexStatus]=useState("");
  const change=(key,value)=>{setSaved(false);setForm(x=>({...x,[key]:value}));};
  async function save(e){
-  e.preventDefault();setBusy(true);setError("");setSaved(false);
-  try{const r=await fetch("/api/admin/customer-contacts",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});const data=await r.json();if(!r.ok)throw Error(data.error);setForm(data.contact);setSaved(true);}
+  e.preventDefault();setBusy(true);setError("");setSaved(false);setTripletexStatus("");
+  try{
+   const r=await fetch("/api/admin/customer-contacts",{method:"PATCH",
+    headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});
+   const data=await r.json().catch(()=>({}));
+   if(!r.ok)throw Error(data.error||"Kunne ikke lagre kundekortet.");
+   setForm(data.contact);setSaved(true);
+   if(autoSyncTripletex){
+    setTripletexStatus("Sender kontaktopplysningene automatisk til Tripletex …");
+    try{
+     // The owner is editing a linked, unpaid invoice's customer. PUT by the
+     // persisted Tripletex customer ID, never create an invoice or customer.
+     const remote=await fetch("/api/admin/tripletex/customers",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action:"update",sourceType:"contact",sourceId:contact.id})
+     });
+     const result=await remote.json().catch(()=>({}));
+     if(!remote.ok)throw Error(result.error||"Tripletex bekreftet ikke oppdateringen.");
+     setTripletexStatus("Kundekortet er oppdatert i Tripletex. Den opprinnelige fakturaen er uendret.");
+    }catch(err){
+     setTripletexStatus("Kundekortet er lagret i Aadland Service, men Tripletex ble ikke oppdatert: "+
+      (err.message||"Ukjent feil")+". Gå til Tripletex-overføringer for å kontrollere og forsøke på nytt.");
+    }
+   }
+  }
   catch(err){setError(err.message)}finally{setBusy(false)}
  }
  const back=invoiceId?"/admin/faktura?id="+encodeURIComponent(invoiceId)+"&customerId="+encodeURIComponent(contact.id):"/admin";
- return <main className="admin" style={{maxWidth:720,margin:"auto",padding:24}}><Link href={back}>{invoiceId?"← Tilbake til faktura":"← Admin"}</Link><h1>Kundekort</h1><p>Rett kundens kontaktopplysninger her. Endringene oppdaterer tilknyttede fakturakladder. Utstedte fakturaer beholdes uendret.</p><form className="card" onSubmit={save} style={{padding:24}}><fieldset disabled={busy} style={{border:0,padding:0,minWidth:0}}><label>Kundetype <select value={form.customerType||"private"} onChange={e=>change("customerType",e.target.value)}><option value="private">Privatkunde</option><option value="business">Bedrift</option></select></label><label>Navn <input required maxLength={180} autoComplete="name" value={form.name||""} onChange={e=>change("name",e.target.value)}/></label>{form.customerType==="business"&&<><label>Organisasjonsnummer (9 sifre) <input inputMode="numeric" maxLength={9} pattern="[0-9]{9}" value={form.organizationNumber||""} onChange={e=>change("organizationNumber",e.target.value)}/></label><CompanyRegistryCardUpdater form={form} disabled={busy} onApply={next=>{setSaved(false);setForm(next);}}/><label>Kontaktperson <input maxLength={180} value={form.contactPerson||""} onChange={e=>change("contactPerson",e.target.value)}/></label></>}<label>Adresse og poststed <textarea rows={3} maxLength={500} autoComplete="street-address" value={form.address||""} onChange={e=>change("address",e.target.value)}/></label><label>Telefonnummer <input type="tel" maxLength={70} autoComplete="tel" value={form.phone||""} onChange={e=>change("phone",e.target.value)}/></label><label>E-postadresse <input type="email" maxLength={240} autoComplete="email" value={form.email||""} onChange={e=>change("email",e.target.value)}/></label><label>Betalingsfrist (antall dager)<input type="number" min="0" max="365" step="1" required value={form.paymentTermsDays} onChange={e=>change("paymentTermsDays",e.target.value)}/></label><label>Foretrukket betalingsmåte <select value={form.preferredPaymentMethod||"bank"} onChange={e=>change("preferredPaymentMethod",e.target.value)}><option value="bank">Vanlig faktura / bank</option><option value="vipps">Vipps – når godkjent og tilgjengelig</option></select></label><label>Internt kundenotat (vises ikke på faktura) <textarea rows={3} maxLength={1000} value={form.internalNote||""} onChange={e=>change("internalNote",e.target.value)}/></label><p>Nye fakturaer får dagens fakturadato ved utstedelse. Forfall beregnes automatisk med denne betalingsfristen. Du kan velge en egen forfallsdato på en enkelt faktura.</p><button type="submit">{busy?"Lagrer …":"Lagre kundekort"}</button></fieldset>{error&&<p role="alert" style={{color:"crimson"}}>{error}</p>}{saved&&<p role="status">Kundekort og tilknyttede fakturakladder er oppdatert. <Link href={back}>{invoiceId?"Bruk oppdatert kunde på faktura →":"Kundekort lagret →"}</Link></p>}</form></main>;
+ return <main className="admin" style={{maxWidth:720,margin:"auto",padding:24}}><Link href={back}>{invoiceId?"← Tilbake til faktura":"← Admin"}</Link><h1>Kundekort</h1><p>Rett kundens kontaktopplysninger her. Endringene oppdaterer tilknyttede fakturakladder. Utstedte fakturaer beholdes uendret.</p><form className="card" onSubmit={save} style={{padding:24}}><fieldset disabled={busy} style={{border:0,padding:0,minWidth:0}}><label>Kundetype <select value={form.customerType||"private"} onChange={e=>change("customerType",e.target.value)}><option value="private">Privatkunde</option><option value="business">Bedrift</option></select></label><label>Navn <input required maxLength={180} autoComplete="name" value={form.name||""} onChange={e=>change("name",e.target.value)}/></label>{form.customerType==="business"&&<><label>Organisasjonsnummer (9 sifre) <input inputMode="numeric" maxLength={9} pattern="[0-9]{9}" value={form.organizationNumber||""} onChange={e=>change("organizationNumber",e.target.value)}/></label><CompanyRegistryCardUpdater form={form} disabled={busy} onApply={next=>{setSaved(false);setForm(next);}}/><label>Kontaktperson <input maxLength={180} value={form.contactPerson||""} onChange={e=>change("contactPerson",e.target.value)}/></label></>}<label>Adresse og poststed <textarea rows={3} maxLength={500} autoComplete="street-address" value={form.address||""} onChange={e=>change("address",e.target.value)}/></label><label>Telefonnummer <input type="tel" maxLength={70} autoComplete="tel" value={form.phone||""} onChange={e=>change("phone",e.target.value)}/></label><label>E-postadresse <input type="email" maxLength={240} autoComplete="email" value={form.email||""} onChange={e=>change("email",e.target.value)}/></label><label>Betalingsfrist (antall dager)<input type="number" min="0" max="365" step="1" required value={form.paymentTermsDays} onChange={e=>change("paymentTermsDays",e.target.value)}/></label><label>Foretrukket betalingsmåte <select value={form.preferredPaymentMethod||"bank"} onChange={e=>change("preferredPaymentMethod",e.target.value)}><option value="bank">Vanlig faktura / bank</option><option value="vipps">Vipps – når godkjent og tilgjengelig</option></select></label><label>Internt kundenotat (vises ikke på faktura) <textarea rows={3} maxLength={1000} value={form.internalNote||""} onChange={e=>change("internalNote",e.target.value)}/></label><p>Nye fakturaer får dagens fakturadato ved utstedelse. Forfall beregnes automatisk med denne betalingsfristen. Du kan velge en egen forfallsdato på en enkelt faktura.</p><button type="submit">{busy?"Lagrer …":"Lagre kundekort"}</button></fieldset>{error&&<p role="alert" style={{color:"crimson"}}>{error}</p>}{saved&&<p role="status">Kundekort og tilknyttede fakturakladder er oppdatert. <Link href={back}>{invoiceId?"Bruk oppdatert kunde på faktura →":"Kundekort lagret →"}</Link></p>}{tripletexStatus&&<p role="status">{tripletexStatus}</p>}</form></main>;
 }

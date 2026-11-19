@@ -212,11 +212,16 @@ export default function TripletexSalesClient(){
    <div className={styles.section}>
     <h3 style={{fontSize:20,margin:"0 0 8px"}}>Fakturaer uten innbetaling ({withoutPayment.length})</h3>
     <p className={styles.hint}>Disse tas <strong>ikke med i samlefilen</strong>. Velg en faktura om gangen.
-     Foreløpig klargjøres en manuell CSV-import.</p>
+     Foreløpig klargjøres en manuell CSV-import. Når du retter kundekortet fra en ubetalt faktura,
+     sendes nye kontaktopplysninger automatisk til den allerede koblede Tripletex-kunden.
+     <strong> Selve utstedte fakturaen endres ikke.</strong> Beløp, MVA eller fakturadato krever
+     regnskapsmessig korrigering, ikke overskriving.</p>
     <div className={styles.list}>
      {withoutPayment.map(x=><div key={x.id} className={styles.item}>
       <div className={styles.itemInfo}>{invoiceSummary(x)}</div>
       <div className={styles.itemLinks}>
+       <a className={styles.link} href={"/admin/faktura/arkiv?id="+encodeURIComponent(x.id)}>
+        Åpne ubetalt faktura</a>
        <button className={styles.primary} disabled={!canPrepare} type="button"
         onClick={()=>prepare([x.id],"unpaid-single")}>Overfør denne fakturaen – CSV</button>
        {originalLink(x)}
