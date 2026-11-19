@@ -59,6 +59,16 @@ export async function POST(req){
    "invoice_id,status,original_invoice_number",q=>q.in("invoice_id",ids));
   const items=await invoiceItems(s,ids);
   const byId=new Map(items.map(x=>[x.invoice.id,x]));
+  // Customer links are tied to the original Aadland contact ID, not an e-mail address.
+  const contactIds=[...new Set(items.map(x=>x.invoice.customer?.contactId).filter(isUuid))];
+  const linksResult=contactIds.length?
+   await s.from("tripletex_customer_links")
+    .select("source_id,status,tripletex_customer_id")
+    .eq("source_type","contact").eq("environment",connection.environment)
+    .eq("status","linked").in("source_id",contactIds):
+   {data:[],error:null};
+  if(linksResult.error)throw Error("Kunne ikke lese kundekoblingene fra Tripletex.");
+  const customerLinks=new Map((linksResult.data||[]).map(x=>[x.source_id,Number(x.tripletex_customer_id)]));
   const session=await tripletexOpenSession(unprotectTripletexToken(connection),connection.environment);
   const [vatResult,paymentTypeResult]=await Promise.all([
    tripletexRead("/ledger/vatType?count=500&typeOfVat=OUTGOING",session,connection.environment),
@@ -84,14 +94,16 @@ export async function POST(req){
    const customer=found.invoice.customer||{};
    const org=String(customer.organizationNumber||"").replace(/\D/g,"");
    const email=String(customer.email||"").trim();
-   if(!org&&!email){
-    results.push({id,ready:false,reason:"Manglende kundenummer, organisasjonsnummer eller e-post for sikker matching."});
+   const linkedId=customerLinks.get(customer.contactId)||null;
+   if(!linkedId&&!org&&!email){
+    results.push({id,ready:false,reason:"Kunden har ingen lagret Tripletex-kobling. Overfør kunden fra kundelisten først."});
     continue;
    }
    const search=org?"organizationNumber="+encodeURIComponent(org):
     "email="+encodeURIComponent(email);
-   const matches=await tripletexRead("/customer?"+search+"&count=50",session,connection.environment);
-   const preview=previewTripletexInvoice(found,Array.isArray(matches.values)?matches.values:[],vatTypes);
+   const matches=linkedId?{values:[]}:
+    await tripletexRead("/customer?"+search+"&count=50",session,connection.environment);
+   const preview=previewTripletexInvoice(found,Array.isArray(matches.values)?matches.values:[],vatTypes,linkedId);
    results.push({id,ready:preview.ready,
     originalNumber:found.invoice.invoice_number,
     reason:preview.ready?(preview.needsPaymentMapping?

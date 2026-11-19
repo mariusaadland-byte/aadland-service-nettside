@@ -56,8 +56,11 @@ async function saveLink(s,customer,environment,remoteId){
 }
 async function findRemote(customer,session,environment){
  const key=customerTransferKey(customer);
- if(!key)return {state:"invalid",reason:"Legg inn e-post eller organisasjonsnummer på kundekortet først."};
- const path="/customer?"+key.kind+"="+encodeURIComponent(key.value)+"&count=100";
+ if(!key)return {state:"invalid",reason:"Legg inn kundenavn på kundekortet først."};
+ // Name-only matching must scan all customers, not rely on an unverified name filter.
+ // A full page stops safely at 1000 customers, rather than risking duplicate creation.
+ const path=key.kind==="name"?"/customer?count=1000":
+  "/customer?"+key.kind+"="+encodeURIComponent(key.value)+"&count=100";
  const result=await tripletexRead(path,session,environment);
  if(!Array.isArray(result.values))throw Error("Tripletex returnerte ikke en gyldig kundeliste.");
  return findTripletexCustomerForTransfer(customer,result.values);
@@ -92,7 +95,7 @@ export async function GET(req){
   return json({configured:true,environment:connection.environment,
    customers:unique.map(x=>{
     const link=links.get(x.sourceType+":"+x.id);
-    return {...x,address:undefined,phone:undefined,organizationNumber:x.organizationNumber,
+    return {...x,address:undefined,phone:undefined,hasPhone:Boolean(x.phone),organizationNumber:x.organizationNumber,
      status:link?.status||"pending",tripletexCustomerId:link?.tripletex_customer_id||null,
      problem:link?.status==="needs_review"?
       "Krever kontroll i Tripletex før du forsøker på nytt.":""
@@ -117,7 +120,7 @@ export async function POST(req){
   customer=await getSource(s,sourceType,sourceId);
   if(!customer)return json({error:"Kunden finnes ikke lenger i Aadland Service."},404);
   const key=customerTransferKey(customer);
-  if(!key)return json({error:"Kunden trenger gyldig e-post eller organisasjonsnummer før overføring."},409);
+  if(!key)return json({error:"Kunden trenger et gyldig navn før overføring."},409);
   const previous=await getLink(s,customer,environment);
   if(previous?.status==="linked")
    return json({ok:true,status:"linked",tripletexCustomerId:previous.tripletex_customer_id,existing:true});
