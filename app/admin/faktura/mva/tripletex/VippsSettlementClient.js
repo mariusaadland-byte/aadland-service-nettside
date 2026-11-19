@@ -3,7 +3,8 @@ import {useEffect,useRef,useState} from "react";
 import styles from "./TripletexReceipts.module.css";
 import VippsTripletexTransferPanel from "./VippsTripletexTransferPanel";
 import VippsRetainedFeeTransferPanel from "./VippsRetainedFeeTransferPanel";
-import {vippsPeriodBatches,combineVippsPeriodResponses} from "../../../../../lib/vippsSettlementPeriod";
+import {vippsPeriodBatches} from "../../../../../lib/vippsSettlementPeriod";
+import {chunkVippsDays} from "../../../../../lib/vippsReportCache";
 const dateAtOffset=days=>{
  const date=new Date(Date.now()+days*86400000);
  return new Intl.DateTimeFormat("en-CA",{year:"numeric",month:"2-digit",day:"2-digit",
@@ -23,61 +24,114 @@ export default function VippsSettlementClient(){
  const [to,setTo]=useState(()=>dateAtOffset(-1));
  const [loading,setLoading]=useState(false),[error,setError]=useState(""),[result,setResult]=useState(null);
  const [progress,setProgress]=useState("");
+ const [cacheInfo,setCacheInfo]=useState(null);
+ const [loadingSaved,setLoadingSaved]=useState(false);
+ const [lastCheck,setLastCheck]=useState(null);
  const [yearPreset,setYearPreset]=useState("");
  const abortRef=useRef(null);
  useEffect(()=>()=>abortRef.current?.abort(),[]);
  const currentYear=Number(dateAtOffset(0).slice(0,4));
  const yearOptions=Array.from({length:7},(_,i)=>currentYear-i);
  function chooseYear(value){
-  setYearPreset(value);setResult(null);setError("");
+  setYearPreset(value);setResult(null);setCacheInfo(null);setLastCheck(null);setError("");
   if(!value)return;
   setFrom(value+"-01-01");
   setTo(Number(value)===currentYear?dateAtOffset(-1):value+"-12-31");
  }
+ function asReport(snapshot){
+  if(!snapshot?.result)return null;
+  return {unit:snapshot.unit,from:snapshot.from,to:snapshot.to,...snapshot.result};
+ }
+ function cacheUrl(){
+  return "/api/admin/tripletex/vipps-settlement/cache?"+
+   new URLSearchParams({unit,from,to});
+ }
+ async function fetchSaved(signal){
+  const response=await fetch(cacheUrl(),{cache:"no-store",signal});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||!data.ok)throw Error(data.error||"Kunne ikke lese lagrede Vipps-rapporter.");
+  return data;
+ }
+ // Showing saved reports never calls Vipps. A year previously fetched before
+ // persistent caching was introduced must be imported once.
+ useEffect(()=>{
+  if(!vippsPeriodBatches(from,to)||to>dateAtOffset(-1)){
+   setCacheInfo(null);setResult(null);return;
+  }
+  const controller=new AbortController();
+  setLoadingSaved(true);
+  setCacheInfo(null);setResult(null);setError("");
+  fetchSaved(controller.signal).then(data=>{
+   if(controller.signal.aborted)return;
+   setCacheInfo(data);setResult(asReport(data));
+  }).catch(err=>{
+   if(!controller.signal.aborted)
+    setError(err.message||"Lagrede Vipps-rapporter kunne ikke vises.");
+  }).finally(()=>{if(!controller.signal.aborted)setLoadingSaved(false);});
+  return ()=>controller.abort();
+ },[unit,from,to]);
  function cancelLoad(){abortRef.current?.abort();}
  async function load(){
   if(loading)return;
   const controller=new AbortController();
   abortRef.current=controller;
-  setLoading(true);setError("");setResult(null);setProgress("");
+  setLoading(true);setError("");setLastCheck(null);setProgress("");
   try{
-   const batches=vippsPeriodBatches(from,to);
-   if(!batches)throw Error("Velg en gyldig periode på maksimalt ett år (366 dager).");
-   if(to>dateAtOffset(-1))throw Error("Velg senest gårsdagens dato. Dagens oppgjør kan være ufullstendig.");
-   const parts=[];
+   if(!vippsPeriodBatches(from,to))
+    throw Error("Velg en gyldig periode på maksimalt ett år (366 dager).");
+   if(to>dateAtOffset(-1))
+    throw Error("Velg senest gårsdagens dato. Dagens oppgjør kan være ufullstendig.");
+   const before=await fetchSaved(controller.signal);
+   const batches=chunkVippsDays(before.checkDays||[]);
+   const totals={newDays:0,changedDays:0,unchangedDays:0,checkedDays:0};
    for(let i=0;i<batches.length;i++){
     if(controller.signal.aborted)throw Error("Hentingen ble avbrutt.");
-    setProgress("Henter uke "+(i+1)+" av "+batches.length+" ("+
-     batches[i].from+"–"+batches[i].to+") …");
-    const params=new URLSearchParams({unit,...batches[i]});
-    const response=await fetch("/api/admin/tripletex/vipps-settlement?"+params,{
-     cache:"no-store",signal:controller.signal});
+    const days=batches[i];
+    setProgress("Sjekker kun manglende eller nylige datoer: "+
+     (i+1)+" av "+batches.length+" ("+days[0]+"–"+days.at(-1)+") …");
+    const response=await fetch("/api/admin/tripletex/vipps-settlement/cache",{
+     method:"POST",headers:{"Content-Type":"application/json"},
+     cache:"no-store",signal:controller.signal,
+     body:JSON.stringify({action:"check-new",unit,days})
+    });
     const data=await response.json().catch(()=>({}));
-    if(!response.ok||!data.ok)throw Error(
-     "Uke "+(i+1)+" av "+batches.length+" ("+batches[i].from+"–"+batches[i].to+") feilet: "+
-     (data.error||"Vipps-oppgjøret kunne ikke hentes.")+
-     " Ingen samlet rapport blir vist.");
-    parts.push(data);
+    if(!response.ok||!data.ok)
+     throw Error("Kontrollen for "+days[0]+"–"+days.at(-1)+" feilet: "+
+      (data.error||"Kunne ikke hente endringer fra Vipps.")+
+      " Allerede lagrede dager beholdes. Du kan prøve kontrollen igjen.");
+    for(const key of Object.keys(totals))totals[key]+=Number(data[key]||0);
    }
    if(controller.signal.aborted)throw Error("Hentingen ble avbrutt.");
-   setResult(combineVippsPeriodResponses(parts,batches,unit));
+   setProgress("Oppdaterer lagret oversikt og status fra Tripletex …");
+   const after=await fetchSaved(controller.signal);
+   if(controller.signal.aborted)throw Error("Hentingen ble avbrutt.");
+   setCacheInfo(after);setResult(asReport(after));setLastCheck(totals);
   }catch(err){
-   setError(controller.signal.aborted||err?.name==="AbortError"
-    ?"Hentingen ble avbrutt. Ingen ufullstendig rapport er vist."
-    :err.message||"Vipps-rapporten kunne ikke kontrolleres.");
+   setError(controller.signal.aborted||err?.name==="AbortError"?
+    "Kontrollen ble avbrutt. Dager som allerede er lagret, beholdes; du kan fortsette senere.":
+    err.message||"Kunne ikke kontrollere endringer fra Vipps.");
   }finally{
    if(abortRef.current===controller)abortRef.current=null;
    setProgress("");setLoading(false);
   }
  }
+ async function reloadSaved(){
+  if(loading)return;
+  setError("");setLoadingSaved(true);
+  try{
+   const fresh=await fetchSaved();
+   setCacheInfo(fresh);setResult(asReport(fresh));
+  }catch(err){setError(err.message||"Lagrede rapporter kunne ikke oppdateres.");}
+  finally{setLoadingSaved(false);}
+ }
  const totals=result?.totals||{};
  return <section className={styles.section} style={{paddingTop:0}}>
   <h2 style={{fontSize:20,margin:"0 0 7px"}}>Vipps-oppgjør og avstemming</h2>
   <p className={styles.hint}>
-   Hent faktisk oppgjørsgrunnlag fra Vipps med de eksisterende API-nøklene.
-   Se salg, refusjoner, gebyrer, planlagte bankutbetalinger og hvilke betalinger
-   som har en sikker kobling til Aadland Service. Denne kontrollen oppretter
-   ingen nye bilag i Tripletex.
+   Rapportene lagres i Aadland Service første gang de hentes. Ved neste kontroll
+   sjekkes bare manglende dager og nylig aktivitet. Se det som allerede er lagret,
+   gebyrer og hvilke oppgjør som er overført via Aadland Service til Tripletex.
+   En rapportkontroll bokfører ingen nye bilag.
   </p>
   <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"end",margin:"12px 0"}}>
    <label style={{display:"grid",gap:4,fontSize:13}}>
@@ -100,28 +154,62 @@ export default function VippsSettlementClient(){
    <label style={{display:"grid",gap:4,fontSize:13}}>
     Fra dato
     <input type="date" value={from} disabled={loading}
-     onChange={event=>{setFrom(event.target.value);setYearPreset("");setResult(null);}}/>
+     onChange={event=>{setFrom(event.target.value);setYearPreset("");setCacheInfo(null);setLastCheck(null);setResult(null);}}/>
    </label>
    <label style={{display:"grid",gap:4,fontSize:13}}>
     Til dato
     <input type="date" value={to} disabled={loading}
-     onChange={event=>{setTo(event.target.value);setYearPreset("");setResult(null);}}/>
+     onChange={event=>{setTo(event.target.value);setYearPreset("");setCacheInfo(null);setLastCheck(null);setResult(null);}}/>
    </label>
-   <button type="button" className={styles.primary} disabled={loading}
-    onClick={load}>{loading?"Henter og kontrollerer …":"Hent Vipps-oppgjør"}</button>
+   <button type="button" className={styles.primary} disabled={loading||loadingSaved}
+    onClick={load}>{loading?"Sjekker endringer …":"Sjekk hva som er nytt fra Vipps"}</button>
+   <button type="button" disabled={loading||loadingSaved} onClick={reloadSaved}>
+    Vis lagrede rapporter
+   </button>
    {loading&&<button type="button" onClick={cancelLoad} style={{padding:"10px 14px",borderRadius:8}}>
     Avbryt henting
    </button>}
   </div>
-  <p className={styles.hint}>Velg opptil ett år (366 dager) med ett knappetrykk – eller velg et regnskapsår fra listen.
-   Systemet henter automatisk uke for uke og viser bare én samlet rapport når alle ukene er hentet.
-   Ved et helt år må du beholde denne siden åpen mens hentingen pågår. Du kan avbryte uten å endre regnskapet.
-   Oppgjørsrapportene kan komme senere enn selve Vipps-betalingen. Et Vippsnummer kan kreve rapporttilgang via regnskapspartner.</p>
+  <p className={styles.hint}>Velg opptil ett år (366 dager). Lagrede perioder vises direkte
+   uten å hente dem fra Vipps igjen. Når du trykker «Sjekk hva som er nytt», hentes kun
+   dager som mangler og de siste 14 dagene dersom de ikke nylig er kontrollert.
+   Tidligere rapporter hentet før denne lagringsfunksjonen må importeres én gang.
+   Ved første årsimport må du beholde siden åpen. Ingen regnskapsbilag sendes av denne knappen.</p>
+  {loadingSaved&&<p role="status" className={styles.hint}>Åpner lagrede Vipps-rapporter …</p>}
+  {cacheInfo&&<div style={{border:"1px solid #d8dedf",borderRadius:9,padding:13,
+   margin:"12px 0",fontSize:13}}>
+   <strong>Lagret hos Aadland Service: {cacheInfo.storedDays} av {cacheInfo.totalDays} dager</strong>
+   <p style={{margin:"6px 0"}}>
+    {cacheInfo.complete?"Hele perioden finnes lagret.":"Det mangler "+cacheInfo.missingDays.length+
+     " dager i lagringen. De blir hentet ved neste kontroll."}
+    {" "} {cacheInfo.checkDays.length} datoer skal kontrolleres mot Vipps.
+   </p>
+   {cacheInfo.lastCheckedAt&&<p style={{margin:"6px 0"}}>
+    Sist kontrollert: {new Date(cacheInfo.lastCheckedAt).toLocaleString("nb-NO")}
+   </p>}
+   {cacheInfo.transferCounts&&<p style={{margin:"6px 0"}}>
+    Tripletex via Aadland Service: {cacheInfo.transferCounts.feesConfirmed} gebyrer og
+    {" "}{cacheInfo.transferCounts.payoutsConfirmed} utbetalinger bekreftet bokført.
+    {" "}{cacheInfo.transferCounts.feesNotTransferred} gebyrer og
+    {" "}{cacheInfo.transferCounts.payoutsNotTransferred} utbetalinger mangler
+    registrert overføring fra Aadland Service.
+    {(cacheInfo.transferCounts.feesToReview+cacheInfo.transferCounts.payoutsToReview)>0&&
+     <span style={{color:"#a7412f"}}> Noen tidligere overføringer må kontrolleres manuelt.</span>}
+   </p>}
+   {!cacheInfo.complete&&<p style={{margin:"6px 0",fontWeight:600}}>
+    Tallene nedenfor gjelder bare lagrede dager, ikke hele den valgte perioden.
+   </p>}
+  </div>}
+  {lastCheck&&<p role="status" className={styles.progress}>
+   Kontroll ferdig: {lastCheck.newDays} nye dager lagret, {lastCheck.changedDays} dager
+   med endret innhold og {lastCheck.unchangedDays} uendrede dager.
+   Ingen bilag er sendt til Tripletex.
+  </p>}
   {loading&&progress&&<p className={styles.hint} role="status">{progress}</p>}
   {error&&<p className={styles.error} role="alert">{error}</p>}
   {result&&<div>
    <p role="status" className={styles.progress}>
-    Vipps-rapport hentet for {result.from} til {result.to}.
+    Viser lagrede Vipps-rapporter for {result.from} til {result.to}.
     {result.tripletexConnected?" Tripletex er tilkoblet.":" Tripletex er ikke tilkoblet."}
     Ingen nye bilag er bokført.
    </p>
@@ -150,6 +238,9 @@ export default function VippsSettlementClient(){
      </span>
     </p>}
    <p className={styles.hint}>{result.warning}</p>
+   {!cacheInfo?.complete&&<p className={styles.hint} style={{fontWeight:700}}>
+    Delvis oversikt: kontrollér manglende datoer før perioden brukes som komplett regnskapsgrunnlag.
+   </p>
    {result.unknownEntryTypes>0&&<p className={styles.error} role="alert">
     Rapporten inneholder {result.unknownEntryTypes} ukjente posttyper.
     Disse må vurderes før bokføring.</p>}
