@@ -3,8 +3,8 @@ import {readFileSync} from "node:fs";
 const read=p=>readFileSync(p,"utf8");
 const source=read("lib/vippsTripletexBankMatch.js").replace(/^export /gm,"");
 const {BANK_MATCH_MAX_DAYS,bankMatchDateSpan,decimalToOre,
- normalizeBankStatementTransactions,vippsBankCandidates,bankStatementCoverage}=new Function(source+
- ";return {BANK_MATCH_MAX_DAYS,bankMatchDateSpan,decimalToOre,normalizeBankStatementTransactions,vippsBankCandidates,bankStatementCoverage};")();
+ normalizeBankStatementTransactions,vippsBankCandidates,bankStatementCoverage,vippsBankReviewTasks}=new Function(source+
+ ";return {BANK_MATCH_MAX_DAYS,bankMatchDateSpan,decimalToOre,normalizeBankStatementTransactions,vippsBankCandidates,bankStatementCoverage,vippsBankReviewTasks};")();
 assert.equal(BANK_MATCH_MAX_DAYS,31);
 assert.equal(bankMatchDateSpan("2026-10-01","2026-10-31"),31);
 assert.equal(bankMatchDateSpan("2026-10-01","2026-11-01"),null);
@@ -48,6 +48,18 @@ const withBankMatch=vippsBankCandidates([{
 assert.equal(withBankMatch[0].status,"possible_already_reconciled");
 assert.equal(withBankMatch[0].candidate.bankReconciled,true);
 assert.equal(withBankMatch[0].previouslyReconciledCount,1);
+const reviewTasks=vippsBankReviewTasks([
+ withBankMatch[0],
+ {...withBankMatch[0],date:"2026-11-20",reference:"next-1",
+  status:"not_found",transferStatus:"needs_review"},
+ {...withBankMatch[0],date:"2026-11-21",reference:"next-2",
+  status:"ambiguous",previouslyReconciledCount:1}
+]);
+assert.equal(reviewTasks.length,3);
+assert.equal(reviewTasks[0].reference,"next-1","uncertain book entries come first");
+assert.equal(reviewTasks[1].reference,"ASVP-1","already matched bank item comes next");
+assert.match(reviewTasks[0].message,/usikker overføringsstatus/);
+assert.match(reviewTasks[1].message,/allerede matchet/);
 const alreadyUnmatched=normalizeBankStatementTransactions(statements,
  [{...raw[0],matched:false}],192);
 assert.equal(vippsBankCandidates([{
@@ -103,6 +115,8 @@ assert.ok(ui.includes("no_statement_coverage"));
 assert.ok(ui.includes("possible_already_reconciled"));
 assert.ok(ui.includes("checkAccess(newId)"));
 assert.ok(ui.includes("bankReconciled===true"));
+assert.ok(ui.includes("vippsBankReviewTasks(match.matches)"));
+assert.ok(ui.includes("Vis hva som må følges opp"));
 assert.ok(ui.includes("Beløpstreff er ikke automatisk bekreftelse"));
 assert.ok(!ui.includes("bankReceived:true"));
 const parent=read("app/admin/faktura/mva/tripletex/VippsSettlementClient.js");
