@@ -194,8 +194,10 @@ export default function TripletexApiConnectClient(){
     </div>
     {preflight?.results?.map(x=><p className={styles.hint} key={x.id} role="status">
      <strong>{x.ready?"Kunde/MVA mappet ✓":"Må avklares"}:</strong> {x.reason}
+     {x.ready&&x.needsPaymentMapping&&
+      " Direktepiloten gjelder foreløpig bare helt ubetalte fakturaer."}
     </p>)}
-    {preflight?.results?.some(x=>x.id===selectedInvoice&&x.ready)&&<div>
+    {preflight?.results?.some(x=>x.id===selectedInvoice&&x.ready&&!x.needsPaymentMapping)&&<div>
      <p className={styles.hint}><strong>Direkte pilot:</strong> Kun én helt ubetalt faktura.
       Tripletex lager et eget fakturanummer, men sender ingenting til kunden.
       Betalte fakturaer må fortsatt håndteres separat.</p>
