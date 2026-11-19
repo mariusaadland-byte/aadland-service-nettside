@@ -8,6 +8,8 @@ import {vippsSettlementLedgers,vippsSettlementEntries} from "../../../../../lib/
 import {matchingLedger,normalizeReportEntries,vippsRange} from "../../../../../lib/vippsSettlementReconcile";
 import {vippsPayoutPlan,payoutTripletexMarker,
  tripletexPayoutVoucher} from "../../../../../lib/vippsTripletexPayoutPlan";
+import {acquireVippsAccountingLock,releaseVippsAccountingLock}
+ from "../../../../../lib/vippsTripletexWriteLock";
 import {storedTripletexConnection,unprotectTripletexToken} from "../../../../../lib/tripletexCredentials";
 import {tripletexOpenSession,tripletexRead,
  tripletexCreateVippsSettlementVoucher} from "../../../../../lib/tripletexApi";
@@ -57,6 +59,27 @@ async function prepare(s,day,payoutId){
  if(loc.error||paid.error||(loc.data||[]).length>2000||(paid.data||[]).length>2000)
   throw Error("Kunne ikke kontrollere fullstendig betalingshistorikk i Aadland Service.");
  const plan=vippsPayoutPlan(funds,payoutId,day,loc.data||[],paid.data||[]);
+ const feeIds=plan.feeRows.map(x=>x.pspReference);
+ let previouslyBookedFeeOre=0;
+ if(feeIds.length){
+  const posted=await s.from("tripletex_vipps_fee_transfers")
+   .select("fee_psp_reference,ledger_date,amount_ore,status")
+   .eq("environment",conn.environment).eq("unit","service")
+   .eq("ledger_id",match.ledgerId)
+   .in("fee_psp_reference",feeIds).limit(1001);
+  if(posted.error||(posted.data||[]).length>1000)
+   throw Error("Tidligere Vipps-gebyrbilag kunne ikke kontrolleres.");
+  for(const row of posted.data||[]){
+   const source=plan.feeRows.find(x=>x.pspReference===row.fee_psp_reference);
+   if(!source||row.status!=="confirmed"||
+    Number(row.amount_ore)!==source.amountOre||row.ledger_date!==source.date)
+    throw Error("Et Vipps-gebyr må kontrolleres manuelt før oppgjøret kan bokføres.");
+   previouslyBookedFeeOre+=source.amountOre;
+  }
+ }
+ if(!Number.isSafeInteger(previouslyBookedFeeOre)||previouslyBookedFeeOre>plan.feeOre)
+  throw Error("Tidligere gebyrbilag stemmer ikke med Vipps-oppgjøret.");
+ plan.previouslyBookedFeeOre=previouslyBookedFeeOre;
  const session=await tripletexOpenSession(unprotectTripletexToken(conn),conn.environment);
  const [accounts,customers,types]=await Promise.all([
   tripletexRead("/ledger/account?count=1000",session,conn.environment),
@@ -99,8 +122,9 @@ async function prepare(s,day,payoutId){
  if(duplicate.error)throw Error("Kunne ikke sjekke tidligere Vipps-overføringer.");
  if(!duplicate.data)await reviewVoucherDuplicate(session,conn.environment,day,marker);
  const digest=hash({unit:"service",payoutId,plan,
-  customerId:Number(customer.id),typeId:vippsTypeId});
+  previouslyBookedFeeOre,customerId:Number(customer.id),typeId:vippsTypeId});
  return {plan,digest,marker,conn,session,
+  previouslyBookedFeeOre,
   customer:{id:Number(customer.id),name:customer.name,number:10009},
   customerAccount:customerAccounts[0],
   feeAccounts:feeAccounts.map(x=>({id:Number(x.id),number:x.number,name:x.name})),
@@ -143,8 +167,9 @@ export async function POST(req){
   typeof expectedDigest!=="string"||!/^[a-f0-9]{64}$/.test(expectedDigest))
   return json({error:"Kontroller bankinnbetaling, kontoer og at oppgjøret ikke er importert før."},400);
  const s=db();if(!s)return json({error:"Databasen er utilgjengelig."},503);
- let claimed=false,writeStarted=false;
+ let claimed=false,writeStarted=false,lock=null;
  try{
+  lock=await acquireVippsAccountingLock(s,"production","service");
   const x=await prepare(s,date,payoutId);
   if(x.previous)return json({error:"Dette Vipps-oppgjøret er allerede overført eller under kontroll. Ikke send på nytt."},409);
   if(expectedDigest!==x.digest)return json({error:"Oppgjøret er endret siden kontrollen. Oppdater og kontroller igjen."},409);
@@ -153,7 +178,8 @@ export async function POST(req){
   if(!bank||!fee)return json({error:"Valgte kontoer stemmer ikke med Tripletex."},409);
   const voucher=tripletexPayoutVoucher({plan:x.plan,unit:"service",
    customerId:x.customer.id,customerAccountId:Number(x.customerAccount.id),
-   bankAccountId:bank.id,feeAccountId:fee.id});
+   bankAccountId:bank.id,feeAccountId:fee.id,
+   previouslyBookedFeeOre:x.previouslyBookedFeeOre});
   // Unique claim BEFORE the non-idempotent POST. Never retry this claim after
   // an uncertain response or timeout.
   const inserted=await s.from("tripletex_vipps_settlement_transfers").insert({
@@ -181,7 +207,7 @@ export async function POST(req){
    .eq("payout_psp_reference",payoutId).eq("status","processing")
    .select("tripletex_voucher_id").maybeSingle();
   if(updated.error||!updated.data)throw Error("Bilaget kan være opprettet, men kontrolloggen ble ikke lagret.");
-  claimed=false;
+  claimed=false;writeStarted=false;
   return json({ok:true,voucherId,payoutId,amountOre:x.plan.payoutOre,
    message:"Vipps-oppgjøret er bokført som bilag i Tripletex. Kontroller og lukk åpne poster på Vipps oppgjørskunde."});
  }catch(error){
@@ -194,5 +220,9 @@ export async function POST(req){
   return json({error:claimed?
    "Oppgjøret kan allerede være bokført i Tripletex. Ikke prøv på nytt før bilagsoversikten er kontrollert.":
    error.message||"Kunne ikke overføre Vipps-oppgjøret."},claimed?409:503);
+ }finally{
+  // Ambiguous provider outcome retains the cross-workflow lock.
+  if(lock&&!writeStarted)
+   await releaseVippsAccountingLock(s,"production","service",lock).catch(()=>null);
  }
 }
