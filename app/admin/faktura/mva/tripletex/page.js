@@ -3,6 +3,7 @@ import {redirect} from "next/navigation";
 import {getAdminUser} from "../../../../../lib/auth";
 import TripletexReceiptsClient from "./TripletexReceiptsClient";
 import TripletexSalesClient from "./TripletexSalesClient";
+import VippsSettlementClient from "./VippsSettlementClient";
 import TripletexApiConnectClient from "./TripletexApiConnectClient";
 
 export const metadata={title:"Overfør bilag og fakturaer til Tripletex – Aadland Service",robots:{index:false,follow:false}};
@@ -17,6 +18,9 @@ export default async function TripletexReceiptsPage(){
   <TripletexApiConnectClient/>
   <section style={{marginTop:28,borderTop:"2px solid #dfd8ce",paddingTop:17}}>
    <TripletexSalesClient/>
+  </section>
+  <section style={{marginTop:28,borderTop:"2px solid #dfd8ce",paddingTop:17}}>
+   <VippsSettlementClient/>
   </section>
   <section style={{marginTop:28,borderTop:"2px solid #dfd8ce",paddingTop:17}}>
    <TripletexReceiptsClient/>
