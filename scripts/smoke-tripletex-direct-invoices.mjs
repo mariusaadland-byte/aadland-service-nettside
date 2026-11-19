@@ -43,6 +43,9 @@ assert.equal(paidPlan.ready,true);
 assert.equal(paidPlan.mode,"paid");
 assert.equal(paidPlan.paidOre,3000);
 assert.equal(paidPlan.paymentCount,2);
+assert.equal(helpers.directPaidPaymentPlan(paidInvoice,
+ recorded.slice().reverse(),paidVipps.slice().reverse()).paymentDigest,
+ paidPlan.paymentDigest,"Payment history hash must not depend on database row order");
 assert.ok(Date.parse(paidPlan.checkpointAt)<Date.parse(recorded[0].recorded_at));
 const directPaid=helpers.directInvoicePilotPreview(paidInvoice,19,[{id:3}],paidPlan);
 assert.equal(directPaid.ready,true);
