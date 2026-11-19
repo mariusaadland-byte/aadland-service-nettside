@@ -52,6 +52,21 @@ ready=paymentReadiness({...options,payments:split,transfers:[
  remoteOutstandingOre:70000});
 assert.equal(ready.ok,true);
 assert.equal(ready.next,null);
+// A new remote/local matched checkpoint means historical, already-confirmed
+// payments must not prevent syncing a later new bank/Vipps payment.
+const later=new Date(Date.now()-1000).toISOString();
+const rebased=paymentReadiness({
+ link:{...link,matched_at:new Date(Date.now()-15000).toISOString(),
+  matched_outstanding_ore:70000},
+ invoice:{...invoice,paid_ore:35000},
+ payments:[...split,{...payments[0],id:"new-3",amount_ore:5000,recorded_at:later}],
+ transfers:[
+  {status:"confirmed",payment_id:"new-1",amount_ore:20000,payment_date:"2026-11-19"},
+  {status:"confirmed",payment_id:"new-2",amount_ore:10000,payment_date:"2026-11-19"}],
+ remoteOutstandingOre:70000
+});
+assert.equal(rebased.ok,true);
+assert.equal(rebased.next.id,"new-3");
 const api=read("app/api/admin/tripletex/invoices/payments/route.js");
 assert.ok(api.includes('user?.role!=="owner"')&&api.includes("sameOriginGuard(req)"));
 assert.ok(api.includes('process.env.VERCEL_ENV!=="production"'));
