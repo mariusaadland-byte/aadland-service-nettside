@@ -409,12 +409,13 @@ export default function TripletexSalesClient(){
          {" · "}{linksByInvoice.get(x.invoiceId).comparison==="match"?
           "Saldo stemmer":"Innbetalinger gjenstår / må avstemmes"}
         </small>}
-        {x.initialPaidOre>0&&<button type="button" disabled={busy}
+        <button type="button" disabled={busy}
          onClick={()=>paymentPanel?.invoiceId===x.invoiceId?setPaymentPanel(null):
           showPaymentReview({id:x.invoiceId,originalNumber:x.sourceNumber})}>
          {paymentPanel?.invoiceId===x.invoiceId?"Skjul betalingskontroll":
-          "Kontroller og bokfør historiske innbetalinger"}
-        </button>}
+          x.initialPaidOre>0?"Kontroller og bokfør historiske innbetalinger":
+          "Kontroller og bokfør innbetaling"}
+        </button>
         <a className={styles.link} href={"/admin/faktura/arkiv?id="+encodeURIComponent(x.invoiceId)}>
          Se originalfaktura</a>
         {paymentPanelContent({id:x.invoiceId,originalNumber:x.sourceNumber})}
