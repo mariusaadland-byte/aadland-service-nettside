@@ -109,7 +109,7 @@ assert.ok(route.includes('process.env.VERCEL_ENV!=="production"'));
 assert.ok(route.indexOf('.insert({')<route.indexOf('const remote=await tripletexCreateUnsentedInvoice('));
 assert.ok(route.includes('status:"needs_review"')&&route.includes('error_code:"outcome_unknown"'));
 assert.ok(route.includes("duplicateDirectInvoiceSearch(latest?.values"));
-assert.ok(route.includes("directInvoiceDigest(again.data,customerId)"));
+assert.ok(route.includes("directInvoiceDigest(again.data,customerId,planAgain.paymentDigest)"));
 assert.ok(route.includes('tripletex_invoice_api_links'));
 assert.ok(route.includes("directPaidPaymentPlan(again.data,paymentAgain.data"));
 assert.ok(route.includes("initial_import_checkpoint_at:preview.checkpointAt"));
