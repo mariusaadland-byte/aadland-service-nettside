@@ -6,6 +6,7 @@ import VippsRetainedFeeTransferPanel from "./VippsRetainedFeeTransferPanel";
 import VippsReconcilePanel from "./VippsReconcilePanel";
 import VippsFeeQueuePanel from "./VippsFeeQueuePanel";
 import VippsPayoutQueuePanel from "./VippsPayoutQueuePanel";
+import VippsBankMatchPanel from "./VippsBankMatchPanel";
 import {vippsPeriodBatches} from "../../../../../lib/vippsSettlementPeriod";
 import {chunkVippsDays} from "../../../../../lib/vippsReportCache";
 const dateAtOffset=days=>{
@@ -218,6 +219,7 @@ export default function VippsSettlementClient(){
   </div>}
   <VippsReconcilePanel unit={unit} from={from} to={to}
    cacheInfo={cacheInfo} autoRunKey={reconcileAutoRunKey}/>
+  <VippsBankMatchPanel unit={unit} from={from} to={to} cacheInfo={cacheInfo}/>
   {lastCheck&&<p role="status" className={styles.progress}>
    Kontroll ferdig: {lastCheck.newDays} nye dager lagret, {lastCheck.changedDays} dager
    med endret innhold, {lastCheck.unchangedDays} uendrede kontrollerte dager
