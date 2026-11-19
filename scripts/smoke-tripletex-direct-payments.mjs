@@ -67,9 +67,34 @@ const rebased=paymentReadiness({
 });
 assert.equal(rebased.ok,true);
 assert.equal(rebased.next.id,"new-3");
+
+const imported={
+ link:{
+  invoice_gross_ore:50000,
+  matched_outstanding_ore:null,matched_at:null,
+  initial_import_outstanding_ore:50000,
+  initial_import_checkpoint_at:new Date(Date.now()-3600000).toISOString()
+ },
+ invoice:{status:"sent",paid_ore:20000,credited_ore:0},
+ payments:[{id:"old-bank",amount_ore:20000,paid_on:"2026-11-18",
+  recorded_at:new Date(Date.now()-1800000).toISOString(),
+  reversed_at:null,vipps_reference:null}],
+ transfers:[],remoteOutstandingOre:50000,vippsPayments:[],creditNotes:[]
+};
+let importReady=paymentReadiness(imported);
+assert.equal(importReady.ok,true);
+assert.equal(importReady.next.id,"old-bank");
+assert.equal(importReady.localOutstandingOre,30000);
+assert.equal(paymentReadiness({...imported,remoteOutstandingOre:30000}).ok,false,
+ "A payment already reflected in Tripletex must not be imported again");
+importReady=paymentReadiness({...imported,remoteOutstandingOre:30000,transfers:[
+ {status:"confirmed",payment_id:"old-bank",amount_ore:20000,payment_date:"2026-11-18"}]});
+assert.equal(importReady.ok,true);
+assert.equal(importReady.next,null);
 const api=read("app/api/admin/tripletex/invoices/payments/route.js");
 assert.ok(api.includes('user?.role!=="owner"')&&api.includes("sameOriginGuard(req)"));
 assert.ok(api.includes('process.env.VERCEL_ENV!=="production"'));
+assert.ok(api.includes("initial_import_checkpoint_at,initial_import_outstanding_ore"));
 assert.ok(api.includes('body.confirmed!==true')&&api.includes('expectedRemoteOutstandingOre'));
 assert.ok(api.includes('await tripletexRecordInvoicePayment('));
 assert.ok(api.indexOf('.insert({')<api.indexOf('await tripletexRecordInvoicePayment('),
