@@ -1,5 +1,5 @@
 "use client";
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import styles from "./TripletexReceipts.module.css";
 
 const kr=ore=>Number.isSafeInteger(ore)?new Intl.NumberFormat("nb-NO",{
@@ -13,21 +13,36 @@ export default function VippsReconcilePanel({unit,from,to,cacheInfo,autoRunKey=0
  const [loading,setLoading]=useState(false);
  const [error,setError]=useState("");
  const [check,setCheck]=useState(null);
+ const activeRequest=useRef(null);
  const available=unit==="service"&&Boolean(cacheInfo?.storedDays);
  const periodKey=unit+"|"+from+"|"+to+"|"+cacheInfo?.lastCheckedAt;
- useEffect(()=>{setCheck(null);setError("");},[periodKey]);
+ useEffect(()=>{
+  activeRequest.current?.abort();
+  activeRequest.current=null;
+  setLoading(false);setCheck(null);setError("");
+  return ()=>activeRequest.current?.abort();
+ },[periodKey]);
  async function reconcile(){
   if(!available||loading)return;
+  activeRequest.current?.abort();
+  const controller=new AbortController();
+  activeRequest.current=controller;
   setLoading(true);setError("");setCheck(null);
   try{
    const response=await fetch("/api/admin/tripletex/vipps-settlement/reconcile?"+
-    new URLSearchParams({unit,from,to}),{cache:"no-store"});
+    new URLSearchParams({unit,from,to}),{cache:"no-store",signal:controller.signal});
    const json=await response.json().catch(()=>({}));
    if(!response.ok||!json.ok)
     throw Error(json.error||"Kunne ikke hente åpne poster fra Tripletex.");
-   setCheck(json);
-  }catch(e){setError(e.message||"Kunne ikke kontrollere saldo.");}
-  finally{setLoading(false);}
+   if(!controller.signal.aborted)setCheck(json);
+  }catch(e){
+   if(!controller.signal.aborted)setError(e.message||"Kunne ikke kontrollere saldo.");
+  }finally{
+   if(activeRequest.current===controller){
+    activeRequest.current=null;
+    setLoading(false);
+   }
+  }
  }
  // One-click "Sjekk Vipps og avstem": parent refreshes cached days, then raises this key.
  useEffect(()=>{
