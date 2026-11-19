@@ -37,6 +37,28 @@ assert.equal(bankStatementCoverage([
 assert.equal(bankStatementCoverage([],"2026-11-19","2026-11-25"),"missing");
 assert.equal(trans.length,3);
 assert.equal(trans[2].amountOre,-103);
+assert.equal(trans[0].bankReconciled,null,
+ "Missing matched flag must never be interpreted as unmatched");
+const matchedSource=[{...raw[0],matched:true}];
+const alreadyReconciled=normalizeBankStatementTransactions(statements,matchedSource,192);
+assert.equal(alreadyReconciled[0].bankReconciled,true);
+const withBankMatch=vippsBankCandidates([{
+ date:"2026-11-19",pspReference:"ASVP-1",amountOre:9900
+}],alreadyReconciled,{from:"2026-11-01",to:"2026-11-19"});
+assert.equal(withBankMatch[0].status,"possible_already_reconciled");
+assert.equal(withBankMatch[0].candidate.bankReconciled,true);
+assert.equal(withBankMatch[0].previouslyReconciledCount,1);
+const alreadyUnmatched=normalizeBankStatementTransactions(statements,
+ [{...raw[0],matched:false}],192);
+assert.equal(vippsBankCandidates([{
+ date:"2026-11-19",pspReference:"ASVP-1",amountOre:9900
+}],alreadyUnmatched,{from:"2026-11-01",to:"2026-11-19"})[0].status,
+ "possible_with_reference");
+assert.equal(vippsBankCandidates([{
+ date:"2026-11-19",pspReference:"ASVP-1",amountOre:9900
+}],normalizeBankStatementTransactions(statements,[
+ {...raw[0],matched:true},raw[1]],192),
+ {from:"2026-11-01",to:"2026-11-19"})[0].previouslyReconciledCount,1);
 assert.throws(()=>normalizeBankStatementTransactions(statements,
  [{...raw[0],bankStatement:{id:91}}],192),/må kontrolleres/);
 assert.throws(()=>normalizeBankStatementTransactions(
@@ -67,6 +89,8 @@ assert.ok(route.includes('mode==="accounts"'));
 assert.ok(route.includes('tripletexRead("/bank/statement?accountId="'));
 assert.ok(route.includes('"/bank/statement/transaction?bankStatementId="'));
 assert.ok(route.includes("bankStatementCoverage"));
+assert.ok(route.includes('const selectedId=q.get("accountId")'));
+assert.ok(route.includes('checkedAccountId:selected.id'));
 assert.ok(route.includes("(x.accountId??x.account?.id)!=null"));
 assert.ok(route.includes("vippsBankCandidates"));
 assert.ok(route.includes('unit","service"'));
@@ -76,6 +100,9 @@ assert.ok(!route.includes(".insert(")&&!route.includes(".update(")&&!route.inclu
 const ui=read("app/admin/faktura/mva/tripletex/VippsBankMatchPanel.js");
 assert.ok(ui.includes("Kontroller banktilgang i Tripletex"));
 assert.ok(ui.includes("no_statement_coverage"));
+assert.ok(ui.includes("possible_already_reconciled"));
+assert.ok(ui.includes("checkAccess(newId)"));
+assert.ok(ui.includes("bankReconciled===true"));
 assert.ok(ui.includes("Beløpstreff er ikke automatisk bekreftelse"));
 assert.ok(!ui.includes("bankReceived:true"));
 const parent=read("app/admin/faktura/mva/tripletex/VippsSettlementClient.js");
