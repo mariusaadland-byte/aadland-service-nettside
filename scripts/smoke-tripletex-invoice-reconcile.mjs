@@ -42,6 +42,13 @@ assert.ok(!api.includes('tripletexCreateInvoice')&&!api.includes('tripletexRecor
 const ui=read("app/admin/faktura/mva/tripletex/TripletexSalesClient.js");
 assert.ok(ui.includes("Kontroller i Tripletex")&&ui.includes("Oppdater betalingskontroll"));
 assert.ok(ui.includes('action:existing?"check":"link"'));
+const invoiceUi=read("app/admin/faktura/InvoicesClient.js");
+assert.ok(invoiceUi.includes("checkTripletexAfterPayment(form.id)"),
+ "Local payments should trigger read-only Tripletex balance review");
+assert.ok(invoiceUi.includes('action:"check",invoiceId'));
+assert.ok(invoiceUi.includes("setSaved(localMessage);"),
+ "Local payment success must not depend on Tripletex availability");
+assert.ok(invoiceUi.includes("kun kontroll"));
 const sql=read("supabase/migrations/20261119033000_tripletex_invoice_api_links.sql");
 assert.ok(sql.includes("unique(environment,tripletex_invoice_id)"));
 assert.ok(sql.includes("enable row level security"));
