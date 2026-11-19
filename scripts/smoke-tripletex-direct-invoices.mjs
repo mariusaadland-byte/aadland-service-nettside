@@ -17,7 +17,7 @@ const previewTripletexInvoice=({invoice},unused,vat,customerId)=>{
 };
 const helpers=new Function("crypto","invoiceGrossOre","previewTripletexInvoice",
  "positiveId","nokToOre","nextInvoiceDate",helperSource+
- ";return {directInvoiceDigest,directInvoicePilotPreview,directInvoiceSearchPath,duplicateDirectInvoiceSearch,directInvoiceVerification};")(
+ ";return {directInvoiceDigest,directInvoicePilotPreview,directPaidPaymentPlan,directInvoiceSearchPath,duplicateDirectInvoiceSearch,directInvoiceVerification};")(
  crypto,invoiceGrossOre,previewTripletexInvoice,positiveId,nokToOre,nextInvoiceDate
 );
 const source={
@@ -28,6 +28,40 @@ const source={
  customer:{name:"Demo",contactId:"22222222-2222-4222-8222-222222222222"},
  line_items:[{description:"Ytelse",quantity:1,unitPriceOre:10000,vatRate:25}]
 };
+
+const paidInvoice={...source,paid_ore:3000};
+const recorded=[
+ {id:"p-one",amount_ore:1000,paid_on:"2026-11-18",
+  recorded_at:"2026-11-18T10:00:00Z",reversed_at:null,vipps_reference:"V-100"},
+ {id:"p-two",amount_ore:2000,paid_on:"2026-11-19",
+  recorded_at:"2026-11-19T11:00:00Z",reversed_at:null,vipps_reference:null}
+];
+const paidVipps=[{id:"v-paid",state:"paid",captured_ore:1000,refunded_ore:0},
+ {id:"v-cancelled",state:"cancelled",captured_ore:0,refunded_ore:0}];
+const paidPlan=helpers.directPaidPaymentPlan(paidInvoice,recorded,paidVipps);
+assert.equal(paidPlan.ready,true);
+assert.equal(paidPlan.mode,"paid");
+assert.equal(paidPlan.paidOre,3000);
+assert.equal(paidPlan.paymentCount,2);
+assert.ok(Date.parse(paidPlan.checkpointAt)<Date.parse(recorded[0].recorded_at));
+const directPaid=helpers.directInvoicePilotPreview(paidInvoice,19,[{id:3}],paidPlan);
+assert.equal(directPaid.ready,true);
+assert.equal(directPaid.body.invoiceNumber,0);
+assert.equal(directPaid.paymentCount,2);
+assert.notEqual(directPaid.digest,helpers.directInvoiceDigest(paidInvoice,19));
+assert.equal(helpers.directPaidPaymentPlan(paidInvoice,[recorded[0]],paidVipps).ready,false);
+assert.equal(helpers.directPaidPaymentPlan(paidInvoice,
+ [{...recorded[0],reversed_at:"2026-11-19T12:00:00Z"},recorded[1]],paidVipps).ready,false);
+assert.equal(helpers.directPaidPaymentPlan(paidInvoice,recorded,
+ [{...paidVipps[0],refunded_ore:1000}]).ready,false);
+assert.equal(helpers.directPaidPaymentPlan(paidInvoice,recorded,
+ [{...paidVipps[0],captured_ore:500}]).ready,false);
+assert.equal(helpers.directPaidPaymentPlan(paidInvoice,[recorded[0],
+ {...recorded[1],id:"p-one"}],paidVipps).ready,false);
+assert.equal(helpers.directPaidPaymentPlan(paidInvoice,recorded.map((x,i)=>
+ i===1?{...x,paid_on:"2026-02-30"}:x),paidVipps).ready,false);
+assert.equal(helpers.directPaidPaymentPlan({...paidInvoice,paid_ore:0},recorded,paidVipps).ready,false);
+
 const check=helpers.directInvoicePilotPreview(source,19,[{id:3}]);
 assert.equal(check.ready,true);
 assert.equal(check.grossOre,12500);
@@ -77,6 +111,10 @@ assert.ok(route.includes('status:"needs_review"')&&route.includes('error_code:"o
 assert.ok(route.includes("duplicateDirectInvoiceSearch(latest?.values"));
 assert.ok(route.includes("directInvoiceDigest(again.data,customerId)"));
 assert.ok(route.includes('tripletex_invoice_api_links'));
+assert.ok(route.includes("directPaidPaymentPlan(again.data,paymentAgain.data"));
+assert.ok(route.includes("initial_import_checkpoint_at:preview.checkpointAt"));
+assert.ok(route.includes("initial_paid_ore:preview.paidOre"));
+assert.ok(route.includes("initial_payment_digest:preview.paymentDigest"));
 const ui=read("app/admin/faktura/mva/tripletex/TripletexApiConnectClient.js");
 assert.ok(ui.includes('onClick={()=>checkDirectPilot("transfer")}'));
 assert.ok(ui.includes('if(!window.confirm('));
@@ -87,4 +125,4 @@ assert.ok(csv.includes('s.from("tripletex_direct_invoice_claims")'));
 assert.ok(csv.includes("CSV-import er sperret for å unngå dobbeltføring"));
 const sql=read("supabase/migrations/20261119060000_tripletex_direct_invoice_claims.sql");
 assert.ok(sql.includes("enable row level security")&&sql.includes("revoke all"));
-console.log("Tripletex direktepilot bestått: kun ubetalt, MVA, historikk, unik lås, endringsdigest, ekstern dublettkontroll, ingen ny utsending og mock API.");
+console.log("Tripletex direktepilot bestått: ubetalt og betalt faktura, historiske Vipps/bank-innbetalinger, riktig dato, duplikatsperre, import-checkpoint, ingen ny kundesending og mock API.");
