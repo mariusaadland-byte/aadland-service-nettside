@@ -123,6 +123,13 @@ export async function POST(req){
    .eq("id",invoice.id).maybeSingle();
   if(again.error||!again.data||directInvoiceDigest(again.data,customerId)!==preview.digest)
    throw Error("Fakturaen endret seg etter at overføringen ble låst.");
+  const [paymentAgain,creditAgain,vippsAgain]=await Promise.all([
+   s.from("invoice_payments").select("id").eq("invoice_id",invoice.id).limit(1),
+   s.from("invoice_credit_notes").select("id").eq("invoice_id",invoice.id).limit(1),
+   s.from("invoice_vipps_payments").select("id").eq("invoice_id",invoice.id).limit(1)
+  ]);
+  if([paymentAgain,creditAgain,vippsAgain].some(x=>x.error||(x.data||[]).length))
+   throw Error("Betalings- eller kreditthistorikken endret seg etter at overføringen ble låst.");
   const latest=await tripletexRead(directInvoiceSearchPath(invoice.issued_date,customerId),
    session,connection.environment);
   const matches=duplicateDirectInvoiceSearch(latest?.values,customerId,invoice.issued_date,preview.grossOre);
