@@ -120,6 +120,19 @@ export async function POST(req){
  const s=db();if(!s)return json({error:"Databasen er utilgjengelig."},503);
  let claimed=false,customer=null,environment=null,isCorrection=false;
  try{
+  if(action==="saveProfile"){
+   if(sourceType!=="profile")return json({error:"Bruk kundekortet til å redigere denne kunden."},400);
+   const name=String(body.name||"").trim().slice(0,120);
+   const phone=String(body.phone||"").trim().slice(0,40);
+   const address=String(body.address||"").trim().slice(0,300);
+   if(name.length<2||!body.updatedAt)return json({error:"Oppgi kundenavn og last inn kundekortet på nytt."},400);
+   const saved=await s.from("customer_profiles").update({
+    name,phone,address,updated_at:new Date().toISOString()
+   }).eq("id",sourceId).eq("updated_at",body.updatedAt)
+    .select(cols.profile).maybeSingle();
+   if(saved.error||!saved.data)return json({error:"Kunden ble endret andre steder. Last inn kundelisten på nytt."},409);
+   return json({ok:true,customer:fromLocal("profile",saved.data)});
+  }
   const connection=await storedTripletexConnection(s);
   if(!connection)return json({error:"Tripletex må kobles til først."},409);
   environment=connection.environment;
@@ -128,11 +141,39 @@ export async function POST(req){
   const key=customerTransferKey(customer);
   if(!key)return json({error:"Kunden trenger et gyldig navn før overføring."},409);
   const previous=await getLink(s,customer,environment);
-  if(previous?.status==="linked")
+  if(action==="transfer"&&previous?.status==="linked")
    return json({ok:true,status:"linked",tripletexCustomerId:previous.tripletex_customer_id,existing:true});
   if(action==="transfer"&&previous)
    return json({error:"Denne kunden har en tidligere uavklart overføring. Bruk «Kontroller» før ny overføring."},409);
   const session=await tripletexOpenSession(unprotectTripletexToken(connection),environment);
+  if(action==="update"||action==="retryUpdate"){
+   if(!previous?.tripletex_customer_id||
+    (action==="update"&&previous.status!=="linked")||
+    (action==="retryUpdate"&&previous.status!=="needs_review"))
+    return json({error:"Kunden har ingen sikker Tripletex-kobling for korrigering."},409);
+   const customerId=Number(previous.tripletex_customer_id);
+   const fetched=await tripletexRead("/customer/"+customerId,session,environment);
+   const remote=fetched.value;
+   if(Number(remote?.id)!==customerId)
+    return json({error:"Tripletex bekreftet ikke riktig kunde-ID. Ingen endring sendt."},409);
+   const correction=tripletexCustomerCorrection(customer,remote);
+   if(correction.hasChanges){
+    const lock=await s.from("tripletex_customer_links").update({
+     status:"processing",last_error:null,updated_at:new Date().toISOString()
+    }).eq("source_type",sourceType).eq("source_id",sourceId)
+     .eq("environment",environment).eq("status",previous.status)
+     .eq("tripletex_customer_id",customerId)
+     .select("source_id").maybeSingle();
+    if(lock.error||!lock.data)
+     return json({error:"Kunden er allerede under behandling. Oppdater listen."},409);
+    claimed=true;isCorrection=true;
+    await tripletexUpdateCustomer(customerId,correction.payload,session,environment);
+   }
+   await saveLink(s,customer,environment,customerId);
+   claimed=false;
+   return json({ok:true,status:"linked",tripletexCustomerId:customerId,updated:true,
+    unchanged:!correction.hasChanges,warnings:correction.warnings});
+  }
   const match=await findRemote(customer,session,environment);
   if(match.state==="invalid"||match.state==="review")
    return json({error:match.reason,status:"needs_review"},409);
@@ -167,7 +208,9 @@ export async function POST(req){
     .eq("environment",environment).eq("status","processing");
   }
   return json({error:claimed?
-   "Overføringen er usikker. Kontroller om kunden finnes i Tripletex før du prøver igjen.":
+   (isCorrection?
+    "Korrigeringen er uavklart. Kontroller kundekortet i Tripletex før du trykker «Prøv korrigering igjen».":
+    "Overføringen er usikker. Kontroller om kunden finnes i Tripletex før du prøver igjen."):
    error?.name==="TripletexApiError"?error.message:
    "Kundeoverføringen kunne ikke gjennomføres. Ingen ny overføring bekreftet.",
    status:claimed?"needs_review":undefined},claimed?409:503);
