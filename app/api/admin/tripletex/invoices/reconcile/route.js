@@ -57,9 +57,12 @@ export async function POST(req){
  try{
   const connection=await storedTripletexConnection(s);
   if(!connection)return json({error:"Koble til Tripletex før kontroll."},409);
-  const [transferResult,invoiceResult,linkResult]=await Promise.all([
+  const [transferResult,directResult,invoiceResult,linkResult]=await Promise.all([
    s.from("invoice_tripletex_transfers").select(
     "invoice_id,status,import_number,original_invoice_number,original_issued_date,snapshot_gross_ore")
+    .eq("invoice_id",body.invoiceId).maybeSingle(),
+   s.from("tripletex_direct_invoice_claims").select(
+    "invoice_id,status,tripletex_invoice_number,source_number,issued_date,snapshot_gross_ore")
     .eq("invoice_id",body.invoiceId).maybeSingle(),
    s.from("invoice_drafts").select(
     "id,status,customer,line_items,invoice_number,issued_date,paid_ore,credited_ore")
@@ -68,9 +71,16 @@ export async function POST(req){
     "invoice_id,environment,tripletex_invoice_id")
     .eq("invoice_id",body.invoiceId).maybeSingle()
   ]);
-  if(transferResult.error||invoiceResult.error||linkResult.error)
+  if(transferResult.error||directResult.error||invoiceResult.error||linkResult.error)
    return json({error:"Faktura- eller importstatus kunne ikke leses. Ingen avstemming utført."},503);
-  const transfer=transferResult.data,invoice=invoiceResult.data,existing=linkResult.data;
+  const transfer=transferResult.data||(directResult.data?.status==="confirmed"?{
+   invoice_id:directResult.data.invoice_id,status:"confirmed",
+   import_number:directResult.data.tripletex_invoice_number,
+   original_invoice_number:directResult.data.source_number,
+   original_issued_date:directResult.data.issued_date,
+   snapshot_gross_ore:directResult.data.snapshot_gross_ore
+  }:null);
+  const invoice=invoiceResult.data,existing=linkResult.data;
   if(!invoice||!transfer||transfer.status!=="confirmed"||invoice.status!=="sent")
    return json({error:"Fakturaen må være sendt og importen må være bekreftet før API-kobling."},409);
   if(invoice.invoice_number!==transfer.original_invoice_number||
