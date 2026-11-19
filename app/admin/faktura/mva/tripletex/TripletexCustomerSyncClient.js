@@ -11,8 +11,10 @@ export default function TripletexCustomerSyncClient(){
  const [customers,setCustomers]=useState([]),[error,setError]=useState("");
  const [notice,setNotice]=useState(""),[query,setQuery]=useState("");
  const [showLinked,setShowLinked]=useState(false);
+ const [editing,setEditing]=useState(null);
  const pending=customers.filter(x=>x.status!=="linked");
- const searchable=useMemo(()=>customers.filter(x=>(showLinked||x.status!=="linked")&&
+ const corrections=customers.filter(x=>x.status==="linked"&&x.needsUpdate);
+ const searchable=useMemo(()=>customers.filter(x=>(showLinked||x.status!=="linked"||x.needsUpdate)&&
   [x.name,x.email,x.organizationNumber].some(s=>String(s||"").toLocaleLowerCase("nb-NO")
    .includes(query.toLocaleLowerCase("nb-NO")))),[customers,showLinked,query]);
  async function load(){
@@ -39,19 +41,26 @@ export default function TripletexCustomerSyncClient(){
    throw Error(data.error||"Overføringen feilet.");
   }
   setCustomers(prev=>prev.map(x=>x.id===customer.id&&x.sourceType===customer.sourceType?
-   {...x,status:"linked",tripletexCustomerId:data.tripletexCustomerId}:x));
+   {...x,status:"linked",needsUpdate:false,tripletexCustomerId:data.tripletexCustomerId}:x));
   return data;
  }
  async function single(customer,action="transfer"){
   if(busy||loading)return;
   if(action==="transfer"&&!window.confirm("Overføre "+customer.name+
-   " til din ekte Tripletex-konto? En ny kunde opprettes bare hvis kunden ikke finnes fra før."+
-   (!customer.email?"\n\nKunden mangler e-post. E-postfeltet blir stående tomt i Tripletex.":"")))return;
+   " til din ekte Tripletex-konto? Nye kunder opprettes bare hvis de ikke finnes fra før."+
+   (!customer.email?"\n\nE-post er ikke oppgitt. Det opprettes ikke en falsk e-postadresse.":"")))return;
+  if(action==="update"&&!window.confirm(
+   "Send oppdaterte kundeopplysninger for "+customer.name+
+   " til samme kunde i Tripletex? Ingen ny kunde opprettes."))return;
+  if(action==="retryUpdate"&&!window.confirm(
+   "Kontroller først kunden i Tripletex. Vil du forsøke å sende korrigeringen på nytt til samme kunde-ID?"))return;
   setBusy(true);setBusyId(customer.sourceType+":"+customer.id);setError("");setNotice("");
   try{
    const result=await transferOne(customer,action);
-   setNotice(customer.name+(result.existing?" er koblet til eksisterende kunde i Tripletex.":
-    " er opprettet i Tripletex."));
+   setNotice(customer.name+(result.updated?
+     (result.unchanged?" har ingen nye opplysninger som må korrigeres.":" er oppdatert i Tripletex."):
+     result.existing?" er koblet til eksisterende kunde i Tripletex.":" er opprettet i Tripletex.")+
+     (result.warnings?.length?" "+result.warnings.join(" "):""));
   }catch(e){setError(e.message||"Kundeoverføringen feilet.")}
   finally{setBusy(false);setBusyId("");}
  }
@@ -75,6 +84,34 @@ export default function TripletexCustomerSyncClient(){
   setBusy(false);setBusyId("");
   await load();
  }
+ async function updateAll(){
+  if(busy||loading||!corrections.length)return;
+  if(!window.confirm("Oppdatere "+corrections.length+
+   " eksisterende kunder i Tripletex? Ingen nye kunder opprettes."))return;
+  setBusy(true);setBusyId("updates");setError("");setNotice("");
+  let done=0,failed=0;
+  for(const customer of corrections){
+   try{await transferOne(customer,"update");done++;}
+   catch{failed++;}
+  }
+  setBusy(false);setBusyId("");
+  setNotice(done+" kunder er oppdatert."+(failed?" "+failed+" må kontrolleres.":""));
+  await load();
+ }
+ async function saveProfile(){
+  if(!editing||busy)return;
+  setBusy(true);setError("");setNotice("");
+  try{
+   const response=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({...editing,action:"saveProfile"})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(data.error||"Kundekortet kunne ikke lagres.");
+   setEditing(null);
+   setNotice("Kundekortet er lagret i Aadland Service. Bruk «Oppdater i Tripletex» for å sende rettelsen.");
+   await load();
+  }catch(e){setError(e.message||"Kundekortet kunne ikke lagres.");}
+  finally{setBusy(false);}
+ }
  return <div style={{borderTop:"1px solid #e3dfd9",paddingTop:14,marginTop:16}}>
   <div className={styles.actions}>
    <button type="button" className={styles.primary} onClick={toggle} disabled={busy}>
@@ -85,8 +122,9 @@ export default function TripletexCustomerSyncClient(){
    <p className={styles.hint}>Kundene hentes fra kunderegisteret i Aadland Service.
     Allerede overførte kunder fjernes fra listen over dem som gjenstår.
     Nye kunder blir først kontrollert mot Tripletex for å unngå duplikater.
-    <strong> E-post er valgfritt. Uten e-post overføres kunden med tomt e-postfelt.</strong>
-    <strong> Kundeoverføring oppretter aldri fakturaer.</strong></p>
+    <strong> Kunder kan overføres med bare navn, og kontaktopplysninger kan fylles inn senere.</strong>
+    Oppdater kundekortet i Aadland Service og send deretter en korrigering til samme kunde i Tripletex.
+    <strong> Ingen fakturaer opprettes ved kundeoverføring.</strong></p>
    {loading&&<p role="status">Henter kunder …</p>}
    {error&&<p className={styles.error} role="alert">{error}</p>}
    {notice&&<p className={styles.progress} role="status">{notice}</p>}
@@ -95,9 +133,13 @@ export default function TripletexCustomerSyncClient(){
      onClick={transferAll} disabled={busy||!pending.some(eligible)}>
      {busyId==="all"?"Overfører …":"Overfør alle nye kunder ("+pending.filter(eligible).length+")"}
     </button>
+    <button type="button" disabled={busy||!corrections.length} onClick={updateAll}>
+     {busyId==="updates"?"Oppdaterer …":"Send alle korrigeringer ("+corrections.length+")"}
+    </button>
     <button type="button" disabled={busy} onClick={load}>Oppdater listen</button>
    </div>}
-   <p className={styles.hint}>{pending.length} gjenstår · {customers.length-pending.length} koblet til Tripletex</p>
+   <p className={styles.hint}>{pending.length} nye/uavklarte · {corrections.length} har endringer som kan sendes ·
+    {customers.length-pending.length} koblet til Tripletex</p>
    <div className={styles.inputs}>
     <label>Søk etter kunde
      <input type="search" value={query} onChange={e=>setQuery(e.target.value)}
@@ -106,7 +148,7 @@ export default function TripletexCustomerSyncClient(){
    </div>
    <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,margin:"12px 0"}}>
     <input type="checkbox" checked={showLinked} onChange={e=>setShowLinked(e.target.checked)}/>
-    Vis også overførte kunder
+    Vis også overførte kunder uten nye endringer
    </label>
    <div style={{maxHeight:360,overflowY:"auto",borderTop:"1px solid #e3dfd9"}}>
     {searchable.map(customer=><div key={customer.sourceType+":"+customer.id}
@@ -115,10 +157,11 @@ export default function TripletexCustomerSyncClient(){
      <div style={{minWidth:0,overflowWrap:"anywhere"}}>
       <strong>{customer.name}</strong>
       <div className={styles.hint} style={{margin:"3px 0",fontSize:12}}>
-       {[customer.organizationNumber?"Org.nr. "+customer.organizationNumber:null,
+       {customer.hasDetails?[customer.organizationNumber?"Org.nr. "+customer.organizationNumber:null,
         customer.email||"E-post ikke oppgitt",customer.hasPhone?"Telefon registrert":null]
-         .filter(Boolean).join(" · ")}
-       {" · "}{customer.status==="linked"?"Overført ✓":
+         .filter(Boolean).join(" · "):"Kun navn – kontaktopplysninger kan fylles inn senere"}
+       {" · "}{customer.status==="linked"?
+        (customer.needsUpdate?"Endret – kan korrigeres":"Overført ✓"):
        customer.status==="needs_review"?"Krever kontroll":
        customer.status==="processing"?"Uavklart / pågår":"Ikke overført"}
       </div>
@@ -129,11 +172,35 @@ export default function TripletexCustomerSyncClient(){
         onClick={()=>single(customer)}>
         {busyId===customer.sourceType+":"+customer.id?"Overfører …":"Overfør"}
        </button>:
+       customer.status==="linked"&&customer.needsUpdate?
+       <button type="button" disabled={busy}
+        onClick={()=>single(customer,"update")}>Oppdater i Tripletex</button>:
+       customer.status==="needs_review"&&customer.tripletexCustomerId?
+       <button type="button" disabled={busy}
+        onClick={()=>single(customer,"retryUpdate")}>Prøv korrigering igjen</button>:
        (customer.status==="needs_review"||customer.status==="processing")?
        <button type="button" disabled={busy}
         onClick={()=>single(customer,"check")}>Kontroller</button>:
        null}
+      {customer.sourceType==="contact"?
+       <a href={"/admin/kunder/"+encodeURIComponent(customer.id)}
+        style={{fontSize:13}}>Rett kundekort</a>:
+       <button type="button" disabled={busy}
+        onClick={()=>setEditing({sourceType:"profile",sourceId:customer.id,updatedAt:customer.updatedAt,
+         name:customer.name,phone:customer.phone||"",address:customer.address||""})}>
+        Rett kundekort
+       </button>}
      </div>
+     {editing?.sourceId===customer.id&&<div style={{width:"100%",display:"grid",gap:8}}>
+      <p className={styles.hint}>Kundekonto: E-post er knyttet til innlogging og endres ikke her.</p>
+      <label>Navn <input value={editing.name} onChange={e=>setEditing(x=>({...x,name:e.target.value}))}/></label>
+      <label>Telefon <input value={editing.phone} onChange={e=>setEditing(x=>({...x,phone:e.target.value}))}/></label>
+      <label>Adresse <input value={editing.address} onChange={e=>setEditing(x=>({...x,address:e.target.value}))}/></label>
+      <div className={styles.actions}>
+       <button type="button" disabled={busy} onClick={saveProfile}>Lagre kundekort</button>
+       <button type="button" disabled={busy} onClick={()=>setEditing(null)}>Avbryt</button>
+      </div>
+     </div>}
     </div>)}
     {!searchable.length&&!loading&&<p className={styles.hint}>Ingen kunder i dette utvalget.</p>}
    </div>
