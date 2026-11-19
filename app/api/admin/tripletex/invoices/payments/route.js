@@ -105,11 +105,12 @@ export async function GET(req){
   if(state.error)return json({ok:true,ready:false,reason:state.error,payments:[],types:[]});
   const types=state.ready.ok&&state.ready.next?
    await typeChoices(state.session,state.connection.environment):[];
+  const readinessReason=!state.ready.ok?state.ready.reason:
+   !state.ready.next?"Ingen nye innbetalinger som skal registreres.":
+   types.length?"Klar for kontrollert betalingsregistrering.":
+   "Ingen aktive betalingstyper funnet i Tripletex.";
   return json({ok:true,ready:state.ready.ok&&Boolean(state.ready.next)&&types.length>0,
-   reason:state.ready.ok?(state.ready.next?
-    types.length?"Klar for kontrollert betalingsregistrering.":"Ingen aktive betalingstyper funnet i Tripletex."):
-    "Ingen nye innbetalinger som skal registreres."):
-    state.ready.reason,
+   reason:readinessReason,
    next:state.ready.ok?state.ready.next:null,types,
    remainingCount:state.ready.ok?state.ready.pending.length:0,
    remoteOutstandingOre:state.ready.ok?state.ready.remoteOutstandingOre:state.verified.outstandingOre,
