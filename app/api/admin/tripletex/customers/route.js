@@ -99,7 +99,7 @@ export async function GET(req){
     const needsUpdate=link?.status==="linked"&&Boolean(
      x.updatedAt&&link.linked_at&&Date.parse(x.updatedAt)>Date.parse(link.linked_at)+500
     );
-    return {...x,phone:undefined,hasPhone:Boolean(x.phone),hasDetails,
+    return {...x,phone:x.sourceType==="profile"?x.phone:undefined,hasPhone:Boolean(x.phone),hasDetails,
      status:link?.status||"pending",needsUpdate,
      tripletexCustomerId:link?.tripletex_customer_id||null,
      problem:link?.status==="needs_review"?
