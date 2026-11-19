@@ -122,7 +122,19 @@ export async function POST(req){
    paid+credited>result.grossOre)
    return json({error:"Lokale betalinger kan ikke avstemmes. Kontroller historikken."},409);
   const localOutstandingOre=result.grossOre-paid-credited;
+  const balanceMatched=localOutstandingOre===result.outstandingOre;
+  // Re-baseline ONLY if both systems agree and no remote write is unresolved.
+  // Otherwise keep the last confirmed balance for pending payment comparisons.
+  const {data:uncertain,error:uncertainError}=await s.from("tripletex_payment_transfers")
+   .select("payment_id").eq("invoice_id",invoice.id)
+   .in("status",["processing","needs_review"]).limit(1);
+  if(uncertainError)return json({error:"Kunne ikke kontrollere tidligere betalingsforsøk."},503);
+  const canBaseline=balanceMatched&&!(uncertain||[]).length;
   const record={
+   ...(canBaseline?{
+    matched_outstanding_ore:localOutstandingOre,
+    matched_at:new Date().toISOString()
+   }:{}),
    invoice_id:invoice.id,environment:connection.environment,
    tripletex_invoice_id:result.id,tripletex_invoice_number:result.invoiceNumber,
    tripletex_customer_id:result.customerId,source_invoice_number:invoice.invoice_number,
