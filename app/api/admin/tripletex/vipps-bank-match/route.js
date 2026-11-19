@@ -56,14 +56,36 @@ export async function GET(req){
    throw Error("Tripletex returnerte ikke en komplett bankkontoliste.");
   const accounts=bankAccounts(accountResponse.values);
   if(mode==="accounts"){
+   if(!accounts.length)return json({ok:true,bankReadAccess:false,
+    bankAccounts:[],hasStatementData:false,
+    reason:"Ingen aktiv bankkonto er merket som bankkonto i Tripletex. Kontroller kontoplanen."});
    try{
-    const statements=await tripletexRead("/bank/statement?count=1",
-     session,conn.environment);
+    // Read one statement for one trusted, active bank account; an unfiltered
+    // probe could accidentally claim access based on another company's data.
+    const selected=accounts[0];
+    const statements=await tripletexRead("/bank/statement?accountId="+
+     selected.id+"&count=1",session,conn.environment);
     if(!Array.isArray(statements?.values))
      throw Error("Kontoutskriftstjenesten returnerte uventede data.");
-    return json({ok:true,bankReadAccess:true,bankAccounts:accounts,
+    let transactionReadAccess=null;
+    if(statements.values.length){
+     const statementId=Number(statements.values[0]?.id);
+     if(!idOk(statementId))throw Error("Kontoutskriften mangler gyldig ID.");
+     try{
+      const bankRows=await tripletexRead(
+       "/bank/statement/transaction?bankStatementId="+statementId+
+       "&count=1",session,conn.environment);
+      transactionReadAccess=Array.isArray(bankRows?.values);
+     }catch{transactionReadAccess=false;}
+    }
+    return json({ok:true,
+     bankReadAccess:transactionReadAccess!==false,
+     transactionReadAccess,bankAccounts:accounts,
      hasStatementData:statements.values.length>0,
-     note:"API-tilgang er bekreftet, men det beviser ikke at bankintegrasjonen er aktiv eller at dagens transaksjoner er oppdatert."});
+     reason:transactionReadAccess===false?
+      "Kontoutskriften kan leses, men banktransaksjonene er ikke tilgjengelige med denne Tripletex-nøkkelen.":
+      undefined,
+     note:"Dette sjekker lesetilgang, ikke om banken har sendt oppdaterte kontoutskrifter."});
    }catch(error){
     const denied=[401,403,404].includes(Number(error?.status));
     return json({ok:true,bankReadAccess:false,bankAccounts:accounts,
