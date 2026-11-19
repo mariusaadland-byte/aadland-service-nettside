@@ -50,6 +50,8 @@ assert.equal(summary.totals.capturesOre,100);
 assert.equal(summary.totals.retainedFeesOre,-200);
 assert.equal(summary.totals.numberOfPayouts,0);
 assert.equal(summary.feeRows.length,1);
+assert.equal(summary.lastVippsBalanceOre,-100);
+assert.equal(summary.lastVippsBalanceDate,date);
 assert.equal(summary.feeRows[0].kind,"trukket");
 assert.equal(summary.feeRows[0].amountOre,200);
 const laterDate="2026-10-24",payoutId="payout-123";
