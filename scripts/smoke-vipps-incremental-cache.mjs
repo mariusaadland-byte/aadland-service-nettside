@@ -55,7 +55,7 @@ assert.ok(route.includes('upsert(fetched,{onConflict:"unit,ledger_id,report_date
  "Daily snapshots must replace an old day, not add its amounts again");
 assert.ok(route.includes("cacheDailyComparison(existing,fetched)"));
 assert.ok(route.includes("newDays:0,changedDays:0"),"No-op sync must report zero changed days");
-assert.ok(route.includes("transferStatuses(s,unit,from,to)"),
+assert.ok(route.includes("transferStatuses(s,unit,from,to,cached[0].ledger_id)"),
  "Read existing Tripletex transfer claims for badges");
 assert.ok(!route.includes("tripletexCreateVippsSettlementVoucher")&&
  !route.includes("tripletexRecordInvoicePayment"),
