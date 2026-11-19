@@ -57,7 +57,10 @@ async function saveLink(s,customer,environment,remoteId){
 async function findRemote(customer,session,environment){
  const key=customerTransferKey(customer);
  if(!key)return {state:"invalid",reason:"Legg inn kundenavn på kundekortet først."};
- const path="/customer?"+key.kind+"="+encodeURIComponent(key.value)+"&count=100";
+ // Name-only matching must scan all customers, not rely on an unverified name filter.
+ // A full page stops safely at 1000 customers, rather than risking duplicate creation.
+ const path=key.kind==="name"?"/customer?count=1000":
+  "/customer?"+key.kind+"="+encodeURIComponent(key.value)+"&count=100";
  const result=await tripletexRead(path,session,environment);
  if(!Array.isArray(result.values))throw Error("Tripletex returnerte ikke en gyldig kundeliste.");
  return findTripletexCustomerForTransfer(customer,result.values);
