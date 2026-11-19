@@ -155,6 +155,16 @@ export async function POST(req){
   });
   if(claim.error)return json({error:"Denne innbetalingen er allerede overført eller behandles. Oppdater listen; ikke send den på nytt."},409);
   claimed=true;
+  // Read the remote balance again AFTER the database claim and immediately
+  // BEFORE the irreversible payment request. Abort if Tripletex changed
+  // outside our integration between preflight and claim.
+  const justBefore=await tripletexRead("/invoice/"+state.verified.id,
+   state.session,state.connection.environment);
+  const rechecked=verifyTripletexInvoice(justBefore?.value,state.context.transfer,
+   state.context.link.tripletex_customer_id);
+  if(!rechecked.ok||rechecked.id!==state.verified.id||
+   rechecked.outstandingOre!==state.verified.outstandingOre)
+   throw Error("Tripletex endret seg mens betalingskontrollen pågikk. Ingen betaling sendt.");
   await tripletexRecordInvoicePayment(state.verified.id,next.paidOn,
    Number(paymentTypeId),next.amountOre,state.session,state.connection.environment);
   const latest=await tripletexRead("/invoice/"+state.verified.id,
