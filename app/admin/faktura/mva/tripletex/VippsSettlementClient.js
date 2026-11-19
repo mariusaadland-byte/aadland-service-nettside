@@ -139,6 +139,16 @@ export default function VippsSettlementClient(){
      <strong>{value}</strong>
     </div>)}
    </div>
+   {Number.isSafeInteger(result.lastVippsBalanceOre)&&result.lastVippsBalanceDate&&
+    <p style={{margin:"10px 0",fontSize:14}}>
+     <strong>Saldo hos Vipps etter siste registrerte post ({result.lastVippsBalanceDate}):
+      {" "}{kroner(result.lastVippsBalanceOre)}</strong>
+     <span style={{display:"block",fontSize:12,opacity:0.8}}>
+      {result.lastVippsBalanceOre<0?
+       "Negativ saldo betyr at Vipps har trukket mer enn saldoen, eller at andre poster har redusert den. Dette er ikke en bankutbetaling.":
+       "Dette er saldo på Vipps oppgjørskonto, ikke bekreftet saldo i banken."}
+     </span>
+    </p>}
    <p className={styles.hint}>{result.warning}</p>
    {result.unknownEntryTypes>0&&<p className={styles.error} role="alert">
     Rapporten inneholder {result.unknownEntryTypes} ukjente posttyper.
