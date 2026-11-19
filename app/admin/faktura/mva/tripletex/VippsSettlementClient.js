@@ -89,7 +89,7 @@ export default function VippsSettlementClient(){
     throw Error("Velg senest gårsdagens dato. Dagens oppgjør kan være ufullstendig.");
    const before=await fetchSaved(controller.signal);
    const batches=chunkVippsDays(before.checkDays||[]);
-   const totals={newDays:0,changedDays:0,unchangedDays:0,checkedDays:0};
+   const totals={newDays:0,changedDays:0,unchangedDays:0,checkedDays:0,skippedDays:0};
    for(let i=0;i<batches.length;i++){
     if(controller.signal.aborted)throw Error("Hentingen ble avbrutt.");
     const days=batches[i];
@@ -208,7 +208,8 @@ export default function VippsSettlementClient(){
   </div>}
   {lastCheck&&<p role="status" className={styles.progress}>
    Kontroll ferdig: {lastCheck.newDays} nye dager lagret, {lastCheck.changedDays} dager
-   med endret innhold og {lastCheck.unchangedDays} uendrede dager.
+   med endret innhold, {lastCheck.unchangedDays} uendrede kontrollerte dager
+   og {lastCheck.skippedDays} allerede nylig kontrollert.
    Ingen bilag er sendt til Tripletex.
   </p>}
   {loading&&progress&&<p className={styles.hint} role="status">{progress}</p>}
