@@ -1,6 +1,7 @@
 "use client";
 import {useState} from "react";
 import styles from "./TripletexReceipts.module.css";
+import {vippsPeriodBatches,combineVippsPeriodResponses} from "../../../../../lib/vippsSettlementPeriod";
 const dateAtOffset=days=>{
  const date=new Date(Date.now()+days*86400000);
  return new Intl.DateTimeFormat("en-CA",{year:"numeric",month:"2-digit",day:"2-digit",
@@ -16,22 +17,32 @@ const labels={
 };
 export default function VippsSettlementClient(){
  const [unit,setUnit]=useState("service");
- const [from,setFrom]=useState(()=>dateAtOffset(-7));
+ const [from,setFrom]=useState(()=>dateAtOffset(-30));
  const [to,setTo]=useState(()=>dateAtOffset(-1));
  const [loading,setLoading]=useState(false),[error,setError]=useState(""),[result,setResult]=useState(null);
+ const [progress,setProgress]=useState("");
  async function load(){
   if(loading)return;
-  setLoading(true);setError("");setResult(null);
+  setLoading(true);setError("");setResult(null);setProgress("");
   try{
-   const params=new URLSearchParams({unit,from,to});
-   const response=await fetch("/api/admin/tripletex/vipps-settlement?"+params,{
-    cache:"no-store"});
-   const data=await response.json().catch(()=>({}));
-   if(!response.ok||!data.ok)
-    throw Error(data.error||"Vipps-oppgjøret kunne ikke hentes.");
-   setResult(data);
+   const batches=vippsPeriodBatches(from,to);
+   if(!batches)throw Error("Velg en gyldig periode på maksimalt 31 dager.");
+   const parts=[];
+   for(let i=0;i<batches.length;i++){
+    setProgress("Henter periode "+(i+1)+" av "+batches.length+" …");
+    const params=new URLSearchParams({unit,...batches[i]});
+    const response=await fetch("/api/admin/tripletex/vipps-settlement?"+params,{
+     cache:"no-store"});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||!data.ok)throw Error(
+     "Del "+(i+1)+" av "+batches.length+" ("+batches[i].from+"–"+batches[i].to+") feilet: "+
+     (data.error||"Vipps-oppgjøret kunne ikke hentes.")+
+     " Ingen samlet rapport blir vist.");
+    parts.push(data);
+   }
+   setResult(combineVippsPeriodResponses(parts,batches,unit));
   }catch(err){setError(err.message||"Vipps-rapporten kunne ikke kontrolleres.");}
-  finally{setLoading(false);}
+  finally{setProgress("");setLoading(false);}
  }
  const totals=result?.totals||{};
  return <section className={styles.section} style={{paddingTop:0}}>
@@ -64,9 +75,10 @@ export default function VippsSettlementClient(){
    <button type="button" className={styles.primary} disabled={loading}
     onClick={load}>{loading?"Henter og kontrollerer …":"Hent Vipps-oppgjør"}</button>
   </div>
-  <p className={styles.hint}>Velg maksimalt 7 dager om gangen. Oppgjørsrapportene
+  <p className={styles.hint}>Velg opptil 31 dager med ett knappetrykk. Systemet henter automatisk uke for uke og viser bare et samlet resultat når alle periodene er hentet. Oppgjørsrapportene
    kan komme senere enn selve Vipps-betalingen. Er Vippsnummer brukt uten ePayment-tilgang,
    kan Vipps kreve en autorisert regnskapspartner for denne rapporten.</p>
+  {loading&&progress&&<p className={styles.hint} role="status">{progress}</p>}
   {error&&<p className={styles.error} role="alert">{error}</p>}
   {result&&<div>
    <p role="status" className={styles.progress}>
