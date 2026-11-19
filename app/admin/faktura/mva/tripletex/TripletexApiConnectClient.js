@@ -13,6 +13,7 @@ export default function TripletexApiConnectClient(){
  const [error,setError]=useState(""),[info,setInfo]=useState(""),[access,setAccess]=useState(null);
  const [invoiceOptions,setInvoiceOptions]=useState([]),[selectedInvoice,setSelectedInvoice]=useState("");
  const [preflight,setPreflight]=useState(null);
+ const [directPilot,setDirectPilot]=useState(null);
  useEffect(()=>{
   let active=true;
   fetch(url,{cache:"no-store"}).then(async r=>{
@@ -47,9 +48,48 @@ export default function TripletexApiConnectClient(){
   }catch(e){setError(e.message||"Kunne ikke gjennomføre handlingen.")}
   finally{setBusy(false);}
  }
+ async function checkDirectPilot(action){
+  if(busy||!selectedInvoice)return;
+  if(action==="transfer"){
+   if(!directPilot?.ready||directPilot.invoiceId!==selectedInvoice)return;
+   const money=new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"})
+    .format(Number(directPilot.grossOre||0)/100);
+   if(!window.confirm(
+    "OPPRETTE EN EKTE REGNSKAPSFØRT FAKTURA I TRIPLETEX?"+
+    "\n\nOpprinnelig faktura: "+directPilot.sourceNumber+
+    "\nBeløp inkl. MVA: "+money+
+    "\nFakturadato: "+directPilot.issuedDate+
+    "\n\nTripletex tildeler sitt eget fakturanummer."+
+    "\nDen opprinnelige fakturaen i Aadland Service er allerede sendt til kunden."+
+    "\nTripletex skal IKKE sende den på nytt."+
+    "\n\nDette kan påvirke regnskapet og MVA. Fortsett bare dersom fakturaen ikke finnes i Tripletex fra før."
+   ))return;
+  }
+  setBusy(true);setError("");setInfo("");
+  try{
+   const resp=await fetch("/api/admin/tripletex/invoices/direct",{
+    method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({action,invoiceId:selectedInvoice,
+     ...(action==="transfer"?{confirmed:true,digest:directPilot.digest}:{})})
+   });
+   const result=await resp.json().catch(()=>({}));
+   if(!resp.ok)throw Error(result.error||"Direkte fakturakontroll feilet.");
+   if(action==="check")setDirectPilot(result);
+   else{
+    setDirectPilot(null);setPreflight(null);
+    setInfo(result.message+" Tripletex-fakturanummer: "+result.tripletexInvoiceNumber+
+     ". Den er fjernet fra listen over gjenstående fakturaer.");
+    setInvoiceOptions(old=>old.filter(x=>x.id!==selectedInvoice));
+    setSelectedInvoice("");
+   }
+  }catch(e){
+   if(action==="transfer")setDirectPilot(null);
+   setError(e.message||"Fakturaoverføringen kunne ikke fullføres.");
+  }finally{setBusy(false);}
+ }
  async function checkInvoiceMapping(){
   if(busy||!selectedInvoice)return;
-  setBusy(true);setError("");setPreflight(null);
+  setBusy(true);setError("");setPreflight(null);setDirectPilot(null);
   try{
    const r=await fetch("/api/admin/tripletex/preview",{
     method:"POST",headers:{"Content-Type":"application/json"},
@@ -64,11 +104,17 @@ export default function TripletexApiConnectClient(){
  useEffect(()=>{
   if(!state.configured)return;
   let active=true;
-  fetch("/api/admin/invoices/tripletex/sales",{cache:"no-store"})
-   .then(async r=>{const v=await r.json().catch(()=>({}));
-    if(!r.ok)throw Error(v.error||"Kunne ikke hente fakturaer.");
+  Promise.all([
+   fetch("/api/admin/invoices/tripletex/sales",{cache:"no-store"}),
+   fetch("/api/admin/tripletex/invoices/direct",{cache:"no-store"})
+  ]).then(async ([r,direct])=>{
+    const [v,log]=await Promise.all([
+     r.json().catch(()=>({})),direct.json().catch(()=>({}))
+    ]);
+    if(!r.ok||!direct.ok)throw Error(v.error||log.error||"Kunne ikke hente fakturaer.");
     if(active){
-     const arr=(v.rows||[]).filter(x=>x.state==="paid"||x.state==="unpaid")
+     const previously=new Set((log.claims||[]).map(x=>x.invoiceId));
+     const arr=(v.rows||[]).filter(x=>(x.state==="paid"||x.state==="unpaid")&&!previously.has(x.id))
       .map(x=>({id:x.id,label:String(x.originalNumber||"Faktura")+" · "+
        String(x.customerName||"Kunde").slice(0,80)}));
      setInvoiceOptions(arr);
@@ -91,8 +137,8 @@ export default function TripletexApiConnectClient(){
     <div className={styles.stat}><strong style={{fontSize:18}}>{status}</strong><span>API-forbindelse</span></div>
     <div className={styles.stat}><strong style={{fontSize:18}}>{state.environment==="production"?"Produksjon":
      state.environment==="test"?"Test":"–"}</strong><span>Tripletex-miljø</span></div>
-    <div className={styles.stat}><strong style={{fontSize:18}}>{state.directInvoiceTransferEnabled?"Klar":"Sperret"}</strong>
-     <span>Direkte fakturabokføring</span></div>
+    <div className={styles.stat}><strong style={{fontSize:18}}>{state.directInvoiceTransferEnabled?"Klar":state.directInvoicePilotEnabled?"Pilot":"Sperret"}</strong>
+     <span>Direkte fakturabokføring (generell)</span></div>
    </div>
    {state.configured?<div className={styles.actions}>
     <button type="button" className={styles.primary} disabled={busy} onClick={()=>run("check")}>
@@ -136,7 +182,7 @@ export default function TripletexApiConnectClient(){
     <div className={styles.inputs}>
      <label>Faktura
       <select value={selectedInvoice} disabled={busy}
-       onChange={e=>{setSelectedInvoice(e.target.value);setPreflight(null)}}>
+       onChange={e=>{setSelectedInvoice(e.target.value);setPreflight(null);setDirectPilot(null)}}>
        {invoiceOptions.map(x=><option key={x.id} value={x.id}>{x.label}</option>)}
       </select>
      </label>
@@ -148,13 +194,33 @@ export default function TripletexApiConnectClient(){
     </div>
     {preflight?.results?.map(x=><p className={styles.hint} key={x.id} role="status">
      <strong>{x.ready?"Kunde/MVA mappet ✓":"Må avklares"}:</strong> {x.reason}
+     {x.ready&&x.needsPaymentMapping&&
+      " Direktepiloten gjelder foreløpig bare helt ubetalte fakturaer."}
     </p>)}
+    {preflight?.results?.some(x=>x.id===selectedInvoice&&x.ready&&!x.needsPaymentMapping)&&<div>
+     <p className={styles.hint}><strong>Direkte pilot:</strong> Kun én helt ubetalt faktura.
+      Tripletex lager et eget fakturanummer, men sender ingenting til kunden.
+      Betalte fakturaer må fortsatt håndteres separat.</p>
+     <div className={styles.actions}>
+      <button type="button" disabled={busy} onClick={()=>checkDirectPilot("check")}>
+       {busy?"Kontrollerer …":"Kontroller direkteoverføring (kun lesing)"}
+      </button>
+      {directPilot?.ready&&directPilot.invoiceId===selectedInvoice&&
+       <button type="button" disabled={busy} className={styles.primary}
+        onClick={()=>checkDirectPilot("transfer")}>
+        Opprett denne ubetalte fakturaen i Tripletex
+       </button>}
+     </div>
+     {directPilot?.ready&&<p className={styles.hint}>Klart for én kontrollert
+      overføring. Beløp: {(Number(directPilot.grossOre)/100).toLocaleString("nb-NO",{style:"currency",currency:"NOK"})}.
+      Dette er en ekte bokføring først når du trykker opprett og bekrefter.</p>}
+    </div>}
    </div>}
    {state.configured&&<p className={styles.hint}>Sist bekreftet:
     {" "}{state.verifiedAt?new Date(state.verifiedAt).toLocaleString("nb-NO"):"–"}.
-    API-et kan nå testes. Direkte opprettelse av regnskapsfakturaer er fortsatt sperret
-    frem til vi har verifisert mapping og gjennomført en kontrollert pilot.
-    CSV-importen er fortsatt tilgjengelig.</p>}
+    API-et kan testes. Én ubetalt faktura kan nå overføres som kontrollert pilot
+    etter særskilt bekreftelse. For øvrige fakturaer er direkte bokføring fortsatt sperret,
+    og CSV-importen er tilgjengelig.</p>}
   </>}
  </section>;
 }

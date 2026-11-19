@@ -7,6 +7,7 @@ const base="/api/admin/invoices/tripletex/sales";
 const transferApi=base+"/transfer";
 const reconcileApi="/api/admin/tripletex/invoices/reconcile";
 const paymentApi="/api/admin/tripletex/invoices/payments";
+const directApi="/api/admin/tripletex/invoices/direct";
 const money=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(Number(ore||0)/100);
 const validType=value=>/^[A-Za-z0-9_-]{1,32}$/.test(String(value||"").trim());
 const fileDownload=url=>{
@@ -18,6 +19,7 @@ const fileDownload=url=>{
 export default function TripletexSalesClient(){
  const [invoices,setInvoices]=useState([]),[transfers,setTransfers]=useState([]);
  const [invoiceLinks,setInvoiceLinks]=useState([]),[reconcileError,setReconcileError]=useState("");
+ const [directClaims,setDirectClaims]=useState([]);
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
  const [error,setError]=useState(""),[message,setMessage]=useState("");
  const [startNumber,setStartNumber]=useState("80000000");
@@ -30,17 +32,18 @@ export default function TripletexSalesClient(){
  const csvSettingsRef=useRef(null);
 
  const reload=useCallback(async()=>{
-  const [list,history,reconciled]=await Promise.all([
+  const [list,history,reconciled,direct]=await Promise.all([
    fetch(base,{cache:"no-store"}),fetch(transferApi,{cache:"no-store"}),
-   fetch(reconcileApi,{cache:"no-store"})
+   fetch(reconcileApi,{cache:"no-store"}),fetch(directApi,{cache:"no-store"})
   ]);
-  const [data,log,checks]=await Promise.all([
+  const [data,log,checks,directLog]=await Promise.all([
    list.json().catch(()=>({})),history.json().catch(()=>({})),
-   reconciled.json().catch(()=>({}))
+   reconciled.json().catch(()=>({})),direct.json().catch(()=>({}))
   ]);
-  if(!list.ok||!history.ok)
-   throw Error(data.error||log.error||"Kunne ikke hente komplett overføringsstatus.");
+  if(!list.ok||!history.ok||!direct.ok)
+   throw Error(data.error||log.error||directLog.error||"Kunne ikke hente komplett overføringsstatus.");
   setInvoices(data.rows||[]);setTransfers(log.transfers||[]);
+  setDirectClaims(directLog.claims||[]);
   setInvoiceLinks(reconciled.ok&&checks.configured?(checks.links||[]):[]);
   setReconcileError(reconciled.ok?"":"Kunne ikke hente direkte API-avstemming. CSV-overføring er fortsatt tilgjengelig.");
  },[]);
@@ -51,7 +54,11 @@ export default function TripletexSalesClient(){
   return()=>{active=false};
  },[reload]);
 
- const queue=useMemo(()=>tripletexCustomerInvoiceQueue(invoices,transfers),[invoices,transfers]);
+ const queue=useMemo(()=>tripletexCustomerInvoiceQueue(
+  invoices.filter(row=>!directClaims.some(x=>x.invoiceId===row.id)),transfers
+ ),[invoices,transfers,directClaims]);
+ const directConfirmed=directClaims.filter(x=>x.status==="confirmed");
+ const directReview=directClaims.filter(x=>x.status!=="confirmed");
  const selections=useMemo(()=>tripletexCustomerInvoiceSelections(queue),[queue]);
  const withPayment=selections.withPayment;
  const withoutPayment=selections.withoutPayment;
@@ -219,8 +226,9 @@ export default function TripletexSalesClient(){
   <p className={styles.hint}>Fakturaene er allerede sendt til kundene fra Aadland Service.
    Du kan overføre <strong>alle med registrert innbetaling samlet</strong>, mens du selv velger
    hvilke <strong>uten innbetaling</strong> du vil klargjøre én og én.
-   <strong>Direkte API-overføring er ikke aktiv ennå.</strong> Knappene under klargjør derfor en CSV-fil
-   som du importerer manuelt i Tripletex. Oppsettet for denne filen ligger skjult under «Avansert».</p>
+   <strong>Kontrollert direktepilot for én ubetalt faktura</strong> finner du øverst,
+   under «Forhåndskontroller én kundefaktura». Øvrige knapper lager fortsatt
+   CSV-filer. Filoppsettet ligger skjult under «Avansert».</p>
   {loading&&<p role="status">Henter fakturaer og overføringsstatus …</p>}
   {error&&<p role="alert" className={styles.error}>{error}</p>}
   {message&&<p role="status" className={styles.progress}>{message}</p>}
@@ -229,8 +237,13 @@ export default function TripletexSalesClient(){
    <div className={styles.stats}>
     <div className={styles.stat}><strong>{allPending}</strong><span>Gjenstår å importere eller kontrollere</span></div>
     <div className={styles.stat}><strong>{queue.prepared.length}</strong><span>CSV klargjort, avventer bekreftelse</span></div>
-    <div className={styles.stat}><strong>{queue.confirmed.length}</strong><span>Bekreftet importert</span></div>
+    <div className={styles.stat}><strong>{queue.confirmed.length+directConfirmed.length}</strong><span>Bekreftet overført (CSV/API)</span></div>
    </div>
+
+   {directReview.length>0&&<p role="alert" className={styles.error}>
+    {directReview.length} faktura(er) har en uavklart direkteoverføring.
+    Disse må kontrolleres i Tripletex og kan ikke sendes på nytt automatisk.
+   </p>}
 
    <div className={styles.section}>
     <details className={styles.importSettings} ref={csvSettingsRef}>
@@ -341,13 +354,25 @@ export default function TripletexSalesClient(){
 
    <div className={styles.section}>
     <details open={showHistory} onToggle={e=>setShowHistory(e.currentTarget.open)}>
-     <summary className={styles.historyToggle}>Overføringshistorikk ({queue.confirmed.length})</summary>
+     <summary className={styles.historyToggle}>Overføringshistorikk ({queue.confirmed.length+directConfirmed.length})</summary>
      <p className={styles.hint}>Her vises bare fakturaer du har bekreftet importert.
       Du kan nå trykke «Kontroller i Tripletex» for å bekrefte kunde, fakturanummer,
       dato og beløp mot Tripletex-API-et. Restbeløpene sammenlignes uten å
       opprette nye fakturaer eller bokføre betalinger. En manuell importbekreftelse
       alene er ikke en API-bekreftelse.</p>
-     <div className={styles.list}>{completed.map(x=><div className={styles.item} key={x.id}>
+     <div className={styles.list}>
+      {directConfirmed.map(x=><div className={styles.item} key={"direct-"+x.invoiceId}>
+       <div className={styles.itemInfo}>
+        <strong>{x.sourceNumber} · Direkte overført via API</strong>
+        <small>Tripletex-fakturanr. {x.tripletexInvoiceNumber} ·
+         Allerede sendt fra Aadland Service – ikke sendt på nytt fra Tripletex</small>
+       </div>
+       <div className={styles.itemLinks}>
+        <a className={styles.link} href={"/admin/faktura/arkiv?id="+encodeURIComponent(x.invoiceId)}>
+         Se originalfaktura</a>
+       </div>
+      </div>)}
+      {completed.map(x=><div className={styles.item} key={x.id}>
       <div className={styles.itemInfo}><strong>{x.originalNumber} · {x.customerName}</strong>
        <small>Tripletex-fakturanr. {x.transfer.import_number}
         {" · "}Bekreftet {new Date(x.transfer.confirmed_at).toLocaleDateString("nb-NO")}</small>
@@ -397,7 +422,8 @@ export default function TripletexSalesClient(){
        </div>}
       </div>
      </div>)}
-     {!completed.length&&<p className={styles.empty}>Ingen bekreftede fakturaimporter ennå.</p>}
+     {!completed.length&&!directConfirmed.length&&
+      <p className={styles.empty}>Ingen bekreftede fakturaoverføringer ennå.</p>}
      </div>
     </details>
    </div>

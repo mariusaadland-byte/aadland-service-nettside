@@ -26,6 +26,7 @@ function publicState(connection){
  return {configured:Boolean(connection),environment:connection?.environment||null,
   verifiedAt:connection?.verified_at||null,
   directInvoiceTransferEnabled:false,
+  directInvoicePilotEnabled:Boolean(connection),
   needsMappingAndPilot:true};
 }
 export async function GET(req){
@@ -57,13 +58,18 @@ export async function POST(req){
    const validation=await tripletexCheckConnection(refreshToken,environment);
    const sealed=protectTripletexToken(refreshToken);
    const current=await storedTripletexConnection(s);
-   // Replacing a connection with existing accounting transfers can point to
-   // another company; disallow without dedicated reconciliation.
-   if(current&&current.environment!==environment){
-    const {count,error:countErr}=await s.from("invoice_tripletex_transfers")
-     .select("id",{count:"exact",head:true});
-    if(countErr||Number(count)>0)
-     return json({error:"Det finnes tidligere fakturaoverføringer. Tripletex-miljø kan ikke byttes uten manuell avstemming."},409);
+   // A new JWT can point to a DIFFERENT company, even in the same environment.
+   // Never silently repoint linked financial records to another Tripletex account.
+   if(current&&(current.environment!==environment||
+    unprotectTripletexToken(current)!==refreshToken)){
+    const checks=await Promise.all([
+     s.from("invoice_tripletex_transfers").select("id",{count:"exact",head:true}),
+     s.from("tripletex_direct_invoice_claims").select("invoice_id",{count:"exact",head:true}),
+     s.from("tripletex_invoice_api_links").select("invoice_id",{count:"exact",head:true}),
+     s.from("tripletex_payment_transfers").select("payment_id",{count:"exact",head:true})
+    ]);
+    if(checks.some(x=>x.error||Number(x.count)>0))
+     return json({error:"Det finnes regnskaps- eller fakturakoblinger. Ny Tripletex-nøkkel må først avstemmes mot riktig firma før du bytter."},409);
    }
    const now=new Date().toISOString();
    const saved=await s.from("tripletex_api_connections").upsert({
@@ -88,7 +94,7 @@ export async function POST(req){
   const removed=await s.from("tripletex_api_connections").delete().eq("id","primary");
   if(removed.error)throw Error("Disconnect failed");
   return json({ok:true,configured:false,environment:null,verifiedAt:null,
-   directInvoiceTransferEnabled:false,
+   directInvoiceTransferEnabled:false,directInvoicePilotEnabled:false,
    message:"API-tilkoblingen er fjernet. Tidligere fakturaoverføringer er bevart."});
  }catch(error){
   // Never log JWT, decrypted secrets, provider bodies or sensitive invoice details.

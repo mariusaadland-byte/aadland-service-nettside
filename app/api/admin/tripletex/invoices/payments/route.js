@@ -27,11 +27,14 @@ async function permitted(req,write){
  return null;
 }
 async function loadContext(s,invoiceId,connection){
- const [inv,imported,linked,records,transferred,credits,vipps]=await Promise.all([
+ const [inv,imported,direct,linked,records,transferred,credits,vipps]=await Promise.all([
   s.from("invoice_drafts").select("id,status,invoice_number,line_items,customer,issued_date,paid_ore,credited_ore")
    .eq("id",invoiceId).maybeSingle(),
   s.from("invoice_tripletex_transfers").select(
    "invoice_id,status,import_number,original_invoice_number,original_issued_date,snapshot_gross_ore")
+   .eq("invoice_id",invoiceId).maybeSingle(),
+  s.from("tripletex_direct_invoice_claims").select(
+   "invoice_id,status,tripletex_invoice_number,source_number,issued_date,snapshot_gross_ore")
    .eq("invoice_id",invoiceId).maybeSingle(),
   s.from("tripletex_invoice_api_links").select(
    "invoice_id,environment,tripletex_invoice_id,tripletex_invoice_number,tripletex_customer_id,invoice_gross_ore,matched_outstanding_ore,matched_at")
@@ -46,11 +49,18 @@ async function loadContext(s,invoiceId,connection){
   s.from("invoice_vipps_payments").select("id,state,refunded_ore")
    .eq("invoice_id",invoiceId).limit(1001)
  ]);
- if([inv,imported,linked,records,transferred,credits,vipps].some(x=>x.error))
+ if([inv,imported,direct,linked,records,transferred,credits,vipps].some(x=>x.error))
   throw Error("Kunne ikke lese fullstendig faktura- og betalingshistorikk.");
  if([records,transferred,vipps].some(x=>(x.data||[]).length>1000))
   throw Error("For mange betalinger til sikker automatisk avstemming.");
- const invoice=inv.data,transfer=imported.data,link=linked.data;
+ const invoice=inv.data,link=linked.data;
+ const transfer=imported.data||(direct.data?.status==="confirmed"?{
+  invoice_id:direct.data.invoice_id,status:"confirmed",
+  import_number:direct.data.tripletex_invoice_number,
+  original_invoice_number:direct.data.source_number,
+  original_issued_date:direct.data.issued_date,
+  snapshot_gross_ore:direct.data.snapshot_gross_ore
+ }:null);
  if(!invoice||invoice.status!=="sent"||!transfer||transfer.status!=="confirmed"||!link||
   connection.environment!==link.environment)
   return {valid:false,reason:"Fakturaen er ikke verifisert og importert i Tripletex ennå."};
