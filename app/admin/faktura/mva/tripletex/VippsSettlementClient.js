@@ -1,5 +1,5 @@
 "use client";
-import {useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import styles from "./TripletexReceipts.module.css";
 import {vippsPeriodBatches,combineVippsPeriodResponses} from "../../../../../lib/vippsSettlementPeriod";
 const dateAtOffset=days=>{
@@ -21,28 +21,52 @@ export default function VippsSettlementClient(){
  const [to,setTo]=useState(()=>dateAtOffset(-1));
  const [loading,setLoading]=useState(false),[error,setError]=useState(""),[result,setResult]=useState(null);
  const [progress,setProgress]=useState("");
+ const [yearPreset,setYearPreset]=useState("");
+ const abortRef=useRef(null);
+ useEffect(()=>()=>abortRef.current?.abort(),[]);
+ const currentYear=Number(dateAtOffset(0).slice(0,4));
+ const yearOptions=Array.from({length:7},(_,i)=>currentYear-i);
+ function chooseYear(value){
+  setYearPreset(value);setResult(null);setError("");
+  if(!value)return;
+  setFrom(value+"-01-01");
+  setTo(Number(value)===currentYear?dateAtOffset(-1):value+"-12-31");
+ }
+ function cancelLoad(){abortRef.current?.abort();}
  async function load(){
   if(loading)return;
+  const controller=new AbortController();
+  abortRef.current=controller;
   setLoading(true);setError("");setResult(null);setProgress("");
   try{
    const batches=vippsPeriodBatches(from,to);
-   if(!batches)throw Error("Velg en gyldig periode på maksimalt 31 dager.");
+   if(!batches)throw Error("Velg en gyldig periode på maksimalt ett år (366 dager).");
+   if(to>dateAtOffset(-1))throw Error("Velg senest gårsdagens dato. Dagens oppgjør kan være ufullstendig.");
    const parts=[];
    for(let i=0;i<batches.length;i++){
-    setProgress("Henter periode "+(i+1)+" av "+batches.length+" …");
+    if(controller.signal.aborted)throw Error("Hentingen ble avbrutt.");
+    setProgress("Henter uke "+(i+1)+" av "+batches.length+" ("+
+     batches[i].from+"–"+batches[i].to+") …");
     const params=new URLSearchParams({unit,...batches[i]});
     const response=await fetch("/api/admin/tripletex/vipps-settlement?"+params,{
-     cache:"no-store"});
+     cache:"no-store",signal:controller.signal});
     const data=await response.json().catch(()=>({}));
     if(!response.ok||!data.ok)throw Error(
-     "Del "+(i+1)+" av "+batches.length+" ("+batches[i].from+"–"+batches[i].to+") feilet: "+
+     "Uke "+(i+1)+" av "+batches.length+" ("+batches[i].from+"–"+batches[i].to+") feilet: "+
      (data.error||"Vipps-oppgjøret kunne ikke hentes.")+
      " Ingen samlet rapport blir vist.");
     parts.push(data);
    }
+   if(controller.signal.aborted)throw Error("Hentingen ble avbrutt.");
    setResult(combineVippsPeriodResponses(parts,batches,unit));
-  }catch(err){setError(err.message||"Vipps-rapporten kunne ikke kontrolleres.");}
-  finally{setProgress("");setLoading(false);}
+  }catch(err){
+   setError(controller.signal.aborted||err?.name==="AbortError"
+    ?"Hentingen ble avbrutt. Ingen ufullstendig rapport er vist."
+    :err.message||"Vipps-rapporten kunne ikke kontrolleres.");
+  }finally{
+   if(abortRef.current===controller)abortRef.current=null;
+   setProgress("");setLoading(false);
+  }
  }
  const totals=result?.totals||{};
  return <section className={styles.section} style={{paddingTop:0}}>
@@ -63,21 +87,34 @@ export default function VippsSettlementClient(){
     </select>
    </label>
    <label style={{display:"grid",gap:4,fontSize:13}}>
+    Velg regnskapsår
+    <select value={yearPreset} disabled={loading} onChange={event=>chooseYear(event.target.value)}>
+     <option value="">Egendefinert periode</option>
+     {yearOptions.map(year=><option key={year} value={String(year)}>
+      {year===currentYear?year+" – hittil i år":year+" – hele året"}
+     </option>)}
+    </select>
+   </label>
+   <label style={{display:"grid",gap:4,fontSize:13}}>
     Fra dato
     <input type="date" value={from} disabled={loading}
-     onChange={event=>{setFrom(event.target.value);setResult(null);}}/>
+     onChange={event=>{setFrom(event.target.value);setYearPreset("");setResult(null);}}/>
    </label>
    <label style={{display:"grid",gap:4,fontSize:13}}>
     Til dato
     <input type="date" value={to} disabled={loading}
-     onChange={event=>{setTo(event.target.value);setResult(null);}}/>
+     onChange={event=>{setTo(event.target.value);setYearPreset("");setResult(null);}}/>
    </label>
    <button type="button" className={styles.primary} disabled={loading}
     onClick={load}>{loading?"Henter og kontrollerer …":"Hent Vipps-oppgjør"}</button>
+   {loading&&<button type="button" onClick={cancelLoad} style={{padding:"10px 14px",borderRadius:8}}>
+    Avbryt henting
+   </button>}
   </div>
-  <p className={styles.hint}>Velg opptil 31 dager med ett knappetrykk. Systemet henter automatisk uke for uke og viser bare et samlet resultat når alle periodene er hentet. Oppgjørsrapportene
-   kan komme senere enn selve Vipps-betalingen. Er Vippsnummer brukt uten ePayment-tilgang,
-   kan Vipps kreve en autorisert regnskapspartner for denne rapporten.</p>
+  <p className={styles.hint}>Velg opptil ett år (366 dager) med ett knappetrykk – eller velg et regnskapsår fra listen.
+   Systemet henter automatisk uke for uke og viser bare én samlet rapport når alle ukene er hentet.
+   Ved et helt år må du beholde denne siden åpen mens hentingen pågår. Du kan avbryte uten å endre regnskapet.
+   Oppgjørsrapportene kan komme senere enn selve Vipps-betalingen. Et Vippsnummer kan kreve rapporttilgang via regnskapspartner.</p>
   {loading&&progress&&<p className={styles.hint} role="status">{progress}</p>}
   {error&&<p className={styles.error} role="alert">{error}</p>}
   {result&&<div>
@@ -104,6 +141,10 @@ export default function VippsSettlementClient(){
    {result.unknownEntryTypes>0&&<p className={styles.error} role="alert">
     Rapporten inneholder {result.unknownEntryTypes} ukjente posttyper.
     Disse må vurderes før bokføring.</p>}
+   {result.matchingLimited&&<p className={styles.hint} role="status">
+    Vipps hadde flere betalingsreferanser enn vi viser i detaljvisningen for én eller flere uker.
+    Beløpssummene er for hele den hentede perioden, men alle referanser kan ikke bekreftes enkeltvis her.
+   </p>}
    {result.unreferencedCaptures>0&&<p className={styles.hint}>
     {result.unreferencedCaptures} betalinger mangler Vipps-referanse
     og kan ikke kobles automatisk til en faktura.</p>}
