@@ -361,11 +361,11 @@ export default function AdminClient({ user }) {
   const today = osloDateKey(new Date());
   const waitingQuotes = customerQuotes.filter(
     (quote) =>
-      quote.status === "sent" &&
+      quote.status === "sent" && !quote.archivedAt &&
       (!quote.validUntil || quote.validUntil >= today)
   ).length;
   const acceptedQuoteValue = customerQuotes
-    .filter((quote) => quote.status === "accepted")
+    .filter((quote) => quote.status === "accepted" && !quote.archivedAt)
     .reduce((sum, quote) => sum + (Number(quote.totalOre) || 0), 0);
 
   const nowMs=Date.now();
@@ -468,7 +468,7 @@ export default function AdminClient({ user }) {
         href:"/admin/oppdrag/"+order.id+"/planlegg"
       })),
     ...customerQuotes
-      .filter(quote=>quote.status==="sent"&&(!quote.validUntil||quote.validUntil>=today))
+      .filter(quote=>quote.status==="sent"&&!quote.archivedAt&&(!quote.validUntil||quote.validUntil>=today))
       .map(quote=>({
         key:"quote-"+quote.id,
         sort:7,
