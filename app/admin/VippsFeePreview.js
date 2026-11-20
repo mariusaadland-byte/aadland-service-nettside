@@ -1,10 +1,10 @@
 "use client";
 import {useId,useState} from "react";
-import {vippsFeeEstimateForPayments,vippsPriceForPayoutWithPayments} from "../../lib/vippsFeeEstimate";
+import {vippsFeeEstimateForPayments,vippsPriceForPayoutWithPayments,VIPPS_STANDARD_RATE_BPS,VIPPS_STANDARD_FIXED_ORE} from "../../lib/vippsFeeEstimate";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(n/100);
 const parse=value=>{const s=String(value).trim().replace(",",".");return s?Number(s):NaN};
 export default function VippsFeePreview({amountOre,title="Vipps – intern prisberegning",note="",onApply,applyLabel="Bruk beregnet pris",disabled=false,paymentPercentages=[100],allowPriceAdjustment=true,noPriceAdjustmentText="Ingen materialer eller andre varelinjer å justere. Timeprisen endres aldri; Vipps-kostnaden dekkes av bedriften."}){
- const id=useId(),[percent,setPercent]=useState("2.99"),[fixed,setFixed]=useState("1"),[target,setTarget]=useState("");
+ const id=useId(),[percent,setPercent]=useState((VIPPS_STANDARD_RATE_BPS/100).toFixed(2).replace(".",",")),[fixed,setFixed]=useState((VIPPS_STANDARD_FIXED_ORE/100).toFixed(2).replace(".",",")),[target,setTarget]=useState("");
  const rawRate=parse(percent)*100,rawFixed=parse(fixed)*100;
  const terms={rateBps:Math.round(rawRate),fixedOre:Math.round(rawFixed)};
  const valid=Number.isFinite(rawRate)&&Number.isFinite(rawFixed);
@@ -14,7 +14,7 @@ export default function VippsFeePreview({amountOre,title="Vipps – intern prisb
  return <section aria-label={title} style={{padding:14,margin:"12px 0",background:"#f8f5ee",border:"1px solid #ddd0b9",borderRadius:10}}>
   <h4 style={{margin:"0 0 8px"}}>{title}</h4>
   {estimate?<div aria-live="polite"><div>Kundepris inkl. mva.: <b>{money(estimate.amountOre)}</b></div><div>Anslått Vipps-kostnad: <b>{money(estimate.feeOre)}</b></div><div>Anslått utbetalt etter Vipps: <b>{money(estimate.payoutOre)}</b></div></div>:<p>Kontroller beløp og gebyrsats.</p>}
-  <p style={{fontSize:12,margin:"8px 0"}}>{estimate?.paymentCount>1?"Det er regnet "+estimate.paymentCount+" Vipps-betalinger etter betalingsplanen, med fastgebyr per betaling. ":""}Utbetalingen er før øvrige kostnader og mva-oppgjør. Standardsats for Integrert betaling: 2,99 % + 1 kr per betaling. Faktisk avtale og oppgjør kan avvike.{note?" "+note:""}</p>
+  <p style={{fontSize:12,margin:"8px 0"}}>{estimate?.paymentCount>1?"Det er regnet "+estimate.paymentCount+" Vipps-betalinger etter betalingsplanen, med fastgebyr per betaling. ":""}Utbetalingen er før øvrige kostnader og mva-oppgjør. Pris vist i Vipps-portalen 21.10.2026 for «Integrert betaling»: 2,99 % + 1 kr per transaksjon. To testoppgjør for Aadland Service på 1 kr hadde 1,03 kr i gebyr. En eventuell individuell rabatt og separate vilkår for Aadland Utleie må fortsatt kontrolleres i signert avtale.{note?" "+note:""}</p>
   <details><summary>{allowPriceAdjustment?"Beregn pris fra ønsket utbetaling / endre beregningssats":"Endre Vipps-gebyrsats"}</summary>
    <div style={{display:"flex",flexWrap:"wrap",gap:12,marginTop:10}}>
     <label htmlFor={id+"-percent"}>Vipps-sats (%)<input id={id+"-percent"} type="text" inputMode="decimal" value={percent} disabled={disabled} onChange={e=>setPercent(e.target.value)}/></label>
