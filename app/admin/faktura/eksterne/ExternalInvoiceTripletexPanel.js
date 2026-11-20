@@ -3,6 +3,7 @@ import {useEffect,useRef,useState} from "react";
 import {readExternalInvoiceAmountFromOriginal} from "../../../../lib/externalInvoiceDocumentReader";
 import {parseExternalInvoiceOre} from "../../../../lib/externalInvoiceRegister";
 import {splitExternalInvoiceGrossByRate} from "../../../../lib/externalInvoiceVatMath";
+import {externalInvoiceTransferBlockers} from "../../../../lib/externalInvoiceTransferReadiness";
 const kr=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(n/100);
 const box={padding:"clamp(14px,2.5vw,22px)",border:"2px solid #9baebd",borderRadius:12,marginTop:10,
  background:"#fff",color:"#192b3b",display:"grid",gap:14};
@@ -26,6 +27,9 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
  const userChanged=useRef(false);
  const [number,setNumber]=useState("90000000");
  const [customerStatus,setCustomerStatus]=useState("loading");
+ const [linkedContactId,setLinkedContactId]=useState(null);
+ const [showTransferSteps,setShowTransferSteps]=useState(false);
+ const customerLinkInFlight=useRef(false);
  const [confirmed,setConfirmed]=useState(false);
  const [notImported,setNotImported]=useState(false);
  const [customerConfirmed,setCustomerConfirmed]=useState(false);
@@ -49,6 +53,7 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
   if(!r.ok||!d.ok)throw Error(d.error||"Kan ikke hente status fra Tripletex.");
   setRecord(d.import||null);
   setCustomerStatus(d.customerStatus||"missing_local_card");
+  setLinkedContactId(d.linkedContactId||null);
   await refreshDirect();
  };
  useEffect(()=>{
@@ -59,6 +64,7 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
     if(!r.ok||!d.ok)throw Error(d.error||"Overføringsstatus kunne ikke hentes.");
     if(live){setRecord(d.import||null);
      setCustomerStatus(d.customerStatus||"missing_local_card");
+     setLinkedContactId(d.linkedContactId||null);
      if(!d.import&&Number.isSafeInteger(Number(d.suggestedImportNumber)))
       setNumber(String(d.suggestedImportNumber));}
    }).catch(e=>{if(live)setError(e.message)})
@@ -71,6 +77,11 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
   Math.round(enteredBaseOre*Number(vatRate)/100):null;
  const importAmountsMatch=computedVatOre!==null&&
   enteredBaseOre+computedVatOre===Number(invoice.amount_ore);
+ const transferSteps=externalInvoiceTransferBlockers({
+  loading,directLoading,customerStatus,direct,importAmountsMatch,readerStatus,
+  confirmed,customerConfirmed,notImported,accountingPeriodConfirmed,number,
+  paid,paidOn:invoice.paid_on,paymentTypeId,paymentSourceConfirmed
+ });
  async function readOriginalAmount({manualRetry=false}={}){
   readerAbort.current?.abort();
   const controller=new AbortController();
@@ -169,8 +180,12 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
   return()=>{live=false};
  },[invoice.id]);
  async function transferDirect(){
-  if(busy||record||directLoading||direct?.importExists||
-   !importAmountsMatch||customerStatus!=="linked_to_tripletex")return;
+  if(busy||record)return;
+  if(transferSteps.length){
+   setShowTransferSteps(true);
+   setError("Overføringen er ikke startet. Se punktene under knappen for hva som gjenstår.");
+   return;
+  }
   const selectedType=paid?Number(paymentTypeId):null;
   if(paid&&(!selectedType||!paymentSourceConfirmed)){
    setError("Velg riktig betalingsmåte i Tripletex og bekreft at innbetalingen ikke allerede er bokført.");
@@ -219,6 +234,33 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
    setError(e.message||"Overføringen kunne ikke bekreftes. Sjekk Tripletex før du prøver igjen.");
    try{await refresh();}catch{}
   }finally{setBusy(false);}
+ }
+ async function linkCustomerNow(){
+  if(busy||customerLinkInFlight.current||!linkedContactId||
+   customerStatus!=="not_linked_to_tripletex")return;
+  if(!window.confirm("Koble fakturaens eksisterende kundekort til Tripletex? "+
+   "Tripletex sjekkes først for en tilsvarende kunde. "+
+   "Ingen faktura eller betaling opprettes med dette valget."))return;
+  customerLinkInFlight.current=true;
+  setBusy(true);setError("");setInfo("");
+  try{
+   const response=await fetch("/api/admin/tripletex/customers",{
+    method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({action:"transfer",sourceType:"contact",sourceId:linkedContactId})
+   });
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok||!data.ok)throw Error(data.error||
+    "Kundekoblingen er uavklart. Kontroller Tripletex før nytt forsøk.");
+   await refresh();
+   setInfo(data.existing?
+    "Eksisterende kunde er funnet og koblet i Tripletex. Kontroller MVA og betalingen før overføring.":
+    "Kundekortet er opprettet og koblet i Tripletex. Kontroller MVA og betalingen før overføring.");
+  }catch(e){
+   setError(e.message||"Kunne ikke bekrefte kundekoblingen. Ikke prøv på nytt før du har kontrollert i Tripletex.");
+   try{await refresh();}catch{}
+  }finally{
+   setBusy(false);customerLinkInFlight.current=false;
+  }
  }
  async function prepare(){
   if(busy||record)return;
