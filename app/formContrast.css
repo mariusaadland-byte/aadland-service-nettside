@@ -1,0 +1,125 @@
+/* Public + customer portal form contrast safety net.
+ * Browser document defaults to dark, while many form fields use white surfaces.
+ * Give editable controls an explicit readable foreground; individual dark-themed
+ * forms override it with their own text/background as a matched pair.
+ * This file is imported AFTER globals.css. It does NOT change sizes or layout. */
+:where(
+ input:not([type="checkbox"]):not([type="radio"]):not([type="range"])
+      :not([type="color"]):not([type="file"]):not([type="hidden"])
+      :not([type="button"]):not([type="submit"]):not([type="reset"])
+      :not([type="image"]),
+ select,
+ textarea
+){
+ color:#1b2c3b;
+ -webkit-text-fill-color:currentColor;
+ caret-color:currentColor;
+ color-scheme:light;
+}
+:where(
+ input:not([type="checkbox"]):not([type="radio"]):not([type="range"])
+      :not([type="color"]):not([type="file"]):not([type="hidden"])
+      :not([type="button"]):not([type="submit"]):not([type="reset"])
+      :not([type="image"]),
+ select,
+ textarea
+)::placeholder{
+ color:#677587;
+ -webkit-text-fill-color:#677587;
+ opacity:1;
+}
+
+/* Exact reported issue: /min-side -> Mine opplysninger -> Rediger.
+ * White inputs previously inherited almost white text from the dark card.
+ * A disabled email stays visibly readable (though not editable). */
+.customerPage .customerAccountForm .field :is(input,textarea,select){
+ background-color:#fff!important;
+ color:#172a3b!important;
+ -webkit-text-fill-color:#172a3b!important;
+ caret-color:#172a3b!important;
+ border:1.5px solid #8093a5!important;
+ color-scheme:light!important;
+ opacity:1!important;
+}
+.customerPage .customerAccountForm .field :is(input,textarea,select):is(:focus,:focus-visible){
+ background-color:#fff!important;
+ color:#172a3b!important;
+ -webkit-text-fill-color:#172a3b!important;
+ caret-color:#172a3b!important;
+ border-color:#d7a74e!important;
+ outline:2px solid #d7a74e!important;
+ outline-offset:2px;
+}
+.customerPage .customerAccountForm .field :is(input,textarea,select)::placeholder{
+ color:#596b7b!important;
+ -webkit-text-fill-color:#596b7b!important;
+ opacity:1!important;
+}
+.customerPage .customerAccountForm .field :is(input,textarea,select):disabled{
+ background-color:#e5edf3!important;
+ color:#344a5d!important;
+ -webkit-text-fill-color:#344a5d!important;
+ opacity:1!important;
+ cursor:not-allowed;
+}
+
+/* Chrome/Edge saved form autofill must not hide the text again. */
+.customerPage .customerAccountForm .field :is(input,textarea,select):-webkit-autofill,
+.customerPage .customerAccountForm .field :is(input,textarea,select):-webkit-autofill:hover,
+.customerPage .customerAccountForm .field :is(input,textarea,select):-webkit-autofill:focus{
+ -webkit-text-fill-color:#172a3b!important;
+ caret-color:#172a3b!important;
+ -webkit-box-shadow:0 0 0 1000px #fff inset!important;
+ box-shadow:0 0 0 1000px #fff inset!important;
+}
+.customerPage .customerAccountForm .field :is(input,textarea,select):disabled:-webkit-autofill{
+ -webkit-text-fill-color:#344a5d!important;
+ -webkit-box-shadow:0 0 0 1000px #e5edf3 inset!important;
+ box-shadow:0 0 0 1000px #e5edf3 inset!important;
+}
+
+/* The login/register card intentionally uses DARK inputs. Preserve its
+ * dark visual theme, including autofill and focus, with white text. */
+.customerPage .customerLoginCard .field :is(input,select,textarea){
+ background:#101010!important;
+ color:#f7f7f5!important;
+ -webkit-text-fill-color:#f7f7f5!important;
+ caret-color:#f7f7f5!important;
+ color-scheme:dark!important;
+}
+.customerPage .customerLoginCard .field :is(input,textarea)::placeholder{
+ color:#bec4cb!important;
+ -webkit-text-fill-color:#bec4cb!important;
+ opacity:1!important;
+}
+.customerPage .customerLoginCard .field :is(input,select,textarea):-webkit-autofill,
+.customerPage .customerLoginCard .field :is(input,select,textarea):-webkit-autofill:hover,
+.customerPage .customerLoginCard .field :is(input,select,textarea):-webkit-autofill:focus{
+ -webkit-text-fill-color:#f7f7f5!important;
+ -webkit-box-shadow:0 0 0 1000px #101010 inset!important;
+ box-shadow:0 0 0 1000px #101010 inset!important;
+}
+
+/* Rental checkout also uses dark fields. Keep those matched in all states. */
+.rentalDateFields input,
+.rentalBookingFields :is(input,select,textarea){
+ color:#f7f7f5!important;
+ -webkit-text-fill-color:#f7f7f5!important;
+ caret-color:#f7f7f5!important;
+ color-scheme:dark!important;
+}
+.rentalBookingFields :is(input,select,textarea)::placeholder,
+.rentalDateFields input::placeholder{
+ color:#bfc5cb!important;
+ -webkit-text-fill-color:#bfc5cb!important;
+ opacity:1!important;
+}
+.rentalBookingFields :is(input,select,textarea):-webkit-autofill,
+.rentalDateFields input:-webkit-autofill{
+ -webkit-text-fill-color:#f7f7f5!important;
+ -webkit-box-shadow:0 0 0 1000px #101010 inset!important;
+ box-shadow:0 0 0 1000px #101010 inset!important;
+}
+@media print{
+ :where(input,select,textarea){color-scheme:normal}
+}
