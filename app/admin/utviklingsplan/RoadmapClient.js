@@ -4,6 +4,7 @@ import Link from "next/link";
 import styles from "./roadmap.module.css";
 import {DEVELOPMENT_GROUPS,DEVELOPMENT_STATUSES,DEVELOPMENT_PRIORITIES} from "../../../lib/developmentTasks";
 import {developmentTaskLink,developmentNextTasks} from "../../../lib/developmentTaskLinks";
+import ApprovalQueue from "./ApprovalQueue";
 
 const STATUS_LABELS={todo:"Ikke startet",progress:"Under arbeid",test:"Klar for testing",done:"Ferdig"};
 const PRIORITY_LABELS={high:"Høy",normal:"Normal",low:"Lav"};
@@ -18,6 +19,7 @@ export default function RoadmapClient(){
  const [openGroup,setOpenGroup]=useState("all");
  const [notesDraft,setNotesDraft]=useState({});
  const [adding,setAdding]=useState(false);
+ const [showCatalog,setShowCatalog]=useState(false);
  const [newTask,setNewTask]=useState({title:"",description:"",category:"drawing",priority:"normal"});
  const load=useCallback(async()=>{
   setLoading(true);setError("");
@@ -41,8 +43,22 @@ export default function RoadmapClient(){
    setTasks(current=>current.map(item=>item.id===task.id?data.task:item));
    if(change.notes!==undefined)setNotesDraft(current=>({...current,[task.id]:data.task.notes||""}));
    setMessage("Lagret: "+data.task.title);
-  }catch(e){setError(e.message||"Kunne ikke lagre endringen.");}
+   return true;
+  }catch(e){setError(e.message||"Kunne ikke lagre endringen.");return false;}
   finally{setSavingId("")}
+ }
+ async function approveTask(task){
+  if(task.status!=="test"||savingId)return false;
+  const date=new Intl.DateTimeFormat("nb-NO",{timeZone:"Europe/Oslo",
+   year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+  const addition="\n"+date+": Godkjent av eier via oppgavens sjekkliste etter "+
+   "manuell kontroll av alle kontrollpunkter.";
+  const original=notesDraft[task.id]??task.notes??"";
+  // Preserve prior notes, including earlier test evidence, when making the
+  // final recorded approval. The database limits notes to 3000 characters.
+  const updated=original.length+addition.length<=3000?
+   original+addition:original;
+  return updateTask(task,{status:"done",notes:updated});
  }
  async function createTask(event){
   event.preventDefault();
@@ -80,7 +96,7 @@ export default function RoadmapClient(){
   <div className={styles.shell}>
    <header className={styles.header}>
     <div><Link href="/admin" className={styles.back}>← Tilbake til admin</Link><p className={styles.eyebrow}>AADLAND SERVICE · BACKOFFICE</p><h1>Utviklingsplan</h1><p className={styles.intro}>Her ser du hva som er bygget, hva som gjenstår, og hva vi tester videre. Alle endringer lagres på serveren og følger deg mellom PC og mobil.</p></div>
-    <button className={styles.primary} type="button" onClick={()=>setAdding(current=>!current)}>{adding?"Lukk":"＋ Ny oppgave"}</button>
+    <button className={styles.primary} type="button" onClick={()=>{setAdding(current=>!current);setShowCatalog(true);}}>{adding?"Lukk":"＋ Ny oppgave"}</button>
    </header>
    {error&&<p className={styles.error} role="alert">{error}</p>}
    {message&&<p className={styles.message} role="status">{message}</p>}
@@ -92,6 +108,15 @@ export default function RoadmapClient(){
      <div><b>{stats.done}</b><span>Ferdigstilt</span></div>
     </div>
     <div className={styles.progressLine} role="progressbar" aria-label="Ferdigstilte oppgaver" aria-valuemin={0} aria-valuemax={stats.total||1} aria-valuenow={stats.done}><span style={{width:(stats.total?100*stats.done/stats.total:0)+"%"}}/></div>
+    <ApprovalQueue tasks={tasks} savingId={savingId} onApprove={approveTask}/>
+    <div className={styles.fullPlanToggle}>
+     <button type="button" onClick={()=>setShowCatalog(v=>!v)}
+      aria-expanded={showCatalog}>
+      {showCatalog?"Skjul full utviklingsplan":"Vis alle oppgaver, notater og prioriteringer"}
+     </button>
+     <p>Godkjenningskøen viser én testoppgave om gangen. Resten av planen beholdes her.</p>
+    </div>
+    {showCatalog&&<>
     <section className={styles.nextWork} aria-label="Neste utviklingsoppgaver">
      <div className={styles.nextHeader}>
       <div><h2>Neste punkter å fullføre</h2>
@@ -157,6 +182,7 @@ export default function RoadmapClient(){
        </div>
       </article>)}</div>
     </section>):<p className={styles.empty}>Ingen oppgaver passer filtrene.</p>}
+    </>}
    </>}
   </div>
  </main>;
