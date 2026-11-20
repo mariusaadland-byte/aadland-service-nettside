@@ -66,3 +66,73 @@
 .featureLink{margin-top:9px}
 .task{scroll-margin-top:22px}
 @media(max-width:740px){.nextWork{padding:13px}.nextGrid{grid-template-columns:minmax(0,1fr)}}
+
+/* Owner acceptance queue: show one test at a time, not a wall of tasks. */
+.approvalBoard{
+ margin:22px 0 20px;background:#fff;border:2px solid #9aadb9;
+ border-radius:16px;padding:clamp(15px,3vw,25px);color:#203448
+}
+.approvalHeader{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap}
+.approvalHeader h2{font-size:clamp(19px,2.2vw,25px);margin:4px 0 7px;line-height:1.25;color:#1d3346}
+.approvalHeader p:not(.approvalEyebrow){font-size:14px;line-height:1.5;margin:0;max-width:690px;color:#435566}
+.approvalEyebrow{font-size:11px;margin:0;font-weight:900;letter-spacing:.14em;color:#36566e}
+.approvalCount{display:flex;flex-direction:column;align-items:center;justify-content:center;
+ min-width:112px;background:#e9f1f8;border:1px solid #b3c8da;border-radius:12px;padding:10px 16px}
+.approvalCount strong{font-size:29px;line-height:1.1;font-variant-numeric:tabular-nums}
+.approvalCount span{font-size:11px;color:#375268;font-weight:800}
+.approvalBuckets{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0}
+.approvalBuckets span{font-size:12px;background:#f1f4f7;border:1px solid #ccd7e2;
+ padding:7px 10px;border-radius:9px;color:#2b4052}
+.approvalBuckets strong{font-variant-numeric:tabular-nums}
+.approvalMain{background:#f9fbfc;border:1px solid #d4dfe8;border-radius:12px;
+ padding:clamp(14px,2vw,20px);display:grid;gap:12px}
+.approvalTaskTop{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;
+ color:#456078;font-size:12px;font-weight:850}
+.approvalMain h3{font-size:clamp(17px,2vw,21px);line-height:1.35;margin:0;color:#18364d}
+.approvalDesc{font-size:14px;line-height:1.55;margin:0;color:#354e61}
+.approvalDependency{font-size:13px;margin:0;padding:11px;border-radius:8px;
+ color:#5a3611;background:#fff1d8;border:1px solid #d6b987;line-height:1.5}
+.approvalSteps{display:grid;gap:2px}
+.approvalStepHead{display:flex;justify-content:space-between;align-items:center;gap:9px;
+ font-size:13px;padding:7px 0;color:#283f53}
+.approvalStepHead span{color:#385974;font-size:12px;font-weight:800}
+.approvalStep{display:flex;align-items:flex-start;gap:12px;
+ padding:11px 10px;background:#fff;border:1px solid #e0e8ee;border-radius:9px;
+ line-height:1.5;font-size:14px;font-weight:650;color:#21394d;cursor:pointer}
+.approvalStep input{flex-shrink:0;width:20px;height:20px;margin:2px 0 0;accent-color:#286346}
+.approvalActions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.approvalActions a,.approvalActions button{
+ font:inherit;display:inline-flex;align-items:center;justify-content:center;
+ border-radius:9px;border:1.5px solid #69849c;
+ padding:10px 13px;min-height:43px;font-size:13px;font-weight:850;cursor:pointer;
+ text-decoration:none
+}
+.approvalOpen{color:#fff!important;background:#294f6c!important;border-color:#294f6c!important}
+.approvalSkip{background:#e8f0f6;color:#193e5c}
+.approvalDone{background:#286345;color:#fff;border-color:#286345!important}
+.approvalDone:disabled{background:#dde7df!important;color:#385743!important;
+ border-color:#8aa994!important;cursor:not-allowed}
+.approvalFooter{font-size:12px;color:#475969;line-height:1.5;margin:0}
+.approvalEmpty{color:#23583d;font-size:14px;font-weight:750}
+.approvalQueueList{display:grid;gap:9px;margin-top:12px}
+.approvalListToggle,.fullPlanToggle button{border:1.5px solid #7790a5;
+ background:#e8f0f8;color:#1c3b53;padding:10px 13px;border-radius:9px;
+ font-weight:850;font-size:13px;cursor:pointer;justify-self:start}
+.approvalAllItems{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.approvalListItem{border:1px solid #ccd9e4;border-radius:9px;background:#fff;
+ color:#253e52;display:flex;justify-content:space-between;gap:8px;
+ text-align:left;padding:11px 12px;line-height:1.35;cursor:pointer}
+.approvalListItem[aria-current="step"]{border:2px solid #386a8e;background:#eaf3fa}
+.approvalListItem span{font-size:13px;font-weight:750}
+.approvalListItem small{color:#485f73;white-space:normal;text-align:right;font-size:11px}
+.fullPlanToggle{padding:12px 0 18px;display:flex;align-items:center;flex-wrap:wrap;gap:12px}
+.fullPlanToggle p{font-size:12px;color:#605548;margin:0}
+@media(max-width:740px){
+ .approvalBoard{padding:14px}
+ .approvalHeader{align-items:stretch}
+ .approvalCount{flex-direction:row;gap:7px;min-width:0}
+ .approvalCount strong{font-size:23px}
+ .approvalAllItems{grid-template-columns:minmax(0,1fr)}
+ .approvalListItem{flex-wrap:wrap}
+ .approvalActions>*{flex:1 1 100%}
+}
