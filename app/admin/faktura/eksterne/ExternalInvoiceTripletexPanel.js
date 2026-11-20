@@ -33,6 +33,7 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
  const [directLoading,setDirectLoading]=useState(true);
  const [paymentTypeId,setPaymentTypeId]=useState("");
  const [paymentSourceConfirmed,setPaymentSourceConfirmed]=useState(false);
+ const [accountingPeriodConfirmed,setAccountingPeriodConfirmed]=useState(false);
  const url="/api/admin/invoices/external-register/tripletex";
  const directUrl=url+"/direct";
  const refreshDirect=async()=>{
@@ -198,7 +199,8 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
     method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
      action:"transfer-direct",id:invoice.id,confirmed:true,
-     notBookedElsewhere:notImported,verifiedPaymentSource:paid?paymentSourceConfirmed:true,
+     notBookedElsewhere:notImported,
+     accountingPeriodConfirmed,verifiedPaymentSource:paid?paymentSourceConfirmed:true,
      paymentTypeId:selectedType,vatRate,baseAmount:base,importNumber:number,
      vatConfirmed:confirmed,notImportedConfirmed:notImported,
      correctCustomerConfirmed:customerConfirmed
@@ -405,13 +407,20 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
       konto, og at den ikke allerede er bokført eller matchet i Tripletex.
      </label>
     </>}
+    <label style={{display:"flex",gap:9,alignItems:"start"}}>
+     <input type="checkbox" checked={accountingPeriodConfirmed}
+      onChange={e=>setAccountingPeriodConfirmed(e.target.checked)}/>
+     Jeg har kontrollert at dette salget ikke allerede er bokført i et annet
+     regnskap og at direkteoverføringen ikke gir dobbel omsetning eller MVA.
+    </label>
     {directLoading&&<p role="status">Kontrollerer betalingstyper i Tripletex …</p>}
     {direct?.configured===false&&<p role="alert">
      Koble til Tripletex-produksjon før automatisk overføring.</p>}
     <button type="button" className="externalTripletexPrimaryButton"
      style={buttons}
      disabled={busy||directLoading||!direct?.configured||
-      !confirmed||!customerConfirmed||!notImported||!importAmountsMatch||
+      !confirmed||!customerConfirmed||!notImported||
+      !accountingPeriodConfirmed||!importAmountsMatch||
       !number||customerStatus!=="linked_to_tripletex"||readerStatus==="reading"||
       (paid&&(!invoice.paid_on||!paymentTypeId||!paymentSourceConfirmed))}
      onClick={transferDirect}>
