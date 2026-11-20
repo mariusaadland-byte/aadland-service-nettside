@@ -2,6 +2,7 @@
 import Link from "next/link";
 import {useEffect,useState} from "react";
 import {osloDateKey} from "../../../../lib/osloTime";
+import ExternalInvoiceTripletexPanel from "./ExternalInvoiceTripletexPanel";
 
 const money=ore=>new Intl.NumberFormat("nb-NO",{
  style:"currency",currency:"NOK"}).format(Number(ore||0)/100);
@@ -24,6 +25,7 @@ export default function ExternalInvoiceRegisterClient(){
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
  const [filter,setFilter]=useState("unpaid"),[search,setSearch]=useState("");
  const [paymentId,setPaymentId]=useState("");
+ const [tripletexId,setTripletexId]=useState("");
  const [paidOn,setPaidOn]=useState(()=>osloDateKey(new Date()));
  const [paymentNote,setPaymentNote]=useState("");
  const [expanded,setExpanded]=useState(false);
@@ -42,6 +44,10 @@ export default function ExternalInvoiceRegisterClient(){
   (async()=>{try{await load(0);}catch(e){if(live)setError(e.message); }
    finally{if(live)setLoading(false);}})();
   return()=>{live=false};
+ },[]);
+ useEffect(()=>{
+  const requested=new URLSearchParams(window.location.search).get("id");
+  if(requested){setFilter("all");setTripletexId(requested);}
  },[]);
  async function upload(event){
   event.preventDefault();
@@ -186,7 +192,7 @@ export default function ExternalInvoiceRegisterClient(){
    {!loading&&visible.length===0&&<p style={muted}>
     Ingen fakturaer i dette utvalget.</p>}
    <div style={{display:"grid",gap:10,marginTop:15}}>
-    {visible.map(x=><article key={x.id} style={{
+    {visible.map(x=><article key={x.id} id={"external-invoice-"+x.id} style={{
      ...box,padding:14,background:"#fffdfa",minWidth:0
     }}>
      <div style={{display:"flex",gap:12,justifyContent:"space-between",flexWrap:"wrap"}}>
@@ -211,12 +217,18 @@ export default function ExternalInvoiceRegisterClient(){
       <a href={"/api/admin/invoices/external-register?download=1&id="+
        encodeURIComponent(x.id)} style={{padding:"10px 0",fontWeight:700}}>
        Last ned original ({x.original_filename})</a>
+      <button type="button" disabled={busy}
+       onClick={()=>setTripletexId(v=>v===x.id?"":x.id)}
+       style={btn}>{tripletexId===x.id?"Skjul Tripletex-import":
+       "Overfør til Tripletex"}</button>
       {x.status==="unpaid"&&<button type="button" disabled={busy}
        onClick={()=>{
         setPaymentId(v=>v===x.id?"":x.id);
         setPaidOn(osloDateKey(new Date()));setPaymentNote("");
        }} style={btn}>{paymentId===x.id?"Lukk betaling":"Merk som betalt"}</button>}
      </div>
+     {tripletexId===x.id&&<ExternalInvoiceTripletexPanel invoice={x}
+      onChanged={async()=>{try{await load(0)}catch(e){setError(e.message)}}}/>}
      {x.status==="unpaid"&&paymentId===x.id&&<div style={{borderTop:"1px solid #ddd",
       marginTop:11,paddingTop:12,display:"grid",gap:10}}>
       <p style={{...muted,margin:0}}>Merk bare fakturaen betalt når hele beløpet
