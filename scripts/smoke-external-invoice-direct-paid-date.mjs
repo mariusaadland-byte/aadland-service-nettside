@@ -88,7 +88,7 @@ assert.ok(!api.includes("sendToCustomer=true"));
 const writeWrapper=read("lib/tripletexApi.js");
 assert.ok(writeWrapper.includes('"/invoice?sendToCustomer=false"'));
 assert.ok(writeWrapper.includes('"/invoice/"+invoiceId+"/:payment?paymentDate="+paymentDate+'));
-assert.ok(writeWrapper.includes("&paymentTypeId="+typeId+"&paidAmount="+amount"));
+assert.ok(writeWrapper.includes('&paymentTypeId="+typeId+"&paidAmount="+amount'));
 const status=read("app/api/admin/invoices/external-register/tripletex/route.js");
 assert.ok(status.includes("paymentDate:claim.payment_date"));
 assert.ok(status.includes("transferMethod:claim.transfer_method"));
