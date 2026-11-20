@@ -3,6 +3,7 @@ import Link from "next/link";
 import {useEffect,useState} from "react";
 import {osloDateKey} from "../../../../lib/osloTime";
 import ExternalInvoiceTripletexPanel from "./ExternalInvoiceTripletexPanel";
+import InvoiceCustomerCardButton from "../InvoiceCustomerCardButton";
 
 const money=ore=>new Intl.NumberFormat("nb-NO",{
  style:"currency",currency:"NOK"}).format(Number(ore||0)/100);
@@ -217,6 +218,8 @@ export default function ExternalInvoiceRegisterClient(){
       <a href={"/api/admin/invoices/external-register?download=1&id="+
        encodeURIComponent(x.id)} style={{padding:"10px 0",fontWeight:700}}>
        Last ned original ({x.original_filename})</a>
+      <InvoiceCustomerCardButton invoiceKind="external" invoiceId={x.id}
+       caption="Kundekort – velg eller opprett"/>
       <button type="button" disabled={busy}
        onClick={()=>setTripletexId(v=>v===x.id?"":x.id)}
        style={btn}>{tripletexId===x.id?"Skjul Tripletex-import":
