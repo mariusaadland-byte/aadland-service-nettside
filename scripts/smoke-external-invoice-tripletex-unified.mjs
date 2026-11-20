@@ -71,7 +71,7 @@ assert.ok(route.includes("checkedRemoteList(session,connection.environment,invoi
 assert.ok(route.includes("snapshot_contact_id:customer.contactId"));
 assert.ok(route.includes("tripletex_customer_number:customer.tripletexCustomerNumber"));
 assert.ok(route.includes("Number(found[0]?.customer?.id)!==Number(claim.tripletex_customer_id)"));
-assert.ok(route.includes('customerStatus="linked_to_tripletex"')===false);
+assert.ok(route.includes('customerStatus="linked_to_tripletex"'));
 const native=read("app/admin/faktura/InvoicesClient.js");
 assert.ok(native.includes("<CombinedInvoiceOverview nativeInvoices={items}/>"));
 const combined=read("app/admin/faktura/CombinedInvoiceOverview.js");
