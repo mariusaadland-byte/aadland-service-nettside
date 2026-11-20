@@ -40,7 +40,7 @@ for(const phrase of [
  "vercel.com/dashboard",
  "Webhook-ID",
  "Riktig salgssted (MSN)",
- "Depositum",
+ "depositum",
  "callback/webhook",
  "Kontroller koblingen til Vipps",
  "Test oppsett uten betaling",
