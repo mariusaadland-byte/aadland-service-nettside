@@ -370,23 +370,94 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
    <label><input type="checkbox" checked={notImported}
     onChange={e=>setNotImported(e.target.checked)}/>
     Fakturaen er ikke allerede importert eller bokført i Tripletex.</label>
-   <button type="button" disabled={busy||!confirmed||!customerConfirmed||
-    !notImported||!importAmountsMatch||!number||
-    customerStatus!=="linked_to_tripletex"||readerStatus==="reading"} onClick={prepare}
-    className="externalTripletexPrimaryButton"
-    style={buttons}>{busy?"Kontrollerer …":"Klargjør Tripletex-import"}</button>
+   <div style={{border:"2px solid #2b5474",borderRadius:10,padding:14,
+    background:"#f0f6fc",display:"grid",gap:11}}>
+    <strong style={{fontSize:18}}>Direkte overføring til Tripletex</strong>
+    <p style={{fontSize:14,margin:0}}>Opprett fakturaen direkte i Tripletex uten CSV.
+     Originalfakturaen sendes ikke til kunden igjen. Tripletex tildeler eget
+     fakturanummer, og det gamle nummeret lagres som referanse.</p>
+    {paid&&<>
+     <div style={{padding:11,border:"1px solid #9aabba",borderRadius:8,
+      background:"#fff",display:"grid",gap:6}}>
+      <strong>Betaling hentes automatisk fra Aadland Service</strong>
+      <div>Registrert betalingsdato: <strong>{invoice.paid_on||"Mangler"}</strong></div>
+      <div>Registrert innbetaling: <strong>{kr(Number(invoice.amount_ore))}</strong></div>
+      <small>Dato og beløp kan ikke overstyres her. Hvis de er feil,
+       må du korrigere registreringen på nettsiden før overføring.</small>
+     </div>
+     <label style={label}>Betalingsmåte / riktig bankkonto i Tripletex
+      <select value={paymentTypeId}
+       onChange={e=>{setPaymentTypeId(e.target.value);setPaymentSourceConfirmed(false);}}
+       disabled={busy||directLoading}>
+       <option value="">Velg betalingsmåte i Tripletex</option>
+       {(direct?.paymentTypes||[]).map(type=>
+        <option key={type.id} value={String(type.id)}>
+         {type.name}{type.account?" · konto "+type.account:""}
+        </option>)}
+      </select>
+     </label>
+     {direct?.paymentTypesError&&<p role="alert" style={{color:"#9b3027",margin:0}}>
+      {direct.paymentTypesError}</p>}
+     <label style={{display:"flex",gap:9,alignItems:"start"}}>
+      <input type="checkbox" checked={paymentSourceConfirmed}
+       onChange={e=>setPaymentSourceConfirmed(e.target.checked)}/>
+      Jeg har kontrollert at denne betalingen faktisk er mottatt på riktig
+      konto, og at den ikke allerede er bokført eller matchet i Tripletex.
+     </label>
+    </>}
+    {directLoading&&<p role="status">Kontrollerer betalingstyper i Tripletex …</p>}
+    {direct?.configured===false&&<p role="alert">
+     Koble til Tripletex-produksjon før automatisk overføring.</p>}
+    <button type="button" className="externalTripletexPrimaryButton"
+     style={buttons}
+     disabled={busy||directLoading||!direct?.configured||
+      !confirmed||!customerConfirmed||!notImported||!importAmountsMatch||
+      !number||customerStatus!=="linked_to_tripletex"||readerStatus==="reading"||
+      (paid&&(!invoice.paid_on||!paymentTypeId||!paymentSourceConfirmed))}
+     onClick={transferDirect}>
+     {busy?"Overfører og kontrollerer …":
+      paid?"Overfør faktura + registrer lagret betaling automatisk":
+      "Overfør faktura automatisk til Tripletex"}
+    </button>
+    <small>Dette oppretter fakturaen i regnskapet og registrerer eventuell
+     eksisterende innbetaling med historisk dato. En uavklart API-respons
+     sperrer ny automatisk overføring for å forhindre dobbeltføring.</small>
+   </div>
+   <details style={{border:"1px solid #a4b4c2",borderRadius:9,padding:12}}>
+    <summary style={{cursor:"pointer",fontWeight:700}}>Alternativ: manuell CSV-import</summary>
+    <p style={{fontSize:13}}>Bruk dette bare hvis du vil beholde den manuelle
+     Tripletex-fakturaimporten. Betaling med original dato blir ikke automatisk
+     bokført via CSV.</p>
+    <button type="button" disabled={busy||!confirmed||!customerConfirmed||
+     !notImported||!importAmountsMatch||!number||
+     customerStatus!=="linked_to_tripletex"||readerStatus==="reading"} onClick={prepare}
+     style={buttons}>{busy?"Kontrollerer …":"Klargjør CSV-import"}</button>
+   </details>
   </>}
   {record&&<>
    <p style={{margin:0}}>
-    <strong>Tripletex-importnummer: {record.importNumber}</strong>
-    {" · "}{record.status==="prepared"?"Klargjort – IKKE importert":
-     record.status==="confirmed"?"Bekreftet importert":"Må kontrolleres"}
+    <strong>{record.transferMethod==="api"?
+     "Tripletex fakturanummer: "+(record.tripletexInvoiceNumber||"under kontroll"):
+     "Tripletex-importnummer: "+record.importNumber}</strong>
+    {" · "}{record.status==="prepared"?"CSV klargjort – IKKE importert":
+     record.status==="confirmed"?"Bekreftet registrert i Tripletex":
+     record.status==="processing"?"Overføring pågår – ikke send på nytt":
+     "Må kontrolleres i Tripletex – ikke send på nytt"}
    </p>
    <p style={{fontSize:13,margin:0}}>
     Kontrollert grunnlag {kr(Number(record.baseOre))} + MVA
     {" "}{kr(Number(record.vatOre))} = {kr(Number(invoice.amount_ore))}.
    </p>
-   {record.status==="prepared"&&<>
+   {record.transferMethod==="api"&&<p role="status" style={{
+    padding:12,border:"1px solid #bdcdd8",borderRadius:8,
+    background:"#f2f6fa"}}>
+    {record.paymentStatus==="confirmed"?
+      "Betalingen er registrert i Tripletex med dato "+record.paymentDate+" og fullt beløp.":
+     record.paymentStatus==="not_applicable"?
+      "Denne fakturaen ble registrert som ubetalt i Tripletex.":
+      "Betalingen er ikke bekreftet i Tripletex og må kontrolleres manuelt. Ikke registrer den på nytt før du har kontrollert hovedbok og bank."}
+   </p>}
+   {record.transferMethod!=="api"&&record.status==="prepared"&&<>
     <a href={url+"?id="+encodeURIComponent(invoice.id)+"&format=csv"}
      download style={{fontWeight:700}}>
      Last ned Tripletex-importfil (CSV)
@@ -406,10 +477,9 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
      {busy?"Kontrollerer Tripletex …":"Kontroller og bekreft importen i Tripletex"}
     </button>
    </>}
-   {record.status==="confirmed"&&<p role="status">
-    Fakturaen er funnet med riktig nummer, dato og beløp i Tripletex.
-    Kundetilknytningen er bekreftet på riktig Tripletex-kunde. Betalingspostering,
-    faktisk dato og bankavstemming må fortsatt kontrolleres separat.
+   {record.status==="confirmed"&&record.transferMethod!=="api"&&<p role="status">
+    CSV-fakturaen er funnet med riktig dato, beløp og kunde i Tripletex.
+    Betaling med original dato er ikke registrert automatisk for CSV-import.
    </p>}
   </>}
  </section>;
