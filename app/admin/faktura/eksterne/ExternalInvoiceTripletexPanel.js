@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from "react";
 import {readExternalInvoiceAmountFromOriginal} from "../../../../lib/externalInvoiceDocumentReader";
 import {parseExternalInvoiceOre} from "../../../../lib/externalInvoiceRegister";
+import {splitExternalInvoiceGrossByRate} from "../../../../lib/externalInvoiceVatMath";
 const kr=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(n/100);
 const box={padding:"clamp(14px,2.5vw,22px)",border:"2px solid #9baebd",borderRadius:12,marginTop:10,
  background:"#fff",color:"#192b3b",display:"grid",gap:14};
@@ -118,13 +119,14 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
  }
  function calculateFromStoredTotal(selectedRate=vatRate){
   const rate=Number(selectedRate),total=Number(invoice.amount_ore);
-  if(![12,15,25].includes(rate)||!Number.isSafeInteger(total)||total<=0)return;
-  const net=Math.round(total*100/(100+rate));
-  const tax=Math.round(net*rate/100);
-  if(net<=0||net+tax!==total){
+  const calculated=splitExternalInvoiceGrossByRate(total,rate);
+  if(!calculated){
+   setReaderStatus("manual");
+   setBase("");
    setReaderMessage("Totalbeløpet kan ikke fordeles nøyaktig på valgt MVA-sats. Kontroller manuelt.");
    return;
   }
+  const net=calculated.baseOre,tax=calculated.vatOre;
   userChanged.current=true;
   setBase((net/100).toFixed(2).replace(".",","));
   setDetectedVatOre(tax);setReaderSource("");
