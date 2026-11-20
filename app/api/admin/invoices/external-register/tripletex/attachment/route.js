@@ -20,7 +20,7 @@ const validUuid=id=>typeof id==="string"&&
  /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(id);
 const positive=n=>Number.isSafeInteger(Number(n))&&Number(n)>0?Number(n):null;
 const invoiceFields="id,invoice_number,customer_name,issued_on,amount_ore,sha256,storage_path,original_filename,mime_type,file_size";
-const importFields="status,tripletex_invoice_id,tripletex_invoice_number,tripletex_customer_id,snapshot_gross_ore,snapshot_sha256";
+const importFields="status,transfer_method,import_number,tripletex_invoice_id,tripletex_invoice_number,tripletex_customer_id,snapshot_gross_ore,snapshot_sha256";
 const attachmentFields="external_invoice_id,tripletex_invoice_id,voucher_id,original_sha256,status,confirmed_at";
 async function load(s,id){
  const [invoice,imported,attachment]=await Promise.all([
@@ -35,7 +35,7 @@ async function load(s,id){
 function validateLocal(invoice,imported){
  if(!invoice||!imported||imported.status!=="confirmed"||
   !positive(imported.tripletex_invoice_id)||
-  !positive(imported.tripletex_invoice_number)||
+  !(positive(imported.tripletex_invoice_number)||positive(imported.import_number))||
   !positive(imported.tripletex_customer_id)||
   invoice.sha256!==imported.snapshot_sha256||
   Number(invoice.amount_ore)!==Number(imported.snapshot_gross_ore))
@@ -49,7 +49,7 @@ function validateLocal(invoice,imported){
 function verifyRemoteInvoice(value,invoice,imported){
  const invoiceId=validateLocal(invoice,imported);
  if(positive(value?.id)!==invoiceId||
-  positive(value?.invoiceNumber)!==positive(imported.tripletex_invoice_number)||
+  positive(value?.invoiceNumber)!==(positive(imported.tripletex_invoice_number)||positive(imported.import_number))||
   positive(value?.customer?.id)!==positive(imported.tripletex_customer_id)||
   String(value?.invoiceDate||"").slice(0,10)!==invoice.issued_on||
   nokToOre(value?.amount)!==Number(invoice.amount_ore)||
