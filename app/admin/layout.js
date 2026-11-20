@@ -1,4 +1,5 @@
 import "./adminContrast.css";
+import "./tilbud/quoteEditorResponsive.css";
 export const metadata={
  robots:{index:false,follow:false},
  title:{default:"Aadland Admin",template:"%s | Aadland Admin"},
