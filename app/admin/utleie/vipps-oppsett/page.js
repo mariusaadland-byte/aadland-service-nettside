@@ -1,5 +1,4 @@
 import {redirect} from "next/navigation";
-import Link from "next/link";
 import {getAdminUser} from "../../../../lib/auth";
 import RentalVippsSetupClient from "./RentalVippsSetupClient";
 
