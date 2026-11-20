@@ -76,6 +76,53 @@ assert.equal(previous.total.issuedCount,1);
 assert.equal(previous.total.recordedPaymentsThisYearOre,0);
 assert.equal(previous.total.transfersTotal,2,"Tripletex status must be visible across years");
 assert.throws(()=>buildAccountingOverview(fixtures,1999,"2026-11-18"),/Ugyldig/);
+const externalInvoices=[
+ {id:"e1",source_system:"Conta",invoice_number:"CONTA-501",
+  customer_name:"Ekstern kunde 1",issued_on:"2026-09-10",due_on:"2026-09-24",
+  amount_ore:125000,status:"unpaid",paid_on:null},
+ {id:"e2",source_system:"Tripletex",invoice_number:"TRIP-502",
+  customer_name:"Ekstern kunde 2",issued_on:"2026-10-12",due_on:"2026-10-31",
+  amount_ore:250000,status:"paid",paid_on:"2026-11-15"},
+ {id:"e3",source_system:"Conta",invoice_number:"CONTA-2025-9",
+  customer_name:"Eldre ekstern kunde",issued_on:"2025-12-15",due_on:"2026-01-15",
+  amount_ore:100000,status:"paid",paid_on:"2026-01-03"}
+];
+const externalImports=[
+ {external_invoice_id:"e1",status:"prepared",import_number:90000000},
+ {external_invoice_id:"e2",status:"confirmed",import_number:90000001}
+];
+const integrated=buildAccountingOverview({...fixtures,externalInvoices,externalImports},
+ 2026,"2026-11-18");
+assert.equal(integrated.total.issuedCount,4,"native and external both counted");
+assert.equal(integrated.total.externalIssuedCount,2);
+assert.equal(integrated.total.invoicedGrossOre,412500);
+assert.equal(integrated.total.outstandingOre,137500);
+assert.equal(integrated.total.recordedPaidOnInvoicesOre,275000);
+assert.equal(integrated.total.recordedPaymentsThisYearOre,387500,
+ "Payments made this year include prior-year native and external invoices");
+assert.equal(integrated.total.externalPaymentsThisYearOre,350000);
+assert.equal(integrated.total.outputVatOre,7500,
+ "Unverified external invoice VAT must not be invented or counted");
+assert.equal(integrated.total.externalVatUnverifiedCount,2);
+assert.equal(integrated.sales.filter(x=>x.source==="external").length,2);
+assert.equal(integrated.sales.find(x=>x.externalId==="e1").tripletexStatus,"prepared");
+assert.equal(integrated.sales.find(x=>x.externalId==="e2").tripletexStatus,"confirmed");
+assert.ok(integrated.ledger.some(x=>x.kind.includes("Ekstern kundefaktura")&&
+ x.ref.includes("CONTA-501")&&x.salesOre===125000&&x.vatOre===0));
+assert.ok(integrated.ledger.some(x=>x.kind.includes("ekstern faktura")&&
+ x.date==="2026-01-03"&&x.receivedOre===100000&&x.salesOre===0));
+assert.equal(integrated.ledger.filter(x=>x.key==="external-sale-e2").length,1);
+assert.equal(integrated.ledger.filter(x=>x.key==="external-payment-external:e2").length,1);
+assert.ok(accountingOverviewCsv(integrated.ledger).includes("CONTA-501"));
+assert.throws(()=>buildAccountingOverview({...fixtures,externalInvoices:[
+ externalInvoices[0],externalInvoices[0]]},2026,"2026-11-18"),/manglende/);
+assert.throws(()=>buildAccountingOverview({...fixtures,externalInvoices:[
+ {...externalInvoices[0],status:"paid",paid_on:null}]},2026,"2026-11-18"),/manglende/);
+const priorIntegrated=buildAccountingOverview({...fixtures,externalInvoices,externalImports},
+ 2025,"2026-11-18");
+assert.equal(priorIntegrated.total.externalIssuedCount,1);
+assert.equal(priorIntegrated.total.externalPaymentsThisYearOre,0,
+ "External payment belongs to payment year, not necessarily invoice year");
 
 const admin=read("app/admin/AdminClient.js");
 for(const x of ['title:"Regnskap"','accountPaid','accountUnpaid','accountExpenses','accountVat',
@@ -92,11 +139,16 @@ for(const label of ["Betalte fakturaer","Ubetalte fakturaer","Utgifter","Regnska
  assert.ok(view.includes(label),"Missing accounting view "+label);
 }
 assert.ok(view.includes("Last ned regnskapsark"));
+assert.ok(view.includes("Eksterne fakturaer"));
+assert.ok(view.includes('x.source==="external"'));
+assert.ok(view.includes("MVA krever egen kontroll"));
 assert.ok(view.includes('href="/admin/faktura/mva/tripletex"')||
  view.includes('link("/admin/faktura/mva/tripletex"'));
 const routeSrc=read("app/api/admin/regnskap/route.js");
 assert.ok(routeSrc.includes('user?.role!=="owner"'));
 assert.ok(routeSrc.includes('format==="csv"'));
+assert.ok(routeSrc.includes('"external_customer_invoices"'));
+assert.ok(routeSrc.includes('"external_invoice_tripletex_imports"'));
 assert.ok(!routeSrc.includes(".update(")&&!routeSrc.includes(".insert("),"Read-only financial data");
 const clean=routeSrc.replace(/^import .*;\n/gm,"").replace(/^export const .*;\n/gm,"")
  .replace(/^export async function /gm,"async function ");
@@ -104,7 +156,8 @@ const NextResponse=class extends Response {static json(value,init={}){return Res
 let role="owner",broken=false;
 const sourceTables={invoice_drafts:invoices,vat_purchase_documents:purchases,
  invoice_payments:payments,vat_tripletex_receipt_transfers:transfers,
- vat_purchase_document_files:files};
+ vat_purchase_document_files:files,external_customer_invoices:externalInvoices,
+ external_invoice_tripletex_imports:externalImports};
 const db=()=>({from:table=>{
  let eqs=[],from=0,to=249;
  const q={
@@ -126,12 +179,18 @@ const request=part=>new Request("https://example.invalid/api/admin/regnskap"+par
 let response=await GET(request("?year=2026"));
 assert.equal(response.status,200);
 let payload=await response.json();
-assert.equal(payload.total.issuedCount,2);
-assert.equal(payload.total.recordedPaymentsThisYearOre,37500);
+assert.equal(payload.total.issuedCount,4);
+assert.equal(payload.total.externalIssuedCount,2);
+assert.equal(payload.total.recordedPaymentsThisYearOre,387500);
+assert.equal(payload.total.outputVatOre,7500);
+assert.ok(payload.sales.some(x=>x.externalId==="e1"&&x.tripletexStatus==="prepared"));
 assert.ok(!JSON.stringify(payload).includes("vipps_reference"),"Do not expose raw Vipps tokens");
 response=await GET(request("?year=2026&format=csv"));
 assert.equal(response.status,200);assert.match(response.headers.get("content-type"),/csv/);
-assert.match(await response.text(),/FA-2026-1/);
+const exportedLedger=await response.text();
+assert.match(exportedLedger,/FA-2026-1/);
+assert.match(exportedLedger,/CONTA-501/);
+assert.match(exportedLedger,/Innbetaling – ekstern faktura/);
 role="staff";response=await GET(request(""));assert.equal(response.status,403);
 role="owner";response=await GET(request("?year=1000"));assert.equal(response.status,400);
 broken=true;response=await GET(request(""));assert.equal(response.status,503);
