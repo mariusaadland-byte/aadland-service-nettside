@@ -56,6 +56,10 @@ async function verifiedCustomer(s,invoice,session,environment){
   .select("id,name").eq("id",contactId).maybeSingle();
  if(card.error||!card.data||normalized(card.data.name)!==normalized(remote.name))
   throw Error("Kundenavn i Tripletex avviker fra kundekortet. Kontroller og oppdater kundeopplysningene før import.");
+ // CUSTOMER NO in CSV can update an existing customer in Tripletex. Never
+ // overwrite a master customer name from an unverified external PDF summary.
+ if(normalized(invoice.customer_name)!==normalized(remote.name))
+  throw Error("Kundenavnet på originalfakturaen og Tripletex-kundekortet er forskjellig. Kontroller riktig kunde før import; CSV kan ellers endre eksisterende kunde.");
  return {contactId,tripletexCustomerId:Number(remote.id),
   tripletexCustomerNumber:Number(remote.customerNumber),
   customerName:String(invoice.customer_name||"").trim()};
