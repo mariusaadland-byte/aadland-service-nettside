@@ -70,6 +70,8 @@ assert.ok(route.includes("verifiedCustomer(s,invoice,session,connection.environm
 assert.ok(route.includes("checkedRemoteList(session,connection.environment,invoice.issued_on)"));
 assert.ok(route.includes("snapshot_contact_id:customer.contactId"));
 assert.ok(route.includes("tripletex_customer_number:customer.tripletexCustomerNumber"));
+assert.ok(route.includes("normalized(invoice.customer_name)!==normalized(remote.name)"),
+ "An imported invoice must not rename another Tripletex customer");
 assert.ok(route.includes("Number(found[0]?.customer?.id)!==Number(claim.tripletex_customer_id)"));
 assert.ok(route.includes('customerStatus="linked_to_tripletex"'));
 const native=read("app/admin/faktura/InvoicesClient.js");
