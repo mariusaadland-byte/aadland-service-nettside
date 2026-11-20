@@ -18,7 +18,52 @@ const json=(body,status=200)=>NextResponse.json(body,{status,headers});
 const uuid=x=>typeof x==="string"&&
  /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(x);
 const positive=x=>Number.isSafeInteger(Number(x))&&Number(x)>0;
-const cols="external_invoice_id,import_number,status,vat_rate,base_ore,vat_ore,snapshot_gross_ore,snapshot_sha256,snapshot_paid,payment_type_import_id,prepared_at,confirmed_at,tripletex_invoice_id";
+const cols="external_invoice_id,import_number,status,vat_rate,base_ore,vat_ore,snapshot_gross_ore,snapshot_sha256,snapshot_paid,payment_type_import_id,prepared_at,confirmed_at,tripletex_invoice_id,snapshot_contact_id,tripletex_customer_id,tripletex_customer_number,snapshot_customer_name";
+const normalized=x=>String(x||"").trim().replace(/\\s+/g," ").toLocaleLowerCase("nb-NO");
+async function checkedRemoteList(session,environment,date){
+ const next=nextInvoiceDate(date);
+ if(!next)throw Error("Ugyldig fakturadato.");
+ const remote=await tripletexRead("/invoice?invoiceDateFrom="+date+
+  "&invoiceDateTo="+next+"&count=1000&fields=id,invoiceNumber,invoiceDate,amount,amountOutstanding,customer,isCreditNote,isCredited",
+  session,environment);
+ if(!Array.isArray(remote?.values)||remote.values.length>=1000||
+  (Number.isFinite(Number(remote?.fullResultSize))&&
+   Number(remote.fullResultSize)>remote.values.length))
+  throw Error("Tripletex returnerte en ufullstendig fakturaliste. Ingen import bekreftes.");
+ return remote.values;
+}
+async function verifiedCustomer(s,invoice,session,environment){
+ const [linkResult,connectionResult]=await Promise.all([
+  s.from("invoice_customer_card_links").select("contact_id")
+   .eq("invoice_kind","external").eq("invoice_id",invoice.id).maybeSingle(),
+  s.from("tripletex_customer_links")
+   .select("source_id,status,tripletex_customer_id").eq("source_type","contact")
+   .eq("environment",environment).eq("status","linked").limit(5001)
+ ]);
+ if(linkResult.error||connectionResult.error)throw Error("Kundekortkoblingene kunne ikke kontrolleres.");
+ const contactId=linkResult.data?.contact_id;
+ if(!contactId)return null;
+ // A small owner-only customer mapping is enough; never silently use another
+ // contact's remote ID for an issued invoice.
+ const links=connectionResult.data||[];
+ if(links.length>=5001)throw Error("Kundelisten er for omfattende for en sikker kontroll.");
+ const local=links.find(x=>x.source_id===contactId);
+ if(!local||!positive(local.tripletex_customer_id))return null;
+ const response=await tripletexRead("/customer/"+Number(local.tripletex_customer_id),
+  session,environment);
+ const remote=response?.value;
+ if(Number(remote?.id)!==Number(local.tripletex_customer_id)||
+  !positive(remote.customerNumber)||
+  typeof remote.name!=="string"||!remote.name.trim())
+  throw Error("Tripletex bekreftet ikke korrekt kundenummer og kunde-ID. Kontroller kundekortet.");
+ const card=await s.from("admin_customer_contacts")
+  .select("id,name").eq("id",contactId).maybeSingle();
+ if(card.error||!card.data||normalized(card.data.name)!==normalized(remote.name))
+  throw Error("Kundenavn i Tripletex avviker fra kundekortet. Kontroller og oppdater kundeopplysningene før import.");
+ return {contactId,tripletexCustomerId:Number(remote.id),
+  tripletexCustomerNumber:Number(remote.customerNumber),
+  customerName:String(invoice.customer_name||"").trim()};
+}
 async function getData(s,id){
  const [invoice,claim]=await Promise.all([
   s.from("external_customer_invoices").select(
