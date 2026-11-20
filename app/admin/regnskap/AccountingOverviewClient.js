@@ -63,17 +63,23 @@ export default function AccountingOverviewClient({initialView="oversikt"}){
     </label>}
    {view==="oversikt"&&<>
     <div className={styles.metrics}>
-     {metric("Fakturert inkl. MVA",kroner(t.invoicedGrossOre),t.issuedCount+" sendte fakturaer")}
-     {metric("Registrert betalt på årets fakturaer",kroner(t.recordedPaidOnInvoicesOre),"Kan være betalt i et annet år")}
+     {metric("Fakturert inkl. MVA",kroner(t.invoicedGrossOre),t.issuedCount+" fakturaer fra alle systemer")}
+     {metric("Registrert betalt på årets fakturaer",kroner(t.recordedPaidOnInvoicesOre),"Inkluderer eksterne fakturaer – betaling kan være fra et annet år")}
      {metric("Utestående",kroner(t.outstandingOre),t.unpaidCount+" helt eller delvis ubetalte")}
      {metric("Registrerte kjøpsbilag",kroner(t.expenseGrossOre),t.purchasesCount+" bilag – ikke nødvendigvis betalt")}
     </div>
     {block("Fakturaer og betaling",<>
-     <p className={styles.intro}>{t.paidCount} betalte fakturaer, {t.unpaidCount} med utestående beløp.</p>
-     <div className={styles.actions}>{button("betalt","Se betalte fakturaer")}{button("ubetalt","Se ubetalte fakturaer")}{link("/admin/faktura/arkiv","Fakturaarkiv")}</div>
+     <p className={styles.intro}>{t.paidCount} betalte fakturaer, {t.unpaidCount} med utestående beløp – inkludert fakturaer fra andre systemer.</p>
+     {t.externalIssuedCount>0&&<p className={styles.intro} style={{marginTop:10}}>
+      Eksterne fakturaer: {t.externalIssuedCount} · fakturert {kroner(t.externalGrossOre)} ·
+      {" "}registrert betalt {kroner(t.externalPaidOre)} · utestående {kroner(t.externalOutstandingOre)}.
+      Dette er interne betalingsregistreringer, ikke bekreftede bankposteringer eller MVA-tall.
+     </p>}
+     <div className={styles.actions}>{button("betalt","Se betalte fakturaer")}{button("ubetalt","Se ubetalte fakturaer")}{link("/admin/faktura/arkiv","Fakturaarkiv")}{link("/admin/faktura/eksterne","Eksterne fakturaer")}</div>
     </>)}
     {block("MVA og utgifter",<>
-     <p className={styles.intro}>Foreløpig utgående MVA: {kroner(t.outputVatOre)}. Foreslått inngående MVA-fradrag: {kroner(t.inputVatProposedOre)}.</p>
+     <p className={styles.intro}>Foreløpig utgående MVA fra Aadland-fakturaer: {kroner(t.outputVatOre)}. Foreslått inngående MVA-fradrag: {kroner(t.inputVatProposedOre)}.
+      {t.externalVatUnverifiedCount>0&&" MVA for "+t.externalVatUnverifiedCount+" eksterne fakturaer er ikke med før grunnlaget er kontrollert."}</p>
      <div className={styles.actions}>{button("mva","Se MVA")}{button("bilag","Se leverandørbilag")}{link("/admin/faktura/mva#mobilkvittering","Registrer kvittering")}</div>
     </>)}
     {block("Tripletex-overføring",<>
@@ -83,9 +89,20 @@ export default function AccountingOverviewClient({initialView="oversikt"}){
     {block("Regnskapsark",<div className={styles.actions}>{button("regnskapsark","Se alle registreringer")}{link("/api/admin/regnskap?year="+year+"&format=csv","Last ned CSV")}</div>)}
    </>}
    {(view==="betalt"||view==="ubetalt")&&block(views[view]+" · "+sales.length,<>
-    <p className={styles.intro}>Fakturaer utstedt i {year}, med registrert betalingsstatus. Se fakturaarkivet for betaling og kreditnota.</p>
+    <p className={styles.intro}>Fakturaer utstedt i {year} fra Aadland Service og andre systemer. Eksterne betalinger er manuelt registrert; åpne originalen for detaljer.</p>
     <div className={styles.rows}>{sales.map(x=><div key={x.id} className={styles.row}>
-     <span>{x.date}</span><div className={styles.desc}><strong>{x.customer}</strong><small>{x.number}</small></div>
+     <span>{x.date}</span><div className={styles.desc}>
+      <strong>{x.customer}</strong><small>{x.number}
+       {x.source==="external"?" · "+x.sourceSystem:" · Aadland Service"}</small>
+      {x.source==="external"&&<small>Tripletex: {x.tripletexStatus==="confirmed"?
+       "Import bekreftet":x.tripletexStatus==="prepared"?
+       "CSV klargjort, ikke bekreftet importert":"Ikke bekreftet importert"}
+       {" · "}MVA krever egen kontroll</small>}
+      <Link href={x.source==="external"?
+       "/admin/faktura/eksterne?id="+encodeURIComponent(x.externalId):
+       "/admin/faktura/arkiv?id="+encodeURIComponent(x.id)}>
+       {x.source==="external"?"Åpne original / registrer betaling":"Åpne faktura"}</Link>
+     </div>
      <span className={styles.pill}>{x.paymentLabel}</span><div className={styles.amount}>
       {kroner(x.grossOre)}<small>Betalt {kroner(x.paidOre)} · Rest {kroner(x.outstandingOre)}</small>
      </div>
@@ -103,16 +120,16 @@ export default function AccountingOverviewClient({initialView="oversikt"}){
    </>)}
    {view==="mva"&&block("MVA – foreløpig oversikt for "+year,<>
     <div className={styles.metrics}>
-     {metric("Utgående MVA fra fakturaer",kroner(t.outputVatOre))}
+     {metric("Utgående MVA – Aadland-fakturaer",kroner(t.outputVatOre))}
      {metric("Inngående MVA – foreslått fradrag",kroner(t.inputVatProposedOre))}
      {metric("Foreløpig differanse",kroner(t.vatDifferenceIndicativeOre),"Ikke en MVA-melding")}
      {metric("Registrerte kjøpsbilag",t.purchasesCount)}
     </div>
-    <p className={styles.intro}>Denne årssummen er ikke periodisert eller avstemt mot Tripletex. Bruk MVA-siden for terminer og dokumentasjon.</p>
+    <p className={styles.intro}>Denne årssummen er ikke periodisert eller avstemt mot Tripletex. MVA fra eksterne fakturaer tas ikke med før avgiftsgrunnlaget er kontrollert; pass på at samme salg ikke er bokført fra før.</p>
     <div className={styles.actions}>{link("/admin/faktura/mva#mva-oversikt","Åpne MVA-terminer")}{link("/admin/faktura/mva#mobilkvittering","Legg inn kvittering")}</div>
    </>)}
    {view==="regnskapsark"&&block("Regnskapsark · "+year,<>
-    <p className={styles.intro}>Tidslinje for kundefakturaer, kjøpsbilag og innbetalinger. Innbetalinger har egen kolonne og er ikke nytt salg.</p>
+    <p className={styles.intro}>Tidslinje for Aadland-fakturaer, eksterne kundefakturaer, kjøpsbilag og innbetalinger. Eksterne fakturaer vises med bruttobeløp, og deres MVA er ikke bekreftet her. Innbetalinger er en egen kolonne og er ikke nytt salg.</p>
     <div className={styles.actions}>{link("/api/admin/regnskap?year="+year+"&format=csv","Last ned regnskapsark (CSV)")}{link("/admin/faktura/mva/tripletex","Tripletex-overføring")}</div>
     <div className={styles.tableWrap}><table className={styles.ledger}>
      <thead><tr><th>Dato</th><th>Type</th><th>Kunde / leverandør</th><th>Referanse</th><th className={styles.right}>Fakturert</th><th className={styles.right}>Kjøpsbilag</th><th className={styles.right}>Innbetalt</th></tr></thead>
@@ -124,7 +141,8 @@ export default function AccountingOverviewClient({initialView="oversikt"}){
     </table>{!ledger.length&&<p className={styles.empty}>Ingen registreringer.</p>}</div>
    </>)}
    {view==="overforinger"&&block("Tripletex – overføringsliste",<>
-    <p className={styles.intro}>Her finner du både kundefakturaer og leverandørbilag som gjenstår. Ferdig importerte kundefakturaer ligger i historikken; kvitteringer flyttes når e-postleverandøren har akseptert sendingen.</p>
+    <p className={styles.intro}>Her vises overføring av Aadland-fakturaer og leverandørbilag. Eksterne fakturaer har egen Tripletex-import under eksterne fakturaer. Klargjort CSV betyr ikke bekreftet import.</p>
+    <div className={styles.actions}>{link("/admin/faktura/eksterne","Eksterne fakturaer og Tripletex-import")}</div>
     <div style={{marginTop:20}}><TripletexApiConnectClient/></div>
     <div style={{marginTop:20}}><TripletexSalesClient/></div>
     <div style={{marginTop:28,borderTop:"2px solid #e3ddd3",paddingTop:15}}><TripletexReceiptsClient/></div>
