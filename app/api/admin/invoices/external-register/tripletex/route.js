@@ -114,7 +114,8 @@ export async function GET(req){
    else if(["processing","needs_review"].includes(link.data?.status))
     customerStatus="needs_review";
   }
-  return json({ok:true,suggestedImportNumber,customerStatus,import:claim?{
+  return json({ok:true,suggestedImportNumber,customerStatus,
+   linkedContactId:local.data?.contact_id||null,import:claim?{
    importNumber:claim.import_number,status:claim.status,
    vatRate:claim.vat_rate,baseOre:claim.base_ore,vatOre:claim.vat_ore,
    snapshotPaid:claim.snapshot_paid,
