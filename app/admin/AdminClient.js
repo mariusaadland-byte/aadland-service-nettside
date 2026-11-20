@@ -32,7 +32,7 @@ const labels = {
 
 
 const ADMIN_NAV_GROUPS=[
-  {id:"sales",title:"Salg og kunder",icon:"◎",ids:["orders","surveys","customers","drawings","quotes","invoices","invoiceArchive","reminders","archive"]},
+  {id:"sales",title:"Salg og kunder",icon:"◎",ids:["orders","surveys","customers","drawings","quotes","invoices","invoiceArchive","externalInvoices","reminders","archive"]},
   {id:"accounting",title:"Regnskap",icon:"▥",ids:["accounting","accountPaid","accountUnpaid","accountExpenses","accountVat","accountLedger","accountTransfers","vippsSettlement"]},
   {id:"jobs",title:"Oppdrag og planlegging",icon:"▤",ids:["jobs","jobCalendar","workClock","drawing"]},
   {id:"shop",title:"Produkter og tjenester",icon:"◫",ids:["products","categories","services"]},
@@ -501,6 +501,7 @@ export default function AdminClient({ user }) {
   if (canManageUsers) tabs.push(["users", "Brukere"]);
   if (canUpdateOrders || canManageProducts) tabs.push(["quotes", "Tilbud"],["invoices", "Fakturakladder"],["invoiceArchive", "Fakturaoversikt"]);
   if (user?.role === "owner") tabs.push(
+    ["externalInvoices","Eksterne fakturaer"],
     ["accounting","Regnskapsoversikt"],
     ["accountPaid","Betalte fakturaer"],
     ["accountUnpaid","Ubetalte fakturaer"],
@@ -525,6 +526,10 @@ export default function AdminClient({ user }) {
     if (id === "quotes") {setMenuOpen(false);router.push("/admin/tilbud");return;}
     if (id === "invoices") {setMenuOpen(false);router.push("/admin/faktura");return;}
     if (id === "invoiceArchive") {setMenuOpen(false);router.push("/admin/faktura/arkiv");return;}
+    if (id === "externalInvoices") {
+      if(user?.role!=="owner")return;
+      setMenuOpen(false);router.push("/admin/faktura/eksterne");return;
+    }
     if(id==="vippsSettlement"){
      if(user?.role!=="owner")return;
      setMenuOpen(false);
