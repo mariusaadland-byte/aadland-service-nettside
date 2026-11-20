@@ -82,7 +82,7 @@ for(const marker of [
  "Depositum (kr) – holdes utenfor","Vipps-gebyr (%)",
  "Fastgebyr per betaling","Forventet utbetalt fra Vipps",
  "Regn baklengs fra ønsket utbetaling","Foreslått kundepris inkl. MVA",
- "ikke bekreftede vilkår","Ingen betaling opprettes",
+ "Prisgrunnlag fra Vipps-portalen","Ingen betaling opprettes",
  "Ingen data overføres til Tripletex","calculateVippsCostPreview",
  'aria-live="polite"'
 ])assert.ok(ui.includes(marker),"Missing cost calculator label: "+marker);
