@@ -136,3 +136,81 @@
  .approvalListItem{flex-wrap:wrap}
  .approvalActions>*{flex:1 1 100%}
 }
+
+/* Guided QA wizard: click a task tile, then work through one action at a time. */
+.wizardTileGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:12px;margin:16px 0}
+.wizardTile{border:1.5px solid #91a8bb;border-radius:12px;background:#f7fafc;color:#1e3547;
+ display:grid;gap:8px;align-content:start;text-align:left;cursor:pointer;min-height:154px;padding:15px;
+ box-shadow:0 1px 3px rgba(27,55,77,.06)}
+.wizardTile:hover{border-color:#24516e;background:#eaf3fa;box-shadow:0 3px 13px rgba(27,55,77,.12)}
+.wizardTile:focus-visible{outline:3px solid #b68634;outline-offset:3px}
+.wizardTile:disabled{cursor:wait}
+.wizardTileIndex{color:#355670;font-weight:850;font-size:12px;letter-spacing:.05em}
+.wizardTile strong{font-size:16px;line-height:1.32;color:#152f43}
+.wizardTile>span:not(.wizardTileIndex):not(.wizardTileFooter){font-size:12px;color:#465e72}
+.wizardTileFooter{border-top:1px solid #cbd7e1;padding-top:10px;margin-top:auto;
+ display:flex;align-items:center;justify-content:space-between;gap:8px;
+ font-size:12px;color:#344b5d}
+.wizardTileFooter b{color:#205375;font-size:12px;white-space:nowrap}
+.wizardBackdrop{position:fixed;inset:0;z-index:20000;background:rgba(10,22,32,.74);
+ display:flex;align-items:center;justify-content:center;padding:clamp(10px,3vw,26px)}
+.wizardDialog{background:#fff;color:#1c3447;border:2px solid #91a9b9;border-radius:16px;
+ width:min(100%,770px);max-height:calc(100dvh - 28px);overflow-y:auto;
+ box-shadow:0 18px 70px rgba(0,0,0,.35);padding:clamp(16px,3vw,27px);display:grid;gap:15px}
+.wizardDialogHeader{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.wizardDialogHeader h2{margin:4px 0 0;font-size:clamp(19px,2.4vw,25px);
+ line-height:1.35;color:#162f42}
+.wizardClose{flex-shrink:0;border:1.5px solid #7c98ac;border-radius:8px;
+ padding:9px 12px;background:#f1f5f8;color:#213f55;font-weight:800;cursor:pointer;
+ min-height:42px}
+.wizardIntro{margin:0;color:#455d6d;line-height:1.5;font-size:14px}
+.wizardNotice{border:1px solid #a5c7b5;background:#eaf5ed;color:#1b5539;
+ border-radius:9px;padding:10px 12px;margin:0;font-weight:700;font-size:13px;line-height:1.5}
+.wizardStepTrack{height:11px;background:#dbe6ed;border-radius:50px;overflow:hidden}
+.wizardStepTrack span{display:block;background:#287247;height:100%;border-radius:50px;transition:width .2s ease}
+.wizardStepBody{background:#f3f8fb;border:1px solid #c6d6e1;border-radius:12px;
+ padding:clamp(15px,2.5vw,24px);display:grid;gap:15px}
+.wizardStepCount{font-size:12px;font-weight:900;letter-spacing:.08em;color:#23516c;margin:0}
+.wizardStepBody h3{font-size:17px;color:#1b3d56;margin:0}
+.wizardInstruction{font-size:clamp(17px,2.1vw,21px);line-height:1.5;
+ color:#162f42;font-weight:750;background:#fff;border:1px solid #c2d2df;
+ border-radius:11px;padding:18px;margin:0}
+.wizardStepBody .approvalOpen{display:inline-flex;justify-content:center;align-items:center;
+ align-self:start;min-height:44px;padding:11px 15px;border-radius:9px;
+ font-size:14px;font-weight:850;text-decoration:none}
+.wizardTip{margin:0;color:#466072;font-size:13px;line-height:1.5}
+.wizardButtons{display:flex;gap:11px;flex-wrap:wrap}
+.wizardPrimary{display:inline-flex;align-items:center;justify-content:center;
+ min-height:48px;padding:12px 19px;border:1.5px solid #235d3c;border-radius:9px;
+ background:#257348;color:#fff;font-size:15px;font-weight:850;cursor:pointer}
+.wizardPrimary:hover:not(:disabled){background:#195734}
+.wizardPrimary:disabled{opacity:1;background:#dce9e0;color:#30533a;border-color:#87aa91;cursor:not-allowed}
+.wizardIssueButton{min-height:48px;background:#fff;color:#8b2c21;
+ border:1.5px solid #b86e66;border-radius:9px;padding:12px 16px;
+ font-size:14px;font-weight:850;cursor:pointer}
+.wizardIssue{border:1px solid #c6aa9d;border-radius:9px;background:#fffaf6;
+ padding:14px;display:grid;gap:8px}
+.wizardIssue label{color:#583827;font-weight:800;font-size:14px}
+.wizardIssue textarea{background:#fff!important;color:#1b3344!important;
+ border:1.5px solid #9c7c6d!important;min-height:93px;resize:vertical;
+ width:100%;border-radius:8px;padding:10px;font-size:15px}
+.wizardIssueSave{background:#813b25;color:#fff;border:1px solid #813b25;
+ border-radius:9px;padding:11px 14px;font-size:14px;font-weight:850;cursor:pointer}
+.wizardDialogFooter{border-top:1px solid #c8d8e3;padding-top:13px;
+ display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.wizardDialogFooter button{border:1.5px solid #91aabb;border-radius:8px;
+ background:#eaf1f6;color:#23435a;padding:10px 13px;
+ min-height:42px;font-size:13px;font-weight:800;cursor:pointer}
+.wizardDialogFooter p{font-size:12px;color:#4a6274;width:100%;margin:0;line-height:1.45}
+.wizardDialog button:focus-visible,.wizardDialog a:focus-visible{outline:3px solid #bb8730;outline-offset:3px}
+@media(max-width:660px){
+ .wizardTileGrid{grid-template-columns:minmax(0,1fr)}
+ .wizardTile{min-height:134px}
+ .wizardDialog{max-height:calc(100dvh - 14px);padding:14px}
+ .wizardBackdrop{padding:7px}
+ .wizardDialogHeader{align-items:flex-start}
+ .wizardClose{padding:8px 10px}
+ .wizardButtons>*{width:100%}
+ .wizardStepBody .approvalOpen{width:100%}
+ .wizardDialogFooter button{flex:1 1 100%}
+}
