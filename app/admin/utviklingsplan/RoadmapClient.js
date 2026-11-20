@@ -3,6 +3,7 @@ import {useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import styles from "./roadmap.module.css";
 import {DEVELOPMENT_GROUPS,DEVELOPMENT_STATUSES,DEVELOPMENT_PRIORITIES} from "../../../lib/developmentTasks";
+import {developmentTaskLink,developmentNextTasks} from "../../../lib/developmentTaskLinks";
 
 const STATUS_LABELS={todo:"Ikke startet",progress:"Under arbeid",test:"Klar for testing",done:"Ferdig"};
 const PRIORITY_LABELS={high:"Høy",normal:"Normal",low:"Lav"};
@@ -73,6 +74,7 @@ export default function RoadmapClient(){
  }
  const stats=useMemo(()=>({total:tasks.length,done:tasks.filter(task=>task.status==="done").length,test:tasks.filter(task=>task.status==="test").length,progress:tasks.filter(task=>task.status==="progress").length}),[tasks]);
  const visible=useMemo(()=>tasks.filter(task=>(filter==="all"||task.status===filter)&&(!search.trim()||[task.title,task.description,task.notes].join(" ").toLocaleLowerCase("nb-NO").includes(search.trim().toLocaleLowerCase("nb-NO")))),[tasks,filter,search]);
+ const nextTasks=useMemo(()=>developmentNextTasks(tasks,6),[tasks]);
  const groups=DEVELOPMENT_GROUPS.map(group=>({...group,tasks:visible.filter(task=>task.category===group.id)})).filter(group=>group.tasks.length&&(openGroup==="all"||openGroup===group.id));
  return <main className={styles.page}>
   <div className={styles.shell}>
@@ -90,6 +92,31 @@ export default function RoadmapClient(){
      <div><b>{stats.done}</b><span>Ferdigstilt</span></div>
     </div>
     <div className={styles.progressLine} role="progressbar" aria-label="Ferdigstilte oppgaver" aria-valuemin={0} aria-valuemax={stats.total||1} aria-valuenow={stats.done}><span style={{width:(stats.total?100*stats.done/stats.total:0)+"%"}}/></div>
+    <section className={styles.nextWork} aria-label="Neste utviklingsoppgaver">
+     <div className={styles.nextHeader}>
+      <div><h2>Neste punkter å fullføre</h2>
+       <p>Høyt prioriterte oppgaver som ennå ikke er ferdig bekreftet.
+        Du kan åpne riktig funksjon direkte fra planen.</p>
+      </div>
+      <button type="button" onClick={()=>{
+       setFilter("all");setSearch("");setOpenGroup("all");
+      }}>Vis alle oppgaver</button>
+     </div>
+     <div className={styles.nextGrid}>
+      {nextTasks.map(task=><div key={task.id} className={styles.nextItem}>
+       <strong>{task.title}</strong>
+       <span>{STATUS_LABELS[task.status]||"Under kontroll"}</span>
+       <div className={styles.nextActions}>
+        {developmentTaskLink(task)&&
+         <Link href={developmentTaskLink(task)}>Åpne funksjonen</Link>}
+        <a href={"#roadmap-"+task.id} onClick={()=>{
+         setFilter("all");setSearch("");setOpenGroup("all");
+        }}>Se oppgaven</a>
+       </div>
+      </div>)}
+      {!nextTasks.length&&<p>Ingen høyt prioriterte åpne oppgaver.</p>}
+     </div>
+    </section>
     {adding&&<form className={styles.addForm} onSubmit={createTask}>
      <h2>Legg til en ny oppgave</h2>
      <label>Hva skal gjøres?<input required maxLength={150} value={newTask.title} onChange={e=>setNewTask(v=>({...v,title:e.target.value}))} placeholder="F.eks. bedre mobilvisning av tegning"/></label>
@@ -107,10 +134,15 @@ export default function RoadmapClient(){
     </section>
     {groups.length?groups.map(group=><section className={styles.group} key={group.id}>
       <div className={styles.groupHead}><h2>{group.label}</h2><span>{group.tasks.filter(task=>task.status==="done").length}/{group.tasks.length} ferdige</span></div>
-      <div className={styles.taskList}>{group.tasks.map(task=><article key={task.id} className={styles.task+(task.status==="done"?" "+styles.complete:"")}>
+      <div className={styles.taskList}>{group.tasks.map(task=><article key={task.id} id={"roadmap-"+task.id} className={styles.task+(task.status==="done"?" "+styles.complete:"")}>
        <div className={styles.taskTitle}>
         <label className={styles.doneCheck} title="Marker ferdig"><input type="checkbox" checked={task.status==="done"} disabled={Boolean(savingId)} onChange={e=>updateTask(task,{status:e.target.checked?"done":"test"})}/></label>
-        <div><h3>{task.title}</h3><p>{task.description}</p></div>
+        <div><h3>{task.title}</h3><p>{task.description}</p>
+         {developmentTaskLink(task)&&
+          <Link className={styles.featureLink} href={developmentTaskLink(task)}>
+           Åpne funksjonen
+          </Link>}
+        </div>
        </div>
        <div className={styles.taskControls}>
         <label>Status<select value={task.status} disabled={Boolean(savingId)} onChange={e=>updateTask(task,{status:e.target.value})}>{DEVELOPMENT_STATUSES.map(status=><option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select></label>
