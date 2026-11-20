@@ -4,6 +4,7 @@ import {invoicePaymentState} from "../../../lib/invoicePaymentStatus";
 import {invoiceSettlementInfo} from "../../../lib/invoiceSettlementInfo";
 import {osloDateKey} from "../../../lib/osloTime";
 import {nextInvoiceReminder,reminderDateAfter,reminderText} from "../../../lib/invoiceReminders";
+import InvoiceDebtCasePanel from "./InvoiceDebtCasePanel";
 const money=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(ore/100);
 const date=value=>value?new Date(value.length===10?value+"T12:00:00":value).toLocaleString("nb-NO",{timeZone:"Europe/Oslo",...(value.length===10?{year:"numeric",month:"2-digit",day:"2-digit"}:{dateStyle:"short",timeStyle:"short"})}):"";
 export default function InvoiceReminderPanel({invoice,disabled=false,onRefresh}){
@@ -79,6 +80,7 @@ export default function InvoiceReminderPanel({invoice,disabled=false,onRefresh})
    <button type="button" disabled={sending||disabled||!eligible||(reviewRequired&&!refundedRestReviewed)||(!pending&&dueDate<reminderDateAfter(today))} onClick={send}>{sending?"Sender …":pending?"Prøv samme utsending igjen":"Send "+name.toLowerCase()+" på e-post"}</button>{" "}
    <button type="button" disabled={sending} onClick={()=>setOpen(false)}>Avbryt</button>
   </div>}
+  {next.done&&<InvoiceDebtCasePanel key={invoice.id} invoiceId={invoice.id}/>}
   <h3>Historikk</h3>
   {loading?<p>Henter historikk …</p>:records.length===0?<p>Ingen purringer eller inkassovarsler sendt.</p>:records.map(record=><details key={record.id} style={{padding:"10px 0",borderBottom:"1px solid #ddd"}}>
    <summary>{record.kind==="inkasso"?"Inkassovarsel":"Purring"} · {record.status==="sent"?"Sendt "+date(record.sent_at):"Sending ikke bekreftet – "+date(record.created_at)}</summary>
