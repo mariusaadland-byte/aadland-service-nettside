@@ -25,6 +25,7 @@ assert.equal(prepared.orders[0].orderLines[0].unitPriceExcludingVatCurrency,1435
 assert.equal(prepared.orders[0].orderLines[0].vatType.id,17);
 assert.equal(prepared.orders[0].customer.id,321);
 assert.match(prepared.comment,/10035/);
+assert.equal(prepared.orders[0].isPrioritizeAmountsIncludingVat,false);
 const hash=externalDirectHash(invoice,claim,321,88);
 assert.match(hash,/^[a-f0-9]{64}$/);
 assert.notEqual(hash,externalDirectHash({...invoice,paid_on:"2026-09-29"},claim,321,88));
@@ -71,7 +72,7 @@ for(const needed of [
  "tripletexCreateUnsentedInvoice",
  "tripletexRecordInvoicePayment",
  "payment.date,payment.paymentTypeId",
- "paid_on", 'body.action',
+ "paid_on", 'body?.action',
  'status:"processing"',
  'payment_status:"processing"',
  'payment_status:"needs_review"',
@@ -81,8 +82,7 @@ for(const needed of [
  "invoiceIsDuplicate",
  "verifiedTypes",
  'transfer_method:"api"',
- "tripletex_customer_links",
- "isPrioritizeAmountsIncludingVat"
+ "tripletex_customer_links"
 ])assert.ok(api.includes(needed),"Missing direct invoice + historical paid date guard: "+needed);
 assert.ok(!api.includes("sendToCustomer=true"));
 const writeWrapper=read("lib/tripletexApi.js");
