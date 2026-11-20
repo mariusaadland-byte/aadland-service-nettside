@@ -48,6 +48,20 @@ const root=read("app/layout.js");
 assert.ok(root.includes('colorScheme:"dark"'),"Public storefront retains dark theme metadata");
 const css=read("app/admin/adminContrast.css");
 assert.ok(css.includes(".adminContrastRoot main.admin"));
+assert.ok(css.includes("main.admin:not(:has(> aside.side))"),
+ "Standalone one-column fix must not override admin dashboard sidebar grid");
+assert.ok(css.includes("main.admin:has(> aside.side)"),
+ "The real admin dashboard must retain its own grid structure");
+assert.ok(css.includes("grid-template-columns:248px minmax(0,1fr)!important"),
+ "Desktop admin sidebar must remain alongside the dashboard");
+assert.ok(css.includes("display:block;\n  grid-template-columns:none!important"),
+ "Mobile admin nav still uses its own drawer layout");
+assert.ok(!/\.adminContrastRoot main\.admin\s*\{\s*grid-template-columns\s*:\s*minmax\(0,1fr\)!important/.test(css),
+ "Never force the entire admin dashboard into a one-column grid");
+const adminClient=read("app/admin/AdminClient.js");
+assert.ok(adminClient.includes('<aside className={"side "+navStyles.sideContainer}>'));
+assert.ok(adminClient.includes('<section className="adminmain">'));
+assert.ok(adminClient.includes('className="stats adminOverviewStats"'));
 assert.ok(css.includes("grid-template-columns:minmax(0,1fr)!important"));
 assert.ok(css.includes("color-scheme:light"));
 assert.ok(css.includes("::-webkit")===false||css.includes("-webkit-text-fill-color"));
