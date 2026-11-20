@@ -78,7 +78,7 @@ for(const needed of [
  'payment_status:"needs_review"',
  "tripletex_invoice_id:createdId",
  'status:"confirmed"',
- "notBookedElsewhere",
+ "notBookedElsewhere","accountingPeriodConfirmed",
  "invoiceIsDuplicate",
  "verifiedTypes",
  'transfer_method:"api"',
@@ -99,6 +99,8 @@ assert.ok(ui.includes("invoice.paid_on"));
 assert.ok(ui.includes('action:"transfer-direct"'));
 assert.ok(ui.includes("notBookedElsewhere:notImported"));
 assert.ok(ui.includes("paymentSourceConfirmed"));
+assert.ok(ui.includes("accountingPeriodConfirmed"));
+assert.ok(ui.includes("ikke allerede er bokført i et annet"));
 assert.ok(ui.includes("Klargjør CSV-import"));
 const sql=read("supabase/migrations/20261120181000_external_invoice_direct_payment_date.sql");
 assert.ok(sql.includes("xit_api_payment_values"));
