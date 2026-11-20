@@ -205,6 +205,21 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
      <input style={input} inputMode="decimal" value={base}
       placeholder="Hentes automatisk fra PDF" onChange={e=>manualAmountChange("base",e.target.value)}/>
     </label>
+    <label style={label}>MVA-beløp (kr) – beregnet
+     <input style={{...input,background:"#f6f4ef"}} readOnly
+      aria-label="MVA-beløp beregnet" value={computedVatOre===null?"":(computedVatOre/100).toFixed(2).replace(".",",")}
+      placeholder="Vises etter MVA-sats og netto"/>
+    </label>
+    <label style={label}>Beløp inkl. MVA (kr) – beregnet
+     <input style={{...input,background:"#f6f4ef",fontWeight:700}} readOnly
+      aria-label="Beløp inkl. MVA beregnet" value={computedVatOre===null?"":((enteredBaseOre+computedVatOre)/100).toFixed(2).replace(".",",")}
+      placeholder="Vises automatisk"/>
+    </label>
+    <label style={label}>Fakturasum inkl. MVA på originalen (kr)
+     <input style={{...input,background:"#f6f4ef"}} readOnly
+      aria-label="Fakturasum inkl. MVA fra originalfakturaen"
+      value={(Number(invoice.amount_ore)/100).toFixed(2).replace(".",",")}/>
+    </label>
     <label style={label}>Ledig Tripletex-importnummer
      <input style={input} inputMode="numeric" value={number}
       onChange={e=>{setNumber(e.target.value);setNotImported(false);}}/>
@@ -237,8 +252,8 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
      margin:0,color:importAmountsMatch?"#246346":"#9b3428"}}>
      {kr(enteredBaseOre)} ekskl. MVA + {kr(computedVatOre)} MVA =
      {" "}{kr(enteredBaseOre+computedVatOre)}.
-     {importAmountsMatch?" Stemmer med registrert fakturasum.":
-      " Stemmer IKKE med registrert fakturasum – kontroller tallene."}
+     {importAmountsMatch?" ✓ Beregnet inkl. MVA stemmer med originalfakturaen.":
+      " ⚠ Beregnet inkl. MVA stemmer IKKE med originalfakturaen. Tripletex-importen er sperret til tallene er rettet."}
     </p>}
     <small>Beløpet må fortsatt bekreftes mot originalfakturaen.
      Ingen MVA eller faktura bokføres automatisk.</small>
