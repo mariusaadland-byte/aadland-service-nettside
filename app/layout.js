@@ -1,5 +1,6 @@
 import "./globals.css";
 import "./accessibility.css";
+import "./formContrast.css";
 
 const siteTitle="Aadland Service | Bygg, oppussing og uteområder i Bergen";
 const siteDescription="Aadland Service hjelper privatkunder i Bergen og omegn med bygg, oppussing, vedlikehold, uteområder og produkter på bestilling.";
