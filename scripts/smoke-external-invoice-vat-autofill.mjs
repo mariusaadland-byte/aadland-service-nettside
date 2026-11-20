@@ -71,6 +71,16 @@ assert.ok(ui.includes('useState(""),[base,setBase]=useState("")'),
  "Do not preset 25% tax when original VAT rate is unknown");
 assert.ok(ui.includes('customerStatus!=="linked_to_tripletex"'),
  "Do not weaken customer and Tripletex import checks");
+for(const label of [
+ "MVA-beløp (kr) – beregnet",
+ "Beløp inkl. MVA (kr) – beregnet",
+ "Fakturasum inkl. MVA på originalen (kr)",
+ 'aria-label="Beløp inkl. MVA beregnet"',
+ 'aria-label="Fakturasum inkl. MVA fra originalfakturaen"',
+ "Beregnet inkl. MVA stemmer IKKE med originalfakturaen"
+])assert.ok(ui.includes(label),"Missing visible VAT double-check: "+label);
+assert.ok(ui.includes("readOnly"),"Gross and VAT must be computed read-only values");
+assert.ok(ui.includes("!importAmountsMatch"),"Mismatch must prevent preparing the import");
 assert.ok(ui.includes("setConfirmed(false)"),
  "Changing auto-filled values must require a new manual review");
 const importEngine=read("lib/externalInvoiceTripletex.js");
