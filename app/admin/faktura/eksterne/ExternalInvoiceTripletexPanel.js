@@ -11,7 +11,8 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
  const [record,setRecord]=useState(null),[error,setError]=useState("");
  const [info,setInfo]=useState("");
  const [vatRate,setVatRate]=useState("25"),[base,setBase]=useState("");
- const [number,setNumber]=useState("90000000"),[paymentType,setPaymentType]=useState("");
+ const [number,setNumber]=useState("90000000");
+ const [customerStatus,setCustomerStatus]=useState("loading");
  const [confirmed,setConfirmed]=useState(false);
  const [notImported,setNotImported]=useState(false);
  const [customerConfirmed,setCustomerConfirmed]=useState(false);
@@ -21,6 +22,7 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
   const d=await r.json().catch(()=>({}));
   if(!r.ok||!d.ok)throw Error(d.error||"Kan ikke hente status fra Tripletex.");
   setRecord(d.import||null);
+  setCustomerStatus(d.customerStatus||"missing_local_card");
  };
  useEffect(()=>{
   let live=true;setLoading(true);setError("");
@@ -29,6 +31,7 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
     const d=await r.json().catch(()=>({}));
     if(!r.ok||!d.ok)throw Error(d.error||"Overføringsstatus kunne ikke hentes.");
     if(live){setRecord(d.import||null);
+     setCustomerStatus(d.customerStatus||"missing_local_card");
      if(!d.import&&Number.isSafeInteger(Number(d.suggestedImportNumber)))
       setNumber(String(d.suggestedImportNumber));}
    }).catch(e=>{if(live)setError(e.message)})
@@ -47,7 +50,7 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
    const r=await fetch(url,{method:"POST",
     headers:{"Content-Type":"application/json"},body:JSON.stringify({
      action:"prepare",id:invoice.id,vatRate,baseAmount:base,importNumber:number,
-     paymentTypeImportId:paid?paymentType:"",
+     paymentTypeImportId:"",
      vatConfirmed:confirmed,notImportedConfirmed:notImported,
      correctCustomerConfirmed:customerConfirmed
     })});
@@ -62,7 +65,7 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
   if(busy||record?.status!=="prepared")return;
   if(!window.confirm("Har du lastet opp CSV-filen i Tripletex, og kontrollert "+
    "at fakturaen faktisk er importert med riktig kunde, dato, MVA og beløp? "+
-   "Jeg kontrollerer fakturanummer, dato og beløp mot Tripletex før statusen endres."))return;
+   "Jeg kontrollerer fakturanummer, dato, beløp og kundenummer mot Tripletex før statusen endres."))return;
   setBusy(true);setInfo("");setError("");
   try{
    const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},
@@ -85,6 +88,24 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
   {error&&<p role="alert" style={{color:"#a43a2b"}}>{error}</p>}
   {info&&<p role="status">{info}</p>}
   {!loading&&!record&&<>
+   <div style={{display:"grid",gap:8,border:"1px solid #d7c8aa",
+    background:"#fff",padding:11,borderRadius:9}}>
+    <strong>Kundekort i Tripletex</strong>
+    <p style={{fontSize:13,margin:0}}>
+     {customerStatus==="linked_to_tripletex"?
+      "Kunden er koblet til Tripletex. Importfilen bruker det bekreftede kundenummeret.":
+      customerStatus==="missing_local_card"?
+      "Først må du trykke «Kundekort – velg eller opprett» på fakturaen, og knytte riktig kunde.":
+      customerStatus==="needs_review"?
+      "Kundeoverføringen er uavklart. Kontroller den i Tripletex før du fortsetter.":
+      "Kundekortet finnes på nettsiden, men må opprettes eller kobles i Tripletex før import."}
+    </p>
+    <button type="button" onClick={async()=>{
+     setBusy(true);setError("");
+     try{await refresh();}catch(e){setError(e.message)}
+     finally{setBusy(false);}
+    }} disabled={busy}>Oppdater kundekobling</button>
+   </div>
    <p style={{fontSize:13,margin:0}}>
     <strong>Oppgi eksakt avgiftsgrunnlag fra PDF-en.</strong> Automatisk
     MVA-gjetting er ikke tillatt. Denne enkle importen støtter fakturaer med
@@ -106,27 +127,23 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
      <input style={input} inputMode="numeric" value={number}
       onChange={e=>{setNumber(e.target.value);setNotImported(false);}}/>
     </label>
-    {paid&&<label style={label}>Import-ID for riktig betalingstype i Tripletex
-     <input style={input} maxLength={32} value={paymentType}
-      placeholder="Hentes fra Tripletex"
-      onChange={e=>{setPaymentType(e.target.value);setConfirmed(false);}}/>
-    </label>}
+    
    </div>
    <p style={{fontSize:13,margin:0}}>
     Fakturabeløp fra originalen: <strong>{kr(Number(invoice.amount_ore))}</strong>.
-    {paid?" Fakturaen er allerede merket betalt lokalt. Bruk riktig betalingstype og kontroller betalingsdato og bankavstemming særskilt i Tripletex.":""}
+    {paid?" Fakturaen er merket betalt på nettsiden, men CSV-importen vil opprette den som UBETALT i Tripletex. Registrer faktisk betaling med korrekt opprinnelig bankdato etterpå, én gang.":""}
    </p>
    <label><input type="checkbox" checked={confirmed}
     onChange={e=>setConfirmed(e.target.checked)}/>
     Jeg har kontrollert MVA-sats og beløp mot originalfakturaen.</label>
    <label><input type="checkbox" checked={customerConfirmed}
     onChange={e=>setCustomerConfirmed(e.target.checked)}/>
-    Jeg vil kontrollere at riktig kundekort brukes ved importen i Tripletex.</label>
+    Jeg har kontrollert at kundekortet er koblet til riktig kunde i Tripletex.</label>
    <label><input type="checkbox" checked={notImported}
     onChange={e=>setNotImported(e.target.checked)}/>
     Fakturaen er ikke allerede importert eller bokført i Tripletex.</label>
    <button type="button" disabled={busy||!confirmed||!customerConfirmed||
-    !notImported||!base||!number||(paid&&!paymentType)} onClick={prepare}
+    !notImported||!base||!number||customerStatus!=="linked_to_tripletex"} onClick={prepare}
     style={buttons}>{busy?"Kontrollerer …":"Klargjør Tripletex-import"}</button>
   </>}
   {record&&<>
@@ -161,8 +178,8 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
    </>}
    {record.status==="confirmed"&&<p role="status">
     Fakturaen er funnet med riktig nummer, dato og beløp i Tripletex.
-    Kundetilknytning og eventuell betalingspostering skal fortsatt
-    avstemmes separat i Tripletex.
+    Kundetilknytningen er bekreftet på riktig Tripletex-kunde. Betalingspostering,
+    faktisk dato og bankavstemming må fortsatt kontrolleres separat.
    </p>}
   </>}
  </section>;
