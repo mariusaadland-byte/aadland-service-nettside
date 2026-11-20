@@ -1,0 +1,133 @@
+/* Shared accessible color system for Aadland Service's private admin only.
+   Public pages, printable invoices and customer-facing surfaces remain untouched. */
+.adminContrastRoot{
+ display:contents;
+ color-scheme:light;
+ --admin-text:#192b3b;
+ --admin-muted:#405468;
+ --admin-border:#71869a;
+ --admin-field:#ffffff;
+ --admin-readonly:#edf3fa;
+ --admin-disabled:#e1e9f1;
+ --admin-accent:#254863;
+ --muted:#405468;
+}
+/* Standalone pages had inherited .admin's sidebar grid (248px 1fr).
+   The owner accounting / external invoices / customer card pages must span
+   the entire page instead of accidentally splitting into two columns. */
+.adminContrastRoot main.admin{
+ grid-template-columns:minmax(0,1fr)!important;
+ width:100%;
+ min-width:0;
+ color:var(--admin-text);
+}
+/* Global site requests a dark browser color scheme. Admin inputs are LIGHT.
+   This is required for Chrome desktop, iOS and Android dark appearance. */
+.adminContrastRoot,
+.adminContrastRoot :is(main,form,section,article,[role="dialog"]){
+ color-scheme:light;
+}
+:is(.adminContrastRoot,body:has(.adminContrastRoot) [role="dialog"])
+ :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"])
+  :not([type="color"]):not([type="file"]):not([type="hidden"])
+  :not([type="submit"]):not([type="button"]):not([type="reset"]),select,textarea){
+ color:#192b3b!important;
+ -webkit-text-fill-color:#192b3b!important;
+ caret-color:#192b3b!important;
+ background-color:var(--admin-field,#fff)!important;
+ border:1.5px solid var(--admin-border,#71869a)!important;
+ border-radius:8px;
+ font-size:15px;
+ font-weight:650;
+ line-height:1.45;
+ min-height:42px;
+ padding:9px 11px;
+ min-width:0;
+ max-width:100%;
+ opacity:1!important;
+ color-scheme:light;
+}
+:is(.adminContrastRoot,body:has(.adminContrastRoot) [role="dialog"])
+ :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"])
+  :not([type="color"]):not([type="file"]):not([type="hidden"])
+  :not([type="submit"]):not([type="button"]):not([type="reset"]),select,textarea)::placeholder{
+ color:#52647a!important;
+ -webkit-text-fill-color:#52647a!important;
+ opacity:1!important;
+ font-weight:500;
+}
+:is(.adminContrastRoot,body:has(.adminContrastRoot) [role="dialog"])
+ :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"])
+  :not([type="color"]):not([type="file"]):not([type="hidden"])
+  :not([type="submit"]):not([type="button"]):not([type="reset"]),select,textarea):read-only{
+ background-color:var(--admin-readonly,#edf3fa)!important;
+ color:#183146!important;
+ -webkit-text-fill-color:#183146!important;
+}
+:is(.adminContrastRoot,body:has(.adminContrastRoot) [role="dialog"])
+ :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"])
+  :not([type="color"]):not([type="file"]):not([type="hidden"])
+  :not([type="submit"]):not([type="button"]):not([type="reset"]),select,textarea):disabled{
+ background-color:var(--admin-disabled,#e1e9f1)!important;
+ border-color:#9aaaba!important;
+ color:#354b60!important;
+ -webkit-text-fill-color:#354b60!important;
+ opacity:1!important;
+}
+:is(.adminContrastRoot,body:has(.adminContrastRoot) [role="dialog"])
+ :is(input,textarea,select):focus-visible{
+ outline:3px solid #bc8a35!important;
+ outline-offset:2px!important;
+ border-color:#315a78!important;
+}
+:is(.adminContrastRoot,body:has(.adminContrastRoot) [role="dialog"])
+ :is(input[type="checkbox"],input[type="radio"]){
+ accent-color:#244e6b;
+ width:17px;
+ height:17px;
+ opacity:1!important;
+}
+:is(.adminContrastRoot,body:has(.adminContrastRoot) [role="dialog"]) label{
+ color:#21354a;
+ font-weight:650;
+}
+:is(.adminContrastRoot,body:has(.adminContrastRoot) [role="dialog"]) button:disabled{
+ opacity:1!important;
+ color:#30485f!important;
+ -webkit-text-fill-color:#30485f!important;
+ background:#dde6ee!important;
+ border:1px solid #96a8b8!important;
+ text-shadow:none!important;
+ box-shadow:none!important;
+ cursor:not-allowed;
+}
+:is(.adminContrastRoot,body:has(.adminContrastRoot) [role="dialog"])
+ button:not([class]):not([style]):not(:disabled){
+ background:#e9f1f8;
+ border:1px solid #70899e;
+ color:#1a3950;
+ border-radius:8px;
+ font-weight:750;
+ min-height:40px;
+ padding:8px 12px;
+}
+.adminContrastRoot :is(main.admin,.adminmain,.adminStandalonePage)
+ :is(table,th,td,small,summary){
+ font-variant-numeric:tabular-nums;
+}
+.adminContrastRoot :is(main.admin,.adminmain,.adminStandalonePage) th{
+ color:#263c4f;
+ font-weight:750;
+}
+@media(max-width:650px){
+ :is(.adminContrastRoot,body:has(.adminContrastRoot) [role="dialog"])
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"])
+  :not([type="color"]):not([type="file"]):not([type="hidden"])
+  :not([type="submit"]):not([type="button"]):not([type="reset"]),select,textarea){
+  font-size:16px;
+ }
+ .adminContrastRoot main.admin{padding-left:14px!important;padding-right:14px!important}
+}
+@media print{
+ .adminContrastRoot :is(input,textarea,select,button){color-scheme:normal}
+}
