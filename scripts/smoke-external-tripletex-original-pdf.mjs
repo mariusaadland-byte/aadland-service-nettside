@@ -12,7 +12,7 @@ const fetcher=async(url,options)=>{
 };
 const returned=await tripletexUploadVoucherAttachment(333,bytes,"originalfaktura-10035.pdf",
  "test-session","test",{fetcher});
-assert.equal(returned.value.id,21);
+assert.equal(returned.accepted,true);
 assert.equal(seen.length,1);
 assert.ok(seen[0].url.endsWith("/ledger/voucher/333/attachment"));
 assert.equal(seen[0].options.method,"POST");
