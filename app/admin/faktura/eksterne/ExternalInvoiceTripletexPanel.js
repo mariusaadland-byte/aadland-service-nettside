@@ -11,7 +11,7 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
  const [record,setRecord]=useState(null),[error,setError]=useState("");
  const [info,setInfo]=useState("");
  const [vatRate,setVatRate]=useState("25"),[base,setBase]=useState("");
- const [number,setNumber]=useState("80000000"),[paymentType,setPaymentType]=useState("");
+ const [number,setNumber]=useState("90000000"),[paymentType,setPaymentType]=useState("");
  const [confirmed,setConfirmed]=useState(false);
  const [notImported,setNotImported]=useState(false);
  const [customerConfirmed,setCustomerConfirmed]=useState(false);
@@ -28,7 +28,9 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
    .then(async r=>{
     const d=await r.json().catch(()=>({}));
     if(!r.ok||!d.ok)throw Error(d.error||"Overføringsstatus kunne ikke hentes.");
-    if(live)setRecord(d.import||null);
+    if(live){setRecord(d.import||null);
+     if(!d.import&&Number.isSafeInteger(Number(d.suggestedImportNumber)))
+      setNumber(String(d.suggestedImportNumber));}
    }).catch(e=>{if(live)setError(e.message)})
    .finally(()=>{if(live)setLoading(false)});
   return()=>{live=false};
