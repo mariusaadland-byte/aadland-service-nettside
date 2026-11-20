@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
  calculateVippsCostPreview,VIPPS_COST_PAYMENT_PLANS
 } from "../../../lib/vippsCostCalculator";
+import {VIPPS_INTEGRATED_PAYMENT_RATE_SOURCE,VIPPS_STANDARD_RATE_BPS,VIPPS_STANDARD_FIXED_ORE} from "../../../lib/vippsFeeEstimate";
 import styles from "./vippsCostCalculator.module.css";
 
 const money=ore=>new Intl.NumberFormat("nb-NO",{
@@ -15,8 +16,8 @@ export default function VippsCostCalculatorClient(){
  const [invoicePrice,setInvoicePrice]=useState("1000,00");
  const [rentalPrice,setRentalPrice]=useState("1500,00");
  const [deposit,setDeposit]=useState("2000,00");
- const [rate,setRate]=useState("2,99");
- const [fixed,setFixed]=useState("1,00");
+ const [rate,setRate]=useState((VIPPS_STANDARD_RATE_BPS/100).toFixed(2).replace(".",","));
+ const [fixed,setFixed]=useState((VIPPS_STANDARD_FIXED_ORE/100).toFixed(2).replace(".",","));
  const [plan,setPlan]=useState("once");
  const [desired,setDesired]=useState("");
  const price=type==="rental"?rentalPrice:invoicePrice;
@@ -86,13 +87,19 @@ export default function VippsCostCalculatorClient(){
       </label>
      </div>
      <p className={styles.warning}>
-      <strong>Viktig:</strong> 2,99 % + 1 kr er kun et forhåndsutfylt
-      beregningseksempel, ikke bekreftede vilkår i din Vipps-avtale.
-      Endre feltene etter satsen du faktisk betaler.
+      <strong>Prisgrunnlag fra Vipps-portalen:</strong> Du sendte bilde av
+      «{VIPPS_INTEGRATED_PAYMENT_RATE_SOURCE.product}» med 2,99 % + 1 kr
+      per transaksjon 21.10.2026. I Aadland Service viser to faktiske
+      testoppgjør på 1 kr et trukket gebyr på 1,03 kr hver.
+      <strong> {type==="rental"?
+       "For Aadland Utleie er eventuell separat prisavtale ennå ikke kontrollert.":
+       "Dette samsvarer med prisen som vises i portalen."}</strong>
+      Vi har ikke sett en signert avtale med eventuelle spesialpriser.
+      Endre satsen dersom Vipps viser andre vilkår for salgsstedet.
      </p>
      <button type="button" className={styles.reset}
-      onClick={()=>{setRate("2,99");setFixed("1,00");setPlan("once");setDesired("");}}>
-      Nullstill gebyreksempelet
+      onClick={()=>{setRate((VIPPS_STANDARD_RATE_BPS/100).toFixed(2).replace(".",","));setFixed((VIPPS_STANDARD_FIXED_ORE/100).toFixed(2).replace(".",","));setPlan("once");setDesired("");}}>
+      Tilbakestill til pris vist i Vipps-portalen
      </button>
     </section>
 
