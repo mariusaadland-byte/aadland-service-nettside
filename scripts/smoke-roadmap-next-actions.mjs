@@ -8,7 +8,7 @@ const tests=[
  ["drawing_builder","/admin/tegning"],
  ["quote_pdf","/admin/tilbud"],
  ["suppliers","/admin/prisliste"],
- ["rental_booking","/admin/utleie"],
+ ["rental_booking","/admin/utleie/vipps-oppsett"],
  ["vipps","/admin/vipps-oppgjor"],
  ["custom-external-tripletex-paid-20261120","/admin/faktura/eksterne"],
  ["custom-external-ledger-review-20261120","/admin/regnskap"],
