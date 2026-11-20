@@ -18,7 +18,7 @@ const json=(body,status=200)=>NextResponse.json(body,{status,headers});
 const uuid=x=>typeof x==="string"&&
  /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(x);
 const positive=x=>Number.isSafeInteger(Number(x))&&Number(x)>0;
-const cols="external_invoice_id,import_number,status,vat_rate,base_ore,vat_ore,snapshot_gross_ore,snapshot_sha256,snapshot_paid,payment_type_import_id,prepared_at,confirmed_at,tripletex_invoice_id,snapshot_contact_id,tripletex_customer_id,tripletex_customer_number,snapshot_customer_name";
+const cols="external_invoice_id,import_number,status,vat_rate,base_ore,vat_ore,snapshot_gross_ore,snapshot_sha256,snapshot_paid,payment_type_import_id,prepared_at,confirmed_at,tripletex_invoice_id,snapshot_contact_id,tripletex_customer_id,tripletex_customer_number,snapshot_customer_name,transfer_method,payment_status,payment_date,tripletex_invoice_number";
 const normalized=x=>String(x||"").trim().replace(/\s+/g," ").toLocaleLowerCase("nb-NO");
 async function checkedRemoteList(session,environment,date){
  const next=nextInvoiceDate(date);
@@ -118,6 +118,10 @@ export async function GET(req){
    importNumber:claim.import_number,status:claim.status,
    vatRate:claim.vat_rate,baseOre:claim.base_ore,vatOre:claim.vat_ore,
    snapshotPaid:claim.snapshot_paid,
+   transferMethod:claim.transfer_method,
+   paymentStatus:claim.payment_status,
+   paymentDate:claim.payment_date,
+   tripletexInvoiceNumber:claim.tripletex_invoice_number,
    tripletexInvoiceId:claim.tripletex_invoice_id,
    preparedAt:claim.prepared_at,confirmedAt:claim.confirmed_at
   }:null});
