@@ -143,8 +143,30 @@ export async function POST(req){
    if(native.data?.length)return json({
     error:"Fakturanummeret finnes allerede i Aadland Service. Importen er sperret."
    },409);
+   const connection=await storedTripletexConnection(s);
+   if(!connection||connection.environment!=="production")
+    return json({error:"Koble til Tripletex-produksjon før importklargjøring."},409);
+   const session=await tripletexOpenSession(
+    unprotectTripletexToken(connection),connection.environment);
+   const customer=await verifiedCustomer(s,invoice,session,connection.environment);
+   if(!customer)return json({error:"Koble fakturaen til et kundekort i Aadland Service og overfør/koble kunden i Tripletex først. Ingen importfil er laget."},409);
+   const remote=await checkedRemoteList(session,connection.environment,invoice.issued_on);
+   // Reissued or pre-booked invoices must not be cloned under another import number.
+   const likelyExisting=remote.some(x=>!x.isCreditNote&&!x.isCredited&&
+    Number(x.customer?.id)===customer.tripletexCustomerId&&
+    String(x.invoiceDate||"").slice(0,10)===invoice.issued_on&&
+    nokToOre(x.amount)===Number(invoice.amount_ore));
+   if(likelyExisting)return json({error:
+    "Tripletex har allerede en faktura med samme kunde, dato og beløp. Kontroller om dette er den samme fakturaen før ny import. Ingen ny importfil opprettes."},409);
+   if(remote.some(x=>Number(x.invoiceNumber)===record.import_number))
+    return json({error:"Fakturanummeret er allerede i bruk i Tripletex. Velg et annet nummer i importserien."},409);
    const result=await s.from("external_invoice_tripletex_imports").insert({
-    external_invoice_id:invoice.id,...record,prepared_by:user.id,status:"prepared"
+    external_invoice_id:invoice.id,...record,prepared_by:user.id,
+    snapshot_contact_id:customer.contactId,
+    tripletex_customer_id:customer.tripletexCustomerId,
+    tripletex_customer_number:customer.tripletexCustomerNumber,
+    snapshot_customer_name:customer.customerName,
+    status:"prepared"
    }).select("external_invoice_id,import_number").single();
    if(result.error||!result.data)
     return json({error:result.error?.code==="23505"?
@@ -162,19 +184,12 @@ export async function POST(req){
    return json({error:"Koble til Tripletex-produksjon før du bekrefter import."},409);
   const session=await tripletexOpenSession(
    unprotectTripletexToken(connection),connection.environment);
-  const next=nextInvoiceDate(invoice.issued_on);
-  if(!next)return json({error:"Fakturadatoen kan ikke kontrolleres."},409);
-  const remote=await tripletexRead("/invoice?invoiceDateFrom="+invoice.issued_on+
-   "&invoiceDateTo="+next+"&count=1000&fields=id,invoiceNumber,invoiceDate,amount,amountOutstanding,customer,isCreditNote,isCredited",
-   session,connection.environment);
-  if(!Array.isArray(remote?.values)||remote.values.length>=1000||
-   (Number.isFinite(Number(remote?.fullResultSize))&&
-    Number(remote.fullResultSize)>remote.values.length))
-   return json({error:"Tripletex returnerte en ufullstendig fakturaliste. Ingen import blir bekreftet."},409);
-  const found=remote.values.filter(x=>Number(x.invoiceNumber)===Number(claim.import_number));
+  const remote=await checkedRemoteList(session,connection.environment,invoice.issued_on);
+  const found=remote.filter(x=>Number(x.invoiceNumber)===Number(claim.import_number));
   if(found.length!==1||!positive(found[0]?.id)||
    String(found[0].invoiceDate).slice(0,10)!==invoice.issued_on||
    nokToOre(found[0].amount)!==Number(invoice.amount_ore)||
+   Number(found[0]?.customer?.id)!==Number(claim.tripletex_customer_id)||
    found[0].isCreditNote||found[0].isCredited)
    return json({error:"Importen er ikke entydig funnet med riktig dato, nummer og beløp i Tripletex. Kontroller først under Fakturaoversikt der."},409);
   const updated=await s.from("external_invoice_tripletex_imports").update({
