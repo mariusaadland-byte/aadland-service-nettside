@@ -63,6 +63,12 @@ export default function InvoicesClient({archiveMode=false,isOwner=false}){
  const [invoiceListOpen,setInvoiceListOpen]=useState(()=>
   typeof window==="undefined"||!new URLSearchParams(window.location.search).has("id"));
  const paymentRequest=useRef(null);
+ // The combined owner archive is the primary list. Keep the legacy native
+ // invoice actions available on demand, not as a second expanded list.
+ useEffect(()=>{
+  if(archiveMode&&isOwner&&!new URLSearchParams(window.location.search).has("id"))
+   setInvoiceListOpen(false);
+ },[archiveMode,isOwner]);
  const today=osloDateKey(new Date());
  const summary=invoiceArchiveOverview(items,today);
  const rawVisibleItems=invoiceArchiveVisible(items,today,{archiveMode,filter,query:search,sort:sortMode});
