@@ -53,3 +53,14 @@
 .secondaryActions button[aria-pressed="true"]{color:#2e2112;text-decoration-thickness:2px}
 .secondaryActions button:hover{text-decoration-thickness:2px}
 @media(max-width:510px){.activeActionHeader{flex-wrap:wrap}.activeActionHeader button{min-height:42px}}
+
+/* One dedicated, compact entry beside Kladder and Fakturaarkiv. */
+.externalInvoiceNavLink{
+ display:inline-flex;align-items:center;justify-content:center;
+ min-height:42px;padding:9px 15px;border:1px solid #aa8449;
+ border-radius:9px;background:#f4e6cc;color:#3b2914!important;
+ font-weight:750;text-decoration:none!important;line-height:1.3;
+}
+.externalInvoiceNavLink:hover{background:#ead7b5;border-color:#8e713c}
+.externalInvoiceNavLink:focus-visible{outline:3px solid #9c7133;outline-offset:3px}
+@media(max-width:510px){.externalInvoiceNavLink{min-height:44px}}
