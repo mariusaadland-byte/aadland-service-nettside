@@ -29,13 +29,26 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
  const [confirmed,setConfirmed]=useState(false);
  const [notImported,setNotImported]=useState(false);
  const [customerConfirmed,setCustomerConfirmed]=useState(false);
+ const [direct,setDirect]=useState(null);
+ const [directLoading,setDirectLoading]=useState(true);
+ const [paymentTypeId,setPaymentTypeId]=useState("");
+ const [paymentSourceConfirmed,setPaymentSourceConfirmed]=useState(false);
  const url="/api/admin/invoices/external-register/tripletex";
+ const directUrl=url+"/direct";
+ const refreshDirect=async()=>{
+  const response=await fetch(directUrl+"?id="+encodeURIComponent(invoice.id),{cache:"no-store"});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||!result.ok)throw Error(result.error||"Direkte Tripletex-overføring kunne ikke kontrolleres.");
+  setDirect(result);
+  return result;
+ };
  const refresh=async()=>{
   const r=await fetch(url+"?id="+encodeURIComponent(invoice.id),{cache:"no-store"});
   const d=await r.json().catch(()=>({}));
   if(!r.ok||!d.ok)throw Error(d.error||"Kan ikke hente status fra Tripletex.");
   setRecord(d.import||null);
   setCustomerStatus(d.customerStatus||"missing_local_card");
+  await refreshDirect();
  };
  useEffect(()=>{
   let live=true;setLoading(true);setError("");
@@ -142,6 +155,69 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
   void readOriginalAmount();
   return()=>readerAbort.current?.abort();
  },[invoice.id]);
+ useEffect(()=>{
+  let live=true;
+  setDirectLoading(true);
+  fetch(directUrl+"?id="+encodeURIComponent(invoice.id),{cache:"no-store"})
+   .then(async response=>{
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||!data.ok)throw Error(data.error||"Betalingsmåtene kunne ikke leses.");
+    if(live)setDirect(data);
+   }).catch(e=>{if(live)setError(e.message)})
+   .finally(()=>{if(live)setDirectLoading(false)});
+  return()=>{live=false};
+ },[invoice.id]);
+ async function transferDirect(){
+  if(busy||record||directLoading||direct?.importExists||
+   !importAmountsMatch||customerStatus!=="linked_to_tripletex")return;
+  const selectedType=paid?Number(paymentTypeId):null;
+  if(paid&&(!selectedType||!paymentSourceConfirmed)){
+   setError("Velg riktig betalingsmåte i Tripletex og bekreft at innbetalingen ikke allerede er bokført.");
+   return;
+  }
+  const today=new Date().toLocaleDateString("en-CA",{timeZone:"Europe/Oslo"});
+  if(paid&&(!invoice.paid_on||invoice.paid_on>today)){
+   setError("Den lagrede betalingsdatoen er ikke gyldig. Rett betalingsdatoen i Aadland Service før overføring.");
+   return;
+  }
+  const approved=window.confirm(
+   "Du er i ferd med å BOKFØRE en ekstern faktura i Tripletex, ikke bare klargjøre CSV. "+
+   "Opprinnelig faktura "+invoice.invoice_number+" – "+invoice.customer_name+
+   ", "+kr(Number(invoice.amount_ore))+".\n\n"+
+   (paid?"Den lagrede innbetalingen på "+kr(Number(invoice.amount_ore))+
+    " blir også bokført automatisk på dato "+invoice.paid_on+
+    " med betalingsmåten du har valgt.\n\n":"Fakturaen registreres som ubetalt.\n\n")+
+   "Tripletex gir fakturaen et NYTT internt fakturanummer. Originalnummeret beholdes som referanse. "+
+   "Den sendes IKKE til kunden.\n\n"+
+   "Har du kontrollert at den ikke allerede er bokført, og at MVA og betalingsmåte er riktig?"
+  );
+  if(!approved)return;
+  setBusy(true);setError("");setInfo("");
+  try{
+   const response=await fetch(directUrl,{
+    method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+     action:"transfer-direct",id:invoice.id,confirmed:true,
+     notBookedElsewhere:notImported,verifiedPaymentSource:paid?paymentSourceConfirmed:true,
+     paymentTypeId:selectedType,vatRate,baseAmount:base,importNumber:number,
+     vatConfirmed:confirmed,notImportedConfirmed:notImported,
+     correctCustomerConfirmed:customerConfirmed
+    })
+   });
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok||!result.ok)throw Error(result.error||
+    "Resultatet av overføringen er uavklart. Kontroller Tripletex før nytt forsøk.");
+   setInfo("Overført til Tripletex – faktura "+result.tripletexInvoiceNumber+
+    (result.paymentStatus==="confirmed"?
+     ", med automatisk registrert betaling "+result.paidOn:"")+
+    ". Ingen faktura er sendt på nytt til kunden.");
+   await refresh();
+   onChanged?.();
+  }catch(e){
+   setError(e.message||"Overføringen kunne ikke bekreftes. Sjekk Tripletex før du prøver igjen.");
+   try{await refresh();}catch{}
+  }finally{setBusy(false);}
+ }
  async function prepare(){
   if(busy||record)return;
   if(!window.confirm("Klargjøre ekte fakturaimport til Tripletex for "+
