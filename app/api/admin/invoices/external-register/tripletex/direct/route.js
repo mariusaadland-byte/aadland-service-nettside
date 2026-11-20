@@ -112,6 +112,7 @@ export async function POST(req){
  const body=await req.json().catch(()=>({}));
  if(body?.action!=="transfer-direct"||!uuid(body.id)||
   body.confirmed!==true||body.notBookedElsewhere!==true||
+  body.accountingPeriodConfirmed!==true||
   (body.paymentTypeId!=null&&body.verifiedPaymentSource!==true))
   return json({error:"Bekreft fakturaen, at den ikke er bokført tidligere, og korrekt betalingsgrunnlag."},400);
  const s=db();if(!s)return json({error:"Databasen er utilgjengelig."},503);
@@ -190,7 +191,9 @@ export async function POST(req){
    .select("external_invoice_id").maybeSingle();
   if(stamped.error||!stamped.data)
    throw Error("Fakturaen kan være bokført i Tripletex, men lokal kobling mangler.");
-  const check=await tripletexRead("/invoice/"+createdId,session,connection.environment);
+  const invoiceDetailPath="/invoice/"+createdId+
+   "?fields=id,invoiceNumber,invoiceDate,customer,amount,amountOutstanding,isCreditNote,isCredited,currency";
+  const check=await tripletexRead(invoiceDetailPath,session,connection.environment);
   const verified=verifyDirectExternalInvoice(check?.value,customer.id,invoice.issued_on,
    Number(invoice.amount_ore));
   const marked=await s.from("external_invoice_tripletex_imports").update({
@@ -210,15 +213,17 @@ export async function POST(req){
     .eq("payment_status","pending").select("external_invoice_id").maybeSingle();
    if(payClaim.error||!payClaim.data)
     throw Error("Betalingen kan ikke låses mot dobbel overføring.");
-   const ready=await tripletexRead("/invoice/"+createdId,session,connection.environment);
+   const ready=await tripletexRead(invoiceDetailPath,session,connection.environment);
    const payment=assertReadyToPostHistoricalPayment(invoice,ready?.value,
     paymentTypeId,osloToday());
    paymentAttempted=true;
    await tripletexRecordInvoicePayment(createdId,payment.date,payment.paymentTypeId,
     payment.amountOre,session,connection.environment);
-   const after=await tripletexRead("/invoice/"+createdId,session,connection.environment);
+   const after=await tripletexRead(invoiceDetailPath,session,connection.environment);
    if(nokToOre(after?.value?.amountOutstanding)!==0||
-    nokToOre(after?.value?.amount)!==Number(invoice.amount_ore))
+    nokToOre(after?.value?.amount)!==Number(invoice.amount_ore)||
+    safePositive(after?.value?.customer?.id)!==customer.id||
+    after?.value?.isCreditNote||after?.value?.isCredited)
     throw Error("Betalingen ble sendt, men Tripletex bekreftet ikke full innbetaling.");
    const done=await s.from("external_invoice_tripletex_imports").update({
     payment_status:"confirmed",payment_confirmed_at:new Date().toISOString(),
