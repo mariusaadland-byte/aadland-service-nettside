@@ -40,6 +40,7 @@ export default function RentalInventoryClient(){
   <nav className={styles.actions} aria-label="Utleiehandlinger">
    <Link href="/admin/utleiekategorier">Kategorier</Link>
    <Link href="/admin/utleie/depositum">Depositum og returkontroll</Link>
+   <Link href="/admin/vipps-kostnadskalkulator">Vipps-kostnad og utbetaling</Link>
    <Link href="/admin">Bookinger og kalender</Link>
    <Link href="/utleie" target="_blank" rel="noreferrer">Se offentlig utleieside</Link>
    <button type="button" onClick={load} disabled={loading}>Oppdater</button>
