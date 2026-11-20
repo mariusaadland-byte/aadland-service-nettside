@@ -1,5 +1,7 @@
 "use client";
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
+import {readExternalInvoiceAmountFromOriginal} from "../../../../lib/externalInvoiceDocumentReader";
+import {parseExternalInvoiceOre} from "../../../../lib/externalInvoiceRegister";
 const kr=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(n/100);
 const box={padding:12,border:"1px solid #d7c8aa",borderRadius:10,marginTop:10,
  background:"#f9f7f2",display:"grid",gap:12};
@@ -10,7 +12,13 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
  const [record,setRecord]=useState(null),[error,setError]=useState("");
  const [info,setInfo]=useState("");
- const [vatRate,setVatRate]=useState("25"),[base,setBase]=useState("");
+ const [vatRate,setVatRate]=useState(""),[base,setBase]=useState("");
+ const [readerStatus,setReaderStatus]=useState("idle");
+ const [readerMessage,setReaderMessage]=useState("");
+ const [readerSource,setReaderSource]=useState("");
+ const [detectedVatOre,setDetectedVatOre]=useState(null);
+ const readerAbort=useRef(null);
+ const userChanged=useRef(false);
  const [number,setNumber]=useState("90000000");
  const [customerStatus,setCustomerStatus]=useState("loading");
  const [confirmed,setConfirmed]=useState(false);
@@ -39,6 +47,78 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
   return()=>{live=false};
  },[invoice.id]);
  const paid=invoice.status==="paid";
+ const enteredBaseOre=parseExternalInvoiceOre(base);
+ const computedVatOre=enteredBaseOre!==null&&[12,15,25].includes(Number(vatRate))?
+  Math.round(enteredBaseOre*Number(vatRate)/100):null;
+ const importAmountsMatch=computedVatOre!==null&&
+  enteredBaseOre+computedVatOre===Number(invoice.amount_ore);
+ async function readOriginalAmount({manualRetry=false}={}){
+  readerAbort.current?.abort();
+  const controller=new AbortController();
+  readerAbort.current=controller;
+  if(manualRetry){userChanged.current=false;setConfirmed(false);}
+  setReaderStatus("reading");setReaderMessage("Åpner originalfakturaen …");
+  setReaderSource("");setDetectedVatOre(null);
+  try{
+   const suggestion=await readExternalInvoiceAmountFromOriginal({
+    id:invoice.id,invoiceNumber:invoice.invoice_number,
+    amountOre:Number(invoice.amount_ore)
+   },message=>{
+    if(!controller.signal.aborted)setReaderMessage(message);
+   },controller.signal);
+   if(controller.signal.aborted)return;
+   if(suggestion.ok){
+    if(!userChanged.current){
+     setBase(suggestion.baseAmount);
+     setVatRate(String(suggestion.vatRate));
+     setReaderStatus("found");
+     setReaderSource(suggestion.method);
+     setDetectedVatOre(suggestion.vatOre);
+     setReaderMessage("Beløp ekskl. MVA og avgift er hentet fra originalfakturaen. Kontroller begge beløpene før import.");
+    }else{
+     setReaderStatus("manual");
+     setReaderMessage("Du har endret tallene selv. Den automatiske lesingen overskrev dem ikke.");
+    }
+   }else{
+    setReaderStatus("manual");
+    setReaderMessage(suggestion.reason||"Kunne ikke lese MVA-beløpene sikkert. Kontroller fakturaen.");
+   }
+  }catch(error){
+   if(!controller.signal.aborted){
+    setReaderStatus("manual");
+    setReaderMessage(error.message||"Originalfakturaen kunne ikke leses. Kontroller MVA-grunnlaget manuelt.");
+   }
+  }finally{
+   if(readerAbort.current===controller)readerAbort.current=null;
+  }
+ }
+ function manualAmountChange(kind,value){
+  userChanged.current=true;
+  setReaderStatus("manual");setReaderSource("");setDetectedVatOre(null);
+  setConfirmed(false);
+  if(kind==="rate")setVatRate(value);
+  else setBase(value);
+ }
+ function calculateFromStoredTotal(){
+  const rate=Number(vatRate),total=Number(invoice.amount_ore);
+  if(![12,15,25].includes(rate)||!Number.isSafeInteger(total)||total<=0)return;
+  const net=Math.round(total*100/(100+rate));
+  const tax=Math.round(net*rate/100);
+  if(net<=0||net+tax!==total){
+   setReaderMessage("Totalbeløpet kan ikke fordeles nøyaktig på valgt MVA-sats. Kontroller manuelt.");
+   return;
+  }
+  userChanged.current=true;
+  setBase((net/100).toFixed(2).replace(".",","));
+  setDetectedVatOre(tax);setReaderSource("");
+  setReaderStatus("calculated");setConfirmed(false);
+  setReaderMessage("Beregnet fra den registrerte totalsummen, ikke lest fra PDF-en. Må kontrolleres mot originalfakturaen.");
+ }
+ useEffect(()=>{
+  userChanged.current=false;
+  void readOriginalAmount();
+  return()=>readerAbort.current?.abort();
+ },[invoice.id]);
  async function prepare(){
   if(busy||record)return;
   if(!window.confirm("Klargjøre ekte fakturaimport til Tripletex for "+
@@ -107,27 +187,61 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
     }} disabled={busy}>Oppdater kundekobling</button>
    </div>
    <p style={{fontSize:13,margin:0}}>
-    <strong>Oppgi eksakt avgiftsgrunnlag fra PDF-en.</strong> Automatisk
-    MVA-gjetting er ikke tillatt. Denne enkle importen støtter fakturaer med
+    <strong>MVA-grunnlag fra originalfakturaen.</strong> PDF-leseren fyller inn
+    sats og beløp når den finner et entydig grunnlag som stemmer med totalsummen.
+    Denne enkle importen støtter fakturaer med
     kun én avgiftssats (12, 15 eller 25 %). Andre fakturaer må gjennomgås
     særskilt i Tripletex.</p>
    <div style={{display:"grid",gap:10,
     gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,190px),1fr))"}}>
     <label style={label}>MVA-sats på hele fakturaen
-     <select value={vatRate} onChange={e=>{setVatRate(e.target.value);setConfirmed(false);}}>
+     <select value={vatRate} onChange={e=>manualAmountChange("rate",e.target.value)}>
+      <option value="">Velg MVA-sats</option>
       <option value="25">25 %</option><option value="15">15 %</option>
       <option value="12">12 %</option>
      </select>
     </label>
     <label style={label}>Eksakt beløp eks. MVA (kr)
      <input style={input} inputMode="decimal" value={base}
-      placeholder="F.eks. 1000,00" onChange={e=>{setBase(e.target.value);setConfirmed(false);}}/>
+      placeholder="Hentes automatisk fra PDF" onChange={e=>manualAmountChange("base",e.target.value)}/>
     </label>
     <label style={label}>Ledig Tripletex-importnummer
      <input style={input} inputMode="numeric" value={number}
       onChange={e=>{setNumber(e.target.value);setNotImported(false);}}/>
     </label>
     
+   </div>
+   <div style={{display:"grid",gap:8,padding:10,border:"1px solid #d6dfd5",
+    borderRadius:9,background:"#fff"}}>
+    <strong>Automatisk lesing av originalfakturaen</strong>
+    <p role="status" style={{fontSize:13,margin:0}}>
+     {readerStatus==="reading"?"Leser dokumentet: ":""}{readerMessage||
+      "Leseren starter når overføringen åpnes."}
+    </p>
+    {readerStatus==="found"&&<p style={{fontSize:13,margin:0}}>
+     Hentet fra {readerSource}: ekskl. MVA {kr(enteredBaseOre||0)},
+     MVA {kr(detectedVatOre||0)}, total {kr(Number(invoice.amount_ore))}.
+    </p>}
+    <div style={{display:"flex",gap:9,flexWrap:"wrap"}}>
+     <button type="button" disabled={busy||readerStatus==="reading"}
+      onClick={()=>readOriginalAmount({manualRetry:true})}>
+      Les originalfakturaen på nytt
+     </button>
+     <button type="button" disabled={busy||readerStatus==="reading"||
+      ![12,15,25].includes(Number(vatRate))}
+      onClick={calculateFromStoredTotal}>
+      Beregn fra total og valgt MVA-sats
+     </button>
+    </div>
+    {enteredBaseOre!==null&&computedVatOre!==null&&<p style={{fontSize:13,
+     margin:0,color:importAmountsMatch?"#246346":"#9b3428"}}>
+     {kr(enteredBaseOre)} ekskl. MVA + {kr(computedVatOre)} MVA =
+     {" "}{kr(enteredBaseOre+computedVatOre)}.
+     {importAmountsMatch?" Stemmer med registrert fakturasum.":
+      " Stemmer IKKE med registrert fakturasum – kontroller tallene."}
+    </p>}
+    <small>Beløpet må fortsatt bekreftes mot originalfakturaen.
+     Ingen MVA eller faktura bokføres automatisk.</small>
    </div>
    <p style={{fontSize:13,margin:0}}>
     Fakturabeløp fra originalen: <strong>{kr(Number(invoice.amount_ore))}</strong>.
@@ -143,7 +257,8 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
     onChange={e=>setNotImported(e.target.checked)}/>
     Fakturaen er ikke allerede importert eller bokført i Tripletex.</label>
    <button type="button" disabled={busy||!confirmed||!customerConfirmed||
-    !notImported||!base||!number||customerStatus!=="linked_to_tripletex"} onClick={prepare}
+    !notImported||!importAmountsMatch||!number||
+    customerStatus!=="linked_to_tripletex"||readerStatus==="reading"} onClick={prepare}
     style={buttons}>{busy?"Kontrollerer …":"Klargjør Tripletex-import"}</button>
   </>}
   {record&&<>
