@@ -65,7 +65,7 @@ for(const marker of [
  "manualAmountChange","userChanged.current","readOriginalAmount({manualRetry:true})",
  "Hentet fra {readerSource}","importAmountsMatch",
  "Beløp ekskl. MVA og avgift er hentet fra originalfakturaen",
- "Beregnet fra den registrerte totalsummen, ikke lest fra PDF-en"
+ "Dette er beregnet fra totalsummen, ikke lest fra PDF-en"
 ])assert.ok(ui.includes(marker),"Missing UI "+marker);
 assert.ok(ui.includes('useState(""),[base,setBase]=useState("")'),
  "Do not preset 25% tax when original VAT rate is unknown");
