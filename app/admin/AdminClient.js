@@ -37,7 +37,7 @@ const ADMIN_NAV_GROUPS=[
   {id:"jobs",title:"Oppdrag og planlegging",icon:"▤",ids:["jobs","jobCalendar","workClock","drawing"]},
   {id:"shop",title:"Produkter og tjenester",icon:"◫",ids:["products","categories","services"]},
   {id:"rental",title:"Utleie",icon:"▣",ids:["rental","rentalCalendar","rentalBookings"]},
-  {id:"tools",title:"Kalkyle og betaling",icon:"⌗",ids:["calculator","materialAi","vipps"]},
+  {id:"tools",title:"Kalkyle og betaling",icon:"⌗",ids:["calculator","materialAi","vipps","vippsCostCalculator"]},
   {id:"website",title:"Nettsiden",icon:"▥",ids:["projects","homepage"]},
   {id:"settings",title:"Styring og utvikling",icon:"⚙",ids:["roadmap","users"]}
 ];
@@ -510,6 +510,7 @@ export default function AdminClient({ user }) {
     ["accountLedger","Regnskapsark"],
     ["accountTransfers","Tripletex-overføring"],
     ["vippsSettlement","Vipps-oppgjør og avstemming"],
+     ["vippsCostCalculator","Vipps-kostnadskalkulator"],
     ["roadmap", "Utviklingsplan"]
   );
   const navLabels=new Map(tabs);
@@ -552,6 +553,7 @@ export default function AdminClient({ user }) {
     if (id === "drawings") { setMenuOpen(false); router.push("/admin/tegninger"); return; }
     if (id === "workClock") { setMenuOpen(false); router.push("/admin/arbeidsklokke"); return; }
     if (id === "calculator") { setMenuOpen(false); router.push("/admin/kalkulator"); return; }
+    if (id === "vippsCostCalculator") { if(user?.role!=="owner")return; setMenuOpen(false); router.push("/admin/vipps-kostnadskalkulator"); return; }
     if (id === "materialAi") { setMenuOpen(false); router.push("/admin/material-ai"); return; }
     if (id === "reminders") { setMenuOpen(false); router.push("/admin/purring"); return; }
     if (id === "vipps") { setMenuOpen(false); router.push("/admin/vipps"); return; }
