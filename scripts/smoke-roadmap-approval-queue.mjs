@@ -31,7 +31,8 @@ const testIDs=[
  "custom-external-ledger-review-20261120",
  "suppliers","rental_booking","vipps",
  "custom-invoice-vipps-payment-20261021",
- "custom-external-vat-double-count-20261120"
+ "custom-external-vat-double-count-20261120",
+ "custom-tripletex-original-pdf-20261120"
 ];
 assert.deepEqual(Object.keys(APPROVAL_CHECKS).sort(),testIDs.slice().sort(),
  "Every development plan task currently awaiting approval must have reviewed criteria");
@@ -48,14 +49,14 @@ const queue=developmentApprovalQueue(testIDs.map((id,i)=>({
  {id:"planned",status:"todo",priority:"high"},
  {id:"progress",status:"progress",priority:"high"}
 ]));
-assert.equal(queue.length,29);
+assert.equal(queue.length,30);
 assert.equal(queue[0].id,"custom-invoice-customer-card-20261021",
  "Begin with fast, nonpayment customer-card approval");
-assert.equal(queue.at(-1).id,"custom-external-vat-double-count-20261120",
- "Accounting reconciliation must not be prematurely approved");
+assert.equal(queue.at(-1).id,"custom-tripletex-original-pdf-20261120",
+ "Actual PDF attachment confirmation must not be prematurely approved");
 assert.equal(queue.filter(x=>x.approval.group==="quick").length,13);
 assert.equal(queue.filter(x=>x.approval.group==="workflow").length,11);
-assert.equal(queue.filter(x=>x.approval.group==="dependent").length,5);
+assert.equal(queue.filter(x=>x.approval.group==="dependent").length,6);
 assert.equal(approvalMeta({id:"done",status:"done"}),null);
 assert.equal(developmentApprovalQueue(null).length,0);
 assert.equal(approvalMeta({id:"unknown",status:"test"}).checks.length,3,
@@ -100,4 +101,4 @@ for(const key of [".approvalBoard",".wizardTileGrid",".wizardBackdrop",
  ".wizardDialog",".wizardStepBody",".wizardPrimary",".wizardIssue",
  ".wizardDialogFooter",".fullPlanToggle","@media(max-width:740px)"])
  assert.ok(css.includes(key));
-console.log("Utviklingsplan testvindu: 29 testoppgaver, 13 raske, 11 fullflyt, 5 avhengigheter, veiledet steg for steg, eiergodkjenning og lagret fremdrift.");
+console.log("Utviklingsplan testvindu: 30 testoppgaver, 13 raske, 11 fullflyt, 6 avhengigheter, veiledet steg for steg, eiergodkjenning og lagret fremdrift.");
