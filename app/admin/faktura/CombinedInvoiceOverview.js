@@ -22,6 +22,7 @@ function combinedInvoiceRows(native,external,today){
    date:x.issued_on||"",due:x.due_on||"",total,
    paid:isPaid?total:0,outstanding:isPaid?0:total,
    state:isPaid?"paid":x.due_on<today?"overdue":"unpaid",
+   tripletexStatus:x.tripletex_import?.status||null,
    href:"/admin/faktura/eksterne?id="+encodeURIComponent(x.id),
    label:isPaid?"Betalt":x.due_on<today?"Forfalt":"Ubetalt"};
  });
@@ -124,6 +125,9 @@ export default function CombinedInvoiceOverview({nativeInvoices=[]}){
       <strong>{x.number}</strong> · {x.customer}
       <small style={{display:"block",color:"#635b52"}}>
        {x.source} · Fakturadato {x.date||"ukjent"} · Forfall {x.due||"ukjent"}
+       {x.tripletexStatus?" · Tripletex: "+(x.tripletexStatus==="confirmed"?
+        "import bekreftet":x.tripletexStatus==="prepared"?
+        "CSV klargjort, ikke bekreftet importert":"krever kontroll"):""}
       </small>
      </span>
      <span style={{textAlign:"right"}}>
