@@ -189,7 +189,7 @@ export default function ApprovalQueue({
     aria-labelledby="wizard-title" aria-describedby="wizard-explanation">
     <div className={styles.wizardDialogHeader}>
      <div>
-      <p className={styles.approvalEyebrow}>TESTVINDU · {Math.max(1,queue.findIndex(x=>x.id===current.id)+1)} AV {queue.length}</p>
+      <p className={styles.approvalEyebrow}>TESTVINDU · {Math.max(1,queue.findIndex(x=>x.id===current.id)+1)} AV {queue.length} · {APPROVAL_GROUPS[current.approval.group]?.label}</p>
       <h2 id="wizard-title">{current.title}</h2>
      </div>
      <button type="button" className={styles.wizardClose} onClick={()=>setIsOpen(false)}
