@@ -48,7 +48,12 @@ export async function GET(req){
     "X-Content-Type-Options":"nosniff"
    }});
   }
-  return json({ok:true,import:claim?{
+  const mostRecent=await s.from("external_invoice_tripletex_imports")
+   .select("import_number").order("import_number",{ascending:false}).limit(1);
+  if(mostRecent.error)return json({error:"Kunne ikke kontrollere siste importnummer."},503);
+  const top=Number(mostRecent.data?.[0]?.import_number||89999999);
+  const suggestedImportNumber=top>=90000000&&top<999999999?top+1:90000000;
+  return json({ok:true,suggestedImportNumber,import:claim?{
    importNumber:claim.import_number,status:claim.status,
    vatRate:claim.vat_rate,baseOre:claim.base_ore,vatOre:claim.vat_ore,
    snapshotPaid:claim.snapshot_paid,
