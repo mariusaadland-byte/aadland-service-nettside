@@ -94,13 +94,26 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
  }
  function manualAmountChange(kind,value){
   userChanged.current=true;
-  setReaderStatus("manual");setReaderSource("");setDetectedVatOre(null);
   setConfirmed(false);
-  if(kind==="rate")setVatRate(value);
-  else setBase(value);
+  setReaderSource("");setDetectedVatOre(null);
+  if(kind==="rate"){
+   setVatRate(value);
+   if(!value){
+    setBase("");setReaderStatus("manual");
+    setReaderMessage("Velg en MVA-sats for å beregne fra totalbeløpet.");
+   }else{
+    // The owner has explicitly chosen the VAT rate. Use the gross amount
+    // already recorded on the invoice to calculate net immediately.
+    calculateFromStoredTotal(value);
+   }
+  }else{
+   setReaderStatus("manual");
+   setBase(value);
+   setReaderMessage("Beløp ekskl. MVA er redigert manuelt. Kontroller mot originalfakturaen.");
+  }
  }
- function calculateFromStoredTotal(){
-  const rate=Number(vatRate),total=Number(invoice.amount_ore);
+ function calculateFromStoredTotal(selectedRate=vatRate){
+  const rate=Number(selectedRate),total=Number(invoice.amount_ore);
   if(![12,15,25].includes(rate)||!Number.isSafeInteger(total)||total<=0)return;
   const net=Math.round(total*100/(100+rate));
   const tax=Math.round(net*rate/100);
@@ -112,7 +125,11 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
   setBase((net/100).toFixed(2).replace(".",","));
   setDetectedVatOre(tax);setReaderSource("");
   setReaderStatus("calculated");setConfirmed(false);
-  setReaderMessage("Beregnet fra den registrerte totalsummen, ikke lest fra PDF-en. Må kontrolleres mot originalfakturaen.");
+  setReaderMessage("Beregnet automatisk etter at du valgte "+rate+" % MVA: "+
+   (net/100).toFixed(2).replace(".",",")+" kr ekskl. MVA + "+
+   (tax/100).toFixed(2).replace(".",",")+" kr MVA = "+
+   (total/100).toFixed(2).replace(".",",")+" kr inkl. MVA. "+
+   "Dette er beregnet fra totalsummen, ikke lest fra PDF-en. Kontroller mot originalfakturaen.");
  }
  useEffect(()=>{
   userChanged.current=false;
@@ -244,7 +261,7 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
      </button>
      <button type="button" disabled={busy||readerStatus==="reading"||
       ![12,15,25].includes(Number(vatRate))}
-      onClick={calculateFromStoredTotal}>
+      onClick={()=>calculateFromStoredTotal()}>
       Beregn fra total og valgt MVA-sats
      </button>
     </div>
