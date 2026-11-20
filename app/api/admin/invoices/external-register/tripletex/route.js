@@ -19,7 +19,7 @@ const uuid=x=>typeof x==="string"&&
  /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(x);
 const positive=x=>Number.isSafeInteger(Number(x))&&Number(x)>0;
 const cols="external_invoice_id,import_number,status,vat_rate,base_ore,vat_ore,snapshot_gross_ore,snapshot_sha256,snapshot_paid,payment_type_import_id,prepared_at,confirmed_at,tripletex_invoice_id,snapshot_contact_id,tripletex_customer_id,tripletex_customer_number,snapshot_customer_name";
-const normalized=x=>String(x||"").trim().replace(/\\s+/g," ").toLocaleLowerCase("nb-NO");
+const normalized=x=>String(x||"").trim().replace(/\s+/g," ").toLocaleLowerCase("nb-NO");
 async function checkedRemoteList(session,environment,date){
  const next=nextInvoiceDate(date);
  if(!next)throw Error("Ugyldig fakturadato.");
@@ -33,21 +33,17 @@ async function checkedRemoteList(session,environment,date){
  return remote.values;
 }
 async function verifiedCustomer(s,invoice,session,environment){
- const [linkResult,connectionResult]=await Promise.all([
-  s.from("invoice_customer_card_links").select("contact_id")
-   .eq("invoice_kind","external").eq("invoice_id",invoice.id).maybeSingle(),
-  s.from("tripletex_customer_links")
-   .select("source_id,status,tripletex_customer_id").eq("source_type","contact")
-   .eq("environment",environment).eq("status","linked").limit(5001)
- ]);
- if(linkResult.error||connectionResult.error)throw Error("Kundekortkoblingene kunne ikke kontrolleres.");
+ const linkResult=await s.from("invoice_customer_card_links").select("contact_id")
+   .eq("invoice_kind","external").eq("invoice_id",invoice.id).maybeSingle();
+ if(linkResult.error)throw Error("Kundekortkoblingen kunne ikke kontrolleres.");
  const contactId=linkResult.data?.contact_id;
  if(!contactId)return null;
- // A small owner-only customer mapping is enough; never silently use another
- // contact's remote ID for an issued invoice.
- const links=connectionResult.data||[];
- if(links.length>=5001)throw Error("Kundelisten er for omfattende for en sikker kontroll.");
- const local=links.find(x=>x.source_id===contactId);
+ const connectionResult=await s.from("tripletex_customer_links")
+   .select("source_id,status,tripletex_customer_id").eq("source_type","contact")
+   .eq("source_id",contactId).eq("environment",environment).maybeSingle();
+ if(connectionResult.error)throw Error("Tripletex-kundekoblingen kunne ikke kontrolleres.");
+ const local=connectionResult.data;
+ if(local?.status!=="linked")return null;
  if(!local||!positive(local.tripletex_customer_id))return null;
  const response=await tripletexRead("/customer/"+Number(local.tripletex_customer_id),
   session,environment);
@@ -98,7 +94,23 @@ export async function GET(req){
   if(mostRecent.error)return json({error:"Kunne ikke kontrollere siste importnummer."},503);
   const top=Number(mostRecent.data?.[0]?.import_number||89999999);
   const suggestedImportNumber=top>=90000000&&top<999999999?top+1:90000000;
-  return json({ok:true,suggestedImportNumber,import:claim?{
+  const local=await s.from("invoice_customer_card_links").select("contact_id")
+   .eq("invoice_kind","external").eq("invoice_id",invoice.id).maybeSingle();
+  if(local.error)throw Error("Kundekortkoblingen kunne ikke kontrolleres.");
+  const connection=await storedTripletexConnection(s);
+  let customerStatus=local.data?.contact_id?"not_linked_to_tripletex":"missing_local_card";
+  if(local.data?.contact_id&&connection){
+   const link=await s.from("tripletex_customer_links")
+    .select("status,tripletex_customer_id")
+    .eq("source_type","contact").eq("source_id",local.data.contact_id)
+    .eq("environment",connection.environment).maybeSingle();
+   if(link.error)throw Error("Tripletex-kundestatus kunne ikke kontrolleres.");
+   if(link.data?.status==="linked"&&positive(link.data.tripletex_customer_id))
+    customerStatus="linked_to_tripletex";
+   else if(["processing","needs_review"].includes(link.data?.status))
+    customerStatus="needs_review";
+  }
+  return json({ok:true,suggestedImportNumber,customerStatus,import:claim?{
    importNumber:claim.import_number,status:claim.status,
    vatRate:claim.vat_rate,baseOre:claim.base_ore,vatOre:claim.vat_ore,
    snapshotPaid:claim.snapshot_paid,
