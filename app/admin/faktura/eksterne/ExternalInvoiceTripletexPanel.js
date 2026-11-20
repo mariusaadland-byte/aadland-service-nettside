@@ -323,6 +323,16 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
       "Kundeoverføringen er uavklart. Kontroller den i Tripletex før du fortsetter.":
       "Kundekortet finnes på nettsiden, men må opprettes eller kobles i Tripletex før import."}
     </p>
+    {customerStatus==="not_linked_to_tripletex"&&linkedContactId&&
+     <button type="button" onClick={linkCustomerNow} disabled={busy}
+      style={{...buttons,background:"#254b68",color:"#fff",
+       borderColor:"#254b68"}}>
+      {busy?"Kontrollerer kunden …":"Koble kunde til Tripletex"}
+     </button>}
+    {customerStatus==="missing_local_card"&&<p style={{
+     fontSize:14,margin:0,fontWeight:650,color:"#263c4f"}}>
+     Bruk knappen «Kundekort – velg eller opprett» rett over dette panelet.
+    </p>}
     <button type="button" onClick={async()=>{
      setBusy(true);setError("");
      try{await refresh();}catch(e){setError(e.message)}
@@ -458,13 +468,24 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
     {directLoading&&<p role="status">Kontrollerer betalingstyper i Tripletex …</p>}
     {direct?.configured===false&&<p role="alert">
      Koble til Tripletex-produksjon før automatisk overføring.</p>}
+    {transferSteps.length>0&&<div style={{
+     border:"1.5px solid #b08942",borderRadius:9,padding:12,
+     background:"#fffaf0",color:"#293b4c",display:"grid",gap:7}}>
+     <strong style={{fontSize:15}}>Før overføring: {transferSteps.length} punkt
+      {transferSteps.length===1?"":"er"} gjenstår</strong>
+     <p style={{fontSize:13,margin:0}}>Du kan trykke på «Overfør» for å se
+      hvorfor den ikke er klar. Ingenting sendes før alle kontroller er godkjent.</p>
+     {(showTransferSteps||transferSteps.length<=2)&&
+      <ol style={{margin:"4px 0",paddingLeft:21,fontSize:14,lineHeight:1.55}}>
+       {transferSteps.map(step=><li key={step}>{step}</li>)}
+      </ol>}
+     {!showTransferSteps&&transferSteps.length>2&&
+      <button type="button" onClick={()=>setShowTransferSteps(true)}
+       style={buttons}>Vis alle {transferSteps.length} punkter</button>}
+    </div>}
     <button type="button" className="externalTripletexPrimaryButton"
      style={buttons}
-     disabled={busy||directLoading||!direct?.configured||
-      !confirmed||!customerConfirmed||!notImported||
-      !accountingPeriodConfirmed||!importAmountsMatch||
-      !number||customerStatus!=="linked_to_tripletex"||readerStatus==="reading"||
-      (paid&&(!invoice.paid_on||!paymentTypeId||!paymentSourceConfirmed))}
+     disabled={busy}
      onClick={transferDirect}>
      {busy?"Overfører og kontrollerer …":
       paid?"Overfør faktura + registrer lagret betaling automatisk":
