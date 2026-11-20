@@ -53,7 +53,17 @@ export async function GET(req){
   .order("created_at",{ascending:false}).order("id",{ascending:false})
   .range(offset,offset+size);
  if(error||!Array.isArray(data))return json({error:"Fakturaoversikten kunne ikke hentes."},503);
- return json({ok:true,invoices:data.slice(0,size),hasMore:data.length>size,nextOffset:offset+size});
+ const rows=data.slice(0,size);
+ if(!rows.length)return json({ok:true,invoices:[],hasMore:false,nextOffset:offset+size});
+ const imported=await s.from("external_invoice_tripletex_imports")
+  .select("external_invoice_id,status,import_number")
+  .in("external_invoice_id",rows.map(x=>x.id)).limit(101);
+ if(imported.error||!Array.isArray(imported.data))
+  return json({error:"Tripletex-overføringsstatus kunne ikke kontrolleres."},503);
+ const byId=new Map(imported.data.map(x=>[x.external_invoice_id,x]));
+ return json({ok:true,invoices:rows.map(x=>({
+  ...x,tripletex_import:byId.get(x.id)||null
+ })),hasMore:data.length>size,nextOffset:offset+size});
 }
 
 export async function POST(req){
