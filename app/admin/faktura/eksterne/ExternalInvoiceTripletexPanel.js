@@ -3,11 +3,15 @@ import {useEffect,useRef,useState} from "react";
 import {readExternalInvoiceAmountFromOriginal} from "../../../../lib/externalInvoiceDocumentReader";
 import {parseExternalInvoiceOre} from "../../../../lib/externalInvoiceRegister";
 const kr=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(n/100);
-const box={padding:12,border:"1px solid #d7c8aa",borderRadius:10,marginTop:10,
- background:"#f9f7f2",display:"grid",gap:12};
-const input={width:"100%",maxWidth:410};
-const label={display:"grid",gap:4,fontSize:13,fontWeight:700};
-const buttons={padding:"10px 14px",borderRadius:9,fontWeight:700};
+const box={padding:"clamp(14px,2.5vw,22px)",border:"2px solid #9baebd",borderRadius:12,marginTop:10,
+ background:"#fff",color:"#192b3b",display:"grid",gap:14};
+const input={width:"100%",maxWidth:410,minHeight:44,fontSize:16,fontWeight:750,
+ padding:"10px 12px",color:"#192b3b",background:"#fff",
+ border:"1.5px solid #71869a",borderRadius:8};
+const label={display:"grid",gap:6,fontSize:15,fontWeight:750,color:"#192b3b"};
+const buttons={padding:"11px 14px",borderRadius:9,fontWeight:750,
+ fontSize:15,minHeight:44,background:"#e9f1f8",color:"#18374f",
+ border:"1.5px solid #7892a6"};
 export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
  const [record,setRecord]=useState(null),[error,setError]=useState("");
@@ -174,7 +178,7 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
   }catch(e){setError(e.message||"Tripletex kunne ikke bekrefte fakturaen.");}
   finally{setBusy(false);}
  }
- return <section style={box}>
+ return <section className="externalTripletexPanel" style={box}>
   <h3 style={{fontSize:17,margin:0}}>Tripletex – ekstern faktura {invoice.invoice_number}</h3>
   <p style={{fontSize:13,margin:0}}>
    Originalen er allerede utstedt i {invoice.source_system}. I Tripletex
@@ -291,6 +295,7 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
    <button type="button" disabled={busy||!confirmed||!customerConfirmed||
     !notImported||!importAmountsMatch||!number||
     customerStatus!=="linked_to_tripletex"||readerStatus==="reading"} onClick={prepare}
+    className="externalTripletexPrimaryButton"
     style={buttons}>{busy?"Kontrollerer …":"Klargjør Tripletex-import"}</button>
   </>}
   {record&&<>
@@ -319,7 +324,7 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
      inneholder fakturadata, ikke PDF-en; originalfilen kan lastes ned her
      og vedlegges i Tripletex ved behov.
     </p>
-    <button type="button" disabled={busy} onClick={verify} style={buttons}>
+    <button type="button" className="externalTripletexPrimaryButton" disabled={busy} onClick={verify} style={buttons}>
      {busy?"Kontrollerer Tripletex …":"Kontroller og bekreft importen i Tripletex"}
     </button>
    </>}
