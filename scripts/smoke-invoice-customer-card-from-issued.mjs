@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 const read=path=>readFileSync(path,"utf8");
+// This mock checks owner-authorized production requests, even on preview builds.
+// A separate node process runs each smoke test, so no global environment leaks.
+process.env.VERCEL_ENV="production";
 const route=read("app/api/admin/invoices/customer-card/route.js");
 const source=route.replace(/^import[\s\S]*?;\n/gm,"")
  .replace(/^export /gm,"");
