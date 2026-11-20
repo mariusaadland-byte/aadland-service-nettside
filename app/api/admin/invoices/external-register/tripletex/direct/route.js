@@ -112,7 +112,7 @@ export async function POST(req){
  const body=await req.json().catch(()=>({}));
  if(body?.action!=="transfer-direct"||!uuid(body.id)||
   body.confirmed!==true||body.notBookedElsewhere!==true||
-  body.verifiedPaymentSource!==true)
+  (body.paymentTypeId!=null&&body.verifiedPaymentSource!==true))
   return json({error:"Bekreft fakturaen, at den ikke er bokført tidligere, og korrekt betalingsgrunnlag."},400);
  const s=db();if(!s)return json({error:"Databasen er utilgjengelig."},503);
  let claimed=false,createdId=null,invoiceConfirmed=false,paymentAttempted=false;
