@@ -12,14 +12,30 @@
  --admin-accent:#254863;
  --muted:#405468;
 }
-/* Standalone pages had inherited .admin's sidebar grid (248px 1fr).
-   The owner accounting / external invoices / customer card pages must span
-   the entire page instead of accidentally splitting into two columns. */
-.adminContrastRoot main.admin{
+/* Standalone pages have no sidebar and need a single full-width column.
+   CRITICAL: /admin has a real <aside class="side"> beside .adminmain.
+   Do NOT override its 248px sidebar + content grid! */
+.adminContrastRoot main.admin:not(:has(> aside.side)){
  grid-template-columns:minmax(0,1fr)!important;
  width:100%;
  min-width:0;
  color:var(--admin-text);
+}
+@media (min-width:901px){
+ .adminContrastRoot main.admin:has(> aside.side){
+  display:grid;
+  grid-template-columns:248px minmax(0,1fr)!important;
+  align-items:start;
+ }
+ .adminContrastRoot main.admin:has(> aside.side) > .adminmain{
+  min-width:0;
+ }
+}
+@media (max-width:900px){
+ .adminContrastRoot main.admin:has(> aside.side){
+  display:block;
+  grid-template-columns:none!important;
+ }
 }
 /* Global site requests a dark browser color scheme. Admin inputs are LIGHT.
    This is required for Chrome desktop, iOS and Android dark appearance. */
