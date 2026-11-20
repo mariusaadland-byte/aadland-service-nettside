@@ -45,7 +45,7 @@ assert.ok(route.includes(".eq(\"status\",\"unpaid\")"));
 assert.ok(route.includes('status:"paid"'));
 assert.ok(route.includes("externalInvoicePaidInput"));
 assert.ok(!route.includes("tripletexCreateVippsSettlementVoucher"));
-assert.ok(!route.includes("invoice_payments").replaceAll(" ",""));
+assert.ok(!route.includes("invoice_payments"));
 assert.ok(!route.includes("invoice_credit_notes"));
 const page=read("app/admin/faktura/eksterne/page.js");
 assert.ok(page.includes('admin.role!=="owner"'));
