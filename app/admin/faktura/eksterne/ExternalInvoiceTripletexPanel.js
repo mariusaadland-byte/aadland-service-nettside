@@ -4,6 +4,7 @@ import {readExternalInvoiceAmountFromOriginal} from "../../../../lib/externalInv
 import {parseExternalInvoiceOre} from "../../../../lib/externalInvoiceRegister";
 import {splitExternalInvoiceGrossByRate} from "../../../../lib/externalInvoiceVatMath";
 import {externalInvoiceTransferBlockers} from "../../../../lib/externalInvoiceTransferReadiness";
+import ExternalInvoicePdfAttachmentPanel from "./ExternalInvoicePdfAttachmentPanel";
 const kr=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(n/100);
 const box={padding:"clamp(14px,2.5vw,22px)",border:"2px solid #9baebd",borderRadius:12,marginTop:10,
  background:"#fff",color:"#192b3b",display:"grid",gap:14};
@@ -549,6 +550,8 @@ export default function ExternalInvoiceTripletexPanel({invoice,onChanged}){
      {busy?"Kontrollerer Tripletex …":"Kontroller og bekreft importen i Tripletex"}
     </button>
    </>}
+   {record.status==="confirmed"&&<ExternalInvoicePdfAttachmentPanel
+    invoiceId={invoice.id} invoiceNumber={invoice.invoice_number}/>}
    {record.status==="confirmed"&&record.transferMethod!=="api"&&<p role="status">
     CSV-fakturaen er funnet med riktig dato, beløp og kunde i Tripletex.
     Betaling med original dato er ikke registrert automatisk for CSV-import.
