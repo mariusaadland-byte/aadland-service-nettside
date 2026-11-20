@@ -62,22 +62,30 @@ assert.equal(approvalMeta({id:"unknown",status:"test"}).checks.length,3,
  "Any new test task still gets explicit manual review prompts");
 const ui=read("app/admin/utviklingsplan/ApprovalQueue.js");
 for(const phrase of [
- "Godkjenningskø – én oppgave om gangen",
+ "Trykk på en boks for å starte testen",
  "developmentApprovalQueue(tasks)",
- "Dette må fungere",
- "Godkjenn og merk ferdig",
+ "Dette skal du teste nå",
+ "Fungerer – neste steg",
+ "Fungerer ikke",
+ "Godkjenn og gå til neste test",
  "onApprove(current)",
+ "onReport(current,description)",
  "window.confirm",
- "setChecks(prev",
- "Neste / ta denne senere",
- "Vis hele godkjenningslisten",
+ "setProgress(prev",
+ "Ta denne senere – neste test",
+ "Vis alle ",
  "APPROVAL_GROUPS[current.approval.group]",
+ "role=\"dialog\" aria-modal=\"true\"",
+ "target=\"_blank\"",
+ "rel=\"noopener noreferrer\"",
  "disabled={!done||Boolean(savingId)||busy}",
- "Ingen oppgave lukkes automatisk",
- "status"
-])assert.ok(ui.includes(phrase),"Missing checklist control: "+phrase);
+ "Alle oppgaver som var klare til testing",
+ "localStorage.setItem"
+])assert.ok(ui.includes(phrase),"Missing guided test window: "+phrase);
 const parent=read("app/admin/utviklingsplan/RoadmapClient.js");
-assert.ok(parent.includes("<ApprovalQueue tasks={tasks} savingId={savingId} onApprove={approveTask}/>"));
+assert.ok(parent.includes('onReport={reportTaskIssue}'));
+assert.ok(parent.includes('onApprove={approveTask}'));
+assert.ok(parent.includes('reportTaskIssue(task,description)'));
 assert.ok(parent.includes('if(task.status!=="test"||savingId)return false;'));
 assert.ok(parent.includes('return updateTask(task,{status:"done",notes:updated});'));
 assert.ok(parent.includes('showCatalog&&<>'));
@@ -88,7 +96,8 @@ assert.ok(route.includes("sameOriginGuard(request)"));
 assert.ok(route.includes('user?.role==="owner"'));
 assert.ok(route.includes('if(!STATUSES.has')===false||route.includes("STATUSES.has(status)"));
 const css=read("app/admin/utviklingsplan/roadmap.module.css");
-for(const key of [".approvalBoard",".approvalMain",".approvalStep",
- ".approvalDone:disabled",".approvalQueueList",".fullPlanToggle","@media(max-width:740px)"])
+for(const key of [".approvalBoard",".wizardTileGrid",".wizardBackdrop",
+ ".wizardDialog",".wizardStepBody",".wizardPrimary",".wizardIssue",
+ ".wizardDialogFooter",".fullPlanToggle","@media(max-width:740px)"])
  assert.ok(css.includes(key));
-console.log("Utviklingsplan godkjenningskø: 29 testoppgaver, 13 raske, 11 fullflyt, 5 avhengigheter, en-og-en godkjenning, eierbekreftelse og bevaring av åpne oppgaver bestått.");
+console.log("Utviklingsplan testvindu: 29 testoppgaver, 13 raske, 11 fullflyt, 5 avhengigheter, veiledet steg for steg, eiergodkjenning og lagret fremdrift.");
