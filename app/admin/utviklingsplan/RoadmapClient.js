@@ -60,6 +60,20 @@ export default function RoadmapClient(){
    original+addition:original;
   return updateTask(task,{status:"done",notes:updated});
  }
+ async function reportTaskIssue(task,description){
+  if(task.status!=="test"||savingId)return false;
+  const detail=String(description||"").trim().slice(0,1000);
+  if(detail.length<6)return false;
+  const date=new Intl.DateTimeFormat("nb-NO",{timeZone:"Europe/Oslo",
+   year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+  const line="\n"+date+": Test må rettes – "+detail;
+  const previous=notesDraft[task.id]??task.notes??"";
+  if(previous.length+line.length>3000){
+   setError("Testnotatene er fulle. Rydd i eldre notater før du lagrer flere feil.");
+   return false;
+  }
+  return updateTask(task,{notes:previous+line});
+ }
  async function createTask(event){
   event.preventDefault();
   if(!newTask.title.trim())return;
@@ -108,7 +122,8 @@ export default function RoadmapClient(){
      <div><b>{stats.done}</b><span>Ferdigstilt</span></div>
     </div>
     <div className={styles.progressLine} role="progressbar" aria-label="Ferdigstilte oppgaver" aria-valuemin={0} aria-valuemax={stats.total||1} aria-valuenow={stats.done}><span style={{width:(stats.total?100*stats.done/stats.total:0)+"%"}}/></div>
-    <ApprovalQueue tasks={tasks} savingId={savingId} onApprove={approveTask}/>
+    <ApprovalQueue tasks={tasks} savingId={savingId} onApprove={approveTask}
+     onReport={reportTaskIssue}/>
     <div className={styles.fullPlanToggle}>
      <button type="button" onClick={()=>setShowCatalog(v=>!v)}
       aria-expanded={showCatalog}>
