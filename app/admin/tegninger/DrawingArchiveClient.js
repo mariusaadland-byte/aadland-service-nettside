@@ -13,7 +13,7 @@ const when=value=>{if(!value)return "";const date=new Date(value);return Number.
 const groupLabel=row=>safeText(row.customer,"Uten kunde")||"Uten kunde";
 const normalizeArchiveRow=row=>({...row,name:safeText(row.name,"Uten navn"),customer:safeText(row.customer),address:safeText(row.address),notes:safeText(row.notes)});
 const normalizeContact=row=>({...row,name:safeText(row.name),email:safeText(row.email),phone:safeText(row.phone),address:safeText(row.address)});
-export default function DrawingArchiveClient(){
+export default function DrawingArchiveClient({canEdit=false}){
  const [drawings,setDrawings]=useState([]);
  const [contacts,setContacts]=useState([]);
  const [publishedIds,setPublishedIds]=useState([]);
@@ -82,7 +82,7 @@ export default function DrawingArchiveClient(){
  return <main className={styles.page}>
   <header className={styles.header}>
    <div className={styles.brand}><Link href="/admin">← Tilbake til admin</Link><span>TEGNINGER OG KUNDER</span></div>
-   <div className={styles.heading}><div><h1>Tegningsarkiv</h1><p>Alle tegninger som er lagret på serveren, også uten prosjekt eller oppdrag. Finn dem igjen når du skal lage tilbud.</p></div><Link className={styles.newButton} href="/admin/tegning">＋ Ny tegning</Link></div>
+   <div className={styles.heading}><div><h1>Tegningsarkiv</h1><p>{canEdit?"Alle tegninger som er lagret på serveren, også uten prosjekt eller oppdrag. Finn dem igjen når du skal lage tilbud.":"Du har lesetilgang til prosjekttegninger. Endringer og sletting krever egne redigeringsrettigheter."}</p></div>{canEdit&&<Link className={styles.newButton} href="/admin/tegning">＋ Ny tegning</Link>}</div>
   </header>
   <section className={styles.stats} aria-label="Arkivstatus">
    <div><span>Lagret i admin</span><strong>{drawings.length}</strong></div>
@@ -96,7 +96,7 @@ export default function DrawingArchiveClient(){
   </section>
   {loading&&<div className={styles.notice}>Henter lagrede tegninger …</div>}
   {error&&<div className={styles.error} role="alert">{error}</div>}
-  {!loading&&!error&&!matches.length&&<section className={styles.empty}><h2>Ingen tegninger funnet</h2><p>Opprett eller åpne en tegning, velg kunde og trykk «Lagre». Den vil dukke opp her uten at du oppretter et prosjekt.</p><Link href="/admin/tegning">Åpne tegneprogrammet →</Link></section>}
+  {!loading&&!error&&!matches.length&&<section className={styles.empty}><h2>Ingen tegninger funnet</h2><p>{canEdit?"Opprett eller åpne en tegning, velg kunde og trykk «Lagre». Den vil dukke opp her uten at du oppretter et prosjekt.":"Du har lesetilgang, men det finnes ingen tegninger som samsvarer med søket."}</p>{canEdit&&<Link href="/admin/tegning">Åpne tegneprogrammet →</Link>}</section>}
   {!loading&&!error&&groups.map(group=><section key={group.email||group.name} className={styles.group}>
    <div className={styles.groupTitle}><div><h2>{group.name}</h2>{group.email&&<small>{group.email}</small>}</div><span>{group.rows.length} tegning{group.rows.length===1?"":"er"}</span></div>
    <div className={styles.cards}>{group.rows.map(row=>{
@@ -109,8 +109,9 @@ export default function DrawingArchiveClient(){
       <small>Sist lagret: {when(row.updatedAt)} · {row.orderId?"Tilknyttet oppdrag":row.projectId?"Tilknyttet prosjekt":"Uten prosjekt"}</small>
      </div>
      <div className={styles.actions}>
-      <Link href={"/admin/tegning?drawingId="+encodeURIComponent(row.id)}>Åpne / rediger</Link>
-      <button type="button" onClick={()=>offerFromDrawing(row)}>＋ Nytt tilbud</button>
+      <Link href={"/admin/tegninger/"+encodeURIComponent(row.id)}>Vis tegning</Link>
+      {canEdit&&<Link href={"/admin/tegning?drawingId="+encodeURIComponent(row.id)}>Rediger</Link>}
+      {canEdit&&<button type="button" onClick={()=>offerFromDrawing(row)}>＋ Nytt tilbud</button>}
      </div>
     </article>
    })}</div>
