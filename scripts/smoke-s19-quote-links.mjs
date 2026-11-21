@@ -103,6 +103,72 @@ for(const required of [
  '.eq("quote_link_generation",generation)','validForReissue(quote)',
  'createQuoteToken(updated.data)','"Cache-Control":"private, no-store"'
 ])assert.ok(ownerApi.includes(required),"Missing owner link-security guard: "+required);
+// Exercise owner revoke/rotate through the real handler with an in-memory quote.
+// Nothing is sent to Resend and the database is not contacted.
+const ownerSource=ownerApi.replace(/^import .*;\n/gm,"")
+ .replace(/^export const dynamic=.*;\n/gm,"")
+ .replace(/export async function (GET|POST)\(/g,"async function $1(");
+let admin=null,mutations=0;
+let ownerQuote={...quote,sent_at:new Date().toISOString(),
+ valid_until:new Date(Date.now()+20*day*1000).toISOString().slice(0,10)};
+const ownerDb=()=>({from(table){
+ assert.equal(table,"quotes");
+ const checks=[];let patch=null;
+ const q={
+  select(){return q},
+  eq(name,value){checks.push([name,value]);return q},
+  update(value){patch=value;return q},
+  async maybeSingle(){
+   if(!checks.every(([key,value])=>ownerQuote[key]===value))return {data:null,error:null};
+   if(patch){ownerQuote={...ownerQuote,...patch};mutations++;}
+   return {data:{...ownerQuote},error:null};
+  }
+ };
+ return q;
+}});
+const owners=new Function("NextResponse","getAdminUser","sameOriginGuard","db",
+ "createQuoteToken","QUOTE_LINK_MAX_AGE_SECONDS","osloDateKey","process",
+ ownerSource+";return {GET,POST};")(
+ response,async()=>admin,()=>null,ownerDb,createQuoteToken,
+ QUOTE_LINK_MAX_AGE_SECONDS,
+ d=>new Date(d).toISOString().slice(0,10),
+ {env:{NEXT_PUBLIC_SITE_URL:"https://www.aadland-service.no"}}
+);
+const ownerRequest={url:"https://www.aadland-service.no/api/admin/quotes/link?id="+quote.id};
+const ownerPost=(action,confirmation)=>owners.POST({
+ json:async()=>({id:quote.id,action,confirmation})
+});
+result=await owners.GET(ownerRequest);assert.equal(result.status,403);
+admin={id:"owner",role:"staff"};
+result=await ownerPost("disable","SPERR LENKE");assert.equal(result.status,403);
+admin={id:"owner",role:"owner"};
+result=await ownerPost("disable","wrong");assert.equal(result.status,400);
+assert.equal(mutations,0);
+result=await owners.GET(ownerRequest);assert.equal(result.status,200);
+assert.equal(result.body.enabled,true);
+const oldActiveToken=createQuoteToken(ownerQuote);
+result=await ownerPost("disable","SPERR LENKE");
+assert.equal(result.status,200);
+assert.equal(result.body.enabled,false);
+assert.equal(ownerQuote.quote_link_generation,2);
+assert.ok(ownerQuote.quote_link_disabled_at);
+assert.equal(verifyQuoteToken(ownerQuote,oldActiveToken),false);
+result=await ownerPost("disable","SPERR LENKE");
+assert.equal(result.body.alreadyDisabled,true);
+assert.equal(mutations,1,"No further generation update for already disabled quote");
+result=await ownerPost("rotate","NY LENKE");
+assert.equal(result.status,200);
+assert.equal(ownerQuote.quote_link_generation,3);
+assert.equal(ownerQuote.quote_link_disabled_at,null);
+assert.match(result.body.link,/^https:\/\/www\.aadland-service\.no\/tilbud\/.*#token=v2\./);
+const newActiveToken=decodeURIComponent(result.body.link.split("#token=")[1]);
+assert.equal(verifyQuoteToken(ownerQuote,newActiveToken),true);
+assert.equal(verifyQuoteToken(ownerQuote,oldActiveToken),false);
+ownerQuote={...ownerQuote,status:"accepted"};
+result=await ownerPost("rotate","NY LENKE");
+assert.equal(result.status,409,"Owner cannot renew sharing link for completed quote.");
+assert.equal(mutations,2,"Completed quote must not be changed");
+
 const history=read("app/api/customer/me/route.js");
 assert.ok(!history.includes("createQuoteToken"));
 assert.ok(!history.includes('"?token="'));
