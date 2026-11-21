@@ -3,6 +3,7 @@ import {NextResponse} from "next/server";
 import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
 import {materialMarkupOrFallback} from "../../../../lib/materialMarkupPolicy";
+import {supplierPriceFreshness} from "../../../../lib/materialPriceFreshness";
 
 async function allowed(){
  const user=await getAdminUser();
@@ -18,7 +19,8 @@ function supplierRow(row,companyMarkup=15){
   defaultMarkupPercent:Number(row.default_markup_percent??companyMarkup),
   inheritsCompanyMarkup:row.default_markup_percent===null,
   lastImportAt:row.last_import_at||null,
-  lastSourceFilename:row.last_source_filename||""
+  lastSourceFilename:row.last_source_filename||"",
+  ...supplierPriceFreshness({id:row.id,lastImportAt:row.last_import_at})
  };
 }
 function productRow(row,companyMarkup=15){
@@ -70,6 +72,7 @@ export async function GET(req){
  });
  if(error)return NextResponse.json({error:"Kunne ikke søke i materialkatalogen."},{status:500});
  const markupBySupplier=new Map(suppliers.map(row=>[row.id,row.defaultMarkupPercent]));
+ const freshnessBySupplier=new Map(suppliers.map(row=>[row.id,{priceStatus:row.priceStatus,priceReviewRequired:row.priceReviewRequired,priceAgeDays:row.priceAgeDays,lastImportAt:row.lastImportAt}]));
  const manualSkus=(data||[]).filter(row=>row.supplier_id==="egne-varer").map(row=>row.supplier_sku);
  const manualPrices=new Map();
  if(manualSkus.length){
@@ -77,7 +80,7 @@ export async function GET(req){
   if(priceError)return NextResponse.json({error:"Kunne ikke hente lagrede salgspriser."},{status:500});
   for(const price of prices||[])if(price.sale_ex_vat_ore!=null)manualPrices.set(price.supplier_sku,Number(price.sale_ex_vat_ore)/100);
  }
- return NextResponse.json({suppliers,products:(data||[]).map(row=>({...productRow(row,companyMarkup),defaultMarkupPercent:markupBySupplier.get(row.supplier_id)??companyMarkup,...(row.supplier_id==="egne-varer"&&manualPrices.has(row.supplier_sku)?{saleExVat:manualPrices.get(row.supplier_sku)}:{})}))});
+ return NextResponse.json({suppliers,products:(data||[]).map(row=>({...productRow(row,companyMarkup),defaultMarkupPercent:markupBySupplier.get(row.supplier_id)??companyMarkup,...(freshnessBySupplier.get(row.supplier_id)||{priceStatus:"unknown",priceReviewRequired:true,priceAgeDays:null,lastImportAt:null}),...(row.supplier_id==="egne-varer"&&manualPrices.has(row.supplier_sku)?{saleExVat:manualPrices.get(row.supplier_sku)}:{})}))});
 }
 
 export async function PATCH(req){
