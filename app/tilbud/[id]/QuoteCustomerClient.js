@@ -62,16 +62,27 @@ export default function QuoteCustomerClient({quoteId}){
   const label=action==="accept"?"godkjenne":"avslå";
   if(!window.confirm("Vil du "+label+" dette tilbudet?"))return;
   setSaving(true);setError("");setMessage("");
-  const response=await fetch("/api/quotes/"+encodeURIComponent(quoteId),{
-   method:"POST",
-   headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({token,action})
-  });
-  const data=await response.json().catch(()=>({}));
-  setSaving(false);
-  if(!response.ok){setError(data.error||"Svaret kunne ikke lagres.");return;}
-  setQuote(data.quote);
-  setMessage(action==="accept"?"Takk. Tilbudet er godkjent. Vi tar kontakt for å avtale endelig oppstart og videre fremdrift.":"Tilbudet er registrert som avslått.");
+  try{
+   const response=await fetch("/api/quotes/"+encodeURIComponent(quoteId),{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({token,action})
+   });
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok){setError(data.error||"Svaret kunne ikke lagres. Kontakt oss før du prøver på nytt.");return;}
+   setQuote(data.quote);
+   const base=action==="accept"
+    ?"Takk. Tilbudet er godkjent. Vi tar kontakt for å avtale endelig oppstart og videre fremdrift."
+    :"Tilbudet er registrert som avslått.";
+   const mailNote=data.confirmationPending
+    ?" E-postbekreftelsen er registrert for oppfølging, men utsendelsen er ikke bekreftet. Selve tilbudssvaret er lagret – du trenger ikke godkjenne på nytt."
+    :" Bekreftelser er registrert hos e-postleverandøren. Dette betyr ikke nødvendigvis at de er levert til innboksen.";
+   setMessage(base+mailNote);
+  }catch{
+   // The server may have saved the answer before the network timed out.
+   // Never imply that clicking again is required.
+   setError("Vi kunne ikke bekrefte svaret fra serveren. Oppdater tilbudet eller kontakt oss før du prøver igjen, slik at svaret ikke registreres på nytt.");
+  }finally{setSaving(false);}
  }
 
  if(loading)return <main className="customerQuoteShell"><div className="customerQuoteState">Laster tilbud …</div></main>;
