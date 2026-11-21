@@ -79,6 +79,19 @@ begin
  if not found then raise exception 'reminder_attempt_missing'; end if;
 end; $$;
 
+create or replace function public.skip_vat_deadline_reminder_if_filed(
+ p_year integer,p_term integer,p_lead_days integer,p_key text
+) returns void language plpgsql security invoker set search_path='' as $
+declare v_status text;
+begin
+ select status into v_status from public.vat_reporting_term_status
+ where year=p_year and term=p_term;
+ if v_status<>'filed' then raise exception 'vat_term_not_confirmed_filed'; end if;
+ update public.vat_deadline_reminder_attempts set status='skipped',updated_at=now()
+ where year=p_year and term=p_term and lead_days=p_lead_days
+   and idempotency_key=p_key and status='claimed';
+end; $;
+
 create or replace function public.vat_deadline_reminder_uncertain(
  p_year integer,p_term integer,p_lead_days integer,
  p_key text,p_error text
@@ -115,11 +128,14 @@ revoke execute on function public.claim_vat_deadline_reminder(integer,integer,in
  from public,anon,authenticated;
 revoke execute on function public.vat_deadline_reminder_provider_accepted(integer,integer,integer,text,text)
  from public,anon,authenticated;
+revoke execute on function public.skip_vat_deadline_reminder_if_filed(integer,integer,integer,text)
+ from public,anon,authenticated;
 revoke execute on function public.vat_deadline_reminder_uncertain(integer,integer,integer,text,text)
  from public,anon,authenticated;
 revoke execute on function public.complete_vat_deadline_reminder(integer,integer,integer,text)
  from public,anon,authenticated;
 grant execute on function public.claim_vat_deadline_reminder(integer,integer,integer,date,date) to service_role;
 grant execute on function public.vat_deadline_reminder_provider_accepted(integer,integer,integer,text,text) to service_role;
+grant execute on function public.skip_vat_deadline_reminder_if_filed(integer,integer,integer,text) to service_role;
 grant execute on function public.vat_deadline_reminder_uncertain(integer,integer,integer,text,text) to service_role;
 grant execute on function public.complete_vat_deadline_reminder(integer,integer,integer,text) to service_role;
