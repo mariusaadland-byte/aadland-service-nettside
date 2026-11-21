@@ -27,7 +27,7 @@ assert.ok(checkExit>=0&&beforeCreate>checkExit,"Check must exit before irreversi
 assert.ok(route.includes('!["check","transfer"].includes(body.action)'),"API must restrict allowed actions");
 assert.ok(route.includes("Det utelukker ikke tidligere manuell bokføring"));
 assert.ok(pilot.includes("duplicateDirectInvoiceSearch"));
-assert.ok(pilot.includes('+"&customerId="+customerId'));
+assert.ok(pilot.includes('"&customerId="+customerId'),"Tripletex query is scoped to the linked customer");
 
 // Execute only the extracted UI callback with simulated network and state.
 let state={},requests=[],isBusy=false;
@@ -51,7 +51,7 @@ await fn(row);
 assert.equal(requests.length,1);
 assert.equal(requests[0].action,"check","No transfer, invoice, or payment side effect");
 assert.equal(state[invoiceId].safe,true);
-assert.ok(state[invoiceId].message.includes("begren"));
+assert.ok(state[invoiceId].message.includes("avgrenset"));
 assert.equal(isBusy,false);
 providerMode="duplicate";
 await fn(row);
@@ -61,5 +61,6 @@ providerMode="error";
 await fn(row);
 assert.equal(state[invoiceId].safe,false);
 assert.ok(state[invoiceId].message.includes("simulert API-feil"));
-assert.equal(requests.length,2,"Network failure should not call transfer");
+assert.equal(requests.length,3,"All three calls are checks, including simulated API failure");
+assert.ok(requests.every(x=>x.action==="check"),"Never create or transfer an invoice during a duplicate check");
 console.log("S-08 bestått: fakturakontroll bruker bare eksisterende read-only Tripletex-check, viser søkets begrensning og stopper CSV-knappen ved mulig duplikat eller feil.");
