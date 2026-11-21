@@ -169,6 +169,7 @@ for(const code of [
  "quote_email_send_reviews"
 ])assert.ok(migration.includes(code),"Missing critical protection: "+code);
 const editor=readFileSync("app/admin/tilbud/QuoteEditorClient.js","utf8");
+assert.ok(!source.includes('s.from("quote_send_log").insert('),"A second best-effort history write would duplicate the transactional log");
 assert.ok(editor.includes("sendBlocked"));
 assert.ok(editor.includes("Frigi etter bekreftet IKKE sendt"));
 assert.ok(editor.includes("Fullfør registrering uten ny e-post"));
