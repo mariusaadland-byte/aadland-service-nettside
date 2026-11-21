@@ -128,11 +128,13 @@ begin
     or length(trim(coalesce(p_note,''))) not between 12 and 1200 then
   raise exception 'invalid_response_notice_review';
  end if;
- select r.*,q.quote_number into n,actual_number
- from public.quote_response_notifications r
- join public.quotes q on q.id=r.quote_id
- where r.id=p_notification_id
- for update of r;
+ select * into n
+ from public.quote_response_notifications
+ where id=p_notification_id
+ for update;
+ if not found then raise exception 'quote_review_mismatch'; end if;
+ select quote_number into actual_number
+ from public.quotes where id=n.quote_id;
  if not found or actual_number<>p_quote_number then
   raise exception 'quote_review_mismatch';
  end if;
