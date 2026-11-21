@@ -46,7 +46,7 @@ begin
    update public.quote_email_send_attempts set
     recipient=p_recipient,delivery_type=p_delivery_type,idempotency_key=k,
     state='claimed',claimed_at=now(),provider_email_id=null,provider_accepted_at=null,
-    sent_at=null,last_error=null,updated_at=now()
+    sent_at=null,last_error=null,reviewed_at=null,review_note=null,updated_at=now()
    where quote_id=p_quote_id;
    return jsonb_build_object('state','claimed','idempotencyKey',k);
   end if;
