@@ -71,7 +71,10 @@ export default function VatReportingControlClient({year,term,onChanged,onSelectT
    });
    const data=await response.json().catch(()=>({}));
    if(!response.ok)throw Error(data.error||"Kunne ikke lagre terminstatus.");
-   setResult(old=>({...old,terms:[...old.terms.filter(row=>row.term!==Number(term)),data.term]
+   const refreshed=await fetch("/api/admin/invoices/vat-reporting-control?year="+encodeURIComponent(year),{cache:"no-store"});
+   const fresh=await refreshed.json().catch(()=>null);
+   if(refreshed.ok&&fresh?.terms)setResult(fresh);
+   else setResult(old=>({...old,terms:[...old.terms.filter(row=>row.term!==Number(term)),data.term]
     .sort((a,b)=>a.term-b.term)}));
    setConfirmedStatus(false);setSuccess(state==="filed"
     ?"Kontrollert leveringsstatus er lagret med kilde og referanse. Skatteetaten er ikke kontaktet."
