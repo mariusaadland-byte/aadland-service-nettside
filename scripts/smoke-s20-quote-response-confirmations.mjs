@@ -63,6 +63,7 @@ function fakeDb(){
     const records=table==="quote_response_notifications"?notices:[];
     const filtered=records.filter(row=>filters.every(([k,v])=>row[k]===v))
      .slice(0,this.max||100);
+    if(this.patch){for(const row of filtered){Object.assign(row,this.patch);dbWriteCount++;}}
     return Promise.resolve({data:filtered.map(row=>({...row})),error:null}).then(resolve,reject);
    }
   };
@@ -86,7 +87,6 @@ assert.equal(customerEmail.text.includes("Test Kunde"),true);
 assert.equal(quoteResponseNotificationSummary(notices).hasPending,true);
 let outcome=await dispatchQueuedQuoteResponseNotices(fakeDb(),{sendMail,limit:2});
 assert.equal(outcome.ok,true);
-console.log("S20 isolated dispatch details",JSON.stringify(outcome));
 assert.equal(outcome.sent,2);
 assert.equal(sendCount,2);
 assert.equal(notices.filter(row=>row.state==="sent").length,2);
