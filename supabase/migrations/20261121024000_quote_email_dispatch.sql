@@ -51,7 +51,7 @@ begin
    return jsonb_build_object('state','claimed','idempotencyKey',k);
   end if;
   if attempt.state='provider_accepted' then
-   return jsonb_build_object('state','provider_accepted','idempotencyKey',attempt.idempotency_key);
+   return jsonb_build_object('state','provider_accepted','idempotencyKey',attempt.idempotency_key,'recipient',attempt.recipient,'deliveryType',attempt.delivery_type);
   end if;
   raise exception 'quote_dispatch_already_claimed_%',attempt.state;
  end if;
@@ -104,10 +104,10 @@ grant select,insert,update,delete on public.quote_email_send_reviews to service_
 create or replace function public.release_quote_email_after_review(
  p_quote_id uuid,p_quote_number text,p_reviewer uuid,p_confirmed_not_sent boolean,p_note text
 ) returns void language plpgsql security invoker set search_path='' as $
-declare a public.quote_email_send_attempts%rowtype; number text;
+declare a public.quote_email_send_attempts%rowtype; v_quote_number text;
 begin
- select quote_number into number from public.quotes where id=p_quote_id for update;
- if number is null or number<>p_quote_number or p_confirmed_not_sent is distinct from true
+ select quote_number into v_quote_number from public.quotes where id=p_quote_id for update;
+ if v_quote_number is null or v_quote_number<>p_quote_number or p_confirmed_not_sent is distinct from true
  then raise exception 'quote_release_confirmation_required'; end if;
  select * into a from public.quote_email_send_attempts
  where quote_id=p_quote_id for update;
@@ -129,8 +129,10 @@ end; $;
 create or replace function public.complete_quote_email_send(
  p_quote_id uuid,p_idempotency_key text
 ) returns jsonb language plpgsql security invoker set search_path='' as $$
-declare a public.quote_email_send_attempts%rowtype; sent_timestamp timestamptz;
+declare a public.quote_email_send_attempts%rowtype; sent_timestamp timestamptz; locked_quote uuid;
 begin
+ select id into locked_quote from public.quotes where id=p_quote_id for update;
+ if not found then raise exception 'quote_not_found'; end if;
  select * into a from public.quote_email_send_attempts where quote_id=p_quote_id for update;
  if not found or a.idempotency_key is distinct from p_idempotency_key
  then raise exception 'quote_email_attempt_not_found'; end if;
