@@ -1,6 +1,13 @@
 -- S-06: Owner-maintained MVA term status must be traceable.
 -- No statement is submitted to Skatteetaten or Tripletex by this migration.
 -- Only future manually recorded "filed" states require an identifiable source and reference.
+-- Allow an erroneous old status to be restored explicitly to "unverified"
+-- without falsely labelling an unconfirmed term as not filed.
+alter table public.vat_reporting_term_status
+ drop constraint if exists vat_reporting_term_status_status_check;
+alter table public.vat_reporting_term_status
+ add constraint vat_reporting_term_status_status_check
+ check (status in ('unverified','not_filed','preparing','filed'));
 alter table public.vat_reporting_term_status
  add column if not exists verification_source text not null default 'owner_review';
 alter table public.vat_reporting_term_status
@@ -21,7 +28,7 @@ create table if not exists public.vat_reporting_term_events(
  id uuid primary key default gen_random_uuid(),
  year integer not null check(year between 2000 and 2100),
  term integer not null check(term between 1 and 6),
- status text not null check(status in ('not_filed','preparing','filed')),
+ status text not null check(status in ('unverified','not_filed','preparing','filed')),
  filed_on date,
  verification_source text not null check(verification_source in ('owner_review','skatteetaten','tripletex')),
  submission_reference text,
