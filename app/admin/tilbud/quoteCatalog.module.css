@@ -21,3 +21,5 @@
 .notice{background:#eaf7ed;color:#245c34;border:1px solid #bdd8c1}
 .error{background:#fff1ee;color:#8a3124;border:1px solid #e2b4ac}
 @media(max-width:600px){.box{padding:11px}.options{grid-template-columns:minmax(0,1fr) 105px}.results button{grid-template-columns:1fr auto}.results button em{grid-column:1/-1}.results button>span:nth-child(2){text-align:right}}
+
+.priceNotice{margin:0;padding:10px 12px;border:1px solid #d3b782;background:#fff7e7;color:#583e1b;border-radius:8px;font-size:12px;line-height:1.5}
