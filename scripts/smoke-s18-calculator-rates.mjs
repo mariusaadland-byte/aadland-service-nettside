@@ -28,7 +28,7 @@ assert.ok(helperText.includes("calculatorTollEstimate(form)"),"Transferred quote
 assert.ok(!calc.includes("const TOLL_PRESETS=["),"No separate UI hardcoded toll tariff list");
 assert.ok(!helperText.includes("const tolls={"),"No separate transfer hardcoded toll tariff list");
 assert.ok(preview.includes("quoteLinesFromCalculator(form,{includeExtras})"));
-assert.ok(preview.includes("Kunde")&&preview.includes("Ikke"),"Transfer uses the user-confirmed quote draft");
+assert.ok(preview.includes("Kunde")&&preview.toLowerCase().includes("ingenting sendes"),"Transfer opens a draft without sending a customer message");
 assert.equal(CALCULATOR_TOLL_PRESETS[0].id,"none");
 assert.deepEqual(CALCULATOR_TOLL_PRESETS.map(x=>x.id),[
  "none","bergen-bjornafjorden-ordinary","bergen-bjornafjorden-rush",
