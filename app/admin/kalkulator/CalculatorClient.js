@@ -4,7 +4,7 @@ import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import styles from "./calculator.module.css";
 import QuoteTransferPanel from "./QuoteTransferPanel";
-import {unitSaleExVat} from "../../../lib/calculatorQuoteLines";
+import {unitSaleExVat,CALCULATOR_TOLL_PRESETS,calculatorTollEstimate} from "../../../lib/calculatorQuoteLines";
 import {supplierPriceNotice} from "../../../lib/materialPriceFreshness";
 
 const STORAGE_KEY="aadland-service-calculator-v1";
@@ -21,22 +21,11 @@ const DEFAULTS={
  distanceOneWay:"",
  oneWayTrips:"2",
  kmRate:"5.30",
- tollPreset:"bergen-bjornafjorden-ordinary",
- customToll:"76.80",
+ tollPreset:"none",
+ customToll:"",
+ tollSelectionExplicit:false,
  businessExVat:false
 };
-
-const TOLL_PRESETS=[
- {id:"bergen-bjornafjorden-ordinary",label:"Bergen ↔ Bjørnafjorden · ordinær AutoPASS",amount:76.80,note:"25,60 Bergen + 51,20 E39 per vei, uten rush"},
- {id:"bergen-bjornafjorden-rush",label:"Bergen ↔ Bjørnafjorden · ordinær AutoPASS i rush",amount:102.40,note:"51,20 Bergen + 51,20 E39 per vei"},
- {id:"bergen-bjornafjorden-ev",label:"Bergen ↔ Bjørnafjorden · elbil AutoPASS",amount:53.44,note:"17,60 Bergen + 35,84 E39 per vei, uten rush"},
- {id:"e39-ordinary",label:"Kun E39 Rådal–Svegatjørn · ordinær AutoPASS",amount:51.20,note:"Takstgruppe 1, ordinært kjøretøy"},
- {id:"e39-ev",label:"Kun E39 Rådal–Svegatjørn · elbil AutoPASS",amount:35.84,note:"Takstgruppe 1, nullutslipp"},
- {id:"bergen-ordinary",label:"Kun Bergen bomring · ordinær AutoPASS",amount:25.60,note:"Uten rush"},
- {id:"bergen-ordinary-rush",label:"Kun Bergen bomring · ordinær AutoPASS i rush",amount:51.20,note:"Rushtid"},
- {id:"bergen-ev",label:"Kun Bergen bomring · elbil AutoPASS",amount:17.60,note:"Uten rush"},
- {id:"custom",label:"Egendefinert bom per vei",amount:null,note:"Skriv inn beløpet selv"}
-];
 
 function number(value){
  const normalized=String(value??"").trim().replace(/\s/g,"").replace(",",".");
@@ -63,6 +52,7 @@ export default function CalculatorClient(){
  const [markupLoadError,setMarkupLoadError]=useState("");
  const [copied,setCopied]=useState(false);
  const [addedNotice,setAddedNotice]=useState("");
+ const [legacyTollCleared,setLegacyTollCleared]=useState(false);
  const [catalogSuppliers,setCatalogSuppliers]=useState([]);
  const [catalogSupplier,setCatalogSupplier]=useState("byggern");
  const [materialQuery,setMaterialQuery]=useState("");
@@ -80,13 +70,25 @@ export default function CalculatorClient(){
  useEffect(()=>{
   try{
    const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||"null");
-   if(saved&&typeof saved==="object")setForm({
-    ...DEFAULTS,...saved,
-    // Old saved numbers might be intentional: never change 15 -> 20 (or 20 -> 15).
-    // Only new, company-linked calculations follow future company updates.
-    materialMarkup:String(saved.materialMarkup??DEFAULTS.materialMarkup),
-    materialMarkupSource:saved.materialMarkupSource==="company"?"company":"manual"
-   });
+   if(saved&&typeof saved==="object"){
+    // The old calculator preselected a route even with no distance.
+    // Clear only that untouched default; keep intentional selections and
+    // older calculations that have a filled-in distance.
+    const staleAutoToll=saved.tollPreset==="bergen-bjornafjorden-ordinary"&&
+     !String(saved.distanceOneWay??"").trim()&&
+     String(saved.customToll??"76.80").trim()==="76.80"&&
+     saved.tollSelectionExplicit!==true;
+    setForm({
+     ...DEFAULTS,...saved,
+     tollPreset:staleAutoToll?"none":saved.tollPreset??DEFAULTS.tollPreset,
+     tollSelectionExplicit:saved.tollSelectionExplicit===true,
+     // Old saved numbers might be intentional: never change 15 -> 20 (or 20 -> 15).
+     // Only new, company-linked calculations follow future company updates.
+     materialMarkup:String(saved.materialMarkup??DEFAULTS.materialMarkup),
+     materialMarkupSource:saved.materialMarkupSource==="company"?"company":"manual"
+    });
+    if(staleAutoToll)setLegacyTollCleared(true);
+   }
   }catch{}
   setHydrated(true);
  },[]);
@@ -159,6 +161,7 @@ export default function CalculatorClient(){
  function reset(){
   setForm({...DEFAULTS,materialMarkup:companyMarkup});
   setCopied(false);
+  setLegacyTollCleared(false);
  }
 
  function addMaterial(product){
@@ -249,13 +252,9 @@ export default function CalculatorClient(){
   const materials=(catalogMaterialSalesExVat+manualMaterialCost/(1+VAT_RATE)*(1+markup/100))*(1+VAT_RATE);
 
   const oneWayDistance=number(form.distanceOneWay);
-  const trips=Math.max(0,Math.round(number(form.oneWayTrips)));
+  const {preset,trips,tollPerWay,toll}=calculatorTollEstimate(form);
   const totalKm=oneWayDistance*trips;
   const travel=totalKm*number(form.kmRate);
-
-  const preset=TOLL_PRESETS.find(item=>item.id===form.tollPreset)||TOLL_PRESETS[0];
-  const tollPerWay=preset.id==="custom"?number(form.customToll):number(preset.amount);
-  const toll=tollPerWay*trips;
 
   const total=labor+materials+travel+toll;
   const exVat=withoutVat(total);
@@ -421,7 +420,7 @@ export default function CalculatorClient(){
     </section>
 
     <section className={styles.card}>
-     <div className={styles.cardHead}><span className={styles.step}>3</span><div><h2>Reise</h2><p>Statens sats er forhåndsutfylt, men kan endres per kalkyle.</p></div></div>
+     <div className={styles.cardHead}><span className={styles.step}>3</span><div><h2>Reise</h2><p>5,30 kr/km er statens kilometergodtgjørelse, ikke en pålagt kundepris. Satsen kan endres per kalkyle.</p></div></div>
      <div className={styles.two}>
       <Field label="Km én vei">
        <div className={styles.suffixInput}><input inputMode="decimal" value={form.distanceOneWay} onChange={e=>set("distanceOneWay",e.target.value)} placeholder="0"/><span>km</span></div>
@@ -437,16 +436,21 @@ export default function CalculatorClient(){
     </section>
 
     <section className={styles.card}>
-     <div className={styles.cardHead}><span className={styles.step}>4</span><div><h2>Bom</h2><p>Velg et hurtigvalg eller bruk eget beløp per vei.</p></div></div>
+     <div className={styles.cardHead}><span className={styles.step}>4</span><div><h2>Bom</h2><p>Ingen bom legges til før du velger en takst eller et eget beløp. Velg etter faktisk rute og biltype.</p></div></div>
      <Field label="Bomoppsett">
-      <select value={form.tollPreset} onChange={e=>set("tollPreset",e.target.value)}>
-       {TOLL_PRESETS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}
+      <select value={form.tollPreset} onChange={e=>{
+        setForm(current=>({...current,tollPreset:e.target.value,tollSelectionExplicit:true}));
+        setLegacyTollCleared(false);
+       }}>
+       {CALCULATOR_TOLL_PRESETS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}
       </select>
      </Field>
+     {legacyTollCleared&&<p role="status" className={styles.vatNote}>Tidligere ble bom lagt til automatisk før du valgte rute. Det gamle standardvalget er nå fjernet fra denne ufullstendige kalkylen. Velg bomoppsett igjen hvis du faktisk skal fakturere bom.</p>}
      {form.tollPreset==="custom"&&<Field label="Bom per vei inkl. mva">
       <div className={styles.moneyInput}><span>kr</span><input inputMode="decimal" value={form.customToll} onChange={e=>set("customToll",e.target.value)}/></div>
      </Field>}
-     <div className={styles.rateNote}><b>{money(calc.tollPerWay)} per vei</b><span>{calc.preset.note}</span></div>
+     <div className={styles.rateNote}><b>{money(calc.tollPerWay)} per valgt enkeltvei</b><span>{calc.preset.note}</span></div>
+     {calc.toll>0&&<p className={styles.vatNote} role="status">Bommen er et estimat. Kontroller reelle betalingsretninger, timesregel, rushtid, rabatter og antall passeringer før tilbudet sendes.{!calc.oneWayDistance?" Ingen kjøreavstand er fylt ut, men valgt bom belastes likevel i kalkylen og følger med når ekstrakostnader overføres til tilbud.":""}</p>}
      <div className={styles.calculationLine}><span>{calc.trips} vei(er)</span><b>{money(calc.toll)}</b></div>
     </section>
    </div>
@@ -473,8 +477,8 @@ export default function CalculatorClient(){
    </section>
 
    <section className={styles.sources}>
-    <b>Satser kontrollert 3. oktober 2026</b>
-    <p>Statens kilometergodtgjørelse er 5,30 kr/km fra 1. januar 2026. Bom-hurtigvalgene bruker gjeldende AutoPASS-takster for lett kjøretøy fra Ferde: Bergen og E39 Rådal–Svegatjørn. Bom kan variere med kjøretøy, avtale og rushtid, så feltet kan overstyres.</p>
+    <b>Satser kontrollert 21. november 2026</b>
+    <p>Statens kilometergodtgjørelse er 5,30 kr/km fra 1. januar 2026, men avtalt kundepris kan være en annen. Bom-hurtigvalgene viser forenklede takstgruppe-1-estimater med AutoPASS fra Ferde for Bergen og E39. Bergen innkrever i én retning, E39 i begge. Timesregel, faktisk passering, biltype (inkludert diesel), rush og rabatter kan endre beløpet. Ingen bom legges til automatisk i en ny kalkyle. Verifiser faktiske kostnader før tilbud sendes.</p>
     <div>
      <a href="https://www.regjeringen.no/no/tema/arbeidsliv/Statlig-arbeidsgiverpolitikk/statens-personalhandbok/sph-meldinger/2025/pm-2025-12-saravtale-om-dekning-av-utgifter-til-reise-og-kost-innenlands/id3143994/" target="_blank" rel="noreferrer">Statens sats ↗</a>
      <a href="https://ferde.no/bomanlegg-og-priser/bypakke-bergen" target="_blank" rel="noreferrer">Bergen bomring ↗</a>
