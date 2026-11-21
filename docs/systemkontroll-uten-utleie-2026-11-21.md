@@ -5,7 +5,7 @@ Opprettet 21.11.2026. Løpende funnliste. **S-01 og S-02 er teknisk rettet og pr
 - Hvert funn får en stabil ID. Nye funn føyes til denne samme filen.
 - Prioritet: **P1** = risiko for økonomifeil, dobbeltutsending eller feil regnskap; **P2** = sikkerhet, dokumentasjon eller driftssikkerhet; **P3** = forbedring/vedlikehold.
 - Dokumentasjon: **Påvist** = demonstrert ved kode eller database; **Kontrolleres** = krever reell avstemming, konfigurasjon eller brukertest. Påvist kodefeil er ikke bevis på at en kunde allerede er rammet.
-- Status: **S-01 og S-02: teknisk ferdig, produksjonsverifisert, avventer brukerens UI-godkjenning. S-03: teknisk ferdig og produksjonsverifisert, manuell UI-kontroll gjenstår.** S-04: **TEKNISK RETTET, PRODUKSJONSVERIFISERT – EKTÉ INTERN VARSLING IKKE TESTET.** S-05–S-35: **IKKE BEHANDLET**. Produksjonsendringer er dokumentert i utbedringsloggen nedenfor.
+- Status: **S-01 og S-02: teknisk ferdig, produksjonsverifisert, avventer brukerens UI-godkjenning. S-03: teknisk ferdig og produksjonsverifisert, manuell UI-kontroll gjenstår.** S-04: **TEKNISK RETTET, PRODUKSJONSVERIFISERT – PRAKTISK EIER-VARSLING IKKE TESTET.** S-05–S-35: **IKKE BEHANDLET**. Produksjonsendringer er dokumentert i utbedringsloggen nedenfor.
 
 | ID | Prioritet | Type | Område | Funn / hva vi skal gå gjennom |
 | --- | --- | --- | --- | --- |
