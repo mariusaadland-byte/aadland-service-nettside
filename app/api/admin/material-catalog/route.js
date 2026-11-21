@@ -2,6 +2,7 @@ import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
+import {materialMarkupOrFallback} from "../../../../lib/materialMarkupPolicy";
 
 async function allowed(){
  const user=await getAdminUser();
@@ -53,7 +54,7 @@ export async function GET(req){
  const {data:companyPreference,error:preferenceError}=await s.from("quote_admin_preferences")
   .select("default_material_markup").eq("id","main").maybeSingle();
  if(preferenceError)return NextResponse.json({error:"Kunne ikke hente bedriftens standardpåslag."},{status:503});
- const companyMarkup=Number(companyPreference?.default_material_markup??15);
+ const companyMarkup=materialMarkupOrFallback(companyPreference?.default_material_markup);
  const params=new URL(req.url).searchParams;
  const q=String(params.get("q")||"").trim().slice(0,240);
  const supplier=String(params.get("supplier")||"").trim().slice(0,80);
