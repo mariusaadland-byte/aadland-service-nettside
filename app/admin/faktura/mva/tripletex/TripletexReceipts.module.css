@@ -49,3 +49,17 @@
 .apiConnection h2{font-size:clamp(20px,2.6vw,25px)!important}
 .apiConnection select{width:100%;min-height:47px;max-width:100%;background:#fff;color:#28231d;padding:10px;border:1px solid #cfc8be;border-radius:9px;font-size:15px}
 @media(max-width:650px){.importSettings{padding:3px 11px 8px}.apiConnection{padding:14px}}
+
+
+/* S-05: per-bilag reconciliation. All inputs remain legible in dark/mobile modes. */
+.reconcilePanel{border:1px solid #cfc4b4;border-radius:12px;padding:16px;margin:12px 0 18px;background:#fbf8f3;color:#28231e;min-width:0}
+.reconcilePanel h3{font-size:17px;margin:0 0 9px}
+.reconcileActions{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin:14px 0}
+.reconcileActions label,.reconcileNote{display:grid;gap:6px;font-size:13px;font-weight:700;min-width:0;flex:1}
+.reconcileActions input,.reconcileNote textarea{display:block;width:100%;min-width:0;border:1px solid #c9bba9;border-radius:9px;background:#fff!important;color:#24201c!important;-webkit-text-fill-color:#24201c!important;color-scheme:light;font-size:16px;padding:10px;min-height:44px}
+.reconcileResult{border-top:1px solid #d8cbbb;margin-top:16px;padding-top:13px;font-size:14px;overflow-wrap:anywhere}
+.reconcileResult p{line-height:1.55}
+.reconcileChecks{display:grid;gap:8px;margin:13px 0}
+.reconcileChecks input{margin:0}
+.linkButton{appearance:none;border:0;background:transparent;color:#533b25;text-decoration:underline;font-weight:650;font-size:14px;padding:8px 2px;cursor:pointer}
+@media(max-width:650px){.reconcilePanel{padding:12px}.reconcileActions{align-items:stretch;flex-direction:column}.reconcileActions>*{width:100%}.stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}
