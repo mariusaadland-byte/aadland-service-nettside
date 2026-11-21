@@ -44,6 +44,14 @@ Opprettet 21.11.2026. Løpende funnliste. **Ingen av punktene under er utbedret 
 | S-28 | P3 | Kontrolleres | Publisert innhold | Produksjonsdatabasen har 0 registrerte tjenester og 0 publiserte referanseprosjekter; prosjektgalleriet viser derfor «Ingen prosjekter publisert ennå». Noen tjenestesider har statisk fallback. Avklar hva som skal vises, kvalitetssikre tekst, bilder og om lenker peker til aktivt innhold. |
 | S-29 | P2 | Påvist | Kunderegistrering / e-post | `POST /api/customer/register` sletter nyopprettet Auth-bruker ved uavklart feil fra verifiserings-e-posttilbyderen. Dersom e-posten faktisk ble levert, kan kunden få bekreftelseslenke til en slettet konto. Innfør varig registrerings-/sendestatus og sikker gjenutsending fremfor destruktiv håndtering av usikre svar. |
 
+
+| S-30 | P1 | Påvist | Vipps for Service: belastning og refusjon | Generisk `POST /api/admin/vipps-payment` utfører `capture/cancel/refund` uten en vedvarende handlingslås. Når ingen nøkkel gis, lager `lib/vippsClient.js` en **ny tilfeldig idempotensnøkkel** per kall; samtidige forsøk kan derfor få forskjellige nøkler. Innfør låst handling, entydig nøkkel per forsøk og avstem mot leverandør etter timeout. Faktura-Vipps har separat deterministisk refusjonsnøkkel; det er ikke påvist en dobbel transaksjon. |
+| S-31 | P2 | Påvist | Testmiljø og kunde-e-post | Flere sendeflyter bruker `RESEND_PREVIEW_API_KEY || RESEND_API_KEY` i preview, og mottaker hentes fra reelle kundedata. Hvis testnøkkel mangler, kan forhåndsvisning sende via produksjonsnøkkel til en ekte kunde. Innfør tydelig sperre eller trygt testmottakerregime før videre testarbeid. |
+| S-32 | P3 | Kontrolleres | Vipps: offentlige statusendepunkter | `GET /api/vipps/payment-status` kan ved vanlig statusoppslag også trigge kvitterings- eller refusjons-e-post via underliggende «send if needed»-funksjoner. Det er ratebegrensning og dedupliseringshjelpere; kontroller at anonyme gjentatte oppslag ikke kan skape unødvendige utsendinger eller utilsiktede leverandørkall. |
+| S-33 | P2 | Påvist | Ordrebekreftelser | `POST /api/orders` kan returnere vellykket ordre med `confirmationSent=false` når e-post feiler, og setter bare `confirmation_sent_at` etter registrert send. Det finnes manuell resend i admin, men ingen bekreftet automatisk gjenoppretting for ordinære manuelle produktordre. Legg til varsling til eier / synlig usendt-oversikt og sikker retry. |
+| S-34 | P3 | Kontrolleres | Databaseytelse og indekser | Supabase performance-advisor rapporterer ni fremmednøkler uten dekkende indeks (åtte uten utleie) og 43 indekser uten registrert bruk. Vurder reelle spørringer og framtidig datavolum; **ikke** slett indekser bare fordi de ennå ikke er brukt. |
+| S-35 | P3 | Påvist | Min side: historikk ved vekst | `GET /api/customer/me` begrenser ordre, tilbud og annen historikk til blant annet 100 rader per kategori, uten synlig paginering. I dagens lille datamengde er det ikke et problem, men ved vekst kan eldre registreringer bli usynlige. Legg til sidetall og tydelig totalantall. |
+
 ## Observasjoner som ser riktige ut
 - Siste bekreftede produksjonsdeploy var READY på revisjon 854fa0da6a54a5d39af15a10f75763d967ac68ff.
 - Ingen duplikatgrupper av faktura- eller tilbudsnummer i databasen.
@@ -66,6 +74,32 @@ Opprettet 21.11.2026. Løpende funnliste. **Ingen av punktene under er utbedret 
 - `app/personvern/page.js`, `vercel.json`
 - `lib/quoteLinks.js`, `app/api/quotes/[id]/route.js`, `app/api/contact-images/route.js`
 - Supabase: `admin_development_tasks`, `quote_admin_preferences`, `material_suppliers`, `vat_tripletex_receipt_transfers`, `tripletex_direct_invoice_claims`.
+
+
+## Kartlegging avsluttet – 21.11.2026
+
+**Avsluttet for statisk kode- og konfigurasjonskontroll; ikke godkjent som full ende-til-ende driftstest.** Alt på funnlisten står fortsatt til behandling, mens utleie og de 36 tidligere lukkede utviklingsoppgavene er urørt.
+
+Områder dekket:
+1. Administrator-API: inventar over 90 administrative ruter uten utleie, med nærmere kontroll av sentrale lesings-, endrings- og pengetransaksjonsruter samt sikkerhet og tilgangsroller.
+2. Offentlige og kundevendte API-er: pålogging, registrering, bekreftelser, passordreset, Min side, tilbudslenker og digital aksept, bestilling, produkter, katalog, Vipps-status og kontaktopplasting.
+3. Salg og prosjekt: kostnadskalkulator, materialpåslag og leverandørkatalog, tilbud, revisjoner, konvertering til oppdrag, befaring, planlagte oppstarter, arbeidstimer, tegninger, prosjekter og statisk nettsted.
+4. Økonomi: faktura og PDF, purring/inkasso, kreditnota, manuelle betalinger og Vipps, Tripletex-overføringer og avstemming, MVA-bilag, e-bilagsleveranse og terminkontroll.
+5. Drift: Vercel-produksjonsdeploy, sikkerhets- og helseadvisors fra Supabase, offentlig/privat objektlagring, 7-dagers aggregert kjøretidsfeilrapport, Resend leveringsstatistikk, planlagte jobber, domenekonfigurasjon, personvern og backup-behov.
+6. Datakvalitet: fakturaoriginaler, betaling og kreditering, dobbeltføringsmarkører, ordre-/tilbudsstatuser, kundekoblinger, lagerantall, kundekontakter og publiserte tegninger. Ingen slettinger, nye fakturaer, reelle betalingskall eller test-e-poster ble utført.
+
+Funnene er dokumenterte kode-/dataavvik eller tydelig merket som *kontrolleres*. En innlogget nettlesertest på PC og mobil, praktiske tester av alle forretningsprosesser, betalinger, kunde-e-post og faktisk bokføring/gjenoppretting forblir **testpunkter** på denne listen, ikke dokumentasjon på at alt fungerer. Reell ekstern tilgjengelighet kunne ikke verifiseres via nettleseinnhenting, mens domenene var verifiserte og Vercel deploy READY. Klare systemtester må utføres trygt punktvis ved utbedring.
+
+### Siste kontrollresultater
+- Supabase health: 0 alarmer. Security: 2 advarsler (databasefunksjons søkesti, Auth lekkede passord), dessuten informasjonsmelding om RLS uten policy på tabeller som kan være bevisst service-only. Ytelse: 9 uindekserte FK totalt, 43 ubrukte indekser.
+- Vercel aggregert feilrapport siste 7 døgn: 0 rapporterte kjøretidsfeil; **ikke** en garanti mot feil i løsningen.
+- Datakvalitet: 0 dublettgrupper i administratorkundens e-post og kundeprofilenes e-post, 0 publiserte tegninger uten koblet kunde, 0 aksepterte tilbud uten oppdrag, 0 negative beholdninger, 0 betalte faktura-Vipps-transaksjoner uten kvittering.
+- Resend 01.–21.11.2026: 30 sendt, 30 levert, ingen rapporterte feil/bounces i samlet statistikk.
+- Den eksisterende utviklingsplanen står fortsatt på 36 `done` og 1 `test` (utleie). Auditten er **ikke** en attestasjon av alle 36 ferdige funksjoner.
+
+### Anbefalt gjennomgang etter kartlegging
+Rekkefølge: tilgang til tegninger (S-23), betalings/idempotens for Vipps og ordre (S-30, S-25, S-26), tilbudsutsending (S-02, S-03), prising (S-01), fakturavarslinger og faktisk Tripletex/MVA-avstemming (S-04 til S-08), og så øvrige sikkerhets-/kundetest-/driftspunkter. For hvert punkt: verifiser risiko, lag test, rett i egen gren, kontroller i preview uten ekte kundeutsending, publiser og godkjenn.
+
 
 ## Kontrollrunde 2 – gjennomgått 21.11.2026
 - Kartlagt alle 90 ikke-utleierelaterte administrator-API-ruter på filtre og gått gjennom konkrete endepunkter for tegninger, tjenester, prosjektgalleri, lager/ordre, kundekonto, oppdragsplan, befaring-/oppstartspåminnelser og autorisasjon. Ingen produksjonskall som sender e-post eller oppretter betaling er utført.
