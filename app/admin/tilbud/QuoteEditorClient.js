@@ -7,6 +7,7 @@ import {osloDateKey,shiftDateKey} from "../../../lib/osloTime";
 import {CATALOG_QUOTE_TRANSFER_KEY} from "../../../lib/calculatorQuoteLines";
 import QuoteCatalogSearch from "./QuoteCatalogSearch";
 import QuoteCustomerPicker from "./QuoteCustomerPicker";
+import QuoteLinkControls from "./QuoteLinkControls";
 import VippsFeePreview from "../VippsFeePreview";
 import {hasAdjustableVippsPriceLine,linesForCustomerTotal} from "../../../lib/vippsPriceLines";
 import {calculateContribution,withPrivateCosts} from "../../../lib/quotePrivateCosts";
@@ -54,7 +55,7 @@ function calculate(lines){
  return {subtotal,vat,total:subtotal+vat};
 }
 
-export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initialCustomer=null}){
+export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initialCustomer=null,isOwner=false}){
  const router=useRouter();
  const [v,setV]=useState(blankState);
  const [quoteNumber,setQuoteNumber]=useState("");
@@ -896,6 +897,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      {!locked&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn" disabled={saving||sending||converting} onClick={()=>save()}>{saving?"Lagrer …":"Lagre tilbud"}</button>}
     </div>
    </div>
+
+   {quoteId&&isOwner&&["sent","accepted","declined","expired","cancelled","superseded"].includes(v.status)&&<QuoteLinkControls quoteId={quoteId}/>}
 
    {quoteId&&v.status==="draft"&&sendAttempt&&sendAttempt.state!=="released"&&<section className="card" style={{margin:"12px 0",padding:18,border:"2px solid #b67e36"}} role="status">
     <strong>Utsendingskontroll: {sendAttempt.state==="sent"?"Registrert som sendt":sendAttempt.state==="provider_accepted"?"E-post bekreftet hos Resend":"Uavklart e-poststatus"}</strong>

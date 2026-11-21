@@ -2,6 +2,7 @@ import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {verifyQuoteToken} from "../../../../lib/quoteLinks";
+import {getCustomer} from "../../../../lib/customer-auth";
 import {osloDateKey} from "../../../../lib/osloTime";
 
 function esc(value){
@@ -51,8 +52,20 @@ async function loadQuote(id){
 function expired(quote){
  if(!quote.valid_until)return false;
  const today=osloDateKey(new Date());
- return quote.valid_until<today;
+ return String(quote.valid_until).slice(0,10)<today;
 }
+
+// An authenticated Min side account can see its own historic issued quotes,
+// even after the PUBLIC email link has expired or been revoked.
+// A forwarded email link alone must never grant this account access.
+async function customerOwnsIssuedQuote(quote){
+ if(!quote||quote.status==="draft"||(!quote.sent_at&&!quote.paper_issued_at&&!quote.accepted_at&&!quote.declined_at))return false;
+ const customer=await getCustomer();
+ const profileEmail=String(customer?.email||"").trim().toLowerCase();
+ const quoteEmail=String(quote.customer?.email||"").trim().toLowerCase();
+ return Boolean(profileEmail&&quoteEmail&&profileEmail===quoteEmail);
+}
+const privateHeaders={"Cache-Control":"private, no-store, max-age=0","Referrer-Policy":"no-referrer"};
 
 export async function GET(req,{params}){
  const resolved=await params;
@@ -60,9 +73,11 @@ export async function GET(req,{params}){
  const token=String(req.headers.get("x-quote-token")||new URL(req.url).searchParams.get("token")||"");
  const loaded=await loadQuote(id);
  if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status});
- if(!verifyQuoteToken(loaded.data,token))return NextResponse.json({error:"Ugyldig eller utløpt tilbudslenke."},{status:403});
+ const publicLinkOk=verifyQuoteToken(loaded.data,token);
+ if(!publicLinkOk&&!(await customerOwnsIssuedQuote(loaded.data)))
+  return NextResponse.json({error:"Tilbudslenken er utløpt eller sperret. Logg inn på Min side for å se din tilbudshistorikk."},{status:403,headers:privateHeaders});
  const quote=mapQuote(loaded.data);
- return NextResponse.json({quote:{...quote,isExpired:expired(loaded.data)}},{headers:{"Cache-Control":"private, no-store, max-age=0"}});
+ return NextResponse.json({quote:{...quote,isExpired:expired(loaded.data)}},{headers:privateHeaders});
 }
 
 export async function POST(req,{params}){ const originError=sameOriginGuard(req); if(originError)return originError;
@@ -75,7 +90,9 @@ export async function POST(req,{params}){ const originError=sameOriginGuard(req)
 
  const loaded=await loadQuote(id);
  if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status});
- if(!verifyQuoteToken(loaded.data,token))return NextResponse.json({error:"Ugyldig eller utløpt tilbudslenke."},{status:403});
+ const publicLinkOk=verifyQuoteToken(loaded.data,token);
+ if(!publicLinkOk&&!(await customerOwnsIssuedQuote(loaded.data)))
+  return NextResponse.json({error:"Tilbudslenken er utløpt eller sperret. Logg inn på Min side for å se egne tilbud."},{status:403,headers:privateHeaders});
 
  if(["accepted","declined","cancelled","superseded"].includes(loaded.data.status)){
   return NextResponse.json({error:loaded.data.status==="superseded"?"Denne tilbudsversjonen er erstattet av en nyere revisjon.":"Tilbudet er allerede ferdigbehandlet."},{status:409});
@@ -167,5 +184,5 @@ ${hasCustomerAccount?`<a href="${esc(minSideUrl)}" style="display:inline-block;m
   }
  }
 
- return NextResponse.json({quote:{...mapQuote(data),isExpired:expired(data)}});
+ return NextResponse.json({quote:{...mapQuote(data),isExpired:expired(data)}},{headers:privateHeaders});
 }

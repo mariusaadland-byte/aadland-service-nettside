@@ -1,11 +1,9 @@
 import {NextResponse} from "next/server";
 import {getCustomer} from "../../../../lib/customer-auth";
 import {db} from "../../../../lib/supabase";
-import {createQuoteToken} from "../../../../lib/quoteLinks";
 import {safeHttpsUrl} from "../../../../lib/safeUrl";
 
 function mapQuote(quote){
- const token=createQuoteToken(quote);
  return {
   id:quote.id,
   quoteNumber:quote.quote_number,
@@ -25,7 +23,7 @@ function mapQuote(quote){
   acceptedAt:quote.accepted_at||null,
   declinedAt:quote.declined_at||null,
   createdAt:quote.created_at,
-  href:"/tilbud/"+encodeURIComponent(quote.id)+"?token="+encodeURIComponent(token)
+  href:"/tilbud/"+encodeURIComponent(quote.id)
  };
 }
 
@@ -112,8 +110,7 @@ export async function GET(){
     if(!quote.converted_order_id||String(quote.customer?.email||"").trim().toLowerCase()!==customerEmail)continue;
     let href=null;
     try{
-     const token=createQuoteToken(quote);
-     href="/tilbud/"+encodeURIComponent(quote.id)+"?token="+encodeURIComponent(token);
+     href="/tilbud/"+encodeURIComponent(quote.id);
     }catch(error){
      console.error("CUSTOMER ORDER QUOTE LINK",error);
     }
