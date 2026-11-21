@@ -69,7 +69,5 @@ export async function GET(req){
    await hold();
   }
  }
- return json({ok:true,checked:data.length,removed,linked,review,skipped},{
-  // Use standard status number so S17-style watchdogs interpret manual review.
- }.status||200);
+ return json({ok:review===0,checked:data.length,removed,linked,review,skipped},review?207:200);
 }
