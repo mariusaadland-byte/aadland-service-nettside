@@ -81,7 +81,7 @@ end; $$;
 
 create or replace function public.skip_vat_deadline_reminder_if_filed(
  p_year integer,p_term integer,p_lead_days integer,p_key text
-) returns void language plpgsql security invoker set search_path='' as $
+) returns void language plpgsql security invoker set search_path='' as $$
 declare v_status text;
 begin
  select status into v_status from public.vat_reporting_term_status
@@ -90,7 +90,7 @@ begin
  update public.vat_deadline_reminder_attempts set status='skipped',updated_at=now()
  where year=p_year and term=p_term and lead_days=p_lead_days
    and idempotency_key=p_key and status='claimed';
-end; $;
+end; $$;
 
 create or replace function public.vat_deadline_reminder_uncertain(
  p_year integer,p_term integer,p_lead_days integer,
