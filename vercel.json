@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/vat-deadline-reminders",
       "schedule": "35 8 * * *"
+    },
+    {
+      "path": "/api/cron/service-health-alerts",
+      "schedule": "30 14 * * *"
     }
   ]
 }
