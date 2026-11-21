@@ -21,13 +21,18 @@ function ore(value){
 async function supplierList(s){
  const {data,error}=await s.from("material_suppliers").select("*").order("is_primary",{ascending:false}).order("name");
  if(error)return {error};
+ const {data:preference,error:prefError}=await s.from("quote_admin_preferences")
+  .select("default_material_markup").eq("id","main").maybeSingle();
+ if(prefError)return {error:prefError};
+ const companyMarkup=Number(preference?.default_material_markup??15);
  const direct=new Map(materialSupplierStatuses().map(item=>[item.id,item]));
  const suppliers=await Promise.all((data||[]).map(async item=>{
   const countResult=await s.from("material_supplier_products").select("supplier_id",{count:"exact",head:true}).eq("supplier_id",item.id).eq("active",true);
   const adapter=direct.get(item.id);
   return {
    id:item.id,name:item.name,active:item.active!==false,isPrimary:item.is_primary===true,
-   defaultMarkupPercent:Number(item.default_markup_percent)||15,
+   defaultMarkupPercent:Number(item.default_markup_percent??companyMarkup),
+   inheritsCompanyMarkup:item.default_markup_percent===null,
    lastImportAt:item.last_import_at||null,lastSourceFilename:item.last_source_filename||"",
    productCount:countResult.count||0,
    connected:Boolean(adapter?.connected),
