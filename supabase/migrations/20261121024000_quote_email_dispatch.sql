@@ -124,6 +124,36 @@ begin
  where quote_id=p_quote_id;
 end; $;
 
+-- If Resend confirmed the message but the local receipt write failed,
+-- the owner can verify the Resend message ID and restore the accepted state.
+-- It is an audit-only state change and never sends an email.
+create or replace function public.confirm_quote_provider_after_review(
+ p_quote_id uuid,p_quote_number text,p_reviewer uuid,
+ p_confirmed_sent boolean,p_provider_email_id text,p_note text
+) returns void language plpgsql security invoker set search_path='' as $
+declare a public.quote_email_send_attempts%rowtype; v_quote_number text;
+begin
+ select quote_number into v_quote_number from public.quotes where id=p_quote_id for update;
+ if v_quote_number is null or v_quote_number<>p_quote_number
+  or p_confirmed_sent is distinct from true then
+  raise exception 'quote_provider_confirmation_required';
+ end if;
+ select * into a from public.quote_email_send_attempts where quote_id=p_quote_id for update;
+ if not found or a.state not in ('claimed','needs_review')
+ then raise exception 'quote_attempt_not_reconcilable'; end if;
+ if a.claimed_at>now()-interval '5 minutes' then raise exception 'quote_attempt_too_recent'; end if;
+ if length(btrim(coalesce(p_note,'')))<12 or length(btrim(coalesce(p_provider_email_id,'')))<8
+  or length(p_provider_email_id)>240 then raise exception 'quote_provider_receipt_required'; end if;
+ insert into public.quote_email_send_reviews(
+  quote_id,previous_state,previous_idempotency_key,previous_recipient,reviewed_by,review_note
+ ) values(p_quote_id,a.state,a.idempotency_key,a.recipient,p_reviewer,
+  left('Bekreftet hos Resend, meldings-ID '||p_provider_email_id||'. '||p_note,1200));
+ update public.quote_email_send_attempts set
+  state='provider_accepted',provider_email_id=p_provider_email_id,
+  provider_accepted_at=now(),reviewed_at=now(),review_note=left(p_note,1200),
+  updated_at=now() where quote_id=p_quote_id;
+end; $;
+
 -- This transaction either activates the revision AND logs the send,
 -- or leaves the provider acknowledgment for safe local recovery.
 create or replace function public.complete_quote_email_send(
@@ -180,8 +210,10 @@ revoke execute on function public.quote_email_send_uncertain(uuid,text,text) fro
 revoke execute on function public.complete_quote_email_send(uuid,text) from public,anon,authenticated;
 revoke execute on function public.guard_quote_email_dispatch() from public,anon,authenticated;
 revoke execute on function public.release_quote_email_after_review(uuid,text,uuid,boolean,text) from public,anon,authenticated;
+revoke execute on function public.confirm_quote_provider_after_review(uuid,text,uuid,boolean,text,text) from public,anon,authenticated;
 grant execute on function public.claim_quote_email_send(uuid,timestamptz,text,text) to service_role;
 grant execute on function public.quote_email_provider_accepted(uuid,text,text) to service_role;
 grant execute on function public.quote_email_send_uncertain(uuid,text,text) to service_role;
 grant execute on function public.complete_quote_email_send(uuid,text) to service_role;
 grant execute on function public.release_quote_email_after_review(uuid,text,uuid,boolean,text) to service_role;
+grant execute on function public.confirm_quote_provider_after_review(uuid,text,uuid,boolean,text,text) to service_role;
