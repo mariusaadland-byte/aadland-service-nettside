@@ -280,7 +280,7 @@ export default function MaterialAiClient(){
   }}));
   setSharedMatches(current=>({...current,[line.id]:[]}));
   setSharedErrors(current=>({...current,[line.id]:""}));
-  setMessage("Varenr. "+product.sku+" hentet fra "+product.supplierName+". Kontroller enheten "+(product.unit||"STK")+".");
+  setMessage("Varenr. "+product.sku+" hentet fra "+product.supplierName+". Kontroller enheten "+(product.unit||"STK")+"."+(product.priceReviewRequired?" Prislisten er eldre enn 30 dager – bekreft dagens innkjøpspris.":""));
   setTimeout(()=>setMessage(""),3600);
  }
  function autoMatch(line){
@@ -357,7 +357,7 @@ export default function MaterialAiClient(){
 
   <section className={styles.supplierCard}>
    <div className={styles.sectionHead}><div><span className={styles.kicker}>3 · LEVERANDØRPRISER</span><h2>Dine innkjøpspriser</h2><p>Bygger’n er primær. Søk direkte i den felles prisbasen på materiallinjene nedenfor, eller importer en egen CSV lokalt. Valgt påslag er {decimal(number(markup),2)} %.</p></div><label className={styles.importBtn}>Importer prisfil<input type="file" accept=".csv,text/csv,.txt" onChange={importPriceFile}/></label></div>
-   <div className={styles.supplierGrid}>{SUPPLIERS.map(s=>{const status=supplierStatuses.find(item=>item.id===s.id);return <div key={s.id}><strong>{s.name}</strong><span>{status?.mode||s.mode}</span><small>{s.note}</small><b className={status?.connected?styles.connected:undefined}>{status?.connected?"Direkte koblet ✓":"Prisfil / manuell pris"}</b></div>})}</div>
+   <div className={styles.supplierGrid}>{SUPPLIERS.map(s=>{const status=supplierStatuses.find(item=>item.id===s.id);return <div key={s.id}><strong>{s.name}</strong><span>{status?.mode||s.mode}</span><small>{s.note}</small><small>{status?((status.productCount||0)+" varer · "+(status.priceReviewRequired?"Eldre prisfil – kontroller":status.priceStatus==="missing"?"Ingen prisfil importert":"Prisfil registrert")):"Status hentes …"}</small><b className={status?.connected?styles.connected:undefined}>{status?.connected?"Direkte koblet ✓":"Prisfil / manuell pris"}</b></div>})}</div>
    <div className={styles.catalogStatus}><span>{sharedSuppliers.some(s=>s.isPrimary&&s.lastImportAt)?"Felles katalog: Bygger’n er importert":"Felles katalog: venter på import"} · {catalog.length?catalog.length+" varer i lokal CSV":"Ingen lokal CSV lastet"}</span><div>{catalog.length>0&&rows.length>0&&<button type="button" onClick={()=>{const count=matchAllPrices();setMessage(count?count+" materialer matchet mot prisbasen":"Fant ingen sikre treff");setTimeout(()=>setMessage(""),1800)}}>Match alle materialer</button>}{catalog.length>0&&<button type="button" onClick={clearCatalog}>Tøm prisbase</button>}</div></div>
    <p className={styles.fileHelp}>CSV kan ha kolonner som leverandør, varenr, produkt/navn, enhet, pris eks. mva eller pris inkl. mva, pakningsstørrelse og prisbasis.</p>
   </section>
@@ -410,7 +410,7 @@ export default function MaterialAiClient(){
         <button type="button" disabled={sharedBusy===line.id} onClick={()=>lookupSharedPrice(line)}>{sharedBusy===line.id?"Søker …":"Finn varer"}</button>
        </div>
        {sharedErrors[line.id]&&<p className={styles.sharedCatalogError} role="status">{sharedErrors[line.id]}</p>}
-       {(sharedMatches[line.id]||[]).length>0&&<div className={styles.sharedCatalogMatches}>{sharedMatches[line.id].map(product=><button type="button" key={product.supplierId+"-"+product.sku} onClick={()=>chooseSharedPrice(line,product)}><span><strong>{product.name}</strong><small>{product.supplierName} · varenr. {product.sku}</small></span><span><b>{money(product.costExVat)}</b><small>eks. mva / {product.unit||"stk"}</small></span></button>)}</div>}
+       {(sharedMatches[line.id]||[]).length>0&&<div className={styles.sharedCatalogMatches}>{sharedMatches[line.id].map(product=><button type="button" key={product.supplierId+"-"+product.sku} onClick={()=>chooseSharedPrice(line,product)}><span><strong>{product.name}</strong><small>{product.supplierName} · varenr. {product.sku}{product.priceReviewRequired?" · Eldre importpris – kontroller":""}</small></span><span><b>{money(product.costExVat)}</b><small>eks. mva / {product.unit||"stk"}</small></span></button>)}</div>}
        {p.shared&&<p className={styles.sharedCatalogSelected}>Hentet fra felles prisbase · {p.sku||"uten varenr."} · pris per {p.catalogUnit||"STK"}. Kontroller «Pris gjelder» før tilbud.</p>}
       </div>
       <div className={styles.priceSummary}><span>Kost: <b>{money(qty*cost)}</b></span><span>+ {decimal(number(markup),2)} %: <b>{money(sales)} / {priceBasis==="package"?"pk":line.unit}</b></span><strong>Tilbudslinje {money(total)} eks. mva</strong><button type="button" onClick={()=>saveFavorite(line)}>Lagre materiale</button><button type="button" onClick={()=>removeRow(line.id)}>Slett linje</button></div>

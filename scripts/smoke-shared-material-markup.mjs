@@ -9,7 +9,9 @@ for(const [raw,expected] of [[null,15],[undefined,15],["",15],[0,0],[15,15],[20,
 }
 assert.equal(materialMarkupOrFallback(null,18),18,"company changes take effect for inherited defaults");
 const catalog=read("app/api/admin/material-catalog/route.js");
-const supplierRow=new Function(catalog.slice(catalog.indexOf("function supplierRow("),catalog.indexOf("function productRow("))+"return supplierRow;")();
+const freshnessSource=readFileSync("lib/materialPriceFreshness.js","utf8");
+const {supplierPriceFreshness}=await import("data:text/javascript;base64,"+Buffer.from(freshnessSource).toString("base64"));
+const supplierRow=new Function("supplierPriceFreshness",catalog.slice(catalog.indexOf("function supplierRow("),catalog.indexOf("function productRow("))+"return supplierRow;")(supplierPriceFreshness);
 assert.equal(supplierRow({default_markup_percent:null},18).defaultMarkupPercent,18);
 assert.equal(supplierRow({default_markup_percent:null},18).inheritsCompanyMarkup,true);
 assert.equal(supplierRow({default_markup_percent:0},18).defaultMarkupPercent,0);

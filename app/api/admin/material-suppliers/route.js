@@ -2,6 +2,7 @@ import {NextResponse} from "next/server";
 import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
 import {materialMarkupOrFallback} from "../../../../lib/materialMarkupPolicy";
+import {supplierPriceFreshness} from "../../../../lib/materialPriceFreshness";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {materialSupplierStatuses,lookupMaterialSupplier} from "../../../../lib/materialSupplierAdapters";
 
@@ -36,6 +37,7 @@ async function supplierList(s){
    inheritsCompanyMarkup:item.default_markup_percent===null,
    lastImportAt:item.last_import_at||null,lastSourceFilename:item.last_source_filename||"",
    productCount:countResult.count||0,
+   ...supplierPriceFreshness({id:item.id,lastImportAt:item.last_import_at,productCount:countResult.count||0}),
    connected:Boolean(adapter?.connected),
    mode:(countResult.count||0)>0?"Database / prisliste":adapter?.mode||"Klar for prisliste"
   };

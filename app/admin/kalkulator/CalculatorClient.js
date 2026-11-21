@@ -5,6 +5,7 @@ import Link from "next/link";
 import styles from "./calculator.module.css";
 import QuoteTransferPanel from "./QuoteTransferPanel";
 import {unitSaleExVat} from "../../../lib/calculatorQuoteLines";
+import {supplierPriceNotice} from "../../../lib/materialPriceFreshness";
 
 const STORAGE_KEY="aadland-service-calculator-v1";
 const VAT_RATE=0.25;
@@ -172,12 +173,13 @@ export default function CalculatorClient(){
     :[...items,{
       key,supplierId:product.supplierId,supplierName:product.supplierName||product.supplierId,
       sku:product.sku,name:product.name||"",unit:product.unit||"STK",
-      costExVat:number(product.costExVat),qty:"1",saleExVat:product.saleExVat==null?"":String(product.saleExVat)
+      costExVat:number(product.costExVat),qty:"1",saleExVat:product.saleExVat==null?"":String(product.saleExVat),
+      priceReviewRequired:product.priceReviewRequired===true,sourcePriceImportedAt:product.lastImportAt||null
      }];
    return {...current,materialItems:next};
   });
   setMaterialQuery("");setMaterialResults([]);
-  setAddedNotice("Vare lagt til. Endre antall på linjen under, eller søk etter neste vare.");
+  setAddedNotice(product.priceReviewRequired?"Vare lagt til. OBS: importprisen er eldre enn 30 dager. Bekreft innkjøpsprisen før tilbud.":"Vare lagt til. Endre antall på linjen under, eller søk etter neste vare.");
   document.getElementById("calculator-product-search")?.focus();
  }
  function addCustomMaterial(){
@@ -316,12 +318,13 @@ export default function CalculatorClient(){
         </select></Field>
        </details>
       </div>
-      {catalogError&&<div className={styles.catalogError}>{catalogError}</div>}
+      {catalogSupplier&&catalogSuppliers.find(row=>row.id===catalogSupplier)&&<p className={styles.catalogFreshness} role="status">{supplierPriceNotice(catalogSuppliers.find(row=>row.id===catalogSupplier))}</p>}
+       {catalogError&&<div className={styles.catalogError}>{catalogError}</div>}
       {materialQuery.trim().length>=2&&<div className={styles.searchResults}>
        {catalogBusy&&<div className={styles.catalogEmpty}>Søker …</div>}
        {!catalogBusy&&!catalogError&&materialResults.length===0&&<div className={styles.catalogEmpty}>Ingen treff. Prøv et annet varenummer eller kortere navn.</div>}
        {!catalogBusy&&materialResults.map(product=><button type="button" key={product.supplierId+"::"+product.sku} className={styles.productResult} onClick={()=>addMaterial(product)}>
-        <span><b>{product.name}</b><small>{product.supplierName} · varenr. {product.sku}</small></span>
+        <span><b>{product.name}</b><small>{product.supplierName} · varenr. {product.sku}{product.priceReviewRequired?" · Eldre importpris – kontroller":""}</small></span>
         <span><strong>{money(product.costExVat)}</strong><small>innkjøp eks. mva / {product.unit||"stk"}</small></span><em>+ Legg til</em>
        </button>)}
       </div>}
@@ -336,7 +339,7 @@ export default function CalculatorClient(){
          const sale=unitSaleExVat(item,form.materialMarkup),qty=number(item.qty);
          return <div key={item.key} className={styles.quoteGoodsLine}>
           <span className={styles.quoteGoodsNumber}>{index+1}</span>
-          <label className={styles.quoteGoodsDescription}><span>Vare / beskrivelse</span><input value={item.name||""} onChange={e=>updateMaterial(item.key,"name",e.target.value)} placeholder="Hva skal leveres?"/><small>{item.sku?"Varenr. "+item.sku+" · ":""}{item.supplierName||"Manuell vare"}</small></label>
+          <label className={styles.quoteGoodsDescription}><span>Vare / beskrivelse</span><input value={item.name||""} onChange={e=>updateMaterial(item.key,"name",e.target.value)} placeholder="Hva skal leveres?"/><small>{item.sku?"Varenr. "+item.sku+" · ":""}{item.supplierName||"Manuell vare"}{item.priceReviewRequired?" · Eldre importpris – kontroller":""}</small></label>
           <label><span>Antall</span><input type="number" min="0" step="any" inputMode="decimal" value={item.qty} onChange={e=>updateMaterial(item.key,"qty",e.target.value)}/></label>
           <label><span>Enhet</span><input value={item.unit||""} onChange={e=>updateMaterial(item.key,"unit",e.target.value)} placeholder="stk / lm"/></label>
           <label><span>Innkjøp eks. mva.</span><input type="number" min="0" step="any" inputMode="decimal" value={item.costExVat??""} onChange={e=>updateMaterial(item.key,"costExVat",e.target.value)}/></label>

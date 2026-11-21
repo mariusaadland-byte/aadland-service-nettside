@@ -2,6 +2,7 @@
 import {useEffect,useState} from "react";
 import Link from "next/link";
 import styles from "./quoteCatalog.module.css";
+import {supplierPriceNotice} from "../../../lib/materialPriceFreshness";
 const fmt=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(Number(n)||0);
 export default function QuoteCatalogSearch({onChoose}){
  const [query,setQuery]=useState(""),[supplier,setSupplier]=useState(""),[suppliers,setSuppliers]=useState([]);
@@ -68,7 +69,7 @@ export default function QuoteCatalogSearch({onChoose}){
   const ok=onChoose(product,safeRate);
   if(ok===false)return;
   setQuery("");setResults([]);
-  setMessage(product.name+" er lagt til. Endre antall i linjen nedenfor.");
+  setMessage(product.name+" er lagt til. "+(product.priceReviewRequired?"OBS: Innkjøpsprisen kommer fra en eldre import. Bekreft prisen før du sender tilbudet.":"Endre antall i linjen nedenfor."));
   document.getElementById("offer-catalog-search")?.focus();
  };
  return <div className={styles.box}>
@@ -81,13 +82,14 @@ export default function QuoteCatalogSearch({onChoose}){
   <button type="button" disabled={savingMarkup||!supplier} onClick={saveMarkup}>{savingMarkup?"Lagrer …":"Lagre eget påslag for leverandør"}</button>
   <button type="button" disabled={savingMarkup||!supplier} onClick={useCompanyMarkup}>Bruk bedriftens standard</button>
   {supplier&&<small className={styles.note}>{suppliers.find(row=>row.id===supplier)?.inheritsCompanyMarkup===true?"Denne leverandøren følger bedriftens standard.":"Denne leverandøren har et eget lagret standardpåslag."}</small>}
+  {supplier&&suppliers.find(row=>row.id===supplier)&&<p className={styles.priceNotice} role="status">{supplierPriceNotice(suppliers.find(row=>row.id===supplier))}</p>}
   {message&&<p className={styles.notice} role="status">{message}</p>}
   {error&&<p className={styles.error} role="alert">{error}</p>}
   {query.trim().length>=2&&<div className={styles.results}>
    {busy&&<p>Søker …</p>}
    {!busy&&!error&&!results.length&&<p>Ingen treff på søket.</p>}
    {!busy&&results.map(p=><button type="button" key={p.supplierId+"-"+p.sku} onClick={()=>add(p)}>
-    <span><strong>{p.name}</strong><small>{p.supplierName} · varenr. {p.sku}</small></span>
+    <span><strong>{p.name}</strong><small>{p.supplierName} · varenr. {p.sku}{p.priceReviewRequired?" · Eldre importpris – kontroller":""}</small></span>
     <span><b>{fmt(p.costExVat)}</b><small>innkjøp eks. mva / {p.unit}</small></span><em>+ Legg til</em>
    </button>)}
   </div>}
