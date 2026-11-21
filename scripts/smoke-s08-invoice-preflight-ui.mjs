@@ -24,7 +24,7 @@ assert.ok(!functionSource.includes('action:"prepare"'));
 const beforeCreate=route.indexOf('const saved=await s.from("tripletex_direct_invoice_claims").insert({');
 const checkExit=route.indexOf('if(body.action==="check")return json(');
 assert.ok(checkExit>=0&&beforeCreate>checkExit,"Check must exit before irreversible Tripletex write");
-assert.ok(route.includes('if(!["check","transfer"].includes(body.action))'));
+assert.ok(route.includes('!["check","transfer"].includes(body.action)'),"API must restrict allowed actions");
 assert.ok(route.includes("Det utelukker ikke tidligere manuell bokføring"));
 assert.ok(pilot.includes("duplicateDirectInvoiceSearch"));
 assert.ok(pilot.includes('+"&customerId="+customerId'));
