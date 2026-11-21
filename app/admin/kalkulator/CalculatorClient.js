@@ -57,6 +57,7 @@ function Field({label,help,children}){
 
 export default function CalculatorClient(){
  const [form,setForm]=useState(DEFAULTS);
+ const [hydrated,setHydrated]=useState(false);
  const [companyMarkup,setCompanyMarkup]=useState("15");
  const [markupLoadError,setMarkupLoadError]=useState("");
  const [copied,setCopied]=useState(false);
@@ -86,11 +87,13 @@ export default function CalculatorClient(){
     materialMarkupSource:saved.materialMarkupSource==="company"?"company":"manual"
    });
   }catch{}
+  setHydrated(true);
  },[]);
 
  useEffect(()=>{
+  if(!hydrated)return;
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify(form));}catch{}
- },[form]);
+ },[form,hydrated]);
 
  useEffect(()=>{
   let active=true;
