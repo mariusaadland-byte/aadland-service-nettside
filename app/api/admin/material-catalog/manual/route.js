@@ -25,7 +25,7 @@ export async function POST(req){
  const originalSku=String(body.originalSku||"").trim();
  if(originalSku&&originalSku!==sku)return NextResponse.json({error:"Varenummeret beholdes ved redigering. Opprett en ny vare dersom du trenger et annet nummer."},{status:400});
  const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
- const {error:supplierError}=await s.from("material_suppliers").upsert({id:MANUAL_SUPPLIER_ID,name:"Egne varer",active:true,default_markup_percent:20},{onConflict:"id",ignoreDuplicates:true});
+ const {error:supplierError}=await s.from("material_suppliers").upsert({id:MANUAL_SUPPLIER_ID,name:"Egne varer",active:true,default_markup_percent:null},{onConflict:"id",ignoreDuplicates:true});
  if(supplierError)return NextResponse.json({error:"Kunne ikke klargjøre prislisten."},{status:500});
  const record={...parsed.record,updated_at:new Date().toISOString()};
  const result=originalSku
