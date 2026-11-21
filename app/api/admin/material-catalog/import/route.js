@@ -48,15 +48,19 @@ export async function POST(req){
   if(!newSupplierName)return NextResponse.json({error:"Skriv inn navn på den nye leverandøren."},{status:400});
   const id=slugify(newSupplierName);
   if(!id)return NextResponse.json({error:"Leverandørnavnet er ugyldig."},{status:400});
-  const {data,error}=await s.from("material_suppliers").upsert({
+  // Never reset an existing supplier's explicit markup when the same name is imported.
+  const {error:insertError}=await s.from("material_suppliers").upsert({
    id,
    name:newSupplierName,
    active:true,
    is_primary:false,
-   default_markup_percent:20,
+   default_markup_percent:null,
    updated_at:new Date().toISOString()
-  },{onConflict:"id"}).select("id,name,is_primary,default_markup_percent").single();
-  if(error)return NextResponse.json({error:"Kunne ikke opprette leverandøren."},{status:500});
+  },{onConflict:"id",ignoreDuplicates:true});
+  if(insertError)return NextResponse.json({error:"Kunne ikke opprette leverandøren."},{status:500});
+  const {data,error}=await s.from("material_suppliers")
+   .select("id,name,is_primary,default_markup_percent").eq("id",id).single();
+  if(error||!data)return NextResponse.json({error:"Kunne ikke hente leverandøren."},{status:500});
   supplier=data;
  }
 

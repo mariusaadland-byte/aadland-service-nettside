@@ -19,7 +19,7 @@ assert.ok(quoteEditorSource.includes("function updateSupplierSalePrice(line,prod
 assert.ok(quoteEditorSource.includes("Math.round(cost*(1+rate/100))"),"Sale price must include the chosen material markup");
 assert.ok(quoteEditorSource.includes("Number(product.defaultMarkupPercent)"),"Supplier repricing must use the saved markup default");
 const materialCatalogSource=readFileSync("app/api/admin/material-catalog/route.js","utf8");
-assert.ok(materialCatalogSource.includes("markupBySupplier.get(row.supplier_id)??15"),"Catalog products must include their supplier markup");
+assert.ok(materialCatalogSource.includes("markupBySupplier.get(row.supplier_id)??companyMarkup"),"Catalog products must use the supplier override or live company markup");
 assert.ok(quoteEditorSource.includes("if(locked)return;"),"Locked quote versions must not be repriced");
 const {costMapFromLines,withPrivateCosts,calculateContribution}=await import("data:text/javascript;base64,"+Buffer.from(costSource).toString("base64"));
 const priced=[{id:"a",type:"material",description:"Bord",quantity:2,unitPriceOre:12500,internalUnitCostOre:10000},{id:"b",type:"work",description:"Arbeid",quantity:3,unitPriceOre:40000,internalUnitCostOre:""}];

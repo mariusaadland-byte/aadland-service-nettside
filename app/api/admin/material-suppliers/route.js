@@ -1,6 +1,7 @@
 import {NextResponse} from "next/server";
 import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
+import {materialMarkupOrFallback} from "../../../../lib/materialMarkupPolicy";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {materialSupplierStatuses,lookupMaterialSupplier} from "../../../../lib/materialSupplierAdapters";
 
@@ -21,13 +22,18 @@ function ore(value){
 async function supplierList(s){
  const {data,error}=await s.from("material_suppliers").select("*").order("is_primary",{ascending:false}).order("name");
  if(error)return {error};
+ const {data:preference,error:prefError}=await s.from("quote_admin_preferences")
+  .select("default_material_markup").eq("id","main").maybeSingle();
+ if(prefError)return {error:prefError};
+ const companyMarkup=materialMarkupOrFallback(preference?.default_material_markup);
  const direct=new Map(materialSupplierStatuses().map(item=>[item.id,item]));
  const suppliers=await Promise.all((data||[]).map(async item=>{
   const countResult=await s.from("material_supplier_products").select("supplier_id",{count:"exact",head:true}).eq("supplier_id",item.id).eq("active",true);
   const adapter=direct.get(item.id);
   return {
    id:item.id,name:item.name,active:item.active!==false,isPrimary:item.is_primary===true,
-   defaultMarkupPercent:Number(item.default_markup_percent)||15,
+   defaultMarkupPercent:Number(item.default_markup_percent??companyMarkup),
+   inheritsCompanyMarkup:item.default_markup_percent===null,
    lastImportAt:item.last_import_at||null,lastSourceFilename:item.last_source_filename||"",
    productCount:countResult.count||0,
    connected:Boolean(adapter?.connected),
@@ -133,8 +139,14 @@ export async function POST(req){
  if(!normalized.length)return NextResponse.json({error:"Fant ingen gyldige varer med varenummer, navn og pris."},{status:400});
 
  const batch=crypto.randomUUID();
+ // Retain any owner-specified supplier override during a price-file import.
+ const {data:existingSupplier,error:lookupError}=await s.from("material_suppliers")
+  .select("default_markup_percent").eq("id",supplierId).maybeSingle();
+ if(lookupError)return NextResponse.json({error:"Kunne ikke kontrollere leverandørpåslaget."},{status:500});
  const {error:supplierError}=await s.from("material_suppliers").upsert({
-  id:supplierId,name:supplierName,active:true,updated_at:new Date().toISOString()
+  id:supplierId,name:supplierName,active:true,
+  default_markup_percent:existingSupplier?.default_markup_percent??null,
+  updated_at:new Date().toISOString()
  },{onConflict:"id"});
  if(supplierError){
   console.error("MATERIAL SUPPLIER UPSERT",supplierError);
