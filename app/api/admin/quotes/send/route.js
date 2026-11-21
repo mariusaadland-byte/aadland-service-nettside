@@ -44,7 +44,10 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  }
 
 
- if(["accepted","declined","cancelled","superseded"].includes(quote.status))return NextResponse.json({error:"Dette tilbudet er ferdigbehandlet og kan ikke sendes på nytt."},{status:409});
+ // A finalized revision is never re-sent through the first-send endpoint.
+ // Create a revision or use the separate, controlled manual delivery process.
+ if(quote.status!=="draft"||quote.sent_at||quote.paper_issued_at)
+  return NextResponse.json({error:"Tilbudet er allerede sendt eller utlevert. Denne versjonen kan ikke sendes flere ganger. Opprett en revisjon ved endringer."},{status:409});
  if(quote.revised_from_id){
   const {data:previous,error:previousError}=await s.from("quotes")
    .select("status,superseded_by_id")
@@ -61,8 +64,12 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  const customerEmail=String(quote.customer?.email||"").trim().toLowerCase();
  const overrideEmail=String(recipientEmail||"").trim().toLowerCase();
  const email=overrideEmail||customerEmail;
+ const deliveryType=overrideEmail&&overrideEmail!==customerEmail?"alternate":"primary";
  if(!email)return NextResponse.json({error:"Kunden må ha e-postadresse før tilbudet kan sendes."},{status:400});
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return NextResponse.json({error:"E-postadressen er ugyldig."},{status:400});
+ // Preview must not send to stored customer addresses even if a live API key is present.
+ if(process.env.VERCEL_ENV==="preview")
+  return NextResponse.json({error:"Ekte tilbudsutsending er sperret i forhåndsvisning. Test bare med simulator."},{status:403});
  const resendKey=process.env.VERCEL_ENV==="preview"
   ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)
   :process.env.RESEND_API_KEY;
@@ -165,44 +172,93 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
   }
  }
 
- try{
-  const {Resend}=await import("resend");
-  const resend=new Resend(resendKey);
-  const sent=await resend.emails.send({
-   from,
-   to:email,
-   replyTo,
-   subject:(revisionNumber>1?"Revidert tilbud ":"Tilbud ")+quote.quote_number+" – "+quote.title,
-   html,
-   attachments:[{filename,content:pdf.toString("base64")}]
+
+ // Claim the specific revision/recipient atomically BEFORE touching Resend.
+ // A timeout always remains blocked for manual verification, even after the
+ // provider's 24-hour idempotency-key cache expires.
+ const {data:claim,error:claimError}=await s.rpc("claim_quote_email_send",{
+  p_quote_id:id,p_expected_updated_at:quote.updated_at,
+  p_recipient:email,p_delivery_type:deliveryType
+ });
+ if(claimError){
+  const detail=String(claimError.message||"");
+  if(/quote_dispatch_already_claimed|quote_changed_refresh|quote_already_issued/.test(detail))
+   return NextResponse.json({
+    error:detail.includes("quote_changed")?"Tilbudet er endret. Last det inn på nytt før du sender.":
+     "En sending av denne tilbudsversjonen er allerede startet eller må kontrolleres. Se leveringsstatus i Resend og tilbudshistorikken. Det sendes ingen ny e-post automatisk.",
+    reviewRequired:true
+   },{status:409});
+  console.error("QUOTE DISPATCH CLAIM",{quoteId:id,code:claimError.code});
+  return NextResponse.json({error:"Utsendingen kunne ikke låses i databasen. Ingen ny e-post er sendt."},{status:503});
+ }
+ const idempotencyKey=String(claim?.idempotencyKey||"");
+ if(!idempotencyKey)return NextResponse.json({error:"Kunne ikke kontrollere unik utsending. Ingen e-post er sendt."},{status:503});
+ let sentAt="";
+ const actualRecipient=claim?.state==="provider_accepted"?String(claim.recipient||email):email;
+ const actualDeliveryType=claim?.state==="provider_accepted"?String(claim.deliveryType||deliveryType):deliveryType;
+ if(claim?.state==="provider_accepted"){
+  // Safe recovery of a provider-accepted mail after a database error.
+  // This path NEVER contacts Resend and does not transmit another email.
+  const {data:recovered,error:finishError}=await s.rpc("complete_quote_email_send",{
+   p_quote_id:id,p_idempotency_key:idempotencyKey
   });
-  if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
- }catch(err){
-  console.error("QUOTE EMAIL ERROR",err);
-  return NextResponse.json({error:"Tilbudet kunne ikke sendes på e-post."},{status:500});
+  if(finishError){
+   console.error("QUOTE DISPATCH RECOVER",{quoteId:id,code:finishError.code});
+   return NextResponse.json({error:"E-posten er bekreftet mottatt hos leverandøren, men tilbudsstatus kan ikke ferdigstilles. Ingen ny e-post er sendt.",reviewRequired:true},{status:503});
+  }
+  sentAt=recovered?.sentAt;
+ }else if(claim?.state==="claimed"){
+  let providerEmailId="";
+  try{
+   const {Resend}=await import("resend");
+   const resend=new Resend(resendKey);
+   const sent=await resend.emails.send({
+    from,
+    to:email,
+    replyTo,
+    subject:(revisionNumber>1?"Revidert tilbud ":"Tilbud ")+quote.quote_number+" – "+quote.title,
+    html,
+    attachments:[{filename,content:pdf.toString("base64")}]
+   },{idempotencyKey});
+   if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
+   providerEmailId=String(sent?.data?.id||"").trim();
+   if(!providerEmailId)throw new Error("Resend mangler en bekreftet meldings-ID.");
+  }catch(err){
+   console.error("QUOTE EMAIL UNCERTAIN",{quoteId:id,message:err?.message});
+   const flag=await s.rpc("quote_email_send_uncertain",{
+    p_quote_id:id,p_idempotency_key:idempotencyKey,p_reason:err?.message||"Uavklart Resend-status"
+   });
+   if(flag.error)console.error("QUOTE EMAIL UNCERTAIN SAVE",{quoteId:id,code:flag.error.code});
+   return NextResponse.json({
+    error:"E-poststatus er ikke bekreftet. Utsendingen er sperret mot dobbelsending. Kontroller hos Resend før du prøver på nytt.",
+    reviewRequired:true
+   },{status:409});
+  }
+  const acknowledged=await s.rpc("quote_email_provider_accepted",{
+   p_quote_id:id,p_idempotency_key:idempotencyKey,p_provider_email_id:providerEmailId
+  });
+  if(acknowledged.error){
+   console.error("QUOTE PROVIDER ACK SAVE",{quoteId:id,code:acknowledged.error.code,providerEmailId});
+   return NextResponse.json({error:"E-posten er bekreftet hos leverandøren, men kvitteringen kunne ikke lagres. Ikke send på nytt.",reviewRequired:true},{status:503});
+  }
+  const {data:completed,error:completionError}=await s.rpc("complete_quote_email_send",{
+   p_quote_id:id,p_idempotency_key:idempotencyKey
+  });
+  if(completionError){
+   console.error("QUOTE SEND FINALIZE",{quoteId:id,code:completionError.code,providerEmailId});
+   return NextResponse.json({error:"E-posten ble sendt, men tilbudet kunne ikke ferdigstilles. Åpne tilbudet på nytt; ingen ny e-post må sendes.",reviewRequired:true},{status:503});
+  }
+  sentAt=completed?.sentAt;
+ }else{
+  return NextResponse.json({error:"Ukjent sendestatus. Ikke send tilbudet på nytt.",reviewRequired:true},{status:503});
  }
+ if(!sentAt)return NextResponse.json({error:"Tilbudsutsendingen må kontrolleres før videre behandling.",reviewRequired:true},{status:503});
+ const now=sentAt;
 
- const now=new Date().toISOString();
- const {error:activationError}=await s.rpc("activate_quote_revision",{p_quote_id:id,p_sent_at:now});
- if(activationError){
-  console.error("QUOTE REVISION ACTIVATE",activationError);
-  return NextResponse.json({error:"E-posten ble sendt, men revisjonsstatus kunne ikke lagres. Kontroller tilbudet før du sender på nytt."},{status:500});
- }
-
- try{
-  await s.from("quotes").update({
-   issued_via:quote.issued_via||"email",
-   updated_at:now
-  }).eq("id",id);
- }catch(issueMethodError){
-  console.error("QUOTE EMAIL ISSUE METHOD",issueMethodError);
- }
-
- const deliveryType=overrideEmail&&overrideEmail!==customerEmail?"alternate":"primary";
  // Never publish an attachment to a customer when this email was an admin test
  // or was delivered to any address other than the customer's own.
  let drawingsPublished=drawings.length===0;
- if(drawings.length&&deliveryType==="primary"&&customerEmail){
+ if(drawings.length&&actualDeliveryType==="primary"&&customerEmail){
   const snapshots=drawings.map(row=>({
    quote_id:quote.id,drawing_id:row.id,customer_email:customerEmail,
    name:row.name||"Tegning",address:row.address||"",
@@ -224,16 +280,83 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
   else drawingsPublished=true;
  }
 
- try{
-  await s.from("quote_send_log").insert({
-   quote_id:id,
-   recipient:email,
-   delivery_type:deliveryType,
-   sent_at:now
-  });
- }catch(logError){
-  console.error("QUOTE SEND LOG",logError);
- }
+ // History is committed atomically in complete_quote_email_send; never insert a duplicate log here.
 
- return NextResponse.json({ok:true,sentTo:email,sentAt:now,deliveryType,link,pdfAttached:true,pdfFilename:filename,drawingsPublished});
+ return NextResponse.json({ok:true,sentTo:actualRecipient,sentAt:now,deliveryType:actualDeliveryType,link,pdfAttached:true,pdfFilename:filename,drawingsPublished});
+}
+
+
+const QUOTE_ID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+// Read-only send audit for the quote editor. The provider ID is not a customer secret.
+export async function GET(req){
+ const user=await allowed();
+ if(!user)return NextResponse.json({error:"Ingen tilgang."},{status:403});
+ const id=String(new URL(req.url).searchParams.get("id")||"");
+ if(!QUOTE_ID_PATTERN.test(id))return NextResponse.json({error:"Ugyldig tilbuds-ID."},{status:400});
+ const s=db();
+ if(!s)return NextResponse.json({error:"Databasen er utilgjengelig."},{status:503});
+ const [q,a]=await Promise.all([
+  s.from("quotes").select("id,quote_number,status").eq("id",id).maybeSingle(),
+  s.from("quote_email_send_attempts")
+   .select("recipient,state,provider_email_id,claimed_at,provider_accepted_at,sent_at,updated_at,reviewed_at")
+   .eq("quote_id",id).maybeSingle()
+ ]);
+ if(q.error||a.error)return NextResponse.json({error:"Kunne ikke hente utsendingsstatus."},{status:503});
+ if(!q.data)return NextResponse.json({error:"Tilbudet ble ikke funnet."},{status:404});
+ return NextResponse.json({quoteNumber:q.data.quote_number,quoteStatus:q.data.status,
+  canRelease:user.role==="owner",attempt:a.data||null},{headers:{"Cache-Control":"no-store"}});
+}
+
+// Manual recovery is separate from sending. It NEVER contacts the email provider.
+export async function PATCH(req){
+ const originError=sameOriginGuard(req);if(originError)return originError;
+ const user=await allowed();
+ if(!user)return NextResponse.json({error:"Ingen tilgang."},{status:403});
+ const body=await req.json().catch(()=>({}));
+ const id=String(body.id||"");
+ if(!QUOTE_ID_PATTERN.test(id))return NextResponse.json({error:"Ugyldig tilbuds-ID."},{status:400});
+ const s=db();if(!s)return NextResponse.json({error:"Databasen er utilgjengelig."},{status:503});
+ if(body.action==="finalize"){
+  const found=await s.from("quote_email_send_attempts")
+   .select("state,idempotency_key").eq("quote_id",id).maybeSingle();
+  if(found.error||found.data?.state!=="provider_accepted")
+   return NextResponse.json({error:"Ingen leverandørbekreftet e-post kan ferdigstilles."},{status:409});
+  const result=await s.rpc("complete_quote_email_send",{
+   p_quote_id:id,p_idempotency_key:found.data.idempotency_key
+  });
+  if(result.error)return NextResponse.json({error:"Ferdigstilling feilet. Ingen ny e-post er sendt."},{status:503});
+  return NextResponse.json({ok:true,state:"sent",sentAt:result.data?.sentAt});
+ }
+ if(body.action==="confirmProvider"){
+  if(user.role!=="owner"||body.confirmation!=="BEKREFTET I RESEND")
+   return NextResponse.json({error:"Bare eier kan bekrefte sending, etter kontroll i Resend."},{status:403});
+  const result=await s.rpc("confirm_quote_provider_after_review",{
+   p_quote_id:id,p_quote_number:String(body.quoteNumber||""),p_reviewer:user.id,
+   p_confirmed_sent:true,p_provider_email_id:String(body.providerEmailId||"").trim(),
+   p_note:String(body.note||"").trim()
+  });
+  if(result.error){
+   const msg=String(result.error.message||"");
+   return NextResponse.json({error:msg.includes("quote_attempt_too_recent")?
+    "Sendeprosessen kan fortsatt være aktiv. Kontroller på nytt etter minst fem minutter.":
+    "Kunne ikke bekrefte Resend-kvitteringen. Kontroller ID, tilbudsnummer og begrunnelse."},{status:409});
+  }
+  return NextResponse.json({ok:true,state:"provider_accepted"});
+ }
+ if(body.action!=="release"||user.role!=="owner")
+  return NextResponse.json({error:"Bare eier kan frigjøre en uavklart sending."},{status:403});
+ if(body.confirmation!=="IKKE SENDT")
+  return NextResponse.json({error:"Kontroller først hos Resend, og bekreft med IKKE SENDT."},{status:400});
+ const result=await s.rpc("release_quote_email_after_review",{
+  p_quote_id:id,p_quote_number:String(body.quoteNumber||""),
+  p_reviewer:user.id,p_confirmed_not_sent:true,p_note:String(body.note||"")
+ });
+ if(result.error){
+  const msg=String(result.error.message||"");
+  return NextResponse.json({error:msg.includes("quote_attempt_too_recent")?
+   "Sendeprosessen kan fortsatt være aktiv. Kontroller på nytt etter minst fem minutter.":
+   "Kunne ikke frigjøre sendingen. Kontroller at tilbudsnummer, leveringsstatus og begrunnelse stemmer."},{status:409});
+ }
+ return NextResponse.json({ok:true,state:"released"});
 }

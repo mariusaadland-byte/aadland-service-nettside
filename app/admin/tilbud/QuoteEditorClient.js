@@ -65,6 +65,10 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [saving,setSaving]=useState(false);
  const [billing,setBilling]=useState(false),[directInvoiceId,setDirectInvoiceId]=useState(null);
  const [sending,setSending]=useState(false);
+ const [sendAttempt,setSendAttempt]=useState(null);
+ const [canReleaseSend,setCanReleaseSend]=useState(false);
+ const [sendAuditBusy,setSendAuditBusy]=useState(false);
+ const sendBlocked=Boolean(sendAttempt&&["claimed","needs_review","provider_accepted","sent"].includes(sendAttempt.state));
  const [error,setError]=useState("");
  const [savedMessage,setSavedMessage]=useState("");
  const [savedSnapshot,setSavedSnapshot]=useState("");
@@ -97,6 +101,71 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   }).catch(error=>{if(active)setMarkupPreferenceStatus(error.message||"Kunne ikke hente innstillingen.");});
   return()=>{active=false;};
  },[]);
+ async function refreshSendAttempt(){
+  if(!quoteId)return;
+  try{
+   const response=await fetch("/api/admin/quotes/send?id="+encodeURIComponent(quoteId),{cache:"no-store"});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(data.error||"Kunne ikke lese utsendingsstatus.");
+   setSendAttempt(data.attempt||null);
+   setCanReleaseSend(data.canRelease===true);
+  }catch(e){setError(e.message||"Kunne ikke kontrollere utsendingsstatus. Ikke send før den er kontrollert.");}
+ }
+ useEffect(()=>{if(quoteId)refreshSendAttempt()},[quoteId]);
+
+ async function completeAcceptedSend(){
+  if(!quoteId||sendAuditBusy)return;
+  setSendAuditBusy(true);setError("");
+  try{
+   const response=await fetch("/api/admin/quotes/send",{method:"PATCH",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id:quoteId,action:"finalize"})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(data.error||"Kunne ikke fullføre registreringen.");
+   window.location.reload();
+  }catch(e){setError(e.message);await refreshSendAttempt()}
+  finally{setSendAuditBusy(false)}
+ }
+
+ async function confirmResendProviderReceipt(){
+  if(!quoteId||!canReleaseSend||sendAuditBusy)return;
+  const providerEmailId=window.prompt("Kontroller i Resend at e-posten ER sendt. Lim inn den bekreftede meldings-ID-en:");
+  if(!providerEmailId||providerEmailId.trim().length<8)return;
+  const confirmation=window.prompt("Skriv BEKREFTET I RESEND for å registrere mottatt e-post UTEN å sende den på nytt:");
+  if(confirmation!=="BEKREFTET I RESEND")return;
+  const note=window.prompt("Beskriv kontrollen i Resend (minst 12 tegn):");
+  if(!note||note.trim().length<12){setError("Begrunnelsen må være minst 12 tegn.");return;}
+  setSendAuditBusy(true);setError("");
+  try{
+   const response=await fetch("/api/admin/quotes/send",{method:"PATCH",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id:quoteId,action:"confirmProvider",quoteNumber,providerEmailId:providerEmailId.trim(),confirmation,note:note.trim()})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(data.error||"Kunne ikke registrere bekreftet sending.");
+   setSavedMessage("Resend-kvittering er dokumentert. Trykk Fullfør registrering uten ny e-post.");
+   await refreshSendAttempt();
+  }catch(e){setError(e.message||"Bekreftelse mislyktes.")}
+  finally{setSendAuditBusy(false)}
+ }
+
+ async function releaseUnsentAfterReview(){
+  if(!quoteId||!canReleaseSend||sendAuditBusy)return;
+  const confirmation=window.prompt("Kontroller først i Resend at tilbudet IKKE er sendt. Skriv IKKE SENDT for å frigi et nytt sendeforsøk:");
+  if(confirmation!=="IKKE SENDT")return;
+  const note=window.prompt("Dokumenter hvordan du bekreftet at e-posten ikke ble sendt (minst 12 tegn):");
+  if(!note||note.trim().length<12){setError("Begrunnelsen må være minst 12 tegn.");return;}
+  setSendAuditBusy(true);setError("");
+  try{
+   const response=await fetch("/api/admin/quotes/send",{method:"PATCH",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id:quoteId,action:"release",quoteNumber,confirmation,note:note.trim()})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(data.error||"Kunne ikke frigi sendeforsøket.");
+   setSavedMessage("Kontroll dokumentert. Du kan nå sende tilbudet på nytt med et nytt sendeforsøk.");
+   await refreshSendAttempt();
+  }catch(e){setError(e.message||"Frigivelse mislyktes.")}
+  finally{setSendAuditBusy(false)}
+ }
  function changeMinimumMaterialMarkup(value){
   setMinimumMaterialMarkup(Math.max(0,Math.min(1000,Number(value)||0)));
   setMarkupPreferenceStatus("Ikke lagret");
@@ -592,6 +661,10 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
 
  async function sendQuote(recipientOverride=""){
   if(!quoteId)return false;
+  if(v.status!=="draft"||sendBlocked){
+   setError(sendBlocked?"En tidligere sending må kontrolleres før du kan sende på nytt.":"Denne tilbudsversjonen er allerede utstedt. Opprett en revisjon ved endringer.");
+   return false;
+  }
   const recipient=String(recipientOverride||v.customer.email||"").trim().toLowerCase();
   if(!recipient){setError("Legg inn kundens e-postadresse før tilbudet sendes.");return false;}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)){setError("E-postadressen er ugyldig.");return false;}
@@ -611,7 +684,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   if(v.status==="draft"){
    const saved=await save();
    if(!saved){setSending(false);return false;}
-  }else if(v.status!=="sent"){
+  }else{
    setSending(false);setError("Denne tilbudsversjonen kan ikke sendes.");return false;
   }
   const response=await fetch("/api/admin/quotes/send",{
@@ -621,7 +694,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   });
   const data=await response.json().catch(()=>({}));
   setSending(false);
-  if(!response.ok){setError(data.error||"Tilbudet kunne ikke sendes.");return false;}
+  if(!response.ok){setError(data.error||"Tilbudet kunne ikke sendes.");await refreshSendAttempt();return false;}
+  await refreshSendAttempt();
   const nextState={...v,status:"sent"};
   setV(nextState);
   setSavedSnapshot(JSON.stringify(nextState));
@@ -755,18 +829,29 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     </div>
     <div className="quoteEditorHeaderActions">
      {quoteId&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Forhåndsvis / last ned PDF</button>}
-     {quoteId&&["draft","sent"].includes(v.status)&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
+     {quoteId&&v.status==="draft"&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={saving||sending||sendBlocked} onClick={openAlternateEmail}>Send til annen e-post</button>}
      {quoteId&&v.status==="draft"&&!paperIssuedAt&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={paperBusy||saving} onClick={registerPaperIssue}>{paperBusy?"Registrerer …":"Registrer utlevert på papir"}</button>}
      {quoteId&&v.status==="sent"&&!paperIssuedAt&&<button type="button" className="btn alt" disabled={paperBusy} onClick={registerPaperIssue}>Registrer utlevert på papir</button>}
      {quoteId&&v.status==="sent"&&<button type="button" className="btn alt" disabled={paperBusy} onClick={openPaperAcceptance}>Registrer papirgodkjenning</button>}
      {quoteId&&["sent","expired"].includes(v.status)&&<button type="button" className="btn quoteRevisionButton" disabled={revising} onClick={createRevision}>{revising?"Oppretter …":"Opprett revisjon"}</button>}
      {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
      {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href={"/admin/oppdrag/"+convertedOrderId+"/planlegg"}>Planlegg oppdrag</Link><Link href="/admin">Åpne backoffice</Link></div>}
-     {quoteId&&["draft","sent"].includes(v.status)&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={()=>sendQuote()}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
+     {quoteId&&v.status==="draft"&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending||sendBlocked} onClick={()=>sendQuote()}>{sending?"Sender …":"Send tilbud"}</button>}
      {!locked&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn" disabled={saving||sending||converting} onClick={()=>save()}>{saving?"Lagrer …":"Lagre tilbud"}</button>}
     </div>
    </div>
 
+   {quoteId&&v.status==="draft"&&sendAttempt&&sendAttempt.state!=="released"&&<section className="card" style={{margin:"12px 0",padding:18,border:"2px solid #b67e36"}} role="status">
+    <strong>Utsendingskontroll: {sendAttempt.state==="sent"?"Registrert som sendt":sendAttempt.state==="provider_accepted"?"E-post bekreftet hos Resend":"Uavklart e-poststatus"}</strong>
+    <p>Ingen ny e-post sendes automatisk. Mottaker: {sendAttempt.recipient}. Kontroller leveringsloggen hos Resend før du frigjør en uavklart sending.</p>
+    {sendAttempt.provider_email_id&&<p>Resend meldings-ID: <code>{sendAttempt.provider_email_id}</code></p>}
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+     <button type="button" className="btn alt" disabled={sendAuditBusy} onClick={refreshSendAttempt}>Oppdater status</button>
+     {sendAttempt.state==="provider_accepted"&&<button type="button" className="btn" disabled={sendAuditBusy} onClick={completeAcceptedSend}>Fullfør registrering uten ny e-post</button>}
+     {canReleaseSend&&["claimed","needs_review"].includes(sendAttempt.state)&&<button type="button" className="btn alt" disabled={sendAuditBusy} onClick={confirmResendProviderReceipt}>Bekreft sendt hos Resend</button>}
+     {canReleaseSend&&["claimed","needs_review"].includes(sendAttempt.state)&&<button type="button" className="btn alt" disabled={sendAuditBusy} onClick={releaseUnsentAfterReview}>Frigi etter bekreftet IKKE sendt</button>}
+    </div>
+   </section>}
    <section className="card" style={{margin:"12px 0",padding:18}}>
     <div className="kicker">HURTIGVALG</div><h3>Tilbud eller direkte faktura?</h3>
     <div style={{display:"grid",gap:12,marginTop:10}}>
@@ -1007,9 +1092,9 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      {quoteId&&["sent","expired"].includes(v.status)&&<button type="button" className="btn quoteRevisionButton" disabled={revising} onClick={createRevision}>{revising?"Oppretter …":"Opprett revisjon"}</button>}
      {quoteId&&v.status==="accepted"&&!convertedOrderId&&<button type="button" className="btn quoteCreateJobButton" disabled={converting} onClick={createJob}>{converting?"Oppretter …":"Opprett oppdrag"}</button>}
      {quoteId&&v.status==="accepted"&&convertedOrderId&&<div className="quoteConvertedJob"><b>Oppdrag opprettet ✓</b><Link href="/admin">Åpne backoffice</Link></div>}
-     {quoteId&&["draft","sent"].includes(v.status)&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending} onClick={()=>sendQuote()}>{sending?"Sender …":v.status==="sent"?"Send på nytt":"Send tilbud"}</button>}
+     {quoteId&&v.status==="draft"&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn quoteSendButton" disabled={saving||sending||sendBlocked} onClick={()=>sendQuote()}>{sending?"Sender …":"Send tilbud"}</button>}
      {!locked&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn" disabled={saving||sending||converting} onClick={()=>save()}>{saving?"Lagrer …":"Lagre tilbud"}</button>}
-     {quoteId&&["draft","sent"].includes(v.status)&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openAlternateEmail}>Send til annen e-post</button>}
+     {quoteId&&v.status==="draft"&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={saving||sending||sendBlocked} onClick={openAlternateEmail}>Send til annen e-post</button>}
      {quoteId&&!(v.directInvoice&&v.skipQuoteApproval)&&<button type="button" className="btn alt" disabled={saving||sending} onClick={openPaperCopy}>Forhåndsvis / last ned PDF</button>}
      {quoteId&&<div className="quoteHistory">
       <div className="kicker">HISTORIKK</div>
