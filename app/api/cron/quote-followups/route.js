@@ -87,7 +87,7 @@ export async function GET(req){
    }
    email=lastRecipient;
   }
-  if(!email||!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)){
+  if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
    blockedCount++;
    continue;
   }
