@@ -127,20 +127,9 @@ export default function Home(){
  const menuServices=services.filter(service=>service.showInMenu!==false);
  const footerServices=services.filter(service=>service.showInFooter!==false);
 
- async function cleanupContactImageRefs(refs){
-  if(!Array.isArray(refs)||!refs.length)return;
-  try{
-   await fetch("/api/contact-images",{
-    method:"DELETE",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({refs})
-   });
-  }catch{}
- }
-
  async function customOrder(e){
   e.preventDefault(); setError(""); setMessage(null); setSending(true);
-  let imageUrls=[];
+  let imageReceipts=[];
   try{
    if(contactImages.length){
     if(contactImages.length>8)throw new Error("Du kan laste opp maks 8 bilder.");
@@ -152,17 +141,20 @@ export default function Home(){
       const upload=await fetch("/api/contact-images",{method:"POST",body:formData});
       const uploaded=await upload.json().catch(()=>({}));
       if(!upload.ok)throw new Error(uploaded.error||"Kunne ikke laste opp bildet.");
-      imageUrls.push(...(uploaded.urls||[]));
+      const safeReceipts=Array.isArray(uploaded.receipts)?uploaded.receipts:[];
+      if(safeReceipts.length!==1||!safeReceipts[0]?.ref||!safeReceipts[0]?.receipt)
+       throw Error("Bildet mangler sikker opplastingskvittering. Prøv igjen.");
+      imageReceipts.push(safeReceipts[0]);
      }
     }catch(uploadError){
-     await cleanupContactImageRefs(imageUrls);
+     // No public deletion endpoint: unused images are cleaned by the server.
      throw uploadError;
     }
    }
 
    const servicePrefix=selectedService?"Tjeneste: "+selectedService+"\n\n":"";
    const requestBase=servicePrefix+custom;
-   const requestText=imageUrls.length?requestBase+"\n\nBilder:\n"+imageUrls.join("\n"):requestBase;
+   const requestText=requestBase;
 
    let response;
    try{
@@ -172,6 +164,7 @@ export default function Home(){
      body:JSON.stringify({
       orderType:"custom",
       customRequest:requestText,
+      imageReceipts,
       customer,
       fulfillmentType:"pickup",
       deliveryWithinRadius:customer.deliveryWithinRadius
@@ -184,8 +177,7 @@ export default function Home(){
 
    const data=await response.json().catch(()=>({}));
    if(!response.ok){
-    await cleanupContactImageRefs(imageUrls);
-    setError(data.error||"Noe gikk galt.");
+    setError((data.error||"Noe gikk galt.")+(imageReceipts.length?" Ubrukte opplastinger ryddes automatisk etter 24 timer.":""));
     return;
    }
 
