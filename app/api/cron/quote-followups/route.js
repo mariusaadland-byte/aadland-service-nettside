@@ -19,6 +19,10 @@ function baseUrl(req){
 export async function GET(req){
  const authError=cronGuard(req); if(authError)return authError;
 
+ // Preview builds must never send messages to real customers, even if
+ // deployment secrets accidentally include production Resend credentials.
+ if(process.env.VERCEL_ENV==="preview")
+  return NextResponse.json({ok:false,error:"Automatiske kundepåminnelser er sperret i preview."},{status:403});
  const resendKey=process.env.RESEND_API_KEY;
  if(!resendKey)return NextResponse.json({ok:false,error:"RESEND_API_KEY mangler."},{status:503});
 
@@ -29,9 +33,11 @@ export async function GET(req){
  const today=osloDateKey(new Date());
 
  const {data,error}=await s.from("quotes")
-  .select("id,quote_number,title,status,customer,total_inc_vat_ore,valid_until,sent_at,follow_up_sent_at,auto_follow_up,archived_at")
+  .select("id,quote_number,title,status,customer,total_inc_vat_ore,valid_until,sent_at,follow_up_sent_at,auto_follow_up,archived_at,issued_via,paper_issued_at")
   .eq("status","sent")
   .eq("auto_follow_up",true)
+  .or("issued_via.is.null,issued_via.eq.email")
+  .is("paper_issued_at",null)
   .is("follow_up_sent_at",null)
   .is("archived_at",null)
   .lte("sent_at",cutoff)
@@ -51,33 +57,87 @@ export async function GET(req){
  const resend=new Resend(resendKey);
  const base=baseUrl(req);
  let sentCount=0;
+ let recoveredCount=0;
+ let blockedCount=0;
  const failures=[];
 
  for(const quote of data||[]){
-  let email=String(quote.customer?.email||"").trim().toLowerCase();
-  try{
-   const {data:lastSend}=await s.from("quote_send_log")
-    .select("recipient")
-    .eq("quote_id",quote.id)
-    .order("sent_at",{ascending:false})
-    .limit(1)
-    .maybeSingle();
-   if(lastSend?.recipient)email=String(lastSend.recipient).trim().toLowerCase();
-  }catch{}
-  if(!email)continue;
+  const customerEmail=String(quote.customer?.email||"").trim().toLowerCase();
+  let email=customerEmail;
 
-  const claimedAt=new Date().toISOString();
-  const {data:claimed,error:claimError}=await s.from("quotes")
-   .update({follow_up_sent_at:claimedAt,updated_at:claimedAt})
-   .eq("id",quote.id)
-   .eq("status","sent")
-   .eq("auto_follow_up",true)
-   .is("follow_up_sent_at",null)
-   .select("id")
-   .maybeSingle();
+  // Never follow up with an unrelated alternate recipient used for a test
+  // or manual copy. Never guess after a failed log lookup.
+  const last=await s.from("quote_send_log")
+   .select("recipient,delivery_type")
+   .eq("quote_id",quote.id).order("sent_at",{ascending:false})
+   .limit(1).maybeSingle();
+  if(last.error){
+   failures.push({id:quote.id,error:"Utsendingshistorikk kunne ikke kontrolleres."});
+   continue;
+  }
+  if(last.data?.recipient){
+   const lastRecipient=String(last.data.recipient).trim().toLowerCase();
+   if(last.data.delivery_type==="alternate"&&lastRecipient!==customerEmail){
+    blockedCount++;
+    continue;
+   }
+   if(lastRecipient!==customerEmail){
+    blockedCount++;
+    continue;
+   }
+   email=lastRecipient;
+  }
+  if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+   blockedCount++;
+   continue;
+  }
 
-  if(claimError||!claimed){
-   if(claimError)console.error("QUOTE FOLLOWUP CLAIM",quote.id,claimError);
+  const {data:claim,error:claimError}=await s.rpc("claim_quote_followup",{
+   p_quote_id:quote.id,p_recipient:email,p_cutoff:cutoff,p_local_today:today
+  });
+  if(claimError){
+   console.error("QUOTE FOLLOWUP CLAIM",{quoteId:quote.id,code:claimError.code});
+   failures.push({id:quote.id,error:"Påminnelsen kunne ikke låses i databasen."});
+   continue;
+  }
+  if(claim?.state==="skipped"||claim?.state==="blocked"){
+   blockedCount++;
+   continue;
+  }
+  const key=String(claim?.key||"");
+  if(!key){
+   failures.push({id:quote.id,error:"Ugyldig idempotensnøkkel."});
+   continue;
+  }
+  if(claim.state==="provider_accepted"){
+   // An acknowledged email can be finalized without contacting Resend again.
+   const done=await s.rpc("complete_quote_followup",{p_quote_id:quote.id,p_key:key});
+   if(done.error){
+    console.error("QUOTE FOLLOWUP RECOVERY",{quoteId:quote.id,code:done.error.code});
+    failures.push({id:quote.id,error:"Tidligere bekreftet påminnelse krever manuell kontroll."});
+   }else recoveredCount++;
+   continue;
+  }
+  if(claim.state!=="claimed"){
+   blockedCount++;
+   continue;
+  }
+
+  // Re-check customer eligibility immediately before the external call.
+  // A quote may have been answered or archived between listing and claim.
+  const current=await s.from("quotes")
+   .select("status,auto_follow_up,archived_at,valid_until,follow_up_sent_at,issued_via")
+   .eq("id",quote.id).maybeSingle();
+  const nowToday=osloDateKey(new Date());
+  if(current.error||!current.data||current.data.status!=="sent"||
+     current.data.auto_follow_up!==true||current.data.archived_at||
+     current.data.follow_up_sent_at||current.data.issued_via==="paper"||
+     (current.data.valid_until&&current.data.valid_until<nowToday)){
+   const hold=await s.rpc("quote_followup_uncertain",{
+    p_quote_id:quote.id,p_key:key,p_reason:"Tilbudsstatus ble endret før påminnelsen kunne sendes."
+   });
+   if(hold.error)console.error("QUOTE FOLLOWUP PRECHECK LOCK",{quoteId:quote.id,code:hold.error.code});
+   blockedCount++;
    continue;
   }
 
@@ -111,15 +171,36 @@ ${valid?`<p style="color:#777;font-size:12px;margin:0 0 18px">Tilbudet er gyldig
     replyTo:"post@aadland-service.no",
     subject:"Har du mottatt tilbud "+quote.quote_number+"? – Aadland Service",
     html
-   });
+   },{idempotencyKey:key});
    if(result?.error)throw new Error(result.error.message||"E-postfeil");
+   const providerEmailId=String(result?.data?.id||"").trim();
+   if(!providerEmailId)throw new Error("Resend svarte uten bekreftet meldings-ID.");
+   const accepted=await s.rpc("quote_followup_provider_accepted",{
+    p_quote_id:quote.id,p_key:key,p_provider_email_id:providerEmailId
+   });
+   if(accepted.error){
+    // Resend may have accepted the email. Leave claim blocked for owner review.
+    console.error("QUOTE FOLLOWUP PROVIDER ACK",{quoteId:quote.id,code:accepted.error.code});
+    failures.push({id:quote.id,error:"Resend bekreftet sending, men registreringen feilet. Ikke send på nytt."});
+    continue;
+   }
+   const completed=await s.rpc("complete_quote_followup",{p_quote_id:quote.id,p_key:key});
+   if(completed.error){
+    console.error("QUOTE FOLLOWUP COMPLETE",{quoteId:quote.id,code:completed.error.code});
+    failures.push({id:quote.id,error:"E-post bekreftet, men oppdatering av påminnelsesstatus feilet."});
+    continue;
+   }
    sentCount+=1;
   }catch(sendError){
-   failures.push({id:quote.id,error:String(sendError?.message||sendError||"Ukjent feil").slice(0,180)});
-   console.error("QUOTE FOLLOWUP EMAIL",quote.id,sendError);
-   await s.from("quotes").update({follow_up_sent_at:null,updated_at:new Date().toISOString()}).eq("id",quote.id).eq("follow_up_sent_at",claimedAt);
+   failures.push({id:quote.id,error:"E-poststatus uavklart. Sendeprosessen er sperret til manuell kontroll."});
+   console.error("QUOTE FOLLOWUP UNCERTAIN",{quoteId:quote.id,message:sendError?.message});
+   const held=await s.rpc("quote_followup_uncertain",{
+    p_quote_id:quote.id,p_key:key,p_reason:String(sendError?.message||sendError||"Ukjent feil").slice(0,180)
+   });
+   if(held.error)console.error("QUOTE FOLLOWUP UNCERTAIN SAVE",{quoteId:quote.id,code:held.error.code});
   }
  }
 
- return NextResponse.json({ok:true,checked:(data||[]).length,sent:sentCount,failed:failures.length,failures});
+ return NextResponse.json({ok:true,checked:(data||[]).length,sent:sentCount,
+  recovered:recoveredCount,blocked:blockedCount,failed:failures.length,failures});
 }
