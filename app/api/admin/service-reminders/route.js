@@ -11,11 +11,20 @@ const owner=async()=>{const user=await getAdminUser();return user?.role==="owner
 export async function GET(){
  if(!(await owner()))return respond({error:"Bare eieren kan kontrollere påminnelseslogg."},403);
  const s=db();if(!s)return respond({error:"Databasen er utilgjengelig."},503);
- const {data,error}=await s.from("service_appointment_reminder_attempts")
-  .select("id,order_id,kind,appointment_at,recipient_email,state,claimed_at,sent_at,resend_email_id,last_issue,reviewed_at,review_note")
-  .order("claimed_at",{ascending:false}).limit(50);
- if(error)return respond({error:"Påminnelsesloggen kunne ikke leses."},503);
- return respond({attempts:data||[],needsReview:(data||[]).filter(x=>["claimed","needs_review"].includes(x.state)).length});
+ const columns="id,order_id,kind,appointment_at,recipient_email,state,claimed_at,sent_at,resend_email_id,last_issue,reviewed_at,review_note";
+ const [outstanding,recent]=await Promise.all([
+  s.from("service_appointment_reminder_attempts").select(columns)
+   .in("state",["claimed","needs_review"])
+   .order("claimed_at",{ascending:true}).limit(100),
+  s.from("service_appointment_reminder_attempts").select(columns)
+   .order("claimed_at",{ascending:false}).limit(15)
+ ]);
+ if(outstanding.error||recent.error)
+  return respond({error:"Påminnelsesloggen kunne ikke leses."},503);
+ const merged=new Map();
+ for(const row of [...(outstanding.data||[]),...(recent.data||[])])merged.set(row.id,row);
+ return respond({attempts:[...merged.values()],needsReview:(outstanding.data||[]).length,
+  outstandingLimitReached:(outstanding.data||[]).length>=100});
 }
 
 export async function PATCH(req){
