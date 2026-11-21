@@ -3,7 +3,11 @@ import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
 
-async function allowed(){return Boolean(await getAdminUser())&&await hasPermission("canManageProducts");}
+async function allowed(write=false){
+ const user=await getAdminUser();
+ if(!user)return false;
+ return user.role==="owner"||await hasPermission("canManageProducts")||(!write&&await hasPermission("canUpdateOrders"));
+}
 export async function GET(){
  if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
@@ -13,7 +17,7 @@ export async function GET(){
 }
 export async function PUT(req){
  const originError=sameOriginGuard(req);if(originError)return originError;
- if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
+ if(!(await allowed(true)))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const body=await req.json().catch(()=>({}));
  const hasMinimum=Object.prototype.hasOwnProperty.call(body,"minimumMaterialMarkup");
  const hasDefault=Object.prototype.hasOwnProperty.call(body,"defaultMaterialMarkup");
