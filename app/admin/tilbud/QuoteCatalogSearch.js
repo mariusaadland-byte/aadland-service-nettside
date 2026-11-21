@@ -37,9 +37,30 @@ export default function QuoteCatalogSearch({onChoose}){
    const response=await fetch("/api/admin/material-catalog",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({supplierId:supplier,markupPercent:rate})});
    const data=await response.json().catch(()=>({}));
    if(!response.ok)throw Error(data.error||"Kunne ikke lagre påslaget.");
-   setSuppliers(rows=>rows.map(row=>row.id===supplier?{...row,defaultMarkupPercent:rate}:row));
+   setSuppliers(rows=>rows.map(row=>row.id===supplier?{...row,defaultMarkupPercent:rate,inheritsCompanyMarkup:false}:row));
    setMessage("Standardpåslag på "+rate+" % er lagret for denne leverandøren og brukes på mobil og PC.");
   }catch(e){setError(e.message||"Lagring feilet.");}
+  finally{setSavingMarkup(false);}
+ }
+ async function useCompanyMarkup(){
+  if(!supplier)return;
+  setSavingMarkup(true);setError("");setMessage("");
+  try{
+   const response=await fetch("/api/admin/material-catalog",{
+    method:"PATCH",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({supplierId:supplier,markupPercent:null})
+   });
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(data.error||"Kunne ikke bruke bedriftens standard.");
+   const refreshed=await fetch("/api/admin/material-catalog",{cache:"no-store"});
+   const values=await refreshed.json().catch(()=>({}));
+   if(!refreshed.ok)throw Error(values.error||"Påslaget ble endret, men oppdateringen kunne ikke hentes.");
+   const rows=Array.isArray(values.suppliers)?values.suppliers:[];
+   setSuppliers(rows);
+   const selected=rows.find(row=>row.id===supplier);
+   if(selected)setMarkup(String(selected.defaultMarkupPercent??15));
+   setMessage("Leverandøren følger nå bedriftens standardmaterialpåslag.");
+  }catch(e){setError(e.message||"Påslaget kunne ikke tilbakestilles.");}
   finally{setSavingMarkup(false);}
  }
  const add=product=>{
@@ -57,7 +78,9 @@ export default function QuoteCatalogSearch({onChoose}){
    <label>Leverandør<select value={supplier} onChange={e=>{const id=e.target.value;setSupplier(id);const selected=suppliers.find(row=>row.id===id);if(selected)setMarkup(String(selected.defaultMarkupPercent??15))}}><option value="">Alle</option>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
    <label>Materialpåslag (%)<input inputMode="decimal" value={markup} onChange={e=>setMarkup(e.target.value)} aria-label="Påslag for varer du legger til"/></label>
   </div>
-  <button type="button" disabled={savingMarkup||!supplier} onClick={saveMarkup}>{savingMarkup?"Lagrer …":"Lagre standardpåslag for leverandør"}</button>
+  <button type="button" disabled={savingMarkup||!supplier} onClick={saveMarkup}>{savingMarkup?"Lagrer …":"Lagre eget påslag for leverandør"}</button>
+  <button type="button" disabled={savingMarkup||!supplier} onClick={useCompanyMarkup}>Bruk bedriftens standard</button>
+  {supplier&&<small className={styles.note}>{suppliers.find(row=>row.id===supplier)?.inheritsCompanyMarkup===true?"Denne leverandøren følger bedriftens standard.":"Denne leverandøren har et eget lagret standardpåslag."}</small>}
   {message&&<p className={styles.notice} role="status">{message}</p>}
   {error&&<p className={styles.error} role="alert">{error}</p>}
   {query.trim().length>=2&&<div className={styles.results}>
