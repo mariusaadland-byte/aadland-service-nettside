@@ -12,7 +12,7 @@ assert.match(original,/raise exception 'En lagret ekstern faktura kan ikke endre
 assert.match(original,/enable row level security/);
 assert.match(original,/grant select,insert on table public\.vat_external_sales_files to service_role;/);
 assert.match(original,/revoke all on table public\.vat_external_sales_files from public,anon,authenticated;/);
-assert.ok(ownerRoute.includes('user?.role!=="owner"'));
+assert.ok(ownerRoute.includes('?.role==="owner"')&&ownerRoute.includes("if(!await owner())"));
 assert.ok(ownerRoute.includes('upsert:false'));
 assert.ok(!ownerRoute.includes("export async function DELETE("));
 assert.ok(!ownerRoute.includes("export async function PATCH("));
