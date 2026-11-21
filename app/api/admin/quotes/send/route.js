@@ -291,3 +291,63 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
 
  return NextResponse.json({ok:true,sentTo:email,sentAt:now,deliveryType,link,pdfAttached:true,pdfFilename:filename,drawingsPublished});
 }
+
+
+const QUOTE_ID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+// Read-only send audit for the quote editor. The provider ID is not a customer secret.
+export async function GET(req){
+ const user=await allowed();
+ if(!user)return NextResponse.json({error:"Ingen tilgang."},{status:403});
+ const id=String(new URL(req.url).searchParams.get("id")||"");
+ if(!QUOTE_ID_PATTERN.test(id))return NextResponse.json({error:"Ugyldig tilbuds-ID."},{status:400});
+ const s=db();
+ if(!s)return NextResponse.json({error:"Databasen er utilgjengelig."},{status:503});
+ const [q,a]=await Promise.all([
+  s.from("quotes").select("id,quote_number,status").eq("id",id).maybeSingle(),
+  s.from("quote_email_send_attempts")
+   .select("recipient,state,provider_email_id,claimed_at,provider_accepted_at,sent_at,updated_at,reviewed_at")
+   .eq("quote_id",id).maybeSingle()
+ ]);
+ if(q.error||a.error)return NextResponse.json({error:"Kunne ikke hente utsendingsstatus."},{status:503});
+ if(!q.data)return NextResponse.json({error:"Tilbudet ble ikke funnet."},{status:404});
+ return NextResponse.json({quoteNumber:q.data.quote_number,quoteStatus:q.data.status,
+  canRelease:user.role==="owner",attempt:a.data||null},{headers:{"Cache-Control":"no-store"}});
+}
+
+// Manual recovery is separate from sending. It NEVER contacts the email provider.
+export async function PATCH(req){
+ const originError=sameOriginGuard(req);if(originError)return originError;
+ const user=await allowed();
+ if(!user)return NextResponse.json({error:"Ingen tilgang."},{status:403});
+ const body=await req.json().catch(()=>({}));
+ const id=String(body.id||"");
+ if(!QUOTE_ID_PATTERN.test(id))return NextResponse.json({error:"Ugyldig tilbuds-ID."},{status:400});
+ const s=db();if(!s)return NextResponse.json({error:"Databasen er utilgjengelig."},{status:503});
+ if(body.action==="finalize"){
+  const found=await s.from("quote_email_send_attempts")
+   .select("state,idempotency_key").eq("quote_id",id).maybeSingle();
+  if(found.error||found.data?.state!=="provider_accepted")
+   return NextResponse.json({error:"Ingen leverandørbekreftet e-post kan ferdigstilles."},{status:409});
+  const result=await s.rpc("complete_quote_email_send",{
+   p_quote_id:id,p_idempotency_key:found.data.idempotency_key
+  });
+  if(result.error)return NextResponse.json({error:"Ferdigstilling feilet. Ingen ny e-post er sendt."},{status:503});
+  return NextResponse.json({ok:true,state:"sent",sentAt:result.data?.sentAt});
+ }
+ if(body.action!=="release"||user.role!=="owner")
+  return NextResponse.json({error:"Bare eier kan frigjøre en uavklart sending."},{status:403});
+ if(body.confirmation!=="IKKE SENDT")
+  return NextResponse.json({error:"Kontroller først hos Resend, og bekreft med IKKE SENDT."},{status:400});
+ const result=await s.rpc("release_quote_email_after_review",{
+  p_quote_id:id,p_quote_number:String(body.quoteNumber||""),
+  p_reviewer:user.id,p_confirmed_not_sent:true,p_note:String(body.note||"")
+ });
+ if(result.error){
+  const msg=String(result.error.message||"");
+  return NextResponse.json({error:msg.includes("quote_attempt_too_recent")?
+   "Sendeprosessen kan fortsatt være aktiv. Kontroller på nytt etter minst fem minutter.":
+   "Kunne ikke frigjøre sendingen. Kontroller at tilbudsnummer, leveringsstatus og begrunnelse stemmer."},{status:409});
+ }
+ return NextResponse.json({ok:true,state:"released"});
+}
