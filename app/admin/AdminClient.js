@@ -39,7 +39,7 @@ const ADMIN_NAV_GROUPS=[
   {id:"rental",title:"Utleie",icon:"▣",ids:["rental","rentalCalendar","rentalBookings"]},
   {id:"tools",title:"Kalkyle og betaling",icon:"⌗",ids:["calculator","materialAi","vipps","vippsCostCalculator"]},
   {id:"website",title:"Nettsiden",icon:"▥",ids:["projects","homepage"]},
-  {id:"settings",title:"Styring og utvikling",icon:"⚙",ids:["roadmap","users"]}
+  {id:"settings",title:"Styring og utvikling",icon:"⚙",ids:["drift","roadmap","users"]}
 ];
 export default function AdminClient({ user }) {
   const [tab, setTab] = useState("overview");
@@ -511,7 +511,8 @@ export default function AdminClient({ user }) {
     ["accountTransfers","Tripletex-overføring"],
     ["vippsSettlement","Vipps-oppgjør og avstemming"],
      ["vippsCostCalculator","Vipps-kostnadskalkulator"],
-    ["roadmap", "Utviklingsplan"]
+    ["drift", "Driftskontroll"],
+     ["roadmap", "Utviklingsplan"]
   );
   const navLabels=new Map(tabs);
   const searchText=menuSearch.trim().toLocaleLowerCase("nb-NO");
@@ -548,7 +549,8 @@ export default function AdminClient({ user }) {
      router.push("/admin/regnskap?vis="+accountRoutes[id]);
      return;
     }
-    if (id === "roadmap") {setMenuOpen(false);router.push("/admin/utviklingsplan");return;}
+    if (id === "drift") {if(user?.role!=="owner")return;setMenuOpen(false);router.push("/admin/drift");return;}
+     if (id === "roadmap") {setMenuOpen(false);router.push("/admin/utviklingsplan");return;}
     if (id === "drawing") { setMenuOpen(false); router.push("/admin/tegning"); return; }
     if (id === "drawings") { setMenuOpen(false); router.push("/admin/tegninger"); return; }
     if (id === "workClock") { setMenuOpen(false); router.push("/admin/arbeidsklokke"); return; }

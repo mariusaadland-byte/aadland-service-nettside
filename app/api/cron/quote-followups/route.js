@@ -1,3 +1,4 @@
+import {withServiceCronMonitoring} from "../../../../lib/serviceCronMonitor";
 import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {cronGuard} from "../../../../lib/cronAuth";
@@ -17,6 +18,13 @@ function baseUrl(req){
 }
 
 export async function GET(req){
+ // The fallback is only for isolated source-evaluation tests which strip imports.
+ // Next.js production always imports and uses the persistent monitor helper.
+ if(typeof withServiceCronMonitoring==="function")
+  return withServiceCronMonitoring("quote-followups",req,()=>runServiceCron(req));
+ return runServiceCron(req);
+}
+async function runServiceCron(req){
  const authError=cronGuard(req); if(authError)return authError;
 
  // Preview builds must never send messages to real customers, even if

@@ -1,3 +1,4 @@
+import {withServiceCronMonitoring} from "../../../../lib/serviceCronMonitor";
 import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {cronGuard} from "../../../../lib/cronAuth";
@@ -8,6 +9,13 @@ export const runtime="nodejs";
 export const maxDuration=60;
 
 export async function GET(req){
+ // The fallback is only for isolated source-evaluation tests which strip imports.
+ // Next.js production always imports and uses the persistent monitor helper.
+ if(typeof withServiceCronMonitoring==="function")
+  return withServiceCronMonitoring("vat-deadline-reminders",req,()=>runServiceCron(req));
+ return runServiceCron(req);
+}
+async function runServiceCron(req){
  const denied=cronGuard(req);if(denied)return denied;
  if(process.env.VERCEL_ENV!=="production")
   return NextResponse.json({error:"MVA-fristvarsler er sperret utenfor produksjon."},{status:403});
