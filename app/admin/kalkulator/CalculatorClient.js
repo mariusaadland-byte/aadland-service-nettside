@@ -14,7 +14,8 @@ const DEFAULTS={
  hourlyRate:"500",
  fixedLabor:"",
  materialCost:"",
- materialMarkup:"20",
+ materialMarkup:"15",
+ materialMarkupSource:"company",
  materialItems:[],
  distanceOneWay:"",
  oneWayTrips:"2",
@@ -56,6 +57,8 @@ function Field({label,help,children}){
 
 export default function CalculatorClient(){
  const [form,setForm]=useState(DEFAULTS);
+ const [companyMarkup,setCompanyMarkup]=useState("15");
+ const [markupLoadError,setMarkupLoadError]=useState("");
  const [copied,setCopied]=useState(false);
  const [addedNotice,setAddedNotice]=useState("");
  const [catalogSuppliers,setCatalogSuppliers]=useState([]);
@@ -75,13 +78,35 @@ export default function CalculatorClient(){
  useEffect(()=>{
   try{
    const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||"null");
-   if(saved&&typeof saved==="object")setForm({...DEFAULTS,...saved,materialMarkup:String(saved.materialMarkup??"").trim()==="15"?"20":String(saved.materialMarkup??"20")});
+   if(saved&&typeof saved==="object")setForm({
+    ...DEFAULTS,...saved,
+    // Old saved numbers might be intentional: never change 15 -> 20 (or 20 -> 15).
+    // Only new, company-linked calculations follow future company updates.
+    materialMarkup:String(saved.materialMarkup??DEFAULTS.materialMarkup),
+    materialMarkupSource:saved.materialMarkupSource==="company"?"company":"manual"
+   });
   }catch{}
  },[]);
 
  useEffect(()=>{
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify(form));}catch{}
  },[form]);
+
+ useEffect(()=>{
+  let active=true;
+  fetch("/api/admin/quote-preferences",{cache:"no-store"}).then(async response=>{
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(data.error||"Kunne ikke hente bedriftens standardpåslag.");
+   const value=Number(data.defaultMaterialMarkup);
+   if(!Number.isFinite(value)||value<0||value>1000)throw Error("Ugyldig standardpåslag.");
+   return String(value);
+  }).then(value=>{
+   if(!active)return;
+   setCompanyMarkup(value);
+   setForm(current=>current.materialMarkupSource==="company"?{...current,materialMarkup:value}:current);
+  }).catch(error=>{if(active)setMarkupLoadError(error.message||"Kunne ikke hente bedriftens standardpåslag.");});
+  return()=>{active=false};
+ },[]);
 
  useEffect(()=>{loadSuppliers()},[]);
 
@@ -125,10 +150,10 @@ export default function CalculatorClient(){
  }
 
  function set(name,value){
-  setForm(current=>({...current,[name]:value}));
+  setForm(current=>({...current,[name]:value,...(name==="materialMarkup"?{materialMarkupSource:"manual"}:{})}));
  }
  function reset(){
-  setForm(DEFAULTS);
+  setForm({...DEFAULTS,materialMarkup:companyMarkup});
   setCopied(false);
  }
 
@@ -319,7 +344,14 @@ export default function CalculatorClient(){
        </div>
       )}
       <div className={styles.materialTotals}><span>Innkjøp eks. mva. <b>{money(calc.catalogMaterialCostExVat)}</b></span><span>Tilbudspris eks. mva. <b>{money(calc.catalogMaterialSalesExVat)}</b></span><span>Tilbudspris inkl. mva. <b>{money(calc.catalogMaterialSalesExVat*1.25)}</b></span></div>
-      <Field label="Standard materialpåslag" help="Automatisk på varer uten overstyrt salgspris."><div className={styles.suffixInput}><input inputMode="decimal" value={form.materialMarkup} onChange={e=>set("materialMarkup",e.target.value)}/><span>%</span></div></Field>
+      <Field label="Materialpåslag for denne kalkylen" help="Automatisk på varer uten overstyrt salgspris. Påslaget endrer aldri lagrede tilbud."><div className={styles.suffixInput}><input inputMode="decimal" value={form.materialMarkup} onChange={e=>set("materialMarkup",e.target.value)}/><span>%</span></div></Field>
+      <p className={styles.rateNote}>
+       <span>Bedriftens standardpåslag: {companyMarkup} %. {form.materialMarkupSource==="manual"?"Denne kalkylen har et lokalt valgt påslag.":"Denne kalkylen følger bedriftens sats."}</span>
+       <button type="button" className={styles.secondary} onClick={()=>setForm(current=>({...current,materialMarkup:companyMarkup,materialMarkupSource:"company"}))}>
+        Bruk bedriftens standard
+       </button>
+      </p>
+      {markupLoadError&&<p className={styles.catalogError} role="status">{markupLoadError} Standard 15 % vises som reserve til innstillingen kan hentes.</p>
       <QuoteTransferPanel form={form}/>
       <details className={styles.legacyMaterialCost}><summary>Andre materialkostnader (valgfritt)</summary>
        <Field label="Beløp inkl. mva."><div className={styles.moneyInput}><span>kr</span><input inputMode="decimal" value={form.materialCost} onChange={e=>set("materialCost",e.target.value)} placeholder="0"/></div></Field>
