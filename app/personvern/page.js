@@ -43,6 +43,7 @@ export default function Personvern(){
    <li><strong>Supabase:</strong> database, innlogging og lagring av opplysninger og vedlegg.</li>
    <li><strong>Vercel:</strong> drift av nettstedet og teknisk håndtering av forespørsler.</li>
    <li><strong>Resend:</strong> utsending av nødvendige e-poster som bekreftelser, tilbud, fakturaer, kvitteringer og varsler.</li>
+   <li><strong>Have I Been Pwned (Pwned Passwords):</strong> kontroll av nye passord mot kjente datalekkasjer. Vi sender kun de fem første tegnene av en SHA-1-hash av passordet i oppslaget, ikke passordet i klartekst.</li>
    <li><strong>Vipps:</strong> betalingsopplysninger ved bruk av Vipps, blant annet beløp, betalingsreferanse og status.</li>
    <li><strong>Tripletex:</strong> kunde-, faktura-, betalings- og bilagsopplysninger når data overføres til regnskapssystemet.</li>
   </ul>
@@ -56,6 +57,7 @@ export default function Personvern(){
 
   <h2>7. Min side og innlogging</h2>
   <p>Det er frivillig å opprette kundekonto. En konto kan koble til tidligere bestillinger, tilbud og relevant historikk ved hjelp av bekreftet e-postadresse. Vi bruker nødvendig sesjonsinformasjon for å holde brukeren innlogget og beskytte kontoen. Opplysninger om passord håndteres gjennom innloggingsløsningen, ikke ved å vise passordet i Min side.</p>
+  <p>Ved opprettelse eller endring av passord kontrollerer vi om det nye passordet er kjent fra tidligere datalekkasjer. Kontrollen skjer med et begrenset hash-prefiks, ikke ved å sende selve passordet til oppslagstjenesten.</p>
   <p>Hvis du ønsker å avslutte kontoen, kan du kontakte oss. Opplysninger som må oppbevares for fakturering, dokumentasjon eller andre rettslige plikter, slettes ikke nødvendigvis samtidig med kontoen.</p>
 
   <h2>8. Informasjonskapsler og lokal lagring</h2>
@@ -64,6 +66,7 @@ export default function Personvern(){
 
   <h2>9. Hvor lenge lagrer vi opplysninger?</h2>
   <p>Vi oppbevarer opplysningene så lenge de trengs for formålet de ble samlet inn for, for å følge opp et kundeforhold, håndtere eventuelle krav eller oppfylle lovpålagt dokumentasjonsplikt. Fakturaer og regnskapsbilag kan derfor bli oppbevart lenger enn vanlige henvendelser. Konkrete lagringstider avhenger av dokumenttype og gjeldende krav.</p>
+  <p>Primærdokumentasjon etter bokføringsreglene, blant annet fakturaer og regnskapsbilag, skal som hovedregel oppbevares i fem år etter regnskapsårets slutt. For enkelte dokumenttyper kan andre eller lengre lovpålagte frister gjelde. Denne oppbevaringsplikten betyr ikke at alle andre kundeopplysninger skal oppbevares like lenge.</p>
   <p>Du kan spørre oss hvor lenge opplysninger om deg lagres og be om sletting når vilkårene for det er oppfylt.</p>
 
   <h2>10. Behandling utenfor EU/EØS</h2>
