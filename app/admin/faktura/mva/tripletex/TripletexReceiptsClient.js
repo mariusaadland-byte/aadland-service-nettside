@@ -1,9 +1,11 @@
 "use client";
 import {useCallback,useEffect,useRef,useState} from "react";
 import styles from "./TripletexReceipts.module.css";
+import TripletexReceiptReconciliationPanel from "./TripletexReceiptReconciliationPanel";
 import {DEFAULT_TRIPLETEX_INBOX,tripletexPendingReceipts,tripletexReceiptQueue} from "../../../../../lib/tripletexReceiptTransfer";
 
 const endpoint="/api/admin/invoices/tripletex";
+const reconciliationsEndpoint=endpoint+"/reconcile";
 const cleanAddress=value=>String(value||"").trim().toLowerCase();
 const validAddress=value=>/^[a-z0-9._%+-]+@ebilag\.com$/.test(cleanAddress(value));
 const sizes=bytes=>new Intl.NumberFormat("nb-NO",{maximumFractionDigits:1}).format(Number(bytes||0)/1048576)+" MB";
@@ -20,6 +22,24 @@ export default function TripletexReceiptsClient(){
  const [error,setError]=useState(""),[info,setInfo]=useState("");
  const [progress,setProgress]=useState({done:0,total:0});
  const stop=useRef(false);
+ const [verifiedRows,setVerifiedRows]=useState([]);
+ const [reviewId,setReviewId]=useState(null);
+ const [verifiedLoadError,setVerifiedLoadError]=useState("");
+ const [verifiedLoaded,setVerifiedLoaded]=useState(false);
+
+ const loadReconciliations=useCallback(async()=>{
+  const response=await fetch(reconciliationsEndpoint,{cache:"no-store"});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error(data.error||"Kunne ikke hente bokføringsstatus.");
+  setVerifiedRows(Array.isArray(data.verified)?data.verified:[]);
+  setVerifiedLoaded(true);setVerifiedLoadError("");
+  return data;
+ },[]);
+ useEffect(()=>{
+  let active=true;
+  loadReconciliations().catch(error=>{if(active){setVerifiedLoadError(error.message||"Bokføringsstatus ukjent.");setVerifiedLoaded(false);}});
+  return()=>{active=false};
+ },[loadReconciliations]);
 
  const load=useCallback(async()=>{
   const res=await fetch(endpoint,{cache:"no-store"});
@@ -41,6 +61,8 @@ export default function TripletexReceiptsClient(){
 
  // Only documents with no prior attempt belong to the live work queue.
  const {remaining,eligible,needsReview,sent}=tripletexReceiptQueue(rows);
+ const verifiedByDocument=new Map(verifiedRows.map(row=>[row.purchase_document_id,row]));
+ const bookedCount=sent.filter(row=>verifiedByDocument.has(row.document.id)).length;
  const canSend=validAddress(address)&&(!lockedRecipient||cleanAddress(address)===lockedRecipient);
  const bulkPermitted=eligible.length<=1||
   (summary?.acceptedByEmailProvider>0&&confirmedFirstInTripletex);
@@ -102,10 +124,12 @@ export default function TripletexReceiptsClient(){
   {summary&&<div className={styles.stats}>
    <div className={styles.stat}><strong>{remaining.length}</strong><span>Ikke overført</span></div>
    <div className={styles.stat}><strong>{sent.length}</strong><span>Sendt til e-bilagsmottak</span></div>
-   <div className={styles.stat}><strong>{needsReview.length}</strong><span>Trenger kontroll</span></div>
+   <div className={styles.stat}><strong>{needsReview.length}</strong><span>Trenger sendekontroll</span></div>
+   <div className={styles.stat}><strong>{verifiedLoaded?bookedCount:"–"}</strong><span>Bokført og kontrollert i Tripletex</span></div>
   </div>}
   {loading&&<p role="status">Henter kvitteringer …</p>}
   {error&&<p className={styles.error} role="alert">{error}</p>}
+  {verifiedLoadError&&<p className={styles.error} role="alert">Bokføringsstatus kunne ikke kontrolleres. Ingen bilag antas bokført. {verifiedLoadError}</p>}
   {info&&<p role="status" className={styles.progress}>{info}</p>}
   {!loading&&<>
    <section className={styles.section}>
@@ -171,13 +195,31 @@ export default function TripletexReceiptsClient(){
    <section className={styles.section}>
     <details>
      <summary className={styles.historyToggle}>Sendingshistorikk ({sent.length})</summary>
-     <p className={styles.hint}>«Sendt» betyr at e-posttjenesten aksepterte bilaget. Mottak og bokføring må bekreftes i Tripletex.</p>
+     <p className={styles.hint}>«Sendt» betyr bare at e-posttjenesten aksepterte bilaget. Bokføringen må bekreftes separat, ett bilag om gangen, mot faktisk bokført bilag i Tripletex. Ingen ekstra e-post eller bokføring gjøres av kontrollen.</p>
      {sent.length? <div className={styles.list}>{sent.map(row=><div className={styles.item} key={row.document.id}>
       <div className={styles.itemInfo}><strong>{row.document.supplier_name}</strong>
        <small>{row.document.document_date} · {row.document.supplier_document_number}</small>
        <small>Akseptert av e-posttjenesten · {row.transfer.recipient}</small>
+       <small className={styles.status}>{verifiedLoaded?
+         (verifiedByDocument.has(row.document.id)
+          ?"Eierkontrollert bokført i Tripletex – bilag "+verifiedByDocument.get(row.document.id).voucher_year+
+           "/"+verifiedByDocument.get(row.document.id).voucher_number
+          :"Bokføring ikke verifisert"):"Bokføringsstatus ikke bekreftet"}</small>
       </div>
-      <div className={styles.itemLinks}>{originalLink(row)}</div>
+      <div className={styles.itemLinks}>
+       {originalLink(row)}
+       {!verifiedByDocument.has(row.document.id)&&verifiedLoaded&&row.attachment&&
+        <button type="button" className={styles.primary} disabled={busy}
+         onClick={()=>setReviewId(current=>current===row.document.id?null:row.document.id)}>
+         {reviewId===row.document.id?"Skjul kontroll":"Kontroller bokføring"}
+        </button>}
+      </div>
+      {reviewId===row.document.id&&verifiedLoaded&&
+       <div style={{width:"100%",flexBasis:"100%"}}>
+        <TripletexReceiptReconciliationPanel row={row}
+         onClose={()=>setReviewId(null)}
+         onVerified={async()=>{await loadReconciliations();setReviewId(null);}}/>
+       </div>}
      </div>)}</div>:<p className={styles.empty}>Ingen bilag sendt ennå.</p>}
     </details>
     <div className={styles.actions}>
