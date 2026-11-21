@@ -39,7 +39,9 @@ assert.ok(quoteCatalogSource.includes("defaultMarkupPercent??15"),"Quote search 
 assert.ok(!quoteCatalogSource.includes("localStorage"),"Shared supplier markup must not be overridden by browser-local values");
 assert.ok(quoteCatalogSource.includes("async function saveMarkup()"),"Quote search must allow saving supplier markup");
 const materialCatalogRoute=readFileSync("app/api/admin/material-catalog/route.js","utf8");
-const supplierRow=new Function(materialCatalogRoute.slice(materialCatalogRoute.indexOf("function supplierRow("),materialCatalogRoute.indexOf("function productRow("))+"return supplierRow;")();
+const freshnessSource=readFileSync("lib/materialPriceFreshness.js","utf8");
+const {supplierPriceFreshness}=await import("data:text/javascript;base64,"+Buffer.from(freshnessSource).toString("base64"));
+const supplierRow=new Function("supplierPriceFreshness",materialCatalogRoute.slice(materialCatalogRoute.indexOf("function supplierRow("),materialCatalogRoute.indexOf("function productRow("))+"return supplierRow;")(supplierPriceFreshness);
 for(const [markup,expected] of [[0,0],[null,15],[undefined,15],[15,15],[20,20]]){
  assert.equal(supplierRow({default_markup_percent:markup}).defaultMarkupPercent,expected,"Supplier markup must preserve zero and use the default only when missing");
 }
