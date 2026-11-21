@@ -114,7 +114,7 @@ export async function POST(req){
    grossOre:preview.grossOre,digest:preview.digest,environment:connection.environment,
    paidOre:preview.paidOre,paymentCount:preview.paymentCount,mode:preview.mode,
    paymentSources:preview.paymentSources,
-   message:"Fakturaen er kontrollert mot kundekobling, MVA og mulige duplikater. Ingen bokføring er utført."
+   message:"Søket fant ingen identisk faktura hos samme Tripletex-kunde med samme fakturadato og beløp. Det utelukker ikke tidligere manuell bokføring på en annen dato eller med et annet nummer. Ingen faktura eller betaling er opprettet."
   });
   if(body.digest!==preview.digest)
    return json({error:"Fakturaen ble endret etter kontroll. Kontroller den på nytt før bokføring."},409);
