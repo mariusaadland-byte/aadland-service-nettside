@@ -66,8 +66,8 @@ export default function ServiceReminderReviewClient(){
   {error&&<p role="alert" style={{padding:10,border:"1px solid #b65c53",borderRadius:8}}>{error}</p>}
   {message&&<p role="status" style={{padding:10,background:"#e4efe6",color:"#1a4c2b",borderRadius:8}}>{message}</p>}
   {!data&&!error&&<p>Henter påminnelseslogg …</p>}
-  {data&&<p role="status"><strong>{pending.length} uavklarte</strong> blant de siste 50 registrerte påminnelsene.</p>}
-  {data&&pending.length===0&&<p style={{fontSize:13,color:"#51483f"}}>Ingen uavklarte påminnelser i siste 50 loggposter. Dette beviser ikke tidligere leveranser.</p>}
+  {data&&<p role="status"><strong>{data.needsReview} uavklarte</strong> i gjennomgangen.{data.outstandingLimitReached?" Listen er begrenset til de 100 eldste uavklarte. Kontroller databasen for resten.":""}</p>}
+  {data&&pending.length===0&&<p style={{fontSize:13,color:"#51483f"}}>Ingen uavklarte påminnelser registrert. Dette beviser ikke levering av eldre e-poster.</p>}
   {[...pending,...others].map(a=><article key={a.id} style={{borderTop:"1px solid #e8e1d7",padding:"14px 0"}}>
    <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
     <strong>{a.kind==="survey"?"Befaring":"Oppstart"} · {fmt(a.appointment_at)}</strong>
