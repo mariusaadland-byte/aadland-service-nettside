@@ -20,10 +20,17 @@ assert.equal(vatPeriodKey(2026,5),20265);
 assert.equal(vatPeriodKey(2026,7),null);
 const today="2026-10-26";
 assert.deepEqual(validateVatReportingStatus({year:2026,term:3,status:"filed",filedOn:"2026-09-07",
- submissionReference:"Skatteetaten 123",notes:"",confirmed:true},today),
- {year:2026,term:3,status:"filed",filed_on:"2026-09-07",submission_reference:"Skatteetaten 123",notes:null});
+ submissionReference:"Skatteetaten 123",verificationSource:"skatteetaten",notes:"",confirmed:true},today),
+ {year:2026,term:3,status:"filed",filed_on:"2026-09-07",submission_reference:"Skatteetaten 123",verification_source:"skatteetaten",notes:null});
 assert.equal(validateVatReportingStatus({year:2026,term:4,status:"not_filed",filedOn:"",confirmed:true},today).filed_on,null);
 assert.equal(validateVatReportingStatus({year:2026,term:4,status:"preparing",confirmed:true},today).filed_on,null);
+assert.equal(validateVatReportingStatus({year:2026,term:4,status:"unverified",confirmed:true},today).status,"unverified");
+assert.throws(()=>validateVatReportingStatus({year:2026,term:3,status:"filed",filedOn:"2026-09-07",
+ submissionReference:"Skatteetaten 123",confirmed:true},today),/kontrollert/i);
+assert.throws(()=>validateVatReportingStatus({year:2026,term:3,status:"filed",filedOn:"2026-09-07",
+ verificationSource:"tripletex",submissionReference:"",confirmed:true},today),/referanse/i);
+assert.equal(validateVatReportingStatus({year:2026,term:3,status:"filed",filedOn:"2026-09-07",
+ verificationSource:"tripletex",submissionReference:"Tripletex 55555",confirmed:true},today).verification_source,"tripletex");
 assert.throws(()=>validateVatReportingStatus({year:2026,term:4,status:"filed",filedOn:"",confirmed:true},today),/innsendingsdato/);
 assert.throws(()=>validateVatReportingStatus({year:2026,term:4,status:"filed",filedOn:"2026-11-01",confirmed:true},today),/innsendingsdato/);
 assert.throws(()=>validateVatReportingStatus({year:2026,term:4,status:"filed",filedOn:"2026-10-01",confirmed:false},today),/bekrefte/i);
@@ -49,10 +56,15 @@ assert.ok(route.includes('user?.role!=="owner"'));
 assert.ok(route.includes("sameOriginGuard(req)"));
 assert.ok(route.includes('process.env.VERCEL_ENV==="preview"'));
 assert.ok(route.includes('verifiedWithSkatteetaten:false'));
+assert.ok(route.includes('vat_reporting_term_events'));
+assert.ok(route.includes('verification_source'));
 const reportingUI=read("app/admin/faktura/mva/VatReportingControlClient.js");
 assert.ok(reportingUI.includes("Lagre registreringsdato"));
 assert.ok(reportingUI.includes("Skatteetaten er ikke kontaktet."));
 assert.ok(reportingUI.includes('onSelectTerm?.(t)'));
+assert.ok(reportingUI.includes("Referanse fra leveringskvitteringen (påkrevd)"));
+assert.ok(reportingUI.includes("Se historikk for"));
+assert.ok(reportingUI.includes("Ikke kontrollert / tilbakestill usikker status"));
 const termUI=read("app/admin/faktura/mva/InvoiceVatTermClient.js");
 assert.ok(termUI.includes("<VatReportingControlClient"));
 assert.ok(termUI.includes("Ubetalte fakturaer påvirker ikke når MVA skal meldes"));
@@ -62,4 +74,9 @@ assert.ok(taxApi.includes("paid_ore,credited_ore"));
 const migration=read("supabase/migrations/20261026010000_vat_reporting_control.sql");
 assert.ok(migration.includes("enable row level security")&&migration.includes("revoke all"));
 assert.ok(migration.includes("before delete")&&migration.includes("service_role"));
+const auditMigration=read("supabase/migrations/20261121041000_vat_reporting_term_evidence.sql");
+for(const clause of ["vat_reporting_term_events","log_vat_reporting_term_change","enable row level security",
+ "vat_term_filed_evidence_check","vat_reporting_term_status_status_check",
+ "revoke all on public.vat_reporting_term_events from public,anon,authenticated"])
+ assert.ok(auditMigration.includes(clause),"Missing status evidence safeguard "+clause);
 console.log("MVA-oppfølging bestått: første termin, manuell leveringsstatus, ubetalte fakturaer og RLS-sperrer.");
