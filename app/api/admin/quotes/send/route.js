@@ -328,6 +328,22 @@ export async function PATCH(req){
   if(result.error)return NextResponse.json({error:"Ferdigstilling feilet. Ingen ny e-post er sendt."},{status:503});
   return NextResponse.json({ok:true,state:"sent",sentAt:result.data?.sentAt});
  }
+ if(body.action==="confirmProvider"){
+  if(user.role!=="owner"||body.confirmation!=="BEKREFTET I RESEND")
+   return NextResponse.json({error:"Bare eier kan bekrefte sending, etter kontroll i Resend."},{status:403});
+  const result=await s.rpc("confirm_quote_provider_after_review",{
+   p_quote_id:id,p_quote_number:String(body.quoteNumber||""),p_reviewer:user.id,
+   p_confirmed_sent:true,p_provider_email_id:String(body.providerEmailId||"").trim(),
+   p_note:String(body.note||"").trim()
+  });
+  if(result.error){
+   const msg=String(result.error.message||"");
+   return NextResponse.json({error:msg.includes("quote_attempt_too_recent")?
+    "Sendeprosessen kan fortsatt være aktiv. Kontroller på nytt etter minst fem minutter.":
+    "Kunne ikke bekrefte Resend-kvitteringen. Kontroller ID, tilbudsnummer og begrunnelse."},{status:409});
+  }
+  return NextResponse.json({ok:true,state:"provider_accepted"});
+ }
  if(body.action!=="release"||user.role!=="owner")
   return NextResponse.json({error:"Bare eier kan frigjøre en uavklart sending."},{status:403});
  if(body.confirmation!=="IKKE SENDT")
