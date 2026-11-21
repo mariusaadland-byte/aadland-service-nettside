@@ -139,8 +139,14 @@ export async function POST(req){
  if(!normalized.length)return NextResponse.json({error:"Fant ingen gyldige varer med varenummer, navn og pris."},{status:400});
 
  const batch=crypto.randomUUID();
+ // Retain any owner-specified supplier override during a price-file import.
+ const {data:existingSupplier,error:lookupError}=await s.from("material_suppliers")
+  .select("default_markup_percent").eq("id",supplierId).maybeSingle();
+ if(lookupError)return NextResponse.json({error:"Kunne ikke kontrollere leverandørpåslaget."},{status:500});
  const {error:supplierError}=await s.from("material_suppliers").upsert({
-  id:supplierId,name:supplierName,active:true,updated_at:new Date().toISOString()
+  id:supplierId,name:supplierName,active:true,
+  default_markup_percent:existingSupplier?.default_markup_percent??null,
+  updated_at:new Date().toISOString()
  },{onConflict:"id"});
  if(supplierError){
   console.error("MATERIAL SUPPLIER UPSERT",supplierError);
