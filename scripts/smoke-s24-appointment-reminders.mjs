@@ -235,11 +235,11 @@ for(const kind of ["survey","job"]){
  assert.ok(route.includes('failed:failures.length'),"Ambiguous provider statuses enter S17 warning");
 }
 const admin=read("app/api/admin/service-reminders/route.js");
-for(const expected of ['u?.role==="owner"','sameOriginGuard(req)',
+for(const expected of ['user?.role==="owner"','sameOriginGuard(req)',
  '"review_service_appointment_reminder"','"BEKREFTET I RESEND"','"IKKE SENDT"'])
  assert.ok(admin.includes(expected),"Owner review guard missing: "+expected);
 const panel=read("app/admin/drift/ServiceReminderReviewClient.js");
-assert.ok(panel.includes("Bekreft ikke sendt")&&panel.includes("Ingen ny e-post"));
+assert.ok(panel.includes("Bekreft ikke sendt")&&panel.includes("starter ingen ny e-post"));
 const dashboard=read("app/admin/drift/page.js");
 assert.ok(dashboard.includes("<ServiceReminderReviewClient/>"));
 const schedule=JSON.parse(read("vercel.json")).crons;
