@@ -33,6 +33,8 @@ Opprettet 21.11.2026. Løpende funnliste. **Ingen av punktene under er utbedret 
 | S-20 | P2 | Påvist | Bekreftelse etter tilbudsaksept | Kundens godkjenning/avslag lagres før bekreftelses-e-post sendes. Koden kontrollerer ikke `Resend.errors` for disse to sendene og logger ingen varig leverings-/retry-status; feil kan bety at kunden ikke får bekreftelse selv om saken er godkjent. Legg til pålitelig varsling med idempotens, uten dobbel godkjenning. |
 | S-21 | P2 | Påvist | Kontaktbilders slettinger | `DELETE /api/contact-images` krever samme opprinnelsesdomene, men ingen bruker-/eierskapsautentisering eller kvittering for at innringer eier den private filreferansen. Kjent filreferanse kan derfor brukes til å slette bildet. Design trygg opplastingskvittering/eierbinding og tidsbegrenset opprydding uten å slette andres materiale. |
 
+| S-22 | P2 | Kontrolleres | Produkter, lager og ordre | Tre produkter er aktive, men de fire registrerte produkt-/serviceordrene er alle arkivert. En avsluttet arkivordre står med `payment_status=pending`, uten registrert Vipps-innbetaling; kan være en gammel test. Kontroller full reell kjøpsflyt, reservasjon/lager, bekreftelse, levering, betaling, refusjon og historikk med testordre uten å belaste en kunde. Ikke endre arkiverte historiske oppføringer før formålet er avklart. |
+
 ## Observasjoner som ser riktige ut
 - Siste bekreftede produksjonsdeploy var READY på revisjon 854fa0da6a54a5d39af15a10f75763d967ac68ff.
 - Ingen duplikatgrupper av faktura- eller tilbudsnummer i databasen.
@@ -43,6 +45,9 @@ Opprettet 21.11.2026. Løpende funnliste. **Ingen av punktene under er utbedret 
 - Innlogging for administrator har ratebegrensning i `app/api/auth/login/route.js` (10 forsøk per 15 minutter), og publikum kan bare laste opp kontaktbilder med kontroll av type, størrelse og filsignatur.
 - Resend-kontoens aggregerte leveringsmetrikker for 01.–21.11.2026 viste 30 sendt og 30 levert, uten rapporterte bounce/feil. Dette verifiserer ikke spesifikt hver tilbudsutsending og dekker ikke uregistrerte sendeforsøk.
 - Ingen registrerte Vercel-kjøretidsfeil i siste tilgjengelige 7-dagers rapport. Ikke det samme som full funksjonstest.
+- Alle 18 aktive kjøpsbilag har en lagret originalfil; 7 er PDF, de andre er andre filtyper. De to registrerte betalte faktura-Vipps-betalingene har begge kvittering sendt, og de 2 kansellerte har ingen manglende kvittering.
+- Alle fire eldre ordrene er arkivert, og lageret på de tre aktive produktene har ingen negative lagerantall. I privat kontaktbilde-bucket var det 0 filer ved kontrollen.
+- Begge Vercel-domenene for hovednettsiden er verifisert, og DNS rapporteres riktig konfigurert. Eksternt web-crawl ga gammelt/inkonsistent svar og er ikke brukt til å påstå nedetid.
 
 ## Referanser til koden
 - `app/admin/kalkulator/CalculatorClient.js`, `app/admin/arbeidsklokke/WorkClockClient.js`
