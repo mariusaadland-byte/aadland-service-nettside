@@ -86,6 +86,7 @@ assert.equal(customerEmail.text.includes("Test Kunde"),true);
 assert.equal(quoteResponseNotificationSummary(notices).hasPending,true);
 let outcome=await dispatchQueuedQuoteResponseNotices(fakeDb(),{sendMail,limit:2});
 assert.equal(outcome.ok,true);
+console.log("S20 isolated dispatch details",JSON.stringify(outcome));
 assert.equal(outcome.sent,2);
 assert.equal(sendCount,2);
 assert.equal(notices.filter(row=>row.state==="sent").length,2);
