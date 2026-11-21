@@ -41,13 +41,14 @@ async function runServiceCron(req){
  const today=osloDateKey(new Date());
 
  const {data,error}=await s.from("quotes")
-  .select("id,quote_number,title,status,customer,total_inc_vat_ore,valid_until,sent_at,follow_up_sent_at,auto_follow_up,archived_at,issued_via,paper_issued_at")
+  .select("id,quote_number,title,status,customer,total_inc_vat_ore,valid_until,sent_at,follow_up_sent_at,auto_follow_up,archived_at,issued_via,paper_issued_at,quote_link_generation,quote_link_disabled_at")
   .eq("status","sent")
   .eq("auto_follow_up",true)
   .or("issued_via.is.null,issued_via.eq.email")
   .is("paper_issued_at",null)
   .is("follow_up_sent_at",null)
   .is("archived_at",null)
+  .is("quote_link_disabled_at",null)
   .lte("sent_at",cutoff)
   .or("valid_until.is.null,valid_until.gte."+today)
   .order("sent_at",{ascending:true})
@@ -134,12 +135,14 @@ async function runServiceCron(req){
   // Re-check customer eligibility immediately before the external call.
   // A quote may have been answered or archived between listing and claim.
   const current=await s.from("quotes")
-   .select("status,auto_follow_up,archived_at,valid_until,follow_up_sent_at,issued_via")
+   .select("status,auto_follow_up,archived_at,valid_until,follow_up_sent_at,issued_via,quote_link_generation,quote_link_disabled_at")
    .eq("id",quote.id).maybeSingle();
   const nowToday=osloDateKey(new Date());
   if(current.error||!current.data||current.data.status!=="sent"||
      current.data.auto_follow_up!==true||current.data.archived_at||
      current.data.follow_up_sent_at||current.data.issued_via==="paper"||
+     current.data.quote_link_disabled_at||
+     Number(current.data.quote_link_generation)!==Number(quote.quote_link_generation)||
      (current.data.valid_until&&current.data.valid_until<nowToday)){
    const hold=await s.rpc("quote_followup_uncertain",{
     p_quote_id:quote.id,p_key:key,p_reason:"Tilbudsstatus ble endret før påminnelsen kunne sendes."
