@@ -20,6 +20,7 @@ export default function TripletexSalesClient(){
  const [invoices,setInvoices]=useState([]),[transfers,setTransfers]=useState([]);
  const [invoiceLinks,setInvoiceLinks]=useState([]),[reconcileError,setReconcileError]=useState("");
  const [directClaims,setDirectClaims]=useState([]);
+ const [preflightByInvoice,setPreflightByInvoice]=useState({});
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
  const [error,setError]=useState(""),[message,setMessage]=useState("");
  const [startNumber,setStartNumber]=useState("80000000");
@@ -79,6 +80,39 @@ export default function TripletexSalesClient(){
  const reviewVisible=queue.needsReview.filter(matches);
  const completed=queue.confirmed.filter(matches);
  const linksByInvoice=useMemo(()=>new Map(invoiceLinks.map(x=>[x.invoiceId,x])),[invoiceLinks]);
+
+
+ async function checkUntransferredInvoice(row){
+  if(busy||!row?.id)return;
+  setBusy(true);setError("");setMessage("");
+  setPreflightByInvoice(current=>({...current,[row.id]:{checking:true}}));
+  try{
+   // This already-existing action only reads the local invoice and Tripletex
+   // customer/VAT/invoice lists. NEVER invoke action:"transfer" here.
+   const response=await fetch(directApi,{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({action:"check",invoiceId:row.id})
+   });
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok){
+    setPreflightByInvoice(current=>({...current,[row.id]:{
+     safe:false,checkedAt:new Date().toISOString(),
+     message:result.error||"Tripletex-kontrollen mislyktes. Ingen overføring er utført."
+    }}));
+    return;
+   }
+   setPreflightByInvoice(current=>({...current,[row.id]:{
+    safe:true,checkedAt:new Date().toISOString(),
+    message:"Ingen eksakt lik faktura funnet hos samme Tripletex-kunde, på opprinnelig fakturadato og med samme beløp. Kontrollen er kun et avgrenset søk; en manuelt bokført faktura kan ha en annen dato eller et annet nummer. Kontroller dette i Tripletex før import.",
+    grossOre:result.grossOre
+   }}));
+  }catch(err){
+   setPreflightByInvoice(current=>({...current,[row.id]:{
+    safe:false,checkedAt:new Date().toISOString(),
+    message:"Tripletex-kontrollen kunne ikke gjennomføres. "+String(err?.message||"Kontroller manuelt.")
+   }}));
+  }finally{setBusy(false);}
+ }
 
  async function checkImportedInvoice(row){
   if(busy||!row?.id||!row.transfer||row.transfer.status!=="confirmed")return;
@@ -333,7 +367,7 @@ export default function TripletexSalesClient(){
     <p className={styles.hint}>Disse tas <strong>ikke med i samlefilen</strong>. Velg en faktura om gangen.
      Foreløpig klargjøres en manuell CSV-import. Når du retter kundekortet fra en ubetalt faktura,
      sendes nye kontaktopplysninger automatisk til den allerede koblede Tripletex-kunden.
-     <strong> Selve utstedte fakturaen endres ikke.</strong> Beløp, MVA eller fakturadato krever
+     <strong> Selve utstedte fakturaen endres ikke.</strong> Før overføring bør du bruke «Sjekk Tripletex før overføring». Ingen treff i et begrenset API-søk er ikke bevis på at fakturaen aldri er lagt inn manuelt. Beløp, MVA eller fakturadato krever
      regnskapsmessig korrigering, ikke overskriving.</p>
     <div className={styles.list}>
      {withoutPayment.map(x=><div key={x.id} className={styles.item}>
@@ -341,7 +375,18 @@ export default function TripletexSalesClient(){
       <div className={styles.itemLinks}>
        <a className={styles.link} href={"/admin/faktura/arkiv?id="+encodeURIComponent(x.id)}>
         Åpne ubetalt faktura</a>
-       <button className={styles.primary} disabled={!canPrepare} type="button"
+       <button type="button" disabled={busy} onClick={()=>checkUntransferredInvoice(x)}>
+        {preflightByInvoice[x.id]?.checking?"Kontrollerer Tripletex …":"Sjekk Tripletex før overføring"}
+       </button>
+       {preflightByInvoice[x.id]&&!preflightByInvoice[x.id].checking&&
+        <small role="status" style={{display:"block",maxWidth:460,overflowWrap:"anywhere",
+         color:preflightByInvoice[x.id].safe?"#234b34":"#932e24"}}>
+         {preflightByInvoice[x.id].safe?"Begrenset kontroll bestått: ":"Krever kontroll: "}
+         {preflightByInvoice[x.id].message}
+        </small>}
+       <button className={styles.primary}
+        disabled={!canPrepare||preflightByInvoice[x.id]?.checking===true||
+         preflightByInvoice[x.id]?.safe===false} type="button"
         onClick={()=>prepare([x.id],"unpaid-single")}>Overfør denne fakturaen – CSV</button>
        {originalLink(x)}
       </div>
