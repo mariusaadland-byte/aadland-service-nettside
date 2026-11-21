@@ -14,6 +14,24 @@ const json=(v,status=200)=>NextResponse.json(v,{...opts,status});
 const uuid=v=>typeof v==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 const clean=v=>String(v??"").trim();
 
+// Read-only proof summary. Accepted e-mail receipts without this row remain unverified.
+export async function GET(){
+ const user=await getAdminUser();
+ if(user?.role!=="owner")return json({error:"Kun eier kan se bokføringsavstemmingen."},403);
+ const s=db();if(!s)return json({error:"Databasen er ikke tilgjengelig."},503);
+ const rows=[];
+ for(let offset=0;offset<5000;offset+=250){
+  const {data,error}=await s.from("vat_tripletex_receipt_reconciliations")
+   .select("purchase_document_id,environment,tripletex_voucher_id,voucher_year,voucher_number,vat_code,account_code,verified_at,status")
+   .order("verified_at",{ascending:false}).range(offset,offset+249);
+  if(error||!Array.isArray(data))
+   return json({error:"Bokføringsstatus kunne ikke leses; ingen bilag kan antas bokført."},503);
+  rows.push(...data);
+  if(data.length<250)return json({ok:true,verifiedCount:rows.length,verified:rows});
+ }
+ return json({error:"Over 5000 avstemminger. Avklar arkivet før visning."},503);
+}
+
 export async function POST(req){
  const guard=sameOriginGuard(req);if(guard)return guard;
  const user=await getAdminUser();
