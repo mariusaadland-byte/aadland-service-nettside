@@ -7,5 +7,5 @@ export default async function EditQuotePage({params}){
  if(!admin)redirect("/admin/login");
  if(!(admin.role==="owner"||admin.canUpdateOrders||admin.canManageProducts))redirect("/admin");
  const resolved=await params;
- return <QuoteEditorClient quoteId={resolved.id}/>;
+ return <QuoteEditorClient quoteId={resolved.id} isOwner={admin.role==="owner"}/>;
 }
