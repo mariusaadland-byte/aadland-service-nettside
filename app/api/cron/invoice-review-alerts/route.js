@@ -3,6 +3,7 @@ import {db} from "../../../../lib/supabase";
 import {cronGuard} from "../../../../lib/cronAuth";
 import {osloDateKey} from "../../../../lib/osloTime";
 import {invoiceReviewAlerts,invoiceReviewEmail} from "../../../../lib/invoiceAdminAlerts";
+import {summarizeInvoiceActivity} from "../../../../lib/invoiceSettlementInfo";
 export const runtime="nodejs";
 export const maxDuration=60;
 export async function GET(req){
@@ -19,15 +20,37 @@ export async function GET(req){
   if(!batch){
    const invoices=[],notices=[];
    for(let offset=0;;offset+=500){
-    const {data,error}=await s.from("invoice_drafts").select("id,invoice_number,status,customer,line_items,due_date,paid_ore").in("status",["issued","sent"]).order("id").range(offset,offset+499);
+    const {data,error}=await s.from("invoice_drafts").select("id,invoice_number,status,customer,line_items,due_date,paid_ore,credited_ore").in("status",["issued","sent"]).order("id").range(offset,offset+499);
     if(error)throw Error("Fakturaene kunne ikke hentes.");invoices.push(...data);if(data.length<500)break;
    }
    if(!invoices.length)return NextResponse.json({ok:true,sent:0,needsReview:0});
+   // Invoice balance alone is not sufficient: compare both credit-note
+   // documents and captured/refunded Vipps activity before owner alerts.
+   // Fail closed if any source is unavailable instead of emailing an
+   // unverified collection recommendation.
+   const vippsPayments=[],creditNotes=[];
+   const invoiceIds=invoices.map(invoice=>invoice.id);
+   for(let start=0;start<invoiceIds.length;start+=100){
+    const ids=invoiceIds.slice(start,start+100);
+    for(const [table,columns,target] of [
+     ["invoice_vipps_payments","id,invoice_id,state,captured_ore,refunded_ore",vippsPayments],
+     ["invoice_credit_notes","id,invoice_id,total_ore,sent_at",creditNotes]
+    ]){
+     for(let offset=0;;offset+=500){
+      const {data,error}=await s.from(table).select(columns)
+       .in("invoice_id",ids).order("id",{ascending:true}).range(offset,offset+499);
+      if(error)throw Error("Avstemming av betalinger og kreditnotaer kunne ikke gjennomføres.");
+      target.push(...(data||[]));
+      if((data||[]).length<500)break;
+     }
+    }
+   }
    for(let offset=0;;offset+=500){
     const {data,error}=await s.from("invoice_reminder_sends").select("id,invoice_id,status,kind,due_date,sent_at,created_at").order("id").range(offset,offset+499);
     if(error)throw Error("Purringshistorikken kunne ikke hentes.");notices.push(...data);if(data.length<500)break;
    }
-   const items=invoiceReviewAlerts(invoices,notices,today);
+   const reconciled=summarizeInvoiceActivity(invoices,vippsPayments,creditNotes);
+   const items=invoiceReviewAlerts(reconciled,notices,today);
    if(!items.length)return NextResponse.json({ok:true,sent:0,needsReview:0});
    const email=invoiceReviewEmail(items,today);
    // One frozen digest per Oslo calendar day; simultaneous cron runs reuse it.
