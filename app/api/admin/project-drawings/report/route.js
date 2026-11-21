@@ -1,5 +1,6 @@
 import {NextResponse} from "next/server";
 import {getAdminUser} from "../../../../../lib/auth";
+import {canReadProjectDrawings} from "../../../../../lib/projectDrawingPermissions";
 import {sameOriginGuard} from "../../../../../lib/requestGuard";
 import {buildDrawingReportPdf} from "../../../../../lib/drawingReportPdf";
 export const runtime="nodejs";
@@ -7,7 +8,7 @@ export const runtime="nodejs";
 export async function POST(request){
  const guard=sameOriginGuard(request);if(guard)return guard;
  const user=await getAdminUser();
- if(!user||!(user.role==="owner"||user.canManageProducts||user.canViewOrders)){
+ if(!canReadProjectDrawings(user)){
   return NextResponse.json({error:"Ingen tilgang."},{status:403});
  }
  const raw=await request.text().catch(()=>"");
