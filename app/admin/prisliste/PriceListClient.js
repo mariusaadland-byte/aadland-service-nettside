@@ -2,15 +2,31 @@
 import {useEffect,useState} from "react";
 import Link from "next/link";
 import styles from "./prisliste.module.css";
-const empty=()=>({sku:"EGEN-"+crypto.randomUUID().slice(0,12),originalSku:"",name:"",supplierName:"",unit:"stk",costExVat:"",saleExVat:"",markup:"20",ean:""});
+const empty=(defaultMarkup="15")=>({sku:"EGEN-"+crypto.randomUUID().slice(0,12),originalSku:"",name:"",supplierName:"",unit:"stk",costExVat:"",saleExVat:"",markup:String(defaultMarkup),ean:""});
 const number=v=>Number(String(v??"").replace(/\s/g,"").replace(",","."));
 const money=v=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(v);
 export default function PriceListClient(){
+ const [companyMarkup,setCompanyMarkup]=useState("15");
  const [form,setForm]=useState(null),[products,setProducts]=useState([]),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState(""),[message,setMessage]=useState(""),[search,setSearch]=useState(""),[hasMore,setHasMore]=useState(false);
  async function load(offset=0){
   setLoading(true);try{const r=await fetch("/api/admin/material-catalog/manual?offset="+offset,{cache:"no-store"});const d=await r.json();if(!r.ok)throw Error(d.error);setProducts(rows=>offset?[...rows,...d.products]:d.products);setHasMore(d.hasMore);return true;}catch(e){setError(e.message||"Kunne ikke hente prislisten.");return false;}finally{setLoading(false)}
  }
- useEffect(()=>{setForm(empty());load()},[]);
+ useEffect(()=>{
+  setForm(empty());load();
+  let active=true;
+  fetch("/api/admin/quote-preferences",{cache:"no-store"}).then(async response=>{
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(data.error||"Kunne ikke hente bedriftens standardpåslag.");
+   const rate=Number(data.defaultMaterialMarkup);
+   if(!Number.isFinite(rate)||rate<0||rate>1000)throw Error("Ugyldig standardpåslag.");
+   return String(rate);
+  }).then(value=>{
+   if(!active)return;
+   setCompanyMarkup(value);
+   setForm(current=>current&&!current.originalSku&&current.costExVat===""&&current.saleExVat===""&&current.markup==="15"?{...current,markup:value}:current);
+  }).catch(e=>{if(active)setError(e.message||"Kunne ikke hente standardpåslaget.");});
+  return()=>{active=false};
+ },[]);
  function change(key,value){setForm(f=>{
   const next={...f,[key]:value};
   if(key==="costExVat"||key==="markup"){
@@ -22,7 +38,7 @@ export default function PriceListClient(){
  function edit(p){setForm({originalSku:p.supplier_sku,sku:p.supplier_sku,name:p.name,unit:p.unit,supplierName:p.category_name||"",costExVat:(p.cost_ex_vat_ore/100).toFixed(2),saleExVat:(p.sale_ex_vat_ore/100).toFixed(2),markup:p.cost_ex_vat_ore>0?String(Math.round((p.sale_ex_vat_ore/p.cost_ex_vat_ore-1)*10000)/100):"0",ean:p.ean||""});setMessage("");setError("");window.scrollTo({top:0,behavior:"smooth"})}
  async function save(e){
   e.preventDefault();if(busy)return;setBusy(true);setError("");setMessage("");
-  try{const r=await fetch("/api/admin/material-catalog/manual",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});const d=await r.json();if(!r.ok)throw Error(d.error);setMessage("Varen er lagret og kan søkes opp i kalkulatoren og tilbudet.");setForm(empty());await load();}catch(e){setError(e.message||"Lagring feilet.")}finally{setBusy(false)}
+  try{const r=await fetch("/api/admin/material-catalog/manual",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});const d=await r.json();if(!r.ok)throw Error(d.error);setMessage("Varen er lagret og kan søkes opp i kalkulatoren og tilbudet.");setForm(empty(companyMarkup));await load();}catch(e){setError(e.message||"Lagring feilet.")}finally{setBusy(false)}
  }
  const matches=products.filter(p=>[p.name,p.supplier_sku,p.category_name,p.ean].join(" ").toLocaleLowerCase("nb-NO").includes(search.toLocaleLowerCase("nb-NO")));
  return <main className={styles.page}><div className={styles.shell}>
@@ -35,11 +51,11 @@ export default function PriceListClient(){
    <label>Varenummer<input required maxLength={120} readOnly={Boolean(form.originalSku)} value={form.sku} onChange={e=>change("sku",e.target.value)}/></label>
    <label>Enhet<input required maxLength={30} placeholder="stk, pakke, meter, m²" value={form.unit} onChange={e=>change("unit",e.target.value)}/><small>Oppgi pris for én av denne enheten, for eksempel én hel pakke.</small></label>
    <label>Innkjøpspris eks. MVA<input required inputMode="decimal" value={form.costExVat} onChange={e=>change("costExVat",e.target.value)}/></label>
-   <label>Påslag (%)<input inputMode="decimal" value={form.markup} onChange={e=>change("markup",e.target.value)}/><small>Endrer du kostpris eller påslag, beregnes salgsprisen på nytt.</small></label>
+   <label>Påslag (%)<input inputMode="decimal" value={form.markup} onChange={e=>change("markup",e.target.value)}/><small>Ny vare starter med bedriftens standard på {companyMarkup} %. Endrer du kostpris eller påslag, beregnes salgsprisen på nytt.</small></label>
    <label>Salgspris eks. MVA<input required inputMode="decimal" value={form.saleExVat} onChange={e=>change("saleExVat",e.target.value)}/><small>Du kan overstyre salgsprisen direkte.</small></label>
    {form.saleExVat!==""&&Number.isFinite(number(form.saleExVat))&&<p>Salgspris inkl. 25 % MVA: <strong>{money(Math.round(number(form.saleExVat)*100)*1.25/100)}</strong></p>}
    <label>EAN / strekkode (valgfritt)<input maxLength={120} value={form.ean} onChange={e=>change("ean",e.target.value)}/></label>
-   <div className={styles.actions}><button disabled={busy} type="submit">{busy?"Lagrer …":"Lagre vare"}</button>{form.originalSku&&<button type="button" disabled={busy} onClick={()=>setForm(empty())}>Ny vare</button>}</div>
+   <div className={styles.actions}><button disabled={busy} type="submit">{busy?"Lagrer …":"Lagre vare"}</button>{form.originalSku&&<button type="button" disabled={busy} onClick={()=>setForm(empty(companyMarkup))}>Ny vare</button>}</div>
   </form>}</section>
   <section className={styles.card}><h2>Lagrede varer</h2><p className={styles.muted}>Velg «Egne varer» i leverandørfeltet i varesøket. Lagrede salgspriser følger varen til nye tilbud. Gamle tilbud endres ikke.</p>
    <input aria-label="Søk i innlastede egne varer" className={styles.search} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Søk navn, varenummer eller leverandør"/>
