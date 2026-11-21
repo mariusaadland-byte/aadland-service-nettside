@@ -111,6 +111,7 @@
 .catalogToolbar{display:grid;grid-template-columns:minmax(170px,.7fr) minmax(0,1.3fr);gap:12px}
 .searchResults{margin-top:10px;border:1px solid #343943;border-radius:13px;overflow:hidden;background:#0f1217;max-height:360px;overflow-y:auto}
 .catalogEmpty{padding:16px;color:#969a9f;font-size:14px}
+.catalogFreshness{margin:10px 0 0;padding:10px 12px;border:1px solid #71603d;background:#292417;color:#f4d998;border-radius:9px;font-size:12px;line-height:1.5}
 .catalogError{margin-top:12px;padding:11px 13px;border:1px solid #78433d;background:#2a1918;color:#ffb8ad;border-radius:11px;font-size:13px;line-height:1.4}
 .productResult{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:center;text-align:left;background:#0f1217;color:#f5f1e8;border:0;border-bottom:1px solid #292e36;padding:13px 14px;cursor:pointer;font:inherit}
 .productResult:last-child{border-bottom:0}
