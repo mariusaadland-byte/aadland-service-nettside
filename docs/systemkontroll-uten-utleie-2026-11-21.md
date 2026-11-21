@@ -1,15 +1,15 @@
 # Aadland Service – systemkontroll uten utleie
-Opprettet 21.11.2026. Løpende funnliste. **Ingen av punktene under er utbedret eller godkjent gjennom denne kontrollen.** Utleiedelen holdes utenfor. De 36 tidligere avsluttede utviklingsoppgavene beholdes uendret.
+Opprettet 21.11.2026. Løpende funnliste. **S-01 er teknisk rettet og produksjonsverifisert, men venter på siste manuelle kontroll av brukergrensesnittet. S-02 til S-35 er ennå ikke utbedret.** Utleiedelen holdes utenfor. De 36 tidligere avsluttede utviklingsoppgavene beholdes uendret.
 
 ## Arbeidsmåte
 - Hvert funn får en stabil ID. Nye funn føyes til denne samme filen.
 - Prioritet: **P1** = risiko for økonomifeil, dobbeltutsending eller feil regnskap; **P2** = sikkerhet, dokumentasjon eller driftssikkerhet; **P3** = forbedring/vedlikehold.
 - Dokumentasjon: **Påvist** = demonstrert ved kode eller database; **Kontrolleres** = krever reell avstemming, konfigurasjon eller brukertest. Påvist kodefeil er ikke bevis på at en kunde allerede er rammet.
-- Status for alle: **IKKE BEHANDLET**. Ingen endringer i regnskapsdata, e-postutsending eller prisinnstillinger under kontrollen.
+- Status: **S-01: teknisk ferdig, produksjonsverifisert, avventer brukerens UI-godkjenning.** S-02–S-35: **IKKE BEHANDLET**. Kartleggingen i seg selv endret ikke priser eller regnskap; S-01-utbedringen er dokumentert i loggen nedenfor.
 
 | ID | Prioritet | Type | Område | Funn / hva vi skal gå gjennom |
 | --- | --- | --- | --- | --- |
-| S-01 | P1 | Påvist | Prising og materialer | Tilbud har hovedstandard/minimum 15 % påslag, mens seks leverandørstandarder og kostnadskalkulator står på 20 %. Kalkulatoren omskriver dessuten lagret 15 % til 20 % ved åpning. Bestemme en autoritativ sats, korrigere synkronisering og teste at brukerens valg beholdes. |
+| S-01 | P1 | Teknisk rettet – UI-test gjenstår | Prising og materialer | **21.11.2026:** Bedriftens 15 % er nå kilde for nye kalkyler og leverandører uten egen overstyring. Kalkulatoren beholder gamle lokale verdier uten tvangsendring, og tilbyr «Bruk bedriftens standard». Seks leverandører arver bedriftens sats i produksjonsdatabasen. Eksisterende tilbud, fakturaer og varepriser er uendret. PR #177, produksjon READY, database migrert og testet. Gjør siste praktiske nettleserkontroll før endelig godkjenning. |
 | S-02 | P1 | Påvist | Send tilbud | Vanlig tilbudsutsending sender e-post før lokal status aktiveres og bruker ikke en dokumentert Resend-idempotensnøkkel. Ved avbrutt svar kan man være usikker på om kunden fikk e-posten. Utsendingshistorikk er også «best effort». Lage robust sendelås/kvitteringsstatus og testes med simulator, ikke ekte kunder. |
 | S-03 | P1 | Påvist | Automatiske tilbudspåminnelser | Ved uavklart Resend-feil nullstilles sendemarkøren, mens kallet mangler en eksplisitt idempotensnøkkel. Mulig duplisert e-post ved senere automatisk forsøk. Innføre stabil nøkkel og manuell kontroll av usikker status. |
 | S-04 | P1 | Påvist | Fakturavarslinger | Daglig intern fakturaoppfølging henter ikke feltet credited_ore, selv om betalingsberegningen bruker det. Dette kan varsle om feil restkrav på kreditert faktura. Må hente og avstemme kreditnotaer/Vipps før varsel. |
@@ -78,7 +78,7 @@ Opprettet 21.11.2026. Løpende funnliste. **Ingen av punktene under er utbedret 
 
 ## Kartlegging avsluttet – 21.11.2026
 
-**Avsluttet for statisk kode- og konfigurasjonskontroll; ikke godkjent som full ende-til-ende driftstest.** Alt på funnlisten står fortsatt til behandling, mens utleie og de 36 tidligere lukkede utviklingsoppgavene er urørt.
+**Avsluttet for statisk kode- og konfigurasjonskontroll; ikke godkjent som full ende-til-ende driftstest.** S-01 er nå teknisk rettet og produksjonsverifisert (manuell UI-godkjenning gjenstår); S-02–S-35 står fortsatt til behandling. Utleie og de 36 tidligere lukkede utviklingsoppgavene er urørt.
 
 Områder dekket:
 1. Administrator-API: inventar over 90 administrative ruter uten utleie, med nærmere kontroll av sentrale lesings-, endrings- og pengetransaksjonsruter samt sikkerhet og tilgangsroller.
@@ -105,6 +105,16 @@ Rekkefølge: tilgang til tegninger (S-23), betalings/idempotens for Vipps og ord
 - Kartlagt alle 90 ikke-utleierelaterte administrator-API-ruter på filtre og gått gjennom konkrete endepunkter for tegninger, tjenester, prosjektgalleri, lager/ordre, kundekonto, oppdragsplan, befaring-/oppstartspåminnelser og autorisasjon. Ingen produksjonskall som sender e-post eller oppretter betaling er utført.
 - Databasen har 2 private tegninger og 0 publiserte tegninger, 4 registrerte kundeprofiler, 7 kundekontakter og 3 aktive produkter. Sikkerhetsfeilen ved tegningsrettigheter er i koden, ikke en påvist uautorisert endring.
 - De fire utstedte interne fakturaene har registrert utsendingstid, original-PDF, ikke-negative beløp og gyldige datointervaller.
+
+## Utbedringslogg
+
+### S-01 – 21.11.2026: Teknisk ferdig, klar for UI-godkjenning
+- PR: https://github.com/mariusaadland-byte/aadland-service-nettside/pull/177 ; squash main `06b5375c6dab78b04e632af16b092bdbff0d1f9d`.
+- Vercel produksjonsdeploy `dpl_4VMkZiUpPqDCodk6QixSfxMe9jr6`: READY. Egen automatisert test `scripts/smoke-shared-material-markup.mjs` samt eksisterende testpakke og Next.js-build bestod i forhåndsvisning og produksjon.
+- Database: migrasjon `material_supplier_company_default_20261121` anvendt (svar: success), kolonnen kan være NULL = bedriftens sats. Alle seks gamle globale 20 %-standarder er satt til arvet standard, ikke individuell overstyring. Verifisert at samtlige seks har effektiv sats 15,00 %.
+- Før/etter-kontroll: 5 lagrede tilbud, tilbudssum 33 973 713 øre, 8 992 materialprodukter og sum lagrede særskilte salgspriser 1 436 øre er uendret. Ingen e-poster, betalinger eller fakturaer opprettet.
+- Ny funksjon: prislisten starter på bedriftens standard, kalkulatoren henter satsen fra sentrale tilbudsinnstillinger, gamle lokalt valgte verdier bevares, leverandører kan ha selvstendige overstyringer inklusive 0 %, og leverandør kan tilbakestilles til bedriftens standard.
+- **Manuell UI-test:** Åpne /admin/kalkulator og bekreft at en ny/nullstilt kalkyle bruker 15 %. Trykk «Bruk bedriftens standard» ved eventuell gammel lokal 20 %-kalkyle. Åpne tilbud og søk materialer: bekreft 15 % på valgt leverandør; test eventuelt en midlertidig egen sats og tilbakestilling med «Bruk bedriftens standard». Ingen lagrede kundetilbud skal endre totalsum. Endelig godkjenning først når skjermvisningen er kontrollert.
 
 ## Neste arbeidsrunde
 Gjennomgå hvert funn i prioritert rekkefølge etter at kartleggingen er ferdig. Dokumenter test, utbedring, produksjonspublisering og godkjenning per ID. Hold utleie adskilt.
