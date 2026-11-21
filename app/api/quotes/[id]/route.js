@@ -4,6 +4,10 @@ import {db} from "../../../../lib/supabase";
 import {verifyQuoteToken} from "../../../../lib/quoteLinks";
 import {getCustomer} from "../../../../lib/customer-auth";
 import {osloDateKey} from "../../../../lib/osloTime";
+import {dispatchQueuedQuoteResponseNotices,getQuoteResponseNoticeSummary} from "../../../../lib/quoteResponseNotices";
+
+export const runtime="nodejs";
+export const maxDuration=60;
 
 function esc(value){
  return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
@@ -91,98 +95,55 @@ export async function POST(req,{params}){ const originError=sameOriginGuard(req)
  const loaded=await loadQuote(id);
  if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status});
  const publicLinkOk=verifyQuoteToken(loaded.data,token);
- if(!publicLinkOk&&!(await customerOwnsIssuedQuote(loaded.data)))
+ const authenticatedOwner=!publicLinkOk&&await customerOwnsIssuedQuote(loaded.data);
+ if(!publicLinkOk&&!authenticatedOwner)
   return NextResponse.json({error:"Tilbudslenken er utløpt eller sperret. Logg inn på Min side for å se egne tilbud."},{status:403,headers:privateHeaders});
 
- if(["accepted","declined","cancelled","superseded"].includes(loaded.data.status)){
-  return NextResponse.json({error:loaded.data.status==="superseded"?"Denne tilbudsversjonen er erstattet av en nyere revisjon.":"Tilbudet er allerede ferdigbehandlet."},{status:409});
+ // A repeated click on the same recorded answer returns the canonical status;
+ // it never writes the quote twice and never sends a new confirmation.
+ const expected=action==="accept"?"accepted":"declined";
+ if(loaded.data.status===expected){
+  const notifications=await getQuoteResponseNoticeSummary(loaded.s,id);
+  return NextResponse.json({quote:{...mapQuote(loaded.data),isExpired:expired(loaded.data)},
+   alreadyRecorded:true,notifications,confirmationPending:notifications.owner!=="sent"||
+     Boolean(loaded.data.customer?.email&&notifications.customer!=="sent")},{headers:privateHeaders});
  }
+ if(["accepted","declined","cancelled","superseded"].includes(loaded.data.status))
+  return NextResponse.json({error:loaded.data.status==="superseded"?"Denne tilbudsversjonen er erstattet av en nyere revisjon.":"Tilbudet er allerede ferdigbehandlet."},{status:409,headers:privateHeaders});
  if(loaded.data.status!=="sent")return NextResponse.json({error:"Tilbudet er ikke aktivt for svar ennå."},{status:409});
  if(expired(loaded.data))return NextResponse.json({error:"Tilbudet er utløpt."},{status:409});
 
- const now=new Date().toISOString();
- const patch=action==="accept"
-  ?{status:"accepted",accepted_at:now,declined_at:null,acceptance_method:"digital",paper_signed_date:null,accepted_recorded_by:null,auto_follow_up:false,updated_at:now}
-  :{status:"declined",declined_at:now,accepted_at:null,acceptance_method:null,paper_signed_date:null,accepted_recorded_by:null,auto_follow_up:false,updated_at:now};
+ // Preview must not mutate live quote decisions or send genuine customer mail.
+ if(process.env.VERCEL_ENV!=="production")
+  return NextResponse.json({error:"Digital godkjenning og bekreftelse er bare aktiv i produksjon."},{status:403,headers:privateHeaders});
 
- const {data,error}=await loaded.s.from("quotes")
-  .update(patch)
-  .eq("id",id)
-  .eq("status","sent")
-  .select("*")
-  .maybeSingle();
- if(error)return NextResponse.json({error:"Svaret kunne ikke lagres."},{status:500});
- if(!data)return NextResponse.json({error:"Tilbudet er ikke lenger aktivt. Last siden på nytt for å se siste status."},{status:409});
-
- const resendKey=process.env.VERCEL_ENV==="preview"
-  ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)
-  :process.env.RESEND_API_KEY;
- if(resendKey){
-  try{
-   const {Resend}=await import("resend");
-   const resend=new Resend(resendKey);
-   const from="Aadland Service <post@aadland-service.no>";
-   const to="post@aadland-service.no";
-   const customerEmail=String(data.customer?.email||"").trim().toLowerCase();
-   const customerName=String(data.customer?.name||"Kunde");
-   const accepted=action==="accept";
-   const totalText=new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(data.total_inc_vat_ore)||0)/100);
-   await resend.emails.send({
-    from,
-    to,
-    replyTo:customerEmail||undefined,
-    subject:(accepted?"Tilbud godkjent – ":"Tilbud avslått – ")+data.quote_number,
-    text:[
-     customerName+" har "+(accepted?"godkjent":"avslått")+" tilbud "+data.quote_number+".",
-     "",
-     "Tilbud: "+data.title,
-     "Total inkl. MVA: "+totalText,
-     data.customer?.phone?"Telefon: "+data.customer.phone:"",
-     customerEmail?"E-post: "+customerEmail:""
-    ].filter(Boolean).join("\n")
-   });
-
-   if(customerEmail){
-    const requestOrigin=new URL(req.url).origin;
-    const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
-    const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
-    let hasCustomerAccount=false;
-    try{
-     const {data:profile}=await loaded.s.from("customer_profiles").select("id").eq("email",customerEmail).maybeSingle();
-     hasCustomerAccount=Boolean(profile?.id);
-    }catch{}
-    const minSideUrl=base+"/min-side";
-    const plannedStart=data.planned_start_date?new Date(data.planned_start_date+"T12:00:00").toLocaleDateString("nb-NO"):"";
-    const customerHtml=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111;padding:28px 12px"><tr><td align="center">
-<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#181818;border:1px solid #34312b">
-<tr><td style="padding:28px 30px;background:#0d0d0d;color:#fff"><div style="font-size:18px;font-weight:900;letter-spacing:.13em">AADLAND SERVICE</div><div style="margin-top:5px;color:#d9b365;font-size:11px;letter-spacing:.08em">TILBUD ${esc(data.quote_number)}</div></td></tr>
-<tr><td style="padding:30px">
-<div style="color:#d9b365;font-size:11px;font-weight:800;letter-spacing:.12em">${accepted?"GODKJENT":"AVSLÅTT"}</div>
-<h1 style="font-size:27px;line-height:1.15;margin:9px 0 14px;color:#fff">${accepted?"Takk – tilbudet er godkjent":"Tilbakemeldingen er registrert"}</h1>
-<p style="color:#c9c3b8;line-height:1.65;margin:0 0 20px">Hei ${esc(customerName)}. ${accepted?"Vi har registrert at du har godkjent tilbudet om "+esc(data.title)+". Vi tar kontakt om videre plan og endelig oppstart.":"Vi har registrert at du har avslått tilbudet om "+esc(data.title)+". Takk for tilbakemeldingen."}</p>
-<div style="padding:16px;background:#101010;border:1px solid #2d2d2d">
-<div style="color:#8e887f;font-size:11px">Total inkl. MVA</div><div style="margin-top:5px;color:#fff;font-size:22px;font-weight:900">${esc(totalText)}</div>
-${accepted&&plannedStart?`<div style="margin-top:12px;color:#8e887f;font-size:11px">Tidligst oppstart</div><div style="margin-top:4px;color:#fff;font-weight:800">${esc(plannedStart)}</div>`:""}
-</div>
-${hasCustomerAccount?`<a href="${esc(minSideUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:""}
-<p style="margin:24px 0 0;color:#8e887f;font-size:11px;line-height:1.55">${accepted?"Du kan svare direkte på denne e-posten dersom noe må avklares før oppstart.":"Hvis du ønsker å ta opp tilbudet igjen senere, kan du svare direkte på denne e-posten."}</p>
-</td></tr>
-<tr><td style="padding:18px 30px;border-top:1px solid #34312b;color:#8e887f;font-size:11px">Aadland Service · 471 54 898 · post@aadland-service.no</td></tr>
-</table></td></tr></table></body></html>`;
-
-    await resend.emails.send({
-     from,
-     to:customerEmail,
-     replyTo:"post@aadland-service.no",
-     subject:accepted?"Bekreftelse: tilbud "+data.quote_number+" er godkjent":"Bekreftelse: tilbud "+data.quote_number+" er avslått",
-     html:customerHtml
-    });
-   }
-  }catch(notificationError){
-   console.error("QUOTE RESPONSE NOTIFICATION ERROR",notificationError);
-  }
+ // One atomic database RPC updates the quote and creates each recipient's
+ // private outbox row. On ANY outbox insertion failure the acceptance rolls
+ // back, so no response becomes silently untracked.
+ const stored=await loaded.s.rpc("record_customer_quote_response",{
+  p_quote_id:id,p_action:action,
+  p_expected_generation:Number(loaded.data.quote_link_generation||1),
+  p_via_customer_session:Boolean(authenticatedOwner)
+ });
+ if(stored.error){
+  console.error("QUOTE RESPONSE ATOMIC RECORD FAILED",{quoteId:id,code:stored.error.code});
+  return NextResponse.json({error:"Svaret kunne ikke lagres sikkert med bekreftelseshistorikk. Prøv igjen."},{status:503,headers:privateHeaders});
  }
+ const data=stored.data;
+ if(!data)return NextResponse.json({error:"Tilbudet ble endret eller utløp før svaret ble registrert. Oppdater siden."},{status:409,headers:privateHeaders});
 
- return NextResponse.json({quote:{...mapQuote(data),isExpired:expired(data)}},{headers:privateHeaders});
+ // Dispatch after the transactional quote+outbox commit. If Vercel dies
+ // here, the cron will send only untouched 'queued' rows; 'claimed' and
+ // 'needs_review' rows are never resent without owner's manual review.
+ try{
+  const sent=await dispatchQueuedQuoteResponseNotices(loaded.s,{quoteId:id,limit:2});
+  if(!sent.ok)console.error("QUOTE RESPONSE DISPATCH QUEUE READ FAILED",{quoteId:id});
+ }catch{
+  console.error("QUOTE RESPONSE DISPATCH INTERRUPTED",{quoteId:id});
+ }
+ const notifications=await getQuoteResponseNoticeSummary(loaded.s,id);
+ const confirmationPending=notifications.owner!=="sent"||
+  Boolean(data.customer?.email&&notifications.customer!=="sent");
+ return NextResponse.json({quote:{...mapQuote(data),isExpired:expired(data)},
+  notifications,confirmationPending,alreadyRecorded:false},{headers:privateHeaders});
 }

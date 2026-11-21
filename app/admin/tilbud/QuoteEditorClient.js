@@ -8,6 +8,7 @@ import {CATALOG_QUOTE_TRANSFER_KEY} from "../../../lib/calculatorQuoteLines";
 import QuoteCatalogSearch from "./QuoteCatalogSearch";
 import QuoteCustomerPicker from "./QuoteCustomerPicker";
 import QuoteLinkControls from "./QuoteLinkControls";
+import QuoteResponseDeliveryPanel from "./QuoteResponseDeliveryPanel";
 import VippsFeePreview from "../VippsFeePreview";
 import {hasAdjustableVippsPriceLine,linesForCustomerTotal} from "../../../lib/vippsPriceLines";
 import {calculateContribution,withPrivateCosts} from "../../../lib/quotePrivateCosts";
@@ -899,6 +900,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
    </div>
 
    {quoteId&&isOwner&&["sent","accepted","declined","expired","cancelled","superseded"].includes(v.status)&&<QuoteLinkControls quoteId={quoteId}/>}
+   {quoteId&&isOwner&&["accepted","declined"].includes(v.status)&&<QuoteResponseDeliveryPanel quoteId={quoteId}/>}
 
    {quoteId&&v.status==="draft"&&sendAttempt&&sendAttempt.state!=="released"&&<section className="card" style={{margin:"12px 0",padding:18,border:"2px solid #b67e36"}} role="status">
     <strong>Utsendingskontroll: {sendAttempt.state==="sent"?"Registrert som sendt":sendAttempt.state==="provider_accepted"?"E-post bekreftet hos Resend":"Uavklart e-poststatus"}</strong>

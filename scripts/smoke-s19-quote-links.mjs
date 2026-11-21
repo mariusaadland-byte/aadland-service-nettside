@@ -49,7 +49,7 @@ assert.equal(verifyQuoteToken({...quote,sent_at:new Date(now-61*day*1000).toISOS
 assert.throws(()=>createQuoteToken({...quote,quote_link_disabled_at:issuedAt},now),/sperret/);
 
 const api=read("app/api/quotes/[id]/route.js");
-const noImports=api.replace(/^import .*;\n/gm,"").replace(/^export async function (GET|POST)\(/gm,"async function $1(");
+const noImports=api.replace(/^import .*;\n/gm,"").replace(/^export const .*;\n/gm,"").replace(/^export async function (GET|POST)\(/gm,"async function $1(");
 let account=null,writeCount=0,readCount=0,quoteRow={...quote};
 const dataClient=()=>({from(table){
  assert.equal(table,"quotes");
