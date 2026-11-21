@@ -8,6 +8,7 @@ import {buildInvoiceDraftPdf} from "../../../../../lib/invoiceDraftPdf";
 import {reminderText} from "../../../../../lib/invoiceReminders";
 import {isValidDateInput} from "../../../../../lib/osloTime";
 import {osloDateKey} from "../../../../../lib/osloTime";
+import {invoiceReminderRetryAllowed,INVOICE_REMINDER_RETRY_BLOCKED_MESSAGE} from "../../../../../lib/invoiceReminderRetrySafety";
 export const runtime="nodejs";
 export const maxDuration=60;
 const allowed=user=>user&&(user.role==="owner"||user.canUpdateOrders||user.canManageProducts);
@@ -31,7 +32,7 @@ export async function GET(req){
 export async function POST(req){
  const origin=sameOriginGuard(req);if(origin)return origin;
  const user=await getAdminUser();if(!allowed(user))return fail("Ingen tilgang.",403);
- if(process.env.VERCEL_ENV==="preview")return fail("Purringer sendes fra produksjonssiden.",403);
+ if(process.env.VERCEL_ENV!=="production")return fail("Purringer og inkassovarsler sendes bare fra produksjonssiden.",403);
  const key=process.env.RESEND_API_KEY;if(!key)return fail("E-post er ikke konfigurert.",503);
  const body=await req.json().catch(()=>({}));
  if(!uuid(body.invoiceId)||!uuid(body.requestId)||!["purring","inkasso"].includes(body.kind)||!isValidDateInput(body.dueDate))return fail("Kontroller faktura, varseltype og betalingsfrist.");
@@ -62,6 +63,9 @@ export async function POST(req){
  if(prepared.error)return fail(prepared.error.message,409);
  let record=prepared.data;
  if(record.status==="sent")return NextResponse.json({ok:true,alreadySent:true,sentAt:record.sent_at});
+ // This must run AFTER atomic prepare and BEFORE any PDF update or Resend request.
+ // Resend idempotency expires after 24h: never retry a stale/unverifiable notice.
+ if(!invoiceReminderRetryAllowed(record))return fail(INVOICE_REMINDER_RETRY_BLOCKED_MESSAGE,409);
  try{
   const {data:invoice,error}=await s.from("invoice_drafts").select("*").eq("id",body.invoiceId).single();
   if(error||!invoice?.pdf_base64)throw Error("Original faktura-PDF kunne ikke hentes.");
@@ -81,15 +85,15 @@ export async function POST(req){
    subject:record.subject,text:record.body,
    attachments:[{filename:(record.kind==="inkasso"?"Inkassovarsel":"Purring")+"-"+invoice.invoice_number+".pdf",content:record.pdf_base64},{filename:"Aadland-Service-Faktura-"+invoice.invoice_number+".pdf",content:invoice.pdf_base64}]
   },{idempotencyKey:"invoice-reminder/"+record.id});
-  if(result.error||!result.data?.id)throw Error("E-posttjenesten kunne ikke bekrefte sendingen. Prøv samme utsending igjen.");
+  if(result.error||!result.data?.id)throw Error("E-posttjenesten kunne ikke bekrefte sendestatus.");
   const sentAt=new Date().toISOString();
   const saved=await s.from("invoice_reminder_sends").update({status:"sent",sent_at:sentAt,resend_id:result.data.id,error_message:null}).eq("id",record.id);
-  if(saved.error)return fail("E-posten er sendt, men historikken kunne ikke oppdateres. Prøv samme utsending igjen.",502);
+  if(saved.error)return fail("E-posten kan være sendt, men historikken ble ikke oppdatert. Kontroller Resend-loggen og avstem med kunden før du forsøker noe mer. Ikke send samme varsel på nytt uten kontroll.",502);
   return NextResponse.json({ok:true,sentAt,sentTo:record.recipient});
  }catch(error){
   const message=String(error?.message||"Kunne ikke sende purringen.").slice(0,300);
   // A concurrent successful retry must never be overwritten by an earlier failed attempt.
   await s.from("invoice_reminder_sends").update({status:"failed",error_message:message}).eq("id",record.id).neq("status","sent");
-  return fail(message,502);
+  return fail("Sendestatus er ikke sikkert bekreftet. Kontroller Resend og betalingshistorikken før nytt forsøk. "+message,502);
  }
 }
