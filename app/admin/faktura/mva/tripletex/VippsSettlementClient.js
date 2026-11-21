@@ -4,6 +4,7 @@ import styles from "./TripletexReceipts.module.css";
 import VippsTripletexTransferPanel from "./VippsTripletexTransferPanel";
 import VippsRetainedFeeTransferPanel from "./VippsRetainedFeeTransferPanel";
 import VippsReconcilePanel from "./VippsReconcilePanel";
+import VippsServiceSettlementReview from "./VippsServiceSettlementReview";
 import VippsFeeQueuePanel from "./VippsFeeQueuePanel";
 import VippsPayoutQueuePanel from "./VippsPayoutQueuePanel";
 import VippsBankMatchPanel from "./VippsBankMatchPanel";
@@ -217,6 +218,8 @@ export default function VippsSettlementClient(){
     Tallene nedenfor gjelder bare lagrede dager, ikke hele den valgte perioden.
    </p>}
   </div>}
+  {unit==="service"&&cacheInfo&&
+   <VippsServiceSettlementReview unit={unit} cacheInfo={cacheInfo} report={result}/>}
   <VippsReconcilePanel unit={unit} from={from} to={to}
    cacheInfo={cacheInfo} autoRunKey={reconcileAutoRunKey}/>
   <VippsBankMatchPanel unit={unit} from={from} to={to} cacheInfo={cacheInfo}/>
