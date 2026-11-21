@@ -103,7 +103,7 @@ grant select,insert,update,delete on public.quote_email_send_reviews to service_
 
 create or replace function public.release_quote_email_after_review(
  p_quote_id uuid,p_quote_number text,p_reviewer uuid,p_confirmed_not_sent boolean,p_note text
-) returns void language plpgsql security invoker set search_path='' as $
+) returns void language plpgsql security invoker set search_path='' as $$
 declare a public.quote_email_send_attempts%rowtype; v_quote_number text;
 begin
  select quote_number into v_quote_number from public.quotes where id=p_quote_id for update;
@@ -122,7 +122,7 @@ begin
  update public.quote_email_send_attempts set state='released',
   reviewed_at=now(),review_note=left(p_note,1200),updated_at=now()
  where quote_id=p_quote_id;
-end; $;
+end; $$;
 
 -- If Resend confirmed the message but the local receipt write failed,
 -- the owner can verify the Resend message ID and restore the accepted state.
@@ -130,7 +130,7 @@ end; $;
 create or replace function public.confirm_quote_provider_after_review(
  p_quote_id uuid,p_quote_number text,p_reviewer uuid,
  p_confirmed_sent boolean,p_provider_email_id text,p_note text
-) returns void language plpgsql security invoker set search_path='' as $
+) returns void language plpgsql security invoker set search_path='' as $$
 declare a public.quote_email_send_attempts%rowtype; v_quote_number text;
 begin
  select quote_number into v_quote_number from public.quotes where id=p_quote_id for update;
@@ -152,7 +152,7 @@ begin
   state='provider_accepted',provider_email_id=p_provider_email_id,
   provider_accepted_at=now(),reviewed_at=now(),review_note=left(p_note,1200),
   updated_at=now() where quote_id=p_quote_id;
-end; $;
+end; $$;
 
 -- This transaction either activates the revision AND logs the send,
 -- or leaves the provider acknowledgment for safe local recovery.
