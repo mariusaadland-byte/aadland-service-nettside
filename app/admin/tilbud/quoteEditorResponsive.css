@@ -253,6 +253,35 @@
   text-align:left;
  }
 }
+/* S-15: on iPhone landscape or with keyboard shown, keep actions reachable.
+   Only the private quote editor is affected, never customer PDFs or invoices. */
+.quoteEditorPage .quoteModalBackdrop{
+ box-sizing:border-box;
+ overflow-y:auto;
+ overscroll-behavior:contain;
+ padding:12px;
+}
+.quoteEditorPage .quoteModal{
+ box-sizing:border-box;
+ min-width:0;
+ width:min(520px,100%);
+ max-height:calc(100vh - 24px);
+ max-height:calc(100dvh - 24px);
+ overflow-y:auto;
+ overscroll-behavior:contain;
+}
+.quoteEditorPage .quoteModalActions .btn{
+ white-space:normal;
+ overflow-wrap:anywhere;
+ min-height:44px;
+}
+@media(max-width:600px){
+ .quoteEditorPage .quoteModalBackdrop{
+  padding:max(12px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px))
+          max(12px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));
+ }
+}
+
 @media print{
  .quoteEditorPage .quoteLineMarkupActions,
  .quoteEditorPage .quoteLineProfitWarning,
