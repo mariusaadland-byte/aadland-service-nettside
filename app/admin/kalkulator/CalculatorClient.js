@@ -354,7 +354,7 @@ export default function CalculatorClient(){
         Bruk bedriftens standard
        </button>
       </p>
-      {markupLoadError&&<p className={styles.catalogError} role="status">{markupLoadError} Standard 15 % vises som reserve til innstillingen kan hentes.</p>
+      {markupLoadError&&<p className={styles.catalogError} role="status">{markupLoadError} Standard 15 % vises som reserve til innstillingen kan hentes.</p>}
       <QuoteTransferPanel form={form}/>
       <details className={styles.legacyMaterialCost}><summary>Andre materialkostnader (valgfritt)</summary>
        <Field label="Beløp inkl. mva."><div className={styles.moneyInput}><span>kr</span><input inputMode="decimal" value={form.materialCost} onChange={e=>set("materialCost",e.target.value)} placeholder="0"/></div></Field>
