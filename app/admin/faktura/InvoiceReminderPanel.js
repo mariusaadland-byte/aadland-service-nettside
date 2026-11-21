@@ -4,6 +4,7 @@ import {invoicePaymentState} from "../../../lib/invoicePaymentStatus";
 import {invoiceSettlementInfo} from "../../../lib/invoiceSettlementInfo";
 import {osloDateKey} from "../../../lib/osloTime";
 import {nextInvoiceReminder,reminderDateAfter,reminderText} from "../../../lib/invoiceReminders";
+import {invoiceReminderRetryAllowed,INVOICE_REMINDER_RETRY_BLOCKED_MESSAGE} from "../../../lib/invoiceReminderRetrySafety";
 import InvoiceDebtCasePanel from "./InvoiceDebtCasePanel";
 const money=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(ore/100);
 const date=value=>value?new Date(value.length===10?value+"T12:00:00":value).toLocaleString("nb-NO",{timeZone:"Europe/Oslo",...(value.length===10?{year:"numeric",month:"2-digit",day:"2-digit"}:{dateStyle:"short",timeStyle:"short"})}):"";
@@ -13,10 +14,11 @@ export default function InvoiceReminderPanel({invoice,disabled=false,onRefresh})
  const request=useRef(null),sendingRef=useRef(false);
  const today=osloDateKey(new Date()),payment=invoicePaymentState(invoice,today),next=nextInvoiceReminder(records,today);
  const pending=next.pending,kind=next.kind||"inkasso",name=kind==="inkasso"?"Inkassovarsel":"Purring";
+ const pendingNeedsManualReview=Boolean(pending&&!invoiceReminderRetryAllowed(pending));
  const settlement=invoiceSettlementInfo(invoice,today);
  const reviewRequired=settlement.kind==="refundedOutstanding";
  const blockFollowup=settlement.kind==="activeVipps"||settlement.kind==="mismatch";
- const eligible=historyLoaded&&!loading&&["issued","sent"].includes(invoice.status)&&payment.outstanding>0&&invoice.due_date<today&&!next.done&&(!next.waitUntil||next.waitUntil<today)&&!blockFollowup;
+ const eligible=historyLoaded&&!loading&&["issued","sent"].includes(invoice.status)&&payment.outstanding>0&&invoice.due_date<today&&!next.done&&(!next.waitUntil||next.waitUntil<today)&&!blockFollowup&&!pendingNeedsManualReview;
  const preview=pending?{subject:pending.subject,body:pending.body}:reminderText(invoice,kind,dueDate||next.dueDate,payment.outstanding);
  useEffect(()=>{
   let ignore=false;setLoading(true);setHistoryLoaded(false);setRecords([]);setOpen(false);setRefundedRestReviewed(false);request.current=null;setError("");
@@ -55,10 +57,13 @@ export default function InvoiceReminderPanel({invoice,disabled=false,onRefresh})
    <strong>Kontroll før purring:</strong> {settlement.guidance}
    {blockFollowup&&" Sending er sperret inntil denne situasjonen er avklart."}
   </p>}
+  {pendingNeedsManualReview&&<p role="alert" style={{padding:12,border:"1px solid #c89d68",borderRadius:8,background:"#fff1dc",color:"#56351e"}}>
+   <strong>Uavklart tidligere utsending:</strong> {INVOICE_REMINDER_RETRY_BLOCKED_MESSAGE}
+  </p>}
   {payment.outstanding>0&&<><p>Gjenstående: <strong>{money(payment.outstanding)}</strong>. Standardtekst, egen PDF og originalfaktura følger e-posten.</p>
    {invoice.due_date>=today&&<p>Purring blir tilgjengelig etter fakturaens forfallsdato.</p>}
    {next.waitUntil&&next.waitUntil>=today&&<p>Fristen i purringen er {date(next.waitUntil)}. Inkassovarsel blir tilgjengelig etter denne datoen.</p>}
-   {next.done?<p>Inkassovarsel er sendt med frist {date(next.dueDate)}. Eventuell oversendelse til inkassobyrå håndteres manuelt når fristen er utløpt. Et omtvistet krav må avklares før videre innkreving.</p>:<button type="button" disabled={disabled||loading||sending||!eligible||!invoice.customer?.email} onClick={editReminder}>{pending?"Åpne forrige sendeforsøk":"Send "+name.toLowerCase()}</button>}
+   {next.done?<p>Inkassovarsel er sendt med frist {date(next.dueDate)}. Eventuell oversendelse til inkassobyrå håndteres manuelt når fristen er utløpt. Et omtvistet krav må avklares før videre innkreving.</p>:<button type="button" disabled={disabled||loading||sending||!eligible||!invoice.customer?.email} onClick={editReminder}>{pendingNeedsManualReview?"Kontroller gammel utsending":pending?"Åpne forrige sendeforsøk":"Send "+name.toLowerCase()}</button>}
    {!invoice.customer?.email&&<p>Kunden mangler e-postadresse.</p>}
   </>}
   {!loading&&!historyLoaded&&<button type="button" disabled={disabled||sending} onClick={()=>setHistoryRetry(n=>n+1)}>Prøv å hente purringshistorikken igjen</button>}
