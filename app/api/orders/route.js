@@ -9,6 +9,7 @@ import {buildOrderConfirmationEmail} from "../../../lib/orderConfirmationEmail";
 import {createVippsPayment} from "../../../lib/vippsClient";
 import {vippsUnitReadiness} from "../../../lib/vippsReadiness";
 import {serviceEmailFrom,serviceReplyTo} from "../../../lib/serviceEmailConfig";
+import {validateContactImageReceipts} from "../../../lib/contactImageReceipts";
 const SALES_TERMS_VERSION="2026-10";
 function num(){return "AS-"+Date.now().toString().slice(-8)+"-"+crypto.randomBytes(2).toString("hex").toUpperCase()}
 export async function POST(req){
@@ -23,6 +24,17 @@ export async function POST(req){
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return NextResponse.json({error:"Skriv inn en gyldig e-postadresse."},{status:400});
   if(body.orderType==="custom"&&!String(body.customRequest||"").trim())return NextResponse.json({error:"Beskriv hva du ønsker hjelp med."},{status:400});
   if(String(body.customRequest||"").length>12000)return NextResponse.json({error:"Forespørselen er for lang."},{status:400});
+  // An image path is a private pointer, NOT evidence that the submitter owns
+  // the file. Only one-time, server-verified receipts may attach an image.
+  if(body.orderType==="custom"&&String(body.customRequest||"").toLowerCase().includes("private-image:"))
+   return NextResponse.json({error:"Bruk bildeopplastingen for å legge ved bilder. Ikke lim inn private bildeadresser."},{status:400});
+  if(body.orderType!=="custom"&&body.imageReceipts?.length)
+   return NextResponse.json({error:"Bildekvitteringer kan bare brukes til forespørsler."},{status:400});
+  let contactImageProofs=[];
+  if(body.orderType==="custom"){
+   try{contactImageProofs=validateContactImageReceipts(body.imageReceipts??[]);}
+   catch(e){return NextResponse.json({error:e.message||"Ugyldige bilder. Last opp på nytt."},{status:400});}
+  }
   const s=db(); if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
   const requestedPaymentMethod=body.orderType==="order"&&body.paymentMethod==="vipps"?"vipps":"manual";
   if(body.orderType==="order"&&body.paymentMethod&&!["manual","vipps"].includes(body.paymentMethod))return NextResponse.json({error:"Ugyldig betalingsmåte."},{status:400});
@@ -66,7 +78,18 @@ export async function POST(req){
   const safeCustomer={name,email,phone,address,postalCode,city,note:String(body.customer?.note||"").trim().slice(0,2000)};
   const useVipps=body.orderType==="order"&&requestedPaymentMethod==="vipps";
   const record={customer_user_id:customerUserId,order_number:orderNumber,order_type:body.orderType==="custom"?"custom":"order",status:"new",customer:safeCustomer,fulfillment_type:body.fulfillmentType||"pickup",delivery_within_radius:body.fulfillmentType==="delivery"?null:false,items,custom_request:body.customRequest?String(body.customRequest).trim():null,total_ore:total,shipping_ore:shipping,payment_status:body.orderType==="order"?"pending":"unpaid",payment_provider:useVipps?"vipps":null,payment_reference:useVipps?orderNumber:null,vipps_checkout_started_at:useVipps?now:null,terms_version:body.orderType==="order"?SALES_TERMS_VERSION:null,terms_accepted_at:body.orderType==="order"?now:null};
-  if(stockRequests.length){
+  if(body.orderType==="custom"){
+   const {error:orderError}=await s.rpc("create_custom_order_with_contact_images",{
+    p_order_record:record,p_image_proofs:contactImageProofs
+   });
+   if(orderError){
+    const code=String(orderError.message||"");
+    if(/contact_image|invalid_contact_request|too_many_contact_images/i.test(code))
+     return NextResponse.json({error:"Ett eller flere bilder er utløpt, brukt tidligere eller ikke knyttet til denne opplastingen. Last opp bildene på nytt før du sender."},{status:409});
+    console.error("CUSTOM ORDER CONTACT IMAGE BIND FAILED",{code:orderError.code});
+    throw Error("CONTACT_ORDER_ATOMIC_FAILED");
+   }
+  }else if(stockRequests.length){
    const {error:orderError}=await s.rpc("create_order_with_stock",{order_record:record,stock_requests:stockRequests});
    if(orderError){
     console.error("ATOMIC ORDER ERROR",orderError);

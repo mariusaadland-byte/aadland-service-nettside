@@ -43,6 +43,10 @@
     {
       "path": "/api/cron/quote-response-confirmations",
       "schedule": "40 10 * * *"
+    },
+    {
+      "path": "/api/cron/contact-image-cleanup",
+      "schedule": "50 12 * * *"
     }
   ]
 }
