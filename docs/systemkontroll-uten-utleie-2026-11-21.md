@@ -28,6 +28,11 @@ Opprettet 21.11.2026. Løpende funnliste. **Ingen av punktene under er utbedret 
 | S-17 | P3 | Kontrolleres | Driftskontroll | Vercel viste READY og ingen aggregerte kjøretidsfeil siste 7 dager, men dette beviser ikke at planlagte jobber, e-postvarsler og fakturagenerering kjører feilfritt hver dag. Etabler oversikt over siste vellykkede kjøring, feilstilling og eieralarm. |
 | S-18 | P3 | Påvist | Kalkulator-vedlikehold | Separate standardverdier (timepris og kilometersats) og hardkodede bomtakster ligger i klientkode. Kontrollér at standardsatsene og takstene er aktuelle og at de ikke avviker fra priser/avtaler ellers i systemet; ikke endre satser uten godkjenning. |
 
+
+| S-19 | P2 | Påvist | Tilbudslenker / personvern | `lib/quoteLinks.js` oppretter en HMAC-lenke uten tidsstempel eller revokering; `GET /api/quotes/[id]` returnerer fortsatt tilbudsdetaljer med gyldig lenketoken selv etter utløpt gyldighet. Dette er ikke en gjettbar offentlig URL, men vurder tidsstyring, revokering og trygg kundehistorikk for videresendte/utgåtte lenker. |
+| S-20 | P2 | Påvist | Bekreftelse etter tilbudsaksept | Kundens godkjenning/avslag lagres før bekreftelses-e-post sendes. Koden kontrollerer ikke `Resend.errors` for disse to sendene og logger ingen varig leverings-/retry-status; feil kan bety at kunden ikke får bekreftelse selv om saken er godkjent. Legg til pålitelig varsling med idempotens, uten dobbel godkjenning. |
+| S-21 | P2 | Påvist | Kontaktbilders slettinger | `DELETE /api/contact-images` krever samme opprinnelsesdomene, men ingen bruker-/eierskapsautentisering eller kvittering for at innringer eier den private filreferansen. Kjent filreferanse kan derfor brukes til å slette bildet. Design trygg opplastingskvittering/eierbinding og tidsbegrenset opprydding uten å slette andres materiale. |
+
 ## Observasjoner som ser riktige ut
 - Siste bekreftede produksjonsdeploy var READY på revisjon 854fa0da6a54a5d39af15a10f75763d967ac68ff.
 - Ingen duplikatgrupper av faktura- eller tilbudsnummer i databasen.
@@ -35,6 +40,8 @@ Opprettet 21.11.2026. Løpende funnliste. **Ingen av punktene under er utbedret 
 - Tre av fire interne fakturaer hadde bekreftet direktekobling og sist registrert null restbeløp i Tripletex; den fjerde er tatt opp under S-08.
 - Supabase hadde RLS aktivert på samtlige undersøkte vanlige tabeller i public, og ingen public/anon-EXECUTE på undersøkte security-definer-funksjoner.
 - Original-PDF for eksterne fakturaer 10035 og 10036 er bekreftet vedlagt Tripletex-bilag.
+- Innlogging for administrator har ratebegrensning i `app/api/auth/login/route.js` (10 forsøk per 15 minutter), og publikum kan bare laste opp kontaktbilder med kontroll av type, størrelse og filsignatur.
+- Resend-kontoens aggregerte leveringsmetrikker for 01.–21.11.2026 viste 30 sendt og 30 levert, uten rapporterte bounce/feil. Dette verifiserer ikke spesifikt hver tilbudsutsending og dekker ikke uregistrerte sendeforsøk.
 - Ingen registrerte Vercel-kjøretidsfeil i siste tilgjengelige 7-dagers rapport. Ikke det samme som full funksjonstest.
 
 ## Referanser til koden
@@ -43,6 +50,7 @@ Opprettet 21.11.2026. Løpende funnliste. **Ingen av punktene under er utbedret 
 - `app/api/cron/invoice-review-alerts/route.js`, `lib/invoiceAdminAlerts.js`, `lib/invoicePaymentStatus.js`
 - `app/api/admin/invoices/tripletex/route.js`, `app/api/admin/invoices/vat-reporting-control/route.js`
 - `app/personvern/page.js`, `vercel.json`
+- `lib/quoteLinks.js`, `app/api/quotes/[id]/route.js`, `app/api/contact-images/route.js`
 - Supabase: `admin_development_tasks`, `quote_admin_preferences`, `material_suppliers`, `vat_tripletex_receipt_transfers`, `tripletex_direct_invoice_claims`.
 
 ## Neste arbeidsrunde
