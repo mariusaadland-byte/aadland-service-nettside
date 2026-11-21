@@ -68,6 +68,8 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [sendAttempt,setSendAttempt]=useState(null);
  const [canReleaseSend,setCanReleaseSend]=useState(false);
  const [sendAuditBusy,setSendAuditBusy]=useState(false);
+ const [followUpInfo,setFollowUpInfo]=useState(null);
+ const [followUpBusy,setFollowUpBusy]=useState(false);
  const sendBlocked=Boolean(sendAttempt&&["claimed","needs_review","provider_accepted","sent"].includes(sendAttempt.state));
  const [error,setError]=useState("");
  const [savedMessage,setSavedMessage]=useState("");
@@ -166,6 +168,60 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   }catch(e){setError(e.message||"Frigivelse mislyktes.")}
   finally{setSendAuditBusy(false)}
  }
+ async function refreshFollowUpInfo(){
+  if(!quoteId)return;
+  try{
+   const response=await fetch("/api/admin/quotes/followup-status?id="+encodeURIComponent(quoteId),{cache:"no-store"});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(data.error||"Kunne ikke hente status for automatisk oppfølging.");
+   setFollowUpInfo(data);
+  }catch(e){setError(e.message||"Kunne ikke hente oppfølgingsstatus.")}
+ }
+ useEffect(()=>{if(quoteId)refreshFollowUpInfo()},[quoteId]);
+
+ async function reviewAutomaticFollowUp(action){
+  if(!quoteId||!followUpInfo?.canReview||followUpBusy)return;
+  const confirmation=action==="release_unsent"?"IKKE SENDT":"BEKREFTET I RESEND";
+  let providerEmailId="";
+  if(action==="confirm_sent"){
+   providerEmailId=String(window.prompt("Kontroller at påminnelsen ER sendt i Resend. Lim inn riktig meldings-ID:")||"").trim();
+   if(providerEmailId.length<8)return;
+  }
+  if(window.prompt("Bekreft status fra Resend. Skriv "+confirmation+" for dette tilbudet:")!==confirmation)return;
+  const note=String(window.prompt("Beskriv hvordan du kontrollerte Resend-loggen (minst 12 tegn):")||"").trim();
+  if(note.length<12||note.length>1200){setError("Begrunnelsen må være mellom 12 og 1200 tegn.");return;}
+  setFollowUpBusy(true);setError("");
+  try{
+   const response=await fetch("/api/admin/quotes/followup-status",{
+    method:"PATCH",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id:quoteId,quoteNumber,action,confirmation,providerEmailId,note})
+   });
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(data.error||"Kontrollen kunne ikke lagres.");
+   setSavedMessage(action==="release_unsent"
+    ?"Kontroll loggført: Ingen e-post bekreftet. Neste automatiske kjøring kan prøve én gang, dersom tilbudet fortsatt er gyldig."
+    :"Påminnelsen er registrert som sendt, uten ny e-post.");
+   await refreshFollowUpInfo();
+  }catch(e){setError(e.message||"Påminnelsen kunne ikke oppdateres.");await refreshFollowUpInfo();}
+  finally{setFollowUpBusy(false);}
+ }
+
+ async function finishAutomaticFollowUp(){
+  if(!quoteId||followUpBusy)return;
+  setFollowUpBusy(true);setError("");
+  try{
+   const response=await fetch("/api/admin/quotes/followup-status",{
+    method:"PATCH",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id:quoteId,action:"finalize"})
+   });
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(data.error||"Kunne ikke fullføre registreringen.");
+   setSavedMessage("Tidligere bekreftet påminnelse er registrert uten å sende noen ny e-post.");
+   await refreshFollowUpInfo();
+  }catch(e){setError(e.message||"Kunne ikke fullføre registreringen.");await refreshFollowUpInfo();}
+  finally{setFollowUpBusy(false);}
+ }
+
  function changeMinimumMaterialMarkup(value){
   setMinimumMaterialMarkup(Math.max(0,Math.min(1000,Number(value)||0)));
   setMarkupPreferenceStatus("Ikke lagret");
@@ -850,6 +906,32 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      {sendAttempt.state==="provider_accepted"&&<button type="button" className="btn" disabled={sendAuditBusy} onClick={completeAcceptedSend}>Fullfør registrering uten ny e-post</button>}
      {canReleaseSend&&["claimed","needs_review"].includes(sendAttempt.state)&&<button type="button" className="btn alt" disabled={sendAuditBusy} onClick={confirmResendProviderReceipt}>Bekreft sendt hos Resend</button>}
      {canReleaseSend&&["claimed","needs_review"].includes(sendAttempt.state)&&<button type="button" className="btn alt" disabled={sendAuditBusy} onClick={releaseUnsentAfterReview}>Frigi etter bekreftet IKKE sendt</button>}
+    </div>
+   </section>}
+   {quoteId&&(v.status==="sent"||followUpInfo?.attempt)&&<section className="card" style={{margin:"12px 0",padding:18}} aria-label="Automatisk tilbudsoppfølging">
+    <strong>Automatisk oppfølging av tilbud</strong>
+    <p className="muted" style={{margin:"8px 0"}}>
+     {followUpInfo?.attempt?.state==="sent"||followUpInfo?.followUpSentAt
+       ?"Påminnelse registrert som sendt."
+       :followUpInfo?.attempt?.state==="provider_accepted"
+        ?"Resend har bekreftet påminnelsen, men status må sluttføres uten ny e-post."
+       :["claimed","needs_review"].includes(followUpInfo?.attempt?.state)
+        ?"E-poststatus er uavklart. Automatisk ny sending er sperret inntil leveringen er kontrollert."
+       :followUpInfo?.attempt?.state==="released"
+        ?"Tidligere forsøk er kontrollert som IKKE sendt. Neste planlagte kjøring kan prøve igjen hvis tilbudet fortsatt er gyldig."
+       :followUpInfo?.autoFollowUp===false
+        ?"Automatisk oppfølging er slått av for dette tilbudet."
+        :"Påminnelse kan sendes én gang automatisk etter omtrent to døgn dersom tilbudet fortsatt er gyldig og ubesvart."}
+    </p>
+    {followUpInfo?.attempt&&<p className="muted" style={{overflowWrap:"anywhere"}}>Status: {followUpInfo.attempt.state}. Mottaker: {followUpInfo.attempt.recipient}. {followUpInfo.attempt.provider_email_id&&"Resend-ID: "+followUpInfo.attempt.provider_email_id}</p>}
+    <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+     <button type="button" className="btn alt" disabled={followUpBusy} onClick={refreshFollowUpInfo}>Oppdater oppfølgingsstatus</button>
+     {followUpInfo?.canReview&&followUpInfo?.attempt?.state==="provider_accepted"&&
+      <button type="button" className="btn" disabled={followUpBusy} onClick={finishAutomaticFollowUp}>Fullfør uten ny e-post</button>}
+     {followUpInfo?.canReview&&["claimed","needs_review"].includes(followUpInfo?.attempt?.state)&&<>
+      <button type="button" className="btn alt" disabled={followUpBusy} onClick={()=>reviewAutomaticFollowUp("confirm_sent")}>Bekreft sendt hos Resend</button>
+      <button type="button" className="btn alt" disabled={followUpBusy} onClick={()=>reviewAutomaticFollowUp("release_unsent")}>Frigi etter bekreftet IKKE sendt</button>
+     </>}
     </div>
    </section>}
    <section className="card" style={{margin:"12px 0",padding:18}}>
