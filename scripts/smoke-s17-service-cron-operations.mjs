@@ -88,6 +88,14 @@ assert.ok(schedule.some(x=>x.path==="/api/cron/service-health-alerts"&&x.schedul
 for(const job of SERVICE_CRON_JOBS)assert.ok(schedule.some(x=>x.path==="/api/cron/"+job.key));
 assert.ok(schedule.some(x=>x.path==="/api/cron/rental-reminders"),"No change to rentals");
 
+const migration=read("supabase/migrations/20261121141809_service_cron_monitoring_s17.sql");
+for(const t of ["service_cron_runs","service_cron_alert_batches"]){
+ assert.ok(migration.includes("alter table public."+t+" enable row level security"));
+ assert.ok(migration.includes("revoke all on public."+t+" from public,anon,authenticated"));
+ assert.ok(migration.includes("grant select,insert,update on public."+t+" to service_role"));
+}
+assert.ok(migration.includes("constraint service_cron_finished_state"));
+assert.ok(migration.includes("constraint service_cron_alert_sent_state"));
 const alert=read("app/api/cron/service-health-alerts/route.js");
 for(const expected of ['cronGuard(req)','VERCEL_ENV!=="production"',
  '"post@aadland-service.no"','service_cron_alert_batches','idempotencyKey:"service-cron-health/"+id',
