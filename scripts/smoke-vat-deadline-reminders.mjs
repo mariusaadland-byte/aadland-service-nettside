@@ -163,6 +163,7 @@ assert.equal(sent.length,1,"Concurrent cron requests share single DB claim");
 assert.equal(concurrent.filter(x=>x.body.sent===1).length,1);
 
 const migration=read("supabase/migrations/20261121043000_vat_deadline_reminder_attempts.sql");
+assert.equal(migration.split("as "+String.fromCharCode(36,36)).length-1,5,"All SQL functions must be correctly dollar-quoted");
 for(const need of ["primary key(year,term,lead_days)","enable row level security",
  "claim_vat_deadline_reminder","provider_accepted","needs_review",
  "skip_vat_deadline_reminder_if_filed","complete_vat_deadline_reminder",
