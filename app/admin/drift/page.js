@@ -2,6 +2,7 @@ import Link from "next/link";
 import {redirect} from "next/navigation";
 import {getAdminUser} from "../../../lib/auth";
 import {db} from "../../../lib/supabase";
+import ServiceReminderReviewClient from "./ServiceReminderReviewClient";
 import {
  SERVICE_CRON_JOBS,SERVICE_CRON_FIRST_COMPLETE_DAY,serviceCronDailyStatus
 } from "../../../lib/serviceCronMonitor";
@@ -106,6 +107,7 @@ export default async function ServiceOperationsPage(){
     Overvåkingen kan ikke varsle om sitt eget bortfall når Vercel, databasen eller e-postleverandøren samtidig er nede. Ekstern oppetidskontroll og eierens kontroll av faktiske e-poster er fortsatt nødvendig.
    </p>
   </div>
+  <ServiceReminderReviewClient/>
   <p style={{marginTop:22,fontSize:14}}>
    <Link href="/admin">Tilbake til administrasjon</Link>
   </p>
