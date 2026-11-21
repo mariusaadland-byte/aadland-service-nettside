@@ -35,6 +35,15 @@ Opprettet 21.11.2026. Løpende funnliste. **Ingen av punktene under er utbedret 
 
 | S-22 | P2 | Kontrolleres | Produkter, lager og ordre | Tre produkter er aktive, men de fire registrerte produkt-/serviceordrene er alle arkivert. En avsluttet arkivordre står med `payment_status=pending`, uten registrert Vipps-innbetaling; kan være en gammel test. Kontroller full reell kjøpsflyt, reservasjon/lager, bekreftelse, levering, betaling, refusjon og historikk med testordre uten å belaste en kunde. Ikke endre arkiverte historiske oppføringer før formålet er avklart. |
 
+
+| S-23 | P1 | Påvist | Tegninger / ansattrettigheter | `POST`, `PATCH` og `DELETE /api/admin/project-drawings` bruker samme adgangsvilkår som lesing: `canManageProducts` **eller** `canViewOrders`. En fremtidig ansatt med kun visning av ordre kan dermed endre eller slette tegninger. Del lese- og skriverettigheter og test rollegrenser. De tre eksisterende administratorene har utvidede rettigheter; ingen kjent hendelse er påvist. |
+| S-24 | P2 | Påvist | Automatiske befaring-/oppstartspåminnelser | `/api/cron/survey-reminders` og `/api/cron/job-reminders` nullstiller sendemarkøren etter uavklart e-postfeil uten stabil Resend-idempotensnøkkel. En omplanlegging under jobben kan også kreve mer presis dato-/statuskontroll. Test mot simulert timeout og endret tidspunkt; ingen aktive oppdrag utløser nå disse jobbene. |
+| S-25 | P1 | Påvist | Bestillinger og lager | `POST /api/orders` genererer nytt ordrenummer for hvert forsøk og har ingen transaksjonsbasert idempotensnøkkel for klientens gjentatte forespørsel. Et dobbeltklikk, timeout eller nettverksretry kan opprette dobbel ordre/reservere lager på nytt. Behold lagertransaksjon, men legg til trygg ordre-identitet og replay-kontroll. |
+| S-26 | P1 | Påvist | Manuelt betalte produktordre | `record-paid-and-send-receipt` i `app/api/admin/orders/route.js` oppdaterer ordre til `paid` og sender kvittering uten kontroll på at ordre ikke allerede er registrert betalt, eller sikring mot et gjentatt klikk. Må verifisere betalingen og låse hendelsen idempotent uten å miste historikk. Ingen påvist dobbeltbetaling. |
+| S-27 | P2 | Påvist | Oppdragsplanlegging og e-post | `POST /api/admin/jobs/plan` lagrer ny plan **før** e-postutsending, men kan få uavklart sendestatus ved timeout eller feil når `job_confirmation_sent_at` lagres. Mangler dokumentert idempotensnøkkel. Sikre status etter retry og avtalte endringer før ny utsending. |
+| S-28 | P3 | Kontrolleres | Publisert innhold | Produksjonsdatabasen har 0 registrerte tjenester og 0 publiserte referanseprosjekter; prosjektgalleriet viser derfor «Ingen prosjekter publisert ennå». Noen tjenestesider har statisk fallback. Avklar hva som skal vises, kvalitetssikre tekst, bilder og om lenker peker til aktivt innhold. |
+| S-29 | P2 | Påvist | Kunderegistrering / e-post | `POST /api/customer/register` sletter nyopprettet Auth-bruker ved uavklart feil fra verifiserings-e-posttilbyderen. Dersom e-posten faktisk ble levert, kan kunden få bekreftelseslenke til en slettet konto. Innfør varig registrerings-/sendestatus og sikker gjenutsending fremfor destruktiv håndtering av usikre svar. |
+
 ## Observasjoner som ser riktige ut
 - Siste bekreftede produksjonsdeploy var READY på revisjon 854fa0da6a54a5d39af15a10f75763d967ac68ff.
 - Ingen duplikatgrupper av faktura- eller tilbudsnummer i databasen.
@@ -57,6 +66,11 @@ Opprettet 21.11.2026. Løpende funnliste. **Ingen av punktene under er utbedret 
 - `app/personvern/page.js`, `vercel.json`
 - `lib/quoteLinks.js`, `app/api/quotes/[id]/route.js`, `app/api/contact-images/route.js`
 - Supabase: `admin_development_tasks`, `quote_admin_preferences`, `material_suppliers`, `vat_tripletex_receipt_transfers`, `tripletex_direct_invoice_claims`.
+
+## Kontrollrunde 2 – gjennomgått 21.11.2026
+- Kartlagt alle 90 ikke-utleierelaterte administrator-API-ruter på filtre og gått gjennom konkrete endepunkter for tegninger, tjenester, prosjektgalleri, lager/ordre, kundekonto, oppdragsplan, befaring-/oppstartspåminnelser og autorisasjon. Ingen produksjonskall som sender e-post eller oppretter betaling er utført.
+- Databasen har 2 private tegninger og 0 publiserte tegninger, 4 registrerte kundeprofiler, 7 kundekontakter og 3 aktive produkter. Sikkerhetsfeilen ved tegningsrettigheter er i koden, ikke en påvist uautorisert endring.
+- De fire utstedte interne fakturaene har registrert utsendingstid, original-PDF, ikke-negative beløp og gyldige datointervaller.
 
 ## Neste arbeidsrunde
 Gjennomgå hvert funn i prioritert rekkefølge etter at kartleggingen er ferdig. Dokumenter test, utbedring, produksjonspublisering og godkjenning per ID. Hold utleie adskilt.
