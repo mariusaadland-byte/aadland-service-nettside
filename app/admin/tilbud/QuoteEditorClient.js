@@ -127,6 +127,27 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   finally{setSendAuditBusy(false)}
  }
 
+ async function confirmResendProviderReceipt(){
+  if(!quoteId||!canReleaseSend||sendAuditBusy)return;
+  const providerEmailId=window.prompt("Kontroller i Resend at e-posten ER sendt. Lim inn den bekreftede meldings-ID-en:");
+  if(!providerEmailId||providerEmailId.trim().length<8)return;
+  const confirmation=window.prompt("Skriv BEKREFTET I RESEND for å registrere mottatt e-post UTEN å sende den på nytt:");
+  if(confirmation!=="BEKREFTET I RESEND")return;
+  const note=window.prompt("Beskriv kontrollen i Resend (minst 12 tegn):");
+  if(!note||note.trim().length<12){setError("Begrunnelsen må være minst 12 tegn.");return;}
+  setSendAuditBusy(true);setError("");
+  try{
+   const response=await fetch("/api/admin/quotes/send",{method:"PATCH",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id:quoteId,action:"confirmProvider",quoteNumber,providerEmailId:providerEmailId.trim(),confirmation,note:note.trim()})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(data.error||"Kunne ikke registrere bekreftet sending.");
+   setSavedMessage("Resend-kvittering er dokumentert. Trykk Fullfør registrering uten ny e-post.");
+   await refreshSendAttempt();
+  }catch(e){setError(e.message||"Bekreftelse mislyktes.")}
+  finally{setSendAuditBusy(false)}
+ }
+
  async function releaseUnsentAfterReview(){
   if(!quoteId||!canReleaseSend||sendAuditBusy)return;
   const confirmation=window.prompt("Kontroller først i Resend at tilbudet IKKE er sendt. Skriv IKKE SENDT for å frigi et nytt sendeforsøk:");
@@ -827,6 +848,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
      <button type="button" className="btn alt" disabled={sendAuditBusy} onClick={refreshSendAttempt}>Oppdater status</button>
      {sendAttempt.state==="provider_accepted"&&<button type="button" className="btn" disabled={sendAuditBusy} onClick={completeAcceptedSend}>Fullfør registrering uten ny e-post</button>}
+     {canReleaseSend&&["claimed","needs_review"].includes(sendAttempt.state)&&<button type="button" className="btn alt" disabled={sendAuditBusy} onClick={confirmResendProviderReceipt}>Bekreft sendt hos Resend</button>}
      {canReleaseSend&&["claimed","needs_review"].includes(sendAttempt.state)&&<button type="button" className="btn alt" disabled={sendAuditBusy} onClick={releaseUnsentAfterReview}>Frigi etter bekreftet IKKE sendt</button>}
     </div>
    </section>}
