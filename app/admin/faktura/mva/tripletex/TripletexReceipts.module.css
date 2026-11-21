@@ -1,7 +1,7 @@
 .shell{display:grid;gap:20px;min-width:0;color:#24221e}
 .head h1{font-size:clamp(24px,4.5vw,33px);margin:0 0 8px;letter-spacing:-.025em}
 .head p{font-size:14px;color:#5d5850;line-height:1.6;margin:0}
-.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .stat{border-top:2px solid #d6c9b9;padding-top:8px;min-width:0}
 .stat strong{display:block;font-size:27px;letter-spacing:-.03em}
 .stat span{font-size:12px;color:#666056}
@@ -20,7 +20,7 @@
 .progress{font-size:13px;background:#f5f3ef;border-radius:9px;padding:12px;line-height:1.55}
 .error{color:#982c21;font-size:13px;font-weight:650}
 .list{display:grid;gap:0}
-.item{border-bottom:1px solid #e5e2dd;padding:12px 0;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.item{border-bottom:1px solid #e5e2dd;padding:12px 0;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px}
 .itemInfo{min-width:0;overflow-wrap:anywhere;font-size:13px}
 .itemInfo strong{display:block;font-size:14px}
 .itemInfo small{display:block;line-height:1.55;color:#676057}
