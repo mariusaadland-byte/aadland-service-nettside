@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useState} from "react";
 import {vatReportingAdvice} from "../../../../lib/vatReportingControl";
+import VatDeadlineReminderClient from "./VatDeadlineReminderClient";
 const labels=["Januar–februar","Mars–april","Mai–juni","Juli–august","September–oktober","November–desember"];
 const names={unverified:"Ikke kontrollert",not_filed:"Ikke levert (bekreftet av deg)",preparing:"Under arbeid",filed:"Levert (bekreftet av deg)"};
 const sources={owner_review:"Egen kontroll",skatteetaten:"Skatteetaten",tripletex:"Tripletex"};
@@ -85,6 +86,7 @@ export default function VatReportingControlClient({year,term,onChanged,onSelectT
  }
  return <section className="card" style={{padding:18,marginBottom:18}} id="mva-innsending">
   <h2>Registrering og oversikt over MVA-meldinger</h2>
+  <VatDeadlineReminderClient/>
   <p style={{fontSize:13}}>Her kan du holde oversikt over hvilke terminer du har levert.
    Statusene er <strong>bare dine egne notater</strong> og blir ikke hentet fra eller sendt til Skatteetaten.</p>
   {loading&&<p role="status">Henter terminhistorikk …</p>}
