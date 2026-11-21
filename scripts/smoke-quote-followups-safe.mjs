@@ -15,7 +15,8 @@ const reset=()=>{
  quote={id:quoteId,quote_number:"AS-T-S03",title:"Testoppdrag",status:"sent",
   customer:{name:"Testkunde",email:"customer@example.invalid"},
   total_inc_vat_ore:150000,valid_until:futureDate,sent_at:oldDate,
-  follow_up_sent_at:null,auto_follow_up:true,archived_at:null,issued_via:"email",paper_issued_at:null};
+  follow_up_sent_at:null,auto_follow_up:true,archived_at:null,issued_via:"email",paper_issued_at:null,
+  quote_link_generation:1,quote_link_disabled_at:null};
  attempt=null;lastSend={recipient:"customer@example.invalid",delivery_type:"primary"};
  sendCount=0;providerFails=false;ackFails=false;completionFails=false;history=[];reviews=[];
 };reset();
