@@ -101,9 +101,34 @@ export async function POST(req){
    if(orderError)throw orderError;
   }
 
-  const {data:createdOrder,error:createdOrderError}=await s.from("orders").select("id").eq("order_number",orderNumber).single();
+  const {data:createdOrder,error:createdOrderError}=await s.from("orders")
+   .select("id,payment_provider,payment_reference,vipps_checkout_started_at")
+   .eq("order_number",orderNumber).single();
   if(createdOrderError||!createdOrder?.id)throw createdOrderError||new Error("ORDER_ID_MISSING");
   const orderId=createdOrder.id;
+
+  // Stock-backed orders are written by a database RPC. Fail closed if a
+  // mismatched RPC version silently dropped payment metadata: NEVER start
+  // a Vipps payment that a later webhook cannot match to the stored order.
+  if(useVipps&&(createdOrder.payment_provider!=="vipps"||
+     createdOrder.payment_reference!==orderNumber||
+     !createdOrder.vipps_checkout_started_at)){
+   console.error("SERVICE ORDER VIPPS REFERENCE NOT PERSISTED",{orderId});
+   const cancelled=await s.rpc("cancel_product_order_once",{
+    target_order_id:orderId,customer_reason:"Vipps-referansen ble ikke lagret. Ingen betaling ble startet."
+   });
+   if(cancelled.error)console.error("SERVICE ORDER STOCK RELEASE NEEDS REVIEW",{orderId});
+   else{
+    const ack=await s.from("orders").update({
+     payment_status:"cancelled",payment_cancelled_at:new Date().toISOString(),
+     updated_at:new Date().toISOString()
+    }).eq("id",orderId);
+    if(ack.error)console.error("SERVICE ORDER PAYMENT CANCELLATION STAMP FAILED",{orderId});
+   }
+   return NextResponse.json({
+    error:"Vipps-betalingen kunne ikke startes på grunn av en intern registreringsfeil. Ingen betaling er gjennomført. Kontakt oss hvis bestillingen fortsatt vises."
+   },{status:503});
+  }
 
   let vippsRedirectUrl="";
   if(useVipps){
