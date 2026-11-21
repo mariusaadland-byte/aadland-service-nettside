@@ -1,18 +1,18 @@
 # Aadland Service – systemkontroll uten utleie
-Opprettet 21.11.2026. Løpende funnliste. **S-01 og S-02 er teknisk rettet og produksjonsverifisert, men venter på siste manuelle brukertest. S-03 er teknisk rettet og produksjonsverifisert, men venter på siste manuelle visningskontroll. S-04 til S-35 er ennå ikke utbedret.** Utleiedelen holdes utenfor. De 36 tidligere avsluttede utviklingsoppgavene beholdes uendret.
+Opprettet 21.11.2026. Løpende funnliste. **S-01 og S-02 er teknisk rettet og produksjonsverifisert, men venter på siste manuelle brukertest. S-03 er teknisk rettet og produksjonsverifisert, men venter på siste manuelle visningskontroll. S-04 er teknisk rettet og produksjonsverifisert. S-05 til S-35 er ennå ikke utbedret.** Utleiedelen holdes utenfor. De 36 tidligere avsluttede utviklingsoppgavene beholdes uendret.
 
 ## Arbeidsmåte
 - Hvert funn får en stabil ID. Nye funn føyes til denne samme filen.
 - Prioritet: **P1** = risiko for økonomifeil, dobbeltutsending eller feil regnskap; **P2** = sikkerhet, dokumentasjon eller driftssikkerhet; **P3** = forbedring/vedlikehold.
 - Dokumentasjon: **Påvist** = demonstrert ved kode eller database; **Kontrolleres** = krever reell avstemming, konfigurasjon eller brukertest. Påvist kodefeil er ikke bevis på at en kunde allerede er rammet.
-- Status: **S-01 og S-02: teknisk ferdig, produksjonsverifisert, avventer brukerens UI-godkjenning. S-03: teknisk ferdig og produksjonsverifisert, manuell UI-kontroll gjenstår.** S-04–S-35: **IKKE BEHANDLET**. Produksjonsendringer er dokumentert i utbedringsloggen nedenfor.
+- Status: **S-01 og S-02: teknisk ferdig, produksjonsverifisert, avventer brukerens UI-godkjenning. S-03: teknisk ferdig og produksjonsverifisert, manuell UI-kontroll gjenstår.** S-04: **TEKNISK RETTET, PRODUKSJONSVERIFISERT – EKTÉ INTERN VARSLING IKKE TESTET.** S-05–S-35: **IKKE BEHANDLET**. Produksjonsendringer er dokumentert i utbedringsloggen nedenfor.
 
 | ID | Prioritet | Type | Område | Funn / hva vi skal gå gjennom |
 | --- | --- | --- | --- | --- |
 | S-01 | P1 | Teknisk rettet – UI-test gjenstår | Prising og materialer | **21.11.2026:** Bedriftens 15 % er nå kilde for nye kalkyler og leverandører uten egen overstyring. Kalkulatoren beholder gamle lokale verdier uten tvangsendring, og tilbyr «Bruk bedriftens standard». Seks leverandører arver bedriftens sats i produksjonsdatabasen. Eksisterende tilbud, fakturaer og varepriser er uendret. PR #177, produksjon READY, database migrert og testet. Gjør siste praktiske nettleserkontroll før endelig godkjenning. |
 | S-02 | P1 | Teknisk rettet – UI-test gjenstår | Send tilbud | **21.11.2026:** Varig atomisk sendelås, Resend-idempotens, leverandørkvittering og transaksjonell historikk er publisert. Uavklart status sperrer nye e-poster; eier kan etter kontroll hos Resend frigjøre et ikke-sendt forsøk eller bekrefte en allerede sendt melding og fullføre uten ny utsending. Ingen faktiske kundesendinger i testene. PR #178, produksjon READY og database migrert. Manuell test gjenstår. **Bevisst endring:** automatisk «Send på nytt» for en allerede sendt versjon er sperret; kontrollert nyutsendingsarbeidsflyt ved behov vurderes særskilt. |
 | S-03 | P1 | Teknisk rettet – UI-test gjenstår | Automatiske tilbudspåminnelser | **21.11.2026:** En varig sendetilstand per tilbud, Resend-idempotensnøkkel, atomisk bekreftelse og sikker manuell kontroll er implementert. Ved uavklart e-postsvar kan ikke cron automatisk sende på nytt. Eier kan bekrefte Resend-meldings-ID eller frigjøre en dokumentert IKKE SENDT-påminnelse. Status vises inne på tilbudet. Ingen kunde-e-poster er sendt under test. PR #179, produksjonsmigrasjon gjennomført. Praktisk visningskontroll gjenstår. |
-| S-04 | P1 | Påvist | Fakturavarslinger | Daglig intern fakturaoppfølging henter ikke feltet credited_ore, selv om betalingsberegningen bruker det. Dette kan varsle om feil restkrav på kreditert faktura. Må hente og avstemme kreditnotaer/Vipps før varsel. |
+| S-04 | P1 | Teknisk rettet – praktisk varseltest gjenstår | Fakturavarslinger | **21.11.2026:** Daglig intern fakturaoversikt henter nå `credited_ore` og avstemmer dokumenterte kreditnotaer, Vipps-betalinger og refusjoner. Fullt kreditert faktura gir ikke feilaktig restkrav; ved avvik eller aktiv betaling gis tydelig kontrollvarsel, ikke sikker purringsanbefaling. Hvis avstemmingsdata er utilgjengelige stoppes jobben. PR #180, produksjon READY, tester bestått. Ingen kunde-e-post, betalingsendringer eller database-migrasjon. |
 | S-05 | P1 | Kontrolleres | Tripletex, kjøpsbilag | 18 kjøpsbilag har «accepted» ved e-postleverandør/e-bilag, men dette beviser ikke bokføring i Tripletex. Avstem dokument for dokument med faktisk bilagsnummer, MVA-kode og regnskapsført status. |
 | S-06 | P1 | Kontrolleres | MVA-terminer | Det finnes MVA-registreringsprofil, men 0 registrerte terminstatusrader i Aadland Service. Kontroller faktiske innsendte terminer hos Skatteetaten/Tripletex og registrer status manuelt uten å anta manglende innlevering. |
 | S-07 | P1 | Påvist | MVA-påminnelser | Ingen dedikert MVA-fristvarsler i vercel.json blant planlagte jobber. Må etablere korrekte varsler, deduplisering, lokale datoer og kontroll mot terminstatus før varsling. |
@@ -78,7 +78,7 @@ Opprettet 21.11.2026. Løpende funnliste. **S-01 og S-02 er teknisk rettet og pr
 
 ## Kartlegging avsluttet – 21.11.2026
 
-**Avsluttet for statisk kode- og konfigurasjonskontroll; ikke godkjent som full ende-til-ende driftstest.** S-01 og S-02 er teknisk rettet og produksjonsverifisert; S-03 er teknisk rettet og produksjonsverifisert (manuell UI-kontroll gjenstår). S-04–S-35 står fortsatt til behandling. Utleie og de 36 tidligere lukkede utviklingsoppgavene er urørt.
+**Avsluttet for statisk kode- og konfigurasjonskontroll; ikke godkjent som full ende-til-ende driftstest.** S-01 og S-02 er teknisk rettet og produksjonsverifisert; S-03 er teknisk rettet og produksjonsverifisert (manuell UI-kontroll gjenstår). S-04 er nå teknisk rettet og produksjonsverifisert, praktisk eierdigesttest gjenstår; S-05–S-35 står fortsatt til behandling. Utleie og de 36 tidligere lukkede utviklingsoppgavene er urørt.
 
 Områder dekket:
 1. Administrator-API: inventar over 90 administrative ruter uten utleie, med nærmere kontroll av sentrale lesings-, endrings- og pengetransaksjonsruter samt sikkerhet og tilgangsroller.
@@ -107,6 +107,16 @@ Rekkefølge: tilgang til tegninger (S-23), betalings/idempotens for Vipps og ord
 - De fire utstedte interne fakturaene har registrert utsendingstid, original-PDF, ikke-negative beløp og gyldige datointervaller.
 
 ## Utbedringslogg
+
+### S-04 – 21.11.2026: Teknisk ferdig og produksjonsverifisert, praktisk eierdigesttest gjenstår
+- PR: https://github.com/mariusaadland-byte/aadland-service-nettside/pull/180 ; squash main `155138ba2faff7b9da5c23ac6196340379033c2c`.
+- Vercel preview `dpl_AYHkyb9KPPLvfXxtPDUpUAGaSoq6` READY; produksjonsdeploy `dpl_H2Dmoxg9zhYLXPHKuMiGjKQpY7DV` READY. Ny test `scripts/smoke-invoice-review-reconciliation.mjs` og eksisterende bygg/tester bestått.
+- Cron `app/api/cron/invoice-review-alerts/route.js` henter nå `credited_ore` samt alle registrerte kreditnotadokumenter og Vipps-belastninger/refusjoner, med paginering og feilstopp ved manglende avstemmingskilde. Bruker samme `summarizeInvoiceActivity` og `invoiceSettlementInfo` som fakturaarkivet.
+- `lib/invoiceAdminAlerts.js` utelater fullt oppgjorte og korrekt krediterte fakturaer. Ved motstridende dokumentbeløp, aktiv Vipps eller refusjon med restkrav opprettes **internt** kontrollpunkt med teksten «Registrert restbeløp (IKKE avstemt)», ikke et bekreftet inkassokrav.
+- Tester (mock): 100 % kreditert, delkreditert, fullt betalt, ubetalt forfalt, Vipps-capture som avviker fra `paid_ore`, autorisert/åpen Vipps, refusjon med restbeløp, inkassosteg, utilgjengelige krediteringsdata og e-postsimulator. Ingen reell e-post sendt.
+- Produksjonsdatabase før endringen: 4 sendte interne fakturaer, 0 kreditnotadokumenter, 4 Vipps-betalingsposter, 0 eierbatch- eller purringshistorikkposter. Alle beløp, avtaler og databasetabeller er uendret av S-04. Ingen krediterte fakturaer var tilgjengelige for ekte ende-til-ende-test.
+- **Gjenstår:** Kontrollér et senere reelt internt eier-varsel fra den planlagte jobben når en faktura faktisk trenger oppfølging; ikke opprett falske eller juridiske kundepurringer for testing.
+
 
 ### S-03 – 21.11.2026: Teknisk ferdig og produksjonsverifisert, manuell UI-kontroll gjenstår
 - PR: https://github.com/mariusaadland-byte/aadland-service-nettside/pull/179; squash commit `d52adb1bc4cabae8096e0eb55f0330d2578b9d66`. Forhåndsvisning `dpl_2rNDeNDdxmVhsu4kyzpNeU5sV2CV` og produksjonsdeploy `dpl_BosfyyJCzUM946cQDK7nmVe5ZoS5` var READY med komplett testpakke. Også dokumentasjonsdeploy `dpl_AQcZ5WSJBktuoMZhfrDHNS58UqTe` er READY.
