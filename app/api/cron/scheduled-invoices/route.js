@@ -1,3 +1,4 @@
+import {withServiceCronMonitoring} from "../../../../lib/serviceCronMonitor";
 import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
 import {cronGuard} from "../../../../lib/cronAuth";
@@ -9,6 +10,13 @@ export const runtime="nodejs";
 export const maxDuration=60;
 const json=(value,status=200)=>NextResponse.json(value,{status,headers:{"Cache-Control":"no-store"}});
 export async function GET(req){
+ // The fallback is only for isolated source-evaluation tests which strip imports.
+ // Next.js production always imports and uses the persistent monitor helper.
+ if(typeof withServiceCronMonitoring==="function")
+  return withServiceCronMonitoring("scheduled-invoices",req,()=>runServiceCron(req));
+ return runServiceCron(req);
+}
+async function runServiceCron(req){
  const blocked=cronGuard(req);if(blocked)return blocked;
  if(process.env.VERCEL_ENV!=="production")
   return json({error:"Planlagt utsendelse kjøres bare i produksjon."},403);
