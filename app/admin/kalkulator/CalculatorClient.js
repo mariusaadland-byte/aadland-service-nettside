@@ -23,6 +23,7 @@ const DEFAULTS={
  kmRate:"5.30",
  tollPreset:"none",
  customToll:"",
+ tollSelectionExplicit:false,
  businessExVat:false
 };
 
@@ -51,6 +52,7 @@ export default function CalculatorClient(){
  const [markupLoadError,setMarkupLoadError]=useState("");
  const [copied,setCopied]=useState(false);
  const [addedNotice,setAddedNotice]=useState("");
+ const [legacyTollCleared,setLegacyTollCleared]=useState(false);
  const [catalogSuppliers,setCatalogSuppliers]=useState([]);
  const [catalogSupplier,setCatalogSupplier]=useState("byggern");
  const [materialQuery,setMaterialQuery]=useState("");
@@ -68,13 +70,25 @@ export default function CalculatorClient(){
  useEffect(()=>{
   try{
    const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||"null");
-   if(saved&&typeof saved==="object")setForm({
-    ...DEFAULTS,...saved,
-    // Old saved numbers might be intentional: never change 15 -> 20 (or 20 -> 15).
-    // Only new, company-linked calculations follow future company updates.
-    materialMarkup:String(saved.materialMarkup??DEFAULTS.materialMarkup),
-    materialMarkupSource:saved.materialMarkupSource==="company"?"company":"manual"
-   });
+   if(saved&&typeof saved==="object"){
+    // The old calculator preselected a route even with no distance.
+    // Clear only that untouched default; keep intentional selections and
+    // older calculations that have a filled-in distance.
+    const staleAutoToll=saved.tollPreset==="bergen-bjornafjorden-ordinary"&&
+     !String(saved.distanceOneWay??"").trim()&&
+     String(saved.customToll??"76.80").trim()==="76.80"&&
+     saved.tollSelectionExplicit!==true;
+    setForm({
+     ...DEFAULTS,...saved,
+     tollPreset:staleAutoToll?"none":saved.tollPreset??DEFAULTS.tollPreset,
+     tollSelectionExplicit:saved.tollSelectionExplicit===true,
+     // Old saved numbers might be intentional: never change 15 -> 20 (or 20 -> 15).
+     // Only new, company-linked calculations follow future company updates.
+     materialMarkup:String(saved.materialMarkup??DEFAULTS.materialMarkup),
+     materialMarkupSource:saved.materialMarkupSource==="company"?"company":"manual"
+    });
+    if(staleAutoToll)setLegacyTollCleared(true);
+   }
   }catch{}
   setHydrated(true);
  },[]);
@@ -147,6 +161,7 @@ export default function CalculatorClient(){
  function reset(){
   setForm({...DEFAULTS,materialMarkup:companyMarkup});
   setCopied(false);
+  setLegacyTollCleared(false);
  }
 
  function addMaterial(product){
@@ -423,10 +438,14 @@ export default function CalculatorClient(){
     <section className={styles.card}>
      <div className={styles.cardHead}><span className={styles.step}>4</span><div><h2>Bom</h2><p>Ingen bom legges til før du velger en takst eller et eget beløp. Velg etter faktisk rute og biltype.</p></div></div>
      <Field label="Bomoppsett">
-      <select value={form.tollPreset} onChange={e=>set("tollPreset",e.target.value)}>
+      <select value={form.tollPreset} onChange={e=>{
+        setForm(current=>({...current,tollPreset:e.target.value,tollSelectionExplicit:true}));
+        setLegacyTollCleared(false);
+       }}>
        {CALCULATOR_TOLL_PRESETS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}
       </select>
      </Field>
+     {legacyTollCleared&&<p role="status" className={styles.vatNote}>Tidligere ble bom lagt til automatisk før du valgte rute. Det gamle standardvalget er nå fjernet fra denne ufullstendige kalkylen. Velg bomoppsett igjen hvis du faktisk skal fakturere bom.</p>}
      {form.tollPreset==="custom"&&<Field label="Bom per vei inkl. mva">
       <div className={styles.moneyInput}><span>kr</span><input inputMode="decimal" value={form.customToll} onChange={e=>set("customToll",e.target.value)}/></div>
      </Field>}
