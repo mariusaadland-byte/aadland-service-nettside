@@ -43,9 +43,9 @@ const fetchMock=async (url,options)=>{
   return {ok:false,json:async()=>({error:"Mulig duplikat: samme kunde, dato og beløp."})};
  return {ok:true,json:async()=>({ready:true,grossOre:757500})};
 };
-const fn=new Function("busy","setBusy","setError","setMessage","setPreflightByInvoice","fetch",
+const fn=new Function("busy","setBusy","setError","setMessage","setPreflightByInvoice","fetch","directApi",
  functionSource+"\nreturn checkUntransferredInvoice;"
-)(false,v=>{isBusy=v},()=>{},()=>{},updater=>{state=updater(state)},fetchMock);
+)(false,v=>{isBusy=v},()=>{},()=>{},updater=>{state=updater(state)},fetchMock,"/api/admin/tripletex/invoices/direct");
 const row={id:invoiceId,originalNumber:"AS-WEB-2026-000004"};
 await fn(row);
 assert.equal(requests.length,1);
