@@ -66,6 +66,11 @@ const db={
      logs.push({recipient:attempt.recipient,delivery_type:attempt.delivery_type});
     }
     return {data:{state:"sent",sentAt:attempt.sent_at},error:null};
+   case "confirm_quote_provider_after_review":
+    if(!["claimed","needs_review"].includes(attempt?.state)||params.p_quote_number!=="AS-T-TEST"
+      ||params.p_confirmed_sent!==true)return {data:null,error:{message:"not allowed"}};
+    attempt.state="provider_accepted";attempt.provider_email_id=params.p_provider_email_id;
+    return {data:null,error:null};
    case "release_quote_email_after_review":
     if(params.p_confirmed_not_sent!==true||params.p_quote_number!=="AS-T-TEST")return {data:null,error:{message:"confirm"}};
     if(!["claimed","needs_review"].includes(attempt?.state))return {data:null,error:{message:"not releasable"}};
@@ -127,6 +132,20 @@ response=await api.PATCH({json:async()=>({id,action:"release",quoteNumber:"AS-T-
 assert.equal(response.status,200);
 assert.equal(attempt.state,"released");
 
+reset();sendFailure=true;
+response=await call();assert.equal(response.status,409);
+response=await api.PATCH({json:async()=>({id,action:"confirmProvider",
+ quoteNumber:"AS-T-TEST",confirmation:"BEKREFTET I RESEND",
+ providerEmailId:"resend-mock-verified-1",note:"Verified in Resend dashboard"})});
+assert.equal(response.status,200);
+assert.equal(attempt.state,"provider_accepted");
+assert.equal(sendCount,1);
+response=await api.PATCH({json:async()=>({id,action:"finalize"})});
+assert.equal(response.status,200);
+assert.equal(sendCount,1,"Manual acknowledgment cannot send again");
+assert.equal(quote.status,"sent");
+assert.equal(logs.length,1);
+
 reset();completeFailure=true;
 response=await call();
 assert.equal(response.status,503);
@@ -166,12 +185,14 @@ for(const code of [
  "insert into public.quote_send_log",
  "create or replace function public.release_quote_email_after_review",
  "create trigger guard_quote_email_dispatch_on_quotes",
- "quote_email_send_reviews"
+ "quote_email_send_reviews",
+ "confirm_quote_provider_after_review"
 ])assert.ok(migration.includes(code),"Missing critical protection: "+code);
 const editor=readFileSync("app/admin/tilbud/QuoteEditorClient.js","utf8");
 assert.ok(!source.includes('s.from("quote_send_log").insert('),"A second best-effort history write would duplicate the transactional log");
 assert.ok(editor.includes("sendBlocked"));
 assert.ok(editor.includes("Frigi etter bekreftet IKKE sendt"));
+assert.ok(editor.includes("Bekreft sendt hos Resend"));
 assert.ok(editor.includes("Fullfør registrering uten ny e-post"));
 assert.ok(!editor.includes('?"Send på nytt":"Send tilbud"'));
 console.log("S-02 bestått: én e-post, én logg, timeout-sperre, manuell kontroll, sikker gjenoppretting, preview-sperre og parallell sending.");
