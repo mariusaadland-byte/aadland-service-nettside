@@ -280,16 +280,7 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
   else drawingsPublished=true;
  }
 
- try{
-  await s.from("quote_send_log").insert({
-   quote_id:id,
-   recipient:email,
-   delivery_type:deliveryType,
-   sent_at:now
-  });
- }catch(logError){
-  console.error("QUOTE SEND LOG",logError);
- }
+ // History is committed atomically in complete_quote_email_send; never insert a duplicate log here.
 
  return NextResponse.json({ok:true,sentTo:actualRecipient,sentAt:now,deliveryType:actualDeliveryType,link,pdfAttached:true,pdfFilename:filename,drawingsPublished});
 }
