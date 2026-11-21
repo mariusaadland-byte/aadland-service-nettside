@@ -5,7 +5,7 @@ create table if not exists public.quote_email_send_attempts (
  recipient text not null check (length(recipient) between 3 and 240),
  delivery_type text not null check (delivery_type in ('primary','alternate')),
  idempotency_key text not null unique,
- state text not null default 'claimed' check (state in ('claimed','needs_review','provider_accepted','sent')),
+ state text not null default 'claimed' check (state in ('claimed','needs_review','provider_accepted','sent','released')),
  provider_email_id text,
  claimed_at timestamptz not null default now(),
  provider_accepted_at timestamptz,
@@ -40,12 +40,22 @@ begin
  select * into attempt from public.quote_email_send_attempts
  where quote_id=p_quote_id for update;
  if found then
+  if attempt.state='released' then
+   -- Only an owner-reviewed and released attempt can be retried.
+   k='quote-email-'||gen_random_uuid()::text;
+   update public.quote_email_send_attempts set
+    recipient=p_recipient,delivery_type=p_delivery_type,idempotency_key=k,
+    state='claimed',claimed_at=now(),provider_email_id=null,provider_accepted_at=null,
+    sent_at=null,last_error=null,updated_at=now()
+   where quote_id=p_quote_id;
+   return jsonb_build_object('state','claimed','idempotencyKey',k);
+  end if;
   if attempt.state='provider_accepted' then
    return jsonb_build_object('state','provider_accepted','idempotencyKey',attempt.idempotency_key);
   end if;
   raise exception 'quote_dispatch_already_claimed_%',attempt.state;
  end if;
- k='quote-email-'||p_quote_id::text;
+ k='quote-email-'||gen_random_uuid()::text;
  insert into public.quote_email_send_attempts(quote_id,recipient,delivery_type,idempotency_key)
  values (p_quote_id,p_recipient,p_delivery_type,k);
  return jsonb_build_object('state','claimed','idempotencyKey',k);
@@ -73,6 +83,46 @@ begin
  where quote_id=p_quote_id and idempotency_key=p_idempotency_key and state='claimed';
  -- Provider-accepted and sent states must never be downgraded.
 end; $$;
+
+-- This is deliberately a TWO-STEP recovery: the owner first checks
+-- the Resend dashboard and explicitly confirms NO delivery.
+-- The next manual send uses a new provider idempotency key.
+create table if not exists public.quote_email_send_reviews(
+ id uuid primary key default gen_random_uuid(),
+ quote_id uuid not null references public.quotes(id) on delete restrict,
+ previous_state text not null,
+ previous_idempotency_key text not null,
+ previous_recipient text not null,
+ reviewed_by uuid references public.admin_users(id) on delete set null,
+ review_note text not null,
+ reviewed_at timestamptz not null default now()
+);
+alter table public.quote_email_send_reviews enable row level security;
+revoke all on public.quote_email_send_reviews from public,anon,authenticated;
+grant select,insert,update,delete on public.quote_email_send_reviews to service_role;
+
+create or replace function public.release_quote_email_after_review(
+ p_quote_id uuid,p_quote_number text,p_reviewer uuid,p_confirmed_not_sent boolean,p_note text
+) returns void language plpgsql security invoker set search_path='' as $
+declare a public.quote_email_send_attempts%rowtype; number text;
+begin
+ select quote_number into number from public.quotes where id=p_quote_id for update;
+ if number is null or number<>p_quote_number or p_confirmed_not_sent is distinct from true
+ then raise exception 'quote_release_confirmation_required'; end if;
+ select * into a from public.quote_email_send_attempts
+ where quote_id=p_quote_id for update;
+ if not found or a.state not in ('claimed','needs_review')
+ then raise exception 'quote_attempt_not_releasable'; end if;
+ if a.claimed_at>now()-interval '5 minutes' then
+  raise exception 'quote_attempt_too_recent'; end if;
+ if length(btrim(coalesce(p_note,'')))<12 then raise exception 'quote_review_note_required'; end if;
+ insert into public.quote_email_send_reviews(
+  quote_id,previous_state,previous_idempotency_key,previous_recipient,reviewed_by,review_note
+ ) values (p_quote_id,a.state,a.idempotency_key,a.recipient,p_reviewer,left(p_note,1200));
+ update public.quote_email_send_attempts set state='released',
+  reviewed_at=now(),review_note=left(p_note,1200),updated_at=now()
+ where quote_id=p_quote_id;
+end; $;
 
 -- This transaction either activates the revision AND logs the send,
 -- or leaves the provider acknowledgment for safe local recovery.
@@ -127,7 +177,9 @@ revoke execute on function public.quote_email_provider_accepted(uuid,text,text) 
 revoke execute on function public.quote_email_send_uncertain(uuid,text,text) from public,anon,authenticated;
 revoke execute on function public.complete_quote_email_send(uuid,text) from public,anon,authenticated;
 revoke execute on function public.guard_quote_email_dispatch() from public,anon,authenticated;
+revoke execute on function public.release_quote_email_after_review(uuid,text,uuid,boolean,text) from public,anon,authenticated;
 grant execute on function public.claim_quote_email_send(uuid,timestamptz,text,text) to service_role;
 grant execute on function public.quote_email_provider_accepted(uuid,text,text) to service_role;
 grant execute on function public.quote_email_send_uncertain(uuid,text,text) to service_role;
 grant execute on function public.complete_quote_email_send(uuid,text) to service_role;
+grant execute on function public.release_quote_email_after_review(uuid,text,uuid,boolean,text) to service_role;
