@@ -1,16 +1,16 @@
 # Aadland Service – systemkontroll uten utleie
-Opprettet 21.11.2026. Løpende funnliste. **S-01 er teknisk rettet og produksjonsverifisert, men venter på siste manuelle kontroll av brukergrensesnittet. S-02 til S-35 er ennå ikke utbedret.** Utleiedelen holdes utenfor. De 36 tidligere avsluttede utviklingsoppgavene beholdes uendret.
+Opprettet 21.11.2026. Løpende funnliste. **S-01 og S-02 er teknisk rettet og produksjonsverifisert, men venter på siste manuelle brukertest. S-03 til S-35 er ennå ikke utbedret.** Utleiedelen holdes utenfor. De 36 tidligere avsluttede utviklingsoppgavene beholdes uendret.
 
 ## Arbeidsmåte
 - Hvert funn får en stabil ID. Nye funn føyes til denne samme filen.
 - Prioritet: **P1** = risiko for økonomifeil, dobbeltutsending eller feil regnskap; **P2** = sikkerhet, dokumentasjon eller driftssikkerhet; **P3** = forbedring/vedlikehold.
 - Dokumentasjon: **Påvist** = demonstrert ved kode eller database; **Kontrolleres** = krever reell avstemming, konfigurasjon eller brukertest. Påvist kodefeil er ikke bevis på at en kunde allerede er rammet.
-- Status: **S-01: teknisk ferdig, produksjonsverifisert, avventer brukerens UI-godkjenning.** S-02–S-35: **IKKE BEHANDLET**. Kartleggingen i seg selv endret ikke priser eller regnskap; S-01-utbedringen er dokumentert i loggen nedenfor.
+- Status: **S-01 og S-02: teknisk ferdig, produksjonsverifisert, avventer brukerens UI-godkjenning.** S-03–S-35: **IKKE BEHANDLET**. Produksjonsendringer er dokumentert i utbedringsloggen nedenfor.
 
 | ID | Prioritet | Type | Område | Funn / hva vi skal gå gjennom |
 | --- | --- | --- | --- | --- |
 | S-01 | P1 | Teknisk rettet – UI-test gjenstår | Prising og materialer | **21.11.2026:** Bedriftens 15 % er nå kilde for nye kalkyler og leverandører uten egen overstyring. Kalkulatoren beholder gamle lokale verdier uten tvangsendring, og tilbyr «Bruk bedriftens standard». Seks leverandører arver bedriftens sats i produksjonsdatabasen. Eksisterende tilbud, fakturaer og varepriser er uendret. PR #177, produksjon READY, database migrert og testet. Gjør siste praktiske nettleserkontroll før endelig godkjenning. |
-| S-02 | P1 | Påvist | Send tilbud | Vanlig tilbudsutsending sender e-post før lokal status aktiveres og bruker ikke en dokumentert Resend-idempotensnøkkel. Ved avbrutt svar kan man være usikker på om kunden fikk e-posten. Utsendingshistorikk er også «best effort». Lage robust sendelås/kvitteringsstatus og testes med simulator, ikke ekte kunder. |
+| S-02 | P1 | Teknisk rettet – UI-test gjenstår | Send tilbud | **21.11.2026:** Varig atomisk sendelås, Resend-idempotens, leverandørkvittering og transaksjonell historikk er publisert. Uavklart status sperrer nye e-poster; eier kan etter kontroll hos Resend frigjøre et ikke-sendt forsøk eller bekrefte en allerede sendt melding og fullføre uten ny utsending. Ingen faktiske kundesendinger i testene. PR #178, produksjon READY og database migrert. Manuell test gjenstår. **Bevisst endring:** automatisk «Send på nytt» for en allerede sendt versjon er sperret; kontrollert nyutsendingsarbeidsflyt ved behov vurderes særskilt. |
 | S-03 | P1 | Påvist | Automatiske tilbudspåminnelser | Ved uavklart Resend-feil nullstilles sendemarkøren, mens kallet mangler en eksplisitt idempotensnøkkel. Mulig duplisert e-post ved senere automatisk forsøk. Innføre stabil nøkkel og manuell kontroll av usikker status. |
 | S-04 | P1 | Påvist | Fakturavarslinger | Daglig intern fakturaoppfølging henter ikke feltet credited_ore, selv om betalingsberegningen bruker det. Dette kan varsle om feil restkrav på kreditert faktura. Må hente og avstemme kreditnotaer/Vipps før varsel. |
 | S-05 | P1 | Kontrolleres | Tripletex, kjøpsbilag | 18 kjøpsbilag har «accepted» ved e-postleverandør/e-bilag, men dette beviser ikke bokføring i Tripletex. Avstem dokument for dokument med faktisk bilagsnummer, MVA-kode og regnskapsført status. |
@@ -78,7 +78,7 @@ Opprettet 21.11.2026. Løpende funnliste. **S-01 er teknisk rettet og produksjon
 
 ## Kartlegging avsluttet – 21.11.2026
 
-**Avsluttet for statisk kode- og konfigurasjonskontroll; ikke godkjent som full ende-til-ende driftstest.** S-01 er nå teknisk rettet og produksjonsverifisert (manuell UI-godkjenning gjenstår); S-02–S-35 står fortsatt til behandling. Utleie og de 36 tidligere lukkede utviklingsoppgavene er urørt.
+**Avsluttet for statisk kode- og konfigurasjonskontroll; ikke godkjent som full ende-til-ende driftstest.** S-01 og S-02 er teknisk rettet og produksjonsverifisert (manuell UI-godkjenning gjenstår); S-03–S-35 står fortsatt til behandling. Utleie og de 36 tidligere lukkede utviklingsoppgavene er urørt.
 
 Områder dekket:
 1. Administrator-API: inventar over 90 administrative ruter uten utleie, med nærmere kontroll av sentrale lesings-, endrings- og pengetransaksjonsruter samt sikkerhet og tilgangsroller.
@@ -107,6 +107,16 @@ Rekkefølge: tilgang til tegninger (S-23), betalings/idempotens for Vipps og ord
 - De fire utstedte interne fakturaene har registrert utsendingstid, original-PDF, ikke-negative beløp og gyldige datointervaller.
 
 ## Utbedringslogg
+
+### S-02 – 21.11.2026: Teknisk ferdig, klar for praktisk UI-test
+- PR: https://github.com/mariusaadland-byte/aadland-service-nettside/pull/178 ; squash main `5190b6ef60ea157c1acc856b9f79480cd04e57b0`.
+- Vercel produksjonsdeploy `dpl_DYTXZn7oVVjJmHaoDhpZGVdkLSCr`: READY. Ny `scripts/smoke-quote-email-dispatch.mjs` og alle eksisterende byggerutiner passerte også i preview. Testet med mocks/simulator, **ingen ekte e-post, faktura eller betaling**.
+- Supabase-migrasjonen `quote_email_dispatch_20261121` er installert og etterkontrollert. En `quote_email_send_attempts`-rad låser første sending per versjon før providerkall. To tilstandsovergangsfunksjoner registrerer Resends kvittering og oppdaterer tilbud, aktivert revisjon og én utsendingslogg i samme transaksjon. Ingen automatisk resending etter timeout; dette gjelder selv etter at Resends 24-timers cache ville utløpt.
+- Eier kan kontrollere «IKKE SENDT» eller «BEKREFTET I RESEND» manuelt; begge krever eksplisitt bekreftelse, loggført begrunnelse og minst fem minutters avstand fra påbegynt utsending. Ingen av kontrollhandlingene sender kundemail. Manuell fullføring av bekreftet sending er tilgjengelig.
+- Databasen etter migrasjon: 0 nye sendeforsøk og 0 gjennomførte utsendinger, 5 eksisterende tilbud uendret, sikkerhetsregler på begge tabeller, trigger aktiv og `anon`/`authenticated` uten tilgang til sendefunksjonene.
+- E-post som allerede er sendt fra én versjon kan **ikke** sendes på nytt med den gamle ett-klikk-knappen. Dette er en tilsiktet sikkerhetssperre mot dobbelsending. Hvis virksomheten trenger kontrollert utsending av *samme versjon* til flere mottakere i fremtiden, må det opprettes en separat eksplisitt og revisjonssporbar nyutsendingsrutine.
+- Manuell brukergrensesnitt-test gjenstår: åpne en trygg testkladd og bekreft statuspanel, godkjent/ikke-sendt valg og lesbarhet på mobil. Test aldri med reell kundeadresse i preview; den er sperret.
+
 
 ### S-01 – 21.11.2026: Teknisk ferdig, klar for UI-godkjenning
 - PR: https://github.com/mariusaadland-byte/aadland-service-nettside/pull/177 ; squash main `06b5375c6dab78b04e632af16b092bdbff0d1f9d`.
