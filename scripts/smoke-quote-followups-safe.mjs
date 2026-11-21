@@ -201,7 +201,7 @@ r=await adminCall({action:"release_unsent",confirmation:"IKKE SENDT",note:"Verif
 assert.equal(r.status,403,"Only owner can resolve an ambiguous follow-up");
 currentUser=owner;
 
-assert.equal((migration.match(/as \${'$'}\${'$'}/g)||[]).length,5);
+assert.equal(migration.split("as $").length-1,5);
 for(const marker of [
  "quote_followup_dispatches","enable row level security","claim_quote_followup",
  "quote_followup_provider_accepted","quote_followup_uncertain",
