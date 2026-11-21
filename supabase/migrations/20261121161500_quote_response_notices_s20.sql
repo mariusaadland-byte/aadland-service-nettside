@@ -92,7 +92,87 @@ begin
  values (q.id,'owner','post@aadland-service.no',p_action);
 
  email := lower(trim(coalesce(q.customer->>'email','')));
- if email<>'' and email ~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$' then
+ if email<>'' and email ~ '^[^[:space:]@]+@[^[:space:]@]+[.][^[:space:]@]+
+  insert into public.quote_response_notifications
+   (quote_id,recipient_kind,recipient_email,action)
+  values (q.id,'customer',email,p_action);
+ end if;
+ return to_jsonb(q);
+end;
+$$;
+revoke all on function public.record_customer_quote_response(uuid,text,integer,boolean)
+ from public,anon,authenticated;
+grant execute on function public.record_customer_quote_response(uuid,text,integer,boolean)
+ to service_role;
+
+-- Manual reconciliation is required if Resend status is unknown. A release
+-- changes the idempotency key, but only after the owner checks there was NO
+-- earlier delivery and records a reason. Nothing is sent in this function.
+create function public.review_customer_quote_response_notice(
+ p_notification_id uuid,
+ p_quote_number text,
+ p_reviewer uuid,
+ p_action text,
+ p_note text,
+ p_provider_email_id text default null
+) returns jsonb
+language plpgsql security definer
+set search_path = ''
+as $$
+declare
+ n public.quote_response_notifications%rowtype;
+ actual_number text;
+ stamp timestamptz := now();
+begin
+ if p_reviewer is null or p_action not in ('confirm_sent','release_unsent')
+    or length(trim(coalesce(p_note,''))) not between 12 and 1200 then
+  raise exception 'invalid_response_notice_review';
+ end if;
+ select r.*,q.quote_number into n,actual_number
+ from public.quote_response_notifications r
+ join public.quotes q on q.id=r.quote_id
+ where r.id=p_notification_id
+ for update of r;
+ if not found or actual_number<>p_quote_number then
+  raise exception 'quote_review_mismatch';
+ end if;
+ if n.state not in ('claimed','needs_review') then
+  raise exception 'notice_not_reviewable';
+ end if;
+ if n.claimed_at is not null and n.claimed_at>stamp-interval '5 minutes' then
+  raise exception 'notice_attempt_may_be_active';
+ end if;
+ if p_action='confirm_sent' then
+  if length(trim(coalesce(p_provider_email_id,'')))<8 or
+     length(trim(coalesce(p_provider_email_id,'')))>240 then
+    raise exception 'verified_provider_id_required';
+  end if;
+  update public.quote_response_notifications
+   set state='sent',provider_email_id=trim(p_provider_email_id),
+       sent_at=stamp,updated_at=stamp,last_issue=null
+   where id=n.id;
+ else
+  if n.attempt_number>=100 then raise exception 'too_many_notice_reviews'; end if;
+  update public.quote_response_notifications
+   set state='queued',attempt_number=n.attempt_number+1,
+       claimed_at=null,released_at=stamp,provider_email_id=null,
+       sent_at=null,last_issue=null,updated_at=stamp
+   where id=n.id;
+ end if;
+ insert into public.quote_response_notification_reviews
+  (notification_id,reviewer_id,action,note,provider_email_id)
+ values
+  (n.id,p_reviewer,p_action,trim(p_note),
+   case when p_action='confirm_sent' then trim(p_provider_email_id) else null end);
+ return jsonb_build_object('ok',true,'state',
+  case when p_action='confirm_sent' then 'sent' else 'queued' end);
+end;
+$$;
+revoke all on function public.review_customer_quote_response_notice(uuid,text,uuid,text,text,text)
+ from public,anon,authenticated;
+grant execute on function public.review_customer_quote_response_notice(uuid,text,uuid,text,text,text)
+ to service_role;
+ then
   insert into public.quote_response_notifications
    (quote_id,recipient_kind,recipient_email,action)
   values (q.id,'customer',email,p_action);
