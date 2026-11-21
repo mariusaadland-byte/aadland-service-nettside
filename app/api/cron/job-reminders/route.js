@@ -6,6 +6,9 @@ import {osloDateKey,shiftDateKey,osloDayStartIso,osloDayEndIso} from "../../../.
 import {serviceEmailFrom,serviceReplyTo} from "../../../../lib/serviceEmailConfig";
 import {deliverAppointmentReminder} from "../../../../lib/serviceAppointmentReminders";
 
+export const runtime="nodejs";
+export const maxDuration=60;
+
 const MAX_PER_RUN=25;
 function esc(value){
  return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
