@@ -1,6 +1,7 @@
 import {NextResponse} from "next/server";
 import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
+import {materialMarkupOrFallback} from "../../../../lib/materialMarkupPolicy";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {materialSupplierStatuses,lookupMaterialSupplier} from "../../../../lib/materialSupplierAdapters";
 
@@ -24,7 +25,7 @@ async function supplierList(s){
  const {data:preference,error:prefError}=await s.from("quote_admin_preferences")
   .select("default_material_markup").eq("id","main").maybeSingle();
  if(prefError)return {error:prefError};
- const companyMarkup=Number(preference?.default_material_markup??15);
+ const companyMarkup=materialMarkupOrFallback(preference?.default_material_markup);
  const direct=new Map(materialSupplierStatuses().map(item=>[item.id,item]));
  const suppliers=await Promise.all((data||[]).map(async item=>{
   const countResult=await s.from("material_supplier_products").select("supplier_id",{count:"exact",head:true}).eq("supplier_id",item.id).eq("active",true);
