@@ -27,12 +27,12 @@ export default function QuoteCustomerClient({quoteId}){
  async function load(currentToken){
   setLoading(true);setError("");
   const response=await fetch("/api/quotes/"+encodeURIComponent(quoteId),{
-   headers:{"X-Quote-Token":currentToken},
+   headers:currentToken?{"X-Quote-Token":currentToken}:{},
    cache:"no-store"
   });
   const data=await response.json().catch(()=>({}));
   setLoading(false);
-  if(!response.ok){setError(data.error||"Tilbudet kunne ikke åpnes.");return;}
+  if(!response.ok){setQuote(null);setError(data.error||"Tilbudet kunne ikke åpnes.");return;}
   setQuote(data.quote);
  }
 
@@ -53,7 +53,8 @@ export default function QuoteCustomerClient({quoteId}){
 
  useEffect(()=>{
   if(!tokenReady)return;
-  if(!token){setLoading(false);setError("Tilbudslenken mangler eller er ugyldig.");return;}
+  // A valid customer session can open historical quotes without an email token.
+  // Anonymous visitors still get a server-side 403 without a valid token.
   load(token);
  },[quoteId,token,tokenReady]);
 
@@ -74,7 +75,7 @@ export default function QuoteCustomerClient({quoteId}){
  }
 
  if(loading)return <main className="customerQuoteShell"><div className="customerQuoteState">Laster tilbud …</div></main>;
- if(!quote)return <main className="customerQuoteShell"><div className="customerQuoteState"><h1>Tilbudet kunne ikke åpnes</h1><p>{error}</p><p>Kontakt Aadland Service på 471 54 898 hvis du trenger hjelp.</p></div></main>;
+ if(!quote)return <main className="customerQuoteShell"><div className="customerQuoteState"><h1>Tilbudet kunne ikke åpnes</h1><p>{error}</p><p>Du kan også <a href="/min-side">logge inn på Min side</a> for å åpne dine tidligere tilbud, eller kontakte Aadland Service på 471 54 898.</p></div></main>;
 
  const created=quote.createdAt?new Date(quote.createdAt).toLocaleDateString("nb-NO"):"";
  const valid=quote.validUntil?new Date(quote.validUntil+"T12:00:00").toLocaleDateString("nb-NO"):"";
