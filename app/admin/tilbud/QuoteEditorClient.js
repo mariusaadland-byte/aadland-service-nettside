@@ -990,7 +990,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
            const entered=line.internalUnitCostOre===""||line.internalUnitCostOre==null?null:Number(line.internalUnitCostOre);
            const changed=entered!==null&&Number.isFinite(entered)&&entered!==fresh;
            return <div className="quoteSupplierResult" key={String(product.supplierId||"supplier")+"-"+String(product.sku||product.name||index)}>
-            <div><b>{product.name}</b><small>{product.supplierName||"Leverandør"}{product.sku?" · "+product.sku:""}{product.unit?" · "+product.unit:""}</small></div>
+            <div><b>{product.name}</b><small>{product.supplierName||"Leverandør"}{product.sku?" · "+product.sku:""}{product.unit?" · "+product.unit:""}{product.priceReviewRequired?" · Eldre importpris – kontroller":""}</small></div>
             <div className="quoteSupplierPrice"><b>{nok(fresh)}</b>{changed&&<small>Registrert: {nok(entered)}</small>}</div>
             <button type="button" className="btn alt" onClick={()=>selectSupplierProduct(line,product)}>{changed?"Oppdater kostnad":"Velg kostnad"}</button>
             <button type="button" className="btn alt" disabled={Boolean(locked)} onClick={()=>updateSupplierSalePrice(line,product)}>Oppdater kostnad + salgspris</button>
