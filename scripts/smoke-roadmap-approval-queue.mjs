@@ -38,7 +38,7 @@ assert.deepEqual(Object.keys(APPROVAL_CHECKS).sort(),testIDs.slice().sort(),
  "Every development plan task currently awaiting approval must have reviewed criteria");
 for(const [id,meta] of Object.entries(APPROVAL_CHECKS)){
  assert.ok(APPROVAL_GROUPS[meta.group],"Unknown approval group "+id);
- assert.equal(meta.checks.length,3,"Each task needs three concrete verification steps: "+id);
+ assert.equal(meta.checks.length,id==="responsive"?6:3,"Responsive S-15 needs six device checks; other tasks keep three checks: "+id);
  assert.ok(meta.checks.every(t=>typeof t==="string"&&t.length>25));
  assert.ok(Number.isSafeInteger(meta.order)&&meta.order>0);
 }
