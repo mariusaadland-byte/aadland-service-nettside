@@ -37,6 +37,7 @@ create table if not exists public.vat_reporting_term_events(
  recorded_at timestamptz not null default now(),
  check (status<>'filed' or (
   filed_on is not null and verification_source in ('skatteetaten','tripletex')
+  and submission_reference is not null
   and length(btrim(submission_reference)) between 6 and 160
  ))
 );
