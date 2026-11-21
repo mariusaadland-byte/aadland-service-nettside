@@ -194,6 +194,8 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  const idempotencyKey=String(claim?.idempotencyKey||"");
  if(!idempotencyKey)return NextResponse.json({error:"Kunne ikke kontrollere unik utsending. Ingen e-post er sendt."},{status:503});
  let sentAt="";
+ const actualRecipient=claim?.state==="provider_accepted"?String(claim.recipient||email):email;
+ const actualDeliveryType=claim?.state==="provider_accepted"?String(claim.deliveryType||deliveryType):deliveryType;
  if(claim?.state==="provider_accepted"){
   // Safe recovery of a provider-accepted mail after a database error.
   // This path NEVER contacts Resend and does not transmit another email.
@@ -256,7 +258,7 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  // Never publish an attachment to a customer when this email was an admin test
  // or was delivered to any address other than the customer's own.
  let drawingsPublished=drawings.length===0;
- if(drawings.length&&deliveryType==="primary"&&customerEmail){
+ if(drawings.length&&actualDeliveryType==="primary"&&customerEmail){
   const snapshots=drawings.map(row=>({
    quote_id:quote.id,drawing_id:row.id,customer_email:customerEmail,
    name:row.name||"Tegning",address:row.address||"",
@@ -289,7 +291,7 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
   console.error("QUOTE SEND LOG",logError);
  }
 
- return NextResponse.json({ok:true,sentTo:email,sentAt:now,deliveryType,link,pdfAttached:true,pdfFilename:filename,drawingsPublished});
+ return NextResponse.json({ok:true,sentTo:actualRecipient,sentAt:now,deliveryType:actualDeliveryType,link,pdfAttached:true,pdfFilename:filename,drawingsPublished});
 }
 
 
