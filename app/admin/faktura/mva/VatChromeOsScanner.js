@@ -4,6 +4,7 @@ import styles from "./VatSimpleForm.module.css";
 
 const PAGE_CHANNEL="aadland-chromeos-page",EXT_CHANNEL="aadland-chromeos-extension";
 const ALLOWED=/^data:image\/(?:png|jpeg);base64,[a-z0-9+/=]+$/i;
+const scannerNotFound=error=>/no scanners? available|no scanners? found|no scanners? detected|ingen skannere|scanner not found/i.test(String(error||""));
 export default function VatChromeOsScanner({onScan,disabled=false}){
  const [connected,setConnected]=useState(false);
  const [working,setWorking]=useState(false);
@@ -31,7 +32,12 @@ export default function VatChromeOsScanner({onScan,disabled=false}){
       {type:image.type});
      await onScanRef.current(file);
      setMessage("Kvitteringen er lagt i køen. Legg på neste ark og skann igjen.");
-    }catch(error){setMessage(String(error?.message||"Skanningen mislyktes."));}
+    }catch(error){
+     const detail=String(error?.message||"Skanningen mislyktes.");
+     setMessage(scannerNotFound(detail)
+      ?"ChromeOS finner ingen skanner. HP Smart Tank 7005 fungerer likevel via Webscan. Trykk «Åpne Webscan på skriveren» nedenfor, skann dokumentene og velg deretter alle filene i køen."
+      :detail);
+    }
     finally{setWorking(false);}
    })();
   }
@@ -57,8 +63,9 @@ export default function VatChromeOsScanner({onScan,disabled=false}){
  return <div className={styles.scanMessage}
   style={{marginTop:12,padding:12,border:"1px solid #c1d5d1",borderRadius:12,background:"#f6faf9"}}>
   <strong>🖨️ Skann direkte fra Chromebook</strong>
-  <p>Med en liten Chrome-utvidelse kan du skanne ett ark om gangen til køen uten å gå til HPs nettside.
-   Utvidelsen bruker ChromeOS sin egen skannertilgang og trenger bare installeres én gang.</p>
+  <p>Direkte skanning bruker ChromeOS sin egen skannertilgang. Hvis ChromeOS viser
+   «No scanners available», betyr det at ChromeOS ikke oppdager HP-skanneren.
+   Da kan du bruke «Åpne Webscan på skriveren» nedenfor og fortsatt legge alle skanningene i køen.</p>
   {connected?<button type="button" className={styles.uploadAction} data-aadland-direct-scan="true"
     disabled={disabled||working} onClick={begin}>
     {working?"Skanner …":"📄 Skann neste kvittering"}
