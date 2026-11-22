@@ -18,6 +18,9 @@ const SALES_TERMS_VERSION="2026-10";
 function num(){return "AS-"+Date.now().toString().slice(-8)+"-"+crypto.randomBytes(2).toString("hex").toUpperCase()}
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;
+ // Preview may share a database or payment configuration with production.
+ // Never create real customer orders or Vipps payments from test previews.
+ if(process.env.VERCEL_ENV==="preview")return NextResponse.json({error:"Bestillinger er deaktivert i forhåndsvisning for å beskytte faktiske kundeopplysninger."},{status:403});
  const rateError=await rateLimitRequest(req,{"scope":"orders","max":15,"windowSeconds":900,"message":"For mange forespørsler på kort tid. Prøv igjen senere."}); if(rateError)return rateError;
  try{
   const body=await req.json();
