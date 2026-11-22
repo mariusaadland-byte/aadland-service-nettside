@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {getCheckoutIntent,clearCheckoutIntent} from "../lib/clientOrderIntent";
 import {safeSiteHref} from "../lib/safeUrl";
 import {osloDateKey} from "../lib/osloTime";
 import {COMPANY_ADDRESS} from "../lib/companyInfo";
@@ -59,6 +60,8 @@ export default function Home(){
  const [message,setMessage]=useState(null);
  const [error,setError]=useState("");
  const [sending,setSending]=useState(false);
+ const sendingRef=useRef(false);
+ const contactReceiptRef=useRef({signature:null,receipts:[]});
  const [contactImages,setContactImages]=useState([]);
  const [imageError,setImageError]=useState("");
  const [menuOpen,setMenuOpen]=useState(false);
@@ -128,13 +131,20 @@ export default function Home(){
  const footerServices=services.filter(service=>service.showInFooter!==false);
 
  async function customOrder(e){
-  e.preventDefault(); setError(""); setMessage(null); setSending(true);
-  let imageReceipts=[];
+  e.preventDefault();
+  if(sendingRef.current)return;
+  sendingRef.current=true;
+  setError(""); setMessage(null); setSending(true);
+  const signature=contactImages.map(f=>[f.name,f.size,f.lastModified].join(":")).join("|");
+  if(contactReceiptRef.current.signature!==signature)
+   contactReceiptRef.current={signature,receipts:[]};
+  const imageReceipts=contactReceiptRef.current.receipts;
   try{
    if(contactImages.length){
     if(contactImages.length>8)throw new Error("Du kan laste opp maks 8 bilder.");
     try{
-     for(const file of contactImages){
+     for(let index=imageReceipts.length;index<contactImages.length;index++){
+      const file=contactImages[index];
       if(file.size>4*1024*1024)throw new Error("Hvert bilde kan være maks 4 MB.");
       const formData=new FormData();
       formData.append("images",file);
@@ -156,22 +166,20 @@ export default function Home(){
    const requestBase=servicePrefix+custom;
    const requestText=requestBase;
 
+   const payload={
+    orderType:"custom",customRequest:requestText,
+    imageReceipts,customer,fulfillmentType:"pickup",
+    deliveryWithinRadius:customer.deliveryWithinRadius
+   };
+   const idempotencyKey=await getCheckoutIntent(payload,"aadland-custom-order-v1");
    let response;
    try{
     response=await fetch("/api/orders",{
-     method:"POST",
-     headers:{"Content-Type":"application/json"},
-     body:JSON.stringify({
-      orderType:"custom",
-      customRequest:requestText,
-      imageReceipts,
-      customer,
-      fulfillmentType:"pickup",
-      deliveryWithinRadius:customer.deliveryWithinRadius
-     })
+     method:"POST",headers:{"Content-Type":"application/json"},
+     body:JSON.stringify({...payload,idempotencyKey})
     });
    }catch{
-    setError("Nettverksfeil etter sending. Forespørselen kan ha blitt registrert; sjekk e-post eller Min side før du prøver igjen.");
+    setError("Nettverksfeil etter sending. Forespørselen kan være registrert. Du kan forsøke igjen med samme opplysninger og samme bildekvitteringer uten å opprette en ekstra forespørsel.");
     return;
    }
 
@@ -181,6 +189,8 @@ export default function Home(){
     return;
    }
 
+   clearCheckoutIntent("aadland-custom-order-v1");
+   contactReceiptRef.current={signature:null,receipts:[]};
    setMessage(data);setCustom("");setCustomer(customerAccount?{
     ...emptyCustomer,
     name:customerAccount.name||"",
@@ -191,6 +201,7 @@ export default function Home(){
   }catch(e){
    setError(e?.message||"Noe gikk galt. Prøv igjen.");
   }finally{
+   sendingRef.current=false;
    setSending(false);
   }
  }
