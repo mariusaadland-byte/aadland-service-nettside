@@ -9,6 +9,8 @@ export default function VatChromeOsScanner({onScan,disabled=false}){
  const [working,setWorking]=useState(false);
  const [message,setMessage]=useState("");
  const currentRef=useRef(null),sequenceRef=useRef(0);
+ const onScanRef=useRef(onScan);
+ onScanRef.current=onScan;
  useEffect(()=>{
   function receive(event){
    if(event.source!==window||event.origin!==window.location.origin||event.data?.channel!==EXT_CHANNEL)return;
@@ -27,7 +29,7 @@ export default function VatChromeOsScanner({onScan,disabled=false}){
      const ext=image.type==="image/jpeg"?"jpg":"png";
      const file=new File([image],"HP-skanning-"+new Date().toISOString().replace(/[:.]/g,"-")+"."+ext,
       {type:image.type});
-     await onScan(file);
+     await onScanRef.current(file);
      setMessage("Kvitteringen er lagt i køen. Legg på neste ark og skann igjen.");
     }catch(error){setMessage(String(error?.message||"Skanningen mislyktes."));}
     finally{setWorking(false);}
@@ -39,7 +41,7 @@ export default function VatChromeOsScanner({onScan,disabled=false}){
    window.removeEventListener("message",receive);
    if(currentRef.current){clearTimeout(currentRef.current.timer);currentRef.current=null;}
   };
- },[onScan]);
+ },[]);
  function begin(){
   if(!connected||disabled||working)return;
   const id=++sequenceRef.current;
