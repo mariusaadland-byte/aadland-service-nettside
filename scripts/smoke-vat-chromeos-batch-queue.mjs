@@ -40,7 +40,7 @@ assert.ok(scanner.includes('void chooseSource(queuedSelection.file,{queueId:queu
 assert.ok(scanner.includes("await prepareReceiptFile(source,setProgress)"));
 assert.ok(scanner.includes('if(meta.queueId)onSelected(null,{queueId:meta.queueId});else onSelected(null)'));
 assert.ok(bridgeUi.includes('data-aadland-direct-scan="true"'));
-assert.ok(bridgeUi.includes("onScan(file)"));
+assert.ok(bridgeUi.includes("onScanRef.current(file)"));
 assert.ok(bridgeUi.includes("Utvidelsen er ikke koblet til"));
 assert.ok(bridgeUi.includes("Skann neste kvittering"));
 console.log("ChromeOS skannekø: kildefiler, ChromeOS-utvidelse, installasjon, kontroll per bilag og vedleggsperre OK.");
