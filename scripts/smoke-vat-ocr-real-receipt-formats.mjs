@@ -51,11 +51,11 @@ const noExplicitVat=parser("TEST BUTIKK\nKvitt.nr.: 2222\n27.10.2026\nKABEL 100,
 assert.deepEqual(noExplicitVat.groups,{},"Cannot invent a VAT rate from gross alone");
 
 const scanner=read("app/admin/faktura/mva/VatReceiptScanner.js");
-assert.ok(scanner.includes("Test tekstleseren på denne telefonen"));
+assert.ok(scanner.includes("Test tekstleseren på denne enheten"));
 assert.ok(scanner.includes("async function testReader()"));
 assert.ok(scanner.includes("canvas.toBlob(resolve,\"image/jpeg\",.92)"));
 assert.ok(scanner.includes("readLocalReceipt(file,message=>setDiagnostic"));
-assert.ok(scanner.includes("Ingen kvittering, regnskapsdata eller bilder sendes"));
+assert.ok(scanner.includes("Ingen kvittering eller regnskapsdata lastes opp under denne testen"));
 assert.ok(scanner.includes("async function retryRead(noAutoCrop=false)"));
 assert.ok(scanner.includes("Juster utsnitt og les på nytt"));
 assert.ok(scanner.includes('"Fant "+details.detectedFields'));
