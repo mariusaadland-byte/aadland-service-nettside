@@ -16,7 +16,7 @@ assert.ok(ui.includes("window.localStorage.setItem(KEY,ip.trim())"));
 assert.ok(ui.includes('window.open(address,"_blank","noopener,noreferrer")'),"Open local EWS with no opener access");
 assert.ok(!ui.includes("fetch(")&&!ui.includes("XMLHttpRequest")&&!ui.includes("document.cookie"));
 assert.ok(ui.includes("Webscan")&&ui.includes("Skann")&&ui.includes("Sikkerhet"));
-assert.ok(ui.includes("kan ikke hente resultatet")&&ui.includes("velger skannefilen"));
+assert.ok(ui.includes("kan ikke hente skanninger")&&ui.includes("Velg mange PDF-er / bilder"));
 assert.ok(scanner.includes('import VatPrinterWebscan from "./VatPrinterWebscan";'));
 assert.ok(scanner.includes('<VatPrinterWebscan disabled={disabled||busy||Boolean(cropJob)}/>'));
 console.log("HP Webscan: kun privat lokal IP, nettleserfanen åpnes trygt, husker adresse lokalt og ingen automatisk regnskapslagring.");

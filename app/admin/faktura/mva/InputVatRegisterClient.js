@@ -3,6 +3,7 @@ import {useEffect,useRef,useState} from "react";
 import VatOriginalAttachment from "./VatOriginalAttachment";
 import VatReceiptScanner from "./VatReceiptScanner";
 import VatChromeOsScanner from "./VatChromeOsScanner";
+import VatPrinterWebscan from "./VatPrinterWebscan";
 import VatInvoicePdfViewer from "./VatInvoicePdfViewer";
 import VatDuplicateOriginalPreview from "./VatDuplicateOriginalPreview";
 import styles from "./VatSimpleForm.module.css";
@@ -386,6 +387,8 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
      disabled={busy||scanBusy||Boolean(attachmentIssue)} onChange={importBatch}/>
    </label>
    <VatChromeOsScanner onScan={async file=>addBatchReceipts([file])}
+    disabled={busy||Boolean(attachmentIssue)}/>
+   <VatPrinterWebscan compact initialIp="10.0.0.24"
     disabled={busy||Boolean(attachmentIssue)}/>
    <p style={{fontSize:12}}>Køen oppbevares bare på denne fanen mens den er åpen. Ikke oppdater eller lukk siden
     før du har registrert bilagene eller beholdt originalfilene i Nedlastinger. Ingenting bokføres automatisk.</p>
