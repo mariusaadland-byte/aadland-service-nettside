@@ -42,7 +42,9 @@ export default function InvoiceVatTermClient(){
  const parameters=new URLSearchParams({year:chosen.year,term:chosen.term});
  const query=parameters.toString(),url="/api/admin/invoices/vat-terms?"+query;
  useEffect(()=>{
-  let active=true;setLoading(true);setError("");setReport(null);
+  let active=true;setLoading(true);setError("");
+  // Keep the prior report tree mounted during refresh so an in-progress
+  // receipt batch does not lose its files after each saved document.
   fetch(url,{cache:"no-store"}).then(async r=>{
    const d=await r.json();if(!r.ok)throw Error(d.error||"MVA-avstemmingen kunne ikke hentes.");
    if(active)setReport(d);
@@ -93,7 +95,7 @@ export default function InvoiceVatTermClient(){
   </details>
   {loading&&<p role="status">Kontrollerer alle fakturaer og kreditnotaer i terminen …</p>}
   {error&&<p role="alert" style={{color:"#a52a21"}}>{error} Rapporttall vises ikke hvis grunnlaget er ufullstendig.</p>}
-  {report&&!loading&&<>
+  {report&&<div hidden={loading||Boolean(error)}>
    {view!=="overview"&&<VatQuickBalance report={report} settlement={settlement}
     onDetails={()=>showView("overview")} onRefresh={()=>setReload(n=>n+1)}/>}
    {view==="overview"&&<>
@@ -246,6 +248,6 @@ export default function InvoiceVatTermClient(){
       </tr>)}</tbody>
      </table></div>}
    </section>}
-  </>}
+  </div>}
  </main>;
 }
