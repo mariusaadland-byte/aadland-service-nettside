@@ -70,7 +70,7 @@ export async function GET(req){
    title:loaded.quote.title||"Oppdrag",
    earliestStartDate:loaded.quote.planned_start_date||null
   }:null
- }});
+ },canReview:user.role==="owner"});
 }
 
 async function jobDelivery(s,id,revision,previousSentAt){
@@ -203,11 +203,11 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  const preflight=await loadJob(s,id);
  if(preflight.error){
   await holdAttempt(s,attempt.id,"preflight_unavailable");
-  return NextResponse.json({error:"Planen kunne ikke kontrolles på nytt. Utsending er sperret for sikkerhets skyld."},{status:409});
+  return NextResponse.json({error:"Planen kunne ikke kontrolleres på nytt. Utsending er sperret for sikkerhets skyld."},{status:409});
  }
  const now=preflight.order;
  if(now.job_plan_revision!==saved.revision||
-  now.job_start_at!==saved.data.job_start_at||
+  Number(new Date(now.job_start_at))!==Number(new Date(saved.data.job_start_at))||
   clean(now.job_customer_agreement,8000)!==agreement||
   clean(now.customer?.email,254).toLowerCase()!==email||
   now.status!=="confirmed"||now.archived_at){
