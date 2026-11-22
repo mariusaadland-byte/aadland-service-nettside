@@ -50,10 +50,10 @@ assert.ok(css.includes('safe-area-inset-top')&&css.includes('safe-area-inset-bot
  "Place viewer controls outside the iPhone notch/home bar");
 assert.ok(css.includes('.pdfViewerScroll')&&css.includes('overflow:auto'),
  "Allow reading/scanning long PDF pages by scrolling");
-assert.ok(scanner.includes('pageCount=Math.min(document.numPages,3)'),
- "OCR existing PDF extraction automatically covers one or two pages");
-assert.ok(scanner.includes('Math.min(document.numPages,2)'),
- "Scanned single- or two-page PDFs use existing image OCR fallback");
+assert.ok(scanner.includes('pageCount=Math.min(document.numPages,8)'),
+ "OCR existing PDF extraction automatically covers up to eight pages");
+assert.ok(scanner.includes('for(let i=1;i<=pageCount;i++)'),
+ "Scanned multi-page PDFs use image OCR fallback for every supported page");
 assert.ok(scanner.includes('accept=".pdf,.jpg,.jpeg,.png'),
  "Files from iPhone can be uploaded without printing or taking a photo");
 assert.ok(alreadyTests.includes('Norske leverandørfakturaer'),
