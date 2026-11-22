@@ -162,7 +162,8 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   if(open.length+files.length>BATCH_MAX_FILES)
    throw Error("Maks "+BATCH_MAX_FILES+" uregistrerte bilag i skannekøen.");
   if(files.some(file=>!BATCH_ACCEPTED.test(file.name||"")||
-   (file.type==="application/pdf"?file.size>BATCH_MAX_PDF_BYTES:file.size>BATCH_MAX_IMAGE_BYTES)||
+   (file.type==="application/pdf"||/\.pdf$/i.test(file.name||"")
+    ?file.size>BATCH_MAX_PDF_BYTES:file.size>BATCH_MAX_IMAGE_BYTES)||
    file.size<=0))
    throw Error("Bruk PDF (maks 4 MB) eller JPG/PNG/WebP/HEIC (maks 25 MB) per bilag.");
   const total=open.reduce((sum,item)=>sum+(item.file?.size||0),0)+
