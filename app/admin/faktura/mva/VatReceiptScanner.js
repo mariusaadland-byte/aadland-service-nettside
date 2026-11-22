@@ -359,21 +359,23 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
    </label>
   </div>}
   {!multiMode&&<details className={styles.scanHelp} style={{padding:"12px 0"}}>
-   <summary>🖨️ Importer fra skriver/skanner på PC</summary>
-   <p>Med HP DeskJet 4510: Åpne HPs skanneprogram på PC-en, legg kvitteringen på skannerglasset,
-    velg Skann og lagre som PDF. For flere sider i samme faktura, legg til sidene før du lagrer
-    én samlet PDF. Gjenta for neste kvittering eller faktura.</p>
-   <p>Etter at PDF-en er lagret på PC-en, trykk under for å hente den inn.
-    Aadland Service leser teksten automatisk, men du kontrollerer beløp og MVA før registrering.</p>
+   <summary>🖨️ Importer fra HP Smart Tank 7005</summary>
+   <p>Bruk skannerglasset på HP Smart Tank 7005. Åpne HP-appen (tidligere HP Smart)
+    på mobilen eller PC-en, velg skanning fra skriver, og skann første side.</p>
+   <p>Skanneren har ikke automatisk arkmater. Legg neste ark på glasset og velg
+    Legg til side i HP-appen dersom dokumentet har flere sider. Lagre som én PDF
+    når alle sidene i samme kvittering/faktura er skannet.</p>
+   <p>Velg den lagrede PDF-en nedenfor. Aadland Service foreslår leverandør,
+    dato, beløp og MVA, som du kontrollerer før bilaget registreres.</p>
    <label className={styles.uploadAction} style={{marginTop:10,maxWidth:360}}>
-    📄 Velg skannet PDF fra PC
-    <input aria-label="Importer skannet PDF eller bilde fra skriver på PC"
+    📄 Velg PDF fra HP-skanneren
+    <input aria-label="Importer skannet PDF eller bilde fra HP Smart Tank 7005"
      type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
      disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
    </label>
-   <p style={{fontSize:12}}>Lagre én fil per bilag, gjerne i gråtoner ved omtrent 200 dpi.
-    Maks 4 MB per PDF. Det er ikke nødvendig å laste opp sidene enkeltvis dersom de tilhører samme bilag.
-    Nettleseren kan ikke starte den fysiske skanneren direkte uten et eget program på PC-en.</p>
+   <p style={{fontSize:12}}>Lagre én PDF per bilag, gjerne i gråtoner og ca. 200 dpi.
+    PDF maks 4 MB; opptil åtte sider tekstleses. Nettleseren kan ikke starte
+    skanneren direkte uten en egen lokal skannerintegrasjon.</p>
   </details>}
   {!multiMode&&!liveCamera&&<label className={styles.nativeCameraLink}>Bruk vanlig kamera
    <input aria-label="Ta bilde av kvittering" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"
