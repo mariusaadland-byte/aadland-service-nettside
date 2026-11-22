@@ -1353,28 +1353,75 @@ function Orders({ orders, status, canUpdateOrders, isOwner=false, reload }) {
   if(typeof reload==="function")await reload();
  }
  async function registerPayment(order){
-  if(order.orderType==="custom")return;
-  const reference=document.getElementById("payment-reference-"+order.id)?.value||order.paymentReference||"";
-  const alreadyPaid=order.paymentStatus==="paid";
-  const prompt=alreadyPaid
-   ?"Sende betalingsbekreftelsen på nytt til "+order.customerEmail+"?"
-   :"Registrere "+nok(order.totalOre||0)+" som fullt betalt og sende betalingsbekreftelse til "+order.customerEmail+"?";
-  if(!window.confirm(prompt))return;
-  setSavingId(order.id);setMessage("");
-  const response=await fetch("/api/admin/orders",{
-   method:"PATCH",
-   headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({id:order.id,action:"record-paid-and-send-receipt",paymentReference:reference})
-  });
-  const data=await response.json().catch(()=>({}));
-  setSavingId(null);
-  if(!response.ok){
-   setMessage(data.error||"Betalingen kunne ikke registreres.");
-   if(data.statusSaved&&typeof reload==="function")await reload();
-   return;
+  if(order.orderType==="custom"||String(order.paymentProvider||"").toLowerCase()==="vipps")return;
+  if(["paid","refunded","partial","authorized"].includes(String(order.paymentStatus||""))||
+   Number(order.paymentCapturedOre||0)>0||Number(order.paymentRefundedOre||0)>0){
+   setMessage("Betalingen er allerede registrert eller må avstemmes. Ingen ny kvittering er sendt.");return;
   }
-  setMessage((alreadyPaid?"Betalingsbekreftelsen er sendt på nytt til ":"Betalingen er registrert og betalingsbekreftelsen er sendt til ")+(data.sentTo||order.customerEmail)+".");
-  if(typeof reload==="function")await reload();
+  const reference=(document.getElementById("payment-reference-"+order.id)?.value||"").trim();
+  if(reference.length<3){setMessage("Oppgi betalingsreferanse eller dokumentert betalingsmåte (minst 3 tegn).");return;}
+  if(!window.confirm("Har du kontrollert bank, kontantoppgjør eller annen dokumentasjon for at "+
+   nok(order.totalOre||0)+" faktisk er mottatt på "+order.orderNumber+"?"))return;
+  if(window.prompt("Skriv BETALING MOTTATT for å bekrefte den kontrollerte innbetalingen:")!=="BETALING MOTTATT")return;
+  setSavingId(order.id);setMessage("");
+  try{
+   const response=await fetch("/api/admin/orders",{
+    method:"PATCH",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id:order.id,action:"record-paid-and-send-receipt",
+     paymentReference:reference,paymentVerified:true})
+   });
+   const data=await response.json().catch(()=>({}));
+   setMessage(data.message||data.error||"Betalingsstatus er uavklart.");
+   if(typeof reload==="function")await reload();
+  }catch{
+   setMessage("Nettverksfeil. Betalingen kan allerede være registrert. Oppdater ordren før videre handling.");
+   if(typeof reload==="function")await reload();
+  }finally{setSavingId(null);}
+ }
+ async function sendQueuedManualReceipt(order){
+  if(order.manualReceiptState!=="queued")return;
+  if(!window.confirm("Send en kvittering som aldri før er forsøkt sendt til "+
+   order.customerEmail+"? Dette registrerer IKKE ny betaling."))return;
+  setSavingId(order.id);setMessage("");
+  try{
+   const response=await fetch("/api/admin/orders",{
+    method:"PATCH",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id:order.id,action:"send-queued-manual-receipt"})
+   });
+   const data=await response.json().catch(()=>({}));
+   setMessage(data.message||data.error||"Kvitteringsstatus kunne ikke kontrolleres.");
+   if(typeof reload==="function")await reload();
+  }catch{
+   setMessage("Nettverksfeil. Kvitteringen kan allerede være sendt. Kontroller Resend før ny handling.");
+   if(typeof reload==="function")await reload();
+  }finally{setSavingId(null);}
+ }
+ async function reviewManualReceipt(order,result){
+  if(!isOwner||!["sending","needs_review"].includes(String(order.manualReceiptState||"")))return;
+  const phrase=result==="sent"?"BEKREFTET I RESEND":"IKKE SENDT";
+  const explanation=result==="sent"?
+   "Kontroller i Resend at DENNE kvitteringen ble akseptert. Skriv BEKREFTET I RESEND:":
+   "Kontroller i Resend at kvitteringen IKKE ble akseptert. Skriv IKKE SENDT. Det blir ikke sendt noen ny e-post:";
+  if(window.prompt(explanation)!==phrase)return;
+  const resendId=result==="sent"?(window.prompt("Skriv nøyaktig meldings-ID fra Resend:")||"").trim():"";
+  if(result==="sent"&&resendId.length<8){setMessage("Du må oppgi faktisk Resend-ID.");return;}
+  const note=(window.prompt("Skriv hva du fant i Resend og tidspunktet du kontrollerte (minst 12 tegn):")||"").trim();
+  if(note.length<12){setMessage("Skriv en konkret kontrollmerknad på minst 12 tegn.");return;}
+  setSavingId(order.id);setMessage("");
+  try{
+   const response=await fetch("/api/admin/orders",{
+    method:"PATCH",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id:order.id,action:"review-manual-receipt",
+     receiptReviewResult:result,receiptReviewConfirmation:phrase,
+     receiptReviewNote:note,receiptReviewProviderId:resendId})
+   });
+   const data=await response.json().catch(()=>({}));
+   setMessage(data.message||data.error||"Kunne ikke avstemme kvitteringen.");
+   if(typeof reload==="function")await reload();
+  }catch{
+   setMessage("Nettverksfeil under avstemming. Oppdater status før du prøver igjen.");
+   if(typeof reload==="function")await reload();
+  }finally{setSavingId(null);}
  }
  async function vippsOrderAction(order,action){
   const reference=String(order.paymentReference||order.orderNumber||"").trim();
@@ -1493,8 +1540,15 @@ function Orders({ orders, status, canUpdateOrders, isOwner=false, reload }) {
      {order.paymentStatus==="authorized"&&Number(order.paymentReservedOre||0)>Number(order.paymentCapturedOre||0)&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>vippsOrderAction(order,"cancel")}>Kanseller reservasjon</button>}
      {Number(order.paymentCapturedOre||0)>Number(order.paymentRefundedOre||0)&&<button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>vippsOrderAction(order,"refund")}>Refunder via Vipps</button>}
     </div>}
-    {String(order.paymentProvider||"").toLowerCase()!=="vipps"&&<div className="field"><label>Betalingsreferanse <span className="muted">(f.eks. bank, kontant eller annen manuell betaling)</span></label><input id={"payment-reference-"+order.id} defaultValue={order.paymentReference||""} maxLength={120} placeholder="Valgfri referanse"/></div>}
-    {String(order.paymentProvider||"").toLowerCase()!=="vipps"&&canUpdateOrders&&order.paymentStatus!=="refunded"&&Number(order.paymentRefundedOre||0)===0&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>registerPayment(order)}>{savingId===order.id?"Sender …":order.paymentStatus==="paid"?"Send betalingsbekreftelse på nytt":"Registrer betalt + send bekreftelse"}</button>}
+    {String(order.paymentProvider||"").toLowerCase()!=="vipps"&&["pending","unpaid"].includes(String(order.paymentStatus||""))&&<div className="field"><label>Betalingsreferanse <span className="muted">(obligatorisk: bankreferanse, kontantoppgjør eller annen dokumentert betaling)</span></label><input id={"payment-reference-"+order.id} defaultValue={order.paymentReference||""} maxLength={120} placeholder="Referanse eller kontrollert kontantbetaling"/></div>}
+    {String(order.paymentProvider||"").toLowerCase()!=="vipps"&&canUpdateOrders&&["pending","unpaid"].includes(String(order.paymentStatus||""))&&Number(order.paymentCapturedOre||0)===0&&Number(order.paymentRefundedOre||0)===0&&!order.archivedAt&&order.status!=="cancelled"&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>registerPayment(order)}>{savingId===order.id?"Registrerer …":"Kontroller og registrer betalt én gang"}</button>}
+    {String(order.paymentProvider||"").toLowerCase()!=="vipps"&&order.manualReceiptState&&<p className="muted"><b>Manuell kvittering:</b> {order.manualReceiptState==="queued"?"Betalingen er registrert. Kvittering ennå ikke forsøkt sendt.":order.manualReceiptState==="sent"?"Resend aksepterte e-posten.":order.manualReceiptState==="reviewed_sent"?"Sendestatus bekreftet manuelt.":order.manualReceiptState==="reviewed_unsent"?"Manuelt bekreftet: ikke sendt.":"Uavklart sendestatus – kontroller Resend; ingen automatisk ny utsending."}{order.manualReceiptProviderId?" · Meldings-ID: "+order.manualReceiptProviderId:""}</p>}
+    {String(order.paymentProvider||"").toLowerCase()!=="vipps"&&canUpdateOrders&&order.manualReceiptState==="queued"&&<button className="btn alt" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>sendQueuedManualReceipt(order)}>{savingId===order.id?"Kontrollerer …":"Send kvittering som aldri er forsøkt sendt"}</button>}
+    {String(order.paymentProvider||"").toLowerCase()!=="vipps"&&isOwner&&["sending","needs_review"].includes(String(order.manualReceiptState||""))&&<div className="orderActions">
+     <button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>reviewManualReceipt(order,"sent")}>{savingId===order.id?"Kontrollerer …":"Bekreft Resend-ID etter kontroll"}</button>
+     <button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>reviewManualReceipt(order,"unsent")}>{savingId===order.id?"Kontrollerer …":"Bekreft ikke sendt etter kontroll"}</button>
+    </div>}
+    {String(order.paymentProvider||"").toLowerCase()!=="vipps"&&order.paymentStatus==="paid"&&!order.manualReceiptState&&<p className="notice"><b>Historisk betaling uten kvitteringsjournal:</b> Kontroller bank og Resend manuelt; ingen automatisk ny utsending.</p>}
     {Number(order.paymentCapturedOre)>Number(order.paymentRefundedOre||0)&&String(order.paymentProvider||"").toLowerCase()!=="vipps"&&<div className="orderRefundPanel">
      <h4>Tilbakebetaling</h4>
      <p className="muted">Gjenstår å kunne tilbakebetale: <b>{nok(Math.max(0,Number(order.paymentCapturedOre||0)-Number(order.paymentRefundedOre||0)))}</b></p>

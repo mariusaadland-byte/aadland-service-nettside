@@ -13,6 +13,7 @@ import {sendOrderStatusNotice} from "../../../../lib/orderStatusNotice";
 import {sendProductOrderProgressNotice} from "../../../../lib/orderProgressNotice";
 import {sendManualOrderRefundNotice} from "../../../../lib/orderRefundNotice";
 import {serviceEmailFrom,serviceReplyTo} from "../../../../lib/serviceEmailConfig";
+import {sendManualProductReceiptOnce} from "../../../../lib/manualProductReceiptOnce";
 
 function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
 
@@ -126,6 +127,7 @@ export async function GET() {
   const orderRows=data||[];
   const orderIds=orderRows.map(order=>order.id);
   const quoteByOrder=new Map();
+  const manualReceiptByOrder=new Map();
 
   if(orderIds.length){
     const {data:linkedQuotes,error:quoteError}=await s
@@ -142,12 +144,27 @@ export async function GET() {
     }
   }
 
+  if(orderIds.length){
+    const {data:paymentReceipts,error:receiptError}=await s.from("manual_order_payment_receipts")
+      .select("order_id,receipt_state,provider_email_id,last_issue,paid_at,sent_at")
+      .in("order_id",orderIds);
+    if(!receiptError)for(const receipt of paymentReceipts||[])manualReceiptByOrder.set(receipt.order_id,receipt);
+    else console.error("MANUAL PRODUCT RECEIPT LIST ERROR",{code:receiptError.code});
+  }
   return NextResponse.json({
     orders: await Promise.all(orderRows.map(async order=>{
       const mapped=mapOrder(order);
       const privateData=await privateImages(s,mapped.customRequest);
       mapped.customRequest=privateData.text;
       mapped.contactImages=privateData.images;
+      const manualReceipt=manualReceiptByOrder.get(order.id);
+      if(manualReceipt){
+        mapped.manualReceiptState=manualReceipt.receipt_state||"";
+        mapped.manualReceiptProviderId=manualReceipt.provider_email_id||"";
+        mapped.manualReceiptIssue=manualReceipt.last_issue||"";
+        mapped.manualReceiptPaidAt=manualReceipt.paid_at||null;
+        mapped.manualReceiptSentAt=manualReceipt.sent_at||null;
+      }
       const quote=quoteByOrder.get(order.id);
       if(quote){
         mapped.sourceQuoteId=quote.id;
@@ -181,7 +198,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     );
   }
 
-  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, cancellationReason, progressStatus, refundOre, refundReference, refundNote, deliveryWithinRadius, cleanupConfirmation } = await req.json();
+  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, paymentVerified, receiptReviewResult, receiptReviewNote, receiptReviewProviderId, receiptReviewConfirmation, cancellationReason, progressStatus, refundOre, refundReference, refundNote, deliveryWithinRadius, cleanupConfirmation } = await req.json();
   if(adminNote!==undefined&&String(adminNote||"").length>5000)return NextResponse.json({error:"Internt notat kan være maks 5000 tegn."},{status:400});
   if(paymentReference!==undefined&&String(paymentReference||"").length>120)return NextResponse.json({error:"Betalingsreferansen er for lang."},{status:400});
   if(cancellationReason!==undefined&&String(cancellationReason||"").length>1000)return NextResponse.json({error:"Kanselleringsårsaken kan være maks 1000 tegn."},{status:400});
@@ -568,119 +585,89 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     }
   }
 
-  if(action==="record-paid-and-send-receipt"){
-    const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
-    if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
-    if(order.order_type==="custom")return NextResponse.json({error:"Denne betalingsflyten gjelder produktbestillinger."},{status:400});
-    if((Number(order.payment_refunded_ore)||0)>0)return NextResponse.json({error:"Denne betalingen har allerede en registrert tilbakebetaling. Bruk tilbakebetalingsbekreftelsen i stedet."},{status:409});
-    const email=String(order.customer?.email||"").trim().toLowerCase();
-    if(!email)return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
-    const total=Math.max(0,Number(order.total_ore)||0);
-    if(total<=0)return NextResponse.json({error:"Bestillingen har ikke et gyldig beløp."},{status:400});
-    const reference=String(paymentReference??order.payment_reference??"").trim()||"Manuelt registrert";
-    const now=new Date().toISOString();
-    const {error:paymentError}=await s.from("orders").update({
-      payment_status:"paid",
-      payment_reference:reference,
-      payment_captured_ore:total,
-      updated_at:now
-    }).eq("id",id);
-    if(paymentError)return NextResponse.json({error:"Betalingen kunne ikke registreres."},{status:500});
-
-    const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
-    if(!resendKey)return NextResponse.json({error:"Betalingen er registrert, men e-post er ikke konfigurert.",statusSaved:true},{status:503});
-    try{
-      const {Resend}=await import("resend");
-      const resend=new Resend(resendKey);
-      const from=serviceEmailFrom();
-      const replyTo=serviceReplyTo();
-      const requestOrigin=new URL(req.url).origin;
-      const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
-      const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
-      const accountUrl=order.customer_user_id?base+"/min-side":"";
-      const rawItems=Array.isArray(order.items)?order.items:[];
-      const productIds=[...new Set(rawItems.map(item=>String(item?.productId||"")).filter(Boolean))];
-      const productById=new Map();
-      if(productIds.length){
-        const {data:productRows,error:productError}=await s.from("products").select("*").in("id",productIds);
-        if(!productError){
-          for(const row of productRows||[]){
-            const product=fromDbProduct(row);
-            productById.set(String(product.id),product);
-          }
-        }else{
-          console.error("ORDER RECEIPT PRODUCT DETAILS ERROR",productError);
-        }
-      }
-      const receiptItems=rawItems.map(item=>{
-        const product=productById.get(String(item?.productId||""));
-        const selected=item?.selectedOptions&&typeof item.selectedOptions==="object"?item.selectedOptions:{};
-        const details=(product?.options||[]).map(option=>{
-          const value=selected[option.id];
-          const choice=(option.choices||[]).find(entry=>entry.value===value);
-          if(value==null&&!choice)return null;
-          return {label:option.label||option.id||"Valg",value:choice?.label||String(value??"")};
-        }).filter(Boolean);
-        return {...item,details};
-      });
-      let quoteNumber="",quoteNote="";
-      const {data:linkedQuote,error:quoteLookupError}=await s.from("quotes")
-        .select("quote_number,notes")
-        .eq("converted_order_id",order.id)
-        .maybeSingle();
-      if(!quoteLookupError&&linkedQuote){
-        quoteNumber=linkedQuote.quote_number||"";
-        quoteNote=linkedQuote.notes||"";
-      }else if(quoteLookupError&&!["42P01","42703"].includes(String(quoteLookupError.code||""))){
-        console.error("ORDER RECEIPT QUOTE NOTE ERROR",quoteLookupError);
-      }
-      const customerAddress=[order.customer?.address,order.customer?.postalCode,order.customer?.city].filter(Boolean).join(", ");
-      const fulfillmentLabel=order.fulfillment_type==="delivery"?"Levering":order.fulfillment_type==="shipping"?"Sending med post/Bring":"Henting";
-      const receiptData={
-        orderNumber:order.order_number,
-        customerName:order.customer?.name||"kunde",
-        customerEmail:order.customer?.email||"",
-        customerPhone:order.customer?.phone||"",
-        customerAddress,
-        fulfillmentLabel,
-        reference,
-        items:receiptItems,
-        shippingOre:Number(order.shipping_ore)||0,
-        totalOre:total,
-        paidAt:now,
-        accountUrl,
-        orderNote:order.customer?.note||order.custom_request||"",
-        quoteNumber,
-        quoteNote,
-        vatRate:25
-      };
-      const html=buildReceiptEmail(receiptData);
-      const pdf=await buildReceiptPdf(receiptData);
-      const sent=await resend.emails.send({
-        from,to:email,replyTo,
-        subject:"Betalingsbekreftelse – "+order.order_number,
-        html,
-        attachments:[
-          {
-            filename:"aadland-service-logo.webp",
-            path:"https://www.aadland-service.no/aadland-service-logo.webp",
-            contentId:"aadland-service-logo"
-          },
-          {
-            filename:receiptPdfFilename(order.order_number),
-            content:pdf.toString("base64")
-          }
-        ]
-      });
-      if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
-      const receiptSentAt=new Date().toISOString();
-      const {error:stampError}=await s.from("orders").update({receipt_sent_at:receiptSentAt,updated_at:receiptSentAt}).eq("id",id);
-      if(stampError)console.error("ORDER RECEIPT STAMP ERROR",stampError);
-      return NextResponse.json({ok:true,sentTo:email,receiptSentAt,paymentStatus:"paid",paymentReference:reference});
-    }catch(e){
-      console.error("ORDER RECEIPT EMAIL ERROR",e);
-      return NextResponse.json({error:"Betalingen er registrert, men betalingsbekreftelsen kunne ikke sendes.",statusSaved:true},{status:500});
+  if(action==="review-manual-receipt"){
+    if(process.env.VERCEL_ENV==="preview")
+      return NextResponse.json({error:"Ekte kvitteringshistorikk kan ikke endres i forhåndsvisning."},{status:403});
+    if(currentUser.role!=="owner")
+      return NextResponse.json({error:"Bare eieren kan avstemme uavklarte kvitteringer."},{status:403});
+    const outcome=String(receiptReviewResult||"");
+    const phrase=outcome==="sent"?"BEKREFTET I RESEND":outcome==="unsent"?"IKKE SENDT":null;
+    if(!phrase||receiptReviewConfirmation!==phrase)
+      return NextResponse.json({error:"Kontroller Resend først, og bruk bekreftelsesteksten."},{status:400});
+    const note=String(receiptReviewNote||"").trim();
+    if(note.length<12||note.length>1200)
+      return NextResponse.json({error:"Skriv hva du faktisk kontrollerte, minst 12 tegn."},{status:400});
+    const emailId=String(receiptReviewProviderId||"").trim();
+    if(outcome==="sent"&&(emailId.length<8||emailId.length>240))
+      return NextResponse.json({error:"Oppgi faktisk Resend-meldings-ID fra leverandørloggen."},{status:400});
+    const review=await s.rpc("review_manual_product_receipt",{
+      p_order_id:id,p_reviewer_id:currentUser.id,p_result:outcome,
+      p_note:note,p_provider_email_id:outcome==="sent"?emailId:null
+    });
+    if(review.error||!review.data?.ok){
+      const still=String(review.error?.message||"").includes("S26_RECEIPT_MAY_STILL_BE_SENDING");
+      return NextResponse.json({error:still?
+        "Kvitteringen kan fortsatt være under sending. Kontroller Resend på nytt etter fem minutter.":
+        "Denne kvitteringen kan ikke avstemmes nå. Oppdater ordren og kontroller Resend-status."},{status:409});
     }
+    return NextResponse.json({ok:true,receiptState:review.data.state,
+      message:"Sendestatus er journalført etter eierkontroll. Ingen ny e-post og ingen ny betaling er registrert."});
+  }
+
+  if(action==="record-paid-and-send-receipt"||action==="send-queued-manual-receipt"){
+    if(process.env.VERCEL_ENV==="preview")
+      return NextResponse.json({error:"Ekte betalingsregistrering og kvitteringer er sperret i forhåndsvisningen."},{status:403});
+    const registering=action==="record-paid-and-send-receipt";
+    if(registering){
+      const reference=String(paymentReference||"").trim();
+      if(reference.length<3||reference.length>120)
+        return NextResponse.json({error:"Skriv en betalingsreferanse eller dokumentert betalingsmåte, minst 3 tegn."},{status:400});
+      if(paymentVerified!==true)
+        return NextResponse.json({error:"Bekreft at betalingen faktisk er kontrollert og mottatt før registrering."},{status:400});
+      const result=await s.rpc("record_manual_product_payment_once",{
+        p_order_id:id,p_reference:reference,p_actor_id:currentUser.id,
+        p_payment_verified:true
+      });
+      if(result.error){
+        const issue=String(result.error.message||"");
+        if(issue.includes("S26_ORDER_NOT_FOUND"))
+          return NextResponse.json({error:"Bestillingen finnes ikke."},{status:404});
+        if(issue.includes("S26_REFERENCE_CONFLICT"))
+          return NextResponse.json({error:"Betalingen er allerede registrert med en annen referanse. Kontroller betalingshistorikken før du endrer noe."},{status:409});
+        if(issue.includes("S26_PAYMENT_ALREADY_RECORDED_OR_INELIGIBLE"))
+          return NextResponse.json({error:"Denne ordren har allerede registrert betaling, gjelder Vipps eller er kansellert/arkivert. Ingen ny betaling eller kvittering er opprettet."},{status:409});
+        if(issue.includes("S26_INVALID_ORDER_AMOUNT")||issue.includes("S26_CUSTOMER_EMAIL_REQUIRED"))
+          return NextResponse.json({error:"Kontroller ordrebeløp og kundens e-postadresse før betalingen registreres."},{status:409});
+        console.error("MANUAL PAYMENT ONCE RECORD FAILED",{orderId:id,code:result.error.code});
+        return NextResponse.json({error:"Betalingen kunne ikke registreres trygt."},{status:503});
+      }
+    }
+
+    // The journal exists only for a real, individually verified first
+    // payment. A previously-paid legacy order without this row must NEVER
+    // get a synthetic paid event or automatic duplicate receipt.
+    const {data:receipt,error:receiptError}=await s.from("manual_order_payment_receipts")
+      .select("id,order_id,amount_ore,payment_reference,paid_at,recipient_email,receipt_state,provider_email_id,sent_at")
+      .eq("order_id",id).maybeSingle();
+    if(receiptError)return NextResponse.json({error:"Betalingen er registrert, men kvitteringshistorikken kunne ikke leses. Kontroller ordren før du prøver igjen.",statusSaved:true},{status:503});
+    if(!receipt)return NextResponse.json({error:"Ingen kvitteringsjournal for denne betalingen. Historiske betalinger må kontrolleres manuelt, uten automatisk ny kvittering."},{status:409});
+    if(receipt.receipt_state==="sent"||receipt.receipt_state==="reviewed_sent")
+      return NextResponse.json({ok:true,alreadyRecorded:true,receiptAlreadySent:true,
+        paymentStatus:"paid",paymentReference:receipt.payment_reference,
+        message:"Betalingen er allerede registrert. Ingen ny kvittering er sendt."});
+    if(receipt.receipt_state!=="queued")
+      return NextResponse.json({error:"Betalingen er registrert, men kvitteringsstatusen må kontrolleres i Resend. Ingen ny e-post er sendt.",
+        statusSaved:true,receiptNeedsReview:true,receiptState:receipt.receipt_state},{status:409});
+
+    const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
+    if(findError||!order)return NextResponse.json({error:"Ordren kunne ikke hentes. Betalingen er registrert.",statusSaved:true},{status:503});
+    if(order.order_type!=="order"||order.payment_status!=="paid"||
+       Number(order.payment_captured_ore)!==Number(receipt.amount_ore)||
+       Number(order.payment_refunded_ore||0)!==0)
+      return NextResponse.json({error:"Betalingsopplysningene er endret. Ingen kvittering er sendt.",statusSaved:true},{status:409});
+
+    const outcome=await sendManualProductReceiptOnce(s,order,receipt,{requestUrl:req.url});
+    return NextResponse.json(outcome.payload,{status:outcome.status});
   }
 
   if(action==="mark-ready-and-notify"){
