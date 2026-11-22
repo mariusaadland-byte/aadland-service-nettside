@@ -1396,6 +1396,33 @@ function Orders({ orders, status, canUpdateOrders, isOwner=false, reload }) {
    if(typeof reload==="function")await reload();
   }finally{setSavingId(null);}
  }
+ async function reviewManualReceipt(order,result){
+  if(!isOwner||!["sending","needs_review"].includes(String(order.manualReceiptState||"")))return;
+  const phrase=result==="sent"?"BEKREFTET I RESEND":"IKKE SENDT";
+  const explanation=result==="sent"?
+   "Kontroller i Resend at DENNE kvitteringen ble akseptert. Skriv BEKREFTET I RESEND:":
+   "Kontroller i Resend at kvitteringen IKKE ble akseptert. Skriv IKKE SENDT. Det blir ikke sendt noen ny e-post:";
+  if(window.prompt(explanation)!==phrase)return;
+  const resendId=result==="sent"?(window.prompt("Skriv nøyaktig meldings-ID fra Resend:")||"").trim():"";
+  if(result==="sent"&&resendId.length<8){setMessage("Du må oppgi faktisk Resend-ID.");return;}
+  const note=(window.prompt("Skriv hva du fant i Resend og tidspunktet du kontrollerte (minst 12 tegn):")||"").trim();
+  if(note.length<12){setMessage("Skriv en konkret kontrollmerknad på minst 12 tegn.");return;}
+  setSavingId(order.id);setMessage("");
+  try{
+   const response=await fetch("/api/admin/orders",{
+    method:"PATCH",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id:order.id,action:"review-manual-receipt",
+     receiptReviewResult:result,receiptReviewConfirmation:phrase,
+     receiptReviewNote:note,receiptReviewProviderId:resendId})
+   });
+   const data=await response.json().catch(()=>({}));
+   setMessage(data.message||data.error||"Kunne ikke avstemme kvitteringen.");
+   if(typeof reload==="function")await reload();
+  }catch{
+   setMessage("Nettverksfeil under avstemming. Oppdater status før du prøver igjen.");
+   if(typeof reload==="function")await reload();
+  }finally{setSavingId(null);}
+ }
  async function vippsOrderAction(order,action){
   const reference=String(order.paymentReference||order.orderNumber||"").trim();
   if(!reference){setMessage("Vipps-referansen mangler.");return;}
@@ -1517,6 +1544,10 @@ function Orders({ orders, status, canUpdateOrders, isOwner=false, reload }) {
     {String(order.paymentProvider||"").toLowerCase()!=="vipps"&&canUpdateOrders&&["pending","unpaid"].includes(String(order.paymentStatus||""))&&Number(order.paymentCapturedOre||0)===0&&Number(order.paymentRefundedOre||0)===0&&!order.archivedAt&&order.status!=="cancelled"&&<button className="btn" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>registerPayment(order)}>{savingId===order.id?"Registrerer …":"Kontroller og registrer betalt én gang"}</button>}
     {String(order.paymentProvider||"").toLowerCase()!=="vipps"&&order.manualReceiptState&&<p className="muted"><b>Manuell kvittering:</b> {order.manualReceiptState==="queued"?"Betalingen er registrert. Kvittering ennå ikke forsøkt sendt.":order.manualReceiptState==="sent"?"Resend aksepterte e-posten.":order.manualReceiptState==="reviewed_sent"?"Sendestatus bekreftet manuelt.":order.manualReceiptState==="reviewed_unsent"?"Manuelt bekreftet: ikke sendt.":"Uavklart sendestatus – kontroller Resend; ingen automatisk ny utsending."}{order.manualReceiptProviderId?" · Meldings-ID: "+order.manualReceiptProviderId:""}</p>}
     {String(order.paymentProvider||"").toLowerCase()!=="vipps"&&canUpdateOrders&&order.manualReceiptState==="queued"&&<button className="btn alt" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>sendQueuedManualReceipt(order)}>{savingId===order.id?"Kontrollerer …":"Send kvittering som aldri er forsøkt sendt"}</button>}
+    {String(order.paymentProvider||"").toLowerCase()!=="vipps"&&isOwner&&["sending","needs_review"].includes(String(order.manualReceiptState||""))&&<div className="orderActions">
+     <button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>reviewManualReceipt(order,"sent")}>{savingId===order.id?"Kontrollerer …":"Bekreft Resend-ID etter kontroll"}</button>
+     <button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>reviewManualReceipt(order,"unsent")}>{savingId===order.id?"Kontrollerer …":"Bekreft ikke sendt etter kontroll"}</button>
+    </div>}
     {String(order.paymentProvider||"").toLowerCase()!=="vipps"&&order.paymentStatus==="paid"&&!order.manualReceiptState&&<p className="notice"><b>Historisk betaling uten kvitteringsjournal:</b> Kontroller bank og Resend manuelt; ingen automatisk ny utsending.</p>}
     {Number(order.paymentCapturedOre)>Number(order.paymentRefundedOre||0)&&String(order.paymentProvider||"").toLowerCase()!=="vipps"&&<div className="orderRefundPanel">
      <h4>Tilbakebetaling</h4>
