@@ -8,7 +8,7 @@ import styles from "./VatSimpleForm.module.css";
 // The full camera feed is captured, never just the green guide polygon.
 // The overlay uses the visible video dimensions, including letterboxing,
 // so its lines stay on the paper even when iPhone cameras change aspect.
-export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}){
+export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false,keepOpenAfterCapture=false,pageNumber=1}){
  const videoRef=useRef(null),streamRef=useRef(null),stageRef=useRef(null);
  const closeRef=useRef(null),previousFocus=useRef(null),dialogRef=useRef(null);
  const cancelRef=useRef(onCancel),capturingRef=useRef(false),reviewRef=useRef(false);
@@ -140,7 +140,15 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
  async function acceptPhoto(){
   if(!photo||disabled||capturingRef.current)return;
   capturingRef.current=true;setCapturing(true);setError("");
-  try{await onCapture(photo.file);}
+  try{
+   await onCapture(photo.file);
+   // In a multi-page scan, keep this same MediaStream alive rather than
+   // requesting camera access again between pages. The parent closes the
+   // camera on Done/Cancel or after the last permitted page.
+   if(keepOpenAfterCapture){
+    setPhoto(null);setCorners(null);
+   }
+  }
   catch(e){setError(String(e?.message||"Kunne ikke bruke bildet. Prøv igjen."));}
   finally{capturingRef.current=false;setCapturing(false);}
  }
@@ -153,10 +161,12 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
  return createPortal(<div ref={dialogRef} className={styles.liveCameraFullscreen} role="dialog"
   aria-modal="true" aria-label="Skann kvittering i fullskjerm">
   <header className={styles.liveCameraHeader}>
-   <div><strong>{photo?"Kontroller bildet":"Skann kvittering"}</strong>
-    <span>{photo?"Les hele kvitteringen før du fortsetter":"Hold hele kvitteringen synlig i kameraet"}</span></div>
+   <div><strong>{keepOpenAfterCapture?(photo?"Kontroller side "+pageNumber:"Skann side "+pageNumber):photo?"Kontroller bildet":"Skann kvittering"}</strong>
+    <span>{keepOpenAfterCapture
+     ?"Kameraet holdes åpent mens du tar flere sider."
+     :photo?"Les hele kvitteringen før du fortsetter":"Hold hele kvitteringen synlig i kameraet"}</span></div>
    <button ref={closeRef} type="button" onClick={onCancel} disabled={capturing}
-    className={styles.liveCameraClose} aria-label="Lukk skanneren">✕ Lukk</button>
+     className={styles.liveCameraClose} aria-label={keepOpenAfterCapture?"Ferdig med bilder":"Lukk skanneren"}>{keepOpenAfterCapture?"✓ Ferdig med bilder":"✕ Lukk"}</button>
   </header>
   <div ref={stageRef} className={styles.liveCameraStage}>
    <video ref={videoRef} autoPlay playsInline muted className={styles.liveCameraVideo}
@@ -178,7 +188,9 @@ export default function VatReceiptLiveCamera({onCapture,onCancel,disabled=false}
   </div>
   <footer className={styles.liveCameraFooter}>
    <p className={styles.liveCameraStatus} aria-live="polite">{photo
-    ?"Ser du hele kvitteringen tydelig? Velg Bruk bildet, eller ta et nytt bilde."
+    ?(keepOpenAfterCapture
+      ?"Ser du hele side "+pageNumber+" tydelig? Velg Bruk bildet for å fortsette til neste side."
+      :"Ser du hele kvitteringen tydelig? Velg Bruk bildet, eller ta et nytt bilde.")
     :corners
     ?"Grønn ramme funnet. Hold telefonen stille og ta bildet."
     :"Legg hele kvitteringen på et mørkere underlag. Ta bilde også uten grønn ramme."}</p>

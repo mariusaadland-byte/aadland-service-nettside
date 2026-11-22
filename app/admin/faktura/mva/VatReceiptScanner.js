@@ -399,8 +399,26 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
      onClick={()=>{setMultiMode(false);setMultiPages([]);setLiveCamera(false);setError("");setProgress("");}}>Avbryt flersidig skanning</button>
    </div>
   </section>}
-  {liveCamera&&<VatReceiptLiveCamera onCapture={file=>{setLiveCamera(false);if(multiMode)addMultiSources([file]);else void chooseSource(file);}}
-   onCancel={()=>setLiveCamera(false)} disabled={disabled||busy}/>} 
+  {liveCamera&&<VatReceiptLiveCamera
+   onCapture={file=>{
+    if(multiMode){
+     addMultiSources([file]);
+     // Keep one video session alive across pages; stop at the page limit.
+     if(multiPages.length+1>=VAT_MULTI_PAGE_LIMIT)setLiveCamera(false);
+    }else{
+     setLiveCamera(false);void chooseSource(file);
+    }
+   }}
+   onCancel={()=>setLiveCamera(false)} disabled={disabled||busy}
+   keepOpenAfterCapture={multiMode} pageNumber={multiPages.length+1}/>} 
+  <details className={styles.scanHelp}>
+   <summary>Slipp å godkjenne kamera hver gang (iPhone)</summary>
+   <p>Åpne www.aadland-service.no direkte i Safari. Trykk på sidemenyen ved adresselinjen,
+    velg Nettstedsinnstillinger og sett Kamera til Tillat. Safari lagrer innstillingen
+    for nettstedet. Bruker du nettstedet som app på hjemskjermen,
+    kan iPhone likevel spørre på nytt ved neste oppstart.</p>
+   <p>Ved flersidig skanning holder kameraet seg åpent mellom sidene. Trykk Ferdig med bilder når du er ferdig.</p>
+  </details>
   <details className={styles.scanHelp}>
    <summary>Hjelp hvis tekstlesingen ikke virker</summary>
    <p>PDF maks 4 MB, bilder opptil 25 MB. OCR skjer på telefonen, mens program og språkfiler lastes fra en ekstern leverandør. Nå brukes en mindre lesekopi av bildet, og samme lesemotor gjenbrukes ved neste kvittering. Hvis et utsnitt blir feil, kan du justere det. Originalen beholdes i regnskapet.</p>
