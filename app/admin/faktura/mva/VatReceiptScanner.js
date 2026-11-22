@@ -40,7 +40,7 @@ async function imageFromPdf(file,onProgress){
  pdfjs.GlobalWorkerOptions.workerSrc=PDFJS_WORKER;
  const document=await pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
  try{
-  const pageCount=Math.min(document.numPages,3);
+  const pageCount=Math.min(document.numPages,8);
   let text="";
   for(let i=1;i<=pageCount;i++){
    onProgress("Leser PDF-side "+i+" av "+pageCount+" …");
@@ -58,7 +58,7 @@ async function imageFromPdf(file,onProgress){
   if(text.replace(/\s/g,"").length>=45&&(!invoice||complete))
    return {text,format:"pdf-tekst"};
   const images=[];
-  for(let i=1;i<=Math.min(document.numPages,2);i++){
+  for(let i=1;i<=pageCount;i++){
    const page=await document.getPage(i);
    const viewport=page.getViewport({scale:1});
    const scale=Math.min(2.1,1600/Math.max(viewport.width,viewport.height));
