@@ -349,7 +349,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
 
  return <section className={styles.scanShell}>
   <h3>{documentType==="invoice"?"Last opp faktura":"1. Legg til kvittering"}</h3>
-  <p className={styles.scanLead}>Har du fakturaen som PDF på telefonen? Velg den fra Filer – én eller flere sider leses direkte. Du trenger ikke ta bilde.</p>
+  <p className={styles.scanLead}>Bruk mobilkameraet eller importer en skannet PDF fra skriveren på PC. Flere sider i samme PDF leses sammen som ett bilag.</p>
   {!multiMode&&<div className={styles.uploadActions}>
    <button type="button" className={styles.uploadAction} disabled={disabled||busy||Boolean(cropJob)}
     onClick={()=>setLiveCamera(true)}>📷 Skann med ramme</button>
@@ -358,6 +358,25 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
      disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
    </label>
   </div>}
+  {!multiMode&&<details className={styles.scanHelp} style={{padding:"12px 0"}}>
+   <summary>🖨️ Importer fra HP Smart Tank 7005</summary>
+   <p>Bruk skannerglasset på HP Smart Tank 7005. Åpne HP-appen (tidligere HP Smart)
+    på mobilen eller PC-en, velg skanning fra skriver, og skann første side.</p>
+   <p>Skanneren har ikke automatisk arkmater. Legg neste ark på glasset og velg
+    Legg til side i HP-appen dersom dokumentet har flere sider. Lagre som én PDF
+    når alle sidene i samme kvittering/faktura er skannet.</p>
+   <p>Velg den lagrede PDF-en nedenfor. Aadland Service foreslår leverandør,
+    dato, beløp og MVA, som du kontrollerer før bilaget registreres.</p>
+   <label className={styles.uploadAction} style={{marginTop:10,maxWidth:360}}>
+    📄 Velg PDF fra HP-skanneren
+    <input aria-label="Importer skannet PDF eller bilde fra HP Smart Tank 7005"
+     type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+     disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
+   </label>
+   <p style={{fontSize:12}}>Lagre én PDF per bilag, gjerne i gråtoner og ca. 200 dpi.
+    PDF maks 4 MB; opptil åtte sider tekstleses. Nettleseren kan ikke starte
+    skanneren direkte uten en egen lokal skannerintegrasjon.</p>
+  </details>}
   {!multiMode&&!liveCamera&&<label className={styles.nativeCameraLink}>Bruk vanlig kamera
    <input aria-label="Ta bilde av kvittering" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"
     disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
@@ -421,11 +440,11 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   </details>
   <details className={styles.scanHelp}>
    <summary>Hjelp hvis tekstlesingen ikke virker</summary>
-   <p>PDF maks 4 MB, bilder opptil 25 MB. OCR skjer på telefonen, mens program og språkfiler lastes fra en ekstern leverandør. Nå brukes en mindre lesekopi av bildet, og samme lesemotor gjenbrukes ved neste kvittering. Hvis et utsnitt blir feil, kan du justere det. Originalen beholdes i regnskapet.</p>
+   <p>PDF maks 4 MB, bilder opptil 25 MB. OCR skjer i nettleseren på telefonen eller PC-en, mens program og språkfiler lastes fra en ekstern leverandør. Nå brukes en mindre lesekopi av bildet, og samme lesemotor gjenbrukes ved neste kvittering. Hvis et utsnitt blir feil, kan du justere det. Originalen beholdes i regnskapet.</p>
    <button type="button" className={styles.textAction} disabled={disabled||busy||Boolean(cropJob)} onClick={testReader}>
-    Test tekstleseren på denne telefonen
+    Test tekstleseren på denne enheten
    </button>
-   <p style={{fontSize:12}}>Tester bare et innebygd eksempelbilde. Ingen kvittering, regnskapsdata eller bilder sendes til Aadland Service.</p>
+   <p style={{fontSize:12}}>Tester bare et innebygd eksempelbilde. Ingen kvittering eller regnskapsdata lastes opp under denne testen.</p>
    {diagnostic&&<p role={diagnostic.ok===false?"alert":"status"} className={styles.scanMessage}
     style={diagnostic.ok===false?{color:"#a52a21"}:{}}>{diagnostic.message}</p>}
   </details>
