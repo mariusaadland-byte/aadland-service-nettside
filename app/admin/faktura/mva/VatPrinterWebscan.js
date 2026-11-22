@@ -5,6 +5,7 @@ import styles from "./VatSimpleForm.module.css";
 
 const IP_KEY="aadland-vat-local-hp-webscan-ip";
 const PIN_KEY="aadland-vat-local-hp-webscan-pin";
+const PIN_UPDATED="aadland-vat-webscan-pin-updated";
 // A printer PIN is a credential: never include a user's PIN in the shipped code,
 // server logs, URLs, external requests or an analytics event. The user enters it
 // once on their own Chromebook and explicitly decides whether to remember it.
@@ -33,6 +34,22 @@ export default function VatPrinterWebscan({disabled=false,compact=false,initialI
    // PIN stays empty if persistent browser storage is unavailable.
   }
  },[initialIp]);
+ useEffect(()=>{
+  function syncPin(){
+   try{
+    const stored=window.localStorage.getItem(PIN_KEY)||"";
+    setPin(validPrinterPin(stored)?stored:"");
+    setPinSaved(validPrinterPin(stored));
+   }catch{}
+  }
+  function onStorage(event){if(event.key===PIN_KEY)syncPin();}
+  window.addEventListener(PIN_UPDATED,syncPin);
+  window.addEventListener("storage",onStorage);
+  return()=>{
+   window.removeEventListener(PIN_UPDATED,syncPin);
+   window.removeEventListener("storage",onStorage);
+  };
+ },[]);
  const address=vatWebscanLocalAddress(ip);
  function openPrinter(){
   if(disabled)return;
@@ -54,6 +71,7 @@ export default function VatPrinterWebscan({disabled=false,compact=false,initialI
   try{
    window.localStorage.setItem(PIN_KEY,pin.trim());
    setPinSaved(true);
+   window.dispatchEvent(new Event(PIN_UPDATED));
    setPinMessage("Skriver-PIN er lagret kun i Chrome på denne enheten.");
   }catch{
    setPinSaved(false);
@@ -74,7 +92,7 @@ export default function VatPrinterWebscan({disabled=false,compact=false,initialI
   }
  }
  function forgetPin(){
-  try{window.localStorage.removeItem(PIN_KEY);}catch{}
+  try{window.localStorage.removeItem(PIN_KEY);window.dispatchEvent(new Event(PIN_UPDATED));}catch{}
   setPin("");
   setPinSaved(false);
   setPinVisible(false);
