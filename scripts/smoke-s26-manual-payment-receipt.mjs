@@ -243,7 +243,7 @@ assert.equal(x.status,403);
 assert.equal(paymentWrites,1);
 mockEnv.env.VERCEL_ENV="production";
 
-assert.ok(route.includes('manualReceiptByOrder.set(row.order_id,row)'));
+assert.ok(route.includes('manualReceiptByOrder.set(receipt.order_id,receipt)'));
 const ui=read("app/admin/AdminClient.js");
 assert.ok(ui.includes('paymentVerified:true'));
 assert.ok(ui.includes('window.prompt("Skriv BETALING MOTTATT'));
