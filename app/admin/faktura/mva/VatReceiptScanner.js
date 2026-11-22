@@ -9,6 +9,7 @@ import {prepareVatOcrImage} from "../../../../lib/vatOcrImage";
 import {needsVatReceiptRetry,chooseVatReceiptScan} from "../../../../lib/vatReceiptQuality";
 import VatReceiptCropper from "./VatReceiptCropper";
 import VatReceiptLiveCamera from "./VatReceiptLiveCamera";
+import {createVatMultiPageReceipt,isVatMultiPageImage,VAT_MULTI_PAGE_LIMIT} from "../../../../lib/vatMultiPageReceipt";
 import styles from "./VatSimpleForm.module.css";
 
 const MAX_SIZE=4*1024*1024;
@@ -39,7 +40,7 @@ async function imageFromPdf(file,onProgress){
  pdfjs.GlobalWorkerOptions.workerSrc=PDFJS_WORKER;
  const document=await pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
  try{
-  const pageCount=Math.min(document.numPages,3);
+  const pageCount=Math.min(document.numPages,8);
   let text="";
   for(let i=1;i<=pageCount;i++){
    onProgress("Leser PDF-side "+i+" av "+pageCount+" …");
@@ -57,7 +58,7 @@ async function imageFromPdf(file,onProgress){
   if(text.replace(/\s/g,"").length>=45&&(!invoice||complete))
    return {text,format:"pdf-tekst"};
   const images=[];
-  for(let i=1;i<=Math.min(document.numPages,2);i++){
+  for(let i=1;i<=pageCount;i++){
    const page=await document.getPage(i);
    const viewport=page.getViewport({scale:1});
    const scale=Math.min(2.1,1600/Math.max(viewport.width,viewport.height));
@@ -124,8 +125,8 @@ async function prepareReceiptFile(source,onProgress){
 }
 
 async function readLocalReceipt(file,onProgress,readerRef,options={}){
- let format="bilde",images=[file],pdfText="";
- if(file.type==="application/pdf"){
+ let format=options.ocrImages?"flersidig-pdf":"bilde",images=options.ocrImages||[file],pdfText="";
+ if(file.type==="application/pdf"&&!options.ocrImages){
   const pdf=await imageFromPdf(file,onProgress);
   if(pdf.text)return {text:pdf.text,format:pdf.format,confidence:null};
   images=pdf.images;format="pdf-skann";pdfText=pdf.extractedText||"";
@@ -178,6 +179,8 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
  const [imageForCrop,setImageForCrop]=useState(null);
  const [diagnostic,setDiagnostic]=useState(null);
  const [liveCamera,setLiveCamera]=useState(false);
+ const [multiMode,setMultiMode]=useState(false);
+ const [multiPages,setMultiPages]=useState([]);
  const scanId=useRef(0);
  const readerRef=useRef(null);
  const lastResetToken=useRef(resetToken);
@@ -188,6 +191,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   scanId.current++;
   setProgress("");setError("");setDetails(null);setProcessedNotice("");
   setCropJob(null);setImageForCrop(null);setDiagnostic(null);setLiveCamera(false);
+  setMultiMode(false);setMultiPages([]);
  },[resetToken]);
  async function recognizeSelected(file,meta,options={}){
   // When rescanning a crop or retrying OCR, the already selected original
@@ -241,6 +245,40 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
    setBusy(false);
    onBusyChange?.(false);
   }
+ }
+ function addMultiSources(sources){
+  if(disabled||busy||!multiMode||!sources.length)return;
+  if(multiPages.length+sources.length>VAT_MULTI_PAGE_LIMIT){
+   setError("Maks "+VAT_MULTI_PAGE_LIMIT+" sider per bilag. Fjern en side før du legger til flere.");return;
+  }
+  if(sources.some(source=>!isVatMultiPageImage(source))){
+   setError("Bruk JPG, PNG, WebP eller HEIC, maks 25 MB per bilde.");return;
+  }
+  setError("");setMultiPages(current=>[...current,...sources]);
+ }
+ function chooseMulti(event){
+  const sources=Array.from(event.target.files||[]);
+  event.target.value="";
+  addMultiSources(sources);
+ }
+ async function finishMulti(){
+  if(!multiMode||busy||disabled||multiPages.length<2||cropJob)return;
+  const thisScan=++scanId.current;
+  setBusy(true);onBusyChange?.(true);setError("");setProgress("");setDetails(null);
+  try{
+   // Work locally until a complete valid PDF exists. A failed attempt must
+   // never remove a previously attached receipt or manually edited form.
+   const {file,ocrImages}=await createVatMultiPageReceipt(multiPages,setProgress);
+   if(thisScan!==scanId.current)return;
+   onSelected(null);
+   setImageForCrop(null);setProcessedNotice("Sidene er samlet i én PDF-kopi. Behold papirkvitteringen og eventuelle opprinnelige bilder.");
+   await recognizeSelected(file,{converted:true,copyType:"pdf",originalName:file.name},{ocrImages});
+   if(thisScan!==scanId.current)return;
+   setMultiMode(false);setMultiPages([]);
+  }catch(e){
+   setError("Kunne ikke fullføre flersidig kvittering: "+String(e?.message||"ukjent feil")+
+    ". Sidene beholdes her så du kan prøve igjen.");
+  }finally{setBusy(false);onBusyChange?.(false);}
  }
  function choose(event){
   const source=event.target.files?.[0]||null;
@@ -312,19 +350,56 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
  return <section className={styles.scanShell}>
   <h3>{documentType==="invoice"?"Last opp faktura":"1. Legg til kvittering"}</h3>
   <p className={styles.scanLead}>Har du fakturaen som PDF på telefonen? Velg den fra Filer – én eller flere sider leses direkte. Du trenger ikke ta bilde.</p>
-  <div className={styles.uploadActions}>
+  {!multiMode&&<div className={styles.uploadActions}>
    <button type="button" className={styles.uploadAction} disabled={disabled||busy||Boolean(cropJob)}
     onClick={()=>setLiveCamera(true)}>📷 Skann med ramme</button>
    <label className={styles.uploadAction}>📁 Velg bilde / PDF
     <input aria-label="Velg kvittering fra telefonen" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/jpeg,image/png,image/webp"
      disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
    </label>
-  </div>
-  {!liveCamera&&<label className={styles.nativeCameraLink}>Bruk vanlig kamera
+  </div>}
+  {!multiMode&&!liveCamera&&<label className={styles.nativeCameraLink}>Bruk vanlig kamera
    <input aria-label="Ta bilde av kvittering" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"
     disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
   </label>}
-  {liveCamera&&<VatReceiptLiveCamera onCapture={file=>{setLiveCamera(false);void chooseSource(file);}}
+  {!multiMode&&<button type="button" className={styles.textAction}
+   disabled={disabled||busy||Boolean(cropJob)}
+   onClick={()=>{setMultiPages([]);setMultiMode(true);setError("");setLiveCamera(true);}}>
+   📑 Skann flere sider som ett bilag
+  </button>}
+  {multiMode&&<section className={styles.scanMessage} aria-label="Flersidig kvittering"
+   style={{padding:12,border:"1px solid #c7d7cc",borderRadius:12,background:"#f6faf7"}}>
+   <strong>Flersidig kvittering – {multiPages.length} av {VAT_MULTI_PAGE_LIMIT} sider</strong>
+   <p>Ta bilde av hver side i riktig rekkefølge, eller velg flere bilder fra telefonen. Alt lagres som ett PDF-bilag.</p>
+   {multiPages.length>0&&<ol style={{paddingLeft:22}}>{multiPages.map((page,i)=><li key={i} style={{padding:"5px 0"}}>
+    Side {i+1}: {page.name}
+    <span style={{display:"inline-flex",gap:8,marginLeft:8}}>
+     <button type="button" className={styles.textAction} disabled={busy||i===0} aria-label={"Flytt side "+(i+1)+" opp"}
+      onClick={()=>setMultiPages(old=>{const a=[...old];[a[i-1],a[i]]=[a[i],a[i-1]];return a;})}>↑</button>
+     <button type="button" className={styles.textAction} disabled={busy||i===multiPages.length-1} aria-label={"Flytt side "+(i+1)+" ned"}
+      onClick={()=>setMultiPages(old=>{const a=[...old];[a[i],a[i+1]]=[a[i+1],a[i]];return a;})}>↓</button>
+     <button type="button" className={styles.textAction} disabled={busy} aria-label={"Fjern side "+(i+1)}
+      onClick={()=>setMultiPages(old=>old.filter((_,j)=>i!==j))}>Fjern</button>
+    </span>
+   </li>)}</ol>}
+   <div className={styles.uploadActions}>
+    <button type="button" className={styles.uploadAction} disabled={disabled||busy||multiPages.length>=VAT_MULTI_PAGE_LIMIT}
+     onClick={()=>setLiveCamera(true)}>📷 Ta bilde av {multiPages.length+1}. side</button>
+    <label className={styles.uploadAction}>📁 Legg til bilder
+     <input type="file" aria-label="Legg til flere sidebilder" multiple
+      accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/jpeg,image/png,image/webp,image/heic,image/heif"
+      disabled={disabled||busy||multiPages.length>=VAT_MULTI_PAGE_LIMIT} onChange={chooseMulti}/>
+    </label>
+   </div>
+   <p style={{fontSize:12}}>Du kan fjerne eller flytte sider før du fullfører. Behold papirkvitteringen eller eksisterende originalbilder.</p>
+   <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+    <button type="button" className={styles.uploadAction} disabled={disabled||busy||multiPages.length<2}
+     onClick={finishMulti}>✓ Fullfør og les alle sidene</button>
+    <button type="button" className={styles.textAction} disabled={busy}
+     onClick={()=>{setMultiMode(false);setMultiPages([]);setLiveCamera(false);setError("");setProgress("");}}>Avbryt flersidig skanning</button>
+   </div>
+  </section>}
+  {liveCamera&&<VatReceiptLiveCamera onCapture={file=>{setLiveCamera(false);if(multiMode)addMultiSources([file]);else void chooseSource(file);}}
    onCancel={()=>setLiveCamera(false)} disabled={disabled||busy}/>} 
   <details className={styles.scanHelp}>
    <summary>Hjelp hvis tekstlesingen ikke virker</summary>

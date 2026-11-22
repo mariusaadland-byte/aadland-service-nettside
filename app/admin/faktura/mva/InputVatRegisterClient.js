@@ -110,7 +110,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   } // OCR retry/initial attachment must not erase work on the same receipt.
   setForm(x=>({...x,
    evidenceReference:x.evidenceReference||(
-    meta.converted?"Aadland MVA – vedlagt JPEG-kopi, original beholdes eksternt":"Aadland MVA – privat originalvedlegg"),
+    meta.converted?(meta.copyType==="pdf"?"Aadland MVA – vedlagt PDF-kopi, papiroriginal beholdes eksternt":"Aadland MVA – vedlagt JPEG-kopi, original beholdes eksternt"):"Aadland MVA – privat originalvedlegg"),
    documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
  };
  const receiveScan=result=>{
@@ -272,7 +272,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
     }
    }
    setSuccess(attachmentSaved
-    ?receiptFile?(receiptIsCopy?"Bilaget og en JPEG-kopi er lagret privat. Behold originalfilen i regnskapet.":"Bilaget og originalkvitteringen er lagret privat.")+" MVA-oversikten oppdateres.":"Bilaget er registrert. MVA-oversikten oppdateres."
+    ?receiptFile?(receiptIsCopy?(receiptFile?.type==="application/pdf"?"Bilaget og en samlet PDF-kopi er lagret privat. Behold papiroriginalen.":"Bilaget og en JPEG-kopi er lagret privat. Behold originalfilen i regnskapet."):"Bilaget og originalkvitteringen er lagret privat.")+" MVA-oversikten oppdateres.":"Bilaget er registrert. MVA-oversikten oppdateres."
     :"Bilaget er registrert, men originalfilen er IKKE lagret. Bruk knappen nedenfor for å prøve igjen.");
    setReceiptFile(null);setReceiptIsCopy(false);setOcrGrossOre(null);setOcrMismatchChecked(false);
    setGrossInput("");setVatRateChoice("");
@@ -322,8 +322,8 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    <p>Bildet vises bare her mens du kontrollerer opplysningene.</p>
   </details>}
   {receiptFile&&<div className={styles.scanMessage}>
-   <strong>{receiptIsCopy?"JPEG-kopi valgt":"Valgt fil"}:</strong> {receiptFile.name}
-   {receiptIsCopy&&". Behold originalen i regnskapssystemet."}
+   <strong>{receiptIsCopy?(receiptFile?.type==="application/pdf"?"Samlet PDF-kopi valgt":"JPEG-kopi valgt"):"Valgt fil"}:</strong> {receiptFile.name}
+   {receiptIsCopy&&(receiptFile?.type==="application/pdf"?". Behold papiroriginalen.":". Behold originalen i regnskapssystemet.")}
    <button className={styles.textAction} type="button" disabled={busy||scanBusy}
     onClick={()=>{
      setReceiptFile(null);setReceiptIsCopy(false);setOcrGrossOre(null);setOcrMismatchChecked(false);
