@@ -144,8 +144,13 @@ export async function PATCH(req){const originError=sameOriginGuard(req);if(origi
   if(!phrase||body.confirmation!==phrase||note.length<12||
     outcome==="sent"&&providerId.length<8)
    return NextResponse.json({error:"Kontroller Resend og fyll inn bekreftelsestekst, merknad og eventuell meldings-ID."},{status:400});
+  const attemptId=clean(body.attemptId,100);
+  const {data:belongs,error:lookupError}=await s.from("job_plan_confirmation_attempts")
+   .select("id").eq("id",attemptId).eq("order_id",id).maybeSingle();
+  if(lookupError||!belongs)return NextResponse.json({
+   error:"Sendeforsøket tilhører ikke dette oppdraget."},{status:404});
   const {data,error}=await s.rpc("review_job_plan_confirmation",{
-   p_attempt_id:clean(body.attemptId,100),p_reviewer_id:user.id,
+   p_attempt_id:attemptId,p_reviewer_id:user.id,
    p_result:outcome,p_note:note,p_provider_email_id:outcome==="sent"?providerId:null
   });
   if(error)return NextResponse.json({error:"Sendeforsøket kan ikke avklares ennå. Vent minst fem minutter og kontroller Resend-loggen."},{status:409});
