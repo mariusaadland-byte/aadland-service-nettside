@@ -357,7 +357,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
     <input aria-label="Velg kvittering fra telefonen" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/jpeg,image/png,image/webp"
      disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
    </label>
-  </div>
+  </div>}
   {!multiMode&&!liveCamera&&<label className={styles.nativeCameraLink}>Bruk vanlig kamera
    <input aria-label="Ta bilde av kvittering" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"
     disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
