@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 const scanner=readFileSync("app/admin/faktura/mva/VatReceiptScanner.js","utf8");
 const form=readFileSync("app/admin/faktura/mva/InputVatRegisterClient.js","utf8");
-assert.ok(scanner.includes("Importer fra HP Smart Tank 7005"));
+assert.ok(scanner.includes("Importer bilde / PDF fra HP-skanneren"));
+assert.ok(scanner.includes("<VatPrinterWebscan"));
 assert.ok(scanner.includes("HP Smart Tank 7005"));
 assert.ok(scanner.includes("ikke automatisk arkmater"));
 assert.ok(scanner.includes("HP-appen"));
@@ -16,8 +17,8 @@ assert.ok(scanner.includes('if(source)void chooseSource(source);'),
 assert.ok(scanner.includes('await recognizeSelected(file,{converted:prepared.converted,originalName:source.name});'),
  "OCR must read the chosen PDF or image");
 assert.ok(scanner.includes('PDF maks 4 MB'));
-assert.ok(scanner.includes('Nettleseren kan ikke starte'),
- "The site must not imply it can initiate hardware scans");
+assert.ok(scanner.includes("automatisk import direkte til Aadland Service krever"),
+ "The site must not claim it can ingest HP Webscan data across browser origins");
 assert.ok(form.includes("attachToDocument(documentId,receiptFile)"),
  "Selected documents stay behind explicit registration and attachment controls");
 assert.ok(form.includes("documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false"),

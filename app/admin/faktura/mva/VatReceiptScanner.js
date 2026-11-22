@@ -9,6 +9,7 @@ import {prepareVatOcrImage} from "../../../../lib/vatOcrImage";
 import {needsVatReceiptRetry,chooseVatReceiptScan} from "../../../../lib/vatReceiptQuality";
 import VatReceiptCropper from "./VatReceiptCropper";
 import VatReceiptLiveCamera from "./VatReceiptLiveCamera";
+import VatPrinterWebscan from "./VatPrinterWebscan";
 import {createVatMultiPageReceipt,isVatMultiPageImage,VAT_MULTI_PAGE_LIMIT} from "../../../../lib/vatMultiPageReceipt";
 import styles from "./VatSimpleForm.module.css";
 
@@ -349,7 +350,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
 
  return <section className={styles.scanShell}>
   <h3>{documentType==="invoice"?"Last opp faktura":"1. Legg til kvittering"}</h3>
-  <p className={styles.scanLead}>Bruk mobilkameraet eller importer en skannet PDF fra skriveren på PC. Flere sider i samme PDF leses sammen som ett bilag.</p>
+  <p className={styles.scanLead}>Skann med mobilkamera, åpne HP-skriverens Webscan i nettleseren, eller importer PDF/bilde. Flere sider i samme PDF leses som ett bilag.</p>
   {!multiMode&&<div className={styles.uploadActions}>
    <button type="button" className={styles.uploadAction} disabled={disabled||busy||Boolean(cropJob)}
     onClick={()=>setLiveCamera(true)}>📷 Skann med ramme</button>
@@ -358,8 +359,9 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
      disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
    </label>
   </div>}
+  {!multiMode&&<VatPrinterWebscan disabled={disabled||busy||Boolean(cropJob)}/>}
   {!multiMode&&<details className={styles.scanHelp} style={{padding:"12px 0"}}>
-   <summary>🖨️ Importer fra HP Smart Tank 7005</summary>
+   <summary>📄 Importer bilde / PDF fra HP-skanneren</summary>
    <p>Bruk skannerglasset på HP Smart Tank 7005. Åpne HP-appen (tidligere HP Smart)
     på mobilen eller PC-en, velg skanning fra skriver, og skann første side.</p>
    <p>Skanneren har ikke automatisk arkmater. Legg neste ark på glasset og velg
@@ -374,8 +376,8 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
      disabled={disabled||busy||Boolean(cropJob)} onChange={choose}/>
    </label>
    <p style={{fontSize:12}}>Lagre én PDF per bilag, gjerne i gråtoner og ca. 200 dpi.
-    PDF maks 4 MB; opptil åtte sider tekstleses. Nettleseren kan ikke starte
-    skanneren direkte uten en egen lokal skannerintegrasjon.</p>
+    PDF maks 4 MB; opptil åtte sider tekstleses. Webscan åpnes via skriverens egen nettside;
+    automatisk import direkte til Aadland Service krever en egen lokal integrasjon.</p>
   </details>}
   {!multiMode&&!liveCamera&&<label className={styles.nativeCameraLink}>Bruk vanlig kamera
    <input aria-label="Ta bilde av kvittering" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"
