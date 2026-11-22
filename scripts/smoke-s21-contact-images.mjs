@@ -93,7 +93,9 @@ assert.ok(!form.includes("cleanupContactImageRefs"));
 assert.ok(!form.includes('method:"DELETE"'),"Browser must never attempt contact photo deletion");
 assert.ok(form.includes("Ubrukte opplastinger ryddes automatisk"));
 const order=read("app/api/orders/route.js");
-assert.ok(order.includes('create_custom_order_with_contact_images'));
+assert.ok(order.includes('create_service_order_once'),"S25 wrapper must preserve atomic custom image orders");
+assert.ok(read("supabase/migrations/20261122015000_s25_service_order_idempotency.sql")
+ .includes('public.create_custom_order_with_contact_images('),"S25 must delegate to S21 image receipt transaction");
 assert.ok(order.includes("validateContactImageReceipts"));
 assert.ok(order.includes("p_image_proofs:contactImageProofs"));
 assert.ok(order.includes('includes("private-image:")'),"Reject user-typed private file pointers");

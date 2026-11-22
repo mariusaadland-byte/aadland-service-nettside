@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {getCheckoutIntent,clearCheckoutIntent} from "../../../lib/clientOrderIntent";
 import { useParams } from "next/navigation";
 import { CatalogFooter, CatalogHeader, CatalogPlaceholder } from "../ProductChrome";
 import {
@@ -36,6 +37,7 @@ export default function ProductPage() {
   const [paymentMethod,setPaymentMethod]=useState("manual");
   const [vippsAvailable,setVippsAvailable]=useState(false);
   const [sending, setSending] = useState(false);
+  const orderSendingRef=useRef(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState(null);
   const [acceptedTerms,setAcceptedTerms]=useState(false);
@@ -166,33 +168,26 @@ export default function ProductPage() {
   async function sendOrder(e) {
     e.preventDefault();
 
-    if (!product) return;
+    if (!product||orderSendingRef.current) return;
+    orderSendingRef.current=true;
 
     setError("");
     setMessage(null);
     setSending(true);
 
     try {
-      const response = await fetch("/api/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          orderType: "order",
-          customer,
-          fulfillmentType: fulfillment,
-          deliveryWithinRadius: customer.deliveryWithinRadius,
-          acceptedTerms,
-          paymentMethod:vippsAvailable?paymentMethod:"manual",
-          items: [
-            {
-              productId: product.id,
-              quantity,
-              selectedOptions: selected,
-            },
-          ],
-        }),
+      const payload={
+       orderType:"order",customer,fulfillmentType:fulfillment,
+       deliveryWithinRadius:customer.deliveryWithinRadius,
+       acceptedTerms,paymentMethod:vippsAvailable?paymentMethod:"manual",
+       items:[{productId:product.id,quantity,selectedOptions:selected}]
+      };
+      const intentStorageKey="aadland-product-checkout-v1:"+product.id;
+      const idempotencyKey=await getCheckoutIntent(payload,intentStorageKey);
+      const response=await fetch("/api/orders",{
+       method:"POST",
+       headers:{"Content-Type":"application/json"},
+       body:JSON.stringify({...payload,idempotencyKey})
       });
 
       const data = await response.json();
@@ -206,12 +201,18 @@ export default function ProductPage() {
         window.location.assign(data.payment.redirectUrl);
         return;
       }
-
+      if(data?.payment?.pending){
+       setMessage(data);
+       setShowOrder(false);
+       return;
+      }
+      clearCheckoutIntent(intentStorageKey);
       setMessage(data);
       setShowOrder(false);
     } catch {
-      setError("Bestillingen kunne ikke sendes. Prøv igjen.");
+      setError("Nettverksfeil. Bestillingen kan allerede være registrert. Hvis du prøver igjen med uendrede opplysninger, kontrollerer vi den samme bestillingen – vi oppretter ikke en ny.");
     } finally {
+      orderSendingRef.current=false;
       setSending(false);
     }
   }

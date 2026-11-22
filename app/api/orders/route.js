@@ -10,10 +10,17 @@ import {createVippsPayment} from "../../../lib/vippsClient";
 import {vippsUnitReadiness} from "../../../lib/vippsReadiness";
 import {serviceEmailFrom,serviceReplyTo} from "../../../lib/serviceEmailConfig";
 import {validateContactImageReceipts} from "../../../lib/contactImageReceipts";
+import {parseOrderIntent,existingServiceOrderResponse} from "../../../lib/orderIntent";
+
+export const runtime="nodejs";
+export const maxDuration=60;
 const SALES_TERMS_VERSION="2026-10";
 function num(){return "AS-"+Date.now().toString().slice(-8)+"-"+crypto.randomBytes(2).toString("hex").toUpperCase()}
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;
+ // Preview may share a database or payment configuration with production.
+ // Never create real customer orders or Vipps payments from test previews.
+ if(process.env.VERCEL_ENV==="preview")return NextResponse.json({error:"Bestillinger er deaktivert i forhåndsvisning for å beskytte faktiske kundeopplysninger."},{status:403});
  const rateError=await rateLimitRequest(req,{"scope":"orders","max":15,"windowSeconds":900,"message":"For mange forespørsler på kort tid. Prøv igjen senere."}); if(rateError)return rateError;
  try{
   const body=await req.json();
@@ -35,7 +42,20 @@ export async function POST(req){
    try{contactImageProofs=validateContactImageReceipts(body.imageReceipts??[]);}
    catch(e){return NextResponse.json({error:e.message||"Ugyldige bilder. Last opp på nytt."},{status:400});}
   }
+  // A random UUIDv4 supplied by the checkout stays stable across retries.
+  // Replays are checked before product stock, price or Vipps readiness; stock
+  // and catalogue values may already have changed after the first commit.
+  const intent=parseOrderIntent(body);
+  if(intent.error)return NextResponse.json({error:intent.error},{status:400});
   const s=db(); if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+  const current=await s.from("orders")
+   .select("id,order_number,checkout_request_fingerprint,checkout_provider_state,checkout_redirect_url,payment_provider,status,confirmation_sent_at,payment_status")
+   .eq("checkout_request_key",intent.key).maybeSingle();
+  if(current.error)return NextResponse.json({error:"Kunne ikke kontrollere om bestillingen allerede finnes."},{status:503});
+  if(current.data){
+   const replay=existingServiceOrderResponse(current.data,intent.hash);
+   return NextResponse.json(replay.payload,{status:replay.status,headers:{"Cache-Control":"no-store"}});
+  }
   const requestedPaymentMethod=body.orderType==="order"&&body.paymentMethod==="vipps"?"vipps":"manual";
   if(body.orderType==="order"&&body.paymentMethod&&!["manual","vipps"].includes(body.paymentMethod))return NextResponse.json({error:"Ugyldig betalingsmåte."},{status:400});
   if(requestedPaymentMethod==="vipps"){
@@ -49,7 +69,9 @@ export async function POST(req){
    const {data,error:productError}=await s.from("products").select("*").in("id",ids);
    if(productError)throw productError;
    const products=(data||[]).map(fromDbProduct).filter(p=>ids.includes(p.id)&&p.active!==false);if(ids.length!==products.length)return NextResponse.json({error:"Et produkt er ikke tilgjengelig lenger. Oppdater handlekurven og prøv igjen."},{status:409});
-   const requestedStock=new Map();for(const i of rawItems){const id=String(i.productId||"");requestedStock.set(id,(requestedStock.get(id)||0)+Number(i.quantity))}for(const p of products){if(p.inventoryMode==="stock"&&(Number(p.stockQuantity)||0)<(requestedStock.get(p.id)||0))return NextResponse.json({error:p.name+" har ikke nok på lager."},{status:409})}
+   const requestedStock=new Map();for(const i of rawItems){const id=String(i.productId||"");requestedStock.set(id,(requestedStock.get(id)||0)+Number(i.quantity))}
+   // Only the atomic database function may decide stock availability. A replay
+   // can arrive after the first transaction already reserved the last item.
    for(const i of rawItems){
     const p=products.find(p=>String(p.id)===String(i.productId)); if(!p)return NextResponse.json({error:"Et produkt er ikke tilgjengelig lenger. Oppdater handlekurven og prøv igjen."},{status:409});
     const quantity=Number(i.quantity);
@@ -78,34 +100,36 @@ export async function POST(req){
   const safeCustomer={name,email,phone,address,postalCode,city,note:String(body.customer?.note||"").trim().slice(0,2000)};
   const useVipps=body.orderType==="order"&&requestedPaymentMethod==="vipps";
   const record={customer_user_id:customerUserId,order_number:orderNumber,order_type:body.orderType==="custom"?"custom":"order",status:"new",customer:safeCustomer,fulfillment_type:body.fulfillmentType||"pickup",delivery_within_radius:body.fulfillmentType==="delivery"?null:false,items,custom_request:body.customRequest?String(body.customRequest).trim():null,total_ore:total,shipping_ore:shipping,payment_status:body.orderType==="order"?"pending":"unpaid",payment_provider:useVipps?"vipps":null,payment_reference:useVipps?orderNumber:null,vipps_checkout_started_at:useVipps?now:null,terms_version:body.orderType==="order"?SALES_TERMS_VERSION:null,terms_accepted_at:body.orderType==="order"?now:null};
-  if(body.orderType==="custom"){
-   const {error:orderError}=await s.rpc("create_custom_order_with_contact_images",{
-    p_order_record:record,p_image_proofs:contactImageProofs
-   });
-   if(orderError){
-    const code=String(orderError.message||"");
-    if(/contact_image|invalid_contact_request|too_many_contact_images/i.test(code))
-     return NextResponse.json({error:"Ett eller flere bilder er utløpt, brukt tidligere eller ikke knyttet til denne opplastingen. Last opp bildene på nytt før du sender."},{status:409});
-    console.error("CUSTOM ORDER CONTACT IMAGE BIND FAILED",{code:orderError.code});
-    throw Error("CONTACT_ORDER_ATOMIC_FAILED");
-   }
-  }else if(stockRequests.length){
-   const {error:orderError}=await s.rpc("create_order_with_stock",{order_record:record,stock_requests:stockRequests});
-   if(orderError){
-    console.error("ATOMIC ORDER ERROR",orderError);
-    if(String(orderError.message||"").includes("INSUFFICIENT_STOCK"))return NextResponse.json({error:"En vare ble nettopp utsolgt. Oppdater handlekurven og prøv igjen."},{status:409});
-    throw orderError;
-   }
-  }else{
-   const {error:orderError}=await s.from("orders").insert(record);
-   if(orderError)throw orderError;
+  // Single DB transaction: claim the immutable client intent, perform the
+  // existing S-21 custom-image / S-22 stock operation, link the order ID.
+  // Concurrent identical requests serialize on the same PostgreSQL lock.
+  const created=await s.rpc("create_service_order_once",{
+   p_key:intent.key,p_fingerprint:intent.hash,p_order_record:record,
+   p_stock_requests:stockRequests,p_image_proofs:contactImageProofs
+  });
+  if(created.error){
+   const issue=String(created.error.message||"");
+   if(issue.includes("S25_ORDER_INTENT_CONFLICT"))
+    return NextResponse.json({error:"Bestillingsopplysningene ble endret under samme forsøk. Kontroller bestillingen før du prøver på nytt.",intentConflict:true},{status:409});
+   if(issue.includes("INSUFFICIENT_STOCK"))
+    return NextResponse.json({error:"En vare ble nettopp utsolgt. Oppdater handlekurven og prøv igjen."},{status:409});
+   if(/contact_image|invalid_contact_request|too_many_contact_images/i.test(issue))
+    return NextResponse.json({error:"Bildekvitteringen kunne ikke brukes. Hvis du allerede sendte forespørselen, kontroller Min side før du prøver på nytt."},{status:409});
+   console.error("ATOMIC IDEMPOTENT ORDER FAILED",{code:created.error.code,reason:issue.slice(0,100)});
+   throw Error("S25_ORDER_ATOMIC_TRANSACTION_FAILED");
   }
-
+  const orderId=String(created.data?.order_id||"");
+  if(!orderId)throw Error("S25_ORDER_ID_MISSING");
   const {data:createdOrder,error:createdOrderError}=await s.from("orders")
-   .select("id,payment_provider,payment_reference,vipps_checkout_started_at")
-   .eq("order_number",orderNumber).single();
+   .select("id,order_number,checkout_request_fingerprint,checkout_provider_state,checkout_redirect_url,payment_provider,payment_reference,vipps_checkout_started_at,status,confirmation_sent_at,payment_status")
+   .eq("id",orderId).single();
   if(createdOrderError||!createdOrder?.id)throw createdOrderError||new Error("ORDER_ID_MISSING");
-  const orderId=createdOrder.id;
+  // An overlapping request may have completed while this one was evaluating
+  // stock/products. It must not create a second Vipps request or send emails.
+  if(created.data.existing===true){
+   const replay=existingServiceOrderResponse(createdOrder,intent.hash);
+   return NextResponse.json(replay.payload,{status:replay.status,headers:{"Cache-Control":"no-store"}});
+  }
 
   // Stock-backed orders are written by a database RPC. Fail closed if a
   // mismatched RPC version silently dropped payment metadata: NEVER start
@@ -132,35 +156,54 @@ export async function POST(req){
 
   let vippsRedirectUrl="";
   if(useVipps){
+   const claimed=await s.rpc("claim_service_order_vipps",{
+    p_key:intent.key,p_fingerprint:intent.hash
+   });
+   if(claimed.error){
+    console.error("SERVICE VIPPS CLAIM FAILED",{orderId,code:claimed.error.code});
+    return NextResponse.json({orderNumber,alreadyRecorded:true,
+     payment:{method:"vipps",pending:true},
+     message:"Bestillingen er lagret, men oppstart av Vipps kunne ikke kontrolleres. Vi undersøker betalingen; ikke send bestillingen på nytt."},{status:202});
+   }
+   if(!claimed.data?.order_id){
+    return NextResponse.json({orderNumber,alreadyRecorded:true,
+     payment:{method:"vipps",pending:true},
+     message:"Bestillingen er allerede registrert. Vipps-behandlingen pågår eller må avklares. Ikke opprett en ny bestilling."},{status:202});
+   }
    const requestOrigin=new URL(req.url).origin;
    const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
    const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
    try{
     const payment=await createVippsPayment({
-     unit:"service",
-     reference:orderNumber,
-     amountOre:total,
+     unit:"service",reference:orderNumber,amountOre:total,
      phone:safeCustomer.phone,
      returnUrl:base+"/betaling/vipps?unit=service&reference="+encodeURIComponent(orderNumber),
      description:"Aadland Service "+orderNumber
     });
     vippsRedirectUrl=String(payment?.redirectUrl||"").trim();
-    if(!vippsRedirectUrl)throw new Error("VIPPS_REDIRECT_URL_MISSING");
-    if(payment?.pspReference){
-     const stampAt=new Date().toISOString();
-     const {error:stampError}=await s.from("orders").update({payment_psp_reference:String(payment.pspReference),updated_at:stampAt}).eq("id",orderId);
-     if(stampError)console.error("VIPPS PRODUCT PSP STAMP ERROR",{orderNumber,message:stampError.message});
-    }
+    if(!vippsRedirectUrl)throw Error("VIPPS_REDIRECT_URL_MISSING");
+    const done=await s.rpc("complete_service_order_vipps",{
+     p_key:intent.key,p_fingerprint:intent.hash,
+     p_redirect_url:vippsRedirectUrl,
+     p_psp_reference:payment?.pspReference?String(payment.pspReference):null
+    });
+    if(done.error||!done.data?.ready)throw Error("VIPPS_ACCEPTED_BUT_DB_ACK_UNCERTAIN");
    }catch(error){
-    console.error("VIPPS PRODUCT CHECKOUT CREATE ERROR",{orderNumber,status:error?.status,code:error?.code});
-    const failedAt=new Date().toISOString();
+    // A provider timeout is not proof that NO payment was created.
+    // DO NOT cancel/release stock and then blindly create another payment.
+    // Keep the original order/reference for safe owner reconciliation.
+    console.error("VIPPS PRODUCT CHECKOUT NEEDS REVIEW",{orderId,
+     status:error?.status,code:error?.code});
     try{
-     await s.rpc("cancel_product_order_once",{target_order_id:orderId,customer_reason:"Vipps-betalingen kunne ikke startes."});
-     await s.from("orders").update({payment_status:"cancelled",payment_cancelled_at:failedAt,updated_at:failedAt}).eq("id",orderId);
-    }catch(cleanupError){
-     console.error("VIPPS PRODUCT CHECKOUT CLEANUP ERROR",{orderNumber,message:cleanupError?.message});
-    }
-    return NextResponse.json({error:"Vipps-betalingen kunne ikke startes. Ingen betaling er gjennomført. Prøv igjen."},{status:502});
+     const held=await s.rpc("hold_service_order_vipps",{
+      p_key:intent.key,p_fingerprint:intent.hash,
+      p_issue:"provider_status_uncertain"
+     });
+     if(held.error)console.error("VIPPS PRODUCT CHECKOUT HOLD FAILED",{orderId});
+    }catch{console.error("VIPPS PRODUCT CHECKOUT HOLD INTERRUPTED",{orderId});}
+    return NextResponse.json({orderNumber,alreadyRecorded:true,
+     payment:{method:"vipps",pending:true},
+     message:"Bestillingen er lagret, men Vipps-svaret er uavklart. Kontroller Min side eller kontakt oss. Ikke opprett en ny bestilling eller betal på nytt før den første betalingen er kontrollert."},{status:202});
    }
   }
 
