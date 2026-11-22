@@ -33,7 +33,7 @@ for(const rule of [
  "review_note=note",
  "grant execute on function public.review_manual_product_receipt"
 ])assert.ok(reviewSql.includes(rule),"Missing S26 owner review protection: "+rule);
-assert.ok(read("scripts/sql-s26-manual-payment-receipt-rollback.sql").includes("S26_ROLLBACK_OK"));
+assert.ok(read("scripts/sql-s26-manual-payment-receipt-rollback.sql").includes("S26_ROLLBACK_SUCCESS"));
 
 // Test actual receipt helper with a synthetic Resend transport and in-memory
 // journal. Never connect to Resend or create a real invoice.
