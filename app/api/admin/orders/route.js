@@ -198,7 +198,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     );
   }
 
-  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, paymentVerified, cancellationReason, progressStatus, refundOre, refundReference, refundNote, deliveryWithinRadius, cleanupConfirmation } = await req.json();
+  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, paymentVerified, receiptReviewResult, receiptReviewNote, receiptReviewProviderId, receiptReviewConfirmation, cancellationReason, progressStatus, refundOre, refundReference, refundNote, deliveryWithinRadius, cleanupConfirmation } = await req.json();
   if(adminNote!==undefined&&String(adminNote||"").length>5000)return NextResponse.json({error:"Internt notat kan være maks 5000 tegn."},{status:400});
   if(paymentReference!==undefined&&String(paymentReference||"").length>120)return NextResponse.json({error:"Betalingsreferansen er for lang."},{status:400});
   if(cancellationReason!==undefined&&String(cancellationReason||"").length>1000)return NextResponse.json({error:"Kanselleringsårsaken kan være maks 1000 tegn."},{status:400});
@@ -583,6 +583,35 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
       if(message==="ORDER_REFUND_NOTICE_EMAIL_NOT_CONFIGURED")customerError=resendOnly?"E-post er ikke konfigurert.":"Tilbakebetalingen er registrert, men e-post er ikke konfigurert.";
       return NextResponse.json({error:customerError,statusSaved:!resendOnly,refundResult},{status:500});
     }
+  }
+
+  if(action==="review-manual-receipt"){
+    if(process.env.VERCEL_ENV==="preview")
+      return NextResponse.json({error:"Ekte kvitteringshistorikk kan ikke endres i forhåndsvisning."},{status:403});
+    if(currentUser.role!=="owner")
+      return NextResponse.json({error:"Bare eieren kan avstemme uavklarte kvitteringer."},{status:403});
+    const outcome=String(receiptReviewResult||"");
+    const phrase=outcome==="sent"?"BEKREFTET I RESEND":outcome==="unsent"?"IKKE SENDT":null;
+    if(!phrase||receiptReviewConfirmation!==phrase)
+      return NextResponse.json({error:"Kontroller Resend først, og bruk bekreftelsesteksten."},{status:400});
+    const note=String(receiptReviewNote||"").trim();
+    if(note.length<12||note.length>1200)
+      return NextResponse.json({error:"Skriv hva du faktisk kontrollerte, minst 12 tegn."},{status:400});
+    const emailId=String(receiptReviewProviderId||"").trim();
+    if(outcome==="sent"&&(emailId.length<8||emailId.length>240))
+      return NextResponse.json({error:"Oppgi faktisk Resend-meldings-ID fra leverandørloggen."},{status:400});
+    const review=await s.rpc("review_manual_product_receipt",{
+      p_order_id:id,p_reviewer_id:currentUser.id,p_result:outcome,
+      p_note:note,p_provider_email_id:outcome==="sent"?emailId:null
+    });
+    if(review.error||!review.data?.ok){
+      const still=String(review.error?.message||"").includes("S26_RECEIPT_MAY_STILL_BE_SENDING");
+      return NextResponse.json({error:still?
+        "Kvitteringen kan fortsatt være under sending. Kontroller Resend på nytt etter fem minutter.":
+        "Denne kvitteringen kan ikke avstemmes nå. Oppdater ordren og kontroller Resend-status."},{status:409});
+    }
+    return NextResponse.json({ok:true,receiptState:review.data.state,
+      message:"Sendestatus er journalført etter eierkontroll. Ingen ny e-post og ingen ny betaling er registrert."});
   }
 
   if(action==="record-paid-and-send-receipt"||action==="send-queued-manual-receipt"){
