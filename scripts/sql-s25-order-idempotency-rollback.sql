@@ -62,7 +62,7 @@ BEGIN
   v_stage:=3;
   begin
    perform public.create_service_order_once(gen_random_uuid(),v_hash,
-    v_record||jsonb_build_object('order_number',v_number||'-other'),
+    v_record||jsonb_build_object('order_number',v_number||'-other','payment_reference',v_number||'-other'),
     jsonb_build_array(jsonb_build_object('id',v_product,'quantity',90)),'[]'::jsonb);
    raise exception 'S25_OVERSOLD_NOT_REJECTED';
   exception when others then
