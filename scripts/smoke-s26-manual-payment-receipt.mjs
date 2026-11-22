@@ -124,7 +124,7 @@ assert.ok(t.store.order.receipt_sent_at);
 assert.deepEqual(t.store.lastOptions,{idempotencyKey:"manual-order-receipt/"+t.store.receipt.id});
 assert.equal(t.store.lastMessage.attachments.length,2);
 assert.equal(t.store.lastMessage.to,t.store.receipt.recipient_email);
-assert.match(t.store.lastMessage.attachments[1].content,/^JVBERi0/);
+assert.match(t.store.lastMessage.attachments[1].content,/^JVBERi1/);
 x=await t.run();
 assert.equal(x.status,409);
 assert.equal(t.store.sends,1,"Provider never called again for sent receipt");
