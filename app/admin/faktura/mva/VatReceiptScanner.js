@@ -271,7 +271,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
    const {file,ocrImages}=await createVatMultiPageReceipt(multiPages,setProgress);
    if(thisScan!==scanId.current)return;
    onSelected(null);
-   setImageForCrop(null);setProcessedNotice("Sidene er samlet i én PDF-kopi. Behold originalbildene fra kameraet/telefonen selv.");
+   setImageForCrop(null);setProcessedNotice("Sidene er samlet i én PDF-kopi. Behold papirkvitteringen og eventuelle opprinnelige bilder.");
    await recognizeSelected(file,{converted:true,copyType:"pdf",originalName:file.name},{ocrImages});
    if(thisScan!==scanId.current)return;
    setMultiMode(false);setMultiPages([]);
@@ -391,7 +391,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
       disabled={disabled||busy||multiPages.length>=VAT_MULTI_PAGE_LIMIT} onChange={chooseMulti}/>
     </label>
    </div>
-   <p style={{fontSize:12}}>Du kan fjerne eller flytte sider før du fullfører. Originalbildene forblir på telefonen og må beholdes.</p>
+   <p style={{fontSize:12}}>Du kan fjerne eller flytte sider før du fullfører. Behold papirkvitteringen eller eksisterende originalbilder.</p>
    <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
     <button type="button" className={styles.uploadAction} disabled={disabled||busy||multiPages.length<2}
      onClick={finishMulti}>✓ Fullfør og les alle sidene</button>
