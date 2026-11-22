@@ -46,7 +46,7 @@ export async function POST(req){
   if(intent.error)return NextResponse.json({error:intent.error},{status:400});
   const s=db(); if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
   const current=await s.from("orders")
-   .select("id,order_number,checkout_request_fingerprint,checkout_provider_state,checkout_redirect_url,payment_provider,status,confirmation_sent_at")
+   .select("id,order_number,checkout_request_fingerprint,checkout_provider_state,checkout_redirect_url,payment_provider,status,confirmation_sent_at,payment_status")
    .eq("checkout_request_key",intent.key).maybeSingle();
   if(current.error)return NextResponse.json({error:"Kunne ikke kontrollere om bestillingen allerede finnes."},{status:503});
   if(current.data){
@@ -118,7 +118,7 @@ export async function POST(req){
   const orderId=String(created.data?.order_id||"");
   if(!orderId)throw Error("S25_ORDER_ID_MISSING");
   const {data:createdOrder,error:createdOrderError}=await s.from("orders")
-   .select("id,order_number,checkout_request_fingerprint,checkout_provider_state,checkout_redirect_url,payment_provider,payment_reference,vipps_checkout_started_at,status,confirmation_sent_at")
+   .select("id,order_number,checkout_request_fingerprint,checkout_provider_state,checkout_redirect_url,payment_provider,payment_reference,vipps_checkout_started_at,status,confirmation_sent_at,payment_status")
    .eq("id",orderId).single();
   if(createdOrderError||!createdOrder?.id)throw createdOrderError||new Error("ORDER_ID_MISSING");
   // An overlapping request may have completed while this one was evaluating
