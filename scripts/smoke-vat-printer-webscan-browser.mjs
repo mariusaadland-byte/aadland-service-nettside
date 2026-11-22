@@ -27,7 +27,9 @@ assert.ok(ui.includes('validPrinterPin(pin)')&&ui.includes('type={pinVisible?"te
 assert.ok(ui.includes('navigator.clipboard.writeText(pin.trim())'));
 assert.ok(ui.includes("Lagre PIN på denne enheten")&&ui.includes("Kopier PIN")&&ui.includes("Slett lagret PIN"));
 assert.ok(ui.includes("Lokal lagring er ikke kryptert separat"));
-assert.ok(!/97(?:31|\d{2})\d{5}/.test(ui),"Do not commit a user's actual PIN into public source");
+assert.ok(ui.includes("window.dispatchEvent(new Event(PIN_UPDATED))"));
+assert.ok(ui.includes('window.addEventListener("storage",onStorage)'));
+assert.ok(!/\b\d{8}\b/.test(ui),"Do not commit any eight-digit printer PIN into public source");
 assert.ok(!ui.includes("PIN_KEY,ip")&&!ui.includes('address+"?pin="'),
  "Never put printer PIN into printer URL");
 console.log("HP Webscan: kun privat lokal IP, nettleserfanen åpnes trygt, husker adresse lokalt og ingen automatisk regnskapslagring.");
