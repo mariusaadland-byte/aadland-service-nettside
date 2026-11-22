@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from "react";
 import VatOriginalAttachment from "./VatOriginalAttachment";
 import VatReceiptScanner from "./VatReceiptScanner";
+import VatChromeOsScanner from "./VatChromeOsScanner";
 import VatInvoicePdfViewer from "./VatInvoicePdfViewer";
 import VatDuplicateOriginalPreview from "./VatDuplicateOriginalPreview";
 import styles from "./VatSimpleForm.module.css";
@@ -21,6 +22,11 @@ const parse=value=>{
 const moneyInput=ore=>(ore/100).toFixed(2).replace(".",",");
 const rates=[0,12,15,25];
 const purposeChoices=["Materialer til kundeoppdrag","Verktøy og utstyr","Driftskostnad","Transport i virksomheten"];
+const BATCH_MAX_FILES=40;
+const BATCH_MAX_BYTES=125*1024*1024;
+const BATCH_MAX_IMAGE_BYTES=25*1024*1024;
+const BATCH_MAX_PDF_BYTES=4*1024*1024;
+const BATCH_ACCEPTED=/\.(?:pdf|jpe?g|png|webp|heic|heif)$/i;
 export default function InputVatRegisterClient({purchases,period,onChanged}){
  const [form,setForm]=useState({
   supplierName:"",documentNumber:"",documentDate:"",kind:"purchase",
@@ -42,6 +48,13 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const [ocrMismatchChecked,setOcrMismatchChecked]=useState(false);
  const [scanBusy,setScanBusy]=useState(false);
  const [receiptSession,setReceiptSession]=useState(0);
+ const [batchReceipts,setBatchReceipts]=useState([]);
+ const [batchError,setBatchError]=useState("");
+ const [activeBatchId,setActiveBatchId]=useState(null);
+ const [queuedSelection,setQueuedSelection]=useState(null);
+ const batchSequence=useRef(0);
+ const batchQueued=batchReceipts.filter(item=>item.status==="queued").length;
+ const batchCompleted=batchReceipts.filter(item=>item.status==="registered").length;
  const [showMoreRates,setShowMoreRates]=useState(false);
  const [customPurpose,setCustomPurpose]=useState(false);
  const [attachmentIssue,setAttachmentIssue]=useState(null);
@@ -93,6 +106,9 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  const submittingRef=useRef(false);
  const documentPeriod=vatDocumentPeriod(form.documentDate);
  const chooseReceipt=(file,meta={})=>{
+  // Manually opening a file must never mark the active queue item as processed.
+  if(meta.queueId)setActiveBatchId(meta.queueId);
+  else {setActiveBatchId(null);setQueuedSelection(null);}
   setReceiptFile(file||null);setReceiptIsCopy(Boolean(file&&meta.converted));setAttachmentIssue(null);setError("");setSuccess("");
   setOcrGrossOre(null);setOcrMismatchChecked(false);
   if(!file){
@@ -139,12 +155,47 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
   if(!response.ok)throw Error(data.error||"Originalbilaget kunne ikke lagres.");
   return data;
  };
+ function addBatchReceipts(incoming){
+  const files=Array.from(incoming||[]);
+  if(!files.length)return;
+  const open=batchReceipts.filter(item=>item.status==="queued");
+  if(open.length+files.length>BATCH_MAX_FILES)
+   throw Error("Maks "+BATCH_MAX_FILES+" uregistrerte bilag i skannekøen.");
+  if(files.some(file=>!BATCH_ACCEPTED.test(file.name||"")||
+   (file.type==="application/pdf"||/\.pdf$/i.test(file.name||"")
+    ?file.size>BATCH_MAX_PDF_BYTES:file.size>BATCH_MAX_IMAGE_BYTES)||
+   file.size<=0))
+   throw Error("Bruk PDF (maks 4 MB) eller JPG/PNG/WebP/HEIC (maks 25 MB) per bilag.");
+  const total=open.reduce((sum,item)=>sum+(item.file?.size||0),0)+
+   files.reduce((sum,file)=>sum+file.size,0);
+  if(total>BATCH_MAX_BYTES)throw Error("Køen er for stor (maks 125 MB). Registrer noen bilag først.");
+  const items=files.map(file=>({id:"k"+(++batchSequence.current),file,
+   name:file.name,status:"queued"}));
+  setBatchReceipts(current=>[...current,...items]);
+  setBatchError("");
+ }
+ function chooseBatchReceipt(item){
+  if(!item?.file||item.status!=="queued"||busy||scanBusy||attachmentIssue)return;
+  if((receiptFile||form.supplierName.trim()||form.documentNumber.trim())&&
+   !window.confirm("Bytte bilag nå? Endringer på bilaget du arbeider med blir ikke lagret."))return;
+  setError("");setSuccess("");
+  setActiveBatchId(item.id);
+  setQueuedSelection({id:item.id,file:item.file,request:++batchSequence.current});
+ }
+ function importBatch(event){
+  const files=Array.from(event.target.files||[]);
+  event.target.value="";
+  try{addBatchReceipts(files);}
+  catch(error){setBatchError(error.message||"Kunne ikke legge filene i kø.");}
+ }
  const retryAttachment=async()=>{
   if(!attachmentIssue||busy)return;
   setBusy(true);setError("");
   try{
    await attachToDocument(attachmentIssue.documentId,attachmentIssue.file);
    setAttachmentIssue(null);
+   if(attachmentIssue.queueId)setBatchReceipts(items=>items.map(item=>
+    item.id===attachmentIssue.queueId?{...item,status:"registered",file:null}:item));
    setSuccess("Originalbilaget er nå lagret privat og knyttet til bilaget.");
    onChanged?.({documentDate:attachmentIssue.documentDate});
   }catch(e){setError("Originalbilaget er fortsatt ikke lagret: "+(e.message||"ukjent feil"));}
@@ -268,12 +319,22 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
      attachmentSaved=true;
      setAttachmentIssue(null);
     }catch(attachmentError){
-     setAttachmentIssue({documentId,file:receiptFile,documentDate:form.documentDate,message:attachmentError.message||"Ukjent feil"});
+     setAttachmentIssue({documentId,file:receiptFile,documentDate:form.documentDate,queueId:activeBatchId,message:attachmentError.message||"Ukjent feil"});
     }
    }
    setSuccess(attachmentSaved
     ?receiptFile?(receiptIsCopy?(receiptFile?.type==="application/pdf"?"Bilaget og en samlet PDF-kopi er lagret privat. Behold papiroriginalen.":"Bilaget og en JPEG-kopi er lagret privat. Behold originalfilen i regnskapet."):"Bilaget og originalkvitteringen er lagret privat.")+" MVA-oversikten oppdateres.":"Bilaget er registrert. MVA-oversikten oppdateres."
     :"Bilaget er registrert, men originalfilen er IKKE lagret. Bruk knappen nedenfor for å prøve igjen.");
+   // Registered documents cannot be opened or booked a second time.
+   // Do not move to the next document while an attachment is missing.
+   if(activeBatchId)setBatchReceipts(items=>items.map(item=>item.id===activeBatchId
+    ?{...item,status:attachmentSaved?"registered":"attachment-pending",
+      file:attachmentSaved?null:item.file}:item));
+   const nextBatch=activeBatchId&&attachmentSaved
+    ?batchReceipts.find(item=>item.status==="queued"&&item.id!==activeBatchId):null;
+   setActiveBatchId(null);
+   setQueuedSelection(nextBatch?{id:nextBatch.id,file:nextBatch.file,
+    request:++batchSequence.current}:null);
    setReceiptFile(null);setReceiptIsCopy(false);setOcrGrossOre(null);setOcrMismatchChecked(false);
    setGrossInput("");setVatRateChoice("");
    grossManuallyEdited.current=false;rateManuallyChosen.current=false;grossCalculated.current=false;
@@ -311,10 +372,54 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
  return <section className={styles.registerShell}>
   <div className={styles.header}>
    <h2>Legg til kjøpsbilag</h2>
-   <p className={styles.intro}>Velg faktura eller kvittering fra Filer på telefonen, eller ta et bilde. Du kan lese hele PDF-fakturaen her før registrering.</p>
+   <p className={styles.intro}>Skann eller velg mange kvitteringer først. Gå deretter gjennom én og én med tekstlesing og kontroll før registrering.</p>
   </div>
+  <section className={styles.section} aria-label="Skannekø for kvitteringer"
+   style={{padding:14,border:"1px solid #c7d8d1",borderRadius:13,marginBottom:18}}>
+   <h3 className={styles.groupTitle}>Skannekø – flere kvitteringer</h3>
+   <p className={styles.intro}>Skann mange bilag nå, og registrer dem etterpå ett om gangen.
+    Én PDF eller ett bilde er ett bilag. Har en faktura flere sider, samle sidene i én PDF først.</p>
+   <label className={styles.uploadAction} style={{display:"inline-block",margin:"8px 0"}}>
+    📂 Velg mange PDF-er / bilder
+    <input type="file" aria-label="Legg flere kvitteringer i skannekøen" multiple
+     accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
+     disabled={busy||scanBusy||Boolean(attachmentIssue)} onChange={importBatch}/>
+   </label>
+   <VatChromeOsScanner onScan={async file=>addBatchReceipts([file])}
+    disabled={busy||Boolean(attachmentIssue)}/>
+   <p style={{fontSize:12}}>Køen oppbevares bare på denne fanen mens den er åpen. Ikke oppdater eller lukk siden
+    før du har registrert bilagene eller beholdt originalfilene i Nedlastinger. Ingenting bokføres automatisk.</p>
+   {batchError&&<p role="alert" style={{color:"#a52a21"}}>{batchError}</p>}
+   <p role="status">I kø: <strong>{batchQueued}</strong> · Registrert: <strong>{batchCompleted}</strong>
+    {batchReceipts.some(item=>item.status==="attachment-pending")&&" · Originalvedlegg mangler for et registrert bilag"}</p>
+   {batchReceipts.length>0&&<ol style={{listStyle:"none",padding:0,margin:"10px 0 0",display:"grid",gap:8}}>
+    {batchReceipts.map((item,index)=><li key={item.id}
+     style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,
+      padding:"10px",border:"1px solid #d9e1dc",borderRadius:10,flexWrap:"wrap"}}>
+     <span style={{overflowWrap:"anywhere",flex:"1 1 220px"}}>
+      <strong>{index+1}. {item.name}</strong>
+      <small style={{display:"block"}}>
+       {item.status==="registered"?"Registrert ✓":
+        item.status==="attachment-pending"?"Registrert – vedlegg må lagres":
+        activeBatchId===item.id?"Til kontroll nå":"Venter på kontroll"}
+      </small>
+     </span>
+     {item.status==="queued"&&<div style={{display:"flex",gap:8}}>
+      <button className={styles.textAction} type="button"
+       disabled={busy||scanBusy||Boolean(attachmentIssue)}
+       onClick={()=>chooseBatchReceipt(item)}>
+       {activeBatchId===item.id?"Les på nytt":"Kontroller bilag"}
+      </button>
+      <button className={styles.textAction} type="button"
+       disabled={busy||scanBusy||activeBatchId===item.id}
+       onClick={()=>setBatchReceipts(items=>items.filter(entry=>entry.id!==item.id))}>Fjern</button>
+     </div>}
+    </li>)}
+   </ol>}
+  </section>
   <VatReceiptScanner onSelected={chooseReceipt} onExtracted={receiveScan}
-   onBusyChange={setScanBusy} resetToken={receiptSession} disabled={busy||Boolean(attachmentIssue)}/>
+   onBusyChange={setScanBusy} resetToken={receiptSession} queuedSelection={queuedSelection}
+   disabled={busy||Boolean(attachmentIssue)}/>
   {receiptFile?.type==="application/pdf"&&<VatInvoicePdfViewer file={receiptFile}/>}
   {receiptFile&&receiptPreviewUrl&&<details className={styles.receiptImagePreview}>
    <summary>Vis kvitteringsbildet og kontroller dato/beløp</summary>
