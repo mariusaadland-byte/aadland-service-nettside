@@ -33,8 +33,8 @@ assert.ok(css.includes(".liveCameraPhotoReview")&&css.includes("object-fit:conta
  "Preview must show whole paper without distortion or cropping");
 assert.ok(css.includes(".liveCameraReviewActions")&&css.includes(".liveCameraRetake"));
 assert.ok(css.includes("safe-area-inset-bottom"),"Keep review controls clear of iPhone home indicator");
-assert.ok(scanner.includes('onCapture={file=>{setLiveCamera(false);void chooseSource(file);}}'),
- "Only accepted photo is handed to original OCR flow");
+assert.ok(scanner.includes('onCapture={file=>{setLiveCamera(false);if(multiMode)addMultiSources([file]);else void chooseSource(file);}}'),
+ "Only accepted photo is handed to the chosen single-page or multi-page flow");
 assert.ok(form.includes("setReceiptFile(file||null)"),
  "Retaining original receipt remains controlled by the parent accounting form");
 console.log("Kvitteringskamera forhåndsvisning bestått: Ta på nytt eller Bruk bildet, original beholdes til bekreftelse, sikker iPhone-opprydding.");
