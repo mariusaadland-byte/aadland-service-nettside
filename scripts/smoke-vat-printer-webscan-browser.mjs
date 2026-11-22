@@ -11,12 +11,23 @@ for(const bad of [
 ])assert.equal(vatWebscanLocalAddress(bad),"","Printer local URL rejected: "+bad);
 const ui=readFileSync("app/admin/faktura/mva/VatPrinterWebscan.js","utf8");
 const scanner=readFileSync("app/admin/faktura/mva/VatReceiptScanner.js","utf8");
-assert.ok(ui.includes("window.localStorage.getItem(KEY)"),"Remember IP on browser only");
-assert.ok(ui.includes("window.localStorage.setItem(KEY,ip.trim())"));
+assert.ok(ui.includes("window.localStorage.getItem(IP_KEY)"),"Remember IP on browser only");
+assert.ok(ui.includes("window.localStorage.setItem(IP_KEY,ip.trim())"));
 assert.ok(ui.includes('window.open(address,"_blank","noopener,noreferrer")'),"Open local EWS with no opener access");
 assert.ok(!ui.includes("fetch(")&&!ui.includes("XMLHttpRequest")&&!ui.includes("document.cookie"));
 assert.ok(ui.includes("Webscan")&&ui.includes("Skann")&&ui.includes("Sikkerhet"));
 assert.ok(ui.includes("kan ikke hente skanninger")&&ui.includes("Velg mange PDF-er / bilder"));
 assert.ok(scanner.includes('import VatPrinterWebscan from "./VatPrinterWebscan";'));
 assert.ok(scanner.includes('<VatPrinterWebscan disabled={disabled||busy||Boolean(cropJob)}/>'));
+assert.ok(ui.includes('const PIN_KEY="aadland-vat-local-hp-webscan-pin"'));
+assert.ok(ui.includes('window.localStorage.getItem(PIN_KEY)'));
+assert.ok(ui.includes('window.localStorage.setItem(PIN_KEY,pin.trim())'));
+assert.ok(ui.includes('window.localStorage.removeItem(PIN_KEY)'));
+assert.ok(ui.includes('validPrinterPin(pin)')&&ui.includes('type={pinVisible?"text":"password"}'));
+assert.ok(ui.includes('navigator.clipboard.writeText(pin.trim())'));
+assert.ok(ui.includes("Lagre PIN på denne enheten")&&ui.includes("Kopier PIN")&&ui.includes("Slett lagret PIN"));
+assert.ok(ui.includes("Lokal lagring er ikke kryptert separat"));
+assert.ok(!/97(?:31|\d{2})\d{5}/.test(ui),"Do not commit a user's actual PIN into public source");
+assert.ok(!ui.includes("PIN_KEY,ip")&&!ui.includes('address+"?pin="'),
+ "Never put printer PIN into printer URL");
 console.log("HP Webscan: kun privat lokal IP, nettleserfanen åpnes trygt, husker adresse lokalt og ingen automatisk regnskapslagring.");
