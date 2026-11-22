@@ -24,7 +24,7 @@ function validDate(value){
 }
 async function loadJob(s,id){
  const {data:order,error}=await s.from("orders")
-  .select("id,order_number,order_type,status,customer,customer_user_id,total_ore,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at,job_reminder_sent_at")
+  .select("id,order_number,order_type,status,customer,customer_user_id,total_ore,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at,job_reminder_sent_at,job_plan_revision,archived_at")
   .eq("id",id).maybeSingle();
  if(error){
   if(String(error.code||"")==="42703")return {setupRequired:true,error:"Databaseoppdatering mangler for oppdragsplanlegging."};
@@ -49,6 +49,8 @@ export async function GET(req){
  if(loaded.setupRequired)return NextResponse.json({error:loaded.error,setupRequired:true},{status:409});
  if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status||500});
  const o=loaded.order;
+ const delivery=await jobDelivery(s,id,o.job_plan_revision,o.job_confirmation_sent_at);
+ if(delivery.error)return NextResponse.json({error:"Bekreftelsesloggen kunne ikke leses."},{status:503});
  return NextResponse.json({job:{
   id:o.id,
   orderNumber:o.order_number,
@@ -60,61 +62,121 @@ export async function GET(req){
   planningUpdatedAt:o.job_planning_updated_at||null,
   confirmationSentAt:o.job_confirmation_sent_at||null,
   reminderSentAt:o.job_reminder_sent_at||null,
+  planRevision:o.job_plan_revision||null,
+  delivery:delivery.status,
   quote:loaded.quote?{
    id:loaded.quote.id,
    quoteNumber:loaded.quote.quote_number,
    title:loaded.quote.title||"Oppdrag",
    earliestStartDate:loaded.quote.planned_start_date||null
   }:null
- }});
+ },canReview:user.role==="owner"});
 }
 
-async function savePlan(s,id,startAt,agreement,currentStartAt=null,currentAgreement=""){
+async function jobDelivery(s,id,revision,previousSentAt){
+ const {data,error}=await s.from("job_plan_confirmation_attempts")
+  .select("id,plan_revision,state,recipient_email,claimed_at,sent_at,provider_email_id,issue")
+  .eq("order_id",id).order("claimed_at",{ascending:false}).limit(40);
+ if(error)return {error:true};
+ const attempts=data||[];
+ const unresolved=attempts.find(a=>["sending","needs_review"].includes(a.state));
+ const current=attempts.find(a=>a.plan_revision===revision);
+ return {status:{
+  state:current?.state||(previousSentAt?"legacy_sent":"not_sent"),
+  attemptId:current?.id||null,
+  claimedAt:current?.claimed_at||null,
+  sentAt:current?.sent_at||previousSentAt||null,
+  providerId:current?.provider_email_id||null,
+  issue:current?.issue||null,
+  unresolved:unresolved?{
+   id:unresolved.id,state:unresolved.state,claimedAt:unresolved.claimed_at,
+   email:unresolved.recipient_email,issue:unresolved.issue
+  }:null
+ }};
+}
+
+async function savePlan(s,id,startAt,agreement,expectedRevision,existingOrder){
  const start=validDate(startAt);
  if(!start)return {error:"Velg gyldig dato og klokkeslett for oppstart.",status:400};
  if(!agreement)return {error:"Skriv kort hva som er avtalt videre med kunden.",status:400};
- const now=new Date().toISOString();
- const oldStart=currentStartAt?new Date(currentStartAt).toISOString():null;
- const startChanged=oldStart!==start;
- const planChanged=startChanged||clean(currentAgreement,8000)!==agreement;
- const {data,error}=await s.from("orders").update({
-  job_start_at:start,
-  job_customer_agreement:agreement,
-  job_planning_updated_at:now,
-  ...(planChanged?{job_confirmation_sent_at:null,job_reminder_sent_at:null}:{}),
-  updated_at:now
- }).eq("id",id).select("id,order_number,order_type,status,customer,customer_user_id,total_ore,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at,job_reminder_sent_at").single();
+ const {data,error}=await s.rpc("save_job_plan_once",{
+  p_order_id:id,p_start_at:start,p_agreement:agreement,
+  p_expected_revision:expectedRevision||null
+ });
  if(error){
-  if(String(error.code||"")==="42703")return {setupRequired:true,error:"Databaseoppdatering mangler for oppdragsplanlegging.",status:409};
-  return {error:"Planen kunne ikke lagres.",status:500};
+  const message=String(error.message||"");
+  if(/S27_STALE_PLAN/.test(message))
+   return {error:"Planen ble endret i en annen fane. Last den inn på nytt før du lagrer.",status:409};
+  if(/S27_JOB_NOT_ELIGIBLE/.test(message))
+   return {error:"Oppdraget er ikke lenger aktivt og bekreftet.",status:409};
+  if(/42883|PGRST202|42P01|42703/.test(String(error.code||"")))
+   return {error:"Databaseoppdatering mangler for sikker oppdragsbekreftelse.",status:409,setupRequired:true};
+  return {error:"Planen kunne ikke lagres. Ingen e-post er sendt.",status:503};
  }
- return {data};
+ return {changed:Boolean(data?.changed),revision:data?.revision,
+  data:{...existingOrder,job_start_at:data?.start_at,
+   job_customer_agreement:data?.agreement,
+   job_plan_revision:data?.revision,job_confirmation_sent_at:data?.confirmation_sent_at,
+   job_reminder_sent_at:data?.reminder_sent_at}};
 }
 
-export async function PATCH(req){ const originError=sameOriginGuard(req); if(originError)return originError;
+async function holdAttempt(s,attemptId,issue,cancel=false){
+ const {data,error}=await s.rpc("hold_job_plan_confirmation",{
+  p_attempt_id:attemptId,p_issue:issue,p_cancel:cancel
+ });
+ if(error||!data?.held)console.error("S27 CONFIRMATION HOLD UNCONFIRMED",{issue});
+}
+
+export async function PATCH(req){const originError=sameOriginGuard(req);if(originError)return originError;
  const user=await allowed();
  if(!user)return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const body=await req.json().catch(()=>({}));
  const id=clean(body.id,100);
- const agreement=clean(body.agreement,8000);
  if(!id)return NextResponse.json({error:"Oppdrag mangler."},{status:400});
  const s=db();
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+ if(body.action==="review"){
+  if(user.role!=="owner")return NextResponse.json({error:"Bare eieren kan avklare uvisse sendeforsøk."},{status:403});
+  const note=clean(body.note,1200);
+  const outcome=body.outcome;
+  const phrase=outcome==="sent"?"BEKREFTET I RESEND":outcome==="unsent"?"IKKE SENDT":null;
+  const providerId=clean(body.providerId,240);
+  if(!phrase||body.confirmation!==phrase||note.length<12||
+    outcome==="sent"&&providerId.length<8)
+   return NextResponse.json({error:"Kontroller Resend og fyll inn bekreftelsestekst, merknad og eventuell meldings-ID."},{status:400});
+  const attemptId=clean(body.attemptId,100);
+  const {data:belongs,error:lookupError}=await s.from("job_plan_confirmation_attempts")
+   .select("id").eq("id",attemptId).eq("order_id",id).maybeSingle();
+  if(lookupError||!belongs)return NextResponse.json({
+   error:"Sendeforsøket tilhører ikke dette oppdraget."},{status:404});
+  const {data,error}=await s.rpc("review_job_plan_confirmation",{
+   p_attempt_id:attemptId,p_reviewer_id:user.id,
+   p_result:outcome,p_note:note,p_provider_email_id:outcome==="sent"?providerId:null
+  });
+  if(error)return NextResponse.json({error:"Sendeforsøket kan ikke avklares ennå. Vent minst fem minutter og kontroller Resend-loggen."},{status:409});
+  return NextResponse.json({ok:true,reviewed:data?.reviewed===true,state:data?.state});
+ }
+ const agreement=clean(body.agreement,8000);
  const loaded=await loadJob(s,id);
  if(loaded.setupRequired)return NextResponse.json({error:loaded.error,setupRequired:true},{status:409});
  if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status||500});
- const saved=await savePlan(s,id,body.startAt,agreement,loaded.order.job_start_at,loaded.order.job_customer_agreement);
+ const saved=await savePlan(s,id,body.startAt,agreement,body.expectedRevision,loaded.order);
  if(saved.error)return NextResponse.json({error:saved.error,setupRequired:saved.setupRequired===true},{status:saved.status||500});
+ const delivery=await jobDelivery(s,id,saved.revision,saved.data.job_confirmation_sent_at);
+ if(delivery.error)return NextResponse.json({error:"Planen ble lagret, men sendestatus kunne ikke hentes."},{status:503});
  return NextResponse.json({ok:true,job:{
-  startAt:saved.data.job_start_at,
-  agreement:saved.data.job_customer_agreement,
-  planningUpdatedAt:saved.data.job_planning_updated_at,
+  startAt:saved.data.job_start_at,agreement:saved.data.job_customer_agreement,
+  planningUpdatedAt:saved.changed?new Date().toISOString():loaded.order.job_planning_updated_at,
   confirmationSentAt:saved.data.job_confirmation_sent_at,
-  reminderSentAt:saved.data.job_reminder_sent_at
+  reminderSentAt:saved.data.job_reminder_sent_at,
+  planRevision:saved.revision,delivery:delivery.status
  }});
 }
 
 export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;
+ // Never send real customer email from a Vercel preview using a fallback key.
+ if(process.env.VERCEL_ENV!=="production")return NextResponse.json({
+  error:"Bekreftelser kan bare sendes fra produksjon, ikke fra testmiljø."},{status:403});
  const user=await allowed();
  if(!user)return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const body=await req.json().catch(()=>({}));
@@ -127,17 +189,36 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  if(loaded.setupRequired)return NextResponse.json({error:loaded.error,setupRequired:true},{status:409});
  if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status||500});
 
- const saved=await savePlan(s,id,body.startAt,agreement,loaded.order.job_start_at,loaded.order.job_customer_agreement);
+ const saved=await savePlan(s,id,body.startAt,agreement,body.expectedRevision,loaded.order);
  if(saved.error)return NextResponse.json({error:saved.error,setupRequired:saved.setupRequired===true},{status:saved.status||500});
 
  const email=clean(saved.data.customer?.email,254).toLowerCase();
  if(!email)return NextResponse.json({error:"Planen er lagret, men kunden mangler e-postadresse."},{status:409});
 
- const resendKey=process.env.VERCEL_ENV==="preview"
-  ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)
-  :process.env.RESEND_API_KEY;
+ const resendKey=process.env.RESEND_API_KEY;
  if(!resendKey)return NextResponse.json({error:"Planen er lagret, men e-post er ikke konfigurert."},{status:503});
 
+ const {data:attempt,error:claimError}=await s.rpc("claim_job_plan_confirmation",{
+  p_order_id:id,p_revision:saved.revision,p_expected_email:email
+ });
+ if(claimError)return NextResponse.json({error:"Sendekontrollen var utilgjengelig. Planen er lagret, men ingen e-post er sendt."},{status:503});
+ if(!attempt?.id)return NextResponse.json({error:"Bekreftelsen er allerede forsøkt, sendt eller trenger kontroll. Oppdater planen og se sendestatus før ny utsending."},{status:409});
+ // Preflight prevents an old plan from being sent when another operator
+ // changes the schedule after the one-time claim but before provider delivery.
+ const preflight=await loadJob(s,id);
+ if(preflight.error){
+  await holdAttempt(s,attempt.id,"preflight_unavailable");
+  return NextResponse.json({error:"Planen kunne ikke kontrolleres på nytt. Utsending er sperret for sikkerhets skyld."},{status:409});
+ }
+ const now=preflight.order;
+ if(now.job_plan_revision!==saved.revision||
+  Number(new Date(now.job_start_at))!==Number(new Date(saved.data.job_start_at))||
+  clean(now.job_customer_agreement,8000)!==agreement||
+  clean(now.customer?.email,254).toLowerCase()!==email||
+  now.status!=="confirmed"||now.archived_at){
+  await holdAttempt(s,attempt.id,"plan_or_recipient_changed",true);
+  return NextResponse.json({error:"Planen ble endret før sending. Ingen e-post ble sendt; last inn gjeldende plan."},{status:409});
+ }
  const title=loaded.quote?.title||"Oppdrag";
  const startText=new Date(saved.data.job_start_at).toLocaleString("nb-NO",{
   dateStyle:"long",timeStyle:"short",timeZone:"Europe/Oslo"
@@ -174,19 +255,17 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
    replyTo:"post@aadland-service.no",
    subject:"Bekreftelse på oppstart – "+title,
    html
+  },{idempotencyKey:"job-plan-confirmation/"+attempt.id});
+  if(sent?.error||!sent?.data?.id)throw new Error("provider_status_uncertain");
+  const ack=await s.rpc("ack_job_plan_confirmation",{
+   p_attempt_id:attempt.id,p_provider_email_id:String(sent.data.id)
   });
-  if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
+  if(ack.error||!ack.data?.provider_accepted||!ack.data.marker_recorded)
+   return NextResponse.json({error:"Resend tok imot bekreftelsen, men sendestatus må kontrolleres. Ikke send på nytt.",emailAccepted:true},{status:409});
  }catch(err){
-  console.error("JOB PLANNING EMAIL ERROR",err);
-  return NextResponse.json({error:"Planen er lagret, men bekreftelsen kunne ikke sendes på e-post."},{status:500});
+  // A timeout or transport error does NOT prove the email was never accepted.
+  await holdAttempt(s,attempt.id,"provider_status_uncertain");
+  return NextResponse.json({error:"Uavklart sendestatus. Kontroller Resend før noe nytt forsøk. Planen er lagret.",needsReview:true},{status:409});
  }
-
- const sentAt=new Date().toISOString();
- const {data:stamped,error:stampError}=await s.from("orders")
-  .update({job_confirmation_sent_at:sentAt,job_reminder_sent_at:null,updated_at:sentAt})
-  .eq("id",id).eq("job_start_at",saved.data.job_start_at)
-  .eq("job_customer_agreement",saved.data.job_customer_agreement)
-  .select("id").maybeSingle();
- if(stampError||!stamped)return NextResponse.json({error:"Bekreftelsen ble sendt, men planen kan ha blitt endret eller sendestatus kunne ikke lagres. Last inn planen og kontroller den før du sender på nytt.",emailSent:true,sentTo:email},{status:409});
- return NextResponse.json({ok:true,sentTo:email,sentAt});
+ return NextResponse.json({ok:true,sentTo:email,sentAt:new Date().toISOString(),planRevision:saved.revision});
 }

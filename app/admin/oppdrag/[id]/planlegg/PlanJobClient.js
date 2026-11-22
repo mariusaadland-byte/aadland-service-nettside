@@ -17,6 +17,20 @@ export default function PlanJobClient({jobId}){
  const [sending,setSending]=useState(false);
  const [error,setError]=useState("");
  const [message,setMessage]=useState("");
+ const [canReview,setCanReview]=useState(false);
+ const [reviewResult,setReviewResult]=useState("");
+ const [reviewNote,setReviewNote]=useState("");
+ const [reviewEmailId,setReviewEmailId]=useState("");
+ const [reviewConfirmation,setReviewConfirmation]=useState("");
+ const [reviewing,setReviewing]=useState(false);
+ const dirty=Boolean(job)&&(startAt!==osloDateTimeLocal(job.startAt)||
+  agreement.trim()!==(job.agreement||"").trim());
+ const delivery=job?.delivery||{};
+ const blockedByUnresolved=Boolean(delivery.unresolved);
+ const confirmedCurrent=Boolean(job?.confirmationSentAt)&&!dirty;
+ const attemptedCurrent=delivery.state!=="not_sent"&&delivery.state!=="legacy_sent"&&
+  Boolean(delivery.state)&&!dirty;
+ const cannotSend=blockedByUnresolved||confirmedCurrent||attemptedCurrent;
 
  async function load(){
   setLoading(true);setError("");
@@ -24,7 +38,7 @@ export default function PlanJobClient({jobId}){
    const r=await fetch("/api/admin/jobs/plan?id="+encodeURIComponent(jobId),{cache:"no-store"});
    const d=await r.json().catch(()=>({}));
    if(!r.ok)throw new Error(d.setupRequired?"Databaseoppdatering mangler for planlegging av oppdrag.":(d.error||"Oppdraget kunne ikke lastes."));
-   setJob(d.job);setStartAt(osloDateTimeLocal(d.job.startAt));setAgreement(d.job.agreement||"");
+   setJob(d.job);setCanReview(Boolean(d.canReview));setStartAt(osloDateTimeLocal(d.job.startAt));setAgreement(d.job.agreement||"");
   }catch(err){setError(err.message||"Oppdraget kunne ikke lastes. Kontroller nettet og prøv igjen.");}
   finally{setLoading(false);}
  }
@@ -35,7 +49,8 @@ export default function PlanJobClient({jobId}){
   return {
    id:jobId,
    startAt:startAt?osloLocalDateTimeToIso(startAt):"",
-   agreement
+   agreement,
+   expectedRevision:job?.planRevision||null
   };
  }
 
@@ -55,8 +70,31 @@ export default function PlanJobClient({jobId}){
   finally{setSaving(false);}
  }
 
+ async function review(){
+  if(reviewing||saving||sending||!canReview||!delivery.unresolved)return;
+  const phrase=reviewResult==="sent"?"BEKREFTET I RESEND":"IKKE SENDT";
+  if(!["sent","unsent"].includes(reviewResult)||reviewConfirmation!==phrase||
+   reviewNote.trim().length<12||
+   reviewResult==="sent"&&reviewEmailId.trim().length<8){
+   setError("Kontroller Resend og fyll ut resultat, bekreftelsestekst og merknad.");return;
+  }
+  setReviewing(true);setError("");setMessage("");
+  try{
+   const response=await fetch("/api/admin/jobs/plan",{method:"PATCH",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({action:"review",id:jobId,attemptId:delivery.unresolved.id,
+     outcome:reviewResult,confirmation:reviewConfirmation,
+     note:reviewNote,providerId:reviewEmailId})});
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(result.error||"Kontrollen kunne ikke lagres.");
+   setReviewResult("");setReviewNote("");setReviewEmailId("");setReviewConfirmation("");
+   await load();
+   setMessage("Resend-kontrollen er lagret. Ingen ny e-post er sendt.");
+  }catch(err){setError(err.message||"Kunne ikke fullføre Resend-kontrollen.");}
+  finally{setReviewing(false);}
+ }
  async function send(){
-  if(saving||sending)return;
+  if(saving||sending||cannotSend)return;
   if(!startAt){setError("Velg avtalt oppstart først.");return}
   if(!agreement.trim()){setError("Skriv hva som er avtalt videre med kunden.");return}
   const email=job?.customer?.email||"kunden";
@@ -68,7 +106,10 @@ export default function PlanJobClient({jobId}){
    const r=await fetch("/api/admin/jobs/plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
    const d=await r.json().catch(()=>({}));
    if(!r.ok){await load();throw new Error(d.error||"Bekreftelsen kunne ikke sendes.");}
-   setJob(current=>({...current,startAt:body.startAt,agreement:body.agreement,confirmationSentAt:d.sentAt||new Date().toISOString()}));
+   setJob(current=>({...current,startAt:body.startAt,agreement:body.agreement,
+    planRevision:d.planRevision||current.planRevision,
+    confirmationSentAt:d.sentAt||new Date().toISOString(),
+    delivery:{state:"sent",sentAt:d.sentAt}}));
    setMessage("Bekreftelse er sendt til "+(d.sentTo||email)+".");
   }catch(err){setError(err.message||"Bekreftelsen kunne ikke bekreftes sendt. Last inn planen før du prøver igjen.");}
   finally{setSending(false);}
@@ -113,10 +154,42 @@ export default function PlanJobClient({jobId}){
      <textarea rows="8" value={agreement} onChange={e=>setAgreement(e.target.value)} placeholder="F.eks. Vi starter med riving mandag. Kunde sørger for at rommet er tømt. Materiallevering avtales fortløpende."/>
     </div>
 
+    {blockedByUnresolved&&<p className="notice"><strong>Sendestatus må avklares.</strong>
+     Et tidligere forsøk har uavklart resultat. Kontroller Resend før noen ny kundebekreftelse sendes.</p>}
+    {confirmedCurrent&&<p className="success">Gjeldende plan er allerede bekreftet på e-post.
+     Endre dato eller avtaletekst før en ny bekreftelse kan sendes.</p>}
+    {attemptedCurrent&&!confirmedCurrent&&!blockedByUnresolved&&
+     <p className="notice">Denne planversjonen har allerede hatt et sendeforsøk.
+      Den kan ikke sendes automatisk på nytt.</p>}
     <div className="jobPlanningActions">
-     <button className="btn alt" type="button" disabled={saving||sending} onClick={save}>{saving?"Lagrer …":"Lagre plan"}</button>
-     <button className="btn jobPlanningSend" type="button" disabled={saving||sending} onClick={send}>{sending?"Sender …":"Lagre og send bekreftelse"}</button>
+     <button className="btn alt" type="button" disabled={saving||sending||reviewing} onClick={save}>{saving?"Lagrer …":"Lagre plan"}</button>
+     <button className="btn jobPlanningSend" type="button" disabled={saving||sending||reviewing||cannotSend} onClick={send}>{sending?"Sender …":"Lagre og send bekreftelse"}</button>
     </div>
+    {delivery.unresolved&&canReview&&<section style={{padding:14,marginTop:20,
+     border:"1px solid #d5a66f",borderRadius:10}}>
+     <h3>Avklar uvisst sendeforsøk</h3>
+     <p>Dette sender ingen ny e-post. Finn den faktiske meldingsstatusen i Resend.
+      Vent minst fem minutter etter forsøket før du registrerer utfallet.</p>
+     <label>Resultat fra Resend
+      <select value={reviewResult} onChange={e=>{setReviewResult(e.target.value);setReviewConfirmation("");}}>
+       <option value="">Velg kontrollert resultat</option>
+       <option value="sent">Bekreftet akseptert i Resend</option>
+       <option value="unsent">Bekreftet IKKE sendt</option>
+      </select>
+     </label>
+     {reviewResult==="sent"&&<label>Resend meldings-ID
+      <input value={reviewEmailId} onChange={e=>setReviewEmailId(e.target.value)} placeholder="Faktisk ID fra Resend"/>
+     </label>}
+     <label>Hva kontrollerte du? (minst 12 tegn)
+      <textarea rows={3} value={reviewNote} onChange={e=>setReviewNote(e.target.value)}/>
+     </label>
+     <label>Bekreft kontrollen
+      <input value={reviewConfirmation} onChange={e=>setReviewConfirmation(e.target.value)}
+       placeholder={reviewResult==="sent"?"BEKREFTET I RESEND":"IKKE SENDT"}/>
+     </label>
+     <button type="button" className="btn alt" disabled={reviewing||saving||sending||!reviewResult}
+      onClick={review}>{reviewing?"Kontrollerer …":"Lagre kontroll uten ny sending"}</button>
+    </section>}
    </section>
 
    <aside className="card jobPlanningSummary">
@@ -130,6 +203,11 @@ export default function PlanJobClient({jobId}){
      <span><small>Status</small><b>{job.status}</b></span>
      <span><small>Sist lagret</small><b>{job.planningUpdatedAt?dateTime(job.planningUpdatedAt):"Ikke planlagt"}</b></span>
      <span><small>Bekreftelse sendt</small><b>{job.confirmationSentAt?dateTime(job.confirmationSentAt):"Ikke sendt"}</b></span>
+     <span><small>Sendestatus</small><b>{delivery.unresolved?"Må kontrolleres":
+      delivery.state==="sent"||delivery.state==="reviewed_sent"?"Akseptert av Resend":
+      delivery.state==="cancelled"?"Avbrutt – plan endret":
+      delivery.state==="reviewed_unsent"?"Bekreftet ikke sendt":
+      job.confirmationSentAt?"Sendt tidligere":"Ikke forsøkt"}</b></span>
      <span><small>Påminnelse sendt</small><b>{job.reminderSentAt?dateTime(job.reminderSentAt):"Ikke sendt"}</b></span>
     </div>
     <p className="muted">Når bekreftelsen sendes, får kunden avtalt oppstart og teksten du har skrevet under «Hva er avtalt videre».</p>
