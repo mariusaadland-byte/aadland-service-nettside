@@ -170,7 +170,7 @@ async function readLocalReceipt(file,onProgress,readerRef,options={}){
  return {text:best.text,confidence:best.confidence,format,parsed:best.parsed,retried:best.retried};
 }
 
-export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,documentType="receipt",disabled=false,resetToken=0}){
+export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,documentType="receipt",disabled=false,resetToken=0,queuedSelection=null}){
  const [progress,setProgress]=useState("");
  const [error,setError]=useState("");
  const [details,setDetails]=useState(null);
@@ -221,7 +221,7 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
    :"Lesing fullført på "+seconds+" s, men ingen sikre opplysninger funnet. Juster utsnitt eller ta et skarpere bilde.");
 
  }
- async function chooseSource(source){
+ async function chooseSource(source,meta={}){
   if(!source||busy||disabled||cropJob)return;
   setError("");setDetails(null);setProgress("");setProcessedNotice("");setImageForCrop(null);setDiagnostic(null);
   // Keep the current attachment if the new file cannot be opened/validated.
@@ -231,13 +231,14 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
   try{
    const prepared=await prepareReceiptFile(source,setProgress);
    if(thisScan!==scanId.current)return;
-   onSelected(null);
+   if(meta.queueId)onSelected(null,{queueId:meta.queueId});else onSelected(null);
    const file=prepared.file;
    if(file.type!=="application/pdf")
     setImageForCrop({file,originalName:source.name,previouslyConverted:prepared.converted});
    // Start OCR immediately. Cropping is optional, not a mandatory two-step gate.
    setProgress("Bildet er valgt. Starter automatisk tekstlesing …");
-   await recognizeSelected(file,{converted:prepared.converted,originalName:source.name});
+   if(meta.queueId)await recognizeSelected(file,{converted:prepared.converted,originalName:source.name,queueId:meta.queueId});
+   else await recognizeSelected(file,{converted:prepared.converted,originalName:source.name});
   }catch(e){
    setProgress("");
    setError("Automatisk tekstlesing lyktes ikke: "+String(e.message||"ukjent feil")+
@@ -247,6 +248,11 @@ export default function VatReceiptScanner({onSelected,onExtracted,onBusyChange,d
    onBusyChange?.(false);
   }
  }
+ // A queued receipt must pass the same file validation, OCR and review as a manual import.
+ useEffect(()=>{
+  if(!queuedSelection?.request||!queuedSelection.file)return;
+  void chooseSource(queuedSelection.file,{queueId:queuedSelection.id});
+ },[queuedSelection?.request]);
  function addMultiSources(sources){
   if(disabled||busy||!multiMode||!sources.length)return;
   if(multiPages.length+sources.length>VAT_MULTI_PAGE_LIMIT){
