@@ -12,7 +12,7 @@ Bruk isolerte testdata og egne testkontoer; preview skal ikke sende ekte e-post 
 - [ ] S-13: dokumenter DPA, lagringsplan, overføringer og cookie-/tredjepartsrevisjon; praktisk innsyn/sletting med identitetskontroll.
 
 ## B. Regnskap og betaling
-- [ ] S-05: avstem de 18 kjøpsbilagene fra 21.11 mot faktiske Tripletex-ID-er, original, beløp, konto og MVA; e-postaksept er ikke bokføringsbevis.
+- [ ] S-05: avstem alle aktive kjøpsbilag mot faktiske Tripletex-ID-er (26.11: 68 aktive, 68 med originalregistrering, 68 aksepterte overføringer, 0 dokumentert bokføringskontroll), original, beløp, konto og MVA; e-postaksept er ikke bokføringsbevis.
 - [ ] S-06: sammenhold MVA-terminer med faktiske innsendingskvitteringer og registrer dokumentert status.
 - [ ] S-08: kontroller AS-WEB-2026-000004 i Tripletex før eventuell overføring; ikke opprett dublett.
 - [ ] S-09: hent oppdaterte Vipps-oppgjør, avstem gebyr/saldo og eventuelle faktiske bankutbetalinger mot Tripletex.
