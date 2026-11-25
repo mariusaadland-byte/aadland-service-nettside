@@ -1533,10 +1533,11 @@ function Orders({ orders, status, canUpdateOrders, isOwner=false, reload }) {
    {order.orderType!=="custom"&&<div className="orderPaymentPanel">
     <h4>Ordrebekreftelse</h4>
     <div className="orderPaymentFacts">
-     <span><small>Status</small><b>{order.confirmationSentAt?"Sendt":"Ikke registrert sendt"}</b></span>
+     <span><small>Status</small><b>{order.confirmationSentAt?"Registrert hos e-postleverandør":order.confirmationDeliveryState==="queued"?"Venter på første utsending":order.confirmationDeliveryState==="claimed"||order.confirmationDeliveryState==="needs_review"||order.confirmationDeliveryState==="legacy_review"?"Må kontrolleres i Resend":order.confirmationDeliveryState==="skipped"?"Utsending stoppet":order.confirmationDeliveryState==="unavailable"?"Sendestatus utilgjengelig":"Ikke registrert sendt"}</b></span>
      {order.confirmationSentAt&&<span><small>Sist sendt</small><b>{new Date(order.confirmationSentAt).toLocaleString("nb-NO")}</b></span>}
     </div>
-    {canUpdateOrders&&<button className="btn alt" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>resendOrderConfirmation(order)}>{savingId===order.id?"Sender …":order.confirmationSentAt?"Send ordrebekreftelse på nytt":"Send ordrebekreftelse"}</button>}
+    {order.confirmationDeliveryState&&!["queued","accepted"].includes(order.confirmationDeliveryState)&&<p className="notice">Ingen automatisk ny utsending. Kontroller meldingshistorikken før videre handling.</p>}
+    {canUpdateOrders&&(!order.confirmationDeliveryState||order.confirmationDeliveryState==="queued")&&<button className="btn alt" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>resendOrderConfirmation(order)}>{savingId===order.id?"Sender …":order.confirmationSentAt?"Send ordrebekreftelse på nytt":"Send ordrebekreftelse"}</button>}
    </div>}
    {order.orderType!=="custom"&&<div className="orderPaymentPanel">
     <h4>Betaling og kvittering</h4>
