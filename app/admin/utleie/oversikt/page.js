@@ -54,7 +54,7 @@ export default async function RentalDashboard(){
    <Stat label="Produkter" value={stats.products} href="/admin/utleie" description="Alle registrerte produkttyper"/>
    <Stat label="Publisert og bookbart" value={stats.published} href="/admin/utleie" description="Ikke sanntids lagerkapasitet"/>
    <Stat label="Vedlikehold" value={stats.maintenance} href="/admin/utleie" description="Produktstatus vedlikehold"/>
-  </div><nav className={styles.links}><Link href="/admin/utleie">Utstyr</Link><Link href="/admin/utleie/ny">Legg til utstyr</Link></nav></section>}
+  </div><nav className={styles.links}><Link href="/admin/utleie">Utstyr</Link><Link href="/admin/utleie/ny">Legg til utstyr</Link><Link href="/admin/utleie/enheter">Individregister og QR-koder</Link></nav></section>}
   {user.role==="owner"&&<section><h2>Registrerte betalinger – hele historikken</h2>{!amounts&&<p className={styles.warning}>Beløp ikke vist: grunnlaget er ufullstendig, over 1 000 bookinger eller må avstemmes.</p>}<div className={styles.grid}>
    <Stat label="Registrert leiebetaling" value={money(amounts?.captured??null)} href="/admin?vis=rentalBookings" description="Inkl. mva."/>
    <Stat label="Registrert refundert" value={money(amounts?.refunded??null)} href="/admin?vis=rentalBookings" description="Leie, ikke depositum"/>

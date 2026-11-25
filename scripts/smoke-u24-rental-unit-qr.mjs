@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import qrcode from "../lib/vendor/qrcode.mjs";
+import {rentalUnitUrl,rentalUnitLabel,rentalUnitInput} from "../lib/rentalUnitQr.mjs";
+const id="00000000-0000-4000-8000-000000000001",item="00000000-0000-4000-8000-000000000002";
+assert.ok(rentalUnitUrl(id).endsWith(id));
+assert.equal(rentalUnitUrl("https://example.invalid"),null);
+assert.notEqual(rentalUnitLabel(id),rentalUnitLabel(item));
+assert.deepEqual(rentalUnitInput({itemId:item,requestId:id,serialNumber:" X "}),{id,rental_item_id:item,serial_number:"X"});
+assert.equal(rentalUnitInput({itemId:item,requestId:id,serialNumber:"x\ny"}),null);
+const q=qrcode(0,"M");q.addData(rentalUnitUrl(id),"Byte");q.make();assert.ok(q.getModuleCount()>20);
+const api=readFileSync("app/api/admin/rental/units/route.js","utf8");
+assert.ok(api.includes('RENTAL_UNIT_REGISTER_ENABLED!=="true"')&&api.includes('process.env.VERCEL_ENV!=="production"'));
+assert.ok(api.includes("user.canManageProducts")&&!api.includes('.from("rental_items").update'));
+assert.ok(readFileSync("app/admin/utleie/enheter/[id]/page.js","utf8").includes("getAdminUser()"));
+console.log("U-24 unit identity, QR generation and activation guards passed.");
