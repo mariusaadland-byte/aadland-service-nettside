@@ -32,7 +32,7 @@ const gates=[
  ['settlement','archiveMode&&selectedInvoiceAction==="invoice-settlement"&&<InvoiceSettlementPanel'],
  ['timeline','archiveMode&&selectedInvoiceAction==="invoice-activity-timeline"&&<InvoiceActivityTimeline'],
  ['statement','archiveMode&&selectedInvoiceAction==="invoice-payment-statement"&&<InvoicePaymentStatementPanel'],
- ['Vipps','!form.split_group_id&&(!archiveMode||selectedInvoiceAction==="invoice-vipps-payment")&&<InvoiceVippsPanel'],
+ ['Vipps','archiveMode&&!form.split_group_id&&selectedInvoiceAction==="invoice-vipps-payment"&&<InvoiceVippsPanel'],
  ['payments','archiveMode&&selectedInvoiceAction==="invoice-payment-actions"&&paymentInfo&&<section'],
  ['credit notes','archiveMode&&selectedInvoiceAction==="invoice-credit-note"&&<InvoiceCreditNotePanel'],
  ['friendly reminder','archiveMode&&selectedInvoiceAction==="invoice-friendly-reminder"&&<InvoiceFriendlyReminderPanel'],
