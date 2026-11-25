@@ -1,3 +1,4 @@
+import {rentalHandoverRecord} from "../../../../lib/rentalHandover.mjs";
 import {rentalDateChangeAttempt} from "../../../../lib/rentalChangeRequest.mjs";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
@@ -575,6 +576,12 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
      ?"Bruk «Bekreft og send e-post» eller «Avbryt og varsle kunde» på nye bookinger."
      :"Status kan bare flyttes ett steg videre i utleieflyten."
    },{status:409});
+  }
+  if(b.status!==current.status&&["active","returned"].includes(b.status)){
+   if(b.adminNote!==undefined)return NextResponse.json({error:"Lagre internt notat separat fra kontrollen."},{status:400});
+   const checked=rentalHandoverRecord(current,b.status,b.handoverChecklist,now);
+   if(checked.error)return NextResponse.json({error:checked.error},{status:409});
+   changes.admin_note=checked.note;
   }
   if(b.status==="completed"&&current.status!=="completed"){
    const total=Math.max(0,Number(current.total_ore)||0);

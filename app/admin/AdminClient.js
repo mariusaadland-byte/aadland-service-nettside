@@ -1,5 +1,6 @@
 "use client";
 
+import {rentalHandoverChecklist} from "../../lib/rentalHandover.mjs";
 import { useEffect, useState } from "react";
 import { nok } from "../../lib/catalog";
 import {osloDateKey,osloDateTimeLocal,osloLocalDateTimeToIso} from "../../lib/osloTime";
@@ -4593,6 +4594,25 @@ alter table public.rental_bookings add column if not exists deposit_received_at 
 alter table public.rental_bookings add column if not exists deposit_released_at timestamptz;
 alter table public.rental_bookings add column if not exists deposit_charged_ore integer not null default 0;`;
 
+function RentalHandoverControl({booking,busy,onSubmit}){
+ const next=booking.status==="confirmed"?"active":"returned";
+ const fields=rentalHandoverChecklist(next);
+ const [checks,setChecks]=useState({});
+ const [note,setNote]=useState("");
+ const [deviation,setDeviation]=useState(false);
+ const missingDeposit=next==="active"&&Number(booking.depositOre)>0&&(booking.depositStatus!=="held"||Number(booking.depositHeldOre)<Number(booking.depositOre));
+ const ready=fields.every(([key])=>checks[key]===true)&&(!(deviation||missingDeposit)||note.trim().length>=10);
+ return <section className="orderPaymentPanel rentalHandoverPanel">
+  <h4>{next==="active"?"Kontroll før utlevering":"Kontroll ved tilbakelevering"}</h4>
+  <p className="muted">Bekreft hvert punkt. Registreringen endrer status og legger kontrollen i internt notat, men flytter ikke penger.</p>
+  {fields.map(([key,label])=><label key={key} style={{display:"flex",alignItems:"center",gap:10,minHeight:44}}><input type="checkbox" checked={checks[key]===true} onChange={e=>setChecks(v=>({...v,[key]:e.target.checked}))}/>{label}</label>)}
+  <label style={{display:"flex",alignItems:"center",gap:10,minHeight:44}}><input type="checkbox" checked={deviation} onChange={e=>setDeviation(e.target.checked)}/>Avvik eller skade må følges opp</label>
+  {missingDeposit&&<p className="notice">Depositum er ikke registrert fullt mottatt/holdt. Beskriv avtalt avvik før utlevering.</p>}
+  <div className="field"><label>Kontrollmerknad / avtalt avvik</label><textarea rows={3} maxLength={700} value={note} onChange={e=>setNote(e.target.value)}/></div>
+  <button type="button" className="btn" disabled={busy||!ready} onClick={()=>onSubmit({status:next,handoverChecklist:{checks,note,deviation}})}>{busy?"Lagrer …":next==="active"?"Registrer utlevert":"Registrer returnert"}</button>
+ </section>;
+}
+
 function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymentSetupRequired=false,initialOpenId=""}){
  const statuses={new:"Ny",confirmed:"Bekreftet",active:"Utlevert",returned:"Returnert",completed:"Ferdig",cancelled:"Avbrutt"};
  const paymentLabels={unpaid:"Ikke betalt",pending:"Venter",authorized:"Reservert",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert",cancelled:"Kansellert"};
@@ -4899,8 +4919,9 @@ function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymen
     {b.cancellationSentAt&&<span>✓ Avbestilling sendt {new Date(b.cancellationSentAt).toLocaleString("nb-NO")}</span>}
    </div>}
 
-   <div className="field"><label>Status</label><select disabled={!canUpdate||savingId===b.id||statusChoices(b).length===1} value={b.status} onChange={e=>patch(b.id,{status:e.target.value})}>{statusChoices(b).map(value=><option key={value} value={value}>{statuses[value]||value}</option>)}</select>{b.status==="new"&&<small className="muted">Bekreft eller avbryt bookingen med knappene nederst, slik at kunden alltid varsles.</small>}{b.status==="returned"&&settlementIssue(b)&&<small className="muted">Kan ikke settes som ferdig: {settlementIssue(b)}</small>}</div>
+   <div className="field"><label>Status</label><select disabled={!canUpdate||savingId===b.id||statusChoices(b).length===1||["confirmed","active"].includes(b.status)} value={b.status} onChange={e=>patch(b.id,{status:e.target.value})}>{statusChoices(b).map(value=><option key={value} value={value}>{statuses[value]||value}</option>)}</select>{b.status==="new"&&<small className="muted">Bekreft eller avbryt bookingen med knappene nederst, slik at kunden alltid varsles.</small>}{b.status==="returned"&&settlementIssue(b)&&<small className="muted">Kan ikke settes som ferdig: {settlementIssue(b)}</small>}</div>
 
+   {canUpdate&&["confirmed","active"].includes(b.status)&&<RentalHandoverControl key={b.id+":"+b.status} booking={b} busy={savingId===b.id} onSubmit={changes=>patch(b.id,changes)}/>}
    <section className="orderPaymentPanel rentalPaymentPanel">
     <h4>Leiebetaling</h4>
     <VippsFeePreview amountOre={Number(b.totalOre)||0} title="Vipps – hele leiebeløpet" note="Depositum inngår ikke i denne beregningen." disabled={savingId===b.id}/>
