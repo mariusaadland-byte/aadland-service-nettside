@@ -84,6 +84,7 @@ export default function Utleie(){
      <div>
       <span className="catalogEyebrow">UTLEIEKATALOG</span>
       <h2>Hva trenger du?</h2>
+      <p className="rentalPriceNote">Leiepriser inkl. mva. Eventuelt depositum kommer i tillegg.</p>
      </div>
      {!loading&&!setup&&!error&&<span role="status" aria-live="polite">Viser {visible.length} av {filtered.length} {filtered.length===1?"produkt":"produkter"}</span>}
     </div>

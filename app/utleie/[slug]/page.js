@@ -322,6 +322,7 @@ export default function RentalDetailPage(){
        {item.weeklyPriceOre!=null&&<div><small>Ukepris</small><b>{kr(item.weeklyPriceOre)}</b></div>}
        {item.depositOre>0&&<div><small>Depositum</small><b>{kr(item.depositOre)}</b></div>}
       </div>
+      <p className="rentalPriceNote">Leiepriser inkl. mva. Depositum er separat.</p>
       <div className="rentalFulfillment">
        {item.pickupAvailable&&<span>Henting</span>}
        {item.deliveryAvailable&&<span>Levering</span>}

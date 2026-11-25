@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import {rentalProductPricingError,rentalProductWarnings} from "../lib/rentalProductValidation.mjs";
+const b={dailyPriceOre:45000,weekendPriceOre:"",weeklyPriceOre:null,depositOre:0,status:"available",active:true,pickupAvailable:true};
+assert.equal(rentalProductPricingError(b),null);
+for(const v of [0,-1,NaN,1.5,"45000",100000001])assert.ok(rentalProductPricingError({...b,dailyPriceOre:v}));
+for(const key of ["weekendPriceOre","weeklyPriceOre"])for(const v of [0,-1,1.5])assert.ok(rentalProductPricingError({...b,[key]:v}));
+assert.equal(rentalProductPricingError({...b,weeklyPriceOre:100,depositOre:0}),null);
+assert.ok(rentalProductPricingError({...b,longTermDiscountPercent:10,longTermDays:""}));
+assert.ok(rentalProductPricingError({...b,pickupAvailable:false,deliveryAvailable:false}));
+assert.equal(rentalProductPricingError({...b,pickupAvailable:false,deliveryAvailable:false,active:false}),null);
+assert.ok(rentalProductWarnings(b).length>=2);
+assert.ok(rentalProductWarnings({...b,weeklyPriceOre:400000}).some(x=>x.includes("Ukeprisen")));
+assert.ok(rentalProductWarnings({...b,longTermDiscountPercent:100}).some(x=>x.includes("100 %")));
+console.log("U-06: validering av leiepris, depositum, utlevering og produktvarsler bestått.");
