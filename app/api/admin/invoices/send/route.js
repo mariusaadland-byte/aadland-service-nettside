@@ -1,3 +1,4 @@
+import {invoiceIssueInputError} from "../../../../../lib/invoiceIssueInputReadiness";
 import {NextResponse} from "next/server";
 import {getAdminUser} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
@@ -37,6 +38,8 @@ export async function POST(req){
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invoice.customer?.email||""))return fail("Fyll inn en gyldig e-postadresse før e-postsending.");
  if(invoice.sent_at)return NextResponse.json({ok:true,alreadySent:true,invoiceNumber:invoice.invoice_number,sentTo:invoice.customer.email});
  if(invoice.status==="draft"){
+  const inputError=invoiceIssueInputError(invoice);
+  if(inputError)return fail(inputError);
   const result=await s.rpc("issue_invoice_draft",{p_id:id,p_expected_updated_at:invoice.updated_at});
   if(result.error)return fail(result.error.message);
   invoice=result.data;
