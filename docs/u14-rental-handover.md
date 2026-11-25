@@ -1,0 +1,3 @@
+# U-14 – Utlevering og retur
+
+Sjekklister for bekreftet→utlevert og utlevert→returnert. Kontroller kunde/utstyr, tilstand, tilbehør, sikkerhet, returdato og oppgjør. Avvik krever merknad; manglende registrert depositum krever dokumentert avtalt avvik, ikke en ny absolutt betalingsregel. Server validerer alle avkrysninger og legger datert kontroll til eksisterende internt notat med samme optimistiske statusoppdatering. Notatet er redigerbart, ikke en uforanderlig revisjonslogg. Eksisterende krav om betalt leie og oppgjort depositum før fullføring beholdes. Ingen automatisk pengeflytting, kundevarsling, bildeopplasting eller databaseendring. Praktisk test og varig kontrollhistorikk gjenstår; bildedokumentasjon behandles i U-15.

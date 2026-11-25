@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {rentalHandoverChecklist,rentalHandoverRecord} from "../lib/rentalHandover.mjs";
+const b={deposit_ore:10000,deposit_status:"held",deposit_held_ore:10000,admin_note:"Tidligere notat"};
+const checks=s=>Object.fromEntries(rentalHandoverChecklist(s).map(([key])=>[key,true]));
+const at="2026-11-25T18:00:00Z";
+assert.ok(rentalHandoverRecord(b,"active",{checks:{}},at).error);
+assert.ok(rentalHandoverRecord(b,"active",{checks:checks("active")},at).note.includes("Tidligere notat"));
+assert.ok(rentalHandoverRecord({...b,deposit_status:"not_paid"},"active",{checks:checks("active")},at).error);
+assert.ok(rentalHandoverRecord({...b,deposit_status:"not_paid"},"active",{checks:checks("active"),note:"Avtalt betaling ved retur"},at).note.includes("Avtalt betaling ved retur"));
+assert.ok(rentalHandoverRecord(b,"returned",{checks:checks("returned"),deviation:true},at).error);
+assert.ok(rentalHandoverRecord(b,"returned",{checks:checks("returned"),deviation:true,note:"Skade på håndtak"},at).note.includes("RETURKONTROLL"));
+assert.ok(rentalHandoverRecord({...b,admin_note:"x".repeat(5000)},"returned",{checks:checks("returned")},at).error);
+const api=readFileSync("app/api/admin/rental-bookings/route.js","utf8");
+assert.ok(api.includes("rentalHandoverRecord(current,b.status,b.handoverChecklist,now)"));
+assert.ok(api.includes("changes.admin_note=checked.note"));
+console.log("U-14 handover and return checklist safeguards passed.");
