@@ -8,11 +8,11 @@ function memoryDb(initial){
   then(resolve){chain.maybeSingle().then(resolve)}
  };return chain;}};
 }
-let creates=0,amounts=[],failCreate=false,existingState="CREATED",lastInput;
+let creates=0,amounts=[],failCreate=false,existingState="CREATED",existingMissing=false,lastInput;
 const code=readFileSync("lib/startRentalVippsPayment.js","utf8").replace(/^import .*;\n/gm,"").replace(/export /g,"");
 const startPayment=new Function("crypto","createVippsPayment","getVippsPayment","vippsUnitReadiness","syncVippsPaymentSnapshot","rentalBookingSiteUrl",code+"return startRentalVippsPayment;")(
  crypto,async input=>{lastInput=input;creates++;amounts.push(input.amountOre);if(failCreate)throw Error("Timeout");return {redirectUrl:input.userFlow==="PUSH_MESSAGE"?undefined:"https://example.invalid/pay",pspReference:"PSP-TEST"}},
- async()=>({state:existingState,redirectUrl:"https://example.invalid/pay"}),async()=>({ready:true}),async()=>({db:{status:"pending"}}),()=>"https://example.invalid"
+ async()=>{if(existingMissing)throw Object.assign(Error("Not found"),{status:404});return {state:existingState,redirectUrl:"https://example.invalid/pay"}},async()=>({ready:true}),async()=>({db:{status:"pending"}}),()=>"https://example.invalid"
 );
 const booking={id:"booking-a",booking_number:"AS-U-TEST",status:"confirmed",total_ore:12500,deposit_ore:50000,payment_status:"unpaid",payment_reference:null,payment_captured_ore:0,payment_refunded_ore:0,customer:{}};
 const db=memoryDb(booking);
@@ -23,6 +23,12 @@ failCreate=true;const failedDb=memoryDb({...booking,id:"booking-b"});const fail=
 assert.equal(fail.status,502);assert.ok(failedDb.row.payment_reference,"Keep the reference after an uncertain provider response");assert.equal(failedDb.row.payment_status,"pending");
 failCreate=false;const createsBefore=creates;
 const reuse=await startPayment({s:failedDb,booking:{...failedDb.row}});assert.equal(reuse.body.reused,true);assert.equal(creates,createsBefore);
+assert.match(lastInput.idempotencyKey,/^[a-f0-9]{64}$/);
+existingMissing=true;
+const uncertain=await startPayment({s:failedDb,booking:{...failedDb.row}});
+assert.equal(uncertain.status,409);assert.equal(creates,createsBefore,"404 after uncertain creation must not create another payment");
+assert.equal(failedDb.row.payment_reference,lastInput.reference);
+existingMissing=false;
 assert.equal((await startPayment({s:db,booking:{...booking,payment_captured_ore:12500}})).status,409);
 const client=readFileSync("lib/vippsClient.js","utf8");
 const phoneCode=client.slice(client.indexOf("function normalizedPhone"),client.indexOf("export function vippsPaymentsEnabled"));
