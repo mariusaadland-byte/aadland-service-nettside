@@ -5,6 +5,7 @@ import { nok } from "../../lib/catalog";
 import {osloDateKey,osloDateTimeLocal,osloLocalDateTimeToIso} from "../../lib/osloTime";
 import { useRouter } from "next/navigation";
 import navStyles from "./adminNav.module.css";
+import CustomerVerificationReview from "./CustomerVerificationReview";
 import VippsFeePreview from "./VippsFeePreview";
 
 const ADMIN_IMAGE_TYPES=new Set(["image/jpeg","image/png","image/webp"]);
@@ -39,7 +40,7 @@ const ADMIN_NAV_GROUPS=[
   {id:"rental",title:"Utleie",icon:"▣",ids:["rental","rentalCalendar","rentalBookings"]},
   {id:"tools",title:"Kalkyle og betaling",icon:"⌗",ids:["calculator","materialAi","vipps","vippsCostCalculator"]},
   {id:"website",title:"Nettsiden",icon:"▥",ids:["projects","homepage"]},
-  {id:"settings",title:"Styring og utvikling",icon:"⚙",ids:["drift","roadmap","users"]}
+  {id:"settings",title:"Styring og utvikling",icon:"⚙",ids:["drift","roadmap","customerVerifications","users"]}
 ];
 export default function AdminClient({ user }) {
   const [tab, setTab] = useState("overview");
@@ -512,7 +513,8 @@ export default function AdminClient({ user }) {
     ["vippsSettlement","Vipps-oppgjør og avstemming"],
      ["vippsCostCalculator","Vipps-kostnadskalkulator"],
     ["drift", "Driftskontroll"],
-     ["roadmap", "Utviklingsplan"]
+     ["roadmap", "Utviklingsplan"],
+     ["customerVerifications","Kundebekreftelser"]
   );
   const navLabels=new Map(tabs);
   const searchText=menuSearch.trim().toLocaleLowerCase("nb-NO");
@@ -645,6 +647,8 @@ export default function AdminClient({ user }) {
             ? "Forside"
             : tab === "drawing"
             ? "Tegning & visualisering"
+            : tab === "customerVerifications"
+            ? "Kundebekreftelser"
             : "Brukere"}
         </h1>
 
@@ -883,6 +887,8 @@ export default function AdminClient({ user }) {
         {tab === "homepage" && canManageProducts && (
           <HomepageManager services={services} projects={projects} settings={siteSettings} reload={load} setTab={setTab} setError={setError} />
         )}
+
+        {tab === "customerVerifications" && user?.role==="owner" && <CustomerVerificationReview/>}
 
         {tab === "users" && canManageUsers && (
           <Users
