@@ -52,6 +52,7 @@ function number(value){
  return Number.isFinite(parsed)?Math.max(0,parsed):0;
 }
 function ore(value){return Math.round(number(value)*100)}
+function validAmountInput(value){return /^\d+(?:[.,]\d{1,2})?$/.test(String(value??"").trim())}
 function kroner(oreValue){
  return new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",minimumFractionDigits:2,maximumFractionDigits:2}).format((Number(oreValue)||0)/100);
 }
@@ -182,7 +183,7 @@ export default function WorkClockClient({userName}){
   }finally{setBusy(false)}
  }
  async function start(){
-  if(!String(timerDraft.hourlyRate).trim()){
+  if(!validAmountInput(timerDraft.hourlyRate)){
    setError("Skriv inn timepris før du starter arbeidsklokken.");return;
   }
   const deductedMinutes=String(timerDraft.deductedHours).trim()?parseDeductionHours(timerDraft.deductedHours):0;
@@ -320,10 +321,10 @@ export default function WorkClockClient({userName}){
   if(!String(manual.durationHours).trim()||number(manual.durationHours)<=0){
    setError("Skriv inn antall arbeidstimer før du lagrer.");return;
   }
-  if(!String(manual.hourlyRate).trim()){
+  if(!validAmountInput(manual.hourlyRate)){
    setError("Skriv inn timepris før du lagrer.");return;
   }
-  if(number(manual.distanceKm)>0&&!String(manual.kmRate).trim()){
+  if(number(manual.distanceKm)>0&&!validAmountInput(manual.kmRate)){
    setError("Skriv inn kilometersats når du registrerer kjøring.");return;
   }
   const deductedMinutes=String(manual.deductedHours).trim()?parseDeductionHours(manual.deductedHours):0;
