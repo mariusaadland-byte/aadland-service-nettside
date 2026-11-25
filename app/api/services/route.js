@@ -15,5 +15,13 @@ export async function GET() {
     (!service.publishFrom || new Date(service.publishFrom).getTime() <= now) &&
     (!service.publishUntil || new Date(service.publishUntil).getTime() >= now)
   );
-  return NextResponse.json({ services });
+  // When all services are hidden or scheduled for the future, prevent
+  // the public website from showing default services as a fallback.
+  let configured=(data||[]).length>0;
+  if(!configured){
+    const check=await s.from("services").select("id",{count:"exact",head:true});
+    if(check.error)return NextResponse.json({error:"Tjenestestatus kunne ikke kontrolleres."},{status:503});
+    configured=(check.count||0)>0;
+  }
+  return NextResponse.json({services,configured},{headers:{"Cache-Control":"no-store"}});
 }
