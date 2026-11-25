@@ -23,7 +23,7 @@ for(const x of [0,1,15,30,60,75,90,120,900,99999]){
  "Stored minute amounts should roundtrip correctly through hours input: "+x);
 }
 const ui=read("app/admin/arbeidsklokke/WorkClockClient.js");
-assert.ok(ui.includes('deductedHours:"0"'),"New drafts use hours, not minutes");
+assert.ok(ui.includes('deductedHours:""'),"New drafts leave minustid blank and still store hours");
 assert.ok(ui.includes("deductedHours:formatDeductionHours(entry.deductedMinutes||0)"));
 assert.ok(ui.includes("parseDeductionHours(manual.deductedHours)"));
 assert.ok(ui.includes("parseDeductionHours(editing.deductedHours)"));

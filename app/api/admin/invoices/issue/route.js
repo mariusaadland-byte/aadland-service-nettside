@@ -1,3 +1,4 @@
+import {invoiceIssueInputError} from "../../../../../lib/invoiceIssueInputReadiness";
 import {NextResponse} from "next/server";
 import {getAdminUser} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
@@ -24,6 +25,8 @@ export async function POST(req){
  if(invoice.status==="draft"&&invoice.automatic_send&&invoice.auto_send_state==="scheduled")
   return fail("Stopp automatisk utsendelse først dersom du vil fakturere manuelt.",409);
  if(invoice.status==="draft"){
+  const inputError=invoiceIssueInputError(invoice);
+  if(inputError)return fail(inputError);
   const issued=await s.rpc("issue_invoice_draft",{p_id:id,p_expected_updated_at:invoice.updated_at});
   if(issued.error)return fail(issued.error.message);
   invoice=issued.data;

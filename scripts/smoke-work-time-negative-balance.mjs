@@ -117,7 +117,7 @@ assert.equal(r.status,400);
 const ui=read("app/admin/arbeidsklokke/WorkClockClient.js");
 assert.ok(ui.includes('onClick={saveRunningMinus}'));
 assert.ok(ui.includes('action:"setDeduction"'));
-assert.ok(ui.includes("deductedMinutes=parseDeductionHours(timerDraft.deductedHours)"));
+assert.ok(ui.includes("String(timerDraft.deductedHours).trim()?parseDeductionHours(timerDraft.deductedHours):0"));
 assert.ok(ui.includes("setNetMinutesByScope(data.netMinutesByScope||{})"));
 assert.ok(ui.includes('Samlet timessaldo for oppdraget'));
 assert.ok(ui.includes('Lagre minustid'));

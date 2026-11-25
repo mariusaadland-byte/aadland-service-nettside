@@ -28,6 +28,7 @@ import InvoiceSplitPanel from "./InvoiceSplitPanel";
 import InvoiceSecondPartReschedule from "./InvoiceSecondPartReschedule";
 import {invoiceWithSelectedCustomer} from "../../../lib/invoiceCustomerSelection";
 import {invoiceSavedDraft} from "../../../lib/invoiceCanonicalSave";
+import {invoiceIssueInputError} from "../../../lib/invoiceIssueInputReadiness";
 import {hasAdjustableVippsPriceLine,linesForCustomerTotal} from "../../../lib/vippsPriceLines";
 import {COMPANY_INFO,COMPANY_ADDRESS} from "../../../lib/companyInfo";
 const money=ore=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(ore)||0)/100);
@@ -334,6 +335,10 @@ export default function InvoicesClient({archiveMode=false,isOwner=false}){
  },[archiveMode,draft?.id]);
  async function printInvoice(){
   if(!form||busy)return;
+  if(form.status==="draft"){
+   const missing=invoiceIssueInputError(form);
+   if(missing){setError(missing);return;}
+  }
   if(form.status==="draft"&&!window.confirm("Utstede faktura på "+money(total(form.line_items))+" inkl. MVA? Fakturaen får nummer og låses for videre endringer. Den sendes ikke på e-post automatisk."))return;
   let printWindow=null;setBusy(true);setError("");setSaved("");
   try{
@@ -355,6 +360,10 @@ export default function InvoicesClient({archiveMode=false,isOwner=false}){
  }
  async function sendInvoice(){
   if(!form||busy)return;
+  if(form.status==="draft"){
+   const missing=invoiceIssueInputError(form);
+   if(missing){setError(missing);return;}
+  }
   const recipient=String(form.customer?.email||"").trim();
   if(!recipient){setError("Fyll inn kundens e-postadresse på kundekortet før sending.");return;}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)){setError("Fyll inn en gyldig e-postadresse.");return;}
@@ -629,8 +638,8 @@ export default function InvoicesClient({archiveMode=false,isOwner=false}){
  <label>Arbeidssted (hvis forskjellig fra kundens adresse) <input value={form.customer?.workAddress||""} onChange={e=>change("customer",{...form.customer,workAddress:e.target.value})}/></label>
  <label>Prismodell <select value={form.pricing_model} onChange={e=>change("pricing_model",e.target.value)}><option value="fixed">Fastpris</option><option value="hourly">Timepris – kontroller faktiske timer</option><option value="estimate">Prisoverslag</option></select></label>
  <label>Arbeidsbeskrivelse – utført arbeid og hva som inngår <textarea rows={6} maxLength={3000} placeholder="Beskriv arbeidet, materialene og hva som er inkludert i fakturaen..." value={form.customer?.workDescription||""} onChange={e=>change("customer",{...form.customer,workDescription:e.target.value})}/></label>
- <h3>Fakturalinjer</h3>{form.line_items.map((l,i)=><div key={i} style={{borderBottom:"1px solid #ccc",padding:"12px 0"}}><input aria-label="Beskrivelse" value={l.description||""} onChange={e=>changeLine(i,"description",e.target.value)}/><label>Antall <input type="number" min="0" step="0.01" value={l.quantity} onChange={e=>changeLine(i,"quantity",e.target.value)}/></label><label>Enhetspris eks. MVA (kr) <input type="number" min="0" step="0.01" value={(Number(l.unitPriceOre)||0)/100} onChange={e=>changeLine(i,"unitPriceOre",Math.round(Number(e.target.value)*100))}/></label><label>MVA % <select value={l.vatRate} onChange={e=>changeLine(i,"vatRate",Number(e.target.value))}><option value="25">25</option><option value="15">15</option><option value="12">12</option><option value="0">0</option></select></label></div>)}
- <button onClick={()=>change("line_items",[...form.line_items,{description:"",quantity:1,unit:"stk",unitPriceOre:0,vatRate:25,type:"work"}])}>Legg til linje</button>
+ <h3>Fakturalinjer</h3>{form.line_items.map((l,i)=><div key={i} style={{borderBottom:"1px solid #ccc",padding:"12px 0"}}><input aria-label="Beskrivelse" value={l.description||""} onChange={e=>changeLine(i,"description",e.target.value)}/><label>Antall <input type="number" min="0" step="0.01" value={l.quantity??""} onChange={e=>changeLine(i,"quantity",e.target.value===""?null:e.target.value)}/></label><label>Enhetspris eks. MVA (kr) <input type="number" min="0" step="0.01" value={l.unitPriceOre==null?"":Number(l.unitPriceOre)/100} onChange={e=>changeLine(i,"unitPriceOre",e.target.value===""?null:Math.round(Number(e.target.value)*100))}/></label><label>MVA % <select value={l.vatRate} onChange={e=>changeLine(i,"vatRate",Number(e.target.value))}><option value="25">25</option><option value="15">15</option><option value="12">12</option><option value="0">0</option></select></label></div>)}
+ <button onClick={()=>change("line_items",[...form.line_items,{description:"",quantity:null,unit:"stk",unitPriceOre:null,vatRate:25,type:"work"}])}>Legg til linje</button>
  <h3>Sum inkl. MVA: {money(total(form.line_items))}</h3>
  <label>Notater <textarea value={form.notes||""} onChange={e=>change("notes",e.target.value)}/></label>
  <p>Avsender: noreply@aadland-service.no</p>

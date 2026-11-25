@@ -14,10 +14,10 @@ const priceRoute=read("app/api/admin/quote-preferences/route.js");
 const preview=read("app/admin/kalkulator/QuoteTransferPanel.js");
 
 assert.ok(calc.includes('hourlyRate:"500"'));
-assert.ok(workClock.includes('const DEFAULT_RATE="500"'));
+assert.ok(workClock.includes('const DEFAULT_RATE=""'));
 assert.ok(workClock.includes("Timepris inkl. mva"));
 assert.ok(calc.includes('kmRate:"5.30"'));
-assert.ok(workClock.includes('const DEFAULT_KM_RATE="5.30"'));
+assert.ok(workClock.includes('const DEFAULT_KM_RATE=""'));
 assert.ok(priceRoute.includes("default_material_markup??15"));
 assert.ok(calc.includes('materialMarkup:"15"'));
 assert.ok(calc.includes('tollPreset:"none"'));

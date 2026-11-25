@@ -6,8 +6,8 @@ import styles from "./workClock.module.css";
 import {clockAfterDeduction,formatDeductionHours,parseDeductionHours} from "../../../lib/workTimeDeduction";
 import WorkClockCustomerPicker from "./WorkClockCustomerPicker";
 
-const DEFAULT_RATE="500";
-const DEFAULT_KM_RATE="5.30";
+const DEFAULT_RATE="";
+const DEFAULT_KM_RATE="";
 
 function osloDate(){
  const parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Oslo",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
@@ -52,6 +52,7 @@ function number(value){
  return Number.isFinite(parsed)?Math.max(0,parsed):0;
 }
 function ore(value){return Math.round(number(value)*100)}
+function validAmountInput(value){return /^\d+(?:[.,]\d{1,2})?$/.test(String(value??"").trim())}
 function kroner(oreValue){
  return new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",minimumFractionDigits:2,maximumFractionDigits:2}).format((Number(oreValue)||0)/100);
 }
@@ -72,10 +73,10 @@ function xml(value){
 }
 function moneyNumber(oreValue){return ((Number(oreValue)||0)/100).toFixed(2)}
 function defaultDraft(){
- return {orderId:"",customerRef:"",projectLabel:"",customerLabel:"",note:"",hourlyRate:DEFAULT_RATE,deductedHours:"0"};
+ return {orderId:"",customerRef:"",projectLabel:"",customerLabel:"",note:"",hourlyRate:DEFAULT_RATE,deductedHours:""};
 }
 function defaultManual(){
- return {...defaultDraft(),workDate:osloDate(),durationHours:"",deductedHours:"0",distanceKm:"",kmRate:DEFAULT_KM_RATE,toll:""};
+ return {...defaultDraft(),workDate:osloDate(),durationHours:"",deductedHours:"",distanceKm:"",kmRate:DEFAULT_KM_RATE,toll:""};
 }
 
 export default function WorkClockClient({userName}){
@@ -97,7 +98,7 @@ export default function WorkClockClient({userName}){
  const [credits,setCredits]=useState([]);
  const [laborOreByScope,setLaborOreByScope]=useState({});
  const [netMinutesByScope,setNetMinutesByScope]=useState({});
- const [activeMinusInput,setActiveMinusInput]=useState("0");
+ const [activeMinusInput,setActiveMinusInput]=useState("");
  const [creditEditor,setCreditEditor]=useState(null);
  const [selectedCreditOrder,setSelectedCreditOrder]=useState("");
 
@@ -118,7 +119,7 @@ export default function WorkClockClient({userName}){
    setSetupRequired(false);
    setEntries(Array.isArray(data.entries)?data.entries:[]);
    setActive(data.active||null);
-   setActiveMinusInput(formatDeductionHours(data.active?.deductedMinutes||0));
+   setActiveMinusInput(data.active?.deductedMinutes?formatDeductionHours(data.active.deductedMinutes):"");
    setNetMinutesByScope(data.netMinutesByScope||{});
    setCredits(Array.isArray(data.credits)?data.credits:[]);
    setLaborOreByScope(data.laborOreByScope||{});
@@ -182,7 +183,10 @@ export default function WorkClockClient({userName}){
   }finally{setBusy(false)}
  }
  async function start(){
-  const deductedMinutes=parseDeductionHours(timerDraft.deductedHours);
+  if(!validAmountInput(timerDraft.hourlyRate)){
+   setError("Skriv inn timepris før du starter arbeidsklokken.");return;
+  }
+  const deductedMinutes=String(timerDraft.deductedHours).trim()?parseDeductionHours(timerDraft.deductedHours):0;
   if(deductedMinutes===null){setError("Oppgi gyldig minustid i timer, f.eks. 15 eller 1,5.");return;}
   const data=await request("POST",{
    action:"start",
@@ -199,7 +203,7 @@ export default function WorkClockClient({userName}){
   });
   if(!data)return;
   setActive(data.entry);
-  setActiveMinusInput(formatDeductionHours(data.entry.deductedMinutes));
+  setActiveMinusInput(data.entry.deductedMinutes?formatDeductionHours(data.entry.deductedMinutes):"");
   const startedScope=data.entry.orderId?"order:"+data.entry.orderId:"entry:"+data.entry.id;
   setNetMinutesByScope(current=>({...current,[startedScope]:(Number(current[startedScope])||0)-deductedMinutes}));
   setLaborOreByScope(current=>({...current,[startedScope]:
@@ -215,7 +219,7 @@ export default function WorkClockClient({userName}){
   if(!data)return;
   setEditing(null);
   setActive(data.entry);
-  setActiveMinusInput(formatDeductionHours(data.entry.deductedMinutes));
+  setActiveMinusInput(data.entry.deductedMinutes?formatDeductionHours(data.entry.deductedMinutes):"");
   setNow(Date.now());
   setMessage("Klokken fortsetter på samme registrering. Tidligere timer er beholdt.");
   setEntries(current=>current.map(item=>item.id===data.entry.id?data.entry:item));
@@ -234,7 +238,7 @@ export default function WorkClockClient({userName}){
   setLaborOreByScope(previous=>({...previous,[scope]:(Number(previous[scope])||0)+newBase-oldBase}));
   setNetMinutesByScope(previous=>({...previous,[scope]:(Number(previous[scope])||0)+
    (Number(active.deductedMinutes)||0)-(Number(data.entry.deductedMinutes)||0)}));
-  setActiveMinusInput(formatDeductionHours(data.entry.deductedMinutes));
+  setActiveMinusInput(data.entry.deductedMinutes?formatDeductionHours(data.entry.deductedMinutes):"");
   setEntries(current=>current.map(entry=>entry.id===data.entry.id?data.entry:entry));
   setMessage(deltaMinutes>0?"30 minutter lunsj er trukket fra arbeidstiden.":"Siste lunsjtrekk er angret.");
  }
@@ -253,7 +257,7 @@ export default function WorkClockClient({userName}){
   setLaborOreByScope(previous=>({...previous,[scope]:(Number(previous[scope])||0)+
    Math.round(delta*Number(active.hourlyRateOre||0)/60)}));
   setActive(data.entry);
-  setActiveMinusInput(formatDeductionHours(data.entry.deductedMinutes));
+  setActiveMinusInput(data.entry.deductedMinutes?formatDeductionHours(data.entry.deductedMinutes):"");
   setEntries(previous=>previous.map(e=>e.id===data.entry.id?data.entry:e));
   setMessage("Minustiden er lagret. Klokken fortsetter og saldoen kan være negativ.");
  }
@@ -314,7 +318,16 @@ export default function WorkClockClient({userName}){
  }
  async function addManual(event){
   event.preventDefault();
-  const deductedMinutes=parseDeductionHours(manual.deductedHours);
+  if(!String(manual.durationHours).trim()||number(manual.durationHours)<=0){
+   setError("Skriv inn antall arbeidstimer før du lagrer.");return;
+  }
+  if(!validAmountInput(manual.hourlyRate)){
+   setError("Skriv inn timepris før du lagrer.");return;
+  }
+  if(number(manual.distanceKm)>0&&!validAmountInput(manual.kmRate)){
+   setError("Skriv inn kilometersats når du registrerer kjøring.");return;
+  }
+  const deductedMinutes=String(manual.deductedHours).trim()?parseDeductionHours(manual.deductedHours):0;
   if(deductedMinutes===null){
    setError("Skriv minustid i timer, for eksempel 1,5 for halvannen time eller 15 for femten timer.");
    return;
@@ -546,7 +559,7 @@ export default function WorkClockClient({userName}){
      <label>Minustid ved start (timer)
       <input type="text" inputMode="decimal" value={timerDraft.deductedHours}
        onChange={e=>setTimerDraft(current=>({...current,deductedHours:e.target.value}))}
-       placeholder="0 eller 15"/>
+       placeholder="Valgfritt"/>
      </label>
      <label>Timepris inkl. mva
       <div className={styles.money}><span>kr</span><input inputMode="decimal" value={timerDraft.hourlyRate} onChange={e=>setTimerDraft(current=>({...current,hourlyRate:e.target.value}))}/></div>
@@ -615,7 +628,7 @@ export default function WorkClockClient({userName}){
     <div className={styles.sectionHead}><div><span className={styles.eyebrow}>ETTERREGISTRERING</span><h2>Legg inn timer manuelt</h2></div></div>
     <form className={styles.formGrid} onSubmit={addManual}>
      <label>Dato<input type="date" value={manual.workDate} onChange={e=>setManual(current=>({...current,workDate:e.target.value}))} required/></label>
-     <label>Timer<input inputMode="decimal" value={manual.durationHours} onChange={e=>setManual(current=>({...current,durationHours:e.target.value}))} placeholder="0 eller 7,5"/></label>
+     <label>Timer<input inputMode="decimal" value={manual.durationHours} onChange={e=>setManual(current=>({...current,durationHours:e.target.value}))} placeholder="Skriv timer"/></label>
      <label>Eksisterende oppdrag
       <select value={manual.orderId} onChange={e=>applyOrder(setManual,e.target.value)}>
        <option value="">Ikke koblet til oppdrag</option>
@@ -635,11 +648,11 @@ export default function WorkClockClient({userName}){
      <label>Minustid (timer, kan være høyere enn arbeidstiden)
       <input type="text" inputMode="decimal" value={manual.deductedHours}
        onChange={e=>setManual(current=>({...current,deductedHours:e.target.value}))}
-       placeholder="0 eller 1,5"/>
+       placeholder="Valgfritt"/>
      </label>
-     <label>Km<input inputMode="decimal" value={manual.distanceKm} onChange={e=>setManual(current=>({...current,distanceKm:e.target.value}))} placeholder="0"/></label>
+     <label>Km<input inputMode="decimal" value={manual.distanceKm} onChange={e=>setManual(current=>({...current,distanceKm:e.target.value}))} placeholder="Km"/></label>
      <label>Km-sats inkl. mva<div className={styles.money}><span>kr</span><input inputMode="decimal" value={manual.kmRate} onChange={e=>setManual(current=>({...current,kmRate:e.target.value}))}/></div></label>
-     <label>Bom inkl. mva<div className={styles.money}><span>kr</span><input inputMode="decimal" value={manual.toll} onChange={e=>setManual(current=>({...current,toll:e.target.value}))} placeholder="0"/></div></label>
+     <label>Bom inkl. mva<div className={styles.money}><span>kr</span><input inputMode="decimal" value={manual.toll} onChange={e=>setManual(current=>({...current,toll:e.target.value}))} placeholder="Bom"/></div></label>
      <label className={styles.full}>Notat<input value={manual.note} onChange={e=>setManual(current=>({...current,note:e.target.value}))}/></label>
      <div className={styles.full}><button className={styles.saveButton} disabled={busy}>Lagre timeregistrering</button></div>
     </form>
@@ -717,7 +730,7 @@ export default function WorkClockClient({userName}){
       <label>Minustid (timer, kan være høyere enn arbeidstiden)
        <input type="text" inputMode="decimal"
         value={editing.deductedHours} onChange={e=>setEditing(current=>({...current,deductedHours:e.target.value}))}
-        placeholder="0 eller 1,5"/>
+        placeholder="Valgfritt"/>
       </label>
       <label>Eksisterende oppdrag
        <select value={editing.orderId} onChange={e=>applyOrder(setEditing,e.target.value)}>
