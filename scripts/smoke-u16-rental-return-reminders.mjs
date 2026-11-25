@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {rentalReturnReminderEligible,rentalReturnReminderKey,rentalReturnReminderMessage} from "../lib/rentalReturnReminder.mjs";
+const b={id:"booking",status:"active",end_date:"2026-11-26",booking_number:"AS-U-TEST",customer:{email:"test@example.invalid",name:"<Kunde>"},rental_items:{name:"Sag & bor"}};
+assert.ok(rentalReturnReminderEligible(b,"2026-11-26"));
+for(const status of ["new","confirmed","returned","cancelled","completed"])assert.ok(!rentalReturnReminderEligible({...b,status},"2026-11-26"));
+assert.ok(!rentalReturnReminderEligible({...b,archived_at:"x"},"2026-11-26"));
+assert.ok(!rentalReturnReminderEligible(b,"2026-11-27"));
+assert.equal(rentalReturnReminderKey(b),"rental-return:booking:2026-11-26");
+const msg=rentalReturnReminderMessage(b,{replyTo:"post@example.invalid",siteUrl:"https://example.invalid"});
+assert.ok(msg.text.includes("26.11.2026")&&msg.html.includes("&lt;Kunde&gt;")&&msg.html.includes("Sag &amp; bor"));
+const route=readFileSync("app/api/cron/rental-return-reminders/route.js","utf8");
+assert.ok(route.includes('RENTAL_RETURN_REMINDERS_ENABLED!=="true"'));
+assert.ok(route.indexOf('.insert({booking_id:')<route.indexOf("resend.emails.send("));
+assert.ok(route.includes("idempotencyKey:rentalReturnReminderKey(current)"));
+assert.ok(route.includes('state:"needs_review"'));
+assert.ok(JSON.parse(readFileSync("vercel.json","utf8")).crons.some(x=>x.path==="/api/cron/rental-return-reminders"));
+console.log("U-16 return reminder eligibility, message and rollout guards passed.");

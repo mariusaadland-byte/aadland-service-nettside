@@ -51,6 +51,10 @@
     {
       "path": "/api/cron/service-order-confirmations",
       "schedule": "25 10 * * *"
+    },
+    {
+      "path": "/api/cron/rental-return-reminders",
+      "schedule": "0 8 * * *"
     }
   ]
 }
