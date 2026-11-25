@@ -9,6 +9,14 @@ import {supplierPriceNotice} from "../../../lib/materialPriceFreshness";
 
 const STORAGE_KEY="aadland-service-calculator-v1";
 const VAT_RATE=0.25;
+const MAX_PRICE_FILE_BYTES=4*1024*1024;
+function priceFileError(file,supplier){
+ if(!file)return "";
+ if(file.size===0)return "Prisfilen er tom.";
+ if(file.size>MAX_PRICE_FILE_BYTES)return "Filen er for stor ("+(file.size/1000000).toFixed(2).replace(".",",")+" MB). Maks 4 MiB. "+(supplier==="byggmakker"?"Velg den klargjorte Byggmakker-filen med endelsen .csv.gz i stedet for originalfilen.":"Bruk en komprimert CSV-fil (.csv.gz). Ikke del en fullstendig prisliste i flere separate importer.");
+ if(supplier==="byggmakker"&&/^\d+-pricefile-\d+\.xlsx$/i.test(file.name))return "Denne originale Byggmakker-filen mangler kolonneoverskrifter. Bruk den klargjorte .csv.gz-filen der kolonne G er valgt som innkjøpspris eks. MVA.";
+ return "";
+}
 const DEFAULTS={
  project:"",
  hours:"8",
@@ -254,6 +262,7 @@ export default function CalculatorClient(){
   setActivationAttempted(false);setImportMessage("");setImportError("");setImportPreview(null);setImportPhrase("");
   if(!importSuppliersLoaded||!importSupplier||(importSupplier!=="new"&&!importSuppliers.some(item=>item.id===importSupplier))){setImportError("Velg leverandør først.");return}
   if(!importFile){setImportError("Velg en prisfil først.");return}
+  const validationError=priceFileError(importFile,importSupplier);if(validationError){setImportError(validationError);return}
   if(importSupplier==="new"&&!newSupplierName.trim()){setImportError("Skriv inn leverandørnavn.");return}
   setImportBusy(true);
   try{
@@ -264,7 +273,7 @@ export default function CalculatorClient(){
    body.append("priceIncludesVat",importPriceIncludesVat?"true":"false");
    const response=await fetch("/api/admin/material-catalog/import",{method:"POST",body});
    const data=await response.json().catch(()=>({}));
-   if(!response.ok)throw new Error(data.error||"Kunne ikke importere prislisten.");
+   if(!response.ok)throw new Error(data.error||(response.status===413?"Filen er for stor for opplasting. Bruk en komprimert CSV-fil (.csv.gz).":response.status===504?"Importen brukte for lang tid. Ingen forhåndsvisning ble bekreftet. Prøv igjen.":"Kunne ikke importere prislisten (HTTP "+response.status+")."));
    if(!data.preview?.previewId)throw Error("Forhåndsvisning mangler. Ingen import godkjent.");
    setImportPreview(data.preview);
    setImportMessage("Forhåndsvisning klar. Ingen priser er endret.");
@@ -423,11 +432,12 @@ export default function CalculatorClient(){
         </Field>}
        </div>
        {importError&&<p className={styles.catalogError} role="alert">{importError}</p>}
-       <Field label="Prisfil" help="XLSX, CSV, CSV.GZ, TSV eller TXT. Nye filer oppdaterer samme varenummer og varer som forsvinner fra filen deaktiveres.">
-        <input id="material-price-file" type="file" accept=".xlsx,.csv,.csv.gz,.gz,.tsv,.txt,application/gzip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain" disabled={importBusy} onChange={e=>{setImportFile(e.target.files?.[0]||null);setImportPreview(null);setImportPhrase("");}}/>
+       {importSupplier==="byggmakker"&&<p className={styles.importFileHint}>Byggmakker: Bruk den klargjorte .csv.gz-filen med innkjøpspris fra kolonne G, eks. MVA. Originalfiler uten overskrifter må klargjøres først.</p>}
+       <Field label="Prisfil" help="XLSX, CSV, CSV.GZ, TSV eller TXT. Maks 4 MiB. Nye filer oppdaterer samme varenummer og varer som forsvinner fra filen deaktiveres.">
+        <input id="material-price-file" type="file" accept=".xlsx,.csv,.csv.gz,.gz,.tsv,.txt,application/gzip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain" disabled={importBusy} onChange={e=>{const file=e.target.files?.[0]||null;setImportFile(file);setImportPreview(null);setImportPhrase("");setImportError(priceFileError(file,importSupplier));}}/>
        </Field>
        <label className={styles.importCheck}><input type="checkbox" checked={importPriceIncludesVat} disabled={importBusy} onChange={e=>{setImportPriceIncludesVat(e.target.checked);setImportPreview(null);setImportPhrase("");}}/><span><b>Prisene i filen er inkl. mva</b><small>La denne være av for Bygger’n og den klargjorte Byggmakker-filen – begge er eks. mva.</small></span></label>
-       <div className={styles.importActions}><button type="submit" className={styles.primary} disabled={importBusy||!importSuppliersLoaded||!importSupplier}>{importBusy?"Behandler…":"Forhåndsvis prisliste"}</button>{importMessage&&<span>{importMessage}</span>}</div>
+       <div className={styles.importActions}><button type="submit" className={styles.primary} disabled={importBusy||!importSuppliersLoaded||!importSupplier||!importFile||Boolean(priceFileError(importFile,importSupplier))}>{importBusy?"Behandler…":"Forhåndsvis prisliste"}</button>{importMessage&&<span>{importMessage}</span>}</div>
        {importPreview&&<div className="card" style={{padding:16,marginTop:12}}>
         <h3>Kontroller prisimport – {importPreview.supplierName}</h3>
         <p>{activationAttempted?"Aktivering er forsøkt. Bruk samme godkjenning igjen hvis resultatet er uavklart.":"Ingen priser er endret. Forhåndsvisningen er gyldig i 30 minutter."}</p>
