@@ -3,30 +3,18 @@
 import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import {CatalogFooter,CatalogHeader,CatalogPlaceholder} from "../produkter/ProductChrome";
+import {filterRentalCatalog,rentalCatalogCategory,RENTAL_CATALOG_PAGE_SIZE} from "../../lib/rentalCatalogFilter.mjs";
 
 const kr=o=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",maximumFractionDigits:0}).format((Number(o)||0)/100);
-const ALL_SELECTION_LIMIT=9;
 
-function mixRentalItems(items,categories){
- const categoryIds=categories.map(category=>category.id);
- const groups=categoryIds.map(id=>items.filter(item=>item.categoryId===id));
- const extra=items.filter(item=>!categoryIds.includes(item.categoryId));
- const mixed=[];
- let index=0;
- while(groups.some(group=>index<group.length)){
-  for(const group of groups){
-   if(index<group.length)mixed.push(group[index]);
-  }
-  index++;
- }
- return mixed.concat(extra);
-}
 
 export default function Utleie(){
  const [items,setItems]=useState([]);
  const [categories,setCategories]=useState([]);
  const [filter,setFilter]=useState("all");
- const [visibleCount,setVisibleCount]=useState(12);
+ const [visibleCount,setVisibleCount]=useState(RENTAL_CATALOG_PAGE_SIZE);
+ const [query,setQuery]=useState("");
+ const [sort,setSort]=useState("recommended");
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
  const [setup,setSetup]=useState(false);
@@ -53,18 +41,25 @@ export default function Utleie(){
   return()=>{cancelled=true};
  },[]);
 
- const mixedItems=useMemo(()=>mixRentalItems(items,categories),[items,categories]);
- const filtered=useMemo(()=>{
-  if(filter==="uncategorized")return items.filter(item=>!item.categoryId);
-  if(filter==="all")return mixedItems.slice(0,ALL_SELECTION_LIMIT);
-  return items.filter(item=>item.categoryId===filter);
- },[items,mixedItems,filter]);
- const visible=filter==="all"?filtered:filtered.slice(0,visibleCount);
- const uncategorized=items.some(item=>!item.categoryId);
-
+ const filtered=useMemo(()=>filterRentalCatalog(items,categories,{category:filter,query,sort}),[items,categories,filter,query,sort]);
+ const visible=filtered.slice(0,visibleCount);
+ const uncategorized=items.some(item=>rentalCatalogCategory(item,categories)==="uncategorized");
  function chooseFilter(value){
   setFilter(value);
-  setVisibleCount(12);
+  setVisibleCount(RENTAL_CATALOG_PAGE_SIZE);
+ }
+ function changeQuery(value){
+  setQuery(value);
+  setVisibleCount(RENTAL_CATALOG_PAGE_SIZE);
+ }
+ function changeSort(value){
+  setSort(value);
+  setVisibleCount(RENTAL_CATALOG_PAGE_SIZE);
+ }
+ function resetFilters(){
+  chooseFilter("all");
+  changeQuery("");
+  changeSort("recommended");
  }
 
  return <main className="catalogPage rentalPage">
@@ -90,12 +85,26 @@ export default function Utleie(){
       <span className="catalogEyebrow">UTLEIEKATALOG</span>
       <h2>Hva trenger du?</h2>
      </div>
-     {!loading&&!setup&&<span>{filter==="all"
-      ?(items.length>filtered.length?`Utvalgte ${filtered.length} av ${items.length} produkter`:`${filtered.length} ${filtered.length===1?"produkt":"produkter"}`)
-      :`${Math.min(visible.length,filtered.length)} av ${filtered.length} ${filtered.length===1?"produkt":"produkter"}`}</span>}
+     {!loading&&!setup&&!error&&<span role="status" aria-live="polite">Viser {visible.length} av {filtered.length} {filtered.length===1?"produkt":"produkter"}</span>}
     </div>
 
-    {categories.length>0&&<div className="rentalCategoryFilters" aria-label="Velg utleiekategori">
+    {!setup&&!error&&<div className="rentalCatalogControls">
+     <div className="rentalCatalogSearch">
+      <label htmlFor="rental-search">Søk etter utstyr</label>
+      <div className="rentalSearchField">
+       <input id="rental-search" type="search" placeholder="F.eks. drill, sag eller slipemaskin" value={query} onChange={event=>changeQuery(event.target.value)} autoComplete="off"/>
+       {query&&<button type="button" onClick={()=>changeQuery("")} aria-label="Tøm søk">Tøm</button>}
+      </div>
+     </div>
+     <div className="rentalCatalogSort">
+      <label htmlFor="rental-sort">Sorter</label>
+      <select id="rental-sort" value={sort} onChange={event=>changeSort(event.target.value)}>
+       <option value="recommended">Anbefalt</option><option value="price-asc">Laveste døgnpris</option><option value="price-desc">Høyeste døgnpris</option><option value="name">Produktnavn A–Å</option>
+      </select>
+     </div>
+    </div>}
+
+    {(categories.length>0||uncategorized)&&<div className="rentalCategoryFilters" aria-label="Velg utleiekategori">
      <button type="button" aria-pressed={filter==="all"} className={filter==="all"?"isActive":""} onClick={()=>chooseFilter("all")}>Alle</button>
      {categories.map(category=><button type="button" key={category.id} aria-pressed={filter===category.id} className={filter===category.id?"isActive":""} onClick={()=>chooseFilter(category.id)}>{category.name}</button>)}
      {uncategorized&&<button type="button" aria-pressed={filter==="uncategorized"} className={filter==="uncategorized"?"isActive":""} onClick={()=>chooseFilter("uncategorized")}>Annet</button>}
@@ -104,8 +113,8 @@ export default function Utleie(){
     {error&&<div className="catalogNotice"><b>Noe gikk galt</b><p>{error}</p></div>}
     {setup&&<div className="catalogNotice"><b>Utleie åpner snart</b><p>Utleieoppsettet klargjøres.</p></div>}
 
-    {loading?<div className="catalogStatus">Laster utleieutstyr …</div>:!visible.length&&!setup?(
-     <div className="catalogNotice"><b>Ingen produkter her ennå</b><p>Prøv en annen kategori.</p></div>
+    {loading?<div className="catalogStatus">Laster utleieutstyr …</div>:error||setup?null:!visible.length?(
+     <div className="catalogNotice"><b>{query.trim()||filter!=="all"?"Ingen produkter passer søket":"Ingen produkter her ennå"}</b><p>{query.trim()||filter!=="all"?"Prøv et annet søkeord eller en annen kategori.":"Ta gjerne kontakt om utstyr du trenger."}</p>{(query.trim()||filter!=="all")&&<button type="button" className="catalogGoldButton rentalResetFilters" onClick={resetFilters}>Nullstill søk og filter</button>}</div>
     ):(
      <div className="rentalCatalogGrid">
       {visible.map(item=>{
@@ -129,8 +138,8 @@ export default function Utleie(){
       })}
      </div>
     )}
-    {!loading&&!setup&&filter!=="all"&&visible.length<filtered.length&&<div className="rentalLoadMore">
-     <button type="button" className="catalogGoldButton" onClick={()=>setVisibleCount(count=>count+12)}>Vis flere produkter →</button>
+    {!loading&&!setup&&!error&&visible.length<filtered.length&&<div className="rentalLoadMore">
+     <button type="button" className="catalogGoldButton" onClick={()=>setVisibleCount(count=>count+RENTAL_CATALOG_PAGE_SIZE)}>Vis flere produkter →</button>
      <span>{filtered.length-visible.length} igjen</span>
     </div>}
    </div>
