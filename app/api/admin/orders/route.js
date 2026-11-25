@@ -297,7 +297,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     if(!resendKey)return NextResponse.json({error:"Bestillingen er kansellert og lageret er frigjort, men e-post er ikke konfigurert.",statusSaved:true},{status:503});
 
     try{
-      const {Resend}=await import("resend");
+      const {Resend}=await import("../../../../lib/safeResend");
       const resend=new Resend(resendKey);
       const from=serviceEmailFrom();
       const replyTo=serviceReplyTo();
@@ -486,7 +486,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
     if(!resendKey)return NextResponse.json({error:"E-post er ikke konfigurert."},{status:503});
     try{
-      const {Resend}=await import("resend");
+      const {Resend}=await import("../../../../lib/safeResend");
       const resend=new Resend(resendKey);
       const from=serviceEmailFrom();
       const replyTo=serviceReplyTo();
@@ -687,7 +687,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     if(!resendKey)return NextResponse.json({error:"Bestillingen er satt som klar, men e-post er ikke konfigurert.",statusSaved:true},{status:503});
 
     try{
-      const {Resend}=await import("resend");
+      const {Resend}=await import("../../../../lib/safeResend");
       const resend=new Resend(resendKey);
       const from=serviceEmailFrom();
       const replyTo=serviceReplyTo();
@@ -869,7 +869,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
     if(!resendKey)return NextResponse.json({error:"Befaringen er lagret, men e-post er ikke konfigurert."},{status:503});
     try{
-      const {Resend}=await import("resend");
+      const {Resend}=await import("../../../../lib/safeResend");
       const resend=new Resend(resendKey);
       const from=serviceEmailFrom();
       const replyTo=serviceReplyTo();
