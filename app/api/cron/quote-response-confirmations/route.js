@@ -1,4 +1,5 @@
 import {NextResponse} from "next/server";
+import {withServiceCronMonitoring} from "../../../../lib/serviceCronMonitor";
 import {cronGuard} from "../../../../lib/cronAuth";
 import {db} from "../../../../lib/supabase";
 import {dispatchQueuedQuoteResponseNotices} from "../../../../lib/quoteResponseNotices";
@@ -9,7 +10,7 @@ export const maxDuration=60;
 // Never touch quote state, and never retry 'claimed' or 'needs_review' rows.
 // An interrupted POST only leaves 'queued' first-time deliveries for this
 // watchdog, which runs after all normal customer requests have had time to finish.
-export async function GET(req){
+async function runServiceCron(req){
  const guard=cronGuard(req);if(guard)return guard;
  if(process.env.VERCEL_ENV!=="production")
   return NextResponse.json({ok:false,error:"Varsler kjøres bare i produksjon."},{status:403});
@@ -24,3 +25,5 @@ export async function GET(req){
   headers:{"Cache-Control":"no-store"}
  });
 }
+
+export async function GET(req){return withServiceCronMonitoring("quote-response-confirmations",req,()=>runServiceCron(req));}
