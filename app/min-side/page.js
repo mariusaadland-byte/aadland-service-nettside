@@ -3,6 +3,7 @@
 import {useEffect,useState} from "react";
 import Link from "next/link";
 import {osloDateKey} from "../../lib/osloTime";
+import {rentalPortalExpired,rentalPortalGroup,rentalPortalCanPay,rentalPortalOverdue,rentalPortalDeposit} from "../../lib/rentalCustomerPortal.mjs";
 import CustomerDrawingViewer from "./CustomerDrawingViewer";
 
 function paymentAmounts(plan,total){
@@ -21,7 +22,7 @@ const quoteStatus={sent:"Sendt",accepted:"Godkjent",declined:"Avslått",expired:
 const paymentStatus={unpaid:"Ikke betalt",pending:"Avventer betaling",authorized:"Reservert",partial:"Delvis betalt",paid:"Betalt",refunded:"Refundert"};
 const depositStatus={not_paid:"Ikke mottatt",held:"Holdes",released:"Frigitt",partially_charged:"Delvis trukket",charged:"Trukket"};
 const fulfillmentStatus={pickup:"Henting",delivery:"Levering",shipping:"Post / Bring"};
-const rentalDisplayStatus=r=>r?.status==="confirmed"&&!r?.confirmation_sent_at?"Reservert":(rentalStatus[r?.status]||r?.status||"");
+const rentalDisplayStatus=r=>rentalPortalExpired(r)?"Reservasjon utløpt":r?.status==="confirmed"&&!r?.confirmation_sent_at?"Reservert":(rentalStatus[r?.status]||r?.status||"");
 
 const date=v=>v?new Intl.DateTimeFormat("nb-NO").format(new Date(v+"T12:00:00")):"";
 const dateTime=v=>v?new Intl.DateTimeFormat("nb-NO",{dateStyle:"medium"}).format(new Date(v)):"";
@@ -47,26 +48,32 @@ export default function MinSide(){
  const [portalMenuOpen,setPortalMenuOpen]=useState(false);
  const [serviceVippsAvailable,setServiceVippsAvailable]=useState(false);
  const [rentalVippsAvailable,setRentalVippsAvailable]=useState(false);
+ const [rentalHistoryError,setRentalHistoryError]=useState("");
  const [paymentBusyId,setPaymentBusyId]=useState("");
 
  async function load(){
   try{
-   const r=await fetch("/api/customer/me");
+   const r=await fetch("/api/customer/me",{cache:"no-store"});
    const d=await r.json();
    if(r.ok){
+    setRentalHistoryError("");
     setData(d);
     setProfileForm({
      name:d.customer?.name||"",
      phone:d.customer?.phone||"",
      address:d.customer?.address||""
     });
-   }else setData(null);
-  }finally{setLoading(false)}
+   }else if(r.status===401){setData(null);setRentalHistoryError("");}
+   else{setRentalHistoryError(d.error||"Historikken kunne ikke lastes. Prøv igjen.");}
+  }catch{setRentalHistoryError("Historikken kunne ikke lastes. Kontroller tilkoblingen og prøv igjen.");}
+  finally{setLoading(false)}
  }
 
  useEffect(()=>{
   const host=String(window.location.hostname||"").toLowerCase();
-  setRentalContext(host==="aadlandutleie.no"||host==="www.aadlandutleie.no");
+  const isRental=host==="aadlandutleie.no"||host==="www.aadlandutleie.no";
+  setRentalContext(isRental);
+  if(isRental)setActivePanel("utleie");
   const params=new URLSearchParams(window.location.search);
   const verification=params.get("verification");
   if(verification==="success")setInfo("E-postadressen er bekreftet. Velkommen til Min side.");
@@ -310,16 +317,16 @@ export default function MinSide(){
  const activePurchaseRows=[...purchases].filter(o=>!["completed","cancelled"].includes(o.status)).sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")));
  const pastPurchaseRows=[...purchases].filter(o=>["completed","cancelled"].includes(o.status)).sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")));
  const rentalToday=osloDateKey(new Date());
- const rentalIsPast=r=>["completed","cancelled","returned"].includes(r.status)||String(r.end_date||"")<rentalToday;
- const upcomingRentals=[...rentals].filter(r=>!rentalIsPast(r)).sort((a,b)=>String(a.start_date||"").localeCompare(String(b.start_date||"")));
- const pastRentals=[...rentals].filter(r=>rentalIsPast(r)).sort((a,b)=>String(b.start_date||"").localeCompare(String(a.start_date||"")));
+ const portalNow=Date.now();
+ const upcomingRentals=[...rentals].filter(r=>rentalPortalGroup(r,portalNow)==="active").sort((a,b)=>String(a.start_date||"").localeCompare(String(b.start_date||"")));
+ const pastRentals=[...rentals].filter(r=>rentalPortalGroup(r,portalNow)!=="active").sort((a,b)=>Number(rentalPortalGroup(b,portalNow)==="settlement")-Number(rentalPortalGroup(a,portalNow)==="settlement")||String(b.start_date||"").localeCompare(String(a.start_date||"")));
  const openQuotes=quotes.filter(q=>effectiveQuoteStatus(q)==="sent").length;
  const openEnquiries=enquiries.filter(o=>!["completed","cancelled"].includes(o.status)).length;
  const activeJobs=jobs.filter(o=>!["completed","cancelled"].includes(o.status)).length;
  const activePurchases=purchases.filter(o=>!["completed","cancelled"].includes(o.status)).length;
- const activeRentals=rentals.filter(r=>["new","confirmed","active"].includes(r.status)).length;
+ const activeRentals=upcomingRentals.length;
  const visibleDrawings=drawings.length;
- const pendingRentalRows=rentals.filter(r=>r.status==="confirmed"&&!r.confirmation_sent_at);
+ const pendingRentalRows=rentals.filter(r=>rentalPortalGroup(r,portalNow)==="active"&&(r.status==="new"||(r.status==="confirmed"&&!r.confirmation_sent_at)));
  const readyPurchaseRows=purchases.filter(o=>o.status==="ready");
  const portalAttentionCount=openQuotes+pendingRentalRows.length+readyPurchaseRows.length;
  const recentActivity=[
@@ -771,10 +778,13 @@ export default function MinSide(){
 
   {activePanel==="utleie"&&<section id="utleie" className="customerDashboardSection customerPortalPanel">
    <div className="customerSectionHead">
-    <div><div className="kicker">UTLEIE</div><h2>Utleie</h2></div>
+    <div><div className="kicker">UTLEIE</div><h2>Mine utleier</h2></div>
     <div className="customerSectionActions"><span>{rentals.length}</span><Link className="btn alt" href="/utleie">Ny utleie</Link></div>
    </div>
 
+   {rentalHistoryError&&<p role="alert" className="notice">{rentalHistoryError}</p>}
+   {data.rentalHistoryLimited&&<p className="muted">Viser opptil 100 av de nyeste bookingene. Kontakt oss dersom du trenger eldre historikk.</p>}
+   <button type="button" className="btn alt" onClick={load}>Oppdater utleieoversikten</button>
    {!rentals.length?<div className="card customerEmpty"><p>Ingen utleier knyttet til kontoen ennå.</p></div>:<>
     {upcomingRentals.length>0&&<div className="customerRentalGroup">
      <div className="customerRentalGroupHead"><h3>Aktive og kommende</h3><span>{upcomingRentals.length}</span></div>
@@ -808,7 +818,7 @@ export default function MinSide(){
          <b>✓ Vipps-beløpet er reservert</b>
          <span>Beløpet trekkes først når leien kan leveres eller utleveres.</span>
         </div>}
-        {rentalVippsAvailable&&!["authorized","paid","refunded"].includes(String(r.payment_status||"unpaid").toLowerCase())&&r.status!=="cancelled"&&<div className="customerPaymentConfirmation">
+        {rentalPortalCanPay(r,rentalVippsAvailable,portalNow)&&<div className="customerPaymentConfirmation">
          <b>Leiebetalingen er ikke ferdig</b>
          <span>Du kan betale leiebeløpet med Vipps. Eventuelt depositum håndteres separat.</span>
          <button type="button" className="btn" disabled={paymentBusyId===r.id} onClick={()=>startRentalVipps(r)}>{paymentBusyId===r.id?"Åpner Vipps …":"Betal leien med Vipps"}</button>
@@ -819,10 +829,12 @@ export default function MinSide(){
          {r.reminder_sent_at&&<span>✓ Påminnelse sendt {dateTimeFull(r.reminder_sent_at)}</span>}
          {r.cancellation_sent_at&&<span>✓ Avbestillingsbekreftelse sendt {dateTimeFull(r.cancellation_sent_at)}</span>}
         </div>}
+        {rentalPortalOverdue(r,rentalToday)&&<div className="customerPaymentConfirmation"><b>Avtalt returdato er passert</b><span>Retur er ikke registrert ennå. Kontakt oss dersom utstyret er levert eller du trenger å avtale videre leie.</span></div>}
         {r.status==="active"&&<div className="customerPaymentConfirmation"><b>Utstyret er utlevert</b><span>Bookingen er registrert som aktiv.</span></div>}
+        {r.paymentDetailsAvailable===false&&<p className="muted">Detaljert betalingshistorikk er midlertidig utilgjengelig.</p>}
         {["paid","refunded"].includes(r.payment_status)&&r.receipt_sent_at&&<div className="customerPaymentConfirmation"><b>✓ Leiebetaling registrert</b><span>Betalingsbekreftelse sendt {dateTimeFull(r.receipt_sent_at)}</span></div>}
         {Number(r.deposit_ore)>0&&["held","released","partially_charged","charged"].includes(r.deposit_status)&&<div className="customerPaymentConfirmation">
-         <b>{r.deposit_status==="released"?"✓ Depositum frigitt":r.deposit_status==="held"?"✓ Depositum mottatt":"Depositum oppgjort"}</b>
+         <b>{r.deposit_status==="released"?"Depositum registrert frigitt":r.deposit_status==="held"?"Depositum registrert mottatt":r.deposit_released_at?"Depositum registrert oppgjort":"Depositum delvis brukt – oppgjør gjenstår"}</b>
          {Number(r.deposit_held_ore)>0&&<span>Registrert holdt: {kr(r.deposit_held_ore)}</span>}
          {Number(r.deposit_charged_ore)>0&&<span>Registrert brukt: {kr(r.deposit_charged_ore)}</span>}
          {r.deposit_released_at&&<span>Frigitt {dateTimeFull(r.deposit_released_at)}</span>}
@@ -834,7 +846,7 @@ export default function MinSide(){
     </div>}
 
     {pastRentals.length>0&&<div className="customerRentalGroup customerRentalPast">
-     <div className="customerRentalGroupHead"><h3>Tidligere utleie</h3><span>{pastRentals.length}</span></div>
+     <div className="customerRentalGroupHead"><h3>Returnerte og tidligere utleier</h3><span>{pastRentals.length}</span></div>
      <div className="customerRentalList">
       {pastRentals.map(r=><details className="customerRentalRow" key={r.id}>
        <summary>
@@ -858,6 +870,9 @@ export default function MinSide(){
          <span><small>Utlevering</small><b>{fulfillmentStatus[r.customer?.fulfillment]||"Ikke registrert"}</b></span>
          {Number(r.deposit_ore)>0&&<span><small>Depositum</small><b>{kr(r.deposit_ore)} · {depositStatus[r.deposit_status]||r.deposit_status||"Ikke registrert"}</b></span>}
         </div>
+        {rentalPortalExpired(r,portalNow)&&<div className="customerPaymentConfirmation"><b>Reservasjonen er utløpt</b><span>Velg en ny ledig periode hvis du fortsatt ønsker å leie.</span></div>}
+        {r.paymentDetailsAvailable===false&&<p className="muted">Detaljert betalingshistorikk er midlertidig utilgjengelig.</p>}
+        {Number(r.deposit_ore)>0&&r.paymentDetailsAvailable&&<div className="customerPaymentConfirmation"><b>Registrert depositumoppgjør</b><span>Holdt: {kr(rentalPortalDeposit(r).held)} · Brukt: {kr(rentalPortalDeposit(r).used)}</span><span>{rentalPortalDeposit(r).closed?"Registrert rest ved avslutning":"Rest til oppgjør"}: {kr(rentalPortalDeposit(r).rest)}</span>{r.deposit_released_at&&<span>Frigivelse registrert {dateTimeFull(r.deposit_released_at)}</span>}</div>}
         {r.status==="returned"&&<div className="customerPaymentConfirmation"><b>✓ Utstyret er returnert</b><span>{r.payment_status==="paid"?"Leiebetalingen er registrert.":"Oppgjøret er ikke ferdig registrert ennå."}</span></div>}
         {r.status==="completed"&&<div className="customerPaymentConfirmation"><b>✓ Utleien er ferdigbehandlet</b><span>Betaling og eventuelt depositum er avklart.</span></div>}
         {r.status==="cancelled"&&<div className="customerPaymentConfirmation"><b>Bookingen er avbrutt</b><span>Ta kontakt dersom noe rundt betaling eller depositum ikke stemmer.</span></div>}

@@ -1,0 +1,3 @@
+# U-12 – Kundekonto og Min side
+
+Samme konto på begge domener, separat innlogging per domene. Utleiedomenet åpner Mine utleier som startpanel. Overdue aktive bookinger holdes aktive, utløpt ubrukt betalingsreservasjon flyttes til historikk, returnerte bookinger synliggjør uavklart oppgjør. Kunden får korrekt registrert depositumstatus og rest, og betalingsknapp bare ved gyldig betalingsstatus og tilgjengelige betalingsdetaljer. Kundehistorikk er fortsatt begrenset til 100 nyeste; dette vises når grensen nås. Konto-ID og eksisterende tilgangskontroller beholdes. Kildetest og funksjonstest i bygg; to separate kundeinnlogginger i isolert miljø gjenstår. Ingen kundekontoer eller bookingdata endret.
