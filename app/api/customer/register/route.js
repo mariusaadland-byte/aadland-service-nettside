@@ -2,16 +2,15 @@ import {rateLimitRequest,rateLimitValue} from "../../../../lib/rateLimit";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
-import {createCustomerVerificationToken} from "../../../../lib/customerVerification";
+import {sendCustomerVerificationEmail} from "../../../../lib/customerVerificationDelivery";
 import {checkNewPassword} from "../../../../lib/passwordSecurity";
-import {customerEmailContext,customerResendApiKey} from "../../../../lib/rentalEmailConfig";
-
-function esc(value){
- return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
-}
+import {customerResendApiKey} from "../../../../lib/rentalEmailConfig";
 
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;
+ // A test branch must never create a real auth user or send to a customer.
+ if(process.env.VERCEL_ENV!=="production")return NextResponse.json({
+  error:"Kunderegistrering er deaktivert i testmiljøet."},{status:403});
  const rateError=await rateLimitRequest(req,{"scope":"customer-register","max":5,"windowSeconds":900,"message":"For mange registreringsforsøk. Prøv igjen senere."}); if(rateError)return rateError;
  try{
   const b=await req.json();
@@ -57,58 +56,27 @@ export async function POST(req){
   const {error:profileError}=await s.from("customer_profiles").upsert(profile,{onConflict:"id"});
   if(profileError){
    console.error("CUSTOMER REGISTER PROFILE",profileError);
-   try{await s.auth.admin.deleteUser(data.user.id)}catch(cleanupError){console.error("CUSTOMER REGISTER CLEANUP",cleanupError)}
+   // Account is intentionally retained: email resending can repair the profile.
    if(["42P01","42703"].includes(String(profileError.code||""))){
-    return NextResponse.json({error:"Kundekonto er ikke aktivert i databasen ennå.",setupRequired:true},{status:409});
+    return NextResponse.json({ok:true,verificationRequired:true,
+     message:"Kontoen er opprettet, men kundeprofilen må repareres før bekreftelsesmail kan sendes. Bruk «Send ny bekreftelsesmail» senere.",
+     setupRequired:true},{status:202});
    }
-   return NextResponse.json({error:"Kundeprofilen kunne ikke opprettes. Prøv igjen."},{status:500});
+   return NextResponse.json({ok:true,verificationRequired:true,
+    message:"Kontoen er opprettet, men kundeprofilen kunne ikke lagres. Kontoen er beholdt. Bruk «Send ny bekreftelsesmail» senere."},{status:202});
   }
 
-  const token=createCustomerVerificationToken({id:data.user.id,email});
-  const mailContext=customerEmailContext(req);
-  const verifyUrl=new URL("/min-side/bekreft-epost",mailContext.siteUrl);
-  verifyUrl.hash="token="+encodeURIComponent(token);
-
-  const html=`<!doctype html><html><body style="margin:0;background:#f3efe8;font-family:Arial,Helvetica,sans-serif;color:#181613">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3efe8;padding:28px 12px"><tr><td align="center">
-   <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#fff;border:1px solid #ded7cb">
-    <tr><td style="padding:28px 30px;background:#11100e;color:#fff">
-     ${mailContext.logoHtml}<div style="font-size:18px;font-weight:900;letter-spacing:.13em">${mailContext.brandUpper}</div>
-     <div style="margin-top:5px;color:#d9b365;font-size:11px;letter-spacing:.08em">MIN SIDE</div>
-    </td></tr>
-    <tr><td style="padding:30px">
-     <div style="color:#b5863b;font-size:11px;font-weight:800;letter-spacing:.12em">BEKREFT E-POST</div>
-     <h1 style="font-size:27px;line-height:1.15;margin:9px 0 14px">Velkommen, ${esc(name)}</h1>
-     <p style="color:#625d55;line-height:1.65;margin:0 0 22px">Åpne ${mailContext.brandName}-siden og bekreft e-postadressen din for å aktivere kundekontoen.</p>
-     <a href="${esc(verifyUrl.toString())}" style="display:inline-block;background:#cfa153;color:#111;text-decoration:none;font-weight:900;padding:14px 22px">Gå til bekreftelse →</a>
-     <p style="margin:24px 0 0;color:#8a857c;font-size:11px;line-height:1.55">På siden må du trykke «Bekreft e-post». Lenken alene aktiverer ikke kontoen. Lenken er gyldig i 24 timer. Hvis du ikke opprettet denne kontoen, kan du se bort fra e-posten.</p>
-    </td></tr>
-    <tr><td style="padding:18px 30px;border-top:1px solid #ece7df;color:#777;font-size:11px">${mailContext.brandName} · 471 54 898 · ${esc(mailContext.contactEmail)}</td></tr>
-   </table>
-  </td></tr></table></body></html>`;
-
-  try{
-   const {Resend}=await import("resend");
-   const resend=new Resend(resendKey);
-   const sent=await resend.emails.send({
-    from:mailContext.from,
-    to:email,
-    replyTo:mailContext.replyTo,
-    subject:"Bekreft e-postadressen din – "+mailContext.brandName,
-    html
-   });
-   if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
-  }catch(mailError){
-   console.error("CUSTOMER VERIFY EMAIL",mailError);
-   try{await s.auth.admin.deleteUser(data.user.id)}catch(cleanupError){console.error("CUSTOMER REGISTER MAIL CLEANUP",cleanupError)}
-   return NextResponse.json({error:"Kontoen kunne ikke opprettes fordi bekreftelsesmailen ikke kunne sendes. Prøv igjen."},{status:500});
-  }
-
-  return NextResponse.json({
-   ok:true,
-   verificationRequired:true,
-   message:"Kontoen er opprettet. Vi har sendt en bekreftelsesmail fra "+mailContext.brandName+". Åpne mailen og trykk deretter «Bekreft e-post» på siden."
+  const sent=await sendCustomerVerificationEmail({
+   req,s,userId:data.user.id,email,name,reason:"registration"
   });
+  const accepted=sent.status==="accepted";
+  const msg=accepted
+   ?"Kontoen er opprettet, og bekreftelsesmailen er mottatt av e-postleverandøren. Sjekk innboksen."
+   :sent.status==="uncertain"||sent.status==="unresolved"
+    ?"Kontoen er opprettet og beholdt. Utsendingen må kontrolleres; sjekk innboksen før du ber om ny mail."
+    :"Kontoen er opprettet og beholdt. Bekreftelsesmail er ikke sendt nå. Bruk «Send ny bekreftelsesmail» på Min side.";
+  return NextResponse.json({ok:true,verificationRequired:true,
+   deliveryPending:!accepted,message:msg},{status:accepted?200:202});
  }catch(e){
   console.error("CUSTOMER REGISTER",e);
   return NextResponse.json({error:"Kunne ikke opprette konto."},{status:500});
