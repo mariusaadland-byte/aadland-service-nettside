@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {validateRentalContact,rentalContactText} from "../lib/rentalContact.mjs";
+const b={name:"Test",email:"test@example.invalid",phone:"",booking:"",topic:"deposit",message:"Dette er en testmelding."};
+assert.ok(validateRentalContact(b));
+assert.ok(!validateRentalContact({...b,email:"bad"}));
+assert.ok(!validateRentalContact({...b,topic:"__proto__"}));
+assert.ok(!validateRentalContact({...b,name:"a\nb"}));
+assert.ok(!validateRentalContact({...b,message:"x".repeat(3001)}));
+assert.ok(rentalContactText(validateRentalContact(b)).includes("Betaling og depositum"));
+const api=readFileSync("app/api/rental/contact/route.js","utf8");
+assert.ok(api.includes('RENTAL_CONTACT_ENABLED!=="true"')&&api.includes("rateLimitRequest")&&api.includes("sameOriginGuard"));
+assert.ok(api.includes("to:rentalAdminEmailTo()")&&api.includes("idempotencyKey:"));
+assert.ok(!api.includes("to:v.email"));
+assert.ok(readFileSync("app/rental-sitemap.xml/route.js","utf8").includes("/utleie/kontakt"));
+console.log("U-21 contact validation and production gates passed.");

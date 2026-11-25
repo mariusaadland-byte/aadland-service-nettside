@@ -33,7 +33,7 @@ export function CatalogHeader({ rental = false }) {
             <Link href="/min-side" onClick={() => setOpen(false)}>Min side</Link>
             <Link href="/vilkar/utleie" onClick={() => setOpen(false)}>Utleiebetingelser</Link>
             <a href="https://www.aadland-service.no" onClick={() => setOpen(false)}>Aadland Service</a>
-            <a href="mailto:post@aadland-service.no" onClick={() => setOpen(false)}>Kontakt</a>
+            <Link href="/utleie/kontakt" onClick={() => setOpen(false)}>Kontakt og FAQ</Link>
           </>:<>
             <Link href="/" onClick={() => setOpen(false)}>Hjem</Link>
             <Link href="/min-side" onClick={() => setOpen(false)}>Min side</Link>
@@ -73,6 +73,7 @@ export function CatalogFooter({ rental = false }) {
             <Link href="/utleie">Utleie</Link>
             <Link href="/min-side">Min side</Link>
             <Link href="/vilkar/utleie">Utleiebetingelser</Link>
+            <Link href="/utleie/kontakt">Kontakt og FAQ</Link>
             <Link href="/personvern">Personvern</Link>
             <a href="https://www.aadland-service.no">Aadland Service</a>
           </>:<>
