@@ -50,7 +50,7 @@ assert.ok(partialPdf.includes("Dette dokumentet bekrefter registrert betaling, i
 
 const rawVipps=readFileSync("lib/invoiceVipps.js","utf8")
  .replace(/^import .*;\n/gm,"").replace(/^export /gm,"")
- .replace('const {Resend}=await import("resend");','const Resend=FakeResend;');
+ .replace(/const \{Resend\}=await import\("[^"]*safeResend"\);/,'const Resend=FakeResend;');
 const mailLog=[];
 class FakeResend{
  constructor(){this.emails={send:async(payload,opts)=>{mailLog.push({payload,opts});return {data:{id:"mock-mail"}};}};}
