@@ -271,6 +271,13 @@ export default function MinSide(){
 
  if(loading)return <main className="customerPage"><p>Laster …</p></main>;
 
+ if(!data&&rentalHistoryError)return <main className="customerPage customerLoginPage">
+  <Link href={rentalContext?"/utleie":"/"}>← Tilbake</Link>
+  <h1>Min side er midlertidig utilgjengelig</h1>
+  <p role="alert">{rentalHistoryError}</p>
+  <button type="button" className="btn" onClick={()=>{setLoading(true);load()}}>Prøv igjen</button>
+ </main>;
+
  if(!data)return <main className="customerPage customerLoginPage">
   <Link href={rentalContext?"/utleie":"/"}>← {rentalContext?"Aadland Utleie":"Aadland Service"}</Link>
   {rentalContext&&<img className="rentalCustomerLogo" src="/aadland-utleie-logo.png" alt="Aadland Utleie" width={270} height={90}/>}
