@@ -68,6 +68,8 @@ export async function POST(req){
  if(!unit||!reference)return NextResponse.json({error:"Salgssted eller betalingsreferanse mangler."},{status:400});
  if(!vippsPaymentsEnabled(unit))return NextResponse.json({error:"Vipps-betalingsmotoren er AV for dette salgsstedet."},{status:409});
  if(!["sync","capture","cancel","refund"].includes(action))return NextResponse.json({error:"Ugyldig Vipps-handling."},{status:400});
+ if(unit==="service"&&action!=="sync"&&process.env.VERCEL_ENV!=="production")
+  return NextResponse.json({error:"Økonomiske Vipps-handlinger er sperret i testmiljøet."},{status:403});
 
  const s=db();
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
@@ -180,7 +182,18 @@ export async function POST(req){
    payment=await getVippsPayment(unit,reference);
   }
 
-  const snapshot=await syncVippsPaymentSnapshot(s,unit,reference,payment);
+  let snapshot;
+  try{snapshot=await syncVippsPaymentSnapshot(s,unit,reference,payment);}
+  catch(syncError){
+   if(serviceClaim){
+    console.error("S30 SERVICE SNAPSHOT AFTER PROVIDER ACK FAILED",{action,reference});
+    return NextResponse.json({
+     ok:true,providerAccepted:true,action,unit,reference,
+     warning:"Vipps tok imot handlingen, men oppdatering av ordren feilet. Handlingen må ikke gjentas. Bruk Synk Vipps-status og kontroller ordren."
+    });
+   }
+   throw syncError;
+  }
   let receipt=null;
   let receiptWarning="";
   let rentalConfirmation=null;
