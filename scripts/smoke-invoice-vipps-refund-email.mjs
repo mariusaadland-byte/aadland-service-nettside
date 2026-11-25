@@ -4,7 +4,7 @@ import {readFileSync} from "node:fs";
 // Fully mocked: never talks to Vipps, Resend, customers, or a database.
 const source=readFileSync("lib/invoiceVippsRefundNotice.js","utf8")
  .replace(/^import .*;\n/gm,"").replace(/^export /gm,"")
- .replace('const {Resend}=await import("resend");','const Resend=FakeResend;');
+ .replace(/const \{Resend\}=await import\("[^"]*safeResend"\);/,'const Resend=FakeResend;');
 const sql=readFileSync("supabase/migrations/20261024103000_invoice_vipps_refund_notices.sql","utf8");
 assert.match(sql,/new.refunded_ore > old.refunded_ore/,"Only a real confirmed refund creates a notice");
 assert.match(sql,/unique\(payment_id,refunded_total_ore\)/,"Cumulative refund is uniquely tracked");
