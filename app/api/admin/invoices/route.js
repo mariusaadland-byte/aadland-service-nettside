@@ -145,7 +145,7 @@ export async function PATCH(req){
  const automaticDue=new Date(baseDay+"T12:00:00Z");
  automaticDue.setUTCDate(automaticDue.getUTCDate()+days);
  const savedDueDate=mode==="auto"?automaticDue.toISOString().slice(0,10):due;
- const chosenPaymentMethod=body.customer?.paymentMethod==="vipps"?"vipps":body.customer?.paymentMethod==="bank"?"bank":selected?.preferred_payment_method==="vipps"?"vipps":"bank";
+ const chosenPaymentMethod=["bank","vipps","cash"].includes(body.customer?.paymentMethod)?body.customer.paymentMethod:selected?.preferred_payment_method==="vipps"?"vipps":"bank";
  const workDate=chosenPaymentMethod==="vipps"?osloDateKey(new Date()):clean(body.customer?.workDate,10);
  const update={title:clean(body.title),customer:{...chosen,workDescription:clean(body.customer?.workDescription,3000),workDate,workAddress:clean(body.customer?.workAddress,500),paymentMethod:chosenPaymentMethod},pricing_model:body.pricingModel,line_items:body.lineItems.map(x=>({description:clean(x.description,500),type:clean(x.type,20),quantity:Number(x.quantity),unit:clean(x.unit,30),unitPriceOre:Number(x.unitPriceOre),vatRate:Number(x.vatRate)})),notes:clean(body.notes,4000),due_date:savedDueDate,due_date_mode:mode,updated_at:new Date().toISOString()};
  const {data,error}=await s.from("invoice_drafts").update(update).eq("id",body.id).eq("status","draft")
