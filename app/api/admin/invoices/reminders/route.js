@@ -78,7 +78,7 @@ export async function POST(req){
    if(fresh.error||!fresh.data?.pdf_base64)throw Error("PDF-en kunne ikke hentes.");
    record=fresh.data;
   }
-  const {Resend}=await import("resend");
+  const {Resend}=await import("../../../../../lib/safeResend");
   const resend=new Resend(key);
   const result=await resend.emails.send({
    from:"Aadland Service <noreply@aadland-service.no>",to:record.recipient,replyTo:"post@aadland-service.no",
