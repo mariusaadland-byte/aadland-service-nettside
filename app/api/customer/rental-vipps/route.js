@@ -8,6 +8,8 @@ import {startRentalVippsPayment} from "../../../../lib/startRentalVippsPayment";
 export const runtime="nodejs";
 
 export async function POST(req){
+ if(process.env.VERCEL_ENV!=="production")return NextResponse.json({error:"Utleieendringer er sperret utenfor produksjon."},{status:403,headers:{"Cache-Control":"no-store"}});
+
  const originError=sameOriginGuard(req); if(originError)return originError;
  const rateError=await rateLimitRequest(req,{
   scope:"customer-rental-vipps",

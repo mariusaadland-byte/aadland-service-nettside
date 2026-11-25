@@ -62,6 +62,7 @@ export async function POST(req){
  const body=await req.json().catch(()=>({}));
  const unit=body.unit==="rental"?"rental":body.unit==="service"?"service":"";
  const action=String(body.action||"sync").toLowerCase();
+ if(unit==="rental"&&process.env.VERCEL_ENV!=="production")return NextResponse.json({error:"Utleiebetaling og synkronisering er sperret utenfor produksjon."},{status:403});
  const reference=String(body.reference||"").trim();
  const amountOre=unit==="service"?Number(body.amountOre??0):Math.round(Number(body.amountOre)||0);
 

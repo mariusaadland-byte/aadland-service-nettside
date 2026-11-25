@@ -73,7 +73,7 @@ export async function POST(req){
 
   const [ordersLink,rentalsLink]=await Promise.all([
    serviceClient.from("orders").update({customer_user_id:data.user.id}).is("customer_user_id",null).contains("customer",{email:value}),
-   serviceClient.from("rental_bookings").update({customer_user_id:data.user.id}).is("customer_user_id",null).contains("customer",{email:value})
+   process.env.VERCEL_ENV==="production"?serviceClient.from("rental_bookings").update({customer_user_id:data.user.id}).is("customer_user_id",null).contains("customer",{email:value}):Promise.resolve({error:null})
   ]);
   if(ordersLink.error)console.error("CUSTOMER ORDER HISTORY LINK",ordersLink.error);
   if(rentalsLink.error)console.error("CUSTOMER RENTAL HISTORY LINK",rentalsLink.error);

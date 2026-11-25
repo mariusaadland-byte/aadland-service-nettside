@@ -36,7 +36,9 @@ export async function GET(req){
  }))});
 }
 
-export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;
+export async function POST(req){
+ if(process.env.VERCEL_ENV!=="production")return NextResponse.json({error:"Utleieendringer er sperret utenfor produksjon."},{status:403,headers:{"Cache-Control":"no-store"}});
+ const originError=sameOriginGuard(req); if(originError)return originError;
  if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const b=await req.json();
  if(!b.itemId||!validDate(b.startDate)||!validDate(b.endDate)||b.endDate<b.startDate){
@@ -77,7 +79,9 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  }});
 }
 
-export async function DELETE(req){ const originError=sameOriginGuard(req); if(originError)return originError;
+export async function DELETE(req){
+ if(process.env.VERCEL_ENV!=="production")return NextResponse.json({error:"Utleieendringer er sperret utenfor produksjon."},{status:403,headers:{"Cache-Control":"no-store"}});
+ const originError=sameOriginGuard(req); if(originError)return originError;
  if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const {id}=await req.json();
  if(!id)return NextResponse.json({error:"Blokkering mangler."},{status:400});

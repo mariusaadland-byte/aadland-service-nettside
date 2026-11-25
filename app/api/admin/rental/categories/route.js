@@ -43,7 +43,9 @@ export async function GET(){
  return NextResponse.json({categories:(data||[]).map(map)});
 }
 
-export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;
+export async function POST(req){
+ if(process.env.VERCEL_ENV!=="production")return NextResponse.json({error:"Utleieendringer er sperret utenfor produksjon."},{status:403,headers:{"Cache-Control":"no-store"}});
+ const originError=sameOriginGuard(req); if(originError)return originError;
  if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const body=await req.json();
  const name=clean(body.name,160);
@@ -66,7 +68,9 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  return NextResponse.json({category:map(data)});
 }
 
-export async function PATCH(req){ const originError=sameOriginGuard(req); if(originError)return originError;
+export async function PATCH(req){
+ if(process.env.VERCEL_ENV!=="production")return NextResponse.json({error:"Utleieendringer er sperret utenfor produksjon."},{status:403,headers:{"Cache-Control":"no-store"}});
+ const originError=sameOriginGuard(req); if(originError)return originError;
  if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const body=await req.json();
  if(!body.id)return NextResponse.json({error:"Kategori mangler."},{status:400});
@@ -85,7 +89,9 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
  return NextResponse.json({category:map(data)});
 }
 
-export async function DELETE(req){ const originError=sameOriginGuard(req); if(originError)return originError;
+export async function DELETE(req){
+ if(process.env.VERCEL_ENV!=="production")return NextResponse.json({error:"Utleieendringer er sperret utenfor produksjon."},{status:403,headers:{"Cache-Control":"no-store"}});
+ const originError=sameOriginGuard(req); if(originError)return originError;
  if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const {id}=await req.json();
  if(!id)return NextResponse.json({error:"Kategori mangler."},{status:400});

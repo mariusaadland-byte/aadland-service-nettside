@@ -203,10 +203,12 @@ export async function GET(){
  }
  const paymentSetupRequired=String(paymentProbeError?.code||"")==="42703";
  if(paymentProbeError&&!paymentSetupRequired)console.error("RENTAL PAYMENT SETUP PROBE",paymentProbeError);
- return NextResponse.json({bookings:(data||[]).map(map),paymentSetupRequired});
+ return NextResponse.json({bookings:(data||[]).map(map),paymentSetupRequired},{headers:{"Cache-Control":"private, no-store","Vary":"Cookie"}});
 }
 
-export async function PATCH(req){ const originError=sameOriginGuard(req); if(originError)return originError;
+export async function PATCH(req){
+ if(process.env.VERCEL_ENV!=="production")return NextResponse.json({error:"Utleieendringer er sperret utenfor produksjon."},{status:403,headers:{"Cache-Control":"no-store"}});
+ const originError=sameOriginGuard(req); if(originError)return originError;
  if(!(await getAdminUser())||!(await hasPermission("canUpdateOrders")))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const s=db();
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});

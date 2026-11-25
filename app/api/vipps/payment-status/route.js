@@ -72,7 +72,7 @@ export async function GET(req){
   // across all callers by the actual order ID, not a caller-controlled alias.
   const service=unit==="service";
   const providerReference=service?String(target.payment_reference||"").trim():reference;
-  const canRefresh=refresh&&!state.terminal&&(!service||(process.env.VERCEL_ENV==="production"&&referencePattern.test(providerReference)));
+  const canRefresh=refresh&&!state.terminal&&process.env.VERCEL_ENV==="production"&&referencePattern.test(providerReference);
   const refreshBlocked=canRefresh&&service?await rateLimitValue(target.id,{scope:"vipps-service-public-refresh",max:1,windowSeconds:10}):null;
 
   if(canRefresh&&!refreshBlocked){
@@ -90,14 +90,14 @@ export async function GET(req){
 
   // Leave rental behavior unchanged; Service delivery belongs to the verified
   // webhook, authenticated admin and scheduled receipt recovery.
-  if(!service&&state.status==="paid"){
+  if(!service&&process.env.VERCEL_ENV==="production"&&state.status==="paid"){
    try{
     await sendVippsPaymentReceiptIfNeeded({s,unit,id:target.id,req});
    }catch(error){
     console.error("VIPPS PUBLIC RECEIPT ERROR",{unit,reference,message:error?.message});
    }
   }
-  if(!service)try{
+  if(!service&&process.env.VERCEL_ENV==="production")try{
    await sendVippsRefundNoticeIfNeeded({s,unit,id:target.id,req});
   }catch(error){
    console.error("VIPPS PUBLIC REFUND NOTICE ERROR",{unit,reference,message:error?.message});
