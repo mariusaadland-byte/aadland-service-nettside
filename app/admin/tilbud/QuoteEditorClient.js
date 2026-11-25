@@ -30,7 +30,7 @@ function blankState(){
   customer:{contactId:"",name:"",email:"",phone:"",address:"",paymentTermsDays:14,customerType:"private",organizationNumber:"",contactPerson:""},
   drawingIds:[],
   introText:"Takk for henvendelsen og interessen for Aadland Service. Vi har gleden av å presentere vårt tilbud på arbeidet som er beskrevet nedenfor. Tilbudet viser arbeid, materialer og øvrige leveranser med tilhørende priser og betingelser.",
-  lineItems:[{id:lineId(),type:"work",description:"",quantity:1,unit:"time",unitPriceOre:"",vatRate:25}],
+  lineItems:[{id:lineId(),type:"work",description:"",quantity:"",unit:"time",unitPriceOre:"",vatRate:25}],
   paymentPlan:defaultPlan,
   notes:"",
   terms:defaultTerms,
@@ -421,7 +421,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      },
      drawingIds:Array.isArray(quote.drawingIds)?quote.drawingIds:[],
      introText:quote.introText||"",
-     lineItems:Array.isArray(quote.lineItems)&&quote.lineItems.length?withPrivateCosts(quote.lineItems,quote.internalCosts):[{id:lineId(),type:"work",description:"",quantity:1,unit:"time",unitPriceOre:"",vatRate:25}],
+     lineItems:Array.isArray(quote.lineItems)&&quote.lineItems.length?withPrivateCosts(quote.lineItems,quote.internalCosts):[{id:lineId(),type:"work",description:"",quantity:"",unit:"time",unitPriceOre:"",vatRate:25}],
      paymentPlan:Array.isArray(quote.paymentPlan)&&quote.paymentPlan.length?quote.paymentPlan:defaultPlan,
      notes:quote.notes||"",
      terms:quote.terms||defaultTerms,
@@ -536,7 +536,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  }
  function addLine(type){
   setV(current=>({...current,lineItems:[...current.lineItems,{
-   id:lineId(),type,description:"",quantity:1,unit:type==="work"?"time":"stk",unitPriceOre:"",vatRate:25,internalUnitCostOre:""
+   id:lineId(),type,description:"",quantity:"",unit:type==="work"?"time":"stk",unitPriceOre:"",vatRate:25,internalUnitCostOre:""
   }]}));
  }
  function removeLine(id){
@@ -959,7 +959,7 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
      <section id="quote-material-search" className="card quoteEditorSection">
       <div className="quoteSectionHead">
        <div><div className="kicker">PRISLINJER</div><h3>Arbeid og materialer</h3></div>
-       <div><button type="button" className="btn alt" onClick={()=>addLine("work")}>+ Arbeid</button><button type="button" className="btn alt" onClick={()=>addLine("material")}>+ Materiale</button><button type="button" className="btn alt" onClick={()=>setV(current=>({...current,lineItems:[...current.lineItems,{id:lineId(),type:"material",description:consumablePrefix,quantity:1,unit:"stk",unitPriceOre:"",vatRate:25,internalUnitCostOre:""}]}))}>+ Forbruksmateriell</button></div>
+       <div><button type="button" className="btn alt" onClick={()=>addLine("work")}>+ Arbeid</button><button type="button" className="btn alt" onClick={()=>addLine("material")}>+ Materiale</button><button type="button" className="btn alt" onClick={()=>setV(current=>({...current,lineItems:[...current.lineItems,{id:lineId(),type:"material",description:consumablePrefix,quantity:"",unit:"stk",unitPriceOre:"",vatRate:25,internalUnitCostOre:""}]}))}>+ Forbruksmateriell</button></div>
       </div>
 
       {!locked&&<QuoteCatalogSearch onChoose={addCatalogProduct}/>}
@@ -969,9 +969,9 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
         <div className="quoteLineNumber">{index+1}</div>
         <div className="field quoteLineDescription"><label>Beskrivelse</label><input value={isConsumable(line)?cleanDescription(line.description):line.description} onChange={e=>updateLine(line.id,"description",e.target.value)} placeholder={line.type==="work"?"F.eks. Tømrerarbeid":"F.eks. Gipsplater og stendere"}/></div>
         <div className="field quoteLineType"><label>Type</label><select value={isConsumable(line)?"consumable":line.type} onChange={e=>setCategory(line,e.target.value)}><option value="work">Arbeid</option><option value="material">Materiale</option><option value="consumable">Forbruksmateriell</option><option value="other">Annet</option></select></div>
-        <div className="field quoteLineQuantity"><label>Antall</label><input type="number" min="0.01" step="0.01" value={line.quantity} onChange={e=>updateLine(line.id,"quantity",e.target.value)}/></div>
+        <div className="field quoteLineQuantity"><label>Antall</label><input type="number" min="0.01" step="0.01" value={line.quantity??""} onChange={e=>updateLine(line.id,"quantity",e.target.value)}/></div>
         <div className="field quoteLineUnit"><label>Enhet</label><input value={line.unit} onChange={e=>updateLine(line.id,"unit",e.target.value)} placeholder="time / stk"/></div>
-        <div className="field quoteLinePrice"><label>Pris eks. MVA</label><input type="number" min="0" step="0.01" value={line.unitPriceOre===""?"":Number(line.unitPriceOre)/100} onChange={e=>updateLine(line.id,"unitPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="0"/></div>
+        <div className="field quoteLinePrice"><label>Pris eks. MVA</label><input type="number" min="0" step="0.01" value={line.unitPriceOre===""?"":Number(line.unitPriceOre)/100} onChange={e=>updateLine(line.id,"unitPriceOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="Skriv pris"/></div>
         <div className="field quoteLineInternalCost"><label>Intern kostnad eks. MVA / enhet</label><input type="number" min="0" step="0.01" inputMode="decimal" value={line.internalUnitCostOre===""||line.internalUnitCostOre==null?"":Number(line.internalUnitCostOre)/100} onChange={e=>updateLine(line.id,"internalUnitCostOre",e.target.value===""?"":Math.round(Number(e.target.value)*100))} placeholder="Ikke registrert" title="Kun intern kalkyle. Vises aldri for kunden."/><small className="muted">Kun internt</small></div>
         {line.type==="material"&&<div className="quoteLineMarkupActions">
          <button type="button" className="btn alt" disabled={Boolean(locked)||line.internalUnitCostOre==null||line.internalUnitCostOre===""||!Number.isFinite(Number(line.internalUnitCostOre))||Number(line.internalUnitCostOre)<0} onClick={()=>applyDefaultMaterialMarkup(line)}>Beregn salgspris med {quoteMaterialMarkupOverride===""?(v.quoteMaterialMarkupPercent??defaultMaterialMarkup):quoteMaterialMarkupOverride} % påslag</button>
