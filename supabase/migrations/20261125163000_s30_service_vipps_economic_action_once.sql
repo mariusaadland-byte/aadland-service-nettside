@@ -97,7 +97,9 @@ declare
 begin
  update public.vipps_service_action_attempts
  set state='accepted',provider_ack_at=now(),
-  provider_evidence=left(coalesce(p_provider_evidence::text,'{}'),5000)::jsonb,
+  provider_evidence=case when length(coalesce(p_provider_evidence::text,'{}'))<=5000
+   then coalesce(p_provider_evidence,'{}'::jsonb)
+   else jsonb_build_object('note','provider response omitted due to length') end,
   last_issue=null,updated_at=now()
  where id=p_attempt_id and state='sending'
  returning id into updated_id;
