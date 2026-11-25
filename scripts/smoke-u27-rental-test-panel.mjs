@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const read=p=>readFileSync(p,"utf8");
+const ids=Array.from({length:27},(_,i)=>"rental-final-u"+String(i+1).padStart(2,"0"));
+const seed=new Function(read("lib/developmentTasks.js").replace(/^export /gm,"")+";return DEVELOPMENT_TASKS")();
+const meta=new Function(read("lib/developmentApprovalChecklist.js").replace(/^export /gm,"")+";return {APPROVAL_CHECKS,developmentApprovalQueue}")();
+const rental=seed.filter(x=>x.id.startsWith("rental-final-"));
+assert.deepEqual(rental.map(x=>x.id),ids);
+assert.ok(rental.every(x=>x.status==="test"&&x.category==="rental"));
+assert.ok(meta.developmentApprovalQueue(rental).every(x=>x.approval.checks.length===3&&x.approval.dependency));
+assert.ok(ids.every(id=>read("lib/developmentTaskLinks.js").includes(JSON.stringify(id))));
+assert.ok(read("app/admin/utviklingsplan/ApprovalQueue.js").includes('scope==="rental-final"'));
+assert.ok(read("app/admin/utviklingsplan/ApprovalQueue.js").includes('rentalApproved'));
+assert.ok(read("app/api/admin/utviklingsplan/route.js").includes('id.startsWith("rental-final-")&&process.env.VERCEL_ENV!=="production"'));
+console.log("U-27: 27 dedicated rental test boxes, three checks each, separate Service scope and server approval guard.");

@@ -10,13 +10,15 @@ import {
 import styles from "./roadmap.module.css";
 
 export default function ApprovalQueue({
- tasks=[],savingId="",onApprove=async()=>false,onReport=async()=>false
+ tasks=[],savingId="",onApprove=async()=>false,onReport=async()=>false,initialScope="service-final"
 }){
  const allQueue=useMemo(()=>developmentApprovalQueue(tasks),[tasks]);
- const [scope,setScope]=useState("service-final");
- const queue=useMemo(()=>allQueue.filter(t=>scope==="service-final"?t.id.startsWith("service-final-"):!t.id.startsWith("service-final-")),[allQueue,scope]);
+ const [scope,setScope]=useState(initialScope);
+ const queue=useMemo(()=>allQueue.filter(t=>scope==="service-final"?t.id.startsWith("service-final-"):scope==="rental-final"?t.id.startsWith("rental-final-"):!t.id.startsWith("service-final-")&&!t.id.startsWith("rental-final-")),[allQueue,scope]);
  const finalCount=allQueue.filter(t=>t.id.startsWith("service-final-")).length;
- const earlierCount=allQueue.length-finalCount;
+ const rentalCount=allQueue.filter(t=>t.id.startsWith("rental-final-")).length;
+ const rentalApproved=tasks.filter(t=>t.id.startsWith("rental-final-")&&t.status==="done").length;
+ const earlierCount=allQueue.length-finalCount-rentalCount;
  const [selectedId,setSelectedId]=useState(null);
  const [isOpen,setIsOpen]=useState(false);
  const [progress,setProgress]=useState({});
@@ -158,8 +160,10 @@ export default function ApprovalQueue({
   </div>
   <div className={styles.approvalBuckets}>
    <button type="button" className={styles.approvalOpen} aria-pressed={scope==="service-final"} disabled={busy||Boolean(savingId)} onClick={()=>{setScope("service-final");setSelectedId(null);setIsOpen(false);setShowAll(false);}}>Service-sluttkontroll ({finalCount})</button>
+   <button type="button" className={styles.approvalOpen} aria-pressed={scope==="rental-final"} disabled={busy||Boolean(savingId)} onClick={()=>{setScope("rental-final");setSelectedId(null);setIsOpen(false);setShowAll(true);}}>Utleie-sluttkontroll ({rentalCount})</button>
    <button type="button" className={styles.approvalOpen} aria-pressed={scope==="earlier"} disabled={busy||Boolean(savingId)} onClick={()=>{setScope("earlier");setSelectedId(null);setIsOpen(false);setShowAll(false);}}>Tidligere oppgaver ({earlierCount})</button>
   </div>
+  {scope==="rental-final"&&<p className={styles.wizardTip}>Aadland Utleie · {rentalApproved} av 27 godkjent. Bruk bare lesende kontroll i produksjon, isolert testdatabase for endringer og særskilt godkjent betalings- og e-postoppsett. Testboksene er ikke et isolert testmiljø. Ikke godkjenn manglende funksjoner eller oppsett.</p>}
   {scope==="service-final"&&<p className={styles.wizardTip}>Kun Aadland Service. Bruk isolerte testdata og egne testkontoer. Godkjenn bare etter faktisk kontroll; uavklart ekstern bekreftelse skal stå åpen. Delsteg lagres i denne nettleseren, endelig godkjenning lagres på serveren.</p>}
   <div className={styles.approvalBuckets}>
    <span><strong>{remaining.quick}</strong> raske kontroller</span>
@@ -169,7 +173,7 @@ export default function ApprovalQueue({
   {queue.length?
    <>
     <div className={styles.wizardTileGrid}>
-     {(showAll?queue:queue.slice(0,6)).map((task,i)=>{
+     {(showAll||scope==="rental-final"?queue:queue.slice(0,6)).map((task,i)=>{
       const checkpoint=progress[task.id];
       const total=task.approval.checks.length;
       const passed=checkpoint?.passed?.length||0;
@@ -185,7 +189,7 @@ export default function ApprovalQueue({
       </button>
      })}
     </div>
-    {queue.length>6&&<button className={styles.approvalListToggle}
+    {scope!=="rental-final"&&queue.length>6&&<button className={styles.approvalListToggle}
      type="button" onClick={()=>setShowAll(x=>!x)}>
      {showAll?"Vis færre tester":"Vis alle "+queue.length+" tester"}
     </button>}

@@ -8,7 +8,7 @@ import ApprovalQueue from "./ApprovalQueue";
 
 const STATUS_LABELS={todo:"Ikke startet",progress:"Under arbeid",test:"Klar for testing",done:"Ferdig"};
 const PRIORITY_LABELS={high:"Høy",normal:"Normal",low:"Lav"};
-export default function RoadmapClient(){
+export default function RoadmapClient({initialScope="service-final"}){
  const [tasks,setTasks]=useState([]);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
@@ -122,7 +122,7 @@ export default function RoadmapClient(){
      <div><b>{stats.done}</b><span>Ferdigstilt</span></div>
     </div>
     <div className={styles.progressLine} role="progressbar" aria-label="Ferdigstilte oppgaver" aria-valuemin={0} aria-valuemax={stats.total||1} aria-valuenow={stats.done}><span style={{width:(stats.total?100*stats.done/stats.total:0)+"%"}}/></div>
-    <ApprovalQueue tasks={tasks} savingId={savingId} onApprove={approveTask}
+    <ApprovalQueue tasks={tasks} savingId={savingId} initialScope={initialScope} onApprove={approveTask}
      onReport={reportTaskIssue}/>
     <div className={styles.fullPlanToggle}>
      <button type="button" onClick={()=>setShowCatalog(v=>!v)}
