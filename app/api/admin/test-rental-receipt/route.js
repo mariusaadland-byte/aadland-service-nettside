@@ -54,7 +54,7 @@ export async function POST(req){
   itemsSectionLabel:"Leie",
   brandName:"Aadland Utleie",
   brandSiteUrl:"https://www.aadlandutleie.no",
-  brandEmail:"post@aadland-service.no",
+  brandEmail:rentalReplyTo(),
   depositInfo:{
    amountOre:depositOre,
    statusLabel:"Holdes",
