@@ -21,7 +21,7 @@ const {systimaTokenDates,systimaPublicTokenHealth,refreshSystimaTokens}=
 );
 const now=Date.parse("2026-10-25T12:00:00Z");
 const credentials={accessToken:"MOCK_ACCESS",refreshToken:"MOCK_REFRESH",
- expiresAt:"2026-10-25T12:10:00Z",refreshTokenExpiresAt:"2026-11-25T12:00:00Z"};
+ expiresAt:"2026-10-25T12:10:00Z",refreshTokenExpiresAt:"2030-11-25T12:00:00Z"};
 const sealed=secureSystimaSeal(credentials,key);
 const health=systimaPublicTokenHealth(sealed,key,now);
 assert.equal(health.status,"expiring");
