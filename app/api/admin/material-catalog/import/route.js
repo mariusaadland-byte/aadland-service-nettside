@@ -6,7 +6,8 @@ import {parseMaterialPriceFile} from "../../../../../lib/materialPriceFile";
 
 export const runtime="nodejs";
 
-const MAX_FILE_BYTES=8*1024*1024;
+const MAX_FILE_BYTES=4*1024*1024;
+export const maxDuration=60;
 import {previewMaterialImport,activateMaterialImport} from "../../../../../lib/materialImportWorkflow";
 
 async function allowed(){
@@ -33,7 +34,7 @@ export async function POST(req){
  const file=form.get("file");
  if(!file||typeof file.arrayBuffer!=="function")return NextResponse.json({error:"Velg en prisfil."},{status:400});
  if(file.size<=0)return NextResponse.json({error:"Prisfilen er tom."},{status:400});
- if(file.size>MAX_FILE_BYTES)return NextResponse.json({error:"Prisfilen er for stor. Maks størrelse er 8 MB."},{status:413});
+ if(file.size>MAX_FILE_BYTES)return NextResponse.json({error:"Prisfilen er for stor. Maks størrelse er 4 MB. Bruk komprimert CSV (.csv.gz) for store prislister."},{status:413});
 
  const requestedId=slugify(form.get("supplierId"));
  const newSupplierName=String(form.get("newSupplierName")||"").trim().slice(0,120);

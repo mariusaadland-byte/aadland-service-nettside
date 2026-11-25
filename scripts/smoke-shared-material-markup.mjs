@@ -68,12 +68,17 @@ assert.ok(importSql.includes("S36_CATALOG_CHANGED")&&importSql.includes("GODKJEN
 assert.ok(calc.includes("Forhåndsvis prisliste")&&calc.includes("Godkjenn og aktiver"));
 console.log("S36 static checks: both imports stage then activate, no legacy upsert, preview and explicit approval.");
 
-const {parseMaterialPriceFile}=new Function("inflateRawSync",read("lib/materialPriceFile.js").replace(/^import .*;\n/gm,"").replace("export function parseMaterialPriceFile","function parseMaterialPriceFile")+"\nreturn {parseMaterialPriceFile};")(null);
+const {gzipSync,gunzipSync}=await import("node:zlib");
+const {parseMaterialPriceFile}=new Function("inflateRawSync","gunzipSync",read("lib/materialPriceFile.js").replace(/^import .*;\n/gm,"").replace("export function parseMaterialPriceFile","function parseMaterialPriceFile")+"\nreturn {parseMaterialPriceFile};")(null,gunzipSync);
 const csv=["varenummer;navn;pris;enhet",...Array.from({length:8991},(_,i)=>"SYN-"+i+";Testvare "+i+";100,00;STK")].join("\n");
 assert.equal(parseMaterialPriceFile(Buffer.from(csv),"synthetic.csv").products.length,8991);
 assert.equal(parseMaterialPriceFile(Buffer.from("varenummer;navn;pris;enhet\nA;Test;125;STK"),"test.csv",{priceIncludesVat:true}).products[0].cost_ex_vat_ore,10000);
 assert.throws(()=>parseMaterialPriceFile(Buffer.from('varenummer;navn;pris;enhet\nA;"unfinished;100;STK'),"bad.csv"),/uavsluttet/);
-assert.throws(()=>parseMaterialPriceFile(Buffer.from("varenummer;navn;pris;enhet\n"+("A;Test;100;STK\n").repeat(50001)),"too-large.csv"),/for mange rader/);
+assert.throws(()=>parseMaterialPriceFile(Buffer.from("varenummer;navn;pris;enhet\n"+("A;Test;100;STK\n").repeat(100001)),"too-large.csv"),/for mange rader/);
 const workflow=read("lib/materialImportWorkflow.js");
 assert.ok(workflow.includes('user?.role!=="owner"')&&workflow.includes('process.env.VERCEL_ENV!=="production"'));
 console.log("S36 file parser: 8991 rows, VAT normalization, malformed and oversized CSV rejected.");
+
+const largeCsv=["varenummer;navn;pris;enhet",...Array.from({length:87922},(_,i)=>"SYN-"+i+";Testvare "+i+";100,00;STK")].join("\n");
+assert.equal(parseMaterialPriceFile(gzipSync(largeCsv),"synthetic.csv.gz").products.length,87922);
+console.log("Large compressed supplier file: 87 922 synthetic rows parsed.");

@@ -397,8 +397,8 @@ export default function CalculatorClient(){
          <input value={newSupplierName} disabled={importBusy} onChange={e=>{setNewSupplierName(e.target.value);setImportPreview(null);setImportPhrase("");}} placeholder="F.eks. Montér"/>
         </Field>}
        </div>
-       <Field label="Prisfil" help="XLSX, CSV, TSV eller TXT. Nye filer oppdaterer samme varenummer og varer som forsvinner fra filen deaktiveres.">
-        <input id="material-price-file" type="file" accept=".xlsx,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain" disabled={importBusy} onChange={e=>{setImportFile(e.target.files?.[0]||null);setImportPreview(null);setImportPhrase("");}}/>
+       <Field label="Prisfil" help="XLSX, CSV, CSV.GZ, TSV eller TXT. Nye filer oppdaterer samme varenummer og varer som forsvinner fra filen deaktiveres.">
+        <input id="material-price-file" type="file" accept=".xlsx,.csv,.csv.gz,.gz,.tsv,.txt,application/gzip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain" disabled={importBusy} onChange={e=>{setImportFile(e.target.files?.[0]||null);setImportPreview(null);setImportPhrase("");}}/>
        </Field>
        <label className={styles.importCheck}><input type="checkbox" checked={importPriceIncludesVat} disabled={importBusy} onChange={e=>{setImportPriceIncludesVat(e.target.checked);setImportPreview(null);setImportPhrase("");}}/><span><b>Prisene i filen er inkl. mva</b><small>La denne være av for Bygger’n-filen du har nå – den er eks. mva.</small></span></label>
        <div className={styles.importActions}><button type="submit" className={styles.primary} disabled={importBusy}>{importBusy?"Behandler…":"Forhåndsvis prisliste"}</button>{importMessage&&<span>{importMessage}</span>}</div>
