@@ -3,7 +3,7 @@ import {db} from "../../../../lib/supabase";
 import {vippsUnitReadiness} from "../../../../lib/vippsReadiness";
 import {getVippsPayment} from "../../../../lib/vippsClient";
 import {syncVippsPaymentSnapshot} from "../../../../lib/vippsPaymentSync";
-import {rateLimitRequest} from "../../../../lib/rateLimit";
+import {rateLimitRequest,rateLimitValue} from "../../../../lib/rateLimit";
 import {sendVippsPaymentReceiptIfNeeded} from "../../../../lib/vippsPaymentReceipt";
 import {sendVippsRefundNoticeIfNeeded} from "../../../../lib/vippsRefundNotice";
 
@@ -68,12 +68,19 @@ export async function GET(req){
 
   let state=publicState(target.payment_status);
 
-  if(refresh&&!state.terminal){
+  // Service status polling must not dispatch customer mail. Bound provider refreshes
+  // across all callers by the actual order ID, not a caller-controlled alias.
+  const service=unit==="service";
+  const providerReference=service?String(target.payment_reference||"").trim():reference;
+  const canRefresh=refresh&&!state.terminal&&(!service||(process.env.VERCEL_ENV==="production"&&referencePattern.test(providerReference)));
+  const refreshBlocked=canRefresh&&service?await rateLimitValue(target.id,{scope:"vipps-service-public-refresh",max:1,windowSeconds:10}):null;
+
+  if(canRefresh&&!refreshBlocked){
    const readiness=await vippsUnitReadiness(s,unit);
    if(readiness.ready){
     try{
-     const payment=await getVippsPayment(unit,reference);
-     const snapshot=await syncVippsPaymentSnapshot(s,unit,reference,payment);
+     const payment=await getVippsPayment(unit,providerReference);
+     const snapshot=await syncVippsPaymentSnapshot(s,unit,providerReference,payment);
      state=publicState(snapshot?.db?.status||target.payment_status);
     }catch(error){
      console.error("VIPPS PUBLIC STATUS REFRESH ERROR",{unit,reference,status:error?.status,code:error?.code});
@@ -81,14 +88,16 @@ export async function GET(req){
    }
   }
 
-  if(state.status==="paid"){
+  // Leave rental behavior unchanged; Service delivery belongs to the verified
+  // webhook, authenticated admin and scheduled receipt recovery.
+  if(!service&&state.status==="paid"){
    try{
     await sendVippsPaymentReceiptIfNeeded({s,unit,id:target.id,req});
    }catch(error){
     console.error("VIPPS PUBLIC RECEIPT ERROR",{unit,reference,message:error?.message});
    }
   }
-  try{
+  if(!service)try{
    await sendVippsRefundNoticeIfNeeded({s,unit,id:target.id,req});
   }catch(error){
    console.error("VIPPS PUBLIC REFUND NOTICE ERROR",{unit,reference,message:error?.message});
