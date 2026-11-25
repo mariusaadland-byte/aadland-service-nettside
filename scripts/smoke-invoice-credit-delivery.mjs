@@ -43,7 +43,7 @@ const db={
 };
 const source=readFileSync("lib/invoiceCreditDelivery.js","utf8")
  .replace(/^import .*;\n/gm,"")
- .replace('const {Resend}=await import("resend");','const Resend=FakeResend;')
+ .replace(/const \{Resend\}=await import\("[^"]*safeResend"\);/,'const Resend=FakeResend;')
  .replace(/^export /gm,"");
 const send=new Function("FakeResend","freezeInvoiceCreditPdf","process",
  source+";return sendInvoiceCreditNote;")(FakeResend,async(s,n)=>n,
