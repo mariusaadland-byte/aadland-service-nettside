@@ -68,6 +68,7 @@ export default function CalculatorClient(){
  const [importMessage,setImportMessage]=useState("");
  const [importPreview,setImportPreview]=useState(null);
  const [importPhrase,setImportPhrase]=useState("");
+ const [activationAttempted,setActivationAttempted]=useState(false);
 
  useEffect(()=>{
   try{
@@ -208,7 +209,7 @@ export default function CalculatorClient(){
   if(!importPreview||importBusy)return;
   const phrase=importPreview.largeRemoval?"GODKJENN STOR REDUKSJON":"GODKJENN PRISIMPORT";
   if(importPhrase!==phrase)return;
-  setImportBusy(true);setCatalogError("");
+  setImportBusy(true);setCatalogError("");setActivationAttempted(true);setImportMessage("Kontrollerer aktiveringen …");
   try{
    const body=new FormData();
    body.append("action","activate");
@@ -218,16 +219,19 @@ export default function CalculatorClient(){
    const data=await r.json().catch(()=>({}));
    if(!r.ok)throw Error(data.error||"Kunne ikke bekrefte importen. Bruk samme godkjenning ved nytt forsøk.");
    setImportMessage((data.imported||0)+" varer aktivert for "+(importPreview.supplierName||"leverandøren")+(data.alreadyApplied?" (allerede godkjent).":"."));
-   setImportPreview(null);setImportPhrase("");setImportFile(null);setNewSupplierName("");
+   setImportPreview(null);setImportPhrase("");setImportFile(null);setNewSupplierName("");setActivationAttempted(false);
    const input=document.getElementById("material-price-file");if(input)input.value="";
-   await loadSuppliers();
+   const supplierId=data.supplierId||importPreview.supplierId||"";
+   if(supplierId){setCatalogSupplier(supplierId);setImportSupplier(supplierId);}
+   await loadSuppliers(supplierId);
    if(materialQuery.trim().length>=2)setMaterialQuery(q=>q+" ");
-  }catch(error){setCatalogError(error.message||"Kunne ikke bekrefte import.");}
+  }catch(error){setCatalogError(error.message||"Kunne ikke bekrefte import.");setImportMessage("Aktiveringsstatus er ikke bekreftet. Prøv samme godkjenning igjen før du starter ny import.");}
   finally{setImportBusy(false);}
  }
  async function importPriceList(event){
   event?.preventDefault?.();
-  setImportMessage("");setCatalogError("");setImportPreview(null);setImportPhrase("");
+  if(activationAttempted&&!window.confirm("Forrige aktiveringsstatus er ikke bekreftet. Vil du likevel lage en ny forhåndsvisning av dagens katalog?"))return;
+  setActivationAttempted(false);setImportMessage("");setCatalogError("");setImportPreview(null);setImportPhrase("");
   if(!importFile){setCatalogError("Velg en prisfil først.");return}
   if(importSupplier==="new"&&!newSupplierName.trim()){setCatalogError("Skriv inn leverandørnavn.");return}
   setImportBusy(true);
@@ -400,7 +404,7 @@ export default function CalculatorClient(){
        <div className={styles.importActions}><button type="submit" className={styles.primary} disabled={importBusy}>{importBusy?"Behandler…":"Forhåndsvis prisliste"}</button>{importMessage&&<span>{importMessage}</span>}</div>
        {importPreview&&<div className="card" style={{padding:16,marginTop:12}}>
         <h3>Kontroller prisimport – {importPreview.supplierName}</h3>
-        <p>Ingen priser er endret. Forhåndsvisningen er gyldig i 30 minutter.</p>
+        <p>{activationAttempted?"Aktivering er forsøkt. Bruk samme godkjenning igjen hvis resultatet er uavklart.":"Ingen priser er endret. Forhåndsvisningen er gyldig i 30 minutter."}</p>
         <div className={styles.importGrid}>
          {[[ "Eksisterende aktive varer",importPreview.previous],["Varer i ny fil",importPreview.incoming],["Nye / reaktiverte",importPreview.newOrReactivated],["Endrede varer",importPreview.changed],["Prisøkninger",importPreview.priceUp],["Prisreduksjoner",importPreview.priceDown],["Varer som deaktiveres",importPreview.removed],["Ugyldige rader hoppet over",importPreview.skipped]].map(([label,value])=><div key={label}><small>{label}</small><br/><b>{value}</b></div>)}
         </div>
@@ -408,7 +412,7 @@ export default function CalculatorClient(){
         <Field label={"Skriv "+(importPreview.largeRemoval?"GODKJENN STOR REDUKSJON":"GODKJENN PRISIMPORT")}>
          <input value={importPhrase} disabled={importBusy} onChange={e=>setImportPhrase(e.target.value)}/>
         </Field>
-        <div className={styles.importActions}><button type="button" className={styles.primary} disabled={importBusy||importPhrase!==(importPreview.largeRemoval?"GODKJENN STOR REDUKSJON":"GODKJENN PRISIMPORT")} onClick={approveImport}>Godkjenn og aktiver</button><button type="button" disabled={importBusy} onClick={()=>{setImportPreview(null);setImportPhrase("");setImportMessage("Import avbrutt. Ingen priser endret.");}}>Avbryt</button></div>
+        <div className={styles.importActions}><button type="button" className={styles.primary} disabled={importBusy||importPhrase!==(importPreview.largeRemoval?"GODKJENN STOR REDUKSJON":"GODKJENN PRISIMPORT")} onClick={approveImport}>Godkjenn og aktiver</button><button type="button" disabled={importBusy} onClick={()=>{setImportPreview(null);setImportPhrase("");setImportMessage(activationAttempted?"Forhåndsvisning lukket. Kontroller katalogen før ny import; forrige aktivering kan være gjennomført.":"Import avbrutt. Ingen priser endret.");}}>Avbryt</button></div>
        </div>}
       </form>}
      </div>
