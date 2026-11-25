@@ -293,7 +293,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     const customerEmail=String(order.customer?.email||"").trim().toLowerCase();
     if(!customerEmail)return NextResponse.json({ok:true,status:"cancelled",statusSaved:true,warning:"Bestillingen er kansellert, men kunden mangler e-postadresse.",cancelResult});
 
-    const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
+    const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY):process.env.RESEND_API_KEY;
     if(!resendKey)return NextResponse.json({error:"Bestillingen er kansellert og lageret er frigjort, men e-post er ikke konfigurert.",statusSaved:true},{status:503});
 
     try{
@@ -483,7 +483,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     if(order.order_type!=="order")return NextResponse.json({error:"Ordrebekreftelse gjelder produktbestillinger."},{status:400});
     const email=String(order.customer?.email||"").trim().toLowerCase();
     if(!email)return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
-    const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
+    const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY):process.env.RESEND_API_KEY;
     if(!resendKey)return NextResponse.json({error:"E-post er ikke konfigurert."},{status:503});
     try{
       const {Resend}=await import("../../../../lib/safeResend");
@@ -683,7 +683,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     const {error:updateError}=await s.from("orders").update({status:"ready",updated_at:now}).eq("id",id);
     if(updateError)return NextResponse.json({error:"Bestillingen kunne ikke settes som klar."},{status:500});
 
-    const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
+    const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY):process.env.RESEND_API_KEY;
     if(!resendKey)return NextResponse.json({error:"Bestillingen er satt som klar, men e-post er ikke konfigurert.",statusSaved:true},{status:503});
 
     try{
@@ -866,7 +866,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
   }
 
   if(sendSurveyConfirmation===true&&surveyOrder){
-    const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
+    const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY):process.env.RESEND_API_KEY;
     if(!resendKey)return NextResponse.json({error:"Befaringen er lagret, men e-post er ikke konfigurert."},{status:503});
     try{
       const {Resend}=await import("../../../../lib/safeResend");
