@@ -10,6 +10,7 @@ import {createVippsPayment} from "../../../lib/vippsClient";
 import {vippsUnitReadiness} from "../../../lib/vippsReadiness";
 import {serviceEmailFrom,serviceReplyTo} from "../../../lib/serviceEmailConfig";
 import {validateContactImageReceipts} from "../../../lib/contactImageReceipts";
+import {sendManualOrderConfirmationOnce} from "../../../lib/manualOrderConfirmationOnce";
 import {parseOrderIntent,existingServiceOrderResponse} from "../../../lib/orderIntent";
 
 export const runtime="nodejs";
@@ -103,10 +104,12 @@ export async function POST(req){
   // Single DB transaction: claim the immutable client intent, perform the
   // existing S-21 custom-image / S-22 stock operation, link the order ID.
   // Concurrent identical requests serialize on the same PostgreSQL lock.
-  const created=await s.rpc("create_service_order_once",{
+  const queuedManualOrder=body.orderType==="order"&&!useVipps;
+  const orderArgs={
    p_key:intent.key,p_fingerprint:intent.hash,p_order_record:record,
    p_stock_requests:stockRequests,p_image_proofs:contactImageProofs
-  });
+  };
+  const created=queuedManualOrder?await s.rpc("create_service_order_with_confirmation",orderArgs):await s.rpc("create_service_order_once",orderArgs);
   if(created.error){
    const issue=String(created.error.message||"");
    if(issue.includes("S25_ORDER_INTENT_CONFLICT"))
@@ -208,6 +211,10 @@ export async function POST(req){
   }
 
   let confirmationSent=false;
+  if(queuedManualOrder){
+   try{confirmationSent=(await sendManualOrderConfirmationOnce({s,id:orderId})).state==="accepted";}
+   catch{console.error("S33 ORDER CONFIRMATION QUEUED",{orderId});}
+  }
   const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY):process.env.RESEND_API_KEY;
   if(resendKey){
    const {Resend}=await import("../../../lib/safeResend");
@@ -231,7 +238,7 @@ export async function POST(req){
     vippsPending:useVipps
    });
 
-   try{
+   if(!queuedManualOrder)try{
     const sent=await resend.emails.send({
      from,
      to:safeCustomer.email,

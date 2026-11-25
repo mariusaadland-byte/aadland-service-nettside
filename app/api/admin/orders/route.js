@@ -13,6 +13,7 @@ import {sendOrderStatusNotice} from "../../../../lib/orderStatusNotice";
 import {sendProductOrderProgressNotice} from "../../../../lib/orderProgressNotice";
 import {sendManualOrderRefundNotice} from "../../../../lib/orderRefundNotice";
 import {serviceEmailFrom,serviceReplyTo} from "../../../../lib/serviceEmailConfig";
+import {sendManualOrderConfirmationOnce} from "../../../../lib/manualOrderConfirmationOnce";
 import {sendManualProductReceiptOnce} from "../../../../lib/manualProductReceiptOnce";
 
 function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
@@ -128,6 +129,13 @@ export async function GET() {
   const orderIds=orderRows.map(order=>order.id);
   const quoteByOrder=new Map();
   const manualReceiptByOrder=new Map();
+  const confirmationByOrder=new Map();
+  let confirmationListError=false;
+  if(orderIds.length){
+    const {data:queued,error:queueError}=await s.from("service_order_confirmation_outbox").select("order_id,state,claimed_at").in("order_id",orderIds);
+    if(queueError)confirmationListError=true;
+    else for(const row of queued||[])confirmationByOrder.set(row.order_id,row);
+  }
 
   if(orderIds.length){
     const {data:linkedQuotes,error:quoteError}=await s
@@ -154,6 +162,9 @@ export async function GET() {
   return NextResponse.json({
     orders: await Promise.all(orderRows.map(async order=>{
       const mapped=mapOrder(order);
+      if(order.order_type==="order"&&String(order.payment_provider||"").toLowerCase()!=="vipps"){
+        mapped.confirmationDeliveryState=order.confirmation_sent_at?"accepted":confirmationListError?"unavailable":confirmationByOrder.get(order.id)?.state||"legacy_review";
+      }
       const privateData=await privateImages(s,mapped.customRequest);
       mapped.customRequest=privateData.text;
       mapped.contactImages=privateData.images;
@@ -481,6 +492,15 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
     if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
     if(order.order_type!=="order")return NextResponse.json({error:"Ordrebekreftelse gjelder produktbestillinger."},{status:400});
+    if(String(order.payment_provider||"").toLowerCase()!=="vipps"){
+      if(process.env.VERCEL_ENV!=="production")return NextResponse.json({error:"E-post sendes bare i produksjon."},{status:403});
+      if(order.confirmation_sent_at)return NextResponse.json({error:"Ordrebekreftelsen er allerede registrert. Ingen ny e-post sendt."},{status:409});
+      try{
+        const result=await sendManualOrderConfirmationOnce({s,id});
+        if(result.state==="accepted")return NextResponse.json({ok:true});
+        return NextResponse.json({error:result.state==="unavailable"?"E-posttjenesten er utilgjengelig.": "Ingen ny e-post sendt. Kontroller eksisterende sendestatus i Resend før ny utsending."},{status:409});
+      }catch{return NextResponse.json({error:"Sendekontrollen er utilgjengelig. Ingen ny utsending startet."},{status:503});}
+    }
     const email=String(order.customer?.email||"").trim().toLowerCase();
     if(!email)return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
     const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY):process.env.RESEND_API_KEY;

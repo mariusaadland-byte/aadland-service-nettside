@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const read=p=>readFileSync(p,"utf8");
+const checkout=read("app/api/orders/route.js"),admin=read("app/api/admin/orders/route.js"),cron=read("app/api/cron/service-order-confirmations/route.js"),helper=read("lib/manualOrderConfirmationOnce.js"),sql=read("scripts/sql-s33-order-confirmation-outbox-draft.sql");
+for(const fragment of ['body.orderType==="order"&&!useVipps','s.rpc("create_service_order_with_confirmation",orderArgs)','if(!queuedManualOrder)try','sendManualOrderConfirmationOnce({s,id:orderId})'])assert.ok(checkout.includes(fragment),fragment);
+assert.ok(admin.includes('sendManualOrderConfirmationOnce({s,id})'));assert.ok(admin.includes('confirmationDeliveryState'));
+assert.ok(cron.includes('eq("state","queued")'));assert.ok(cron.includes('cronGuard(req)'));
+assert.ok(helper.includes('VERCEL_ENV!=="production"'));assert.ok(helper.includes('idempotencyKey:"service-order-confirmation/"+id'));
+assert.ok(helper.indexOf('claim_service_order_confirmation')<helper.indexOf('emails.send'));
+assert.ok(sql.includes("enable row level security"));assert.ok(sql.includes("state='queued'"));assert.ok(sql.includes("for update"));assert.ok(sql.includes("from public,anon,authenticated"));
+console.log("S33 static outbox wiring checks passed (database verification separate)");
