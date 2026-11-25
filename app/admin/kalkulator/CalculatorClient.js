@@ -438,7 +438,7 @@ export default function CalculatorClient(){
        </Field>
        <label className={styles.importCheck}><input type="checkbox" checked={importPriceIncludesVat} disabled={importBusy} onChange={e=>{setImportPriceIncludesVat(e.target.checked);setImportPreview(null);setImportPhrase("");}}/><span><b>Prisene i filen er inkl. mva</b><small>La denne være av for Bygger’n og den klargjorte Byggmakker-filen – begge er eks. mva.</small></span></label>
        <div className={styles.importActions}><button type="submit" className={styles.primary} disabled={importBusy||!importSuppliersLoaded||!importSupplier||!importFile||Boolean(priceFileError(importFile,importSupplier))}>{importBusy?"Behandler…":"Forhåndsvis prisliste"}</button>{importMessage&&<span>{importMessage}</span>}</div>
-       {importPreview&&<div className="card" style={{padding:16,marginTop:12}}>
+       {importPreview&&<div className={styles.importPreview}>
         <h3>Kontroller prisimport – {importPreview.supplierName}</h3>
         <p>{activationAttempted?"Aktivering er forsøkt. Bruk samme godkjenning igjen hvis resultatet er uavklart.":"Ingen priser er endret. Forhåndsvisningen er gyldig i 30 minutter."}</p>
         <div className={styles.importGrid}>
