@@ -153,7 +153,7 @@ ${extraNote?`<div style="margin-top:16px;padding:14px;background:#101010;border:
    ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)
    :process.env.RESEND_API_KEY;
   if(!resendKey)throw new Error("RESEND_API_KEY mangler.");
-  const {Resend}=await import("resend");
+  const {Resend}=await import("../../../../lib/safeResend");
   const resend=new Resend(resendKey);
   const content=Buffer.from(await file.arrayBuffer()).toString("base64");
   const sent=await resend.emails.send({
