@@ -43,6 +43,8 @@ export async function GET(req){
  return json({groups,limit:100});
 }
 export async function POST(req){
+ if(process.env.VERCEL_ENV!=="production")return NextResponse.json({error:"Utleieendringer er sperret utenfor produksjon."},{status:403,headers:{"Cache-Control":"no-store"}});
+
  const origin=sameOriginGuard(req);if(origin)return origin;
  const user=await authorized("canUpdateOrders");
  if(!user)return json({error:"Ingen tilgang."},403);

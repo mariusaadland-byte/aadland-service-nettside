@@ -79,7 +79,7 @@ export async function POST(req){
 
   const [ordersLink,rentalsLink]=await Promise.all([
    s.from("orders").update({customer_user_id:user.id}).is("customer_user_id",null).contains("customer",{email:verified.email}),
-   s.from("rental_bookings").update({customer_user_id:user.id}).is("customer_user_id",null).contains("customer",{email:verified.email})
+   process.env.VERCEL_ENV==="production"?s.from("rental_bookings").update({customer_user_id:user.id}).is("customer_user_id",null).contains("customer",{email:verified.email}):Promise.resolve({error:null})
   ]);
   if(ordersLink.error)console.error("CUSTOMER VERIFY ORDER LINK",ordersLink.error);
   if(rentalsLink.error)console.error("CUSTOMER VERIFY RENTAL LINK",rentalsLink.error);

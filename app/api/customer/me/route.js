@@ -48,9 +48,9 @@ export async function GET(req){
    s.from("orders").update({customer_user_id:customer.id})
     .is("customer_user_id",null)
     .contains("customer",{email:customerEmail}),
-   s.from("rental_bookings").update({customer_user_id:customer.id})
+   process.env.VERCEL_ENV==="production"?s.from("rental_bookings").update({customer_user_id:customer.id})
     .is("customer_user_id",null)
-    .contains("customer",{email:customerEmail})
+    .contains("customer",{email:customerEmail}):Promise.resolve({error:null})
   ]);
   if(orderLink.error&&!["42703","42P01"].includes(String(orderLink.error.code||"")))console.error("CUSTOMER ORDER AUTO LINK",orderLink.error);
   if(rentalLink.error&&!["42703","42P01"].includes(String(rentalLink.error.code||"")))console.error("CUSTOMER RENTAL AUTO LINK",rentalLink.error);
