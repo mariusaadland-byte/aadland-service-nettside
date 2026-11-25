@@ -37,6 +37,8 @@ assert.equal(systimaPublicTokenHealth(secureSystimaSeal({...credentials,
  refreshTokenExpiresAt:"2026-10-20T12:00:00Z"},key),key,now).status,"reauthorize");
 assert.equal(systimaTokenDates({...credentials,expiresAt:"n/a"},now).access.status,"unknown");
 assert.equal(systimaPublicTokenHealth(secureSystimaSeal({...credentials,expiresAt:"n/a"},key),key,now).status,"unknown_expiry");
+// Refresh exercises the real clock; use a fresh mock token independent of the historical health fixture.
+const refreshFixture=secureSystimaSeal({...credentials,expiresAt:new Date(Date.now()+10*60*1000).toISOString(),refreshTokenExpiresAt:new Date(Date.now()+30*86400000).toISOString()},key);
 let calls=0;
 const mockFetch=async(url,opts)=>{
  calls++;assert.equal(url,env.SYSTIMA_TOKEN_URL);assert.equal(opts.method,"POST");
@@ -52,7 +54,7 @@ const mockFetch=async(url,opts)=>{
  refreshToken:"MOCK_REFRESH_NEXT",
  expiresAt:"2030-11-01T15:00:00Z",refreshTokenExpiresAt:"2030-12-01T15:00:00Z"};}};
 };
-const updated=await refreshSystimaTokens(sealed,env,mockFetch);
+const updated=await refreshSystimaTokens(refreshFixture,env,mockFetch);
 assert.equal(calls,1);
 assert.deepEqual(secureSystimaOpen(updated.encrypted,key),{
  accessToken:"MOCK_ACCESS_NEXT",refreshToken:"MOCK_REFRESH_NEXT",
@@ -60,10 +62,10 @@ assert.deepEqual(secureSystimaOpen(updated.encrypted,key),{
 });
 assert.equal(updated.health.status,"token_stored");
 assert.ok(!JSON.stringify(updated.health).includes("MOCK_ACCESS"));
-await assert.rejects(()=>refreshSystimaTokens(sealed,{...env,SYSTIMA_OAUTH_ENABLED:"false"},mockFetch));
-await assert.rejects(()=>refreshSystimaTokens(sealed,{...env,SYSTIMA_TOKEN_URL:"https://evil.example/token"},mockFetch));
-await assert.rejects(()=>refreshSystimaTokens(sealed,env,async()=>({ok:false})),/ikke/);
-await assert.rejects(()=>refreshSystimaTokens(sealed,env,async()=>({ok:true,async json(){return {accessToken:"only"};}})),/tokenpar/);
+await assert.rejects(()=>refreshSystimaTokens(refreshFixture,{...env,SYSTIMA_OAUTH_ENABLED:"false"},mockFetch));
+await assert.rejects(()=>refreshSystimaTokens(refreshFixture,{...env,SYSTIMA_TOKEN_URL:"https://evil.example/token"},mockFetch));
+await assert.rejects(()=>refreshSystimaTokens(refreshFixture,env,async()=>({ok:false})),/ikke/);
+await assert.rejects(()=>refreshSystimaTokens(refreshFixture,env,async()=>({ok:true,async json(){return {accessToken:"only"};}})),/tokenpar/);
 assert.equal(calls,1,"All other test paths must not call success mock provider");
 const ui=readFileSync("app/admin/faktura/systima/SystimaConnectionClient.js","utf8");
 assert.ok(ui.includes("Forny tilgangstoken"));
