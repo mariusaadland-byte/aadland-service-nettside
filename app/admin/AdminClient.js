@@ -3,6 +3,7 @@
 import {rentalHandoverChecklist} from "../../lib/rentalHandover.mjs";
 import RentalConditionPhotos from "./utleie/RentalConditionPhotos";
 import {rentalOverdue,rentalLateEstimate} from "../../lib/rentalOverdue.mjs";
+import {rentalAccountingReview} from "../../lib/rentalAccountingReview.mjs";
 import { useEffect, useState } from "react";
 import { nok } from "../../lib/catalog";
 import {osloDateKey,osloDateTimeLocal,osloLocalDateTimeToIso} from "../../lib/osloTime";
@@ -4912,6 +4913,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymen
    const issue=attentionIssue(b);
    const waitingForFinalConfirmation=b.status==="confirmed"&&!b.confirmationSentAt;
    const late=rentalLateEstimate(b,today);
+   const accounting=rentalAccountingReview(b);
    const visibleStatus=late.days>0?"Forsinket · "+late.days+" d":waitingForFinalConfirmation?"Reservert":(statuses[b.status]||b.status);
    return <article id={"rental-booking-"+b.id} className={"card rentalBookingCard "+(isOpen?"isOpen":"isCompact")+" "+(initialOpenId===b.id?"adminCalendarRecordTarget":"")} key={b.id}>
    <button className="rentalBookingCompactHead" type="button" aria-expanded={isOpen} onClick={()=>setOpenId(isOpen?null:b.id)}>
@@ -4946,6 +4948,20 @@ function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymen
 
    {canUpdate&&["confirmed","active"].includes(b.status)&&<RentalHandoverControl key={b.id+":"+b.status} booking={b} busy={savingId===b.id} onSubmit={changes=>patch(b.id,changes)}/>}
    <RentalConditionPhotos key={b.id} booking={b} canUpdate={canUpdate}/>
+   <section className="orderPaymentPanel">
+    <h4>Regnskapsgrunnlag – Aadland Utleie</h4>
+    {accounting.valid?<><div className="orderPaymentFacts">
+     <span><small>Avtalt leie inkl. mva.</small><b>{nok(accounting.agreedOre)}</b></span>
+     <span><small>Registrert leiebetaling</small><b>{nok(accounting.capturedOre)}</b></span>
+     <span><small>Registrert tilbakebetalt</small><b>{nok(accounting.refundedOre)}</b></span>
+     <span><small>Netto registrert leiebetaling</small><b>{nok(accounting.netOre)}</b></span>
+     <span><small>Depositum mottatt/holdt (separat)</small><b>{nok(accounting.depositHeldOre)}</b></span>
+     <span><small>Depositum registrert brukt (separat)</small><b>{nok(accounting.depositUsedOre)}</b></span>
+    </div>
+    {accounting.receiptEligible?<a className="btn alt" href={"/api/admin/rental-receipt-copy?bookingId="+encodeURIComponent(b.id)}>Last ned betalingsbekreftelse (PDF-kopi)</a>:<p className="muted">{accounting.reason}</p>}
+    </>:<p className="notice">{accounting.reason}</p>}
+    <p className="muted">Registrerte beløp må avstemmes mot bank/Vipps. Ikke en faktura eller et bokført bilag. Depositum er ikke inkludert i leiebetalingen. Kontroller tidligere bokføring før eventuell manuell overføring til Tripletex.</p>
+   </section>
    <section className="orderPaymentPanel rentalPaymentPanel">
     <h4>Leiebetaling</h4>
     <VippsFeePreview amountOre={Number(b.totalOre)||0} title="Vipps – hele leiebeløpet" note="Depositum inngår ikke i denne beregningen." disabled={savingId===b.id}/>

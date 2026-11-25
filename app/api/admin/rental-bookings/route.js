@@ -339,6 +339,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
  }
 
  if(action==="record-paid-and-send-receipt"){
+  if(String(current.payment_provider||"").toLowerCase()==="vipps"||["pending","authorized","partial","refunded"].includes(current.payment_status))return NextResponse.json({error:"Bruk riktig betalingsoppgjør; en eksisterende betaling kan ikke erstattes manuelt."},{status:409});
   if((Number(current.payment_refunded_ore)||0)>0){
    return NextResponse.json({error:"Denne leiebetalingen har allerede en registrert tilbakebetaling. Bruk tilbakebetalingsdelen i stedet."},{status:409});
   }
@@ -348,17 +349,19 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
   if(total<=0)return NextResponse.json({error:"Bookingen har ikke et gyldig leiebeløp."},{status:400});
   const reference=String(b.paymentReference??current.payment_reference??"").trim()||"Manuelt registrert";
   const now=new Date().toISOString();
-  const {error:paymentError}=await s.from("rental_bookings").update({
+  const {data:paymentChanged,error:paymentError}=await s.from("rental_bookings").update({
    payment_status:"paid",
    payment_reference:reference,
    payment_captured_ore:total,
+   payment_captured_at:current.payment_captured_at||(current.payment_status==="paid"?null:now),
    updated_at:now
-  }).eq("id",b.id);
+  }).eq("id",b.id).eq("status",current.status).eq("updated_at",current.updated_at).select("id").maybeSingle();
   if(paymentError){
    if(String(paymentError.code||"")==="42703")return NextResponse.json({error:"Databaseoppdateringen for utleiebetaling mangler.",setupRequired:true},{status:409});
    console.error("RENTAL PAYMENT UPDATE",paymentError);
    return NextResponse.json({error:"Leiebetalingen kunne ikke registreres."},{status:500});
   }
+  if(!paymentChanged)return NextResponse.json({error:"Betalingsstatus er endret. Oppdater bookingen før du fortsetter."},{status:409});
 
   const resendKey=rentalResendApiKey();
   if(!resendKey)return NextResponse.json({error:"Leiebetalingen er registrert, men e-post er ikke konfigurert.",statusSaved:true},{status:503});

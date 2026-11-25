@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {rentalAccountingReview} from "../lib/rentalAccountingReview.mjs";
+const b={total_ore:125000,payment_captured_ore:125000,payment_refunded_ore:0,deposit_held_ore:200000,deposit_charged_ore:50000,payment_status:"paid",payment_reference:"BANK-TEST",payment_captured_at:"2026-11-25T12:00:00Z"};
+const v=rentalAccountingReview(b);
+assert.equal(v.netOre,125000);
+assert.equal(v.depositRemainingOre,150000);
+assert.ok(v.receiptEligible);
+assert.equal(rentalAccountingReview({...b,payment_refunded_ore:25000}).netOre,100000);
+assert.ok(!rentalAccountingReview({...b,payment_refunded_ore:25000}).receiptEligible);
+assert.ok(!rentalAccountingReview({...b,payment_captured_at:null}).receiptEligible);
+assert.ok(!rentalAccountingReview({...b,payment_status:"authorized"}).receiptEligible);
+assert.ok(!rentalAccountingReview({...b,payment_refunded_ore:125001}).valid);
+const api=readFileSync("app/api/admin/rental-receipt-copy/route.js","utf8");
+assert.ok(api.includes('hasPermission("canViewOrders")'));
+assert.ok(api.includes("review.receiptEligible")&&api.includes("private, no-store"));
+assert.ok(!api.includes(".update(")&&!api.includes(".insert(")&&!api.includes("resend.emails.send"));
+console.log("U-18 rental receipt copy and separate deposit arithmetic passed.");
