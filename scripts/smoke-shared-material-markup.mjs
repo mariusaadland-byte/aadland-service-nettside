@@ -96,3 +96,6 @@ assert.equal(validateFile({size:12345,name:"normal.xlsx"},"byggern"),"");
 assert.match(validateFile({size:0,name:"empty.csv"},"byggern"),/tom/);
 assert.ok(calc.includes("response.status===413")&&calc.includes("Boolean(priceFileError(importFile,importSupplier))"));
 console.log("Price file feedback: preflight size and original headerless Byggmakker format checks; compact CSV accepted.");
+
+assert.ok(calc.includes('importPreview&&<div className={styles.importPreview}>'));
+assert.ok(read("app/admin/kalkulator/calculator.module.css").includes(".importPreview h3,.importPreview p,.importPreview small,.importPreview b"));
