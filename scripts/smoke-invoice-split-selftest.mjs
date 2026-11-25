@@ -100,7 +100,7 @@ class MockResend{
 }
 const source=routeFile.replace(/^import .*;\n/gm,"")
  .replace(/^export /gm,"")
- .replace('const {Resend}=await import("resend");','const Resend=MockResend;');
+ .replace(/const \{Resend\}=await import\("[^"]*safeResend"\);/,'const Resend=MockResend;');
 const env={get VERCEL_ENV(){return preview?"preview":"production"},
  get RESEND_API_KEY(){return key}};
 const {GET,POST}=new Function("NextResponse","getAdminUser","sameOriginGuard",
