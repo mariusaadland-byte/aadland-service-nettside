@@ -14,6 +14,7 @@ const links=[
  {name:"Kunder og bestillinger",subtitle:"Åpne admin for kunder og oppdrag",href:"/admin",emoji:"👥",access:"orders"},
  {name:"Oppdragsklokke",subtitle:"Registrer tid underveis",href:"/admin/arbeidsklokke",emoji:"⏱️",access:"orders"},
  {name:"Tegneprogram",subtitle:"Prosjekter og tegninger",href:"/admin/tegning",emoji:"📐",access:"products"},
+ {name:"Utleieoversikt",subtitle:"Bookinger, utstyr og oppfølging",href:"/admin/utleie/oversikt",emoji:"📋",access:"orders"},
  {name:"Utleieprodukter",subtitle:"Legg ut, rediger og skjul utstyr",href:"/admin/utleie",emoji:"🛠️",access:"products"},
  {name:"Utleiebookinger",subtitle:"Kalender og bestillinger",href:"/admin",emoji:"📅",access:"orders"},
  {name:"Returkontroll og depositum",subtitle:"Skadesjekk, depositum og kontrollhistorikk",href:"/admin/utleie/depositum",emoji:"🔎",access:"orders"},

@@ -42,7 +42,9 @@ export default function RentalInventoryClient(){
    <Link href="/admin/utleie/depositum">Depositum og returkontroll</Link>
    <Link href="/admin/utleie/vipps-oppsett">Koble Vipps for utleie</Link>
    <Link href="/admin/vipps-kostnadskalkulator">Vipps-kostnad og utbetaling</Link>
-   <Link href="/admin">Bookinger og kalender</Link>
+   <Link href="/admin/utleie/oversikt">Utleieoversikt</Link>
+   <Link href="/admin?vis=rentalBookings">Bookinger</Link>
+   <Link href="/admin?vis=rentalCalendar">Kalender</Link>
    <Link href="/utleie" target="_blank" rel="noreferrer">Se offentlig utleieside</Link>
    <button type="button" onClick={load} disabled={loading}>Oppdater</button>
   </nav>

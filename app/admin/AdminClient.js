@@ -42,13 +42,13 @@ const ADMIN_NAV_GROUPS=[
   {id:"accounting",title:"Regnskap",icon:"▥",ids:["accounting","accountPaid","accountUnpaid","accountExpenses","accountVat","accountLedger","accountTransfers","vippsSettlement"]},
   {id:"jobs",title:"Oppdrag og planlegging",icon:"▤",ids:["jobs","jobCalendar","workClock","drawing"]},
   {id:"shop",title:"Produkter og tjenester",icon:"◫",ids:["products","categories","services"]},
-  {id:"rental",title:"Utleie",icon:"▣",ids:["rental","rentalCalendar","rentalBookings"]},
+  {id:"rental",title:"Utleie",icon:"▣",ids:["rentalDashboard","rental","rentalCalendar","rentalBookings"]},
   {id:"tools",title:"Kalkyle og betaling",icon:"⌗",ids:["calculator","materialAi","vipps","vippsCostCalculator"]},
   {id:"website",title:"Nettsiden",icon:"▥",ids:["projects","homepage"]},
   {id:"settings",title:"Styring og utvikling",icon:"⚙",ids:["drift","roadmap","customerVerifications","serviceVippsReview","users"]}
 ];
-export default function AdminClient({ user }) {
-  const [tab, setTab] = useState("overview");
+export default function AdminClient({ user, initialTab="overview" }) {
+  const [tab, setTab] = useState(initialTab);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuGroupId,setMenuGroupId]=useState(user?.role==="owner"?"accounting":"sales");
   const [menuSearch,setMenuSearch]=useState("");
@@ -497,6 +497,7 @@ export default function AdminClient({ user }) {
   if (canManageProducts) tabs.push(["products", "Produkter"]);
   if (canManageProducts) tabs.push(["categories", "Kategorier"]);
   if (canManageProducts) tabs.push(["services", "Tjenester"]);
+  if (canViewOrders||canManageProducts) tabs.push(["rentalDashboard", "Utleieoversikt"]);
   if (canManageProducts) tabs.push(["rental", "Utleieutstyr"]);
   if (canViewOrders) tabs.push(["rentalCalendar", "Utleiekalender"]);
   if (canViewOrders) tabs.push(["rentalBookings", "Utleiebookinger"]);
@@ -567,6 +568,7 @@ export default function AdminClient({ user }) {
     if (id === "materialAi") { setMenuOpen(false); router.push("/admin/material-ai"); return; }
     if (id === "reminders") { setMenuOpen(false); router.push("/admin/purring"); return; }
     if (id === "vipps") { setMenuOpen(false); router.push("/admin/vipps"); return; }
+    if(id==="rentalDashboard"){if(!canViewOrders&&!canManageProducts)return;setMenuOpen(false);router.push("/admin/utleie/oversikt");return;}
     setTab(id);
     setMenuOpen(false);
   }
