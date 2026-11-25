@@ -19,5 +19,5 @@ export default async function RentalPage(){
    }
   }
  }catch{}
- return <><script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(rentalStructuredData)}}/><RentalCatalogClient initialItems={initialItems} initialCategories={initialCategories} initialReady={initialReady}/></>;
+ return <><script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(rentalStructuredData)}}/><RentalCatalogClient initialItems={initialItems} initialCategories={initialCategories} initialReady={initialReady} initialBookingOpen={process.env.VERCEL_ENV==="production"&&process.env.RENTAL_PUBLIC_BOOKING_ENABLED==="true"}/></>;
 }

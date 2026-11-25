@@ -8,8 +8,9 @@ import {filterRentalCatalog,rentalCatalogCategory,RENTAL_CATALOG_PAGE_SIZE} from
 const kr=o=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",minimumFractionDigits:0,maximumFractionDigits:2}).format((Number(o)||0)/100);
 
 
-export default function RentalCatalogClient({initialItems=[],initialCategories=[],initialReady=false}){
+export default function RentalCatalogClient({initialItems=[],initialCategories=[],initialReady=false,initialBookingOpen=false}){
  const [items,setItems]=useState(initialItems);
+ const [bookingOpen,setBookingOpen]=useState(initialBookingOpen);
  const [categories,setCategories]=useState(initialCategories);
  const [filter,setFilter]=useState("all");
  const [visibleCount,setVisibleCount]=useState(RENTAL_CATALOG_PAGE_SIZE);
@@ -33,6 +34,7 @@ export default function RentalCatalogClient({initialItems=[],initialCategories=[
     const nextItems=data.items||[];
     setCategories(nextCategories);
     setItems(nextItems);
+    setBookingOpen(data.bookingOpen===true);
     setFilter("all");
     setSetup(!!data.setupRequired);
    })
@@ -69,12 +71,12 @@ export default function RentalCatalogClient({initialItems=[],initialCategories=[
    <div className="catalogWrap rentalHeroInner">
     <span className="catalogEyebrow">AADLAND UTLEIE</span>
     <h1>Verktøyutleie i Bergen</h1>
-    <p>Utstyr til jobben. Finn verktøyet du trenger, se leiepris og velg ønsket periode i kalenderen.</p>
+    <p>{bookingOpen?"Utstyr til jobben. Finn verktøyet du trenger, se leiepris og velg ønsket periode i kalenderen.":"Vi klargjør utstyr og betalingsløsning. Bestilling åpner senere."}</p>
     <div className="rentalHeroActions">
      <a className="catalogGoldButton" href="#utleiekatalog">Se utleieutstyr →</a>
      <Link className="rentalHeroAccount" href="/min-side">Min side →</Link>
     </div>
-    <div className="rentalHeroTrust"><span>✓ Se pris før booking</span><span>✓ Kalender på hvert produkt</span><span>✓ Henting eller levering der det tilbys</span></div>
+    {bookingOpen?<div className="rentalHeroTrust"><span>✓ Se pris før booking</span><span>✓ Kalender på hvert produkt</span><span>✓ Henting eller levering der det tilbys</span></div>:<div className="catalogNotice"><b>Under klargjøring – bestilling stengt</b></div>}
    </div>
   </section>
 
@@ -120,7 +122,7 @@ export default function RentalCatalogClient({initialItems=[],initialCategories=[
      <div className="rentalCatalogGrid">
       {visible.map(item=>{
        const image=item.imageUrls?.[0];
-       return <Link href={"/utleie/"+encodeURIComponent(item.slug)} className="rentalCatalogCard" key={item.id} aria-label={"Se og lei "+item.name}>
+       return <Link href={"/utleie/"+encodeURIComponent(item.slug)} className="rentalCatalogCard" key={item.id} aria-label={(bookingOpen?"Se og lei ":"Se ")+item.name}>
         <div className="rentalCatalogMedia">
          {image?<img src={image} alt={item.name}/>:<CatalogPlaceholder rental label="Utstyrsbilde kommer"/>}
          {item.categoryName&&<span className="rentalCatalogCategory">{item.categoryName}</span>}
@@ -133,7 +135,7 @@ export default function RentalCatalogClient({initialItems=[],initialCategories=[
           <div><small>Fra</small><b>{kr(item.dailyPriceOre)} / dag</b></div>
           {item.depositOre>0&&<div><small>Depositum</small><span>{kr(item.depositOre)}</span></div>}
          </div>
-         <span className="rentalCatalogLink">Se og lei →</span>
+         <span className="rentalCatalogLink">{bookingOpen?"Se og lei →":"Se produkt →"}</span>
         </div>
        </Link>;
       })}

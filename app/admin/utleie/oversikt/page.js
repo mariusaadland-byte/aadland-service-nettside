@@ -40,6 +40,7 @@ export default async function RentalDashboard(){
  }else failed=true;
  return <main className={styles.root}>
   <header><Link href="/admin">← Administrasjon</Link><p className={styles.kicker}>AADLAND UTLEIE</p><h1>Utleieoversikt</h1><p>Arbeidsliste og registrerte nøkkeltall · {today}</p><Link href="/admin/utleie/oversikt" className={styles.action}>Oppdater oversikten</Link></header>
+  {user.role==="owner"&&<section><h2>Lanseringsstatus</h2><p className={styles.warning}>{process.env.VERCEL_ENV==="production"&&process.env.RENTAL_PUBLIC_BOOKING_ENABLED==="true"?"Bookingbryter er på. Dette er ikke en attest på gjennomført sluttkontroll.":"Klargjøring – offentlig booking er stengt. Du kan fortsatt registrere utstyr og administrere tidligere bookinger."}</p><nav className={styles.links}><Link href="/admin/utleie">Registrer utstyr</Link><Link href="/admin/utleie/vipps-oppsett">Vipps-oppsett</Link><Link href="/admin/utviklingsplan?vis=utleie">Test og godkjenn</Link></nav></section>}
   {failed&&<p role="alert" className={styles.warning}>Noen tall kunne ikke hentes. En strek betyr ukjent, ikke null.</p>}
   {orders&&<section><h2>Bookinger og oppfølging</h2><div className={styles.grid}>
    <Stat label="Nye bookinger" value={stats.new} href="/admin?vis=rentalBookings" description="Åpne arbeidslisten"/>

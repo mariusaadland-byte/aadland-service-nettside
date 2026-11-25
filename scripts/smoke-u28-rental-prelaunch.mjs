@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const read=p=>readFileSync(p,"utf8");
+const post=read("app/api/rental-bookings/route.js");
+assert.ok(post.indexOf('process.env.RENTAL_PUBLIC_BOOKING_ENABLED!=="true"')<post.indexOf("await rateLimitRequest(req"));
+assert.ok(post.includes('code:"RENTAL_NOT_OPEN"'));
+assert.ok(read("app/api/rental/route.js").includes('bookingOpen:process.env.VERCEL_ENV==="production"&&process.env.RENTAL_PUBLIC_BOOKING_ENABLED==="true"'));
+const detail=read("app/utleie/[slug]/page.js");
+assert.ok(detail.includes("useState(false)")&&detail.includes("if(!bookingOpen||!item||!chosen||booking)return")&&detail.includes("{bookingOpen&&chosen&&"));
+assert.ok(read("app/utleie/RentalCatalogClient.js").includes("Under klargjøring – bestilling stengt"));
+assert.ok(read("app/admin/utleie/oversikt/page.js").includes("Lanseringsstatus"));
+const links=new Function(read("lib/developmentTaskLinks.js").replace(/^export /gm,"")+";return developmentTaskLink")();
+assert.equal(links("rental-final-u27"),"/admin/utviklingsplan?vis=utleie");
+console.log("U-28: default-closed new rental booking, clear public preparation state, owner status and U27 link syntax passed.");

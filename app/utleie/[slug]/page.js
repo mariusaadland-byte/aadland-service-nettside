@@ -182,6 +182,7 @@ export default function RentalDetailPage(){
  const params=useParams();
  const slug=decodeURIComponent(String(params?.slug||""));
  const [item,setItem]=useState(null);
+ const [bookingOpen,setBookingOpen]=useState(false);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
  const [chosen,setChosen]=useState(null);
@@ -239,9 +240,9 @@ export default function RentalDetailPage(){
     if(!response.ok)throw new Error(data.error||"Utstyret kunne ikke lastes.");
     const found=(data.items||[])[0];
     if(!found)throw new Error("Utstyret ble ikke funnet.");
-    return found;
+    return {found,open:data.bookingOpen===true};
    })
-   .then(found=>{if(!cancelled)setItem(found)})
+   .then(({found,open})=>{if(!cancelled){setItem(found);setBookingOpen(open);}})
    .catch(err=>{if(!cancelled)setError(err.message||"Utstyret kunne ikke lastes.")})
    .finally(()=>{if(!cancelled)setLoading(false)});
   return()=>{cancelled=true};
@@ -263,7 +264,7 @@ export default function RentalDetailPage(){
 
  async function book(e){
   e.preventDefault();
-  if(!item||!chosen||booking)return;
+  if(!bookingOpen||!item||!chosen||booking)return;
   setBooking(true);
   setError("");
   try{
@@ -284,6 +285,7 @@ export default function RentalDetailPage(){
    });
    const data=await response.json().catch(()=>({}));
    if(!response.ok){
+    if(data.code==="RENTAL_NOT_OPEN"){setBookingOpen(false);setChosen(null);}
     if(data.code==="RENTAL_TERMS_CHANGED")setAccepted(false);
     if(data.code==="RENTAL_PRICE_CHANGED"){setChosen(null);setAccepted(false);setRefreshKey(value=>value+1);}
     throw new Error(data.error||"Kunne ikke sende booking.");
@@ -353,9 +355,10 @@ export default function RentalDetailPage(){
   {message&&<div className="catalogWrap"><div className="rentalMessage success"><b>{paymentUrl?"Fullfør betalingen":"Booking registrert"}</b><p>{message}</p>{paymentUrl&&<a className="catalogGoldButton" href={paymentUrl}>Gå videre til Vipps-betaling →</a>}<p><strong>Finner du ikke e-posten, sjekk søppelpost/spam.</strong></p>{customerAccount&&<Link className="catalogGoldButton" href="/min-side">Se bookingen på Min side →</Link>}</div></div>}
   {error&&<div className="catalogWrap"><div className="rentalMessage notice"><b>Noe gikk galt</b><p>{error}</p></div></div>}
 
-  {canFulfill&&item.status==="available"&&<div className="catalogWrap rentalDetailCalendarWrap"><RentalCalendar key={item.id} item={item} onChoose={choosePeriod} onSelectionChange={()=>{setChosen(null);setAccepted(false);}} refreshKey={refreshKey}/></div>}
+  {!bookingOpen&&<div className="catalogWrap"><div className="catalogNotice"><b>Utleie åpner senere</b><p>Vi klargjør utstyr og betalingsløsning. Bestilling er ikke åpen ennå.</p><Link href="/utleie/kontakt">Kontakt oss</Link></div></div>}
+  {bookingOpen&&canFulfill&&item.status==="available"&&<div className="catalogWrap rentalDetailCalendarWrap"><RentalCalendar key={item.id} item={item} onChoose={choosePeriod} onSelectionChange={()=>{setChosen(null);setAccepted(false);}} refreshKey={refreshKey}/></div>}
 
-  {chosen&&<section className="rentalBookingSection" id="booking">
+  {bookingOpen&&chosen&&<section className="rentalBookingSection" id="booking">
    <div className="catalogWrap">
     <form className="rentalBookingCard" onSubmit={book}>
      <div className="rentalBookingIntro">
