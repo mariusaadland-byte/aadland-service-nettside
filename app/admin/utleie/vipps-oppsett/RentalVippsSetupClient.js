@@ -193,6 +193,7 @@ export default function RentalVippsSetupClient(){
       riktig salgssted og bank, en reell eller godkjent testbetaling,
       riktig leiebeløp, separat depositum, callback/webhook,
       bookingstatus og kvittering.</p>
+     <p>Kontroller også at en avbrutt eller uklar betalingsforespørsel ikke oppretter en ny betalingsreferanse. Depositum skal ikke inkluderes i Vipps-leiebeløpet.</p>
      <p><strong>Viktig:</strong> VIPPS_RENTAL_PAYMENTS_ENABLED og
       VIPPS_RENTAL_PUBLIC_PAYMENTS_ENABLED skal forbli AV
       til du uttrykkelig godkjenner aktivering etter disse kontrollene.
