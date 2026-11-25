@@ -1107,6 +1107,9 @@ function Customers({orders,bookings,profiles,billingProfiles,quotes,canUpdate,re
 }
 
 function Orders({ orders, status, canUpdateOrders, isOwner=false, reload }) {
+ const [onlyUnconfirmed,setOnlyUnconfirmed]=useState(false);
+ const missingConfirmation=orders.filter(o=>o.confirmationDeliveryState&& !o.confirmationSentAt&&!o.archivedAt&&!["completed","cancelled"].includes(o.status)&&o.confirmationDeliveryState!=="skipped");
+ const visibleOrders=onlyUnconfirmed?missingConfirmation:orders;
  const [openId,setOpenId]=useState(null),[savingId,setSavingId]=useState(null),[message,setMessage]=useState("");
  async function hideTest(order){
   if(!window.confirm("Skjule testbestillingen "+order.orderNumber+" fra den aktive listen?\n\nDette sletter eller refunderer IKKE penger hos Vipps eller i regnskapet. Betalingshistorikken blir liggende i arkivet."))return;
@@ -1307,6 +1310,17 @@ function Orders({ orders, status, canUpdateOrders, isOwner=false, reload }) {
   setMessage("Bestillingen er satt som "+label+" og kunden er varslet.");
   if(typeof reload==="function")await reload();
  }
+ async function reviewOrderConfirmation(order,result){
+  if(!isOwner)return;
+  const accepted=result==="accepted",phrase=accepted?"BEKREFTET I RESEND":"STOPP UTSENDING";
+  if(window.prompt("Kontroller historikken i Resend. Skriv "+phrase)!==phrase)return;
+  const providerId=accepted?(window.prompt("Meldings-ID i Resend:")||"").trim():"";
+  const acceptedAt=accepted?(window.prompt("Tidspunkt for aksept, ISO-format med tidssone (f.eks. 2026-11-25T12:00:00+01:00):")||"").trim():"";
+  const note=(window.prompt("Hva ble kontrollert? Minst 12 tegn.")||"").trim();
+  if(note.length<12||accepted&&(!providerId||!acceptedAt))return;
+  setSavingId(order.id);setMessage("");
+  try{const r=await fetch("/api/admin/orders",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:order.id,action:"review-order-confirmation",confirmationReview:{result,phrase,providerId,acceptedAt,note}})});const d=await r.json();setMessage(d.message||d.error||"Kontrollen kunne ikke lagres.");if(typeof reload==="function")await reload();}catch{setMessage("Kontrollen kunne ikke bekreftes. Oppdater status.");}finally{setSavingId(null);}
+ }
  async function resendOrderConfirmation(order){
   if(!window.confirm("Sende ordrebekreftelsen på nytt til "+order.customerEmail+"?"))return;
   setSavingId(order.id);setMessage("");
@@ -1476,7 +1490,7 @@ function Orders({ orders, status, canUpdateOrders, isOwner=false, reload }) {
   }finally{setSavingId(null);}
  }
 
- return <><>{message&&<p className="notice">{message}</p>}</><div className="orderCards">{orders.length?orders.map(order=>{const isOpen=openId===order.id;return <article className={"card orderCard "+(isOpen?"isOpen":"isCompact")} key={order.id}>
+ return <><>{message&&<p className="notice">{message}</p>}</><div className="orderPaymentPanel"><h4>Ordrebekreftelser som må følges opp</h4><p>{missingConfirmation.length} aktive manuelle produktordrer i denne listen uten registrert bekreftelse.</p><button className="btn alt" type="button" onClick={()=>setOnlyUnconfirmed(!onlyUnconfirmed)}>{onlyUnconfirmed?"Vis alle":"Vis bare uavklarte bekreftelser"}</button></div><div className="orderCards">{visibleOrders.length?visibleOrders.map(order=>{const isOpen=openId===order.id;return <article className={"card orderCard "+(isOpen?"isOpen":"isCompact")} key={order.id}>
   <button className="orderCompactHead" type="button" aria-expanded={isOpen} onClick={()=>setOpenId(isOpen?null:order.id)}><span><b>{order.customerName||"Ukjent kunde"}</b><small>{order.orderNumber} · {new Date(order.createdAt).toLocaleDateString("nb-NO")}</small></span><span><strong>{nok(order.totalOre||0)}</strong><em>{labels[order.status]||order.status}</em><i aria-hidden="true">{isOpen?"⌃":"⌄"}</i></span></button>
   {isOpen&&<div className="orderExpanded">
   <div className="orderCardTop"><div><div className="kicker">{order.orderNumber}</div><h3>{order.customerName||"Ukjent kunde"}</h3><small className="muted">{new Date(order.createdAt).toLocaleString("nb-NO")}</small></div><b>{nok(order.totalOre||0)}</b></div>
@@ -1537,6 +1551,7 @@ function Orders({ orders, status, canUpdateOrders, isOwner=false, reload }) {
      {order.confirmationSentAt&&<span><small>Sist sendt</small><b>{new Date(order.confirmationSentAt).toLocaleString("nb-NO")}</b></span>}
     </div>
     {order.confirmationDeliveryState&&!["queued","accepted"].includes(order.confirmationDeliveryState)&&<p className="notice">Ingen automatisk ny utsending. Kontroller meldingshistorikken før videre handling.</p>}
+    {isOwner&&canUpdateOrders&&["claimed","needs_review","legacy_review"].includes(order.confirmationDeliveryState)&&<div><button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>reviewOrderConfirmation(order,"accepted")}>Registrer bekreftet i Resend</button> <button className="btn alt" type="button" disabled={savingId===order.id} onClick={()=>reviewOrderConfirmation(order,"skipped")}>Stopp utsending etter kontroll</button></div>}
     {canUpdateOrders&&(!order.confirmationDeliveryState||order.confirmationDeliveryState==="queued")&&<button className="btn alt" type="button" disabled={savingId===order.id||!order.customerEmail} onClick={()=>resendOrderConfirmation(order)}>{savingId===order.id?"Sender …":order.confirmationSentAt?"Send ordrebekreftelse på nytt":"Send ordrebekreftelse"}</button>}
    </div>}
    {order.orderType!=="custom"&&<div className="orderPaymentPanel">
