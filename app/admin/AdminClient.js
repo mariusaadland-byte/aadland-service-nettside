@@ -1430,6 +1430,7 @@ function Orders({ orders, status, canUpdateOrders, isOwner=false, reload }) {
   }finally{setSavingId(null);}
  }
  async function vippsOrderAction(order,action){
+  if(savingId===order.id)return;
   const reference=String(order.paymentReference||order.orderNumber||"").trim();
   if(!reference){setMessage("Vipps-referansen mangler.");return;}
   let amountOre=0;
@@ -1449,20 +1450,25 @@ function Orders({ orders, status, canUpdateOrders, isOwner=false, reload }) {
    if(!window.confirm("Refundere "+nok(amountOre)+" gjennom Vipps?"))return;
   }else if(action==="cancel"&&!window.confirm("Kansellere gjenværende Vipps-reservasjon? Beløpet som ikke er captured frigis til kunden."))return;
 
+  const intentId=action==="sync"?null:crypto.randomUUID();
   setSavingId(order.id);setMessage("");
-  const response=await fetch("/api/admin/vipps-payment",{
-   method:"POST",
-   headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({unit:"service",reference,action,amountOre})
-  });
-  const data=await response.json().catch(()=>({}));
-  setSavingId(null);
-  if(!response.ok){setMessage(data.error||"Vipps-handlingen kunne ikke utføres.");return;}
-  const labels={sync:"Vipps-status er synkronisert.",capture:"Vipps-beløpet er trukket.",cancel:"Gjenværende Vipps-reservasjon er kansellert.",refund:"Vipps-refusjonen er registrert."};
-  const receiptText=data?.receipt?.sent?" Kvittering er sendt automatisk til kunden.":data?.receiptWarning?" "+data.receiptWarning:"";
-  const refundText=data?.refundNotice?.sent?" Tilbakebetalingsbekreftelse er sendt automatisk til kunden.":data?.refundNoticeWarning?" "+data.refundNoticeWarning:"";
-  setMessage((labels[action]||"Vipps-betalingen er oppdatert.")+receiptText+refundText);
-  if(typeof reload==="function")await reload();
+  try{
+   const response=await fetch("/api/admin/vipps-payment",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({unit:"service",reference,action,amountOre,intentId})
+   });
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok){setMessage(data.error||"Vipps-resultatet er uavklart. Ikke gjenta handlingen; kontroller betalingsstatus.");return;}
+   if(data.warning){setMessage(data.warning);return;}
+   const labels={sync:"Vipps-status er synkronisert.",capture:"Vipps-beløpet er trukket.",cancel:"Gjenværende Vipps-reservasjon er kansellert.",refund:"Vipps-refusjonen er registrert."};
+   const receiptText=data?.receipt?.sent?" Kvittering er sendt automatisk til kunden.":data?.receiptWarning?" "+data.receiptWarning:"";
+   const refundText=data?.refundNotice?.sent?" Tilbakebetalingsbekreftelse er sendt automatisk til kunden.":data?.refundNoticeWarning?" "+data.refundNoticeWarning:"";
+   setMessage((labels[action]||"Vipps-betalingen er oppdatert.")+receiptText+refundText);
+   if(typeof reload==="function")await reload();
+  }catch{
+   setMessage("Nettverksfeil: Vipps kan ha utført handlingen. Ikke trykk igjen. Kontroller Vipps-status og handlingsloggen først.");
+  }finally{setSavingId(null);}
  }
 
  return <><>{message&&<p className="notice">{message}</p>}</><div className="orderCards">{orders.length?orders.map(order=>{const isOpen=openId===order.id;return <article className={"card orderCard "+(isOpen?"isOpen":"isCompact")} key={order.id}>
