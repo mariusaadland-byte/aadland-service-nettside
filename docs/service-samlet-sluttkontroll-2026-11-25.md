@@ -1,13 +1,13 @@
 # Aadland Service – samlet praktisk sluttkontroll (25.11.2026)
 
-Utleie er utenfor omfanget. Dette er en testplan, ikke dokumentasjon på at testene er bestått. Kilde: docs/systemkontroll-uten-utleie-2026-11-21.md, S32–S35 dokumenter og PR #227, #232, #233, #235. 36 hovedpunkter. Bevar original kontrollhistorikk.
+Utleie er utenfor omfanget. Dette er en testplan, ikke dokumentasjon på at testene er bestått. Kilde: docs/systemkontroll-uten-utleie-2026-11-21.md, S32–S36 dokumenter og PR #227, #232, #233, #235, #237. 36 hovedpunkter. Bevar original kontrollhistorikk.
 
 ## Sikker gjennomføring
-Bruk isolerte testdata og egne testkontoer; preview skal ikke sende ekte e-post eller opprette reelle betalinger. Ikke bruk produksjonskunde eller ekte regnskapsdokument som testobjekt. Reell e-post/Vipps/Tripletex-aktivitet krever kontrollert, særskilt godkjent test med eier; ingen fiktiv bokføring. Registrer testdato, miljø, forventet/faktisk resultat, bevis uten hemmeligheter, og bestått/feilet/ikke utført. Stopp ved avvik. S-14 og S-36 er fortsatt åpne før risikoarbeid/masseimport.
+Bruk isolerte testdata og egne testkontoer; preview skal ikke sende ekte e-post eller opprette reelle betalinger. Ikke bruk produksjonskunde eller ekte regnskapsdokument som testobjekt. Reell e-post/Vipps/Tripletex-aktivitet krever kontrollert, særskilt godkjent test med eier; ingen fiktiv bokføring. Registrer testdato, miljø, forventet/faktisk resultat, bevis uten hemmeligheter, og bestått/feilet/ikke utført. Stopp ved avvik. S-14 (backup/restore) og S-36 (praktisk fil-/samtidighetstest) står åpne før risikoarbeid/masseimport.
 
 ## A. Blokkerende oppgaver
 - [ ] S-14: godkjenn kryptert eksternt lagringsmål; faktiske database- og Storage-kopier; gjenopprett i isolert miljø, kontroller filer, Auth og avstenging av e-post/betaling.
-- [ ] S-36: implementer forhåndsvisning av importdifferanse, eiergodkjenning, transaksjonell aktivering, idempotens og rollback. Test begge import-API-er med syntetisk prisfil og avbrudd. Ikke endre eksisterende katalog før verifisert.
+- [ ] S-36: teknisk implementert, migrert og produksjon READY. 8991-raders syntetisk DB-test og sen feilrollback bestått. Innlogget filopplasting og faktisk parallelle aktiveringer gjenstår; ikke endre eksisterende katalog før verifisert.
 - [ ] S-11: kontroller direkte Auth-signup og lekket passord; ingen abonnementsendring uten godkjenning.
 - [ ] S-13: dokumenter DPA, lagringsplan, overføringer og cookie-/tredjepartsrevisjon; praktisk innsyn/sletting med identitetskontroll.
 
@@ -42,5 +42,8 @@ Bruk isolerte testdata og egne testkontoer; preview skal ikke sende ekte e-post 
 ## E. Teknisk oppfølging
 - [x] S-10: dokumentert funksjons-/triggerkontroll i produksjonsdatabase.
 - [ ] S-34: ny fakturaindeks installert/verifisert; resterende 12 Service-fremmednøkkelindekser vurderes ved dokumentert behov. Ingen sletting av ubrukte indekser uten dokumentasjon.
-- [ ] S-35: preview bestått og merge utført; produksjonsutrulling og innlogget test må bekreftes.
+- [ ] S-35: preview og produksjon READY; innlogget test gjenstår.
 
+
+## Admin-testvindu
+25 separate Service-testbokser, tre kontrollsteg per boks, i eksisterende /admin/utviklingsplan. Tidligere oppgaver beholdes i eget filter. Lokale delsteg, serverlagret endelig eiergodkjenning og feilnotater. Ingen test er godkjent automatisk. S-10 dokumentert teknisk lukket og S-34 oppfølging ved vekst beholdes i denne listen, ikke som brukerprøve.
