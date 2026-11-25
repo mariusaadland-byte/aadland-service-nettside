@@ -165,6 +165,7 @@ function RentalCalendar({item,onChoose,onSelectionChange,refreshKey}){
    {checking?<span role="status">Sjekker hele perioden og pris …</span>:quote&&<>
     <div><small>Leiedager</small><b>{quote.days}</b></div>
     <div><small>Leiepris inkl. mva.</small><b>{kr(quote.totalOre)}</b></div>
+    {quote.discountOre>0&&<div><small>Langtidsrabatt</small><b>−{kr(quote.discountOre)}</b></div>}
     {quote.depositOre>0&&<div><small>Depositum</small><b>{kr(quote.depositOre)}</b></div>}
    </>}
   </div>}
@@ -272,6 +273,7 @@ export default function RentalDetailPage(){
      itemId:item.id,
      startDate:chosen.startDate,
      endDate:chosen.endDate,
+     expectedPricing:{totalOre:chosen.pricing.totalOre,depositOre:chosen.pricing.depositOre},
      customer,
      customerType,
      ...(customerType==="company"?{company}:{}),
@@ -280,7 +282,10 @@ export default function RentalDetailPage(){
     })
    });
    const data=await response.json().catch(()=>({}));
-   if(!response.ok)throw new Error(data.error||"Kunne ikke sende booking.");
+   if(!response.ok){
+    if(data.code==="RENTAL_PRICE_CHANGED"){setChosen(null);setAccepted(false);setRefreshKey(value=>value+1);}
+    throw new Error(data.error||"Kunne ikke sende booking.");
+   }
    setMessage(data.message||("Booking "+data.bookingNumber+" er registrert. Sjekk innboks og søppelpost for e-post om leien."));
    setPaymentUrl(data.paymentPending?data.paymentUrl||"":"");
    setChosen(null);

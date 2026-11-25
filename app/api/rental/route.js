@@ -1,4 +1,5 @@
 import {NextResponse} from "next/server";
+import {calculateRentalPrice} from "../../../lib/rentalPricing.mjs";
 import {db,fromDbRentalItem} from "../../../lib/supabase";
 import {withSupabaseRetry} from "../../../lib/supabaseRetry";
 import {peakRentalBookings,countedRentalBookings} from "../../../lib/rentalAvailability";
@@ -10,27 +11,6 @@ function valid(a,b){
 }
 function daysBetween(a,b){
  return Math.round((new Date(b+"T12:00:00Z")-new Date(a+"T12:00:00Z"))/86400000)+1;
-}
-function price(item,startDate,endDate){
- const days=daysBetween(startDate,endDate);
- let total=days*item.dailyPriceOre,basis="daily";
- if(item.weeklyPriceOre!=null&&days>=7){
-  total=Math.floor(days/7)*item.weeklyPriceOre+(days%7)*item.dailyPriceOre;
-  basis="weekly";
- }
- if(item.weekendPriceOre!=null&&days<=3){
-  const x=new Date(startDate+"T12:00:00Z").getUTCDay();
-  const y=new Date(endDate+"T12:00:00Z").getUTCDay();
-  if([x,y].some(d=>d===0||d===5||d===6)&&item.weekendPriceOre<total){
-   total=item.weekendPriceOre;
-   basis="weekend";
-  }
- }
- if(item.longTermDays&&days>=item.longTermDays&&item.longTermDiscountPercent>0){
-  total=Math.round(total*(1-item.longTermDiscountPercent/100));
-  basis+="+longterm";
- }
- return {days,totalOre:Math.max(0,total),depositOre:item.depositOre,basis};
 }
 function categoryMap(rows){
  return new Map((rows||[]).map(row=>[row.id,{
@@ -115,10 +95,11 @@ export async function GET(req){
   }
   const manuallyBlocked=(blocks?.length||0)>0;
   const booked=peakRentalBookings(countedRentalBookings(bookings),start,end,buffer);
+  const pricing=calculateRentalPrice(item,start,end);
   out.push({
    ...item,
-   available:item.status==="available"&&!manuallyBlocked&&booked<Math.max(1,Number(item.quantity)||1),
-   pricing:price(item,start,end)
+   available:!!pricing&&item.status==="available"&&!manuallyBlocked&&booked<Math.max(1,Number(item.quantity)||1),
+   pricing
   });
  }
 
