@@ -106,7 +106,7 @@ export async function POST(req){
   if(!drafts.length)return fail("Ingen fakturakladder ble opprettet.",500);
   return NextResponse.json({id:drafts[0].id,ids:drafts.map(x=>x.id),count:drafts.length});
  }else{
-  draft={title:clean(body.title)||"Ny faktura",customer:{name:clean(body.customerName),email:clean(body.customerEmail),address:clean(body.customerAddress)},pricing_model:"fixed",line_items:[{description:"Arbeid",type:"work",quantity:1,unit:"stk",unitPriceOre:0,vatRate:25}]};
+  draft={title:clean(body.title)||"Ny faktura",customer:{name:clean(body.customerName),email:clean(body.customerEmail),address:clean(body.customerAddress)},pricing_model:"fixed",line_items:[{description:"Arbeid",type:"work",quantity:null,unit:"stk",unitPriceOre:null,vatRate:25}]};
  }
  const {data,error}=await s.from("invoice_drafts").insert(draft).select("id").single();
  if(error)return fail(error.code==="23505"?"Fakturakladd finnes allerede.":"Kunne ikke opprette fakturakladd.",500);
@@ -147,7 +147,7 @@ export async function PATCH(req){
  const savedDueDate=mode==="auto"?automaticDue.toISOString().slice(0,10):due;
  const chosenPaymentMethod=["bank","vipps","cash"].includes(body.customer?.paymentMethod)?body.customer.paymentMethod:selected?.preferred_payment_method==="vipps"?"vipps":"bank";
  const workDate=chosenPaymentMethod==="vipps"?osloDateKey(new Date()):clean(body.customer?.workDate,10);
- const update={title:clean(body.title),customer:{...chosen,workDescription:clean(body.customer?.workDescription,3000),workDate,workAddress:clean(body.customer?.workAddress,500),paymentMethod:chosenPaymentMethod},pricing_model:body.pricingModel,line_items:body.lineItems.map(x=>({description:clean(x.description,500),type:clean(x.type,20),quantity:Number(x.quantity),unit:clean(x.unit,30),unitPriceOre:Number(x.unitPriceOre),vatRate:Number(x.vatRate)})),notes:clean(body.notes,4000),due_date:savedDueDate,due_date_mode:mode,updated_at:new Date().toISOString()};
+ const update={title:clean(body.title),customer:{...chosen,workDescription:clean(body.customer?.workDescription,3000),workDate,workAddress:clean(body.customer?.workAddress,500),paymentMethod:chosenPaymentMethod},pricing_model:body.pricingModel,line_items:body.lineItems.map(x=>({description:clean(x.description,500),type:clean(x.type,20),quantity:x.quantity==null||x.quantity===""?null:Number(x.quantity),unit:clean(x.unit,30),unitPriceOre:x.unitPriceOre==null||x.unitPriceOre===""?null:Number(x.unitPriceOre),vatRate:Number(x.vatRate)})),notes:clean(body.notes,4000),due_date:savedDueDate,due_date_mode:mode,updated_at:new Date().toISOString()};
  const {data,error}=await s.from("invoice_drafts").update(update).eq("id",body.id).eq("status","draft")
   .eq("updated_at",body.expectedUpdatedAt).select("id,updated_at").maybeSingle();
  if(error)return fail("Fakturakladden kunne ikke lagres.",500);
