@@ -26,7 +26,7 @@ export async function GET(req){
  if(history.error||!Array.isArray(history.data)||history.data.length>=500)
   return json({error:"Driftsloggen kunne ikke leses fullstendig."},503);
  const health=SERVICE_CRON_JOBS.map(job=>serviceCronDailyStatus(job,history.data,day));
- const issues=health.filter(x=>x.state!=="ok");
+ const issues=health.filter(x=>x.state!=="ok"&&x.state!=="starting");
  if(!issues.length)return json({ok:true,date:day,checked:health.length,problems:0,sent:0});
  if(!process.env.RESEND_API_KEY)
   return json({error:"Feil oppdaget, men e-postvarsling er ikke konfigurert."},503);
