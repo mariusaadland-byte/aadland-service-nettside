@@ -1,7 +1,7 @@
 const fs=require("node:fs"),vm=require("node:vm"),assert=require("node:assert/strict");
 const helper=fs.readFileSync("lib/invoiceReminders.js","utf8").replaceAll("export function ","function ");
 const status=fs.readFileSync("lib/invoicePaymentStatus.js","utf8").replaceAll("export function ","function ");
-const route=fs.readFileSync("app/api/admin/invoices/reminders/route.js","utf8").replace(/^import .*;\n/gm,"").replaceAll("export async function ","async function ").replaceAll("export const ","const ").replace('const {Resend}=await import("resend");',"const Resend=MockResend;");
+const route=fs.readFileSync("app/api/admin/invoices/reminders/route.js","utf8").replace(/^import .*;\n/gm,"").replaceAll("export async function ","async function ").replaceAll("export const ","const ").replace(/const \{Resend\}=await import\("[^"]*safeResend"\);/,"const Resend=MockResend;");
 const invoiceId="12345678-1234-4234-8234-123456789abc",requestId="22345678-1234-4234-8234-123456789abc";
 class Response{constructor(body,options={}){this.body=body;this.status=options.status||200;this.headers=options.headers}static json(body,options){return new Response(body,options)}}
 async function run(options={}){
