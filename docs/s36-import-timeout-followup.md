@@ -1,0 +1,5 @@
+# S36 – import timeout follow-up
+
+26.11.2026: actual Byggmakker upload and preview succeeded for 87,922 products. Three POST requests to activate_material_import returned HTTP 500; three PostgreSQL statement timeout events were recorded in the same time window. These observations are consistent with the 8-second authenticator timeout, but individual events were not correlated. The existing atomic preview was subsequently activated using service-role SQL and 87,922 active Byggmakker and 8,991 active Bygger’n products were confirmed.
+
+Migration 20261125232018 sets a 30-second function-level statement_timeout for the three private supplier import RPCs and reloads the PostgREST schema. No role-wide timeout change. Existing lock limits and atomic activation remain. Catalog verification: SECURITY INVOKER, anon/authenticated execution denied, service_role execution allowed for all three functions. No supplier prices were changed by this migration. Actual REST activation under the new limit and concurrent activation must still be tested in an isolated environment. Do not repeat live imports solely for testing.
