@@ -67,7 +67,7 @@ export async function POST(req){
  const pdf=await buildReceiptPdf(receiptData);
 
  try{
-  const {Resend}=await import("resend");
+  const {Resend}=await import("../../../../lib/safeResend");
   const resend=new Resend(resendKey);
   const from=rentalEmailFrom();
   const replyTo=rentalReplyTo();
