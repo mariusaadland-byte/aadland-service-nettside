@@ -55,12 +55,12 @@ export async function GET(){
    .order("created_at",{ascending:false})
    .limit(100),
   s.from("rental_bookings")
-   .select("id,booking_number,start_date,end_date,status,total_ore,deposit_ore,payment_status,deposit_status,customer,confirmation_sent_at,cancellation_sent_at,reminder_sent_at,created_at,rental_items(name,slug,active)")
+   .select("id,booking_number,start_date,end_date,status,total_ore,deposit_ore,payment_status,deposit_status,customer,confirmation_sent_at,cancellation_sent_at,reminder_sent_at,created_at,rental_items(name,slug,active,status)")
    .eq("customer_user_id",customer.id)
    .order("created_at",{ascending:false})
    .limit(100),
   s.from("rental_bookings")
-   .select("id,payment_provider,payment_reference,payment_psp_reference,payment_reserved_ore,payment_captured_ore,payment_authorized_at,payment_captured_at,payment_cancelled_at,payment_capture_guaranteed_until,vipps_checkout_started_at,payment_refunded_ore,payment_refunded_at,refund_last_ore,refund_reference,refund_note,refund_notice_sent_at,receipt_sent_at,deposit_held_ore,deposit_received_at,deposit_released_at,deposit_charged_ore")
+   .select("id,payment_provider,payment_reference,payment_psp_reference,payment_reserved_ore,payment_captured_ore,payment_authorized_at,payment_captured_at,payment_cancelled_at,payment_capture_guaranteed_until,vipps_checkout_started_at,payment_due_at,payment_refunded_ore,payment_refunded_at,refund_last_ore,refund_reference,refund_note,refund_notice_sent_at,receipt_sent_at,deposit_held_ore,deposit_received_at,deposit_released_at,deposit_charged_ore")
    .eq("customer_user_id",customer.id)
    .order("created_at",{ascending:false})
    .limit(100),
@@ -155,9 +155,10 @@ export async function GET(){
  const rentals=(rentalsResult.data||[]).map(row=>({
   ...row,
   ...(rentalPaymentById.get(row.id)||{}),
+  paymentDetailsAvailable:rentalPaymentById.has(row.id),
   rental_items:row.rental_items?{
    ...row.rental_items,
-   slug:row.rental_items.active===false?null:(row.rental_items.slug||null)
+   slug:row.rental_items.active===false||row.rental_items.status==="hidden"?null:(row.rental_items.slug||null)
   }:null
  }));
 
@@ -218,6 +219,7 @@ export async function GET(){
   customer,
   orders,
   rentals,
+  rentalHistoryLimited:rentals.length>=100,
   quotes,
   drawings,
   quoteSetupRequired
