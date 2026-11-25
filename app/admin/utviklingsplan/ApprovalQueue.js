@@ -12,7 +12,11 @@ import styles from "./roadmap.module.css";
 export default function ApprovalQueue({
  tasks=[],savingId="",onApprove=async()=>false,onReport=async()=>false
 }){
- const queue=useMemo(()=>developmentApprovalQueue(tasks),[tasks]);
+ const allQueue=useMemo(()=>developmentApprovalQueue(tasks),[tasks]);
+ const [scope,setScope]=useState("service-final");
+ const queue=useMemo(()=>allQueue.filter(t=>scope==="service-final"?t.id.startsWith("service-final-"):!t.id.startsWith("service-final-")),[allQueue,scope]);
+ const finalCount=allQueue.filter(t=>t.id.startsWith("service-final-")).length;
+ const earlierCount=allQueue.length-finalCount;
  const [selectedId,setSelectedId]=useState(null);
  const [isOpen,setIsOpen]=useState(false);
  const [progress,setProgress]=useState({});
@@ -36,7 +40,7 @@ export default function ApprovalQueue({
  useEffect(()=>{
   try{
    const raw=JSON.parse(window.localStorage.getItem(TEST_WIZARD_STORAGE_KEY)||"{}");
-   setProgress(sanitizeTestProgress(raw,queue));
+   setProgress(sanitizeTestProgress(raw,allQueue));
   }catch{setProgress({});}
   setHydrated(true);
   // Queue is loaded before ApprovalQueue is mounted.
@@ -152,6 +156,11 @@ export default function ApprovalQueue({
    </div>
    <div className={styles.approvalCount}><strong>{queue.length}</strong><span>venter på test</span></div>
   </div>
+  <div className={styles.approvalBuckets}>
+   <button type="button" className={styles.approvalOpen} aria-pressed={scope==="service-final"} disabled={busy||Boolean(savingId)} onClick={()=>{setScope("service-final");setSelectedId(null);setIsOpen(false);setShowAll(false);}}>Service-sluttkontroll ({finalCount})</button>
+   <button type="button" className={styles.approvalOpen} aria-pressed={scope==="earlier"} disabled={busy||Boolean(savingId)} onClick={()=>{setScope("earlier");setSelectedId(null);setIsOpen(false);setShowAll(false);}}>Tidligere oppgaver ({earlierCount})</button>
+  </div>
+  {scope==="service-final"&&<p className={styles.wizardTip}>Kun Aadland Service. Bruk isolerte testdata og egne testkontoer. Godkjenn bare etter faktisk kontroll; uavklart ekstern bekreftelse skal stå åpen. Delsteg lagres i denne nettleseren, endelig godkjenning lagres på serveren.</p>}
   <div className={styles.approvalBuckets}>
    <span><strong>{remaining.quick}</strong> raske kontroller</span>
    <span><strong>{remaining.workflow}</strong> hele testflyter</span>
