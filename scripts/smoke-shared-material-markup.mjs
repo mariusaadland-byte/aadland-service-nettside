@@ -82,3 +82,8 @@ console.log("S36 file parser: 8991 rows, VAT normalization, malformed and oversi
 const largeCsv=["varenummer;navn;pris;enhet",...Array.from({length:87922},(_,i)=>"SYN-"+i+";Testvare "+i+";100,00;STK")].join("\n");
 assert.equal(parseMaterialPriceFile(gzipSync(largeCsv),"synthetic.csv.gz").products.length,87922);
 console.log("Large compressed supplier file: 87 922 synthetic rows parsed.");
+
+assert.ok(supplierImport.includes('export async function GET()')&&supplierImport.includes('.neq("id","egne-varer")'));
+assert.ok(calc.includes('fetch("/api/admin/material-catalog/import",{cache:"no-store"})')&&calc.includes('importSuppliers.map(item=>')&&calc.includes('aria-pressed={importSupplier===item.id}')&&calc.includes('Velg leverandør først.')&&calc.includes('role="alert">{importError}'));
+assert.ok(!calc.includes('if(!suppliers.some(item=>item.id===importSupplier))setImportSupplier(primary)'));
+console.log("Import supplier picker: owner-only dedicated list, no search-state overwrite, explicit selection and visible errors.");
