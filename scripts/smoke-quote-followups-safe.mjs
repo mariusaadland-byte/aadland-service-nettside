@@ -111,7 +111,7 @@ const res={json(body,options={}){return {body,status:options.status||200}}};
 const cron= new Function("NextResponse","db","cronGuard","createQuoteToken","osloDateKey","FakeResend","process",
  cronText.replace(/^import .*;\n/gm,"")
  .replace(/export async function GET\(/,"async function GET(")
- .replace('const {Resend}=await import("resend");',"const Resend=FakeResend;")+
+ .replace(/const \{Resend\}=await import\("[^"]*safeResend"\);/,"const Resend=FakeResend;")+
  "\nreturn {GET};"
 )(res,()=>dbMock,()=>null,()=>"test-token",()=>new Date().toISOString().slice(0,10),
  FakeResend,{env});
