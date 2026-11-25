@@ -1,0 +1,3 @@
+# U-25 – Servicehistorikk
+
+Per fysisk enhet fra U24: kontroll, service, reparasjon, feil, utført dato, tilstand, notat og valgfri neste kontroll. Historikk append-only via app (ikke uforanderlig mot DB-eier), idempotent registrering, rollebasert tilgang. Nyeste utført dato vises først; ved flere samme dato sorteres på registreringstid. Ingen automatisk frigivelse eller sperring av kapasitet, ingen e-post/push om kontrollfrist. Ved utrygg tilstand må produktet sperres og eksisterende bookinger avklares manuelt. U24 og U25 SQL kun utkast, begge funksjoner deaktivert. Praktisk test i isolert database, kobling til booking og atomisk vedlikeholdssperre, kontrollintervaller og planlagte varsler gjenstår. Ingen ekte data endret.

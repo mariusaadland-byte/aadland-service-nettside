@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {maintenanceInput,maintenanceDueLabel,sameMaintenanceEvent} from "../lib/rentalUnitMaintenance.mjs";
+const id="00000000-0000-4000-8000-000000000001",b={unitId:id,requestId:id,kind:"repair",condition:"out_of_service",performedOn:"2026-11-25",nextDueOn:"2026-12-01",note:"Byttet defekt bryter."};
+const v=maintenanceInput(b,"2026-11-25");
+assert.ok(v&&sameMaintenanceEvent(v,v));
+assert.ok(!sameMaintenanceEvent({...v,note:"Annet"},v));
+assert.equal(maintenanceInput({...b,performedOn:"2026-02-30"},"2026-11-25"),null);
+assert.equal(maintenanceInput({...b,performedOn:"2026-11-26"},"2026-11-25"),null);
+assert.equal(maintenanceInput({...b,nextDueOn:"2026-11-24"},"2026-11-25"),null);
+assert.equal(maintenanceInput({...b,kind:"__proto__"},"2026-11-25"),null);
+assert.equal(maintenanceDueLabel("2026-11-24","2026-11-25"),"Kontrollfrist passert");
+const api=readFileSync("app/api/admin/rental/maintenance/route.js","utf8");
+assert.ok(api.includes('process.env.RENTAL_UNIT_MAINTENANCE_ENABLED==="true"')&&api.includes("user.canManageProducts")&&api.includes("sameMaintenanceEvent"));
+assert.ok(!api.includes(".update(")&&!api.includes(".delete("));
+console.log("U-25 maintenance event validation and activation guards passed.");
