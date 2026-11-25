@@ -600,8 +600,12 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
   changes.admin_note=String(b.adminNote||"");
  }
 
- const {error}=await s.from("rental_bookings").update(changes).eq("id",b.id);
- if(error){console.error("RENTAL BOOKING UPDATE",error);return NextResponse.json({error:"Bookingen kunne ikke oppdateres."},{status:500});}
+ const {data:changed,error}=await s.from("rental_bookings").update(changes).eq("id",b.id).eq("status",current.status).eq("updated_at",current.updated_at).select("id").maybeSingle();
+ if(error){
+  if(/RENTAL_(UNAVAILABLE|CAPACITY_BUSY)/.test(String(error.message||""))||error.code==="40P01")return NextResponse.json({error:"Tilgjengeligheten er endret. Oppdater bookingen og prøv igjen."},{status:409});
+  console.error("RENTAL BOOKING UPDATE",error);return NextResponse.json({error:"Bookingen kunne ikke oppdateres."},{status:500});
+ }
+ if(!changed)return NextResponse.json({error:"Bookingen er endret av en annen handling. Last den inn på nytt før du fortsetter."},{status:409});
 
  if(action==="confirm-and-send"||action==="cancel-and-send"){
   const updated={...current,...changes};
