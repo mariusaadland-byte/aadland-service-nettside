@@ -69,7 +69,7 @@ export default async function ServiceOperationsPage(){
    </p>}
    {error&&<p role="alert" style={{padding:12,background:"#f9e8e6",color:"#8c2e26",borderRadius:9}}>{error}</p>}
    {!error&&day>=SERVICE_CRON_FIRST_COMPLETE_DAY&&<p role="status" style={style.muted}>
-     {problems?problems+" av "+health.length+" jobber krever gjennomgang.":"Ingen feil eller manglende kjøringer registrert for dagens seks Service-jobber."}
+     {problems?problems+" av "+health.length+" jobber krever gjennomgang.":"Ingen feil eller manglende kjøringer registrert for dagens overvåkede Service-jobber."}
      {" "}Dette er ikke bevis på at hver kunde-e-post er levert.
    </p>}
    {health.map(item=><div key={item.key} style={style.row}>
@@ -98,7 +98,7 @@ export default async function ServiceOperationsPage(){
   </div>
   <div style={style.surface}>
    <h2 style={{fontSize:20,margin:"0 0 8px"}}>Varsler om driftsavvik</h2>
-   <p style={style.muted}>Etter første hele driftsdag kontrollerer en egen Vercel-jobb de seks Service-jobbene kl. 14:30 UTC og forsøker å sende én samlet feilrapport til bedriftens eieradresse. En uklar sending prøves ikke automatisk på nytt.</p>
+   <p style={style.muted}>Etter første hele driftsdag kontrollerer en egen Vercel-jobb Service-jobbene kl. 14:30 UTC og forsøker å sende én samlet feilrapport til bedriftens eieradresse. En uklar sending prøves ikke automatisk på nytt.</p>
    {!error&&(alerts.length?alerts.map(item=><p key={item.alert_day} style={{padding:"10px 0",borderBottom:"1px solid #eee8de",fontSize:14}}>
     <strong>{item.alert_day}</strong> · {item.issue_count} avvik · {item.state==="sent"?"Varsel sendt":item.state==="uncertain"?"Sendestatus ukjent – kontroller Resend":"Varsel forsøkt – kontroller Resend"}
     {item.sent_at?" · "+displayTime(item.sent_at):""}

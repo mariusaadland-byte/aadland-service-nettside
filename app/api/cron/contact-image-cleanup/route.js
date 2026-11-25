@@ -1,4 +1,5 @@
 import {NextResponse} from "next/server";
+import {withServiceCronMonitoring} from "../../../../lib/serviceCronMonitor";
 import {cronGuard} from "../../../../lib/cronAuth";
 import {db} from "../../../../lib/supabase";
 
@@ -12,7 +13,7 @@ const json=(data,status=200)=>NextResponse.json(data,{status,headers:{"Cache-Con
 // Anonymous clients cannot remove anything. This server-only job deletes
 // only photos that were never bound to a submitted contact request, and only
 // after the proof could no longer be valid for order submission (1h vs 24h).
-export async function GET(req){
+async function runServiceCron(req){
  const denied=cronGuard(req);if(denied)return denied;
  if(process.env.VERCEL_ENV!=="production")return json({error:"Opprydding bare i produksjon."},403);
  const s=db();if(!s)return json({error:"Databasen mangler."},503);
@@ -71,3 +72,5 @@ export async function GET(req){
  }
  return json({ok:review===0,checked:data.length,removed,linked,review,skipped},review?207:200);
 }
+
+export async function GET(req){return withServiceCronMonitoring("contact-image-cleanup",req,()=>runServiceCron(req));}

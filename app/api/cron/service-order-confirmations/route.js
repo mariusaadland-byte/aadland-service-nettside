@@ -1,10 +1,11 @@
 import {NextResponse} from "next/server";
+import {withServiceCronMonitoring} from "../../../../lib/serviceCronMonitor";
 import {cronGuard} from "../../../../lib/cronAuth";
 import {db} from "../../../../lib/supabase";
 import {sendManualOrderConfirmationOnce} from "../../../../lib/manualOrderConfirmationOnce";
 export const runtime="nodejs";
 export const maxDuration=60;
-export async function GET(req){
+async function runServiceCron(req){
  const guard=cronGuard(req);if(guard)return guard;
  if(process.env.VERCEL_ENV!=="production"||!process.env.RESEND_API_KEY)return NextResponse.json({ok:false,error:"Utsending er ikke tilgjengelig."},{status:503});
  const s=db();if(!s)return NextResponse.json({ok:false},{status:503});
@@ -18,3 +19,5 @@ export async function GET(req){
  }
  return NextResponse.json({ok:failed===0,checked:(data||[]).length,accepted,review,failed},{status:failed?503:200,headers:{"Cache-Control":"no-store"}});
 }
+
+export async function GET(req){return withServiceCronMonitoring("service-order-confirmations",req,()=>runServiceCron(req));}
