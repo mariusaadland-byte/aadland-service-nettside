@@ -1,6 +1,6 @@
 import {NextResponse} from "next/server";
 import crypto from "node:crypto";
-import {Resend} from "resend";
+import {Resend} from "../../../../../lib/safeResend";
 import {getAdminUser} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
 import {sameOriginGuard} from "../../../../../lib/requestGuard";

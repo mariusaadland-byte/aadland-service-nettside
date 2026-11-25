@@ -69,7 +69,7 @@ async function runServiceCron(req){
   }
   if(batch.status==="sent")return NextResponse.json({ok:true,alreadySent:true,sent:0});
   if(Date.now()-new Date(batch.created_at).getTime()>23*60*60*1000)return NextResponse.json({error:"Dagens tidligere sendeforsøk må kontrolleres i e-postloggen."},{status:409});
-  const {Resend}=await import("resend");const resend=new Resend(key);
+  const {Resend}=await import("../../../../lib/safeResend");const resend=new Resend(key);
   let result;
   for(let attempt=0;attempt<3;attempt++){
    try{

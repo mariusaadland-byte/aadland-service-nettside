@@ -228,7 +228,7 @@ export async function POST(req){
   let acknowledgementSent=false;
 
   if(resendKey){
-   const {Resend}=await import("resend");
+   const {Resend}=await import("../../../lib/safeResend");
    const resend=new Resend(resendKey);
    const sender=rentalEmailFrom();
    const replyTo=rentalReplyTo();

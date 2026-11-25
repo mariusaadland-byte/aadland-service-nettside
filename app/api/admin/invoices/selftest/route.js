@@ -57,7 +57,7 @@ export async function POST(req){
    content:pdf.toString("base64")
   }));
   const message=splitSelfTestEmail(docs,attachments);
-  const {Resend}=await import("resend");
+  const {Resend}=await import("../../../../../lib/safeResend");
   const result=await new Resend(apiKey).emails.send(message,{
    // One identical self-test per Oslo date; repeat clicks reuse the same request.
    idempotencyKey:"invoice-split-selftest/"+today

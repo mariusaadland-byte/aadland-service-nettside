@@ -247,7 +247,7 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  </table></td></tr></table></body></html>`;
 
  try{
-  const {Resend}=await import("resend");
+  const {Resend}=await import("../../../../../lib/safeResend");
   const resend=new Resend(resendKey);
   const sent=await resend.emails.send({
    from:"Aadland Service <post@aadland-service.no>",

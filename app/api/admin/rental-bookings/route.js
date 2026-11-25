@@ -137,7 +137,7 @@ async function sendCustomerMessage(req,s,booking,item,kind){
  const resendKey=rentalResendApiKey();
  if(!resendKey)return {error:"E-post er ikke konfigurert."};
 
- const {Resend}=await import("resend");
+ const {Resend}=await import("../../../../lib/safeResend");
  const resend=new Resend(resendKey);
  const from=rentalEmailFrom();
  const replyTo=rentalReplyTo();
@@ -357,7 +357,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
   const resendKey=rentalResendApiKey();
   if(!resendKey)return NextResponse.json({error:"Leiebetalingen er registrert, men e-post er ikke konfigurert.",statusSaved:true},{status:503});
   try{
-   const {Resend}=await import("resend");
+   const {Resend}=await import("../../../../lib/safeResend");
    const resend=new Resend(resendKey);
    const from=rentalEmailFrom();
    const replyTo=rentalReplyTo();

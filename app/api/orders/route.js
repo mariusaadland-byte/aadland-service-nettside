@@ -208,9 +208,9 @@ export async function POST(req){
   }
 
   let confirmationSent=false;
-  const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY):process.env.RESEND_API_KEY;
+  const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY):process.env.RESEND_API_KEY;
   if(resendKey){
-   const {Resend}=await import("resend");
+   const {Resend}=await import("../../../lib/safeResend");
    const resend=new Resend(resendKey);
    const from=serviceEmailFrom();
    const replyTo=serviceReplyTo();

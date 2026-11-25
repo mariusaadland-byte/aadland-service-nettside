@@ -5,7 +5,7 @@ const source=readFileSync(path,"utf8")
  .replace(/^import .*;\n/gm,"")
  .replace(/^export const runtime=.*;\n/gm,"")
  .replace(/export async function (POST|GET|PATCH)\(/g,"async function $1(")
- .replace('const {Resend}=await import("resend");','const Resend=FakeResend;');
+ .replace(/const \{Resend\}=await import\("[^"]*safeResend"\);/,'const Resend=FakeResend;');
 const id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const user={id:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",role:"owner"};
 const fakeProcess={env:{VERCEL_ENV:"production",RESEND_API_KEY:"mock-only"}};

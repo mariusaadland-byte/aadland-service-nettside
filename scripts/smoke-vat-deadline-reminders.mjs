@@ -105,7 +105,7 @@ const cronText=read("app/api/cron/vat-deadline-reminders/route.js");
 const cronCode=cronText.replace(/^import .*;\n/gm,"")
  .replace(/^export const [^\n]*\n/gm,"")
  .replace("export async function GET(","async function GET(")
- .replace('const {Resend}=await import("resend");',"const Resend=FakeResend;");
+ .replace(/const \{Resend\}=await import\("[^"]*safeResend"\);/,"const Resend=FakeResend;");
 const NextResponse={json(body,opts={}){return {body,status:opts.status||200}}};
 const route=new Function("NextResponse","db","cronGuard","osloDateKey","vatDeadlineEvents","vatReminderEmail","FakeResend","process",
  cronCode+";return {GET};"

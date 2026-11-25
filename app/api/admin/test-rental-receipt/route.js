@@ -8,6 +8,7 @@ import {rentalEmailFrom,rentalReplyTo,rentalResendApiKey} from "../../../../lib/
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;
  if(process.env.VERCEL_ENV!=="preview")return NextResponse.json({error:"Test av utleiekvittering er bare tilgjengelig i preview."},{status:404});
+ return NextResponse.json({error:"S-31: Testmiljøet sender ikke e-post. Bruk syntetiske forhåndsvisninger uten utsending."},{status:403});
  const user=await getAdminUser();
  if(!user)return NextResponse.json({error:"Ikke innlogget."},{status:401});
  if(!(await hasPermission("canUpdateOrders")))return NextResponse.json({error:"Du har ikke tilgang til å sende testkvittering."},{status:403});
@@ -67,7 +68,7 @@ export async function POST(req){
  const pdf=await buildReceiptPdf(receiptData);
 
  try{
-  const {Resend}=await import("resend");
+  const {Resend}=await import("../../../../lib/safeResend");
   const resend=new Resend(resendKey);
   const from=rentalEmailFrom();
   const replyTo=rentalReplyTo();

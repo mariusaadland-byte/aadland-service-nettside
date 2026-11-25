@@ -92,7 +92,7 @@ export async function POST(req){
   if(record.sent_at)return respond({ok:true,alreadySent:true,to:record.recipient,sentAt:record.sent_at});
  }
  try{
-  const {Resend}=await import("resend");
+  const {Resend}=await import("../../../../../lib/safeResend");
   const sent=await new Resend(process.env.RESEND_API_KEY).emails.send({
    from:"Aadland Service <noreply@aadland-service.no>",
    to:record.recipient,replyTo:"post@aadland-service.no",
