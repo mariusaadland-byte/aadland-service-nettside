@@ -20,6 +20,14 @@ function slugify(value){
  return String(value||"").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/æ/g,"ae").replace(/ø/g,"o").replace(/å/g,"a").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,60);
 }
 
+export async function GET(){
+ const user=await allowed();if(!user)return NextResponse.json({error:"Kun eier kan importere priser."},{status:403});
+ const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
+ const {data,error}=await s.from("material_suppliers").select("id,name,last_import_at").eq("active",true).neq("id","egne-varer").order("name");
+ if(error)return NextResponse.json({error:"Kunne ikke hente leverandører for import."},{status:500});
+ return NextResponse.json({suppliers:(data||[]).map(item=>({id:item.id,name:item.name,lastImportAt:item.last_import_at||null}))},{headers:{"Cache-Control":"no-store"}});
+}
+
 export async function POST(req){
  const originError=sameOriginGuard(req);
  if(originError)return originError;
