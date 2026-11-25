@@ -49,7 +49,7 @@ assert.ok(invoice.includes('if(archiveMode){setInvoiceListOpen(false);setSelecte
 assert.ok(invoice.includes('if(!archiveMode||!form?.id)return;'));
 assert.ok(invoice.includes('invoice-main-actions")'));
 assert.ok(invoice.includes('archiveMode&&<InvoiceQuickActions'));
-assert.ok(invoice.includes('{(!archiveMode||!form.sent_at)&&<>'),
+assert.ok(invoice.includes('{archiveMode&&!form.sent_at&&<>'),
  "Do not show inactive huge send and print buttons on already-sent invoices");
 assert.ok(invoice.includes('onClick={()=>registerPayment(false)}'));
 assert.ok(invoice.includes('onClick={sendInvoice}'));
