@@ -209,7 +209,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     );
   }
 
-  const { id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, paymentVerified, receiptReviewResult, receiptReviewNote, receiptReviewProviderId, receiptReviewConfirmation, cancellationReason, progressStatus, refundOre, refundReference, refundNote, deliveryWithinRadius, cleanupConfirmation } = await req.json();
+  const { confirmationReview, id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, paymentVerified, receiptReviewResult, receiptReviewNote, receiptReviewProviderId, receiptReviewConfirmation, cancellationReason, progressStatus, refundOre, refundReference, refundNote, deliveryWithinRadius, cleanupConfirmation } = await req.json();
   if(adminNote!==undefined&&String(adminNote||"").length>5000)return NextResponse.json({error:"Internt notat kan være maks 5000 tegn."},{status:400});
   if(paymentReference!==undefined&&String(paymentReference||"").length>120)return NextResponse.json({error:"Betalingsreferansen er for lang."},{status:400});
   if(cancellationReason!==undefined&&String(cancellationReason||"").length>1000)return NextResponse.json({error:"Kanselleringsårsaken kan være maks 1000 tegn."},{status:400});
@@ -486,6 +486,19 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     const {error:archiveError}=await s.from("orders").update({archived_at:action==="archive"?new Date().toISOString():null,archive_reason:action==="archive"?"avsluttet":null,updated_at:new Date().toISOString()}).eq("id",id);
     if(archiveError)return NextResponse.json({error:"Arkivstatus kunne ikke lagres."},{status:500});
     return NextResponse.json({ok:true});
+  }
+
+  if(action==="review-order-confirmation"){
+    if(currentUser.role!=="owner"||process.env.VERCEL_ENV!=="production")return NextResponse.json({error:"Bare eier i produksjon kan avstemme."},{status:403});
+    const r=confirmationReview||{};
+    const accepted=r.result==="accepted";
+    if(!["accepted","skipped"].includes(r.result)||r.phrase!==(accepted?"BEKREFTET I RESEND":"STOPP UTSENDING"))return NextResponse.json({error:"Ugyldig bekreftelse."},{status:400});
+    const note=String(r.note||"").trim(),providerId=String(r.providerId||"").trim();
+    const acceptedAt=accepted?new Date(r.acceptedAt):null;
+    if(note.length<12||note.length>1200||(accepted&&(providerId.length<8||providerId.length>240||!Number.isFinite(acceptedAt.getTime()))))return NextResponse.json({error:"Oppgi kontrollmerknad og faktisk meldings-ID og tidspunkt ved aksept."},{status:400});
+    const review=await s.rpc("review_service_order_confirmation",{p_order_id:id,p_reviewer_id:String(currentUser.id),p_result:r.result,p_note:note,p_provider_id:accepted?providerId:null,p_accepted_at:accepted?acceptedAt.toISOString():null});
+    if(review.error||review.data!==true)return NextResponse.json({error:"Kan ikke avstemme denne ordren nå. Kontroller status, og vent minst fem minutter etter et sendeforsøk."},{status:409});
+    return NextResponse.json({ok:true,message:"Kontrollen er journalført. Ingen ny e-post er sendt."});
   }
 
   if(action==="send-order-confirmation"){
