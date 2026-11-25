@@ -1,6 +1,7 @@
 "use client";
 
 import {rentalHandoverChecklist} from "../../lib/rentalHandover.mjs";
+import RentalConditionPhotos from "./utleie/RentalConditionPhotos";
 import { useEffect, useState } from "react";
 import { nok } from "../../lib/catalog";
 import {osloDateKey,osloDateTimeLocal,osloLocalDateTimeToIso} from "../../lib/osloTime";
@@ -4922,6 +4923,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymen
    <div className="field"><label>Status</label><select disabled={!canUpdate||savingId===b.id||statusChoices(b).length===1||["confirmed","active"].includes(b.status)} value={b.status} onChange={e=>patch(b.id,{status:e.target.value})}>{statusChoices(b).map(value=><option key={value} value={value}>{statuses[value]||value}</option>)}</select>{b.status==="new"&&<small className="muted">Bekreft eller avbryt bookingen med knappene nederst, slik at kunden alltid varsles.</small>}{b.status==="returned"&&settlementIssue(b)&&<small className="muted">Kan ikke settes som ferdig: {settlementIssue(b)}</small>}</div>
 
    {canUpdate&&["confirmed","active"].includes(b.status)&&<RentalHandoverControl key={b.id+":"+b.status} booking={b} busy={savingId===b.id} onSubmit={changes=>patch(b.id,changes)}/>}
+   <RentalConditionPhotos key={b.id} booking={b} canUpdate={canUpdate}/>
    <section className="orderPaymentPanel rentalPaymentPanel">
     <h4>Leiebetaling</h4>
     <VippsFeePreview amountOre={Number(b.totalOre)||0} title="Vipps – hele leiebeløpet" note="Depositum inngår ikke i denne beregningen." disabled={savingId===b.id}/>
