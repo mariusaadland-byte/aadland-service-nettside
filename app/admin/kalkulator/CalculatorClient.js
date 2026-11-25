@@ -60,7 +60,11 @@ export default function CalculatorClient(){
  const [catalogBusy,setCatalogBusy]=useState(false);
  const [catalogError,setCatalogError]=useState("");
  const [importOpen,setImportOpen]=useState(false);
- const [importSupplier,setImportSupplier]=useState("byggern");
+ const [importSupplier,setImportSupplier]=useState("");
+ const [importSuppliers,setImportSuppliers]=useState([]);
+ const [importSuppliersLoading,setImportSuppliersLoading]=useState(false);
+ const [importSuppliersLoaded,setImportSuppliersLoaded]=useState(false);
+ const [importError,setImportError]=useState("");
  const [newSupplierName,setNewSupplierName]=useState("");
  const [importPriceIncludesVat,setImportPriceIncludesVat]=useState(false);
  const [importFile,setImportFile]=useState(null);
@@ -117,7 +121,23 @@ export default function CalculatorClient(){
   return()=>{active=false};
  },[]);
 
- useEffect(()=>{loadSuppliers()},[]);
+ useEffect(()=>{loadSuppliers();const requested=new URLSearchParams(window.location.search).get("import");if(requested){setImportSupplier(requested);setImportOpen(true);}},[]);
+ useEffect(()=>{if(importOpen)loadImportSuppliers();},[importOpen]);
+ async function loadImportSuppliers(){
+  setImportSuppliersLoading(true);setImportSuppliersLoaded(false);setImportError("");
+  try{
+   const response=await fetch("/api/admin/material-catalog/import",{cache:"no-store"});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok||!Array.isArray(data.suppliers))throw Error(data.error||"Kunne ikke hente leverandører for import.");
+   setImportSuppliers(data.suppliers);setImportSuppliersLoaded(true);
+   setImportSupplier(current=>current==="new"||data.suppliers.some(item=>item.id===current)?current:"");
+  }catch(error){setImportError(error.message||"Kunne ikke hente importleverandører.");}
+  finally{setImportSuppliersLoading(false);}
+ }
+ function chooseImportSupplier(id){
+  if(importBusy)return;
+  setImportSupplier(id);setImportPreview(null);setImportPhrase("");setImportError("");setImportMessage("");
+ }
 
  useEffect(()=>{
   const query=materialQuery.trim();
@@ -152,7 +172,7 @@ export default function CalculatorClient(){
    const primary=suppliers.find(item=>item.isPrimary)?.id||suppliers[0]?.id||"byggern";
    const next=preferred||catalogSupplier||primary;
    if(!suppliers.some(item=>item.id===next))setCatalogSupplier(primary);
-   if(!suppliers.some(item=>item.id===importSupplier))setImportSupplier(primary);
+
   }catch(error){
    setCatalogError(error?.message||"Kunne ikke hente leverandører.");
   }
@@ -209,7 +229,7 @@ export default function CalculatorClient(){
   if(!importPreview||importBusy)return;
   const phrase=importPreview.largeRemoval?"GODKJENN STOR REDUKSJON":"GODKJENN PRISIMPORT";
   if(importPhrase!==phrase)return;
-  setImportBusy(true);setCatalogError("");setActivationAttempted(true);setImportMessage("Kontrollerer aktiveringen …");
+  setImportBusy(true);setImportError("");setActivationAttempted(true);setImportMessage("Kontrollerer aktiveringen …");
   try{
    const body=new FormData();
    body.append("action","activate");
@@ -225,15 +245,16 @@ export default function CalculatorClient(){
    if(supplierId){setCatalogSupplier(supplierId);setImportSupplier(supplierId);}
    await loadSuppliers(supplierId);
    if(materialQuery.trim().length>=2)setMaterialQuery(q=>q+" ");
-  }catch(error){setCatalogError(error.message||"Kunne ikke bekrefte import.");setImportMessage("Aktiveringsstatus er ikke bekreftet. Prøv samme godkjenning igjen før du starter ny import.");}
+  }catch(error){setImportError(error.message||"Kunne ikke bekrefte import.");setImportMessage("Aktiveringsstatus er ikke bekreftet. Prøv samme godkjenning igjen før du starter ny import.");}
   finally{setImportBusy(false);}
  }
  async function importPriceList(event){
   event?.preventDefault?.();
   if(activationAttempted&&!window.confirm("Forrige aktiveringsstatus er ikke bekreftet. Vil du likevel lage en ny forhåndsvisning av dagens katalog?"))return;
-  setActivationAttempted(false);setImportMessage("");setCatalogError("");setImportPreview(null);setImportPhrase("");
-  if(!importFile){setCatalogError("Velg en prisfil først.");return}
-  if(importSupplier==="new"&&!newSupplierName.trim()){setCatalogError("Skriv inn leverandørnavn.");return}
+  setActivationAttempted(false);setImportMessage("");setImportError("");setImportPreview(null);setImportPhrase("");
+  if(!importSuppliersLoaded||!importSupplier||(importSupplier!=="new"&&!importSuppliers.some(item=>item.id===importSupplier))){setImportError("Velg leverandør først.");return}
+  if(!importFile){setImportError("Velg en prisfil først.");return}
+  if(importSupplier==="new"&&!newSupplierName.trim()){setImportError("Skriv inn leverandørnavn.");return}
   setImportBusy(true);
   try{
    const body=new FormData();
@@ -248,7 +269,7 @@ export default function CalculatorClient(){
    setImportPreview(data.preview);
    setImportMessage("Forhåndsvisning klar. Ingen priser er endret.");
   }catch(error){
-   setCatalogError(error?.message||"Kunne ikke importere prislisten.");
+   setImportError(error?.message||"Kunne ikke importere prislisten.");
   }finally{
    setImportBusy(false);
   }
@@ -381,27 +402,32 @@ export default function CalculatorClient(){
        <p>Bruk gjerne «Manuell vare» ovenfor i stedet. Andre materialkostnader tas med i tilbudet dersom du huker av for øvrige kostnader.</p>
       </details>
       <div className={styles.importPanel}>
-      <button type="button" className={styles.importToggle} onClick={()=>{setImportOpen(value=>!value);setCatalogError("");setImportMessage("")}}>
+      <button type="button" className={styles.importToggle} onClick={()=>{setImportOpen(value=>!value);setImportError("");setImportMessage("")}}>
        <span><b>Leverandørprislister</b><small>Importer eller oppdater Bygger’n og andre leverandører</small></span>
        <strong>{importOpen?"Lukk":"Åpne"} →</strong>
       </button>
       {importOpen&&<form className={styles.importForm} onSubmit={importPriceList}>
        <div className={styles.importGrid}>
-        <Field label="Leverandør">
-         <select value={importSupplier} disabled={importBusy} onChange={e=>{setImportSupplier(e.target.value);setImportPreview(null);setImportPhrase("");}}>
-          {catalogSuppliers.map(item=><option key={item.id} value={item.id}>{item.name}{item.isPrimary?" · primær":""}</option>)}
-          <option value="new">+ Ny leverandør</option>
-         </select>
-        </Field>
+        <div className={styles.importSupplierField}>
+         <strong>Velg leverandør for prisimport</strong>
+         {importSuppliersLoading&&<p role="status">Henter leverandører …</p>}
+         <div className={styles.importSupplierChoices} role="group" aria-label="Leverandør for prisimport">
+          {importSuppliers.map(item=><button type="button" key={item.id} disabled={importBusy||!importSuppliersLoaded} aria-pressed={importSupplier===item.id} onClick={()=>chooseImportSupplier(item.id)}><b>{item.name}</b><small>{item.lastImportAt?"Oppdater prisliste":"Klar for første import"}</small></button>)}
+          <button type="button" disabled={importBusy||!importSuppliersLoaded} aria-pressed={importSupplier==="new"} onClick={()=>chooseImportSupplier("new")}><b>+ Ny leverandør</b></button>
+         </div>
+         {!importSuppliersLoaded&&!importSuppliersLoading&&<button type="button" onClick={loadImportSuppliers}>Hent leverandører på nytt</button>}
+         {importSupplier&&<p role="status">Valgt: {importSupplier==="new"?"Ny leverandør":importSuppliers.find(item=>item.id===importSupplier)?.name||"Henter …"}</p>}
+        </div>
         {importSupplier==="new"&&<Field label="Ny leverandør">
          <input value={newSupplierName} disabled={importBusy} onChange={e=>{setNewSupplierName(e.target.value);setImportPreview(null);setImportPhrase("");}} placeholder="F.eks. Montér"/>
         </Field>}
        </div>
+       {importError&&<p className={styles.catalogError} role="alert">{importError}</p>}
        <Field label="Prisfil" help="XLSX, CSV, CSV.GZ, TSV eller TXT. Nye filer oppdaterer samme varenummer og varer som forsvinner fra filen deaktiveres.">
         <input id="material-price-file" type="file" accept=".xlsx,.csv,.csv.gz,.gz,.tsv,.txt,application/gzip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain" disabled={importBusy} onChange={e=>{setImportFile(e.target.files?.[0]||null);setImportPreview(null);setImportPhrase("");}}/>
        </Field>
-       <label className={styles.importCheck}><input type="checkbox" checked={importPriceIncludesVat} disabled={importBusy} onChange={e=>{setImportPriceIncludesVat(e.target.checked);setImportPreview(null);setImportPhrase("");}}/><span><b>Prisene i filen er inkl. mva</b><small>La denne være av for Bygger’n-filen du har nå – den er eks. mva.</small></span></label>
-       <div className={styles.importActions}><button type="submit" className={styles.primary} disabled={importBusy}>{importBusy?"Behandler…":"Forhåndsvis prisliste"}</button>{importMessage&&<span>{importMessage}</span>}</div>
+       <label className={styles.importCheck}><input type="checkbox" checked={importPriceIncludesVat} disabled={importBusy} onChange={e=>{setImportPriceIncludesVat(e.target.checked);setImportPreview(null);setImportPhrase("");}}/><span><b>Prisene i filen er inkl. mva</b><small>La denne være av for Bygger’n og den klargjorte Byggmakker-filen – begge er eks. mva.</small></span></label>
+       <div className={styles.importActions}><button type="submit" className={styles.primary} disabled={importBusy||!importSuppliersLoaded||!importSupplier}>{importBusy?"Behandler…":"Forhåndsvis prisliste"}</button>{importMessage&&<span>{importMessage}</span>}</div>
        {importPreview&&<div className="card" style={{padding:16,marginTop:12}}>
         <h3>Kontroller prisimport – {importPreview.supplierName}</h3>
         <p>{activationAttempted?"Aktivering er forsøkt. Bruk samme godkjenning igjen hvis resultatet er uavklart.":"Ingen priser er endret. Forhåndsvisningen er gyldig i 30 minutter."}</p>
