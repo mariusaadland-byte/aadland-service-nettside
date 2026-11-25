@@ -3,6 +3,8 @@
 import {useEffect,useState} from "react";
 import Link from "next/link";
 import {osloDateKey} from "../../lib/osloTime";
+import {COMPANY_INFO,RENTAL_CHANGE_DEADLINE_HOURS} from "../../lib/companyInfo";
+import {rentalChangeChoices,rentalChangeMailto,rentalChangeLabel} from "../../lib/rentalChangeRequest.mjs";
 import {rentalPortalExpired,rentalPortalGroup,rentalPortalCanPay,rentalPortalOverdue,rentalPortalDeposit} from "../../lib/rentalCustomerPortal.mjs";
 import CustomerDrawingViewer from "./CustomerDrawingViewer";
 
@@ -845,6 +847,16 @@ export default function MinSide(){
          {Number(r.deposit_held_ore)>0&&<span>Registrert holdt: {kr(r.deposit_held_ore)}</span>}
          {Number(r.deposit_charged_ore)>0&&<span>Registrert brukt: {kr(r.deposit_charged_ore)}</span>}
          {r.deposit_released_at&&<span>Frigitt {dateTimeFull(r.deposit_released_at)}</span>}
+        </div>}
+        {rentalChangeChoices(r.status).length>0&&!rentalPortalExpired(r,portalNow)&&<div className="customerPaymentConfirmation">
+         <b>Endre eller avbestille leien</b>
+         {r.status==="active"?<span>Forlengelse må avtales før retur. Gjeldende returdato gjelder til en ny periode er godkjent.</span>:<span>Bookingforespørselen kan endres eller trekkes før bekreftelse. Etter bekreftelse er endring og avbestilling kostnadsfri frem til {RENTAL_CHANGE_DEADLINE_HOURS} timer før avtalt leiestart. Kontakt oss også dersom fristen er passert.</span>}
+         <span>Valgene åpner en ferdig utfylt e-post. Du må sende meldingen selv. Ingen datoer, betaling eller depositum endres automatisk.</span>
+         <div className="customerLoginActions">
+          {rentalChangeChoices(r.status).map(type=><a key={type} className="btn alt" href={rentalChangeMailto(r,type,COMPANY_INFO.email)}>{rentalChangeLabel(type)}</a>)}
+          <a className="btn alt" href={COMPANY_INFO.phoneHref}>Ring oss</a>
+          <Link href="/vilkar/utleie">Utleiebetingelser</Link>
+         </div>
         </div>}
         {r.rental_items?.slug&&<button type="button" className="btn alt" onClick={()=>repeatRental(r)}>Lei igjen</button>}
        </div>
