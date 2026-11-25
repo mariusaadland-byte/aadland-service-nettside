@@ -71,7 +71,8 @@ function database(){
    return query;
   },
   async rpc(name,args){
-   if(name==="create_service_order_once"){
+   if(name==="create_service_order_once"||name==="create_service_order_with_confirmation"){
+    assert.equal(name==="create_service_order_with_confirmation",args.p_order_record.order_type==="order"&&!args.p_order_record.payment_provider);
     createdCalls++;
     const existing=findOrder({checkout_request_key:args.p_key});
     if(existing){
@@ -125,7 +126,7 @@ const POST=new Function("rateLimitRequest","sameOriginGuard","NextResponse","cry
  "getCustomerUserId","db","fromDbProduct","productPrice",
  "buildOrderConfirmationEmail","createVippsPayment","vippsUnitReadiness",
  "serviceEmailFrom","serviceReplyTo","validateContactImageReceipts",
- "parseOrderIntent","existingServiceOrderResponse","process",
+ "parseOrderIntent","existingServiceOrderResponse","sendManualOrderConfirmationOnce","process",
  src+";return POST;")(
  async()=>null,()=>originDenied?NextResponse.json({error:"wrong origin"},{status:403}):null,
  NextResponse,crypto,async()=>null,database,p=>p,p=>p.basePriceOre,
@@ -137,7 +138,7 @@ const POST=new Function("rateLimitRequest","sameOriginGuard","NextResponse","cry
   if(providerFails)throw Error("Synthetic Resend/Vipps timeout");
   return {redirectUrl:"https://example.invalid/vipps/mock-"+reference,
    pspReference:"synthetic-psp"};
- },async()=>({ready:true}),()=>"",()=>"",()=>[],parseOrderIntent,existingServiceOrderResponse,env
+ },async()=>({ready:true}),()=>"",()=>"",()=>[],parseOrderIntent,existingServiceOrderResponse,async()=>({state:"unavailable"}),env
 );
 const body=(key=requestId(),paymentMethod="vipps")=>({
  orderType:"order",idempotencyKey:key,acceptedTerms:true,paymentMethod,
