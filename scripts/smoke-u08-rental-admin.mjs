@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const a=readFileSync("app/api/admin/rental-bookings/route.js","utf8");
+const b=readFileSync("app/api/admin/rental/blocks/route.js","utf8");
+assert.ok(a.includes('.eq("status",current.status).eq("updated_at",current.updated_at).select("id").maybeSingle()'));
+assert.ok(a.includes("if(!changed)return NextResponse.json"));
+assert.ok(b.includes("countedRentalBookings(bookings).length"));
+assert.ok(b.indexOf("countedRentalBookings(bookings).length")<b.indexOf('.from("rental_blocks").insert'));
+assert.ok(b.includes("RENTAL_(UNAVAILABLE|CAPACITY_BUSY)"));
+console.log("U-08 admin optimistic write and manual block precheck source assertions passed.");

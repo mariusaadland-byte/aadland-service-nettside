@@ -1,6 +1,7 @@
 "use client";
 
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
+import {rentalDaysInclusive,rentalCalendarReady,validRentalCalendarQuote} from "../../../lib/rentalCalendarSelection.mjs";
 import {useParams} from "next/navigation";
 import {RENTAL_CHANGE_DEADLINE_HOURS} from "../../../lib/companyInfo";
 import Link from "next/link";
@@ -12,7 +13,7 @@ const localToday=()=>{
  const v=Object.fromEntries(parts.map(p=>[p.type,p.value]));
  return `${v.year}-${v.month}-${v.day}`;
 };
-const kr=o=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",maximumFractionDigits:0}).format((Number(o)||0)/100);
+const kr=o=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",minimumFractionDigits:0,maximumFractionDigits:2}).format((Number(o)||0)/100);
 const displayDate=value=>value?new Date(value+"T12:00:00Z").toLocaleDateString("nb-NO",{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"}):"";
 const monthLabel=month=>new Date(month+"-01T12:00:00Z").toLocaleDateString("nb-NO",{month:"long",year:"numeric",timeZone:"UTC"});
 const shiftMonth=(month,amount)=>{
@@ -27,44 +28,57 @@ const calendarDays=month=>{
  return [...Array(offset).fill(null),...Array.from({length:days},(_,i)=>month+"-"+String(i+1).padStart(2,"0"))];
 };
 
-function RentalCalendar({item,onChoose,refreshKey}){
+function RentalCalendar({item,onChoose,onSelectionChange,refreshKey}){
  const today=localToday();
  const currentMonth=today.slice(0,7);
  const [month,setMonth]=useState(currentMonth);
- const [unavailable,setUnavailable]=useState([]);
- const [loading,setLoading]=useState(true);
+ const [monthData,setMonthData]=useState(null);
+ const [monthError,setMonthError]=useState("");
+ const [retry,setRetry]=useState(0);
+ const requestKey=refreshKey+":"+retry;
+ const ready=rentalCalendarReady(monthData,item.id,month,requestKey);
+ const loading=!ready&&!monthError;
  const [start,setStart]=useState("");
  const [end,setEnd]=useState("");
  const [quote,setQuote]=useState(null);
  const [error,setError]=useState("");
  const [checking,setChecking]=useState(false);
- const blocked=new Set(unavailable);
+ const quoteRequest=useRef(null);
+ const blocked=new Set(ready?monthData.unavailableDates:[]);
  const cells=calendarDays(month);
 
  useEffect(()=>{
   let cancelled=false;
-  setLoading(true);
-  setError("");
-  fetch("/api/rental/calendar?itemId="+encodeURIComponent(item.id)+"&month="+month)
+  const controller=new AbortController();
+  setMonthError("");
+  fetch("/api/rental/calendar?itemId="+encodeURIComponent(item.id)+"&month="+month,{cache:"no-store",signal:controller.signal})
    .then(async response=>{
     const data=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(data.error||"Kalenderen kunne ikke lastes.");
+    if(data.itemId!==item.id||data.month!==month||!Array.isArray(data.unavailableDates))throw new Error("Kalenderdataene kunne ikke kontrolleres.");
     return data;
    })
-   .then(data=>{if(!cancelled)setUnavailable(Array.isArray(data.unavailableDates)?data.unavailableDates:[])})
-   .catch(err=>{if(!cancelled)setError(err.message||"Kalenderen kunne ikke lastes.")})
-   .finally(()=>{if(!cancelled)setLoading(false)});
-  return()=>{cancelled=true};
- },[item.id,month,refreshKey]);
+   .then(data=>{if(!cancelled)setMonthData({...data,requestKey})})
+   .catch(err=>{if(!cancelled)setMonthError(err.message||"Kalenderen kunne ikke lastes.")});
+  return()=>{cancelled=true;controller.abort()};
+ },[item.id,month,requestKey]);
 
  useEffect(()=>{
-  setStart("");
-  setEnd("");
-  setQuote(null);
- },[refreshKey]);
+  setStart("");setEnd("");setQuote(null);setError("");setChecking(false);
+  return()=>{quoteRequest.current?.abort();quoteRequest.current=null;};
+ },[item.id,refreshKey]);
 
+ function resetSelection(){
+  quoteRequest.current?.abort();quoteRequest.current=null;
+  setStart("");setEnd("");setQuote(null);setError("");setChecking(false);
+  onSelectionChange();
+ }
+ function changeMonth(amount){
+  setMonthError("");
+  setMonth(current=>shiftMonth(current,amount));
+ }
  function isDisabled(date){
-  return date<today||blocked.has(date)||item.status!=="available";
+  return !ready||checking||date<today||blocked.has(date)||item.status!=="available";
  }
  function isSelected(date){
   if(!start)return false;
@@ -73,40 +87,30 @@ function RentalCalendar({item,onChoose,refreshKey}){
  }
 
  async function choose(date){
-  if(isDisabled(date))return;
-  setError("");
-
-  if(!start||end){
-   setStart(date);
-   setEnd("");
-   setQuote(null);
+  if(isDisabled(date)||quoteRequest.current)return;
+  setError("");onSelectionChange();
+  if(!start||end||date<start){
+   setStart(date);setEnd("");setQuote(null);
    return;
   }
-  if(date<start){
-   setStart(date);
-   setEnd("");
-   setQuote(null);
-   return;
-  }
-
-  setEnd(date);
-  setQuote(null);
-  setChecking(true);
+  const days=rentalDaysInclusive(start,date);
+  if(!days||days>365){setError("Velg en leieperiode på maksimalt 365 dager.");return;}
+  const controller=new AbortController();
+  quoteRequest.current=controller;
+  setEnd(date);setQuote(null);setChecking(true);
   try{
-   const response=await fetch("/api/rental?slug="+encodeURIComponent(item.slug)+"&start="+start+"&end="+date);
+   const response=await fetch("/api/rental?slug="+encodeURIComponent(item.slug)+"&start="+start+"&end="+date,{cache:"no-store",signal:controller.signal});
    const data=await response.json().catch(()=>({}));
    if(!response.ok)throw new Error(data.error||"Perioden kunne ikke kontrolleres.");
    const result=(data.items||[])[0];
-   if(!result||!result.available){
-    setEnd("");
-    throw new Error("Perioden inneholder opptatte eller sperrede dager. Velg en annen periode.");
-   }
-   setQuote(result.pricing||null);
+   if(!validRentalCalendarQuote(result,item.id,start,date))throw new Error("Perioden eller prisen kunne ikke bekreftes. Velg en annen periode eller prøv igjen.");
+   if(quoteRequest.current===controller)setQuote(result.pricing);
   }catch(err){
-   setQuote(null);
-   setError(err.message||"Perioden kunne ikke kontrolleres.");
+   if(quoteRequest.current===controller&&!controller.signal.aborted){
+    setEnd("");setQuote(null);setError(err.message||"Perioden kunne ikke kontrolleres.");
+   }
   }finally{
-   setChecking(false);
+   if(quoteRequest.current===controller){quoteRequest.current=null;setChecking(false);}
   }
  }
 
@@ -118,12 +122,14 @@ function RentalCalendar({item,onChoose,refreshKey}){
     <p>{monthLabel(month)}</p>
    </div>
    <div className="rentalMonthNav">
-    <button type="button" disabled={month<=currentMonth} aria-label="Forrige måned" onClick={()=>setMonth(current=>shiftMonth(current,-1))}>←</button>
-    <button type="button" aria-label="Neste måned" onClick={()=>setMonth(current=>shiftMonth(current,1))}>→</button>
+    <button type="button" disabled={checking||month<=currentMonth} aria-label="Forrige måned" onClick={()=>changeMonth(-1)}>←</button>
+    <button type="button" disabled={checking} aria-label="Neste måned" onClick={()=>changeMonth(1)}>→</button>
    </div>
   </div>
 
-  <p className="rentalCalendarHelp">{start&&!end?"Velg siste leiedag.":"Trykk første og siste dagen du ønsker å leie."}</p>
+  <p className="rentalCalendarHelp">{start&&!end?"Velg siste leiedag. Trykk samme dato for å leie én dag.":"Trykk første og siste dagen du ønsker å leie."}</p>
+  {loading&&<p role="status">Henter tilgjengelighet …</p>}
+  {monthError&&<div className="rentalCalendarError" role="alert">{monthError} <button type="button" className="rentalCalendarRetry" onClick={()=>{setMonthError("");setRetry(x=>x+1)}}>Prøv igjen</button></div>}
 
   <div className="rentalCalendarWeekdays" aria-hidden="true">
    {["Man","Tir","Ons","Tor","Fre","Lør","Søn"].map(day=><span key={day}>{day}</span>)}
@@ -134,13 +140,14 @@ function RentalCalendar({item,onChoose,refreshKey}){
     key={date}
     className={[
      "rentalCalendarDay",
-     isDisabled(date)?"isUnavailable":"",
+     (ready&&(date<today||blocked.has(date)||item.status!=="available"))?"isUnavailable":"",
      isSelected(date)?"isSelected":"",
      date===start?"isStart":"",
      date===end?"isEnd":""
     ].filter(Boolean).join(" ")}
     disabled={isDisabled(date)}
     aria-pressed={isSelected(date)}
+    aria-label={displayDate(date)+(ready?(date<today?", passert":blocked.has(date)?", opptatt":", ledig"):", tilgjengelighet ikke kontrollert")}
     onClick={()=>choose(date)}
    >{Number(date.slice(-2))}</button>:<span className="rentalCalendarBlank" key={"blank-"+index}/>)}
   </div>
@@ -151,17 +158,20 @@ function RentalCalendar({item,onChoose,refreshKey}){
    <span><i className="isChosen"></i>Valgt</span>
   </div>
 
-  {error&&<p className="rentalCalendarError">{error}</p>}
+  {error&&<p className="rentalCalendarError" role="alert">{error}</p>}
 
   {start&&<div className="rentalSelectionSummary">
    <div><small>Valgt periode</small><b>{displayDate(start)}{end?" – "+displayDate(end):" – velg sluttdato"}</b></div>
-   {checking?<span>Sjekker pris …</span>:quote&&<>
-    <div><small>Leiepris</small><b>{kr(quote.totalOre)}</b></div>
-    {Number(item.depositOre)>0&&<div><small>Depositum</small><b>{kr(item.depositOre)}</b></div>}
+   {checking?<span role="status">Sjekker hele perioden og pris …</span>:quote&&<>
+    <div><small>Leiedager</small><b>{quote.days}</b></div>
+    <div><small>Leiepris inkl. mva.</small><b>{kr(quote.totalOre)}</b></div>
+    {quote.discountOre>0&&<div><small>Langtidsrabatt</small><b>−{kr(quote.discountOre)}</b></div>}
+    {quote.depositOre>0&&<div><small>Depositum</small><b>{kr(quote.depositOre)}</b></div>}
    </>}
   </div>}
 
-  {quote&&start&&end&&<button type="button" className="catalogGoldButton rentalCalendarBookButton" onClick={()=>onChoose(start,end,quote)}>
+  {start&&<button type="button" className="rentalCalendarRetry" onClick={resetSelection}>Nullstill datoer</button>}
+  {ready&&quote&&start&&end&&!checking&&<button type="button" className="catalogGoldButton rentalCalendarBookButton" onClick={()=>onChoose(start,end,quote)}>
    Gå videre til booking →
   </button>}
  </section>;
@@ -252,7 +262,7 @@ export default function RentalDetailPage(){
 
  async function book(e){
   e.preventDefault();
-  if(!item||!chosen)return;
+  if(!item||!chosen||booking)return;
   setBooking(true);
   setError("");
   try{
@@ -263,6 +273,7 @@ export default function RentalDetailPage(){
      itemId:item.id,
      startDate:chosen.startDate,
      endDate:chosen.endDate,
+     expectedPricing:{totalOre:chosen.pricing.totalOre,depositOre:chosen.pricing.depositOre},
      customer,
      customerType,
      ...(customerType==="company"?{company}:{}),
@@ -271,7 +282,10 @@ export default function RentalDetailPage(){
     })
    });
    const data=await response.json().catch(()=>({}));
-   if(!response.ok)throw new Error(data.error||"Kunne ikke sende booking.");
+   if(!response.ok){
+    if(data.code==="RENTAL_PRICE_CHANGED"){setChosen(null);setAccepted(false);setRefreshKey(value=>value+1);}
+    throw new Error(data.error||"Kunne ikke sende booking.");
+   }
    setMessage(data.message||("Booking "+data.bookingNumber+" er registrert. Sjekk innboks og søppelpost for e-post om leien."));
    setPaymentUrl(data.paymentPending?data.paymentUrl||"":"");
    setChosen(null);
@@ -322,6 +336,7 @@ export default function RentalDetailPage(){
        {item.weeklyPriceOre!=null&&<div><small>Ukepris</small><b>{kr(item.weeklyPriceOre)}</b></div>}
        {item.depositOre>0&&<div><small>Depositum</small><b>{kr(item.depositOre)}</b></div>}
       </div>
+      <p className="rentalPriceNote">Leiepriser inkl. mva. Depositum er separat.</p>
       <div className="rentalFulfillment">
        {item.pickupAvailable&&<span>Henting</span>}
        {item.deliveryAvailable&&<span>Levering</span>}
@@ -336,7 +351,7 @@ export default function RentalDetailPage(){
   {message&&<div className="catalogWrap"><div className="rentalMessage success"><b>{paymentUrl?"Fullfør betalingen":"Booking registrert"}</b><p>{message}</p>{paymentUrl&&<a className="catalogGoldButton" href={paymentUrl}>Gå videre til Vipps-betaling →</a>}<p><strong>Finner du ikke e-posten, sjekk søppelpost/spam.</strong></p>{customerAccount&&<Link className="catalogGoldButton" href="/min-side">Se bookingen på Min side →</Link>}</div></div>}
   {error&&<div className="catalogWrap"><div className="rentalMessage notice"><b>Noe gikk galt</b><p>{error}</p></div></div>}
 
-  {canFulfill&&item.status==="available"&&<div className="catalogWrap rentalDetailCalendarWrap"><RentalCalendar item={item} onChoose={choosePeriod} refreshKey={refreshKey}/></div>}
+  {canFulfill&&item.status==="available"&&<div className="catalogWrap rentalDetailCalendarWrap"><RentalCalendar key={item.id} item={item} onChoose={choosePeriod} onSelectionChange={()=>{setChosen(null);setAccepted(false);}} refreshKey={refreshKey}/></div>}
 
   {chosen&&<section className="rentalBookingSection" id="booking">
    <div className="catalogWrap">
@@ -345,7 +360,7 @@ export default function RentalDetailPage(){
       <span className="catalogEyebrow">BOOKING</span>
       <h2>{item.name}</h2>
       <p>{displayDate(chosen.startDate)} – {displayDate(chosen.endDate)}</p>
-      <div className="rentalBookingPrice"><b>{kr(chosen.pricing?.totalOre)}</b>{item.depositOre>0&&<span>+ depositum {kr(item.depositOre)}</span>}</div>
+      <div className="rentalBookingPrice"><b>{kr(chosen.pricing?.totalOre)}</b>{chosen.pricing?.depositOre>0&&<span>+ depositum {kr(chosen.pricing.depositOre)}</span>}</div>
       {item.depositOre>0&&<p className="muted" style={{fontSize:12,marginTop:8}}>Depositum er en separat sikkerhet for utstyret. Det trekkes eller reserveres ikke automatisk med Vipps ved denne bestillingen.</p>}
      </div>
      <div className="rentalBookingFields">

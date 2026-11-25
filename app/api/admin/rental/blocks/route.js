@@ -2,6 +2,7 @@ import {sameOriginGuard} from "../../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {getAdminUser,hasPermission} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
+import {countedRentalBookings} from "../../../../../lib/rentalAvailability";
 
 async function allowed(){
  return (await getAdminUser())&&(await hasPermission("canManageProducts"));
@@ -43,16 +44,30 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  }
  const s=db();
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
- const {data:item,error:itemError}=await s.from("rental_items").select("id").eq("id",b.itemId).maybeSingle();
+ const {data:item,error:itemError}=await s.from("rental_items").select("id,buffer_days").eq("id",b.itemId).maybeSingle();
  if(itemError)return NextResponse.json({error:"Utstyret kunne ikke kontrolleres."},{status:500});
  if(!item)return NextResponse.json({error:"Utstyret ble ikke funnet."},{status:404});
+ // Advisory precheck for current deployments; the staged database guard is
+ // still required to make this check and insert atomic under concurrency.
+ const buffer=Math.max(0,Number(item.buffer_days)||0);
+ const from=new Date(b.startDate+"T12:00:00Z"),to=new Date(b.endDate+"T12:00:00Z");
+ from.setUTCDate(from.getUTCDate()-buffer);to.setUTCDate(to.getUTCDate()+buffer);
+ const {data:bookings,error:bookingError}=await s.from("rental_bookings")
+  .select("status,payment_status,payment_reference,payment_due_at")
+  .eq("rental_item_id",b.itemId).in("status",["new","confirmed","active"])
+  .lte("start_date",to.toISOString().slice(0,10)).gte("end_date",from.toISOString().slice(0,10));
+ if(bookingError)return NextResponse.json({error:"Eksisterende bookinger kunne ikke kontrolleres."},{status:503});
+ if(countedRentalBookings(bookings).length)return NextResponse.json({error:"Perioden overlapper en eksisterende booking eller bufferdag. Avklar bookingen før du blokkerer utstyret."},{status:409});
  const {data,error}=await s.from("rental_blocks").insert({
   rental_item_id:b.itemId,
   start_date:b.startDate,
   end_date:b.endDate,
   reason:String(b.reason||"").trim().slice(0,1000)
  }).select("*").single();
- if(error)return NextResponse.json({error:"Blokkeringen kunne ikke opprettes."},{status:500});
+ if(error){
+  if(/RENTAL_(UNAVAILABLE|CAPACITY_BUSY)/.test(String(error.message||""))||error.code==="40P01")return NextResponse.json({error:"Perioden ble nettopp opptatt. Oppdater kalenderen og prøv igjen."},{status:409});
+  return NextResponse.json({error:"Blokkeringen kunne ikke opprettes."},{status:500});
+ }
  return NextResponse.json({block:{
   id:data.id,
   itemId:data.rental_item_id,

@@ -1,6 +1,7 @@
 import {rateLimitRequest} from "../../../lib/rateLimit";
 import {sameOriginGuard} from "../../../lib/requestGuard";
 import {NextResponse} from "next/server";
+import {calculateRentalPrice,rentalQuoteMatches} from "../../../lib/rentalPricing.mjs";
 import crypto from "crypto";
 import {getCustomerUserId} from "../../../lib/customer-auth";
 import {db,fromDbRentalItem} from "../../../lib/supabase";
@@ -32,31 +33,6 @@ function num(){
 
 function esc(value){
  return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
-}
-
-function days(a,b){
- return Math.round((new Date(b+"T12:00:00Z")-new Date(a+"T12:00:00Z"))/86400000)+1;
-}
-
-function calculate(i,a,b){
- const d=days(a,b);
- let total=d*i.dailyPriceOre,basis="daily";
- if(i.weeklyPriceOre!=null&&d>=7){
-  total=Math.floor(d/7)*i.weeklyPriceOre+(d%7)*i.dailyPriceOre;
-  basis="weekly";
- }
- if(i.weekendPriceOre!=null&&d<=3){
-  const x=new Date(a+"T12:00:00Z").getUTCDay(),y=new Date(b+"T12:00:00Z").getUTCDay();
-  if([x,y].some(v=>v===0||v===5||v===6)&&i.weekendPriceOre<total){
-   total=i.weekendPriceOre;
-   basis="weekend";
-  }
- }
- if(i.longTermDays&&d>=i.longTermDays&&i.longTermDiscountPercent>0){
-  total=Math.round(total*(1-i.longTermDiscountPercent/100));
-  basis+="+longterm";
- }
- return {days:d,totalOre:Math.max(0,total),depositOre:i.depositOre,basis};
 }
 
 function money(ore){
@@ -154,8 +130,9 @@ export async function POST(req){
    return NextResponse.json({error:"Utstyret er allerede opptatt i denne perioden."},{status:409});
   }
 
-  const p=calculate(item,b.startDate,b.endDate);
-  if(p.days>365)return NextResponse.json({error:"Utleieperioden kan ikke være lengre enn 365 dager."},{status:400});
+  const p=calculateRentalPrice(item,b.startDate,b.endDate);
+  if(!p)return NextResponse.json({error:"Leieperioden eller prisen er ugyldig. Velg en annen periode eller kontakt oss."},{status:400});
+  if(!rentalQuoteMatches(b.expectedPricing,p))return NextResponse.json({code:"RENTAL_PRICE_CHANGED",error:"Prisen må bekreftes på nytt. Velg leieperioden igjen før du sender booking."},{status:409});
 
   const customerUserId=await getCustomerUserId();
   // A business booking is invoiced only when the verified account email
@@ -187,7 +164,9 @@ export async function POST(req){
    longTermDays:item.longTermDays,
    longTermDiscountPercent:item.longTermDiscountPercent,
    basis:p.basis,
-   days:p.days
+   days:p.days,
+   beforeDiscountOre:p.beforeDiscountOre,
+   discountOre:p.discountOre
   };
   const bookingRecord={
    customer_user_id:customerUserId,

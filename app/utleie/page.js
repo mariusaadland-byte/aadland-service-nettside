@@ -5,7 +5,7 @@ import Link from "next/link";
 import {CatalogFooter,CatalogHeader,CatalogPlaceholder} from "../produkter/ProductChrome";
 import {filterRentalCatalog,rentalCatalogCategory,RENTAL_CATALOG_PAGE_SIZE} from "../../lib/rentalCatalogFilter.mjs";
 
-const kr=o=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",maximumFractionDigits:0}).format((Number(o)||0)/100);
+const kr=o=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",minimumFractionDigits:0,maximumFractionDigits:2}).format((Number(o)||0)/100);
 
 
 export default function Utleie(){
@@ -84,6 +84,7 @@ export default function Utleie(){
      <div>
       <span className="catalogEyebrow">UTLEIEKATALOG</span>
       <h2>Hva trenger du?</h2>
+      <p className="rentalPriceNote">Leiepriser inkl. mva. Eventuelt depositum kommer i tillegg.</p>
      </div>
      {!loading&&!setup&&!error&&<span role="status" aria-live="polite">Viser {visible.length} av {filtered.length} {filtered.length===1?"produkt":"produkter"}</span>}
     </div>

@@ -4357,3 +4357,14 @@ body:has(.customerPage) .customerPage{
 .rentalPage .rentalSearchField button{flex:none;min-height:44px;padding:0 14px;background:#24201a;color:#f5d38a;border:1px solid #71624b;border-radius:4px}
 .rentalPage .rentalResetFilters{margin-top:14px;border:0}
 @media(max-width:650px){.rentalPage .rentalCatalogControls{grid-template-columns:minmax(0,1fr);gap:12px}.rentalPage .rentalLoadMore{flex-wrap:wrap}.rentalPage .rentalLoadMore button{width:100%}}
+
+/* U-06: clear product price and publication review */
+.rentalPage .rentalPriceNote{font-size:13px;line-height:1.5;color:#bcb8b0;margin:10px 0 0}
+.rentalNewItemPage .rentalProductReview{border:1px solid #c3b69e;background:#faf7f0;color:#26231f;padding:16px;border-radius:8px;margin:16px 0}
+.rentalNewItemPage .rentalProductReview h3{margin:0 0 8px;color:#26231f}
+.rentalNewItemPage .rentalProductReview ul{padding-left:20px;color:#664b18}
+
+/* U-07 calendar fail-closed and accessible actions */
+.rentalPage .rentalCustomerCalendar.isLoading{opacity:.5}
+.rentalPage .rentalCalendarRetry{min-height:44px;padding:8px 14px;margin:8px 0;border:1px solid #d7a74e;color:#eac77d;background:#201c15;cursor:pointer}
+.rentalPage .rentalCalendarDay:disabled:not(.isUnavailable){cursor:wait}
