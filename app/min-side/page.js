@@ -227,6 +227,7 @@ export default function MinSide(){
  }
 
  async function logout(){
+  historyGeneration.current++;
   await fetch("/api/customer/logout",{method:"POST"});
   setData(null);setMode("login");
  }
