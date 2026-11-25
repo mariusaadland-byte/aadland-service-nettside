@@ -72,7 +72,7 @@ const FakeResend=class{
 const routeSource=readFileSync("app/api/admin/invoices/friendly-reminders/route.js","utf8")
  .replace(/^import .*;\n/gm,"").replace(/^export const .*;\n/gm,"")
  .replace(/^export async function /gm,"async function ")
- .replace('const {Resend}=await import("resend");',"const Resend=FakeResend;");
+ .replace(/const \{Resend\}=await import\("[^"]*safeResend"\);/,"const Resend=FakeResend;");
 const NextResponse={json:(data,opts={})=>({data,status:opts.status||200,headers:opts.headers||{}})};
 const {GET,POST}=new Function("getAdminUser","db","sameOriginGuard","osloDateKey","invoicePaymentState",
  "invoiceSettlementInfo","summarizeInvoiceActivity","friendlyReminderEligible","friendlyReminderText",
