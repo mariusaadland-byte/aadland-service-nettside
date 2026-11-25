@@ -8,3 +8,6 @@ Utkast. Begge import-API-er er lagt om til eierstyrt forhåndsvisning og eksplis
 - Rolleprøve med SET LOCAL ROLE service_role bestått. Anon/authenticated mangler tilgang. Etter rollback: ingen testvarer, 8991 aktive Bygger'n-varer; kladdtabell ikke permanent installert.
 - Søkt etter katalogskrivere i repo: begge masseimport-rutene er erstattet, manuell egenvare-rute separat. Ingen verifikasjon av eventuelle eksterne skript utenfor repo.
 - UI viser uavklart aktivering korrekt etter nettverksfeil, samme kladd kan prøves igjen. Reell innlogget filopplasting, faktisk samtidighet og siste Vercel-build gjenstår.
+
+## Produksjonsmigrasjon 25.11.2026
+Vercel preview c2be5a1 bestod, inkludert CSV-testene. Migrasjon 20261125190437 installert og verifisert: tom kladdtabell, anon SELECT og authenticated EXECUTE avvist, service_role EXECUTE tillatt; 8991 Bygger'n-varer, 0 syntetiske varer. Security Advisor viser forventet RLS uten klientpolicy for privat service-only tabell. To separate SQL-sesjoner ble forsøkt overlappet; connectoren ga ingen observert overlapping, så reell konkurrerende aktivering er ikke verifisert. PostgreSQL-låserekkefølge og sekvensiell konfliktkontroll er testet; ingen reell prisliste er importert. Nettlesertest med eierinnlogging og faktisk filopplasting gjenstår. Kodeutrulling avventes.
