@@ -2,87 +2,80 @@ import {rateLimitRequest,rateLimitValue} from "../../../../lib/rateLimit";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {db} from "../../../../lib/supabase";
-import {createCustomerVerificationToken} from "../../../../lib/customerVerification";
-import {customerEmailContext,customerResendApiKey} from "../../../../lib/rentalEmailConfig";
-
-function esc(value){
- return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
-}
-
-const genericMessage="Hvis e-postadressen tilhører en kundekonto som ikke er bekreftet, sender vi en ny bekreftelsesmail.";
+import {customerResendApiKey} from "../../../../lib/rentalEmailConfig";
+import {customerVerificationGenericMessage,sendCustomerVerificationEmail} from "../../../../lib/customerVerificationDelivery";
 
 export async function POST(req){
- const originError=sameOriginGuard(req); if(originError)return originError;
- const rateError=await rateLimitRequest(req,{"scope":"customer-resend-verification","max":5,"windowSeconds":3600,"message":"For mange forespørsler om bekreftelsesmail. Prøv igjen senere."}); if(rateError)return rateError;
+ const originError=sameOriginGuard(req);if(originError)return originError;
+ if(process.env.VERCEL_ENV!=="production")
+  return NextResponse.json({error:"Bekreftelsesmail sendes bare fra produksjonsmiljøet."},{status:403});
+ const rateError=await rateLimitRequest(req,{"scope":"customer-resend-verification",
+  "max":5,"windowSeconds":3600,
+  "message":"For mange forespørsler om bekreftelsesmail. Prøv igjen senere."});
+ if(rateError)return rateError;
  try{
-  const {email}=await req.json().catch(()=>({}));
-  const value=String(email||"").trim().toLowerCase();
-  if(!value)return NextResponse.json({error:"Skriv inn e-postadressen din."},{status:400});
-  if(value.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))return NextResponse.json({error:"Skriv inn en gyldig e-postadresse."},{status:400});
-  const emailRateError=await rateLimitValue(value,{"scope":"customer-resend-verification-email","max":3,"windowSeconds":3600,"message":"For mange forespørsler om bekreftelsesmail for denne e-postadressen. Prøv igjen senere."}); if(emailRateError)return emailRateError;
-
-  const resendKey=customerResendApiKey(req);
-  if(!process.env.SESSION_SECRET||!resendKey)return NextResponse.json({error:"Bekreftelsesmail er ikke konfigurert akkurat nå."},{status:503});
-
+  const body=await req.json().catch(()=>({}));
+  const email=String(body.email||"").trim().toLowerCase();
+  if(email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+   return NextResponse.json({error:"Skriv inn en gyldig e-postadresse."},{status:400});
+  const emailLimit=await rateLimitValue(email,{"scope":"customer-resend-verification-email",
+   "max":3,"windowSeconds":3600,
+   "message":"For mange forespørsler om bekreftelsesmail for denne e-postadressen. Prøv igjen senere."});
+  if(emailLimit)return emailLimit;
+  if(!process.env.SESSION_SECRET||!customerResendApiKey(req))
+   return NextResponse.json({error:"Bekreftelsesmail er ikke konfigurert akkurat nå."},{status:503});
   const s=db();
-  if(!s)return NextResponse.json({error:"Bekreftelsesmail er ikke konfigurert akkurat nå."},{status:503});
-  const {data:profile,error:profileError}=await s.from("customer_profiles")
-   .select("id,email,name")
-   .eq("email",value)
-   .maybeSingle();
+  if(!s)return NextResponse.json({error:"Kundekonto er ikke tilgjengelig akkurat nå."},{status:503});
 
+  // First use the public customer profile. If profile creation failed after
+  // auth.createUser, a restricted server-only RPC can recover the pending ID.
+  let {data:profile,error:profileError}=await s.from("customer_profiles")
+   .select("id,email,name,phone,address").eq("email",email).maybeSingle();
   if(profileError){
-   console.error("CUSTOMER RESEND PROFILE",profileError);
-   return NextResponse.json({message:genericMessage});
+   console.error("S29 RESEND PROFILE LOOKUP",profileError.code||"unknown");
+   return NextResponse.json({ok:true,message:customerVerificationGenericMessage});
   }
-  if(!profile)return NextResponse.json({ok:true,message:genericMessage});
-
-  const {data:userData,error:userError}=await s.auth.admin.getUserById(profile.id);
-  const user=userData?.user;
-  if(userError||!user||String(user.email||"").trim().toLowerCase()!==value||user.email_confirmed_at){
-   return NextResponse.json({ok:true,message:genericMessage});
-  }
-
-  const token=createCustomerVerificationToken({id:user.id,email:value});
-  const mailContext=customerEmailContext(req);
-  const verifyUrl=new URL("/min-side/bekreft-epost",mailContext.siteUrl);
-  verifyUrl.hash="token="+encodeURIComponent(token);
-
-  const name=String(profile.name||user.user_metadata?.name||"").trim();
-  const html=`<!doctype html><html><body style="margin:0;background:#f3efe8;font-family:Arial,Helvetica,sans-serif;color:#181613">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3efe8;padding:28px 12px"><tr><td align="center">
-   <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#fff;border:1px solid #ded7cb">
-    <tr><td style="padding:28px 30px;background:#11100e;color:#fff">${mailContext.logoHtml}<div style="font-size:18px;font-weight:900;letter-spacing:.13em">${mailContext.brandUpper}</div><div style="margin-top:5px;color:#d9b365;font-size:11px;letter-spacing:.08em">MIN SIDE</div></td></tr>
-    <tr><td style="padding:30px">
-     <div style="color:#b5863b;font-size:11px;font-weight:800;letter-spacing:.12em">NY BEKREFTELSESLENKE</div>
-     <h1 style="font-size:27px;line-height:1.15;margin:9px 0 14px">Bekreft e-post${name?", "+esc(name):""}</h1>
-     <p style="color:#625d55;line-height:1.65;margin:0 0 22px">Her er en ny lenke for å bekrefte e-postadressen og aktivere kundekontoen din.</p>
-     <a href="${esc(verifyUrl.toString())}" style="display:inline-block;background:#cfa153;color:#111;text-decoration:none;font-weight:900;padding:14px 22px">Gå til bekreftelse →</a>
-     <p style="margin:24px 0 0;color:#8a857c;font-size:11px;line-height:1.55">På siden må du trykke «Bekreft e-post». Lenken er gyldig i 24 timer.</p>
-    </td></tr>
-    <tr><td style="padding:18px 30px;border-top:1px solid #ece7df;color:#777;font-size:11px">${mailContext.brandName} · 471 54 898 · ${esc(mailContext.contactEmail)}</td></tr>
-   </table>
-  </td></tr></table></body></html>`;
-
-  try{
-   const {Resend}=await import("resend");
-   const resend=new Resend(resendKey);
-   const sent=await resend.emails.send({
-    from:mailContext.from,
-    to:value,
-    replyTo:mailContext.replyTo,
-    subject:"Ny bekreftelseslenke – "+mailContext.brandName,
-    html
+  let userId=profile?.id||null;
+  if(!userId){
+   const {data:found,error:findError}=await s.rpc("find_unconfirmed_customer_by_email",{
+    p_email:email
    });
-   if(sent?.error)throw new Error(sent.error.message||"E-postfeil");
-  }catch(mailError){
-   console.error("CUSTOMER RESEND EMAIL",mailError);
-   return NextResponse.json({error:"Kunne ikke sende ny bekreftelsesmail akkurat nå. Prøv igjen."},{status:500});
+   if(findError){
+    console.error("S29 RESEND PENDING LOOKUP",findError.code||"unknown");
+    return NextResponse.json({ok:true,message:customerVerificationGenericMessage});
+   }
+   userId=found||null;
   }
-
-  return NextResponse.json({ok:true,message:"Ny bekreftelsesmail er sendt fra "+mailContext.brandName+"."});
- }catch(e){
-  console.error("CUSTOMER RESEND",e);
-  return NextResponse.json({error:"Kunne ikke sende ny bekreftelsesmail akkurat nå."},{status:500});
+  if(!userId)return NextResponse.json({ok:true,message:customerVerificationGenericMessage});
+  const {data:account,error:accountError}=await s.auth.admin.getUserById(userId);
+  const user=account?.user;
+  if(accountError||!user||String(user.email||"").trim().toLowerCase()!==email||
+    user.email_confirmed_at)
+   return NextResponse.json({ok:true,message:customerVerificationGenericMessage});
+  if(!profile){
+   const metadata=user.user_metadata||{};
+   const repaired={
+    id:user.id,email,
+    name:String(metadata.name||"").slice(0,120),
+    phone:String(metadata.phone||"").slice(0,40),
+    address:String(metadata.address||"").slice(0,300)
+   };
+   const result=await s.from("customer_profiles")
+    .upsert(repaired,{onConflict:"id"}).select("id,name").maybeSingle();
+   if(result.error){
+    console.error("S29 RESEND PROFILE REPAIR",result.error.code||"unknown");
+    return NextResponse.json({ok:true,message:customerVerificationGenericMessage});
+   }
+   profile=result.data||repaired;
+  }
+  await sendCustomerVerificationEmail({
+   req,s,userId:user.id,email,name:profile.name||user.user_metadata?.name||"",reason:"resend"
+  });
+  // No account enumeration: do not disclose existence, provider outcome or
+  // whether a previous attempt has an unresolved delivery status.
+  return NextResponse.json({ok:true,message:customerVerificationGenericMessage});
+ }catch(error){
+  console.error("S29 CUSTOMER RESEND",error?.message||"unknown");
+  return NextResponse.json({error:"Bekreftelsesmail kunne ikke behandles akkurat nå."},{status:503});
  }
 }
