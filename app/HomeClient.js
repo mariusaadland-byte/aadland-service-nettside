@@ -5,15 +5,16 @@ import {getCheckoutIntent,clearCheckoutIntent} from "../lib/clientOrderIntent";
 import {safeSiteHref} from "../lib/safeUrl";
 import {osloDateKey} from "../lib/osloTime";
 import {COMPANY_ADDRESS} from "../lib/companyInfo";
+import {safePublicImageUrl} from "../lib/publicContentImages";
 
 const emptyCustomer={name:"",email:"",phone:"",address:"",postalCode:"",city:"",note:"",deliveryWithinRadius:true};
 
 const fallbackServices=[
- {id:null,title:"Oppussing og renovering",description:"Fra mindre oppgraderinger til større fornyelser i hjemmet.",slug:"renovation",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:10},
- {id:null,title:"Uteområder og hage",description:"Terrasser, levegger, vedlikehold og praktiske løsninger ute.",slug:"outdoor",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:20},
+ {id:null,title:"Oppussing og renovering",description:"Fra mindre oppgraderinger til større fornyelser i hjemmet.",slug:"renovation",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:true,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:10},
+ {id:null,title:"Uteområder og hage",description:"Terrasser, levegger, vedlikehold og praktiske løsninger ute.",slug:"outdoor",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:true,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:20},
  {id:null,title:"Produkter på bestilling",description:"Benker, plantekasser og andre produkter tilpasset dine ønsker.",slug:"products",kind:"products",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:30},
  {id:null,title:"Utleie av utstyr",description:"Lei utstyr til prosjektet når du trenger det.",slug:"rental",kind:"rental",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:40},
- {id:null,title:"Vedlikehold og småjobber",description:"Reparasjoner, montering og oppgaver som må bli gjort.",slug:"maintenance",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:50},
+ {id:null,title:"Vedlikehold og småjobber",description:"Reparasjoner, montering og oppgaver som må bli gjort.",slug:"maintenance",kind:"service",active:true,showInMenu:true,showInFooter:true,showOnHome:true,hasPage:true,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:50},
  {id:null,title:"Rådgivning og befaring",description:"Fortell oss om prosjektet, så finner vi en god vei videre.",slug:"survey",kind:"survey",active:true,showInMenu:true,showInFooter:true,showOnHome:false,hasPage:false,imageUrl:"",ctaLabel:"Les mer",ctaHref:"",formTitle:"Be om befaring",formPrompt:"Beskriv kort hva du ønsker hjelp med.",publishFrom:null,publishUntil:null,sortOrder:60},
 ];
 
@@ -29,7 +30,7 @@ function normalizeService(service,index=0){
   showInFooter:service.showInFooter!==false,
   showOnHome:service.showOnHome!==false,
   hasPage:service.hasPage===true,
-  imageUrl:service.imageUrl||service.image_url||"",
+  imageUrl:safePublicImageUrl(service.imageUrl||service.image_url||""),
   ctaLabel:service.ctaLabel||service.cta_label||"Les mer",
   ctaHref:service.ctaHref||service.cta_href||"",
   formTitle:service.formTitle||service.form_title||"Be om befaring",
@@ -44,13 +45,18 @@ function enquiryServiceName(service){
  return service?.title||"Generell befaring";
 }
 
+function serviceActionLabel(service){
+ if(!service.ctaHref&&!service.hasPage&&service.kind!=="products"&&service.kind!=="rental")
+  return "Be om befaring";
+ return service.ctaLabel||"Les mer";
+}
 function serviceHref(service){
  if(service.ctaHref){const safe=safeSiteHref(service.ctaHref);if(safe)return safe;}
  if(service.kind==="products") return "/produkter";
  if(service.kind==="rental") return "/utleie";
  if(service.kind==="survey") return "#befaring";
- if(service.hasPage) return "/tjenester/"+service.slug;
- return "#tjeneste-"+service.slug;
+ if(service.hasPage) return "/tjenester/"+encodeURIComponent(service.slug);
+ return "#befaring";
 }
 
 export default function Home(){
@@ -102,7 +108,9 @@ export default function Home(){
  useEffect(()=>{
   let alive=true;
   fetch("/api/services").then(r=>r.ok?r.json():null).then(data=>{
-   if(alive&&Array.isArray(data?.services)&&data.services.length)setApiServices(data.services);
+   // If all configured services are unpublished, do not reveal the static fallback.
+   if(alive&&Array.isArray(data?.services)&&(data.services.length||data.configured===true))
+    setApiServices(data.services);
   }).catch(()=>{});
   return()=>{alive=false};
  },[]);
@@ -129,6 +137,7 @@ export default function Home(){
  const homeServices=services.filter(service=>service.showOnHome!==false);
  const menuServices=services.filter(service=>service.showInMenu!==false);
  const footerServices=services.filter(service=>service.showInFooter!==false);
+ const showServices=siteSettings.showServices!==false&&homeServices.length>0;
 
  async function customOrder(e){
   e.preventDefault();
@@ -210,7 +219,7 @@ export default function Home(){
   <header className="homeTop homeHeader">
    <div className="homeWrap homeNav homeHeaderInner">
     <a className="homeBrand homeLogo" href="/"><img className="brandLogo" src="/aadland-service-logo.webp" alt="Aadland Service"/></a>
-    <button className="mobileMenuBtn" type="button" aria-label={menuOpen?"Lukk meny":"Åpne meny"} aria-expanded={menuOpen} aria-controls="hovedmeny" onClick={()=>setMenuOpen(!menuOpen)}><span></span><span></span><span></span></button><nav id="hovedmeny" className={"homeLinks "+(menuOpen?"menuOpen":"")} onClick={()=>setMenuOpen(false)}><a href="/">Hjem</a><a href="/min-side">Min side</a><a href="#tjenester">Tjenester</a><a href="/produkter">Produkter</a><a href="/utleie">Utleie</a><a href="/prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a>{menuServices.filter(service=>service.hasPage && !["produkter","utleie"].includes(service.slug)).map(service=>(
+    <button className="mobileMenuBtn" type="button" aria-label={menuOpen?"Lukk meny":"Åpne meny"} aria-expanded={menuOpen} aria-controls="hovedmeny" onClick={()=>setMenuOpen(!menuOpen)}><span></span><span></span><span></span></button><nav id="hovedmeny" className={"homeLinks "+(menuOpen?"menuOpen":"")} onClick={()=>setMenuOpen(false)}><a href="/">Hjem</a><a href="/min-side">Min side</a>{showServices&&<a href="#tjenester">Tjenester</a>}<a href="/produkter">Produkter</a><a href="/utleie">Utleie</a><a href="/prosjekter">Tidligere oppdrag</a><a href="#om">Om oss</a><a href="#kontakt">Kontakt</a>{menuServices.filter(service=>service.hasPage && !["produkter","utleie"].includes(service.slug)).map(service=>(
  <a key={service.id||service.slug} href={serviceHref(service)} onClick={()=>setMenuOpen(false)}>{service.title}</a>
 ))}</nav>
     <a className="goldBtn navCta headerCta" href="#befaring" onClick={()=>setSelectedService(enquiryServiceName())}>Gratis befaring →</a>
@@ -224,24 +233,24 @@ export default function Home(){
     <div className="eyebrow heroEyebrow">{siteSettings.heroEyebrow}</div>
     <h1>{siteSettings.heroTitle}</h1>
     <p className="heroLead">{siteSettings.heroText}</p>
-    <div className="heroActions"><a className="goldBtn" href="#befaring" onClick={()=>setSelectedService(enquiryServiceName())}>Gratis befaring →</a><a className="outlineBtn" href="#tjenester">Se våre tjenester</a></div>
+    <div className="heroActions"><a className="goldBtn" href="#befaring" onClick={()=>setSelectedService(enquiryServiceName())}>Gratis befaring →</a><a className="outlineBtn" href={showServices?"#tjenester":"#befaring"}>{showServices?"Se våre tjenester":"Kontakt oss"}</a></div>
     <div className="heroTrust"><span>Lokalt håndverk – solide resultater</span></div>
    </div>
   </section>
 
   {seasonalVisible&&<section className="seasonalBanner"><div className="homeWrap"><div><span className="goldLabel">AKTUELT</span><h2>{siteSettings.seasonalTitle}</h2>{siteSettings.seasonalText&&<p>{siteSettings.seasonalText}</p>}</div>{siteSettings.seasonalCtaLabel&&safeSiteHref(siteSettings.seasonalCtaHref)&&<a className="goldBtn" href={safeSiteHref(siteSettings.seasonalCtaHref)}>{siteSettings.seasonalCtaLabel} →</a>}</div></section>}
 
-  <section className="serviceStrip"><div className="homeWrap stripGrid serviceStripInner">
+  {showServices&&<section className="serviceStrip"><div className="homeWrap stripGrid serviceStripInner">
    {services.slice(0,6).map(service=><a href={serviceHref(service)} key={service.slug} className="serviceStripItem" onClick={()=>{if(service.kind==="survey")setSelectedService(enquiryServiceName(service))}}><span className={"serviceIcon "+service.slug} aria-hidden="true"></span><span>{service.title}</span></a>)}
-  </div></section>
+  </div></section>}
 
-  {siteSettings.showServices!==false&&<section id="tjenester" className="homeSection light servicesSection">
+  {showServices&&<section id="tjenester" className="homeSection light servicesSection">
    <div className="homeWrap">
-    <div className="sectionIntro servicesHeader"><div><span className="goldLabel">VÅRE TJENESTER</span><h2>Små og store prosjekter</h2></div><a className="textLink" href="#befaring">Se alle tjenester →</a></div>
+    <div className="sectionIntro servicesHeader"><div><span className="goldLabel">VÅRE TJENESTER</span><h2>Små og store prosjekter</h2></div><a className="textLink" href="#befaring">Be om gratis befaring →</a></div>
     <div className="serviceCards">
      {homeServices.slice(0,5).map((service,index)=><article id={"tjeneste-"+service.slug} data-service={service.slug} className={"serviceCard serviceCard"+index} key={service.slug}>
       <div className={"serviceVisual serviceSlot"+index+(service.imageUrl?" hasServiceImage":"")} style={service.imageUrl?{backgroundImage:"linear-gradient(rgba(0,0,0,.08),rgba(0,0,0,.08)), url("+service.imageUrl+")"}:undefined}><div className="visualScene"></div></div>
-      <div className="serviceText serviceContent"><h3>{service.title}</h3><p>{service.description}</p><a href={serviceHref(service)}>{service.ctaLabel||"Les mer"} <b>→</b></a></div>
+      <div className="serviceText serviceContent"><h3>{service.title}</h3><p>{service.description}</p><a href={serviceHref(service)}>{serviceActionLabel(service)} <b>→</b></a></div>
      </article>)}
     </div>
    </div>
@@ -258,7 +267,7 @@ export default function Home(){
   
 
   {siteSettings.showProjects!==false&&<section id="prosjekter" className="homeSection projects projectsSection"><div className="homeWrap">
-   <div className="sectionIntro projectsHeader"><div><span className="goldLabel">UTVALGTE PROSJEKTER</span><h2>Resultater vi er stolte av</h2></div><a className="textLink" href="/prosjekter">Se alle prosjekter →</a></div>
+   <div className="sectionIntro projectsHeader"><div><span className="goldLabel">UTVALGTE PROSJEKTER</span><h2>{apiProjects.length?"Resultater vi er stolte av":"Tidligere oppdrag"}</h2></div><a className="textLink" href="/prosjekter">Se alle prosjekter →</a></div>
    <div className="projectGrid">
     {apiProjects.length?apiProjects.filter(project=>project.featured!==false).slice(0,4).map(project=><a href={"/prosjekter/"+project.slug} className={"projectTile projectCard "+(!project.imageUrls?.[0]?"projectCardNoImage":"")} key={project.id} style={project.imageUrls?.[0]?{backgroundImage:"url("+project.imageUrls[0]+")",backgroundSize:"cover",backgroundPosition:"center"}:{}}>{!project.imageUrls?.[0]&&<div className="projectNoImage"><img src="/aadland-service-logo.webp" alt=""/><span>Bilder kommer</span></div>}<div className="projectCaption"><span>{(project.category||"OPPDRAG").toUpperCase()}</span><strong>{project.title}</strong>{project.description&&<p>{project.description}</p>}<em>Se prosjekt →</em></div></a>):<a href="/prosjekter" className="projectEmptyTeaser"><img src="/aadland-service-logo.webp" alt="Aadland Service"/><div><span className="goldLabel">TIDLIGERE OPPDRAG</span><strong>Prosjekter publiseres fortløpende</strong><p>Når bilder legges inn i backoffice, vises de her og i det nye prosjektgalleriet.</p><em>Se prosjektgalleriet →</em></div></a>}
    </div>
@@ -284,7 +293,7 @@ export default function Home(){
 
   <footer id="kontakt" className="homeFooter"><div className="homeWrap footerGrid"><div className="footerIdentity"><div className="homeBrand"><img className="brandLogo footerLogo" src="/aadland-service-logo.webp" alt="Aadland Service"/></div><p className="footerTagline">Lokalt håndverk – solide resultater</p></div><div><b>Kontakt</b><div className="footerServices"><a href={"tel:"+siteSettings.phone.replace(/\s/g,"")}>{siteSettings.phone}</a><a href={"mailto:"+siteSettings.email}>{siteSettings.email}</a></div></div><div><b>Tjenester</b><div className="footerServices">
  {footerServices.map(service=><a key={service.slug} href={serviceHref(service)}>{service.title}</a>)}
- </div></div><div><b>Firma</b><div className="footerServices"><a href="#om">Om oss</a><a href="/prosjekter">Tidligere oppdrag</a><a href="#befaring">Gratis befaring</a><a href="/vilkar/utleie">Utleiebetingelser</a><a href="/vilkar/salg">Salgsbetingelser</a><a href="/personvern">Personvern</a></div><p>Org.nr. {siteSettings.orgNumber}<br/>{COMPANY_ADDRESS}<br/><span>{siteSettings.location}</span></p></div></div><div className="homeWrap footerBottom"><span>© Aadland Service</span><div><a href="/min-side">Min side</a><a href="/personvern">Personvern</a><a href="/produkter">Produkter</a><a href="#tjenester">Tjenester</a><a href="#kontakt">Kontakt</a></div></div></footer>
+ </div></div><div><b>Firma</b><div className="footerServices"><a href="#om">Om oss</a><a href="/prosjekter">Tidligere oppdrag</a><a href="#befaring">Gratis befaring</a><a href="/vilkar/utleie">Utleiebetingelser</a><a href="/vilkar/salg">Salgsbetingelser</a><a href="/personvern">Personvern</a></div><p>Org.nr. {siteSettings.orgNumber}<br/>{COMPANY_ADDRESS}<br/><span>{siteSettings.location}</span></p></div></div><div className="homeWrap footerBottom"><span>© Aadland Service</span><div><a href="/min-side">Min side</a><a href="/personvern">Personvern</a><a href="/produkter">Produkter</a>{showServices&&<a href="#tjenester">Tjenester</a>}<a href="#kontakt">Kontakt</a></div></div></footer>
  </main>;
 }
 function Field({label,children}){return <label className="homeField"><span>{label}</span>{children}</label>}

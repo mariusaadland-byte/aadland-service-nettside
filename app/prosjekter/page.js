@@ -32,7 +32,7 @@ export default function ProjectsPage(){
    <div className="catalogWrap projectGalleryHeroInner">
     <Link className="catalogBack" href="/">← Tilbake til forsiden</Link>
     <span className="catalogEyebrow">TIDLIGERE OPPDRAG</span>
-    <h1>Resultater vi er stolte av</h1>
+    <h1>{loading||projects.length>0?"Resultater vi er stolte av":"Tidligere oppdrag"}</h1>
     <p>Se arbeid vi har utført. Åpne et prosjekt for å se hele bildegalleriet og mer informasjon om jobben.</p>
    </div>
   </section>

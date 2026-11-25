@@ -1,6 +1,7 @@
 import {NextResponse} from "next/server";
 import {db} from "../../../lib/supabase";
 import {withSupabaseRetry} from "../../../lib/supabaseRetry";
+import {safePublicImageUrl} from "../../../lib/publicContentImages";
 
 const map=p=>({
  id:p.id,
@@ -8,8 +9,10 @@ const map=p=>({
  slug:p.slug,
  category:p.category||"",
  description:p.description||"",
- imageUrls:Array.isArray(p.image_urls)?p.image_urls:[],
- contentBlocks:Array.isArray(p.content_blocks)?p.content_blocks:[],
+ imageUrls:Array.isArray(p.image_urls)?p.image_urls.map(safePublicImageUrl).filter(Boolean):[],
+ contentBlocks:Array.isArray(p.content_blocks)?p.content_blocks.map(block=>
+  block?.type==="image"?{...block,url:safePublicImageUrl(block.url)}:block).filter(block=>
+   block?.type!=="image"||Boolean(block.url)):[],
  featured:p.featured!==false,
  active:p.active!==false,
  sortOrder:p.sort_order||0
@@ -52,7 +55,7 @@ export async function GET(request){
      title:item.title,
      slug:item.slug,
      category:item.category||"",
-     imageUrl:Array.isArray(item.image_urls)?item.image_urls[0]||"":"" 
+     imageUrl:Array.isArray(item.image_urls)?safePublicImageUrl(item.image_urls[0]):"" 
     }:null;
     previousProject=navMap(previous);
     nextProject=navMap(next);
