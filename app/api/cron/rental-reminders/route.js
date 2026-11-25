@@ -51,7 +51,7 @@ export async function GET(req){
   console.error("RENTAL REMINDER VIPPS READINESS",error);
  }
 
- const {Resend}=await import("resend");
+ const {Resend}=await import("../../../../lib/safeResend");
  const resend=new Resend(resendKey);
  let sentCount=0;
  const failures=[];

@@ -3,7 +3,7 @@ import {readFileSync} from "node:fs";
 
 const invoiceSource=readFileSync("lib/invoiceVipps.js","utf8")
  .replace(/^import .*;\n/gm,"").replace(/export /g,"")
- .replace('const {Resend}=await import("resend");','const Resend=MockResend;');
+ .replace(/const \{Resend\}=await import\("[^"]*safeResend"\);/,'const Resend=MockResend;');
 const api=new Function("MockResend",invoiceSource+";return {invoiceVippsView};")(class {});
 const payment={reference:"INV-12345678-1234-1234-1234-123456789abc",state:"partial",amount_ore:12500,
  captured_ore:8000,refunded_ore:0,receipt_sent_at:null,redirect_url:"https://example.invalid/pay"};

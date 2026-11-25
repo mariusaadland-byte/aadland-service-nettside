@@ -24,7 +24,7 @@ const database={from(table){let op="select",value=null,filters=[],from=0,to=499;
   rows=rows.slice(from,to+1);return {data:single?(rows[0]?{...rows[0]}:null):rows,error:null};
  },async maybeSingle(){return chain.run(true)},async single(){return chain.run(true)},then(resolve){resolve(chain.run())}
  };return chain;}};
-const route=readFileSync("app/api/cron/rental-deposit-alerts/route.js","utf8").replace(/^import .*;\n/gm,"").replace(/export /g,"").replace('const {Resend}=await import("resend");','const {Resend}=mail;');
+const route=readFileSync("app/api/cron/rental-deposit-alerts/route.js","utf8").replace(/^import .*;\n/gm,"").replace(/export /g,"").replace(/const \{Resend\}=await import\("[^"]*safeResend"\);/,'const {Resend}=mail;');
 const GET=new Function("NextResponse","db","cronGuard","osloDateKey","shiftDateKey","rentalDepositAlerts","rentalDepositEmail","process","mail","setTimeout",route+"return GET;")(
  {json:(body,options={})=>({body,status:options.status||200})},()=>database,()=>denied?{status:401}:null,()=>today,dates.shiftDateKey,rentalDepositAlerts,rentalDepositEmail,{env},
  {Resend:class{emails={send:async(payload,options)=>{sends.push({payload,options});keys.add(options.idempotencyKey);return {data:{id:"mock-email"}}}}}},fn=>fn()

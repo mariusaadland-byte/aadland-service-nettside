@@ -93,7 +93,7 @@ async function runServiceCron(req){
    const message=vatReminderEmail(event);
    try{
     if(!resend){
-     const {Resend}=await import("resend");
+     const {Resend}=await import("../../../../lib/safeResend");
      resend=new Resend(key);
     }
     const result=await resend.emails.send({

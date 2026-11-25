@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-const source=readFileSync('lib/invoiceVipps.js','utf8').replace(/^import .*;\n/gm,'').replace(/export /g,'').replace('const {Resend}=await import("resend");','const Resend=FakeResend;');
+const source=readFileSync('lib/invoiceVipps.js','utf8').replace(/^import .*;\n/gm,'').replace(/export /g,'').replace(/const \{Resend\}=await import\("[^"]*safeResend"\);/,'const Resend=FakeResend;');
 const snapshotSource=readFileSync('lib/invoicePaymentStatus.js','utf8').replace(/^export /gm,'');
 const confirmationSnapshot=new Function(snapshotSource+';return invoiceVippsConfirmationSnapshot;')();
 const reference='INV-12345678-1234-1234-1234-123456789abc';

@@ -78,7 +78,7 @@ const db={
 };
 const raw=readFileSync("lib/invoiceManualReceipt.js","utf8")
  .replace(/^import .*;\n/gm,"").replace(/^export /gm,"")
- .replace('const {Resend}=await import("resend");','const Resend=FakeResend;');
+ .replace(/const \{Resend\}=await import\("[^"]*safeResend"\);/,'const Resend=FakeResend;');
 const {freezeManualInvoiceReceipt,sendManualInvoiceReceipt}=new Function(
  "buildInvoiceDraftPdf","FakeResend","process",
  raw+";return {freezeManualInvoiceReceipt,sendManualInvoiceReceipt};"

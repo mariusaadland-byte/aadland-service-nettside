@@ -51,11 +51,11 @@ export async function POST(req){
   const link=resetUrl.toString();
 
   const resendKey=process.env.VERCEL_ENV==="preview"
-   ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)
+   ?(process.env.RESEND_PREVIEW_API_KEY)
    :process.env.RESEND_API_KEY;
   if(!resendKey)return NextResponse.json({error:"Passordgjenoppretting er ikke konfigurert."},{status:503});
 
-  const {Resend}=await import("resend");
+  const {Resend}=await import("../../../../lib/safeResend");
   const resend=new Resend(resendKey);
   const name=String(admin.name||"").trim()||"administrator";
   const html=`<!doctype html><html><body style="margin:0;background:#111;font-family:Arial,Helvetica,sans-serif;color:#f5f2ec">

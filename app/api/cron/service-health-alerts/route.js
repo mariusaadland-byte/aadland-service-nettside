@@ -65,7 +65,7 @@ export async function GET(req){
  const id=created.data?.id;
  if(!id)return json({error:"Varslingsforsøket mangler ID."},503);
  try{
-  const {Resend}=await import("resend");
+  const {Resend}=await import("../../../../lib/safeResend");
   const result=await new Resend(process.env.RESEND_API_KEY).emails.send({
    from:"Aadland Service <noreply@aadland-service.no>",
    to:"post@aadland-service.no",replyTo:"post@aadland-service.no",

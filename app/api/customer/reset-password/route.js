@@ -74,7 +74,7 @@ export async function POST(req){
   </td></tr></table></body></html>`;
 
   try{
-   const {Resend}=await import("resend");
+   const {Resend}=await import("../../../../lib/safeResend");
    const resend=new Resend(resendKey);
    const sent=await resend.emails.send({
     from:mailContext.from,
