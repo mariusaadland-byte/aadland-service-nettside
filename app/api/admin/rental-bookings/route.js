@@ -1,3 +1,4 @@
+import {rentalDateChangeAttempt} from "../../../../lib/rentalChangeRequest.mjs";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {NextResponse} from "next/server";
 import {getAdminUser,hasPermission} from "../../../../lib/auth";
@@ -219,6 +220,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
   .eq("id",b.id)
   .maybeSingle();
  if(currentError||!current)return NextResponse.json({error:"Bookingen ble ikke funnet."},{status:404});
+ if(rentalDateChangeAttempt(b,current))return NextResponse.json({error:"Datoendring er ikke tilgjengelig som direkte oppdatering. Avklar ny tilgjengelighet, pris og oppgjør før ombooking."},{status:409});
 
  const action=String(b.action||"");
  if(action==="archive-cleanup"||action==="restore-cleanup"){

@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {rentalChangeChoices,rentalChangeMailto,rentalDateChangeAttempt} from "../lib/rentalChangeRequest.mjs";
+const b={status:"confirmed",booking_number:"AS-U-TEST",start_date:"2026-12-01",end_date:"2026-12-03",rental_items:{name:"Sag & bor"}};
+assert.deepEqual(rentalChangeChoices("active"),["extend"]);
+assert.deepEqual(rentalChangeChoices("cancelled"),[]);
+const mail=rentalChangeMailto(b,"extend","post@example.invalid");
+assert.ok(mail.startsWith("mailto:post@example.invalid?subject="));
+assert.ok(decodeURIComponent(mail).includes("AS-U-TEST"));
+assert.ok(decodeURIComponent(mail).includes("Ønsket ny returdato"));
+assert.equal(rentalChangeMailto({...b,status:"active"},"cancel","post@example.invalid"),null);
+assert.equal(rentalChangeMailto(b,"extend","bad?x@example.invalid"),null);
+assert.equal(rentalDateChangeAttempt({startDate:b.start_date},b),false);
+assert.equal(rentalDateChangeAttempt({endDate:"2026-12-04"},b),true);
+assert.equal(rentalDateChangeAttempt({},b),false);
+const admin=readFileSync("app/api/admin/rental-bookings/route.js","utf8");
+assert.ok(admin.includes("if(rentalDateChangeAttempt(b,current))"));
+console.log("U-13 customer change request and direct date change guard passed.");
