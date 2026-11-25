@@ -14,7 +14,7 @@ import {vippsUnitReadiness} from "../../../lib/vippsReadiness";
 import {createRentalPaymentLinkToken} from "../../../lib/rentalPaymentLink";
 import {peakRentalBookings,countedRentalBookings} from "../../../lib/rentalAvailability";
 
-const RENTAL_TERMS_VERSION="2026-10";
+import {RENTAL_TERMS_VERSION,RENTAL_TERMS_PATH,rentalTermsAccepted} from "../../../lib/rentalTermsVersion.mjs";
 
 function valid(a,b){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(a||"")||!/^\d{4}-\d{2}-\d{2}$/.test(b||"")||b<a)return false;
@@ -61,6 +61,7 @@ ${depositOre?`<tr><td style="padding:12px 14px;color:#8e887f;font-size:11px;bord
 ${creditText}
 ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:`<a href="${esc(minSideUrl)}" style="display:inline-block;margin-top:20px;border:1px solid #d7a74e;color:#d7a74e;text-decoration:none;font-weight:900;padding:12px 18px">Opprett Min side →</a><p style="margin:10px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Opprett konto med samme e-postadresse, så kobles utleien automatisk til kontoen din.</p>`}
 ${guestPaymentUrl?`<a href="${esc(guestPaymentUrl)}" style="display:inline-block;margin-top:12px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Betal leien med Vipps →</a><p style="margin:10px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Vipps gjelder bare leiebeløpet. Eventuelt depositum håndteres separat.</p>`:""}
+<p style="margin:20px 0;color:#c9c3b8">Godkjente vilkår: <a style="color:#d9b365" href="https://www.aadlandutleie.no${RENTAL_TERMS_PATH}">${RENTAL_TERMS_VERSION}</a>.</p>
 <p style="margin:22px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Finner du ikke e-posten, sjekk søppelpost/spam.</p>
 </td></tr>
 <tr><td style="padding:18px 30px;border-top:1px solid #34312b;color:#8e887f;font-size:11px">Aadland Utleie · 471 54 898 · ${esc(rentalReplyTo())}</td></tr>
@@ -84,6 +85,7 @@ export async function POST(req){
   const name=String(b.customer?.name||"").trim();
   const email=String(b.customer?.email||"").trim().toLowerCase();
   const phone=String(b.customer?.phone||"").trim();
+  if(!rentalTermsAccepted(b))return NextResponse.json({code:"RENTAL_TERMS_CHANGED",error:"Les og godta gjeldende utleiebetingelser. Oppdater siden hvis vilkårene er endret."},{status:409});
   const customerType=rentalCustomerClassification(b);
   if(customerType.error)return NextResponse.json({error:customerType.error},{status:400});
 
@@ -175,6 +177,8 @@ export async function POST(req){
    rental_item_id:item.id,
    customer:{name,email,phone,address,fulfillment,siteOrigin,
     customerType:customerType.type,
+    termsAcceptedAt:new Date().toISOString(),
+    termsVersion:RENTAL_TERMS_VERSION,
     ...(customerType.company?{company:customerType.company}:{})},
    start_date:b.startDate,
    end_date:b.endDate,

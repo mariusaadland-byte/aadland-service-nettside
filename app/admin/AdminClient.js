@@ -4937,6 +4937,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymen
     <span><small>Leiepris</small><b>{nok(b.totalOre)}</b></span>
     <span><small>Depositum</small><b>{nok(b.depositOre)}</b></span>
    </div>
+   {b.customer?.termsVersion&&<p className="muted">Vilkårsversjon: {b.customer.termsVersion}{b.customer?.termsAcceptedAt?" · Godkjent "+new Date(b.customer.termsAcceptedAt).toLocaleString("nb-NO"):""}</p>}
    {(b.confirmationSentAt||b.cancellationSentAt||b.receiptSentAt)&&<div className="rentalNotificationState">
     {b.confirmationSentAt&&<span>✓ Bekreftelse sendt {new Date(b.confirmationSentAt).toLocaleString("nb-NO")}</span>}
     {b.reminderSentAt&&<span>✓ Påminnelse sendt {new Date(b.reminderSentAt).toLocaleString("nb-NO")}</span>}

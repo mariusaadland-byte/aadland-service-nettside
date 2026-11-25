@@ -4,6 +4,7 @@ import {useEffect,useRef,useState} from "react";
 import {rentalDaysInclusive,rentalCalendarReady,validRentalCalendarQuote} from "../../../lib/rentalCalendarSelection.mjs";
 import {useParams} from "next/navigation";
 import {RENTAL_CHANGE_DEADLINE_HOURS} from "../../../lib/companyInfo";
+import {RENTAL_TERMS_VERSION,RENTAL_TERMS_PATH} from "../../../lib/rentalTermsVersion.mjs";
 import Link from "next/link";
 import {CatalogFooter,CatalogHeader,CatalogPlaceholder} from "../../produkter/ProductChrome";
 
@@ -278,11 +279,12 @@ export default function RentalDetailPage(){
      customerType,
      ...(customerType==="company"?{company}:{}),
      fulfillment,
-     acceptedTerms:accepted
+     acceptedTerms:accepted,termsVersion:RENTAL_TERMS_VERSION
     })
    });
    const data=await response.json().catch(()=>({}));
    if(!response.ok){
+    if(data.code==="RENTAL_TERMS_CHANGED")setAccepted(false);
     if(data.code==="RENTAL_PRICE_CHANGED"){setChosen(null);setAccepted(false);setRefreshKey(value=>value+1);}
     throw new Error(data.error||"Kunne ikke sende booking.");
    }
@@ -385,7 +387,8 @@ export default function RentalDetailPage(){
       <label><span>Adresse{fulfillment==="delivery"?" *":""}</span><input autoComplete="street-address" required={fulfillment==="delivery"} value={customer.address} onChange={e=>setCustomer({...customer,address:e.target.value})}/></label>
       <label><span>Henting / levering</span><select value={fulfillment} onChange={e=>setFulfillment(e.target.value)}>{item.pickupAvailable&&<option value="pickup">Jeg henter selv</option>}{item.deliveryAvailable&&<option value="delivery">Jeg ønsker levering</option>}</select></label>
       <div className="rentalTermsNotice"><b>Endring og avbestilling</b><span>Gratis frem til {RENTAL_CHANGE_DEADLINE_HOURS} timer før avtalt leiestart. Se vilkårene for detaljer.</span></div>
-      <label className="rentalTerms"><input type="checkbox" required checked={accepted} onChange={e=>setAccepted(e.target.checked)}/><span>Jeg har lest og godtar <a href="/vilkar/utleie" target="_blank" rel="noreferrer">utleiebetingelsene</a>, inkludert fristene for endring og avbestilling.</span></label>
+      <label className="rentalTerms"><input type="checkbox" required checked={accepted} onChange={e=>setAccepted(e.target.checked)}/><span>Jeg har lest og godtar <a href={RENTAL_TERMS_PATH} target="_blank" rel="noreferrer">utleiebetingelsene ({RENTAL_TERMS_VERSION})</a>, inkludert fristene for endring og avbestilling.</span></label>
+      <p className="muted">Slik behandler vi kontakt- og bookingopplysninger: <a href="/personvern" target="_blank" rel="noreferrer">Personvernerklæring</a>.</p>
       <div className="rentalBookingActions">
        <button className="catalogGoldButton" disabled={booking}>{booking?"Sender …":"Send booking →"}</button>
        <button type="button" className="rentalCancelButton" disabled={booking} onClick={()=>setChosen(null)}>Endre periode</button>
