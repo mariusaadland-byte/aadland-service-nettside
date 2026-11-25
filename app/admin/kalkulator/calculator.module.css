@@ -352,3 +352,6 @@
 .importSupplierChoices button[aria-pressed="true"]{background:#173d30!important;color:#fff!important;border:2px solid #24764e;box-shadow:0 0 0 2px #b5d9c4}
 .importSupplierChoices button[aria-pressed="true"] small{color:#fff!important}
 .importSupplierChoices button:disabled{opacity:.55;cursor:not-allowed}
+
+.importPanel .field>span,.importPanel .importCheck b{color:inherit!important;-webkit-text-fill-color:currentColor!important}
+.importFileHint{padding:10px;border:1px solid #76818a;border-radius:8px;font-size:14px;line-height:1.5;color:inherit}
