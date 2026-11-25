@@ -4303,3 +4303,7 @@ body:has(.customerPage) .customerPage{
   .invoicePrintable tr { break-inside: avoid; }
   .invoicePrintable, .invoicePrintable * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
+
+/* Separate rental brand for customer login, portal and payment. */
+.rentalCustomerLogo{display:block;width:min(270px,100%);height:auto;object-fit:contain;margin:14px 0 18px;border-radius:4px}
+.customerPortalPage>.rentalCustomerLogo{width:min(230px,100%)}

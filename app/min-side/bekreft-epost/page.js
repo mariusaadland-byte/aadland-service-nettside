@@ -55,6 +55,7 @@ export default function BekreftEpost(){
 
  return <main className="customerPage customerLoginPage">
   <Link href="/min-side">← Min side</Link>
+  {rentalContext&&<img className="rentalCustomerLogo" src="/aadland-utleie-logo.jpg" alt="Aadland Utleie" width={270} height={90}/>}
   <div className="kicker customerTopKicker">{rentalContext?"AADLAND UTLEIE · MIN SIDE":"MIN SIDE"}</div>
   <h1>Bekreft e-post</h1>
   <p>For å aktivere kundekontoen hos {rentalContext?"Aadland Utleie":"Aadland Service"} må du bekrefte at e-postadressen tilhører deg.</p>
