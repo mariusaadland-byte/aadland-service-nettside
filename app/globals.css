@@ -4347,3 +4347,13 @@ body:has(.customerPage) .customerPage{
 @media(prefers-reduced-motion:reduce){
  .rentalPage .rentalCatalogCard,.rentalPage .rentalCatalogMedia>img,.rentalPage .catalogGoldButton{transition:none!important;transform:none!important}
 }
+
+/* U-05: public rental catalog search, filters and pagination */
+.rentalPage .rentalCatalogControls{display:grid;grid-template-columns:minmax(0,1fr) minmax(180px,260px);gap:14px;margin:0 0 20px}
+.rentalPage .rentalCatalogControls label{display:block;font-size:13px;font-weight:750;color:#e5e1d8;margin-bottom:7px}
+.rentalPage .rentalSearchField{display:flex;align-items:center;gap:8px;min-width:0}
+.rentalPage .rentalCatalogControls input,.rentalPage .rentalCatalogControls select{width:100%;min-width:0;min-height:48px;padding:10px 12px;box-sizing:border-box;background:#151515;border:1px solid #71624b;border-radius:4px;color:#fff;font-size:16px;color-scheme:dark}
+.rentalPage .rentalCatalogControls input::placeholder{color:#bcb8b0}
+.rentalPage .rentalSearchField button{flex:none;min-height:44px;padding:0 14px;background:#24201a;color:#f5d38a;border:1px solid #71624b;border-radius:4px}
+.rentalPage .rentalResetFilters{margin-top:14px;border:0}
+@media(max-width:650px){.rentalPage .rentalCatalogControls{grid-template-columns:minmax(0,1fr);gap:12px}.rentalPage .rentalLoadMore{flex-wrap:wrap}.rentalPage .rentalLoadMore button{width:100%}}
