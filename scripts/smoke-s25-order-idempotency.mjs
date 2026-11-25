@@ -1,3 +1,4 @@
+import "./smoke-s33-order-confirmation-recovery.mjs";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import crypto from "node:crypto";
