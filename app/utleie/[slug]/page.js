@@ -309,7 +309,7 @@ export default function RentalDetailPage(){
       <div className="rentalDetailMainImage">
        {images[activeImage]?<img src={images[activeImage]} alt={item.name}/>:<CatalogPlaceholder rental label="Utstyrsbilde kommer"/>}
       </div>
-      {images.length>1&&<div className="rentalDetailThumbs">{images.map((image,index)=><button type="button" className={index===activeImage?"isActive":""} key={image+index} onClick={()=>setActiveImage(index)}><img src={image} alt=""/></button>)}</div>}
+      {images.length>1&&<div className="rentalDetailThumbs">{images.map((image,index)=><button type="button" className={index===activeImage?"isActive":""} key={image+index} aria-label={`Vis produktbilde ${index+1}`} aria-pressed={index===activeImage} onClick={()=>setActiveImage(index)}><img src={image} alt=""/></button>)}</div>}
      </div>
 
      <div className="rentalDetailInfo">
