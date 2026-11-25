@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import {rentalDaysInclusive,rentalCalendarReady,validRentalCalendarQuote} from "../lib/rentalCalendarSelection.mjs";
+assert.equal(rentalDaysInclusive("2026-11-25","2026-11-25"),1);
+assert.equal(rentalDaysInclusive("2026-12-31","2027-01-02"),3);
+assert.equal(rentalDaysInclusive("2028-02-28","2028-03-01"),3);
+assert.equal(rentalDaysInclusive("2026-02-30","2026-03-01"),0);
+assert.equal(rentalDaysInclusive("2026-12-01","2026-11-30"),0);
+const month={itemId:"x",month:"2026-11",requestKey:"0:0",unavailableDates:[]};
+assert.equal(rentalCalendarReady(month,"x","2026-11","0:0"),true);
+for(const args of [["y","2026-11","0:0"],["x","2026-12","0:0"],["x","2026-11","1:0"]])assert.equal(rentalCalendarReady(month,...args),false);
+const quote={id:"x",available:true,pricing:{days:3,totalOre:12345,depositOre:50000}};
+assert.equal(validRentalCalendarQuote(quote,"x","2026-12-31","2027-01-02"),true);
+for(const q of [{...quote,available:false},{...quote,id:"y"},{...quote,pricing:{...quote.pricing,days:2}},{...quote,pricing:{...quote.pricing,totalOre:-1}},{...quote,pricing:null}])assert.equal(validRentalCalendarQuote(q,"x","2026-12-31","2027-01-02"),false);
+console.log("U-07 calendar selection, month identity, inclusive days and quote validation passed.");

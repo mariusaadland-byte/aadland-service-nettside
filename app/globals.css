@@ -4363,3 +4363,8 @@ body:has(.customerPage) .customerPage{
 .rentalNewItemPage .rentalProductReview{border:1px solid #c3b69e;background:#faf7f0;color:#26231f;padding:16px;border-radius:8px;margin:16px 0}
 .rentalNewItemPage .rentalProductReview h3{margin:0 0 8px;color:#26231f}
 .rentalNewItemPage .rentalProductReview ul{padding-left:20px;color:#664b18}
+
+/* U-07 calendar fail-closed and accessible actions */
+.rentalPage .rentalCustomerCalendar.isLoading{opacity:.5}
+.rentalPage .rentalCalendarRetry{min-height:44px;padding:8px 14px;margin:8px 0;border:1px solid #d7a74e;color:#eac77d;background:#201c15;cursor:pointer}
+.rentalPage .rentalCalendarDay:disabled:not(.isUnavailable){cursor:wait}
