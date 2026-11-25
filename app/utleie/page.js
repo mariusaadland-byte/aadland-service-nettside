@@ -112,7 +112,7 @@ export default function Utleie(){
        const image=item.imageUrls?.[0];
        return <Link href={"/utleie/"+item.slug} className="rentalCatalogCard" key={item.id} aria-label={"Se og lei "+item.name}>
         <div className="rentalCatalogMedia">
-         {image?<img src={image} alt={item.name}/>:<CatalogPlaceholder label="Utstyrsbilde kommer"/>}
+         {image?<img src={image} alt={item.name}/>:<CatalogPlaceholder rental label="Utstyrsbilde kommer"/>}
          {item.categoryName&&<span className="rentalCatalogCategory">{item.categoryName}</span>}
          {item.status!=="available"&&<span className="rentalAvailabilityBadge unavailable">Midlertidig utilgjengelig</span>}
         </div>

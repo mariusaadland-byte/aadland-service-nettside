@@ -307,7 +307,7 @@ export default function RentalDetailPage(){
     <div className="rentalDetailGrid">
      <div className="rentalDetailGallery">
       <div className="rentalDetailMainImage">
-       {images[activeImage]?<img src={images[activeImage]} alt={item.name}/>:<CatalogPlaceholder label="Utstyrsbilde kommer"/>}
+       {images[activeImage]?<img src={images[activeImage]} alt={item.name}/>:<CatalogPlaceholder rental label="Utstyrsbilde kommer"/>}
       </div>
       {images.length>1&&<div className="rentalDetailThumbs">{images.map((image,index)=><button type="button" className={index===activeImage?"isActive":""} key={image+index} onClick={()=>setActiveImage(index)}><img src={image} alt=""/></button>)}</div>}
      </div>
