@@ -3,7 +3,7 @@ import {getAdminUser,hasPermission} from "../../../../lib/auth";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
 import {rateLimitRequest} from "../../../../lib/rateLimit";
 import {db} from "../../../../lib/supabase";
-import {validateRentalDepositInspection} from "../../../../lib/rentalDepositReview";
+import {validateRentalDepositInspection,sameRentalInspection} from "../../../../lib/rentalDepositReview";
 
 export const runtime="nodejs";
 const allowed=async(permission)=>{
@@ -76,10 +76,10 @@ export async function POST(req){
  const s=db();
  if(!s)return NextResponse.json({error:"Databasen er utilgjengelig."},{status:503});
  const {data:existing,error:existingError}=await s.from("rental_deposit_inspection_events")
-  .select("id,booking_id").eq("request_id",requestId).maybeSingle();
+  .select("id,booking_id,result,damage_estimate_ore,note").eq("request_id",requestId).maybeSingle();
  if(existingError)return NextResponse.json({error:"Kunne ikke kontrollere tidligere registrering."},{status:500});
  if(existing){
-  if(existing.booking_id!==bookingId)return NextResponse.json({error:"Kontrollreferansen er allerede brukt."},{status:409});
+  if(!sameRentalInspection(existing,bookingId,body))return NextResponse.json({error:"Kontrollreferansen er allerede brukt."},{status:409});
   return NextResponse.json({ok:true,reused:true,id:existing.id});
  }
  const {data:booking,error:bookingError}=await s.from("rental_bookings")
@@ -97,7 +97,12 @@ export async function POST(req){
    reviewed_by:user.id
   }).select("id").single();
  if(error){
-  if(error.code==="23505")return NextResponse.json({ok:true,reused:true});
+  if(error.code==="23505"){
+   const {data:duplicate,error:lookupError}=await s.from("rental_deposit_inspection_events").select("id,booking_id,result,damage_estimate_ore,note").eq("request_id",requestId).maybeSingle();
+   if(lookupError)return NextResponse.json({error:"Kontrollreferansen kunne ikke bekreftes."},{status:503});
+   if(!sameRentalInspection(duplicate,bookingId,body))return NextResponse.json({error:"Kontrollreferansen er allerede brukt."},{status:409});
+   return NextResponse.json({ok:true,reused:true,id:duplicate.id});
+  }
   console.error("RENTAL DEPOSIT INSPECTION INSERT",error.code);
   return NextResponse.json({error:"Returkontrollen kunne ikke lagres."},{status:500});
  }
