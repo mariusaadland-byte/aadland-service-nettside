@@ -1,0 +1,7 @@
+## S-33 – ordrebekreftelser
+
+Utkast, ikke produksjonsklart. Nye manuelle produktordre fra nettbutikken får en transaksjonell køoppføring. Første sendeforsøk krever atomisk claim; leverandør-ID og ordremarkør registreres sammen. Daglig cron tar kun køoppføringer uten tidligere claim, og admin bruker samme claim. Vipps, egendefinerte forespørsler og utleie holdes utenfor. Historiske ordre uten bekreftelsesmarkør og uavklarte forsøk skal ikke sendes automatisk. Admin viser status og sperrer usikker ny utsending. Egen eieravstemming og samlet varsel/oversikt må fortsatt implementeres. SQL-utkast i scripts må testes med rollback, rettigheter og samtidighet, deretter registreres som migrasjon før merge. Ingen reelle e-poster er sendt.
+
+Oppdatert: Vercel-preview bestått på tidligere gren etter S25 testtilpasning. Samlet filter og eieravstemming er implementert. SQL testet med syntetisk ordre, eksklusiv claim, dobbelt-ack, tidlig avstemmingssperre og rolleprivilegier; ROLLBACK verifisert med 0 testordre og ingen ny tabell. Ny branch bygger på U12; reell e-post og innlogget UI-test gjenstår. Databasemigrasjon skal aktiveres før merge.
+
+Produksjon: migrasjon 20261125184359 installert 25.11.2026 etter godkjent preview. Køen er tom; anon SELECT og authenticated claim er avvist, service_role claim er tillatt. Koden venter på siste merge/utrulling; ingen e-post sendt.

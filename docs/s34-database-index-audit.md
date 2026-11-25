@@ -1,0 +1,5 @@
+# S-34 – databaseytelse (Service)
+
+25.11.2026: Supabase performance advisor viste 14 fremmednøkler uten dekkende indeks (13 uten utleie) og 52 indekser uten registrert bruk (49 uten utleie). Berørte Service-tabeller var 16–248 kB inkludert indekser; enkelte radestimater manglet. `invoice_vipps_refund_notices` manglet indeks på invoice_id som brukes direkte av fakturahistorikk og avhengighetskontroller i admin. Migrasjon 20261125184321 er installert og indeksdefinisjon verifisert. Ny advisor: 13 manglende totalt, 12 uten utleie. Det nye indekset telles foreløpig som ubrukt, som forventet. Ingen eksisterende indekser slettet. Statistikk for øvrige små tabeller må vurderes mot faktisk vekst, spørringsplaner og kostnad ved flere indekser; ingen dokumentert ytelsesgevinst målt i dagens små tabeller. Ingen endring i utleie, ingen endring av fakturadata.
+
+Se [Supabase fremmednøkkelindekser](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys) og [ubrukte indekser](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index).
