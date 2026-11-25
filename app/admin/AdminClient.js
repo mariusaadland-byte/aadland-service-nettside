@@ -4816,7 +4816,8 @@ function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymen
  }
 
  async function releaseDeposit(booking){
-  const d=await runAction(booking,"release-deposit",{},"Registrere depositumet som fullt frigitt/tilbakebetalt til kunden?");
+  const remaining=Math.max(0,(Number(booking.depositHeldOre)||0)-(Number(booking.depositChargedOre)||0));
+  const d=await runAction(booking,"release-deposit",{},"Bekrefter du at "+nok(remaining)+" faktisk er frigitt eller tilbakebetalt utenfor systemet? Dette registrerer oppgjøret, men flytter ikke penger.");
   if(d)setMessage("Depositumet er registrert som frigitt.");
  }
 
@@ -4952,12 +4953,13 @@ function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymen
      <span><small>Status</small><b>{depositLabels[b.depositStatus]||b.depositStatus}</b></span>
      <span><small>Holdt</small><b>{nok(b.depositHeldOre||0)}</b></span>
      <span><small>Brukt</small><b>{nok(b.depositChargedOre||0)}</b></span>
+     <span><small>{b.depositReleasedAt?"Registrert rest ved avslutning":"Rest til oppgjør"}</small><b>{nok(Math.max(0,(Number(b.depositHeldOre)||0)-(Number(b.depositChargedOre)||0)))}</b></span>
     </div>
     <p className="muted">Depositumet holdes separat fra leieinntekten og inngår ikke i leiekvitteringens totalsum.</p>
     <div className="field"><label>Depositumreferanse</label><input id={"rental-deposit-reference-"+b.id} defaultValue={b.depositReference||""} maxLength={120} placeholder="F.eks. Vipps-ref. eller bank"/></div>
     {canUpdate&&<div className="rentalBookingActions">
      <button className="btn alt" type="button" disabled={savingId===b.id||paymentSetupRequired||b.depositStatus!=="not_paid"} onClick={()=>holdDeposit(b)}>Registrer mottatt/holdt</button>
-     <button className="btn alt" type="button" disabled={savingId===b.id||paymentSetupRequired||Boolean(b.depositReleasedAt)||!["held","partially_charged"].includes(b.depositStatus)} onClick={()=>releaseDeposit(b)}>Frigi depositum</button>
+     <button className="btn alt" type="button" disabled={savingId===b.id||paymentSetupRequired||Boolean(b.depositReleasedAt)||!["held","partially_charged"].includes(b.depositStatus)} onClick={()=>releaseDeposit(b)}>Registrer frigitt / tilbakebetalt</button>
     </div>}
     <div className="field"><label>Beløp brukt av depositum (kr)</label><input id={"rental-deposit-charge-"+b.id} type="number" min="0" step="0.01" max={(Number(b.depositOre)||0)/100} defaultValue={b.depositChargedOre?((Number(b.depositChargedOre)||0)/100).toFixed(2):""} placeholder="0,00"/></div>
     {canUpdate&&<button className="btn alt" type="button" disabled={savingId===b.id||paymentSetupRequired||Boolean(b.depositReleasedAt)||!["held","partially_charged","charged"].includes(b.depositStatus)} onClick={()=>chargeDeposit(b)}>Registrer brukt beløp</button>}

@@ -1,5 +1,6 @@
 "use client";
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
+import {rentalDepositBalance} from "../../../../lib/rentalDepositReview";
 import Link from "next/link";
 import styles from "./deposit.module.css";
 
@@ -26,6 +27,8 @@ export default function RentalDepositClient(){
  const [search,setSearch]=useState("");
  const [filter,setFilter]=useState("attention");
  const [drafts,setDrafts]=useState({});
+ const requests=useRef(new Map());
+ const inFlight=useRef(false);
  async function refresh(){
   setLoading(true);setError("");
   try{
@@ -44,27 +47,35 @@ export default function RentalDepositClient(){
  }),[items,filter,search]);
  const updateDraft=(id,key,value)=>setDrafts(curr=>({...curr,[id]:{...curr[id],[key]:value}}));
  async function inspect(b,result){
+  if(inFlight.current)return;
   const draft=drafts[b.id]||{};
-  const amount=result==="damage"?Number(draft.estimate):0;
+  const raw=String(draft.estimate??"").trim();
+  const amount=result==="damage"?Math.round(Number(raw)*100):0;
+  if(result==="damage"&&(!raw||!Number.isFinite(Number(raw)))){setError("Skriv skadeanslaget i kroner, eller 0 hvis beløpet ennå er ukjent.");return;}
   const note=String(draft.note||"").trim();
   if(result==="damage"&&(!note||note.length<10)){setError("Beskriv skaden med minst 10 tegn.");return;}
-  if(!Number.isSafeInteger(amount)||amount<0||amount>b.depositOre/100){setError("Skadeanslaget kan ikke overstige depositumet.");return;}
-  const prompt=result==="ok"?"Registrere at utstyret er kontrollert uten skade?":`Registrere skadevurdering med anslag ${kr(Math.round(amount*100))}? Dette trekker ikke penger.`;
+  if(!Number.isSafeInteger(amount)||amount<0||amount>b.depositOre){setError("Skadeanslaget kan ikke overstige depositumet.");return;}
+  const prompt=result==="ok"?"Registrere at utstyret er kontrollert uten skade?":`Registrere skadevurdering med anslag ${kr(amount)}? Dette trekker ikke penger.`;
   if(!window.confirm(prompt))return;
-  const requestId=crypto.randomUUID();
+  const payload={bookingId:b.id,result,damageEstimateOre:amount,note};
+  const fingerprint=JSON.stringify(payload);
+  const requestId=requests.current.get(fingerprint)||crypto.randomUUID();
+  requests.current.set(fingerprint,requestId);
+  inFlight.current=true;
   setSaving(b.id);setError("");setSuccess("");
   try{
    const response=await fetch("/api/admin/rental-deposits",{
     method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({bookingId:b.id,requestId,result,damageEstimateOre:Math.round(amount*100),note})
+    body:JSON.stringify({...payload,requestId})
    });
    const data=await response.json().catch(()=>({}));
    if(!response.ok)throw Error(data.error||"Kontrollen kunne ikke lagres.");
+   requests.current.delete(fingerprint);
    setSuccess("Returkontrollen er lagret. Depositum må fortsatt gjøres opp separat.");
    setDrafts(curr=>({...curr,[b.id]:{note:"",estimate:""}}));
    await refresh();
   }catch(e){setError(e.message||"Kontrollen kunne ikke lagres.");}
-  finally{setSaving("");}
+  finally{inFlight.current=false;setSaving("");}
  }
  return <main className={styles.root}>
   <header className={styles.heading}>
@@ -95,6 +106,7 @@ export default function RentalDepositClient(){
   {loading?<p>Laster inn …</p>:visible.length===0?<div className={styles.empty}>Ingen bookinger i dette utvalget.</div>:
    <div className={styles.list}>{visible.map(b=>{
     const last=b.inspections[0]||null;const problem=reason(b);
+    const balance=rentalDepositBalance(b.depositHeldOre,b.depositChargedOre,b.depositReleasedAt);
     const canInspect=canUpdate&&["returned","completed"].includes(b.status);
     return <article key={b.id} className={styles.card}>
      <div className={styles.cardHeader}><div><span className={styles.code}>{b.bookingNumber}</span><h2>{b.itemName}</h2><p>{b.customerName} · {day(b.startDate)}–{day(b.endDate)}</p></div>
@@ -103,8 +115,11 @@ export default function RentalDepositClient(){
      <div className={styles.financial}>
       <div><small>Sikkerhetsdepositum</small><strong>{kr(b.depositOre)}</strong></div>
       <div><small>Depositumstatus</small><strong>{deposits[b.depositStatus]||b.depositStatus}</strong></div>
+      <div><small>Registrert mottatt/holdt</small><strong>{kr(b.depositHeldOre)}</strong></div>
       <div><small>Registrert brukt</small><strong>{kr(b.depositChargedOre)}</strong></div>
+      <div><small>{balance.closed?"Registrert rest ved avslutning":"Rest til oppgjør"}</small><strong>{kr(balance.remainingOre)}</strong></div>
      </div>
+     {balance.invalid&&<p className={styles.warning}>Registrert brukt beløp overstiger registrert holdt beløp. Kontroller oppgjøret manuelt.</p>}
      <p className={styles.meta}>Referanse: {b.depositReference||"Ingen"} · Frigivelse registrert: {time(b.depositReleasedAt)}</p>
      <section className={styles.history}>
       <h3>Returkontroll</h3>
@@ -114,10 +129,10 @@ export default function RentalDepositClient(){
      </section>
      {canInspect&&<div className={styles.form}>
        <label>Notater fra kontrollen<textarea value={drafts[b.id]?.note||""} onChange={e=>updateDraft(b.id,"note",e.target.value)} maxLength={2000} rows={2} placeholder="Tilstand, skader eller merknader …"/></label>
-       <label>Skadeanslag (kr – trekkes ikke automatisk)<input value={drafts[b.id]?.estimate||""} onChange={e=>updateDraft(b.id,"estimate",e.target.value)} type="number" min="0" max={b.depositOre/100} step="1" placeholder="0"/></label>
+       <label>Skadeanslag (kr – trekkes ikke automatisk)<input value={drafts[b.id]?.estimate||""} onChange={e=>updateDraft(b.id,"estimate",e.target.value)} type="number" min="0" max={b.depositOre/100} step="0.01" placeholder="0,00"/></label>
        <div className={styles.buttons}>
-        <button disabled={saving===b.id} onClick={()=>inspect(b,"ok")}>Registrer skadefri retur</button>
-        <button disabled={saving===b.id} className={styles.danger} onClick={()=>inspect(b,"damage")}>Registrer skade</button>
+        <button disabled={Boolean(saving)} onClick={()=>inspect(b,"ok")}>Registrer skadefri retur</button>
+        <button disabled={Boolean(saving)} className={styles.danger} onClick={()=>inspect(b,"damage")}>Registrer skade</button>
        </div>
       </div>}
      <p className={styles.foot}>Vurderingen registreres med historikk, men frigjør ikke penger og oppretter ikke skadefaktura. Gå til <Link href="/admin">bookinger og betaling</Link> for å behandle et faktisk oppgjør.</p>
