@@ -11,8 +11,7 @@ export function CatalogHeader({ rental = false }) {
     <header className="catalogHeader">
       <div className="catalogWrap catalogNav">
         <Link href={rental?"/utleie":"/"} className={"catalogBrand "+(rental?"catalogRentalBrand":"")} aria-label={rental?"Aadland Utleie":"Aadland Service forsiden"}>
-          <img src="/aadland-service-logo.webp" alt="Aadland Service" />
-          {rental&&<span>UTLEIE</span>}
+          <img src={rental?"/aadland-utleie-logo.jpg":"/aadland-service-logo.webp"} alt={rental?"Aadland Utleie":"Aadland Service"} />
         </Link>
 
         <button
@@ -60,8 +59,8 @@ export function CatalogFooter({ rental = false }) {
     <footer className="catalogFooter">
       <div className="catalogWrap catalogFooterGrid">
         <div>
-          <img className="catalogFooterLogo" src="/aadland-service-logo.webp" alt="Aadland Service" />
-          {rental?<><strong className="catalogFooterRentalLabel">AADLAND UTLEIE</strong><p className="catalogFooterTagline">Utstyr når du trenger det</p></>:<p className="catalogFooterTagline">Lokalt håndverk – solide resultater</p>}
+          <img className="catalogFooterLogo" src={rental?"/aadland-utleie-logo.jpg":"/aadland-service-logo.webp"} alt={rental?"Aadland Utleie":"Aadland Service"} />
+          {rental?<><p className="catalogFooterTagline">Utstyr når du trenger det</p></>:<p className="catalogFooterTagline">Lokalt håndverk – solide resultater</p>}
         </div>
         <div>
           <b>Kontakt</b>
@@ -97,10 +96,10 @@ export function CatalogFooter({ rental = false }) {
   );
 }
 
-export function CatalogPlaceholder({ label = "Bilde kommer" }) {
+export function CatalogPlaceholder({ label = "Bilde kommer", rental = false }) {
   return (
     <div className="catalogPlaceholder" aria-label={label}>
-      <img src="/aadland-service-logo.webp" alt="" />
+      <img src={rental?"/aadland-utleie-logo.jpg":"/aadland-service-logo.webp"} alt="" />
       <span>{label}</span>
     </div>
   );
