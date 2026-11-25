@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {rentalDashboardMoney} from "../lib/rentalDashboard.mjs";
+const b={payment_captured_ore:125000,payment_refunded_ore:25000,deposit_held_ore:200000,deposit_charged_ore:50000};
+assert.deepEqual(rentalDashboardMoney([b],1),{captured:125000,refunded:25000,net:100000,held:200000,charged:50000});
+assert.equal(rentalDashboardMoney([b],2),null);
+assert.equal(rentalDashboardMoney([{...b,payment_refunded_ore:130000}],1),null);
+assert.equal(rentalDashboardMoney([{...b,deposit_held_ore:null}],1),null);
+assert.equal(rentalDashboardMoney([],0).net,0);
+const page=readFileSync("app/admin/utleie/oversikt/page.js","utf8");
+assert.ok(page.includes("getAdminUser()")&&page.includes("if(!orders&&!products)"));
+assert.ok(page.includes('count:"exact",head:true')&&page.includes('.is("archived_at",null)'));
+assert.ok(page.includes('if(user.role==="owner")tasks.push(["money"'));
+assert.ok(!page.includes(".insert(")&&!page.includes(".update("));
+console.log("U-22 dashboard access, exact counts and incomplete financial data safeguards passed.");
