@@ -87,3 +87,12 @@ assert.ok(supplierImport.includes('export async function GET()')&&supplierImport
 assert.ok(calc.includes('fetch("/api/admin/material-catalog/import",{cache:"no-store"})')&&calc.includes('importSuppliers.map(item=>')&&calc.includes('aria-pressed={importSupplier===item.id}')&&calc.includes('Velg leverandør først.')&&calc.includes('role="alert">{importError}'));
 assert.ok(!calc.includes('if(!suppliers.some(item=>item.id===importSupplier))setImportSupplier(primary)'));
 console.log("Import supplier picker: owner-only dedicated list, no search-state overwrite, explicit selection and visible errors.");
+
+const validateFile=new Function(calc.slice(calc.indexOf("const MAX_PRICE_FILE_BYTES="),calc.indexOf("const DEFAULTS="))+"return priceFileError;")();
+assert.match(validateFile({size:4702829,name:"8827435-pricefile-20261125202253080272.xlsx"},"byggmakker"),/for stor/);
+assert.match(validateFile({size:12345,name:"8827435-pricefile-20261125202253080272.xlsx"},"byggmakker"),/kolonne G/);
+assert.equal(validateFile({size:985377,name:"byggmakker_klargjort_kolonne_G.csv.gz"},"byggmakker"),"");
+assert.equal(validateFile({size:12345,name:"normal.xlsx"},"byggern"),"");
+assert.match(validateFile({size:0,name:"empty.csv"},"byggern"),/tom/);
+assert.ok(calc.includes("response.status===413")&&calc.includes("Boolean(priceFileError(importFile,importSupplier))"));
+console.log("Price file feedback: preflight size and original headerless Byggmakker format checks; compact CSV accepted.");
