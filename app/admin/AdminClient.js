@@ -6,6 +6,7 @@ import {osloDateKey,osloDateTimeLocal,osloLocalDateTimeToIso} from "../../lib/os
 import { useRouter } from "next/navigation";
 import navStyles from "./adminNav.module.css";
 import CustomerVerificationReview from "./CustomerVerificationReview";
+import ServiceVippsReview from "./ServiceVippsReview";
 import VippsFeePreview from "./VippsFeePreview";
 
 const ADMIN_IMAGE_TYPES=new Set(["image/jpeg","image/png","image/webp"]);
@@ -40,7 +41,7 @@ const ADMIN_NAV_GROUPS=[
   {id:"rental",title:"Utleie",icon:"▣",ids:["rental","rentalCalendar","rentalBookings"]},
   {id:"tools",title:"Kalkyle og betaling",icon:"⌗",ids:["calculator","materialAi","vipps","vippsCostCalculator"]},
   {id:"website",title:"Nettsiden",icon:"▥",ids:["projects","homepage"]},
-  {id:"settings",title:"Styring og utvikling",icon:"⚙",ids:["drift","roadmap","customerVerifications","users"]}
+  {id:"settings",title:"Styring og utvikling",icon:"⚙",ids:["drift","roadmap","customerVerifications","serviceVippsReview","users"]}
 ];
 export default function AdminClient({ user }) {
   const [tab, setTab] = useState("overview");
@@ -514,7 +515,8 @@ export default function AdminClient({ user }) {
      ["vippsCostCalculator","Vipps-kostnadskalkulator"],
     ["drift", "Driftskontroll"],
      ["roadmap", "Utviklingsplan"],
-     ["customerVerifications","Kundebekreftelser"]
+     ["customerVerifications","Kundebekreftelser"],
+     ["serviceVippsReview","Vipps Service – kontroll"]
   );
   const navLabels=new Map(tabs);
   const searchText=menuSearch.trim().toLocaleLowerCase("nb-NO");
@@ -649,6 +651,8 @@ export default function AdminClient({ user }) {
             ? "Tegning & visualisering"
             : tab === "customerVerifications"
             ? "Kundebekreftelser"
+            : tab === "serviceVippsReview"
+            ? "Vipps Service – kontroll"
             : "Brukere"}
         </h1>
 
@@ -889,6 +893,7 @@ export default function AdminClient({ user }) {
         )}
 
         {tab === "customerVerifications" && user?.role==="owner" && <CustomerVerificationReview/>}
+        {tab === "serviceVippsReview" && user?.role==="owner" && <ServiceVippsReview/>}
 
         {tab === "users" && canManageUsers && (
           <Users
