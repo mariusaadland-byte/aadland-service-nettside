@@ -20,7 +20,7 @@ const {
  serviceCronDailyStatus,withServiceCronMonitoring
 }=new Function("db","process",src+";return {SERVICE_CRON_JOBS,SERVICE_CRON_FIRST_COMPLETE_DAY,serviceCronResponseStatus,serviceCronDailyStatus,withServiceCronMonitoring};")(db,environment);
 
-assert.equal(SERVICE_CRON_JOBS.length,6);
+assert.equal(SERVICE_CRON_JOBS.length,9);
 assert.ok(SERVICE_CRON_JOBS.every(j=>!j.key.startsWith("rental")&&j.key!=="payment-receipts"));
 assert.equal(SERVICE_CRON_FIRST_COMPLETE_DAY,"2026-11-23");
 assert.equal(serviceCronResponseStatus(200,{ok:true,sent:0}).state,"ok","No work is valid success");
@@ -108,4 +108,9 @@ assert.ok(page.includes('service_cron_runs')&&page.includes('service_cron_alert_
 assert.ok(!page.includes('.insert(')&&!page.includes('.update('),"Dashboard is read-only");
 const nav=read("app/admin/AdminClient.js");
 assert.ok(nav.includes('["drift", "Driftskontroll"]'));
-console.log("S-17 bestått: 6 Service-jobber, skrivende kun intern driftslogg, manglende kjøringer, feil, advarsler og eierbeskyttet oversikt kontrollert uten e-post.");
+console.log("S-17 bestått: 9 Service-jobber, skrivende kun intern driftslogg, manglende kjøringer, feil, advarsler og eierbeskyttet oversikt kontrollert uten e-post.");
+
+for(const key of ["service-order-confirmations","quote-response-confirmations","contact-image-cleanup"]){const job=SERVICE_CRON_JOBS.find(x=>x.key===key);assert.equal(serviceCronDailyStatus(job,[],"2026-11-26").state,"starting");assert.equal(serviceCronDailyStatus(job,[],"2026-11-27").state,"missing");}
+assert.equal(serviceCronResponseStatus(207,{ok:true,requiresReview:1}).state,"warning");
+assert.equal(serviceCronResponseStatus(200,{ok:true,review:1}).state,"warning");
+assert.ok(alert.includes('x.state!=="ok"&&x.state!=="starting"'));
