@@ -82,7 +82,7 @@ class FakeResend{
 }
 const deliveryRaw=readFileSync("lib/invoicePaymentStatementDelivery.js","utf8")
  .replace(/^import .*;\n/gm,"").replace(/^export /gm,"")
- .replace('const {Resend}=await import("resend");','const Resend=FakeResend;');
+ .replace(/const \{Resend\}=await import\("[^"]*safeResend"\);/,'const Resend=FakeResend;');
 const delivery=new Function("buildInvoicePaymentStatementPdf","FakeResend","process",
  deliveryRaw+";return {saveInvoicePaymentStatementPdf,sendInvoicePaymentStatement};")(
  buildPdf,FakeResend,{env:{VERCEL_ENV:"production",RESEND_API_KEY:"fake-only"}}
