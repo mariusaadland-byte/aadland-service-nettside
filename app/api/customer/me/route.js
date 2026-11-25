@@ -27,7 +27,7 @@ function mapQuote(quote){
  };
 }
 
-export async function GET(){
+export async function GET(req){
  const customer=await getCustomer();
  if(!customer)return NextResponse.json({error:"Ikke innlogget."},{status:401});
  const s=db();
@@ -35,7 +35,15 @@ export async function GET(){
 
  const customerEmail=String(customer.email||"").trim().toLowerCase();
  if(!customerEmail)return NextResponse.json({error:"Kundekontoen mangler e-postadresse. Kontakt oss for hjelp."},{status:403});
- if(customerEmail){
+ const params=new URL(req?.url||"https://example.invalid/api/customer/me").searchParams;
+ const kind=params.get("serviceHistory")||"";
+ const page=Number(params.get("page")||"1");
+ if(!["","orders","quotes","drawings"].includes(kind)||!Number.isSafeInteger(page)||page<1||page>100000||(!kind&&page!==1))return NextResponse.json({error:"Ugyldig historikkside."},{status:400});
+ const wants=k=>!kind||kind===k;
+ const empty={data:[],count:0,error:null};
+ const range=(size)=>[(page-1)*size,page*size-1];
+ const meta=(result,size)=>({page,total:Number.isInteger(result.count)?result.count:null,loadedThrough:(page-1)*size+(result.data||[]).length,hasMore:!result.error&&(Number.isInteger(result.count)?page*size<result.count:(result.data||[]).length===size)});
+ if(!kind&&customerEmail){
   const [orderLink,rentalLink]=await Promise.all([
    s.from("orders").update({customer_user_id:customer.id})
     .is("customer_user_id",null)
@@ -49,30 +57,30 @@ export async function GET(){
  }
 
  const [ordersResult,rentalsResult,rentalPaymentResult,quotesResult]=await Promise.all([
-  s.from("orders")
-   .select("id,order_number,order_type,status,total_ore,shipping_ore,payment_status,payment_provider,payment_reference,payment_psp_reference,payment_reserved_ore,payment_captured_ore,payment_authorized_at,payment_captured_at,payment_cancelled_at,payment_capture_guaranteed_until,vipps_checkout_started_at,payment_refunded_ore,payment_refunded_at,refund_last_ore,refund_reference,refund_note,refund_notice_sent_at,receipt_sent_at,confirmation_sent_at,confirmed_at,in_progress_at,confirmed_notice_sent_at,in_progress_notice_sent_at,fulfillment_type,delivery_within_radius,items,custom_request,survey_date,survey_confirmation_sent_at,survey_reminder_sent_at,created_at,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at,job_reminder_sent_at,ready_notice_sent_at,tracking_number,tracking_url,tracking_sent_at,delivery_notice_sent_at,dispatched_at,delivered_at,cancellation_reason,cancellation_sent_at,cancelled_at")
+  wants("orders")?s.from("orders")
+   .select("id,order_number,order_type,status,total_ore,shipping_ore,payment_status,payment_provider,payment_reference,payment_psp_reference,payment_reserved_ore,payment_captured_ore,payment_authorized_at,payment_captured_at,payment_cancelled_at,payment_capture_guaranteed_until,vipps_checkout_started_at,payment_refunded_ore,payment_refunded_at,refund_last_ore,refund_reference,refund_note,refund_notice_sent_at,receipt_sent_at,confirmation_sent_at,confirmed_at,in_progress_at,confirmed_notice_sent_at,in_progress_notice_sent_at,fulfillment_type,delivery_within_radius,items,custom_request,survey_date,survey_confirmation_sent_at,survey_reminder_sent_at,created_at,job_start_at,job_customer_agreement,job_planning_updated_at,job_confirmation_sent_at,job_reminder_sent_at,ready_notice_sent_at,tracking_number,tracking_url,tracking_sent_at,delivery_notice_sent_at,dispatched_at,delivered_at,cancellation_reason,cancellation_sent_at,cancelled_at",{count:"exact"})
    .eq("customer_user_id",customer.id)
-   .order("created_at",{ascending:false})
-   .limit(100),
-  s.from("rental_bookings")
+   .order("created_at",{ascending:false}).order("id",{ascending:false})
+   .range(...range(100)):Promise.resolve(empty),
+  !kind?s.from("rental_bookings")
    .select("id,booking_number,start_date,end_date,status,total_ore,deposit_ore,payment_status,deposit_status,customer,confirmation_sent_at,cancellation_sent_at,reminder_sent_at,created_at,rental_items(name,slug,active,status)")
    .eq("customer_user_id",customer.id)
    .order("created_at",{ascending:false})
-   .limit(100),
-  s.from("rental_bookings")
+   .limit(100):Promise.resolve(empty),
+  !kind?s.from("rental_bookings")
    .select("id,payment_provider,payment_reference,payment_psp_reference,payment_reserved_ore,payment_captured_ore,payment_authorized_at,payment_captured_at,payment_cancelled_at,payment_capture_guaranteed_until,vipps_checkout_started_at,payment_due_at,payment_refunded_ore,payment_refunded_at,refund_last_ore,refund_reference,refund_note,refund_notice_sent_at,receipt_sent_at,deposit_held_ore,deposit_received_at,deposit_released_at,deposit_charged_ore")
    .eq("customer_user_id",customer.id)
    .order("created_at",{ascending:false})
-   .limit(100),
-  s.from("quotes")
-   .select("id,quote_number,status,title,total_inc_vat_ore,valid_until,planned_start_date,revision_number,revised_from_id,superseded_at,issued_via,paper_issued_at,acceptance_method,paper_signed_date,sent_at,accepted_at,declined_at,created_at,customer")
+   .limit(100):Promise.resolve(empty),
+  wants("quotes")?s.from("quotes")
+   .select("id,quote_number,status,title,total_inc_vat_ore,valid_until,planned_start_date,revision_number,revised_from_id,superseded_at,issued_via,paper_issued_at,acceptance_method,paper_signed_date,sent_at,accepted_at,declined_at,created_at,customer",{count:"exact"})
    .contains("customer",{email:customerEmail})
    .in("status",["sent","accepted","declined","expired","cancelled","superseded"])
-   .order("created_at",{ascending:false})
-   .limit(100)
+   .order("created_at",{ascending:false}).order("id",{ascending:false})
+   .range(...range(100)):Promise.resolve(empty)
  ]);
 
- if(ordersResult.error||rentalsResult.error){
+ if(ordersResult.error||rentalsResult.error||(kind==="quotes"&&quotesResult.error)){
   return NextResponse.json({error:"Historikken kunne ikke hentes."},{status:500});
  }
  const rentalPaymentById=new Map();
@@ -163,12 +171,13 @@ export async function GET(){
  }));
 
  let drawings=[];
- const {data:drawingRows,error:drawingError}=await s.from("project_drawings")
-  .select("id,order_id,name,address,notes,drawing_data,updated_at")
+ const directResult=wants("drawings")?await s.from("project_drawings")
+  .select("id,order_id,name,address,notes,drawing_data,updated_at",{count:"exact"})
   .eq("customer_user_id",customer.id)
   .eq("customer_visible",true)
-  .order("updated_at",{ascending:false})
-  .limit(50);
+  .order("updated_at",{ascending:false}).order("id",{ascending:false})
+  .range(...range(50)):empty;
+ const {data:drawingRows,error:drawingError}=directResult;
  if(drawingError){
   if(!["42P01","42703"].includes(String(drawingError.code||"")))console.error("CUSTOMER DRAWINGS",drawingError);
  }else{
@@ -186,12 +195,14 @@ export async function GET(){
  // Include only immutable drawing versions actually shared with this email
  // through a sent offer. A newly registered Min side account sees the same
  // history, while unshared admin drawings remain completely private.
- if(customerEmail){
-  const {data:published,error:publishedError}=await s.from("quote_drawing_publications")
-   .select("id,quote_id,drawing_id,name,address,notes,drawing_data,published_at")
+ let publicationResult=empty;
+ if(wants("drawings")&&customerEmail){
+  publicationResult=await s.from("quote_drawing_publications")
+   .select("id,quote_id,drawing_id,name,address,notes,drawing_data,published_at",{count:"exact"})
    .eq("customer_email",customerEmail)
-   .order("published_at",{ascending:false})
-   .limit(150);
+   .order("published_at",{ascending:false}).order("id",{ascending:false})
+   .range(...range(150));
+  const {data:published,error:publishedError}=publicationResult;
   if(publishedError){
    console.error("CUSTOMER PUBLISHED DRAWINGS",publishedError);
   }else{
@@ -215,8 +226,12 @@ export async function GET(){
   }
  }
 
+ if(kind==="drawings"&&(directResult.error||publicationResult.error))return NextResponse.json({error:"Tegningshistorikken kunne ikke hentes."},{status:503});
+ const direct=meta(directResult,50),published=meta(publicationResult,150);
+ const serviceHistory={orders:meta(ordersResult,100),quotes:meta(quotesResult,100),drawings:{page,hasMore:direct.hasMore||published.hasMore,total:direct.total===null||published.total===null?null:direct.total+published.total,loadedThrough:Math.min(direct.total??Infinity,direct.loadedThrough)+Math.min(published.total??Infinity,published.loadedThrough)}};
  return NextResponse.json({
   customer,
+  serviceHistory,
   orders,
   rentals,
   rentalHistoryLimited:rentals.length>=100,

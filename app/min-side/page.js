@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import Link from "next/link";
 import {osloDateKey} from "../../lib/osloTime";
 import {COMPANY_INFO,RENTAL_CHANGE_DEADLINE_HOURS} from "../../lib/companyInfo";
@@ -35,6 +35,16 @@ const effectiveQuoteStatus=q=>{
  return q.status;
 };
 
+function ServiceHistoryMore({kind,meta,busy,error,onMore}){
+ if(!meta)return null;
+ const label=kind==="drawings"?"tegningsoppføringer (inkl. delte versjoner)":kind==="quotes"?"tilbud":"bestillinger og oppdrag samlet";
+ return <div className="card customerEmpty" style={{marginTop:16}}>
+  <p aria-live="polite">{meta.total===null?"Totalt antall er ikke tilgjengelig.":"Hentet "+Math.min(meta.loadedThrough,meta.total)+" av "+meta.total+" "+label+"."}</p>
+  {meta.hasMore&&<button type="button" className="btn alt" disabled={Boolean(busy)} onClick={()=>onMore(kind)}>{busy===kind?"Henter eldre historikk …":"Vis eldre historikk"}</button>}
+  {error&&<p role="alert" className="notice">{error}</p>}
+ </div>;
+}
+
 export default function MinSide(){
  const [mode,setMode]=useState("login");
  const [form,setForm]=useState({name:"",email:"",phone:"",address:"",password:""});
@@ -52,8 +62,39 @@ export default function MinSide(){
  const [rentalVippsAvailable,setRentalVippsAvailable]=useState(false);
  const [rentalHistoryError,setRentalHistoryError]=useState("");
  const [paymentBusyId,setPaymentBusyId]=useState("");
+ const [serviceHistoryBusy,setServiceHistoryBusy]=useState("");
+ const [serviceHistoryError,setServiceHistoryError]=useState({});
+ const serviceHistoryLock=useRef(false);
+ const historyGeneration=useRef(0);
+
+ async function loadOlderService(kind){
+  const meta=data?.serviceHistory?.[kind];
+  if(!meta?.hasMore||serviceHistoryLock.current)return;
+  const generation=historyGeneration.current;
+  const owner=data.customer?.id;
+  serviceHistoryLock.current=true;setServiceHistoryBusy(kind);setServiceHistoryError(prev=>({...prev,[kind]:""}));
+  try{
+   const r=await fetch("/api/customer/me?serviceHistory="+encodeURIComponent(kind)+"&page="+(meta.page+1),{cache:"no-store"});
+   const next=await r.json();
+   if(!r.ok)throw Error(next.error||"Historikken kunne ikke hentes.");
+   if(generation!==historyGeneration.current||next.customer?.id!==owner)return;
+   setData(prev=>{
+    if(!prev||prev.customer?.id!==owner||prev.serviceHistory?.[kind]?.page!==meta.page)return prev;
+    const merged=new Map((prev[kind]||[]).map(row=>[row.id,row]));
+    for(const row of next[kind]||[]){
+     const existing=merged.get(row.id);
+     if(kind==="drawings"&&existing&&(!existing.publishedCopy||row.publishedCopy))continue;
+     merged.set(row.id,row);
+    }
+    return {...prev,[kind]:[...merged.values()],serviceHistory:{...prev.serviceHistory,[kind]:next.serviceHistory[kind]}};
+   });
+  }catch(e){if(generation===historyGeneration.current)setServiceHistoryError(prev=>({...prev,[kind]:e.message||"Kunne ikke hente eldre historikk."}));}
+  finally{serviceHistoryLock.current=false;setServiceHistoryBusy("");}
+ }
 
  async function load(){
+  historyGeneration.current++;
+  setServiceHistoryError({});
   try{
    const r=await fetch("/api/customer/me",{cache:"no-store"});
    const d=await r.json();
@@ -186,6 +227,7 @@ export default function MinSide(){
  }
 
  async function logout(){
+  historyGeneration.current++;
   await fetch("/api/customer/logout",{method:"POST"});
   setData(null);setMode("login");
  }
@@ -338,6 +380,7 @@ export default function MinSide(){
  const pendingRentalRows=rentals.filter(r=>rentalPortalGroup(r,portalNow)==="active"&&(r.status==="new"||(r.status==="confirmed"&&!r.confirmation_sent_at)));
  const readyPurchaseRows=purchases.filter(o=>o.status==="ready");
  const portalAttentionCount=openQuotes+pendingRentalRows.length+readyPurchaseRows.length;
+ const partialServiceHistory=Boolean(data.serviceHistory?.orders?.hasMore||data.serviceHistory?.quotes?.hasMore);
  const recentActivity=[
   ...quotes.map(q=>({
    key:"quote-"+q.id,
@@ -432,6 +475,7 @@ export default function MinSide(){
     {error&&<p className="notice customerDashboardNotice">{error}</p>}
 
     {activePanel==="overview"&&<section className="customerPortalOverview">
+   {partialServiceHistory&&<p className="notice">Service-tallene gjelder innlastet historikk. Åpne bestillinger, tilbud eller oppdrag for å hente eldre poster.</p>}
      <div className="customerPortalWelcome">
       <div className="kicker">OVERSIKT</div>
       <h1>Hei, {(data.customer.name||"kunde").split(" ")[0]}</h1>
@@ -560,6 +604,7 @@ export default function MinSide(){
      </div>
     </div>}
    </>}
+   <ServiceHistoryMore kind="orders" meta={data.serviceHistory?.orders} busy={serviceHistoryBusy} error={serviceHistoryError.orders} onMore={loadOlderService}/>
   </section>}
 
   {activePanel==="tilbud"&&<section id="tilbud" className="customerDashboardSection customerPortalPanel">
@@ -623,6 +668,7 @@ export default function MinSide(){
      </div>
     </div>}
    </>}
+   <ServiceHistoryMore kind="quotes" meta={data.serviceHistory?.quotes} busy={serviceHistoryBusy} error={serviceHistoryError.quotes} onMore={loadOlderService}/>
   </section>}
 
   {activePanel==="oppdrag"&&<section id="oppdrag" className="customerDashboardSection customerJobsSection customerPortalPanel">
@@ -692,6 +738,7 @@ export default function MinSide(){
      </div>
     </div>}
    </>}
+   <ServiceHistoryMore kind="orders" meta={data.serviceHistory?.orders} busy={serviceHistoryBusy} error={serviceHistoryError.orders} onMore={loadOlderService}/>
   </section>}
 
   {activePanel==="tegninger"&&<section id="tegninger" className="customerDashboardSection customerPortalPanel customerDrawingsPanel">
@@ -706,6 +753,7 @@ export default function MinSide(){
      <CustomerDrawingViewer drawing={drawing}/>
     </article>)}
    </div>}
+   <ServiceHistoryMore kind="drawings" meta={data.serviceHistory?.drawings} busy={serviceHistoryBusy} error={serviceHistoryError.drawings} onMore={loadOlderService}/>
   </section>}
 
   {activePanel==="bestillinger"&&<section id="bestillinger" className="customerDashboardSection customerPortalPanel">
@@ -783,6 +831,7 @@ export default function MinSide(){
      </div>
     </div>}
    </>}
+   <ServiceHistoryMore kind="orders" meta={data.serviceHistory?.orders} busy={serviceHistoryBusy} error={serviceHistoryError.orders} onMore={loadOlderService}/>
   </section>}
 
   {activePanel==="utleie"&&<section id="utleie" className="customerDashboardSection customerPortalPanel">
