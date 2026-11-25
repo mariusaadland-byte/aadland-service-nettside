@@ -1,0 +1,3 @@
+# U-26 – Lønnsomhet
+
+Eierbeskyttet, lesende produktgrunnlag og manuell kalkulator per fysisk maskin. Ingen forhåndsutfylte økonomiske tall; alle beløp oppgis av bruker. Historiske produktbetalinger minus refusjon vises separat, inkl. mva., uten depositum og kun dersom samtlige rader er hentet (maks 1000). Ingen automatisk tilordning av betaling per enhet. Beregner daglig og månedlig bidrag, gjenstående anskaffelsesdekning, forventede måneder og utleiedager. Ingen lagring, regnskapsoverføring eller endring av eksisterende data. Før skatt; avskrivning, finansiering og restverdi ikke automatisk inkludert. Automatisk innkjøps-/servicekostnad, faktisk inntekt per enhet, lagrede kalkyler og bankavstemming gjenstår. Praktisk mobiltest og rolleprøve gjenstår.
