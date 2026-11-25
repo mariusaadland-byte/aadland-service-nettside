@@ -103,7 +103,7 @@ const NextResponse={json(value,opts={}){return {body:value,status:opts.status||2
 const noImport=cronSource.replace(/^import .*;\n/gm,"")
  .replace(/^export const .*\n/gm,"")
  .replace("export async function GET(","async function GET(")
- .replace('const {Resend}=await import("resend");',"const Resend=FakeResend;");
+ .replace(/const \{Resend\}=await import\("[^"]*safeResend"\);/,"const Resend=FakeResend;");
 const route=new Function("NextResponse","db","cronGuard","osloDateKey",
  "invoiceReviewAlerts","invoiceReviewEmail","summarizeInvoiceActivity","FakeResend","process",
  noImport+"\nreturn {GET};"
