@@ -77,8 +77,8 @@ export async function POST(req){
    html,
    attachments:[
     {
-     filename:"aadland-utleie-logo.jpg",
-     path:"https://www.aadlandutleie.no/aadland-utleie-logo.jpg",
+     filename:"aadland-utleie-logo.png",
+     path:"https://www.aadlandutleie.no/aadland-utleie-logo.png",
      contentId:"aadland-service-logo"
     },
     {

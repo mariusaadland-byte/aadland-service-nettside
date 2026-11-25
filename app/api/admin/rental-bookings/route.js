@@ -408,7 +408,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     subject:"Betalingsbekreftelse utleie – "+current.booking_number,
     html,
     attachments:[
-     {filename:"aadland-utleie-logo.jpg",path:"https://www.aadlandutleie.no/aadland-utleie-logo.jpg",contentId:"aadland-service-logo"},
+     {filename:"aadland-utleie-logo.png",path:"https://www.aadlandutleie.no/aadland-utleie-logo.png",contentId:"aadland-service-logo"},
      {filename:receiptPdfFilename(current.booking_number),content:pdf.toString("base64")}
     ]
    });
