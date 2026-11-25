@@ -1,5 +1,6 @@
 import {rateLimitRequest} from "../../../lib/rateLimit";
 import {sameOriginGuard} from "../../../lib/requestGuard";
+import {rentalOverlapOr,extendOverdueAvailability} from "../../../lib/rentalOverdue.mjs";
 import {NextResponse} from "next/server";
 import {calculateRentalPrice,rentalQuoteMatches} from "../../../lib/rentalPricing.mjs";
 import crypto from "crypto";
@@ -123,10 +124,10 @@ export async function POST(req){
 
   const [{data:blocks,error:blockError},{data:bookings,error:bookingError}]=await Promise.all([
    s.from("rental_blocks").select("id").eq("rental_item_id",item.id).lte("start_date",to).gte("end_date",from),
-   s.from("rental_bookings").select("id,start_date,end_date,status,payment_status,payment_reference,payment_due_at").eq("rental_item_id",item.id).in("status",["new","confirmed","active"]).lte("start_date",to).gte("end_date",from)
+   s.from("rental_bookings").select("id,start_date,end_date,status,payment_status,payment_reference,payment_due_at").eq("rental_item_id",item.id).in("status",["new","confirmed","active"]).lte("start_date",to).or(rentalOverlapOr(from,todayOslo()))
   ]);
   if(blockError||bookingError)throw blockError||bookingError;
-  if((blocks?.length||0)>0||peakRentalBookings(countedRentalBookings(bookings),b.startDate,b.endDate,buffer)>=Math.max(1,Number(item.quantity)||1)){
+  if((blocks?.length||0)>0||peakRentalBookings(extendOverdueAvailability(countedRentalBookings(bookings),todayOslo(),to),b.startDate,b.endDate,buffer)>=Math.max(1,Number(item.quantity)||1)){
    return NextResponse.json({error:"Utstyret er allerede opptatt i denne perioden."},{status:409});
   }
 

@@ -1,3 +1,5 @@
+import {rentalOverlapOr,extendOverdueAvailability} from "../../../../lib/rentalOverdue.mjs";
+import {osloDateKey} from "../../../../lib/osloTime";
 import {NextResponse} from "next/server";
 import {db,fromDbRentalItem} from "../../../../lib/supabase";
 import {countedRentalBookings} from "../../../../lib/rentalAvailability";
@@ -73,7 +75,7 @@ export async function GET(req){
    .eq("rental_item_id",item.id)
    .in("status",["new","confirmed","active"])
    .lte("start_date",queryEnd)
-   .gte("end_date",queryStart)
+   .or(rentalOverlapOr(queryStart,osloDateKey(new Date())))
  ]);
 
  if(blockError||bookingError){
@@ -85,7 +87,7 @@ export async function GET(req){
   start:shiftDate(entry.start_date,-buffer),
   end:shiftDate(entry.end_date,buffer)
  }));
- const bookingPeriods=countedRentalBookings(bookings).map(entry=>({
+ const bookingPeriods=extendOverdueAvailability(countedRentalBookings(bookings),osloDateKey(new Date()),queryEnd).map(entry=>({
   start:shiftDate(entry.start_date,-buffer),
   end:shiftDate(entry.end_date,buffer)
  }));

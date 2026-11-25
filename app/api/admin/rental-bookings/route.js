@@ -1,3 +1,5 @@
+import {rentalOverlapOr,extendOverdueAvailability} from "../../../../lib/rentalOverdue.mjs";
+import {osloDateKey} from "../../../../lib/osloTime";
 import {rentalHandoverRecord} from "../../../../lib/rentalHandover.mjs";
 import {rentalDateChangeAttempt} from "../../../../lib/rentalChangeRequest.mjs";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
@@ -44,6 +46,7 @@ const map=b=>({
  archivedAt:b.archived_at||null,
  archiveReason:b.archive_reason||null,
  totalOre:b.total_ore,
+ priceSnapshot:{dailyPriceOre:b.price_snapshot?.dailyPriceOre??null},
  depositOre:b.deposit_ore,
  paymentStatus:b.payment_status||"unpaid",
  paymentProvider:b.payment_provider||"",
@@ -106,14 +109,14 @@ async function checkAvailability(s,booking){
    .neq("id",booking.id)
    .in("status",["new","confirmed","active"])
    .lte("start_date",to)
-   .gte("end_date",from),
+   .or(rentalOverlapOr(from,osloDateKey(new Date()))),
   s.from("rental_blocks").select("id")
    .eq("rental_item_id",booking.rental_item_id)
    .lte("start_date",to)
    .gte("end_date",from)
  ]);
  if(conflictError||blockError)return {error:"Tilgjengelighet kunne ikke kontrolleres.",status:500};
- if((blocks?.length||0)>0||peakRentalBookings(countedRentalBookings(conflicts),booking.start_date,booking.end_date,buffer)>=Math.max(1,Number(item.quantity)||1)){
+ if((blocks?.length||0)>0||peakRentalBookings(extendOverdueAvailability(countedRentalBookings(conflicts),osloDateKey(new Date()),to),booking.start_date,booking.end_date,buffer)>=Math.max(1,Number(item.quantity)||1)){
   return {error:"Kan ikke bekrefte: utstyret er opptatt eller manuelt blokkert i perioden.",status:409};
  }
  return {item};

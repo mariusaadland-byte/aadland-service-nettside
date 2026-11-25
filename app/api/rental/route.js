@@ -1,3 +1,5 @@
+import {rentalOverlapOr,extendOverdueAvailability} from "../../../lib/rentalOverdue.mjs";
+import {osloDateKey} from "../../../lib/osloTime";
 import {NextResponse} from "next/server";
 import {calculateRentalPrice} from "../../../lib/rentalPricing.mjs";
 import {db,fromDbRentalItem} from "../../../lib/supabase";
@@ -87,14 +89,14 @@ export async function GET(req){
 
   const [{data:blocks,error:blockError},{data:bookings,error:bookingError}]=await Promise.all([
    s.from("rental_blocks").select("id").eq("rental_item_id",item.id).lte("start_date",to).gte("end_date",from),
-   s.from("rental_bookings").select("id,start_date,end_date,status,payment_status,payment_reference,payment_due_at").eq("rental_item_id",item.id).in("status",["new","confirmed","active"]).lte("start_date",to).gte("end_date",from)
+   s.from("rental_bookings").select("id,start_date,end_date,status,payment_status,payment_reference,payment_due_at").eq("rental_item_id",item.id).in("status",["new","confirmed","active"]).lte("start_date",to).or(rentalOverlapOr(from,osloDateKey(new Date())))
   ]);
   if(blockError||bookingError){
    console.error("RENTAL AVAILABILITY ERROR",blockError||bookingError);
    return NextResponse.json({error:"Tilgjengelighet kunne ikke kontrolleres."},{status:500});
   }
   const manuallyBlocked=(blocks?.length||0)>0;
-  const booked=peakRentalBookings(countedRentalBookings(bookings),start,end,buffer);
+  const booked=peakRentalBookings(extendOverdueAvailability(countedRentalBookings(bookings),osloDateKey(new Date()),to),start,end,buffer);
   const pricing=calculateRentalPrice(item,start,end);
   out.push({
    ...item,

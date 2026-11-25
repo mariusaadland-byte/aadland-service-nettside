@@ -1,6 +1,8 @@
 "use client";
 
 import {rentalHandoverChecklist} from "../../lib/rentalHandover.mjs";
+import RentalConditionPhotos from "./utleie/RentalConditionPhotos";
+import {rentalOverdue,rentalLateEstimate} from "../../lib/rentalOverdue.mjs";
 import { useEffect, useState } from "react";
 import { nok } from "../../lib/catalog";
 import {osloDateKey,osloDateTimeLocal,osloLocalDateTimeToIso} from "../../lib/osloTime";
@@ -4675,6 +4677,9 @@ function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymen
  const [openId,setOpenId]=useState(null);
  const [migrationCopied,setMigrationCopied]=useState(false);
  const [showArchivedBookings,setShowArchivedBookings]=useState(false);
+ const [onlyOverdue,setOnlyOverdue]=useState(false);
+ const today=osloDateKey(new Date());
+ const overdueBookings=bookings.filter(b=>rentalOverdue(b,today));
  useEffect(()=>{
   if(!initialOpenId)return;
   if(bookings.some(b=>b.id===initialOpenId&&b.archivedAt))setShowArchivedBookings(true);
@@ -4880,12 +4885,13 @@ function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymen
   }
  }
 
- const visibleBookings=bookings.filter(booking=>Boolean(booking.archivedAt)===showArchivedBookings);
+ const visibleBookings=bookings.filter(booking=>Boolean(booking.archivedAt)===showArchivedBookings&&(!onlyOverdue||rentalOverdue(booking,today)));
  const archivedCount=bookings.filter(booking=>Boolean(booking.archivedAt)).length;
  const attentionBookings=bookings.filter(booking=>attentionIssue(booking));
  const attentionNetOre=attentionBookings.reduce((sum,booking)=>sum+Math.max(0,Number(booking.paymentCapturedOre||0)-Number(booking.paymentRefundedOre||0)),0);
 
  return <>
+  {!showArchivedBookings&&<div className="adminProjectMigrationWarning"><b>Forsinkede returer · {overdueBookings.length}</b><span>Utstyr som fortsatt er registrert utlevert etter returdato må følges opp.</span><button type="button" className="btn alt" aria-pressed={onlyOverdue} onClick={()=>setOnlyOverdue(v=>!v)}>{onlyOverdue?"Vis alle bookinger":"Vis kun forsinkede returer"}</button></div>}
   {attentionBookings.length>0&&<div className="adminProjectMigrationWarning">
    <b>Krever oppmerksomhet · {attentionBookings.length} {attentionBookings.length===1?"booking":"bookinger"}</b>
    <span>Returnerte eller avbrutte utleier har betaling/depositum som ikke er ferdig avklart.{attentionNetOre>0?" Netto registrert betaling som må vurderes: "+nok(attentionNetOre):""}</span>
@@ -4899,13 +4905,14 @@ function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymen
    </div>
   </div>}
   {message&&<p className="success">{message}</p>}
-  <div className="rentalBookingActions" style={{marginBottom:12}}><button type="button" className="btn alt" onClick={()=>{setShowArchivedBookings(v=>!v);setOpenId(null)}}>{showArchivedBookings?"Vis aktive bookinger":"Arkiv / fjernede bookinger ("+archivedCount+")"}</button><p className="muted" style={{fontSize:13}}>Fjern uaktuelle bookinger fra arbeidslisten uten å slette betalings- eller leiehistorikk. Kan gjenopprettes.</p></div>
+  <div className="rentalBookingActions" style={{marginBottom:12}}><button type="button" className="btn alt" onClick={()=>{setShowArchivedBookings(v=>!v);setOnlyOverdue(false);setOpenId(null)}}>{showArchivedBookings?"Vis aktive bookinger":"Arkiv / fjernede bookinger ("+archivedCount+")"}</button><p className="muted" style={{fontSize:13}}>Fjern uaktuelle bookinger fra arbeidslisten uten å slette betalings- eller leiehistorikk. Kan gjenopprettes.</p></div>
   {!visibleBookings.length?<div className="card"><h3>{showArchivedBookings?"Ingen arkiverte bookinger":"Ingen aktive utleiebookinger"}</h3><p className="muted">Bruk arkivet for å finne igjen tidligere fjernede bookinger.</p></div>:
   <div className="grid rentalBookingGrid">{visibleBookings.map(b=>{
    const isOpen=openId===b.id;
    const issue=attentionIssue(b);
    const waitingForFinalConfirmation=b.status==="confirmed"&&!b.confirmationSentAt;
-   const visibleStatus=waitingForFinalConfirmation?"Reservert":(statuses[b.status]||b.status);
+   const late=rentalLateEstimate(b,today);
+   const visibleStatus=late.days>0?"Forsinket · "+late.days+" d":waitingForFinalConfirmation?"Reservert":(statuses[b.status]||b.status);
    return <article id={"rental-booking-"+b.id} className={"card rentalBookingCard "+(isOpen?"isOpen":"isCompact")+" "+(initialOpenId===b.id?"adminCalendarRecordTarget":"")} key={b.id}>
    <button className="rentalBookingCompactHead" type="button" aria-expanded={isOpen} onClick={()=>setOpenId(isOpen?null:b.id)}>
     <span className="rentalBookingCompactMain">
@@ -4920,6 +4927,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymen
     </span>
    </button>
    {isOpen&&<div className="rentalBookingExpanded">
+   {late.days>0&&<div className="notice"><b>Retur forsinket med {late.days} kalenderdager</b><p>Avtalt retur: {b.endDate}. Kontakt kunden og avklar faktisk retur.</p><p>{late.estimateOre===null?"Opprinnelig døgnpris mangler. Beregn manuelt.":"Veiledende ekstra leie ved ordinær avtalt døgnpris: "+nok(late.estimateOre)+" inkl. mva."} Dette er kun et anslag. Ingen gebyr, faktura eller belastning opprettes automatisk.</p></div>}
    {issue&&<div className="notice"><b>Krever oppmerksomhet</b><br/><span>{issue}</span></div>}
    <p><b>{b.customer?.name}</b><br/>{b.customer?.phone} · {b.customer?.email}<br/>{b.customer?.fulfillment==="delivery"?"Levering":"Henting"}{b.customer?.address?" · "+b.customer.address:""}</p>
    <div className="rentalBookingSummary">
@@ -4937,6 +4945,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymen
    <div className="field"><label>Status</label><select disabled={!canUpdate||savingId===b.id||statusChoices(b).length===1||["confirmed","active"].includes(b.status)} value={b.status} onChange={e=>patch(b.id,{status:e.target.value})}>{statusChoices(b).map(value=><option key={value} value={value}>{statuses[value]||value}</option>)}</select>{b.status==="new"&&<small className="muted">Bekreft eller avbryt bookingen med knappene nederst, slik at kunden alltid varsles.</small>}{b.status==="returned"&&settlementIssue(b)&&<small className="muted">Kan ikke settes som ferdig: {settlementIssue(b)}</small>}</div>
 
    {canUpdate&&["confirmed","active"].includes(b.status)&&<RentalHandoverControl key={b.id+":"+b.status} booking={b} busy={savingId===b.id} onSubmit={changes=>patch(b.id,changes)}/>}
+   <RentalConditionPhotos key={b.id} booking={b} canUpdate={canUpdate}/>
    <section className="orderPaymentPanel rentalPaymentPanel">
     <h4>Leiebetaling</h4>
     <VippsFeePreview amountOre={Number(b.totalOre)||0} title="Vipps – hele leiebeløpet" note="Depositum inngår ikke i denne beregningen." disabled={savingId===b.id}/>

@@ -1,0 +1,3 @@
+# U-17 – Forsinket retur
+
+Adminvarsling med antall forsinkede bookinger, filter, kalenderdager og veiledende ekstra leie basert på original døgnpris i bookingens prisøyeblikksbilde. Ingen automatisk gebyr, faktura eller betaling. Ved passert returdato og fortsatt aktiv booking telles enheten konservativt som opptatt gjennom hele forespurte perioden. Uendrede bookingdatoer. Dette er en forhåndskontroll i kunde- og admin-API, ikke atomisk databasebeskyttelse; U-08 må utvides og testes før drift. Eksisterende bookinger som overlapper må avklares manuelt. Ingen e-post om forsinkelse aktivert; admin ser varsel i bookingoversikt, ikke push eller e-post. Praktiske tester og avklaring av avtalt ekstra leie gjenstår. Ingen produksjonsdata endret.
