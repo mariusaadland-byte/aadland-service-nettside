@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {rentalStructuredData,rentalProductMetadata} from "../lib/rentalSeo.mjs";
+assert.equal(rentalStructuredData.name,"Aadland Utleie");
+assert.equal(rentalStructuredData.parentOrganization.name,"Aadland Service");
+assert.ok(rentalProductMetadata({name:"Borhammer",slug:"borhammer"}).title.includes("Bergen"));
+assert.equal(rentalProductMetadata({name:"Borhammer",slug:"borhammer"}).url,"https://www.aadlandutleie.no/utleie/borhammer");
+assert.ok(!readFileSync("app/layout.js","utf8").includes("businessStructuredData"));
+assert.ok(readFileSync("app/page.js","utf8").includes("businessStructuredData"));
+assert.ok(readFileSync("app/utleie/page.js","utf8").includes("initialItems={initialItems}"));
+assert.ok(readFileSync("app/utleie/RentalCatalogClient.js","utf8").includes("<h1>Verktøyutleie i Bergen</h1>"));
+assert.ok(readFileSync("app/rental-sitemap.xml/route.js","utf8").includes("status:503"));
+assert.ok(readFileSync("app/rental-robots.txt/route.js","utf8").includes("Disallow: /betaling"));
+console.log("U-20 rental metadata, crawlable initial catalogue and separate sitemap passed.");

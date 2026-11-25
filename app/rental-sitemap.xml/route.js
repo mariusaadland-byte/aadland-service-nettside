@@ -13,17 +13,20 @@ function entry(url,{lastModified,changeFrequency="weekly",priority=".7"}={}){
 export async function GET(){
  const urls=[
   entry(base+"/",{changeFrequency:"weekly",priority:"1.0"}),
-  entry(base+"/vilkar/utleie",{changeFrequency:"yearly",priority:".4"})
+  entry(base+"/vilkar/utleie",{changeFrequency:"yearly",priority:".4"}),
+  entry(base+"/personvern",{changeFrequency:"yearly",priority:".3"})
  ];
 
  try{
   const s=db();
+  if(!s)return new Response("Sitemap temporarily unavailable",{status:503,headers:{"Cache-Control":"no-store"}});
   if(s){
    const {data,error}=await s.from("rental_items")
     .select("slug,updated_at,created_at")
     .eq("active",true)
     .neq("status","hidden")
     .order("sort_order");
+   if(error)return new Response("Sitemap temporarily unavailable",{status:503,headers:{"Cache-Control":"no-store"}});
    if(!error){
     for(const item of data||[]){
      const slug=String(item.slug||"").trim();
@@ -36,7 +39,7 @@ export async function GET(){
     }
    }
   }
- }catch{}
+ }catch{return new Response("Sitemap temporarily unavailable",{status:503,headers:{"Cache-Control":"no-store"}});}
 
  const xml=`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join("")}</urlset>`;
  return new Response(xml,{

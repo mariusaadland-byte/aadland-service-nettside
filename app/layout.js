@@ -33,28 +33,8 @@ export const metadata={
  robots:{index:true,follow:true}
 };
 
-const businessStructuredData={
- "@context":"https://schema.org",
- "@type":"LocalBusiness",
- name:"Aadland Service",
- url:"https://www.aadland-service.no",
- logo:"https://www.aadland-service.no/aadland-service-logo.webp",
- image:"https://www.aadland-service.no/opengraph-image",
- description:siteDescription,
- telephone:"+4747154898",
- email:"post@aadland-service.no",
- vatID:"NO937781873MVA",
- areaServed:"Bergen og omegn"
-};
-
 export default function RootLayout({children}){
  return <html lang="nb">
-  <head>
-   <script
-    type="application/ld+json"
-    dangerouslySetInnerHTML={{__html:JSON.stringify(businessStructuredData)}}
-   />
-  </head>
   <body>{children}</body>
  </html>
 }

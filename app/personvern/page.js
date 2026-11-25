@@ -12,16 +12,17 @@ export default function Personvern(){
   <div className="kicker">AADLAND SERVICE</div>
   <h1>Personvernerklæring</h1>
   <p className="legalLead">Her forklarer vi hvilke personopplysninger vi kan behandle når du besøker nettstedet, kontakter oss, får tilbud, bestiller varer eller tjenester, betaler eller bruker Min side.</p>
-  <p className="muted">Sist oppdatert: 21. november 2026.</p>
+  <p className="muted">Sist oppdatert: 25. november 2026.</p>
 
   <h2>1. Hvem er ansvarlig?</h2>
-  <p><strong>{COMPANY_INFO.name}</strong> er behandlingsansvarlig for opplysninger som virksomheten samler inn og bruker til sine tjenester.</p>
+  <p><strong>{COMPANY_INFO.name}</strong> er behandlingsansvarlig for opplysninger som virksomheten samler inn og bruker til sine tjenester, også utleiedelen Aadland Utleie.</p>
   <p>Organisasjonsnummer: {COMPANY_INFO.orgNumber}. Adresse: {COMPANY_ADDRESS}. Telefon: <a href={COMPANY_INFO.phoneHref}>{COMPANY_INFO.phone}</a>. E-post: <a href={COMPANY_INFO.emailHref}>{COMPANY_INFO.email}</a>.</p>
 
   <h2>2. Hvilke opplysninger behandler vi?</h2>
   <ul>
    <li><strong>Henvendelser og befaringer:</strong> navn, e-postadresse, telefon, eventuell adresse, beskrivelse av oppdraget og bilder eller dokumenter du sender oss.</li>
    <li><strong>Kunder, tilbud og bestillinger:</strong> kontaktinformasjon, produkter/tjenester, avtaler, tegninger som deles med deg, ordre- og tilbudshistorikk, levering og relevant korrespondanse.</li>
+   <li><strong>Utleie:</strong> leieperiode, bookingnummer, utstyr, godkjente utleiebetingelser, registrert utlevering/retur, depositumstatus og relevante kontrollnotater og korrespondanse.</li>
    <li><strong>Faktura og betaling:</strong> fakturaopplysninger, beløp, forfallsdatoer, betalingsstatus, transaksjonsreferanser, kvitteringer og nødvendig regnskapsdokumentasjon.</li>
    <li><strong>Min side:</strong> kontoinformasjon, e-postbekreftelse, innloggings- og sikkerhetsopplysninger samt historikk som knyttes til kontoen din.</li>
    <li><strong>Teknisk bruk:</strong> nødvendige sesjonsopplysninger og tekniske data som kan inngå i drift, sikkerhet og feilsøking, for eksempel tidspunkt for forespørsler og nettverksopplysninger.</li>
@@ -32,6 +33,7 @@ export default function Personvern(){
   <ul>
    <li><strong>Svare på henvendelser, avtale befaring og gi tilbud:</strong> for å gjennomføre tiltak på din forespørsel før en eventuell avtale (personvernforordningen artikkel 6 nr. 1 bokstav b), eller ut fra en berettiget interesse i å besvare henvendelser som ikke gjelder en konkret avtale (bokstav f).</li>
    <li><strong>Gjennomføre bestillinger, oppdrag, levering, betaling og nødvendig kundekommunikasjon:</strong> for å oppfylle en avtale (bokstav b).</li>
+   <li><strong>Utleiekontroll og oppfølging:</strong> for å gjennomføre leieavtalen (bokstav b) og, ved behov, ivareta berettiget interesse i å dokumentere og avklare krav (bokstav f). Eventuell tilstandsfotografering av utstyr skal være relevant og begrenset til nødvendig dokumentasjon. Unngå ansikter, legitimasjon og andre unødvendige personopplysninger.</li>
    <li><strong>Fakturering, bokføring og lovpålagt dokumentasjon:</strong> for å oppfylle rettslige forpliktelser (bokstav c).</li>
    <li><strong>Sikkerhet, feilsøking og forebygging av misbruk:</strong> ut fra vår berettigede interesse i å beskytte nettstedet, virksomheten og kundene (bokstav f).</li>
   </ul>
@@ -67,6 +69,7 @@ export default function Personvern(){
   <h2>9. Hvor lenge lagrer vi opplysninger?</h2>
   <p>Vi oppbevarer opplysningene så lenge de trengs for formålet de ble samlet inn for, for å følge opp et kundeforhold, håndtere eventuelle krav eller oppfylle lovpålagt dokumentasjonsplikt. Fakturaer og regnskapsbilag kan derfor bli oppbevart lenger enn vanlige henvendelser. Konkrete lagringstider avhenger av dokumenttype og gjeldende krav.</p>
   <p>Primærdokumentasjon etter bokføringsreglene, blant annet fakturaer og regnskapsbilag, skal som hovedregel oppbevares i fem år etter regnskapsårets slutt. For enkelte dokumenttyper kan andre eller lengre lovpålagte frister gjelde. Denne oppbevaringsplikten betyr ikke at alle andre kundeopplysninger skal oppbevares like lenge.</p>
+  <p>Dokumentasjon av tilstand, kontroll og skade ved utleie skal ikke beholdes lenger enn nødvendig for oppgjøret, eventuelle uavklarte krav eller lovpålagt dokumentasjon. Ved bruk av tilstandsbilder må konkret oppbevarings- og sletterutine være avklart før funksjonen tas i bruk.</p>
   <p>Du kan spørre oss hvor lenge opplysninger om deg lagres og be om sletting når vilkårene for det er oppfylt.</p>
 
   <h2>10. Behandling utenfor EU/EØS</h2>

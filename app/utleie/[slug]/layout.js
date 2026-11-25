@@ -1,4 +1,5 @@
 import {db} from "../../../lib/supabase";
+import {rentalProductMetadata} from "../../../lib/rentalSeo.mjs";
 
 async function getRentalItem(slug){
  const s=db();
@@ -16,7 +17,7 @@ async function getRentalItem(slug){
 
 export async function generateMetadata({params}){
  const resolved=await params;
- const slug=decodeURIComponent(String(resolved?.slug||""));
+ const slug=String(resolved?.slug||"");
  const item=await getRentalItem(slug);
 
  if(!item){
@@ -27,11 +28,8 @@ export async function generateMetadata({params}){
   };
  }
 
- const title=item.name;
- const socialTitle=`${item.name} | Utleie | Aadland Utleie`;
- const description=String(item.description||`Lei ${item.name} hos Aadland Utleie.`).slice(0,180);
- const image=Array.isArray(item.image_urls)?item.image_urls[0]:null;
- const url=`https://www.aadlandutleie.no/utleie/${encodeURIComponent(item.slug)}`;
+ const {title,description,url,image}=rentalProductMetadata(item);
+ const socialTitle=title+" | Aadland Utleie";
 
  return {
   title,

@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {RENTAL_TERMS_VERSION,RENTAL_TERMS_PATH,rentalTermsAccepted,rentalTermsPath} from "../lib/rentalTermsVersion.mjs";
+assert.ok(rentalTermsAccepted({acceptedTerms:true,termsVersion:RENTAL_TERMS_VERSION}));
+assert.ok(!rentalTermsAccepted({acceptedTerms:false,termsVersion:RENTAL_TERMS_VERSION}));
+assert.ok(!rentalTermsAccepted({acceptedTerms:true,termsVersion:"2026-10"}));
+assert.ok(!rentalTermsAccepted({acceptedTerms:true}));
+assert.equal(rentalTermsPath("2026-10"),null);
+assert.equal(rentalTermsPath(RENTAL_TERMS_VERSION),RENTAL_TERMS_PATH);
+assert.ok(readFileSync("app"+RENTAL_TERMS_PATH+"/page.js","utf8").includes("Versjon "+RENTAL_TERMS_VERSION));
+const api=readFileSync("app/api/rental-bookings/route.js","utf8");
+assert.ok(api.indexOf("rentalTermsAccepted(b)")<api.indexOf('s.rpc("create_rental_booking_if_available"'));
+assert.ok(api.includes("terms_version:RENTAL_TERMS_VERSION")&&api.includes("termsAcceptedAt:new Date()"));
+assert.ok(readFileSync("app/utleie/[slug]/page.js","utf8").includes("termsVersion:RENTAL_TERMS_VERSION"));
+console.log("U-19 terms version check, acceptance and versioned route passed.");
