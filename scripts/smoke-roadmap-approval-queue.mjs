@@ -34,7 +34,8 @@ const testIDs=[
  "custom-external-vat-double-count-20261120",
  "custom-tripletex-original-pdf-20261120"
 ];
-assert.deepEqual(Object.keys(APPROVAL_CHECKS).sort(),testIDs.slice().sort(),
+const finalIDs=["service-final-calc","service-final-mobile","service-final-public-content","service-final-price-age","service-final-price-import","service-final-backup","service-final-auth","service-final-privacy","service-final-receipt-accounting","service-final-vat","service-final-invoice-tripletex","service-final-vipps-settlement","service-final-invoice-followup","service-final-vipps-payment","service-final-manual-payment","service-final-quote-mail","service-final-cron","service-final-quote-response","service-final-appointments","service-final-registration","service-final-order-mail","service-final-quote-links","service-final-contact-images","service-final-drawing-roles","service-final-history"];
+assert.deepEqual(Object.keys(APPROVAL_CHECKS).sort(),[...testIDs,...finalIDs].sort(),
  "Every development plan task currently awaiting approval must have reviewed criteria");
 for(const [id,meta] of Object.entries(APPROVAL_CHECKS)){
  assert.ok(APPROVAL_GROUPS[meta.group],"Unknown approval group "+id);
@@ -102,3 +103,6 @@ for(const key of [".approvalBoard",".wizardTileGrid",".wizardBackdrop",
  ".wizardDialogFooter",".fullPlanToggle","@media(max-width:740px)"])
  assert.ok(css.includes(key));
 console.log("Utviklingsplan testvindu: 30 testoppgaver, 13 raske, 11 fullflyt, 6 avhengigheter, veiledet steg for steg, eiergodkjenning og lagret fremdrift.");
+
+const finalQueue=developmentApprovalQueue(finalIDs.map(id=>({id,status:'test'})));assert.equal(finalQueue.length,25);assert.ok(finalQueue.every(t=>t.approval.checks.length===3));
+const seed=read('lib/developmentTasks.js');for(const id of finalIDs)assert.ok(seed.includes('id:'+JSON.stringify(id)));console.log('Service sluttkontroll: 25 egne testbokser, tre steg hver.');
