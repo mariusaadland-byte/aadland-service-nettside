@@ -47,6 +47,10 @@
     {
       "path": "/api/cron/contact-image-cleanup",
       "schedule": "50 12 * * *"
+    },
+    {
+      "path": "/api/cron/service-order-confirmations",
+      "schedule": "25 10 * * *"
     }
   ]
 }
