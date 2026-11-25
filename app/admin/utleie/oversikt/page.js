@@ -61,6 +61,6 @@ export default async function RentalDashboard(){
    <Stat label="Netto registrert leie" value={money(amounts?.net??null)} href="/admin?vis=rentalBookings" description="Ikke bankavstemt resultat"/>
    <Stat label="Registrert depositum mottatt" value={money(amounts?.held??null)} href="/admin/utleie/depositum" description="Historisk, ikke nåværende saldo"/>
    <Stat label="Registrert depositum brukt" value={money(amounts?.charged??null)} href="/admin/utleie/depositum" description="Separat fra leie"/>
-  </div><p>Inkluderer arkiverte bookinger. Ikke regnskap, fortjeneste eller bekreftet bankoppgjør.</p><nav className={styles.links}><Link href="/admin/utleie/vipps-oppsett">Vipps-oppsett</Link></nav></section>}
+  </div><p>Inkluderer arkiverte bookinger. Ikke regnskap, fortjeneste eller bekreftet bankoppgjør.</p><nav className={styles.links}><Link href="/admin/utleie/vipps-oppsett">Vipps-oppsett</Link><Link href="/admin/utleie/lonnsomhet">Lønnsomhetskalkulator</Link></nav></section>}
  </main>;
 }
