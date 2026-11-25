@@ -3,11 +3,11 @@
 Utleie er utenfor omfanget. Dette er en testplan, ikke dokumentasjon på at testene er bestått. Kilde: docs/systemkontroll-uten-utleie-2026-11-21.md, S32–S36 dokumenter og PR #227, #232, #233, #235, #237. 36 hovedpunkter. Bevar original kontrollhistorikk.
 
 ## Sikker gjennomføring
-Bruk isolerte testdata og egne testkontoer; preview skal ikke sende ekte e-post eller opprette reelle betalinger. Ikke bruk produksjonskunde eller ekte regnskapsdokument som testobjekt. Reell e-post/Vipps/Tripletex-aktivitet krever kontrollert, særskilt godkjent test med eier; ingen fiktiv bokføring. Registrer testdato, miljø, forventet/faktisk resultat, bevis uten hemmeligheter, og bestått/feilet/ikke utført. Stopp ved avvik. S-14 (backup/restore) og S-36 (praktisk fil-/samtidighetstest) står åpne før risikoarbeid/masseimport.
+Bruk isolerte testdata og egne testkontoer; preview skal ikke sende ekte e-post eller opprette reelle betalinger. Ikke bruk produksjonskunde eller ekte regnskapsdokument som testobjekt. Reell e-post/Vipps/Tripletex-aktivitet krever kontrollert, særskilt godkjent test med eier; ingen fiktiv bokføring. Registrer testdato, miljø, forventet/faktisk resultat, bevis uten hemmeligheter, og bestått/feilet/ikke utført. Stopp ved avvik. S-14 (backup/restore) står åpen. S-36 har gjennomført Byggmakker-import; vanlig aktivering fikk uavklart svar, og eksisterende forhåndsvisning ble fullført via service-role etter eiers aktiveringsforsøk. Automatisk ende-til-ende-aktivering og samtidighet gjenstår.
 
 ## A. Blokkerende oppgaver
 - [ ] S-14: godkjenn kryptert eksternt lagringsmål; faktiske database- og Storage-kopier; gjenopprett i isolert miljø, kontroller filer, Auth og avstenging av e-post/betaling.
-- [ ] S-36: teknisk implementert, migrert og produksjon READY. 8991-raders syntetisk DB-test og sen feilrollback bestått. Innlogget filopplasting og faktisk parallelle aktiveringer gjenstår; ikke endre eksisterende katalog før verifisert.
+- [ ] S-36: teknisk implementert, migrert og produksjon READY. 8991-raders syntetisk DB-test og sen feilrollback bestått. 26.11: faktisk innlogget opplasting og forhåndsvisning av 87 922 Byggmakker-varer bestått; aktiveringssvaret var uavklart, deretter fullført via eksisterende atomiske RPC. 87 922 aktive Byggmakker og 8 991 Bygger’n, 48x98 C24 SKU 11303641 = 30,32 kr/lm eks. MVA. 15 % standard. Normal aktiveringsflyt og samtidighet ikke godkjent.
 - [ ] S-11: kontroller direkte Auth-signup og lekket passord; ingen abonnementsendring uten godkjenning.
 - [ ] S-13: dokumenter DPA, lagringsplan, overføringer og cookie-/tredjepartsrevisjon; praktisk innsyn/sletting med identitetskontroll.
 
@@ -31,7 +31,7 @@ Bruk isolerte testdata og egne testkontoer; preview skal ikke sende ekte e-post 
 
 ## D. Brukeropplevelse og tilgang
 - [ ] S-01/S-18: usendt testkalkyle på mobil/PC: 15 % standard, 400 eks. MVA timepris, 5,30/km og eksplisitt bom; avstem faktisk rute.
-- [ ] S-12: kontroller prisalder/varsler og innhent godkjent oppdatert prisliste. Vent på S-36 før masseimport.
+- [ ] S-12: kontroller prisalder/varsler og innhent godkjent oppdatert prisliste. Byggmakker importert 26.11; Bygger’n-filen fra 08.10 trenger oppdatering.
 - [ ] S-15: iPhone/PC, liggende/stående, tastatur, 200 % zoom, modaler, kontrast, fakturaarkiv, MVA og PDF.
 - [ ] S-19: to egne testkontoer, gyldig/utløpt/sperret tilbudslenke, ingen tilgang til andre kunders data.
 - [ ] S-21: mobil-/PC-opplasting, korrekt kvitteringsbinding, 24-timers opprydding og karantene; ikke slett ekte filer.
