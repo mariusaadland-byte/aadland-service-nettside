@@ -14,7 +14,8 @@ export async function GET(){
  const urls=[
   entry(base+"/",{changeFrequency:"weekly",priority:"1.0"}),
   entry(base+"/vilkar/utleie",{changeFrequency:"yearly",priority:".4"}),
-  entry(base+"/personvern",{changeFrequency:"yearly",priority:".3"})
+  entry(base+"/personvern",{changeFrequency:"yearly",priority:".3"}),
+  entry(base+"/utleie/kontakt",{changeFrequency:"monthly",priority:".6"})
  ];
 
  try{

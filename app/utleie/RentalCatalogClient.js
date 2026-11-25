@@ -149,7 +149,7 @@ export default function RentalCatalogClient({initialItems=[],initialCategories=[
   <section className="catalogCallout rentalCallout">
    <div className="catalogWrap catalogCalloutInner">
     <div><span className="catalogEyebrow">FINNER DU IKKE DET DU TRENGER?</span><h2>Spør oss om utstyr.</h2><p>Ta kontakt, så ser vi om vi har en løsning som passer jobben.</p></div>
-    <a href="mailto:post@aadland-service.no?subject=Sp%C3%B8rsm%C3%A5l%20om%20utleie" className="catalogGoldButton">Kontakt oss →</a>
+    <Link href="/utleie/kontakt" className="catalogGoldButton">Kontakt oss og vanlige spørsmål →</Link>
    </div>
   </section>
 

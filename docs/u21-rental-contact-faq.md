@@ -1,0 +1,3 @@
+# U-21 – Kontakt og FAQ
+
+Egen kontakt/FAQ-side, meny, bunntekst, kataloglenke og sitemap. Gjeldende telefon og post@aadland-service.no beholdes. FAQ følger eksisterende booking- og betalingsflyt, ingen oppdiktede åpningstider. Kontaktskjema og separat API er klargjort, men deaktivert med RENTAL_CONTACT_ENABLED inntil mottaker og levering er testet. Faste serverstyrte mottakere, svar til kundens e-post, validering, honeypot, rate limit, Resend-idempotens innen leverandørens vindu; ingen varig sendelogging, ingen automatisk retry ved usikker sending. Ingen e-post sendt. Test mobil, spamkontroll, leveringsstatus, kontaktadresse og aktiveringsbryter før drift. Ikke påstå bekreftet mottak når kun leverandør aksepterer e-post.
