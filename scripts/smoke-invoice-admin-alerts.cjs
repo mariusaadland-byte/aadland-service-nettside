@@ -18,7 +18,7 @@ const review=c.invoiceReviewAlerts([invoice],notices("purring","2026-10-20"),tod
 assert(review.stage.includes("vurder inkassovarsel"));assert.equal(review.outstandingOre,7500);
 assert(c.invoiceReviewAlerts([invoice],notices("inkasso","2026-10-20"),today)[0].stage.includes("Inkassovarsel utløpt"));
 assert(c.invoiceReviewEmail([review],today).body.includes("75,00"));assert(c.invoiceReviewEmail([review],today).body.includes("/admin/faktura/arkiv?id=invoice-1"));
-const route=fs.readFileSync("app/api/cron/invoice-review-alerts/route.js","utf8").replace(/^import .*;\n/gm,"").replaceAll("export async function ","async function ").replaceAll("export const ","const ").replace('const {Resend}=await import("resend");',"const Resend=MockResend;");
+const route=fs.readFileSync("app/api/cron/invoice-review-alerts/route.js","utf8").replace(/^import .*;\n/gm,"").replaceAll("export async function ","async function ").replaceAll("export const ","const ").replace(/const \{Resend\}=await import\("[^"]*safeResend"\);/,"const Resend=MockResend;");
 class Response{static json(body,options={}){return {body,status:options.status||200}}}
 async function run(options={}){
  const sends=[],writes=[],batch={id:"batch-1",created_at:new Date().toISOString(),status:options.alreadySent?"sent":"pending",subject:"Lagret emne",body:"Lagret oversikt",items:[review]};
