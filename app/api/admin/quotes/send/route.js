@@ -71,7 +71,7 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
  if(process.env.VERCEL_ENV==="preview")
   return NextResponse.json({error:"Ekte tilbudsutsending er sperret i forhåndsvisning. Test bare med simulator."},{status:403});
  const resendKey=process.env.VERCEL_ENV==="preview"
-  ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)
+  ?(process.env.RESEND_PREVIEW_API_KEY)
   :process.env.RESEND_API_KEY;
  if(!resendKey)return NextResponse.json({error:"E-post er ikke konfigurert på serveren."},{status:503});
 
