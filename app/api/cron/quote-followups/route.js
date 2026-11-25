@@ -62,7 +62,7 @@ async function runServiceCron(req){
   return NextResponse.json({ok:false,error:"Tilbudene kunne ikke hentes."},{status:500});
  }
 
- const {Resend}=await import("resend");
+ const {Resend}=await import("../../../../lib/safeResend");
  const resend=new Resend(resendKey);
  const base=baseUrl(req);
  let sentCount=0;
