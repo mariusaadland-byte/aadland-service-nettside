@@ -4307,3 +4307,43 @@ body:has(.customerPage) .customerPage{
 /* Separate rental brand for customer login, portal and payment. */
 .rentalCustomerLogo{display:block;width:min(270px,100%);height:auto;object-fit:contain;margin:14px 0 18px;border-radius:4px}
 .customerPortalPage>.rentalCustomerLogo{width:min(230px,100%)}
+
+/* U-04: customer-facing rental layout only. */
+.rentalPage .catalogRentalBrand img{max-width:230px;max-height:72px}
+.rentalPage .catalogFooterLogo{width:min(260px,100%);height:auto}
+.rentalPage .rentalCatalogGrid,.rentalPage .rentalDetailGrid{min-width:0}
+.rentalPage .rentalCatalogCard,.rentalPage .rentalDetailInfo,.rentalPage .rentalBookingFields,.rentalPage .rentalBookingIntro{min-width:0}
+.rentalPage .rentalCatalogBody h3,.rentalPage .rentalDetailInfo h1,.rentalPage .rentalBookingIntro h2,.rentalPage .rentalCatalogMeta{overflow-wrap:anywhere}
+.rentalPage .rentalCatalogMeta small,.rentalPage .rentalDetailPricing small,.rentalPage .rentalCatalogHeading>span,.rentalPage .rentalFulfillment span{color:#bcb8b0}
+.rentalPage .rentalCategoryFilters button{min-height:44px;font-size:13px;overflow-wrap:anywhere;white-space:normal}
+.rentalPage .rentalCatalogLink{font-size:13px}
+.rentalPage .rentalBookingFields input:not([type="checkbox"]):not([type="radio"]),.rentalPage .rentalBookingFields select{min-width:0;font-size:16px;max-width:100%}
+.rentalPage .rentalBookingFields input[type="radio"]{width:20px;min-height:20px;height:20px;padding:0;margin:0;accent-color:#d7a74e;flex:none}
+.rentalPage .rentalBookingFields [role="group"]>label{display:flex;align-items:center;gap:10px;min-height:46px;padding:8px 12px;border:1px solid #5d574f;color:#fff;border-radius:4px}
+.rentalPage .rentalBookingFields [role="group"]>label:has(input:checked){border-color:#d7a74e;background:#282219}
+.rentalPage .rentalDetailMainImage>img,.rentalPage .rentalCatalogMedia>img{object-fit:contain}
+@media(max-width:1100px){
+ .rentalPage .catalogMenuButton{min-width:44px;min-height:44px}
+ .rentalPage .catalogLinks.isOpen{max-height:calc(100dvh - 82px);overflow-y:auto;overscroll-behavior:contain}
+}
+@media(max-width:900px){
+ .rentalPage .catalogRentalBrand img{max-width:190px;max-height:64px}
+ .rentalPage .catalogLinks.isOpen{max-height:calc(100dvh - 72px)}
+}
+@media(max-width:650px){
+ .rentalPage .catalogWrap{width:calc(100% - 28px)}
+ .rentalPage .rentalHero h1,.rentalPage .rentalDetailInfo h1{font-size:clamp(34px,10vw,48px);overflow-wrap:anywhere}
+ .rentalPage .rentalHeroActions{display:grid;grid-template-columns:minmax(0,1fr)}
+ .rentalPage .rentalHeroActions>a{width:100%;min-height:48px}
+ .rentalPage .rentalCategoryFilters{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .rentalPage .rentalCatalogBody{padding:18px}
+ .rentalPage .rentalDetailMainImage{height:clamp(210px,72vw,340px)}
+ .rentalPage .rentalDetailMainImage .catalogPlaceholder{min-height:0}
+ .rentalPage .rentalDetailPricing{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .rentalPage .rentalDetailPricing>div{min-width:0;overflow-wrap:anywhere}
+ .rentalPage .rentalBookingFields,.rentalPage .rentalBookingIntro{padding:20px 14px}
+ .rentalPage .rentalBookingActions button{white-space:normal;min-height:48px}
+}
+@media(prefers-reduced-motion:reduce){
+ .rentalPage .rentalCatalogCard,.rentalPage .rentalCatalogMedia>img,.rentalPage .catalogGoldButton{transition:none!important;transform:none!important}
+}
