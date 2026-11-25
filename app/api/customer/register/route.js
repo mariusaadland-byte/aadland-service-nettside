@@ -73,7 +73,7 @@ export async function POST(req){
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3efe8;padding:28px 12px"><tr><td align="center">
    <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#fff;border:1px solid #ded7cb">
     <tr><td style="padding:28px 30px;background:#11100e;color:#fff">
-     <div style="font-size:18px;font-weight:900;letter-spacing:.13em">${mailContext.brandUpper}</div>
+     ${mailContext.logoHtml}<div style="font-size:18px;font-weight:900;letter-spacing:.13em">${mailContext.brandUpper}</div>
      <div style="margin-top:5px;color:#d9b365;font-size:11px;letter-spacing:.08em">MIN SIDE</div>
     </td></tr>
     <tr><td style="padding:30px">
@@ -83,7 +83,7 @@ export async function POST(req){
      <a href="${esc(verifyUrl.toString())}" style="display:inline-block;background:#cfa153;color:#111;text-decoration:none;font-weight:900;padding:14px 22px">Gå til bekreftelse →</a>
      <p style="margin:24px 0 0;color:#8a857c;font-size:11px;line-height:1.55">På siden må du trykke «Bekreft e-post». Lenken alene aktiverer ikke kontoen. Lenken er gyldig i 24 timer. Hvis du ikke opprettet denne kontoen, kan du se bort fra e-posten.</p>
     </td></tr>
-    <tr><td style="padding:18px 30px;border-top:1px solid #ece7df;color:#777;font-size:11px">${mailContext.brandName} · 471 54 898 · post@aadland-service.no</td></tr>
+    <tr><td style="padding:18px 30px;border-top:1px solid #ece7df;color:#777;font-size:11px">${mailContext.brandName} · 471 54 898 · ${esc(mailContext.contactEmail)}</td></tr>
    </table>
   </td></tr></table></body></html>`;
 

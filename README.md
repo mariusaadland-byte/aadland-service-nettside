@@ -23,11 +23,11 @@ I Vercel må `RESEND_API_KEY` være satt i **Production** for at kundekonto, pas
 Utleiedelen er fortsatt tilgjengelig på `https://www.aadland-service.no/utleie`, men kan i tillegg bruke `https://www.aadlandutleie.no` som eget utleiedomene. Middleware viser utleiekatalogen på roten av utleiedomenet, mens eksisterende `/utleie`-ruter fortsatt fungerer.
 
 Utleie-e-post bruker egne innstillinger:
-- `RENTAL_EMAIL_FROM=Aadland Utleie <noreplay@aadlandutleie.no>`
+- `RENTAL_EMAIL_FROM=Aadland Utleie <noreply@aadlandutleie.no>`
 - `RENTAL_REPLY_TO=post@aadland-service.no`
 - `RENTAL_SITE_URL=https://www.aadlandutleie.no`
 
-Hvis `RENTAL_EMAIL_FROM` ikke er satt, bruker systemet `Aadland Utleie <noreplay@aadlandutleie.no>`. Det verifiserte Aadland Utleie-domenet brukes også i Preview, slik at testmailer følger samme avsenderprofil som produksjon.
+Hvis `RENTAL_EMAIL_FROM` ikke er satt, bruker systemet `Aadland Utleie <noreply@aadlandutleie.no>`. Det verifiserte Aadland Utleie-domenet brukes også i Preview, slik at testmailer følger samme avsenderprofil som produksjon.
 
 Status per 30. september 2026:
 1. `aadlandutleie.no` og `www.aadlandutleie.no` er lagt til på samme Vercel-prosjekt som Aadland Service,

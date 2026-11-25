@@ -58,7 +58,7 @@ export default function NyttPassord(){
 
  return <main className="customerPage customerLoginPage">
   <Link href="/min-side">← Min side</Link>
-  {rentalContext&&<img className="rentalCustomerLogo" src="/aadland-utleie-logo.jpg" alt="Aadland Utleie" width={270} height={90}/>}
+  {rentalContext&&<img className="rentalCustomerLogo" src="/aadland-utleie-logo.png" alt="Aadland Utleie" width={270} height={90}/>}
   <div className="kicker customerTopKicker">{rentalContext?"AADLAND UTLEIE · MIN SIDE":"MIN SIDE"}</div>
   <h1>Nytt passord</h1>
   <p>Velg et nytt passord til kundekontoen din hos {rentalContext?"Aadland Utleie":"Aadland Service"}.</p>

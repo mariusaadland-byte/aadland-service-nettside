@@ -95,7 +95,7 @@ export default function RentalGuestPaymentClient({bookingId}){
 
  return <main className="customerPage customerLoginPage">
   <a href="/utleie">← Aadland Utleie</a>
-  <img className="rentalCustomerLogo" src="/aadland-utleie-logo.jpg" alt="Aadland Utleie" width={270} height={90}/>
+  <img className="rentalCustomerLogo" src="/aadland-utleie-logo.png" alt="Aadland Utleie" width={270} height={90}/>
   <div className="kicker customerTopKicker">SIKKER BETALING</div>
   <h1>Betal utleien med Vipps</h1>
 

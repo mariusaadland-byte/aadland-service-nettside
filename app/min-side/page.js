@@ -266,7 +266,7 @@ export default function MinSide(){
 
  if(!data)return <main className="customerPage customerLoginPage">
   <Link href={rentalContext?"/utleie":"/"}>← {rentalContext?"Aadland Utleie":"Aadland Service"}</Link>
-  {rentalContext&&<img className="rentalCustomerLogo" src="/aadland-utleie-logo.jpg" alt="Aadland Utleie" width={270} height={90}/>}
+  {rentalContext&&<img className="rentalCustomerLogo" src="/aadland-utleie-logo.png" alt="Aadland Utleie" width={270} height={90}/>}
   <div className="kicker customerTopKicker">{rentalContext?"AADLAND UTLEIE · MIN SIDE":"MIN SIDE"}</div>
   <h1>{mode==="login"?"Logg inn":"Opprett kundekonto"}</h1>
   <p>{rentalContext
@@ -376,7 +376,7 @@ export default function MinSide(){
    <button type="button" className="customerPortalLogout" onClick={logout}>Logg ut</button>
   </header>
 
-  {rentalContext&&<img className="rentalCustomerLogo" src="/aadland-utleie-logo.jpg" alt="Aadland Utleie" width={270} height={90}/>}
+  {rentalContext&&<img className="rentalCustomerLogo" src="/aadland-utleie-logo.png" alt="Aadland Utleie" width={270} height={90}/>}
   <div className="customerPortalLayout">
    <aside className="customerPortalSidebar">
     <div className="customerPortalIdentityRow">
