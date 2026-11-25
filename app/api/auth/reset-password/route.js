@@ -51,7 +51,7 @@ export async function POST(req){
   const link=resetUrl.toString();
 
   const resendKey=process.env.VERCEL_ENV==="preview"
-   ?(process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY)
+   ?(process.env.RESEND_PREVIEW_API_KEY)
    :process.env.RESEND_API_KEY;
   if(!resendKey)return NextResponse.json({error:"Passordgjenoppretting er ikke konfigurert."},{status:503});
 
