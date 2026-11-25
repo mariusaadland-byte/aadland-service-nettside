@@ -233,6 +233,27 @@ export default function CalculatorClient(){
   setForm(current=>({...current,materialItems:(Array.isArray(current.materialItems)?current.materialItems:[]).filter(item=>item.key!==key)}));
  }
 
+ async function completeImport(data){
+   setImportError("");setImportMessage((data.imported||0)+" varer aktivert for "+(data.supplierName||importPreview.supplierName||"leverandøren")+(data.alreadyApplied?" (bekreftet fra importhistorikken).":"."));
+   setImportPreview(null);setImportPhrase("");setImportFile(null);setNewSupplierName("");setActivationAttempted(false);
+   const input=document.getElementById("material-price-file");if(input)input.value="";
+   const supplierId=data.supplierId||importPreview.supplierId||"";
+   if(supplierId){setCatalogSupplier(supplierId);setImportSupplier(supplierId);}
+   await loadSuppliers(supplierId);
+   if(materialQuery.trim().length>=2)setMaterialQuery(q=>q+" ");
+ }
+ async function checkImportStatus(){
+  if(!importPreview||importBusy)return;
+  setImportBusy(true);setImportError("");
+  try{
+   const r=await fetch("/api/admin/material-catalog/import/status?previewId="+encodeURIComponent(importPreview.previewId),{cache:"no-store"});
+   const data=await r.json().catch(()=>({}));
+   if(!r.ok||!data.ok)throw Error(data.error||"Kunne ikke lese importstatus.");
+   if(data.state==="applied"){await completeImport({...data,alreadyApplied:true});return;}
+   setImportMessage(data.state==="expired"?"Ingen aktivering er registrert, og forhåndsvisningen er utløpt. Kontroller katalogen før ny import.":"Ingen fullført aktivering er registrert ennå. Et tidligere forsøk kan fortsatt pågå. Kontroller status igjen før nytt forsøk.");
+  }catch(error){setImportError(error.message||"Kunne ikke kontrollere importstatus.");}
+  finally{setImportBusy(false);}
+ }
  async function approveImport(){
   if(!importPreview||importBusy)return;
   const phrase=importPreview.largeRemoval?"GODKJENN STOR REDUKSJON":"GODKJENN PRISIMPORT";
@@ -246,14 +267,8 @@ export default function CalculatorClient(){
    const r=await fetch("/api/admin/material-catalog/import",{method:"POST",body});
    const data=await r.json().catch(()=>({}));
    if(!r.ok)throw Error(data.error||"Kunne ikke bekrefte importen. Bruk samme godkjenning ved nytt forsøk.");
-   setImportMessage((data.imported||0)+" varer aktivert for "+(importPreview.supplierName||"leverandøren")+(data.alreadyApplied?" (allerede godkjent).":"."));
-   setImportPreview(null);setImportPhrase("");setImportFile(null);setNewSupplierName("");setActivationAttempted(false);
-   const input=document.getElementById("material-price-file");if(input)input.value="";
-   const supplierId=data.supplierId||importPreview.supplierId||"";
-   if(supplierId){setCatalogSupplier(supplierId);setImportSupplier(supplierId);}
-   await loadSuppliers(supplierId);
-   if(materialQuery.trim().length>=2)setMaterialQuery(q=>q+" ");
-  }catch(error){setImportError(error.message||"Kunne ikke bekrefte import.");setImportMessage("Aktiveringsstatus er ikke bekreftet. Prøv samme godkjenning igjen før du starter ny import.");}
+   await completeImport(data);
+  }catch(error){setImportError(error.message||"Kunne ikke bekrefte import.");setImportMessage("Aktiveringsstatus er ikke bekreftet. Kontroller status før du forsøker igjen.");}
   finally{setImportBusy(false);}
  }
  async function importPriceList(event){
@@ -440,7 +455,7 @@ export default function CalculatorClient(){
        <div className={styles.importActions}><button type="submit" className={styles.primary} disabled={importBusy||!importSuppliersLoaded||!importSupplier||!importFile||Boolean(priceFileError(importFile,importSupplier))}>{importBusy?"Behandler…":"Forhåndsvis prisliste"}</button>{importMessage&&<span>{importMessage}</span>}</div>
        {importPreview&&<div className={styles.importPreview}>
         <h3>Kontroller prisimport – {importPreview.supplierName}</h3>
-        <p>{activationAttempted?"Aktivering er forsøkt. Bruk samme godkjenning igjen hvis resultatet er uavklart.":"Ingen priser er endret. Forhåndsvisningen er gyldig i 30 minutter."}</p>
+        <p>{activationAttempted?"Aktivering er forsøkt. Kontroller status før nytt forsøk.":"Ingen priser er endret. Forhåndsvisningen er gyldig i 30 minutter."}</p>
         <div className={styles.importGrid}>
          {[[ "Eksisterende aktive varer",importPreview.previous],["Varer i ny fil",importPreview.incoming],["Nye / reaktiverte",importPreview.newOrReactivated],["Endrede varer",importPreview.changed],["Prisøkninger",importPreview.priceUp],["Prisreduksjoner",importPreview.priceDown],["Varer som deaktiveres",importPreview.removed],["Ugyldige rader hoppet over",importPreview.skipped]].map(([label,value])=><div key={label}><small>{label}</small><br/><b>{value}</b></div>)}
         </div>
@@ -448,7 +463,7 @@ export default function CalculatorClient(){
         <Field label={"Skriv "+(importPreview.largeRemoval?"GODKJENN STOR REDUKSJON":"GODKJENN PRISIMPORT")}>
          <input value={importPhrase} disabled={importBusy} onChange={e=>setImportPhrase(e.target.value)}/>
         </Field>
-        <div className={styles.importActions}><button type="button" className={styles.primary} disabled={importBusy||importPhrase!==(importPreview.largeRemoval?"GODKJENN STOR REDUKSJON":"GODKJENN PRISIMPORT")} onClick={approveImport}>Godkjenn og aktiver</button><button type="button" disabled={importBusy} onClick={()=>{setImportPreview(null);setImportPhrase("");setImportMessage(activationAttempted?"Forhåndsvisning lukket. Kontroller katalogen før ny import; forrige aktivering kan være gjennomført.":"Import avbrutt. Ingen priser endret.");}}>Avbryt</button></div>
+        <div className={styles.importActions}><button type="button" className={styles.primary} disabled={importBusy||importPhrase!==(importPreview.largeRemoval?"GODKJENN STOR REDUKSJON":"GODKJENN PRISIMPORT")} onClick={approveImport}>Godkjenn og aktiver</button>{activationAttempted&&<button type="button" disabled={importBusy} onClick={checkImportStatus}>Kontroller aktiveringsstatus</button>}<button type="button" disabled={importBusy} onClick={()=>{setImportPreview(null);setImportPhrase("");setImportMessage(activationAttempted?"Forhåndsvisning lukket. Kontroller katalogen før ny import; forrige aktivering kan være gjennomført.":"Import avbrutt. Ingen priser endret.");}}>Avbryt</button></div>
        </div>}
       </form>}
      </div>
