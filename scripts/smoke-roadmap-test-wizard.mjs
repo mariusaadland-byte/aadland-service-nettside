@@ -47,7 +47,7 @@ for(const mark of [
  'onClick={()=>setIsOpen(false)}',
  'window.localStorage.getItem(TEST_WIZARD_STORAGE_KEY)',
  'window.localStorage.setItem(TEST_WIZARD_STORAGE_KEY,JSON.stringify(progress))',
- 'sanitizeTestProgress(raw,queue)',
+ 'sanitizeTestProgress(raw,allQueue)',
  'wizardAllPassed(savedProgress,criteria.length)',
  'setSelectedId(next.id)',
  'setIsOpen(false)',
