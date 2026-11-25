@@ -57,7 +57,7 @@ begin
  into v_new,v_changed,v_up,v_down from incoming i left join public.material_supplier_products p on p.supplier_id=p_supplier and p.supplier_sku=i.supplier_sku;
  select count(*) into v_removed from public.material_supplier_products p where p.supplier_id=p_supplier and p.active
  and not exists(select 1 from jsonb_to_recordset(p_products) as x(supplier_sku text) where x.supplier_sku=p.supplier_sku);
- v_summary:=jsonb_build_object('previous',v_old,'incoming',v_total,'newOrReactivated',v_new,'changed',v_changed,'priceUp',v_up,'priceDown',v_down,'removed',v_removed,'skipped',p_skipped,'largeRemoval',v_old>0 and v_removed*100>=v_old*20,'supplierName',v_name);
+ v_summary:=jsonb_build_object('previous',v_old,'incoming',v_total,'newOrReactivated',v_new,'changed',v_changed,'priceUp',v_up,'priceDown',v_down,'removed',v_removed,'skipped',p_skipped,'largeRemoval',v_old>0 and v_removed*100>=v_old*20,'supplierName',v_name,'supplierId',p_supplier);
  delete from public.material_import_previews where applied_at is null and created_at<now()-interval '24 hours';
  insert into public.material_import_previews(supplier_id,supplier_name,source_filename,owner_id,base_fingerprint,products,summary)
  values(p_supplier,v_name,coalesce(p_filename,''),p_owner,public.s36_catalog_fingerprint(p_supplier),p_products,v_summary) returning id into v_id;
@@ -72,14 +72,15 @@ returns jsonb language plpgsql security invoker set search_path='' as $$
 declare v public.material_import_previews%rowtype; v_time timestamptz:=now();
 begin
  perform set_config('lock_timeout','3s',true);
+ -- Same lock order as preview: catalog tables first, then preview row.
+ lock table public.material_suppliers in share row exclusive mode;
+ lock table public.material_supplier_products in share row exclusive mode;
  select * into v from public.material_import_previews where id=p_id and owner_id=p_owner for update;
  if not found then raise exception 'S36_PREVIEW_NOT_FOUND';end if;
  if v.applied_at is not null then return v.summary||jsonb_build_object('alreadyApplied',true,'imported',(v.summary->>'incoming')::integer);end if;
  if v.created_at<now()-interval '30 minutes' or v.products is null then raise exception 'S36_PREVIEW_EXPIRED';end if;
  if p_phrase is distinct from (case when (v.summary->>'largeRemoval')::boolean then 'GODKJENN STOR REDUKSJON' else 'GODKJENN PRISIMPORT' end) then raise exception 'S36_APPROVAL_REQUIRED';end if;
- -- Serialize catalog writers, even legacy/direct updates. Readers remain available.
- lock table public.material_suppliers in share row exclusive mode;
- lock table public.material_supplier_products in share row exclusive mode;
+ -- Catalog locks serialize writers; readers remain available.
  if public.s36_catalog_fingerprint(v.supplier_id)<>v.base_fingerprint then raise exception 'S36_CATALOG_CHANGED';end if;
  insert into public.material_suppliers(id,name,active,is_primary,default_markup_percent)
  values(v.supplier_id,v.supplier_name,true,false,null) on conflict(id) do nothing;
