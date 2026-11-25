@@ -4,6 +4,7 @@ import {db} from "../../../../lib/supabase";
 import {materialMarkupOrFallback} from "../../../../lib/materialMarkupPolicy";
 import {supplierPriceFreshness} from "../../../../lib/materialPriceFreshness";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
+import {previewMaterialImport,activateMaterialImport} from "../../../../lib/materialImportWorkflow";
 import {materialSupplierStatuses,lookupMaterialSupplier} from "../../../../lib/materialSupplierAdapters";
 
 async function allowed(){
@@ -111,11 +112,14 @@ export async function GET(req){
 
 export async function POST(req){
  const originError=sameOriginGuard(req);if(originError)return originError;
- if(!(await allowed()))return NextResponse.json({error:"Ingen tilgang."},{status:403});
+ const user=await getAdminUser();if(user?.role!=="owner")return NextResponse.json({error:"Kun eier kan importere priser."},{status:403});
+ if(process.env.VERCEL_ENV!=="production")return NextResponse.json({error:"Prisimport er sperret i testmiljø."},{status:403});
  const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
 
  let body;
  try{body=await req.json()}catch{return NextResponse.json({error:"Ugyldig importfil."},{status:400})}
+ if(!body||typeof body!=="object")return NextResponse.json({error:"Ugyldig importfil."},{status:400});
+ if(body.action==="activate")return activateMaterialImport(s,user,{previewId:body.previewId,phrase:body.phrase});
  const supplierName=clean(body.supplierName,120);
  const supplierId=slug(body.supplierId||supplierName);
  const sourceFilename=clean(body.sourceFilename,240);
@@ -128,7 +132,8 @@ export async function POST(req){
  const seen=new Set();
  for(const row of rows){
   const sku=clean(row.sku,120),name=clean(row.name,300),cost=ore(row.costExVatOre);
-  if(!sku||!name||cost<=0||seen.has(sku))continue;
+  if(sku&&seen.has(sku))return NextResponse.json({error:"Duplikate varenumre i prislisten."},{status:400});
+  if(!sku||!name||cost<=0)continue;
   seen.add(sku);
   normalized.push({
    supplier_id:supplierId,supplier_sku:sku,name,
@@ -140,41 +145,5 @@ export async function POST(req){
  }
  if(!normalized.length)return NextResponse.json({error:"Fant ingen gyldige varer med varenummer, navn og pris."},{status:400});
 
- const batch=crypto.randomUUID();
- // Retain any owner-specified supplier override during a price-file import.
- const {data:existingSupplier,error:lookupError}=await s.from("material_suppliers")
-  .select("default_markup_percent").eq("id",supplierId).maybeSingle();
- if(lookupError)return NextResponse.json({error:"Kunne ikke kontrollere leverandørpåslaget."},{status:500});
- const {error:supplierError}=await s.from("material_suppliers").upsert({
-  id:supplierId,name:supplierName,active:true,
-  default_markup_percent:existingSupplier?.default_markup_percent??null,
-  updated_at:new Date().toISOString()
- },{onConflict:"id"});
- if(supplierError){
-  console.error("MATERIAL SUPPLIER UPSERT",supplierError);
-  return NextResponse.json({error:"Kunne ikke lagre leverandøren."},{status:500});
- }
-
- for(let i=0;i<normalized.length;i+=500){
-  const chunk=normalized.slice(i,i+500).map(row=>({...row,import_batch:batch,imported_at:new Date().toISOString(),updated_at:new Date().toISOString()}));
-  const {error}=await s.from("material_supplier_products").upsert(chunk,{onConflict:"supplier_id,supplier_sku"});
-  if(error){
-   console.error("MATERIAL IMPORT",error);
-   return NextResponse.json({error:"Importen stoppet under lagring. Eksisterende prisliste er fortsatt beholdt."},{status:500});
-  }
- }
-
- const {error:deactivateError}=await s.from("material_supplier_products")
-  .update({active:false,updated_at:new Date().toISOString()})
-  .eq("supplier_id",supplierId).neq("import_batch",batch);
- if(deactivateError){
-  console.error("MATERIAL DEACTIVATE",deactivateError);
-  return NextResponse.json({error:"Varene ble importert, men gamle varer kunne ikke deaktiveres."},{status:500});
- }
-
- await s.from("material_suppliers").update({
-  last_import_at:new Date().toISOString(),last_source_filename:sourceFilename,updated_at:new Date().toISOString()
- }).eq("id",supplierId);
-
- return NextResponse.json({ok:true,supplierId,supplierName,imported:normalized.length,skipped:rows.length-normalized.length});
+ return previewMaterialImport(s,user,{supplierId,supplierName,filename:sourceFilename,products:normalized,skipped:rows.length-normalized.length});
 }

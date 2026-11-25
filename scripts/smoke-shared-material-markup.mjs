@@ -31,8 +31,11 @@ assert.match(calc,/materialMarkupSource:"manual"/);
 assert.match(calc,/materialMarkupSource:"company"/);
 const supplierImport=read("app/api/admin/material-catalog/import/route.js");
 const manualImport=read("app/api/admin/material-catalog/manual/route.js");
-assert.match(supplierImport,/default_markup_percent:null/);
-assert.match(supplierImport,/ignoreDuplicates:true/);
+const importSql=read("scripts/sql-s36-atomic-import-draft.sql");
+assert.match(importSql,/values\(v.supplier_id,v.supplier_name,true,false,null\) on conflict\(id\) do nothing/);
+assert.ok(!/default_markup_percent=excluded/.test(importSql));
+assert.match(supplierImport,/previewMaterialImport/);
+assert.match(supplierImport,/activateMaterialImport/);
 assert.match(manualImport,/default_markup_percent:null/);
 const supplierList=read("app/api/admin/material-suppliers/route.js");
 assert.match(supplierList,/item\.default_markup_percent\?\?companyMarkup/);
@@ -59,3 +62,18 @@ assert.deepEqual(quoteLinesFromCalculator({...form,materialMarkup:"20"}).map(x=>
 assert.deepEqual(quoteLinesFromCalculator({...form,materialMarkup:"0"}).map(x=>x.unitPriceOre),[10000]);
 assert.deepEqual(quoteLinesFromCalculator({...form,materialItems:[{...form.materialItems[0],saleExVat:"130"}]}).map(x=>x.unitPriceOre),[13000]);
 console.log("S-01 bestått: felles bedriftspåslag, leverandørarv, null/egen overstyring, lokal sats, import og uendrede lagrede salgspriser.");
+ 
+for(const route of [supplierImport,supplierList]){assert.ok(route.includes("previewMaterialImport")&&route.includes("activateMaterialImport"));assert.ok(!route.includes(".upsert("));}
+assert.ok(importSql.includes("S36_CATALOG_CHANGED")&&importSql.includes("GODKJENN STOR REDUKSJON")&&importSql.includes("applied_at is not null"));
+assert.ok(calc.includes("Forhåndsvis prisliste")&&calc.includes("Godkjenn og aktiver"));
+console.log("S36 static checks: both imports stage then activate, no legacy upsert, preview and explicit approval.");
+
+const {parseMaterialPriceFile}=new Function("inflateRawSync",read("lib/materialPriceFile.js").replace(/^import .*;\n/gm,"").replace("export function parseMaterialPriceFile","function parseMaterialPriceFile")+"\nreturn {parseMaterialPriceFile};")(null);
+const csv=["varenummer;navn;pris;enhet",...Array.from({length:8991},(_,i)=>"SYN-"+i+";Testvare "+i+";100,00;STK")].join("\n");
+assert.equal(parseMaterialPriceFile(Buffer.from(csv),"synthetic.csv").products.length,8991);
+assert.equal(parseMaterialPriceFile(Buffer.from("varenummer;navn;pris;enhet\nA;Test;125;STK"),"test.csv",{priceIncludesVat:true}).products[0].cost_ex_vat_ore,10000);
+assert.throws(()=>parseMaterialPriceFile(Buffer.from('varenummer;navn;pris;enhet\nA;"unfinished;100;STK'),"bad.csv"),/uavsluttet/);
+assert.throws(()=>parseMaterialPriceFile(Buffer.from("varenummer;navn;pris;enhet\n"+("A;Test;100;STK\n").repeat(50001)),"too-large.csv"),/for mange rader/);
+const workflow=read("lib/materialImportWorkflow.js");
+assert.ok(workflow.includes('user?.role!=="owner"')&&workflow.includes('process.env.VERCEL_ENV!=="production"'));
+console.log("S36 file parser: 8991 rows, VAT normalization, malformed and oversized CSV rejected.");

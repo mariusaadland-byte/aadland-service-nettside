@@ -66,6 +66,9 @@ export default function CalculatorClient(){
  const [importFile,setImportFile]=useState(null);
  const [importBusy,setImportBusy]=useState(false);
  const [importMessage,setImportMessage]=useState("");
+ const [importPreview,setImportPreview]=useState(null);
+ const [importPhrase,setImportPhrase]=useState("");
+ const [activationAttempted,setActivationAttempted]=useState(false);
 
  useEffect(()=>{
   try{
@@ -202,9 +205,33 @@ export default function CalculatorClient(){
   setForm(current=>({...current,materialItems:(Array.isArray(current.materialItems)?current.materialItems:[]).filter(item=>item.key!==key)}));
  }
 
+ async function approveImport(){
+  if(!importPreview||importBusy)return;
+  const phrase=importPreview.largeRemoval?"GODKJENN STOR REDUKSJON":"GODKJENN PRISIMPORT";
+  if(importPhrase!==phrase)return;
+  setImportBusy(true);setCatalogError("");setActivationAttempted(true);setImportMessage("Kontrollerer aktiveringen …");
+  try{
+   const body=new FormData();
+   body.append("action","activate");
+   body.append("previewId",importPreview.previewId);
+   body.append("phrase",importPhrase);
+   const r=await fetch("/api/admin/material-catalog/import",{method:"POST",body});
+   const data=await r.json().catch(()=>({}));
+   if(!r.ok)throw Error(data.error||"Kunne ikke bekrefte importen. Bruk samme godkjenning ved nytt forsøk.");
+   setImportMessage((data.imported||0)+" varer aktivert for "+(importPreview.supplierName||"leverandøren")+(data.alreadyApplied?" (allerede godkjent).":"."));
+   setImportPreview(null);setImportPhrase("");setImportFile(null);setNewSupplierName("");setActivationAttempted(false);
+   const input=document.getElementById("material-price-file");if(input)input.value="";
+   const supplierId=data.supplierId||importPreview.supplierId||"";
+   if(supplierId){setCatalogSupplier(supplierId);setImportSupplier(supplierId);}
+   await loadSuppliers(supplierId);
+   if(materialQuery.trim().length>=2)setMaterialQuery(q=>q+" ");
+  }catch(error){setCatalogError(error.message||"Kunne ikke bekrefte import.");setImportMessage("Aktiveringsstatus er ikke bekreftet. Prøv samme godkjenning igjen før du starter ny import.");}
+  finally{setImportBusy(false);}
+ }
  async function importPriceList(event){
   event?.preventDefault?.();
-  setImportMessage("");setCatalogError("");
+  if(activationAttempted&&!window.confirm("Forrige aktiveringsstatus er ikke bekreftet. Vil du likevel lage en ny forhåndsvisning av dagens katalog?"))return;
+  setActivationAttempted(false);setImportMessage("");setCatalogError("");setImportPreview(null);setImportPhrase("");
   if(!importFile){setCatalogError("Velg en prisfil først.");return}
   if(importSupplier==="new"&&!newSupplierName.trim()){setCatalogError("Skriv inn leverandørnavn.");return}
   setImportBusy(true);
@@ -217,18 +244,9 @@ export default function CalculatorClient(){
    const response=await fetch("/api/admin/material-catalog/import",{method:"POST",body});
    const data=await response.json().catch(()=>({}));
    if(!response.ok)throw new Error(data.error||"Kunne ikke importere prislisten.");
-   setImportMessage((data.imported||0)+" varer importert fra "+(data.supplier?.name||"leverandøren")+(data.skipped?" · "+data.skipped+" rader hoppet over":"")+".");
-   const supplierId=data.supplier?.id||"";
-   if(supplierId){
-    setCatalogSupplier(supplierId);
-    setImportSupplier(supplierId);
-   }
-   setNewSupplierName("");
-   setImportFile(null);
-   const input=document.getElementById("material-price-file");
-   if(input)input.value="";
-   await loadSuppliers(supplierId);
-   if(materialQuery.trim().length>=2)setMaterialQuery(q=>q+" ");
+   if(!data.preview?.previewId)throw Error("Forhåndsvisning mangler. Ingen import godkjent.");
+   setImportPreview(data.preview);
+   setImportMessage("Forhåndsvisning klar. Ingen priser er endret.");
   }catch(error){
    setCatalogError(error?.message||"Kunne ikke importere prislisten.");
   }finally{
@@ -313,7 +331,7 @@ export default function CalculatorClient(){
        </Field>
        <details className={styles.catalogFilter}><summary>Leverandør: {catalogSuppliers.find(item=>item.id===catalogSupplier)?.name||"Alle leverandører"} · Endre</summary>
         <Field label="Søk hos"><select value={catalogSupplier} onChange={e=>setCatalogSupplier(e.target.value)}>
-         <option value="">Alle leverandører</option>{catalogSuppliers.map(item=><option key={item.id} value={item.id}>{item.name}{item.isPrimary?" · primær":""}</option>)}
+         <option value="">Alle leverandører</option>{catalogSuppliers.filter(item=>item.id!=="egne-varer").map(item=><option key={item.id} value={item.id}>{item.name}{item.isPrimary?" · primær":""}</option>)}
         </select></Field>
        </details>
       </div>
@@ -370,20 +388,32 @@ export default function CalculatorClient(){
       {importOpen&&<form className={styles.importForm} onSubmit={importPriceList}>
        <div className={styles.importGrid}>
         <Field label="Leverandør">
-         <select value={importSupplier} onChange={e=>setImportSupplier(e.target.value)}>
+         <select value={importSupplier} disabled={importBusy} onChange={e=>{setImportSupplier(e.target.value);setImportPreview(null);setImportPhrase("");}}>
           {catalogSuppliers.map(item=><option key={item.id} value={item.id}>{item.name}{item.isPrimary?" · primær":""}</option>)}
           <option value="new">+ Ny leverandør</option>
          </select>
         </Field>
         {importSupplier==="new"&&<Field label="Ny leverandør">
-         <input value={newSupplierName} onChange={e=>setNewSupplierName(e.target.value)} placeholder="F.eks. Montér"/>
+         <input value={newSupplierName} disabled={importBusy} onChange={e=>{setNewSupplierName(e.target.value);setImportPreview(null);setImportPhrase("");}} placeholder="F.eks. Montér"/>
         </Field>}
        </div>
        <Field label="Prisfil" help="XLSX, CSV, TSV eller TXT. Nye filer oppdaterer samme varenummer og varer som forsvinner fra filen deaktiveres.">
-        <input id="material-price-file" type="file" accept=".xlsx,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain" onChange={e=>setImportFile(e.target.files?.[0]||null)}/>
+        <input id="material-price-file" type="file" accept=".xlsx,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain" disabled={importBusy} onChange={e=>{setImportFile(e.target.files?.[0]||null);setImportPreview(null);setImportPhrase("");}}/>
        </Field>
-       <label className={styles.importCheck}><input type="checkbox" checked={importPriceIncludesVat} onChange={e=>setImportPriceIncludesVat(e.target.checked)}/><span><b>Prisene i filen er inkl. mva</b><small>La denne være av for Bygger’n-filen du har nå – den er eks. mva.</small></span></label>
-       <div className={styles.importActions}><button type="submit" className={styles.primary} disabled={importBusy}>{importBusy?"Importerer…":"Importer / oppdater prisliste"}</button>{importMessage&&<span>{importMessage}</span>}</div>
+       <label className={styles.importCheck}><input type="checkbox" checked={importPriceIncludesVat} disabled={importBusy} onChange={e=>{setImportPriceIncludesVat(e.target.checked);setImportPreview(null);setImportPhrase("");}}/><span><b>Prisene i filen er inkl. mva</b><small>La denne være av for Bygger’n-filen du har nå – den er eks. mva.</small></span></label>
+       <div className={styles.importActions}><button type="submit" className={styles.primary} disabled={importBusy}>{importBusy?"Behandler…":"Forhåndsvis prisliste"}</button>{importMessage&&<span>{importMessage}</span>}</div>
+       {importPreview&&<div className="card" style={{padding:16,marginTop:12}}>
+        <h3>Kontroller prisimport – {importPreview.supplierName}</h3>
+        <p>{activationAttempted?"Aktivering er forsøkt. Bruk samme godkjenning igjen hvis resultatet er uavklart.":"Ingen priser er endret. Forhåndsvisningen er gyldig i 30 minutter."}</p>
+        <div className={styles.importGrid}>
+         {[[ "Eksisterende aktive varer",importPreview.previous],["Varer i ny fil",importPreview.incoming],["Nye / reaktiverte",importPreview.newOrReactivated],["Endrede varer",importPreview.changed],["Prisøkninger",importPreview.priceUp],["Prisreduksjoner",importPreview.priceDown],["Varer som deaktiveres",importPreview.removed],["Ugyldige rader hoppet over",importPreview.skipped]].map(([label,value])=><div key={label}><small>{label}</small><br/><b>{value}</b></div>)}
+        </div>
+        {importPreview.largeRemoval&&<p role="alert" className="notice">Minst 20 % av dagens aktive varer vil bli deaktivert. Kontroller at dette er en fullstendig prisliste.</p>}
+        <Field label={"Skriv "+(importPreview.largeRemoval?"GODKJENN STOR REDUKSJON":"GODKJENN PRISIMPORT")}>
+         <input value={importPhrase} disabled={importBusy} onChange={e=>setImportPhrase(e.target.value)}/>
+        </Field>
+        <div className={styles.importActions}><button type="button" className={styles.primary} disabled={importBusy||importPhrase!==(importPreview.largeRemoval?"GODKJENN STOR REDUKSJON":"GODKJENN PRISIMPORT")} onClick={approveImport}>Godkjenn og aktiver</button><button type="button" disabled={importBusy} onClick={()=>{setImportPreview(null);setImportPhrase("");setImportMessage(activationAttempted?"Forhåndsvisning lukket. Kontroller katalogen før ny import; forrige aktivering kan være gjennomført.":"Import avbrutt. Ingen priser endret.");}}>Avbryt</button></div>
+       </div>}
       </form>}
      </div>
     </section>
