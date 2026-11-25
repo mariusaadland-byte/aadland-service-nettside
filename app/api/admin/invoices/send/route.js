@@ -65,7 +65,7 @@ export async function POST(req){
   if(Date.now()-new Date(attempt.data.first_send_at).getTime()>23*60*60*1000)throw Error("Forrige sendeforsøk må kontrolleres i e-postloggen før nytt forsøk.");
   const amount=new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(total(invoice.line_items)/100);
   const text=["Hei "+invoice.customer.name+"!","","Vedlagt finner du faktura "+invoice.invoice_number+" for "+invoice.title+".","Beløp inkl. mva.: "+amount,"Forfallsdato: "+invoice.due_date,"Kontonummer: 8450 46 22699","Merk betalingen med fakturanummer "+invoice.invoice_number+".","","Ta gjerne kontakt hvis du har spørsmål.","","Med vennlig hilsen","Aadland Service","Telefon: 471 54 898","E-post: post@aadland-service.no","Org.nr.: 937 781 873 MVA"].join("\n");
-  const {Resend}=await import("resend");
+  const {Resend}=await import("../../../../../lib/safeResend");
   const resend=new Resend(key);
   const result=await resend.emails.send({
    from:"Aadland Service <noreply@aadland-service.no>",to:invoice.customer.email,replyTo:"post@aadland-service.no",
