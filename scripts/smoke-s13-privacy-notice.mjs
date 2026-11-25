@@ -3,7 +3,7 @@ import {readFileSync} from "node:fs";
 
 const policy=readFileSync("app/personvern/page.js","utf8");
 for(const phrase of [
- "21. november 2026","COMPANY_INFO","COMPANY_ADDRESS",
+ "25. november 2026","COMPANY_INFO","COMPANY_ADDRESS",
  "personvernforordningen artikkel 6","Supabase","Vercel","Resend","Vipps","Tripletex",
  "Have I Been Pwned","Pwned Passwords","fem år etter regnskapsårets slutt",
  "fakturering","innsyn","sletting","begrensning","Datatilsynet",

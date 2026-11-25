@@ -4,6 +4,7 @@ Disallow: /admin
 Disallow: /api
 Disallow: /min-side
 Disallow: /tilbud
+Disallow: /betaling
 
 Sitemap: https://www.aadlandutleie.no/sitemap.xml
 Host: https://www.aadlandutleie.no
