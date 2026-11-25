@@ -8,6 +8,7 @@ import {serviceEmailFrom,serviceReplyTo} from "../../../../lib/serviceEmailConfi
 export async function POST(req){
  const originError=sameOriginGuard(req); if(originError)return originError;
  if(process.env.VERCEL_ENV!=="preview")return NextResponse.json({error:"Testkvittering er bare tilgjengelig i preview."},{status:404});
+ return NextResponse.json({error:"S-31: Testmiljøet sender ikke e-post. Bruk syntetiske forhåndsvisninger uten utsending."},{status:403});
  const currentUser=await getAdminUser();
  if(!currentUser)return NextResponse.json({error:"Ikke innlogget."},{status:401});
  if(!(await hasPermission("canUpdateOrders")))return NextResponse.json({error:"Du har ikke tilgang til å sende testkvittering."},{status:403});
@@ -18,7 +19,7 @@ export async function POST(req){
  const reference=String(body.reference||"TEST-VIPPS-12345").trim().slice(0,120)||"TEST-VIPPS-12345";
  if(!email||email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return NextResponse.json({error:"Skriv inn en gyldig e-postadresse."},{status:400});
 
- const resendKey=process.env.RESEND_PREVIEW_API_KEY||process.env.RESEND_API_KEY;
+ const resendKey=process.env.RESEND_PREVIEW_API_KEY;
  if(!resendKey)return NextResponse.json({error:"Preview-e-post er ikke konfigurert."},{status:503});
 
  const orderNumber="TEST-2026-1001";
