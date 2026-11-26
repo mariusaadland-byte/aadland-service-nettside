@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {manualRentalInput,manualRentalNumber,manualRentalMatches} from "../lib/rentalManualBooking.mjs";
+import {RENTAL_TERMS_VERSION} from "../lib/rentalTermsVersion.mjs";
+const id="00000000-0000-4000-8000-000000000001",b={requestId:id,itemId:id,startDate:"2026-11-26",endDate:"2026-11-27",name:"Test",email:"test@example.invalid",phone:"12345678",channel:"phone",customerAccepted:true,acceptedTerms:true,termsVersion:RENTAL_TERMS_VERSION,confirm:true,expectedPricing:{totalOre:30000,depositOre:10000}};
+const v=manualRentalInput(b,"2026-11-26");assert.ok(v);assert.ok(manualRentalNumber(id).startsWith("AS-U-M-"));
+assert.equal(manualRentalInput({...b,customerAccepted:false},"2026-11-26"),null);
+assert.equal(manualRentalInput({...b,termsVersion:"old"},"2026-11-26"),null);
+assert.equal(manualRentalInput({...b,endDate:"2026-02-30"},"2026-11-26"),null);
+assert.equal(manualRentalInput({...b,email:"bad"},"2026-11-26"),null);
+const row={booking_number:manualRentalNumber(id),rental_item_id:id,start_date:b.startDate,end_date:b.endDate,total_ore:30000,deposit_ore:10000,terms_version:RENTAL_TERMS_VERSION,customer:v.customer};
+assert.ok(manualRentalMatches(row,v));assert.ok(!manualRentalMatches({...row,total_ore:1},v));
+const api=readFileSync("app/api/admin/rental/manual-booking/route.js","utf8");
+assert.ok(api.includes('RENTAL_MANUAL_BOOKING_ENABLED!=="true"')&&api.includes('RENTAL_PUBLIC_BOOKING_ENABLED==="true"'));
+assert.ok(api.includes('user.role!=="owner"')&&api.includes("rentalQuoteMatches")&&api.includes("create_rental_booking_if_available")&&api.includes("manualRentalMatches")&&api.includes("rentalOverlapOr"));
+assert.ok(!api.includes("emails.send")&&!api.includes("startRentalVippsPayment"));
+console.log("U-30 manual rental booking validation, unique replay identity and closed activation gates passed.");

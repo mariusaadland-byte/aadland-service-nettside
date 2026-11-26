@@ -1,0 +1,43 @@
+import {NextResponse} from "next/server";
+import {getAdminUser} from "../../../../../lib/auth";
+import {sameOriginGuard} from "../../../../../lib/requestGuard";
+import {rateLimitRequest} from "../../../../../lib/rateLimit";
+import {db,fromDbRentalItem} from "../../../../../lib/supabase";
+import {osloDateKey} from "../../../../../lib/osloTime";
+import {calculateRentalPrice,rentalQuoteMatches} from "../../../../../lib/rentalPricing.mjs";
+import {countedRentalBookings,peakRentalBookings} from "../../../../../lib/rentalAvailability";
+import {rentalOverlapOr,extendOverdueAvailability} from "../../../../../lib/rentalOverdue.mjs";
+import {RENTAL_TERMS_VERSION} from "../../../../../lib/rentalTermsVersion.mjs";
+import {manualRentalInput,manualRentalNumber,manualRentalMatches} from "../../../../../lib/rentalManualBooking.mjs";
+export const runtime="nodejs";
+const json=(body,status=200)=>NextResponse.json(body,{status,headers:{"Cache-Control":"private, no-store","Vary":"Cookie"}});
+export async function POST(req){
+ const origin=sameOriginGuard(req);if(origin)return origin;
+ const user=await getAdminUser();if(!user||user.role!=="owner")return json({error:"Ingen tilgang."},403);
+ if(process.env.VERCEL_ENV!=="production"||process.env.RENTAL_MANUAL_BOOKING_ENABLED!=="true"||process.env.RENTAL_PUBLIC_BOOKING_ENABLED==="true")return json({error:"Manuell booking er ikke aktivert for denne klargjøringsfasen."},503);
+ const limited=await rateLimitRequest(req,{scope:"rental-manual-booking",max:15,windowSeconds:900,message:"For mange forespørsler. Prøv igjen senere."});if(limited)return limited;
+ const today=osloDateKey(new Date()),input=manualRentalInput(await req.json().catch(()=>null),today);
+ if(!input)return json({error:"Kontroller datoer, kundeopplysninger, pris og dokumentert kundegodkjenning."},400);
+ const s=db();if(!s)return json({error:"Database utilgjengelig."},503);
+ const number=manualRentalNumber(input.requestId),fields="id,booking_number,rental_item_id,start_date,end_date,total_ore,deposit_ore,terms_version,customer,status";
+ const lookup=()=>s.from("rental_bookings").select(fields).eq("booking_number",number).maybeSingle();
+ const respond=row=>manualRentalMatches(row,input)?json({ok:true,bookingNumber:number,bookingId:row.id,status:row.status,reused:true}):json({error:"Bestillingsreferansen er i konflikt. Kontroller bookinglisten."},409);
+ const prior=await lookup();if(prior.error)return json({error:"Tidligere bestilling kunne ikke kontrolleres."},503);
+ if(prior.data)return respond(prior.data);
+ const {data:raw,error}=await s.from("rental_items").select("*").eq("id",input.itemId).maybeSingle();
+ if(error||!raw||raw.active!==true||raw.status!=="available")return json({error:"Utstyret er ikke tilgjengelig. Produktet må være aktivt og klart for utleie."},409);
+ const item=fromDbRentalItem(raw);
+ if(!item.pickupAvailable)return json({error:"Manuell booking støtter foreløpig kun henting."},409);
+ const p=calculateRentalPrice(item,input.startDate,input.endDate);
+ if(!p||p.totalOre<1||!rentalQuoteMatches(input.expectedPricing,p))return json({error:"Prisen er endret eller ugyldig. Oppdater siden og bekreft på nytt."},409);
+ const buffer=Math.max(0,Number(item.bufferDays)||0),a=new Date(input.startDate+"T12:00:00Z"),b=new Date(input.endDate+"T12:00:00Z");
+ a.setUTCDate(a.getUTCDate()-buffer);b.setUTCDate(b.getUTCDate()+buffer);
+ const from=a.toISOString().slice(0,10),to=b.toISOString().slice(0,10);
+ const [blocks,bookings]=await Promise.all([s.from("rental_blocks").select("id").eq("rental_item_id",item.id).lte("start_date",to).gte("end_date",from).limit(1),s.from("rental_bookings").select("id,start_date,end_date,status,payment_status,payment_reference,payment_due_at",{count:"exact"}).eq("rental_item_id",item.id).in("status",["new","confirmed","active"]).lte("start_date",to).or(rentalOverlapOr(from,today)).limit(1000)]);
+ if(blocks.error||bookings.error||bookings.count!==bookings.data?.length)return json({error:"Tilgjengeligheten kunne ikke kontrolleres fullstendig."},503);
+ if(blocks.data?.length||peakRentalBookings(extendOverdueAvailability(countedRentalBookings(bookings.data),today,to),input.startDate,input.endDate,buffer)>=Math.max(1,Number(item.quantity)||1))return json({error:"Utstyret er opptatt eller blokkert."},409);
+ const record={customer_user_id:null,booking_number:number,rental_item_id:item.id,customer:{...input.customer,termsAcceptedAt:new Date().toISOString()},start_date:input.startDate,end_date:input.endDate,price_snapshot:{dailyPriceOre:item.dailyPriceOre,weekendPriceOre:item.weekendPriceOre,weeklyPriceOre:item.weeklyPriceOre,longTermDays:item.longTermDays,longTermDiscountPercent:item.longTermDiscountPercent,basis:p.basis,days:p.days,beforeDiscountOre:p.beforeDiscountOre,discountOre:p.discountOre},total_ore:p.totalOre,deposit_ore:p.depositOre,terms_version:RENTAL_TERMS_VERSION,pending_payment:false};
+ const saved=await s.rpc("create_rental_booking_if_available",{booking_record:record,buffered_start:from,buffered_end:to});
+ if(saved.error||!saved.data){const again=await lookup();if(!again.error&&again.data)return respond(again.data);return json({error:String(saved.error?.message||"").includes("RENTAL_UNAVAILABLE")?"Utstyret er opptatt. Kontroller kalenderen.":"Lagringen kunne ikke bekreftes. Kontroller bookinglisten og bruk samme forespørsel ved nytt forsøk."},String(saved.error?.message||"").includes("RENTAL_UNAVAILABLE")?409:503);}
+ return json({ok:true,bookingNumber:number,bookingId:saved.data,status:"confirmed"});
+}
