@@ -130,7 +130,7 @@ export async function GET() {
   const quoteByOrder=new Map();
   const manualReceiptByOrder=new Map();
   const confirmationByOrder=new Map();
-  let confirmationListError=false;
+  let confirmationListError=false,manualReceiptListError=false;
   if(orderIds.length){
     const {data:queued,error:queueError}=await s.from("service_order_confirmation_outbox").select("order_id,state,claimed_at").in("order_id",orderIds);
     if(queueError)confirmationListError=true;
@@ -157,7 +157,7 @@ export async function GET() {
       .select("order_id,receipt_state,provider_email_id,last_issue,paid_at,sent_at")
       .in("order_id",orderIds);
     if(!receiptError)for(const receipt of paymentReceipts||[])manualReceiptByOrder.set(receipt.order_id,receipt);
-    else console.error("MANUAL PRODUCT RECEIPT LIST ERROR",{code:receiptError.code});
+    else{manualReceiptListError=true;console.error("MANUAL PRODUCT RECEIPT LIST ERROR",{code:receiptError.code});}
   }
   return NextResponse.json({
     orders: await Promise.all(orderRows.map(async order=>{
@@ -169,6 +169,7 @@ export async function GET() {
       mapped.customRequest=privateData.text;
       mapped.contactImages=privateData.images;
       const manualReceipt=manualReceiptByOrder.get(order.id);
+      if(manualReceiptListError&&order.order_type==="order"&&String(order.payment_provider||"").toLowerCase()!=="vipps")mapped.manualReceiptState="unavailable";
       if(manualReceipt){
         mapped.manualReceiptState=manualReceipt.receipt_state||"";
         mapped.manualReceiptProviderId=manualReceipt.provider_email_id||"";
