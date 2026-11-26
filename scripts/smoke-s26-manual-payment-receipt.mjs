@@ -252,3 +252,8 @@ assert.ok(ui.includes("Send kvittering som aldri er forsøkt sendt"));
 assert.ok(ui.includes('reviewManualReceipt(order,"sent")'));
 assert.ok(ui.includes("manualReceiptState"));
 console.log("S-26 bestått: én betalingssperre, dokumentasjonsbekreftelse, unik Resend-kvittering, timeout-karantene, safe-queued, eierkontroll, preview-sperre. Bare syntetiske data.");
+
+assert.ok(route.includes("manualReceiptListError=true"));
+assert.ok(route.includes('mapped.manualReceiptState="unavailable"'));
+assert.ok(ui.includes('order.manualReceiptState==="unavailable"?"Kvitteringsjournalen kunne ikke hentes.'));
+console.log("S26: unavailable receipt journal is distinct from missing historical receipt.");
