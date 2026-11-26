@@ -133,3 +133,18 @@ assert.equal(preview.calls.filter(c=>c.type==="provider").length,0);
 const empty=await success.POST(request("refund",{intentId:""}));
 assert.equal(empty.status,400);
 console.log("S-30 bestått: én provider handling, lås på replay/timeout, eksplisitt Vipps idempotens, ACK før synk, preview-sperre og eierkontroll.");
+
+// Verify evidence from an older event is not hidden by the recent display limit.
+const reviewSource=reviewApi.replace(/^import .*;\n/gm,"").replace(/^export async function /gm,"async function ");
+const mockEntry={id:"12345678-1234-4234-8234-123456789012",payment_reference:"mock",idempotency_key:"mock-key"};
+let reviewActor={role:"owner"},eventRows=[{name:"REFUNDED",success:true,idempotencyKey:"mock-key",amount:{value:1000}} ,...Array.from({length:55},(_,i)=>({name:"OTHER",idempotencyKey:"other-"+i}))],count=51,listError=null;
+const reviewDb=()=>({from(table){assert.equal(table,"vipps_service_action_attempts");const q={select(){return q},eq(){return q},in(){return q},order(){return q},limit(){return q},async maybeSingle(){return {data:mockEntry,error:null}},then(resolve,reject){return Promise.resolve({data:Array.from({length:50},()=>mockEntry),count,error:listError}).then(resolve,reject)}};return q}});
+const reviewGet=new Function("NextResponse","getAdminUser","sameOriginGuard","db","getVippsPayment","getVippsPaymentEvents","vippsPaymentsEnabled",reviewSource+";return GET;")({json:(body,opts={})=>({body,status:opts.status||200})},async()=>reviewActor,()=>null,reviewDb,async()=>({aggregate:{}}),async()=>eventRows,()=>true);
+let reviewResult=await reviewGet({url:"https://example.invalid/?attemptId="+mockEntry.id});
+assert.equal(reviewResult.status,200);assert.equal(reviewResult.body.eventCount,56);assert.equal(reviewResult.body.events.length,13);assert.equal(reviewResult.body.matchingEventCount,1);assert.equal(reviewResult.body.events[0].matchesAttempt,true);
+eventRows={invalid:true};assert.equal((await reviewGet({url:"https://example.invalid/?attemptId="+mockEntry.id})).status,503);
+reviewResult=await reviewGet({url:"https://example.invalid/"});assert.equal(reviewResult.body.total,51);assert.equal(reviewResult.body.hasMore,true);
+count=null;assert.equal((await reviewGet({url:"https://example.invalid/"})).status,503);
+reviewActor={role:"staff"};assert.equal((await reviewGet({url:"https://example.invalid/"})).status,403);
+assert.ok(reviewUi.includes("!loading&&!loadFailed&&total===0"));assert.ok(!reviewUi.includes(".slice(-12).map"));
+console.log("S30: older matching Vipps evidence preserved; invalid event/list responses fail closed.");

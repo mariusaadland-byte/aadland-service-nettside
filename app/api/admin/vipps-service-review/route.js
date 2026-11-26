@@ -24,8 +24,12 @@ export async function GET(req){
     getVippsPayment("service",entry.payment_reference),
     getVippsPaymentEvents("service",entry.payment_reference)
    ]);
-   const list=Array.isArray(events)?events:Array.isArray(events?.events)?events.events:[];
-   const visible=list.slice(-40).map(e=>({
+   const list=Array.isArray(events)?events:Array.isArray(events?.events)?events.events:null;
+   if(!list||list.some(e=>!e||typeof e!=="object"))throw Error("Invalid Vipps event list");
+   // Retain every matching event, even outside the recent display window.
+   const matching=list.filter(e=>e.idempotencyKey===entry.idempotency_key);
+   const selected=[...new Set([...matching,...list.slice(-12)])];
+   const visible=selected.map(e=>({
     name:String(e.name||"").slice(0,40),success:e.success===true,
     amountOre:Number(e.amount?.value)||0,
     timestamp:String(e.timestamp||"").slice(0,50),
@@ -33,7 +37,7 @@ export async function GET(req){
     idempotencyKey:e.idempotencyKey===entry.idempotency_key?entry.idempotency_key:null
    }));
    const aggregate=payment?.aggregate||{};
-   return NextResponse.json({ok:true,entry,events:visible,
+   return NextResponse.json({ok:true,entry,events:visible,eventCount:list.length,matchingEventCount:matching.length,
     aggregates:{
      capturedOre:Number(aggregate.capturedAmount?.value)||0,
      refundedOre:Number(aggregate.refundedAmount?.value)||0,
@@ -45,11 +49,11 @@ export async function GET(req){
    return NextResponse.json({error:"Vipps-hendelsene kunne ikke hentes. Forsøket er fortsatt sperret."},{status:503});
   }
  }
- const {data,error}=await s.from("vipps_service_action_attempts")
-  .select("id,order_id,payment_reference,action,amount_ore,state,claimed_at,last_issue")
-  .in("state",["sending","needs_review"]).order("claimed_at",{ascending:true}).limit(50);
- if(error)return NextResponse.json({error:"Kunne ikke hente kontrollisten."},{status:503});
- return NextResponse.json({attempts:data||[]},{headers:{"Cache-Control":"no-store"}});
+ const {data,error,count}=await s.from("vipps_service_action_attempts")
+  .select("id,order_id,payment_reference,action,amount_ore,state,claimed_at,last_issue",{count:"exact"})
+  .in("state",["sending","needs_review"]).order("claimed_at",{ascending:true}).order("id",{ascending:true}).limit(50);
+ if(error||!Array.isArray(data)||!Number.isSafeInteger(count)||count<data.length)return NextResponse.json({error:"Kunne ikke hente kontrollisten."},{status:503});
+ return NextResponse.json({attempts:data,total:count,hasMore:count>data.length},{headers:{"Cache-Control":"no-store"}});
 }
 export async function PATCH(req){
  const origin=sameOriginGuard(req);if(origin)return origin;
