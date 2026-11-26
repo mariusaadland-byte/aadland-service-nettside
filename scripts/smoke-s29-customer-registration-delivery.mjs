@@ -51,3 +51,5 @@ assert.ok(adminUi.includes('Dette panelet sender aldri en ny e-post'));
 assert.ok(admin.includes('<CustomerVerificationReview/>'));
 assert.ok(admin.includes('user?.role==="owner" && <CustomerVerificationReview/>'));
 console.log("S-29: konto beholdes ved usikker mail, engangslås og Resend-idempotens, trygg gjenutsending, eieravklaring og preview-sperre bestått.");
+
+await import("./smoke-s11-password-security.mjs");
