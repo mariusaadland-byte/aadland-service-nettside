@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {appointmentSlotInput,appointmentAssignment,appointmentMatches,validAppointmentTime} from "../lib/rentalAppointments.mjs";
+const id="00000000-0000-4000-8000-000000000001",b={requestId:id,date:"2026-11-27",time:"17:30",kind:"either"};
+const a=appointmentSlotInput(b,"2026-11-26");assert.ok(a);assert.equal(a.slot_time,"17:30:00");assert.ok(appointmentMatches(a,a));
+assert.equal(appointmentSlotInput({...b,time:"17:15"},"2026-11-26"),null);
+assert.equal(appointmentSlotInput({...b,date:"2026-02-30"},"2026-11-26"),null);
+assert.equal(validAppointmentTime("24:00"),false);
+assert.ok(appointmentAssignment({slotId:id,bookingId:id,kind:"pickup"}));
+assert.equal(appointmentAssignment({slotId:id,bookingId:id,kind:"either"}),null);
+const sql=readFileSync("docs/u32-rental-appointment-slots.draft.sql","utf8");
+assert.ok(sql.includes("unique (slot_date,slot_time)")&&sql.includes("unique (booking_id,assigned_kind)")&&sql.includes("for update")&&sql.includes("security invoker"));
+const api=readFileSync("app/api/admin/rental/appointments/route.js","utf8");
+assert.ok(api.includes('RENTAL_APPOINTMENTS_ENABLED==="true"')&&api.includes('RENTAL_PUBLIC_BOOKING_ENABLED!=="true"')&&api.includes('.is("booking_id",null)'));
+console.log("U-32 appointment validation, explicit scheduling and draft transaction guards passed.");
