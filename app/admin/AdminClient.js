@@ -4571,7 +4571,7 @@ function RentalCalendar({items,bookings,blocks,onOpenBooking,onOpenBlock}){
   }));
   (blocks||[]).filter(b=>b.startDate<=d&&b.endDate>=d).forEach(b=>{
    const item=(items||[]).find(i=>i.id===b.itemId);
-   out.push({id:b.id,itemId:b.itemId,kind:"block",label:(item?.name||"Utstyr")+" · blokkert",title:item?.name||"Blokkert periode",meta:b.startDate+" – "+b.endDate+(b.reason?" · "+b.reason:"")});
+   out.push({id:b.id,itemId:b.itemId,kind:"block",label:(item?.name||"Utstyr")+(b.ownUse?" · eget oppdrag":" · blokkert"),title:item?.name||"Blokkert periode",meta:b.startDate+" – "+b.endDate+(b.reason?" · "+b.reason:"")});
   });
   return out;
  }
