@@ -26,7 +26,7 @@ async function runServiceCron(req){
  let removed=0,review=0,linked=0,skipped=0;
  for(const row of data){
   const path=String(row.storage_path||"");
-  if(!pathPattern.test(path)){skipped++;continue;}
+  if(!pathPattern.test(path)){skipped++;review++;continue;}
   const claimed=await s.from("contact_image_uploads")
    .update({state:"cleaning",claimed_for_cleanup_at:new Date().toISOString(),
     updated_at:new Date().toISOString()})
@@ -70,7 +70,19 @@ async function runServiceCron(req){
    await hold();
   }
  }
- return json({ok:review===0,checked:data.length,removed,linked,review,skipped},review?207:200);
+ // Never retry an interrupted deletion. Report unresolved rows across days.
+ const staleCutoff=new Date(Date.now()-10*60*1000).toISOString();
+ const [held,stale,pending]=await Promise.all([
+  s.from("contact_image_uploads").select("storage_path",{count:"exact",head:true}).eq("state","cleanup_review"),
+  s.from("contact_image_uploads").select("storage_path",{count:"exact",head:true}).eq("state","cleaning").lt("claimed_for_cleanup_at",staleCutoff),
+  s.from("contact_image_uploads").select("storage_path",{count:"exact",head:true}).eq("state","pending").lt("created_at",cutoff)
+ ]);
+ if([held,stale,pending].some(x=>x.error||!Number.isSafeInteger(x.count)||x.count<0))
+  return json({ok:false,error:"Oppryddingskøen kunne ikke kontrolleres.",checked:data.length,removed,linked,review,skipped},503);
+ const requiresReview=Math.max(review,held.count+stale.count);
+ return json({ok:requiresReview===0&&pending.count===0,checked:data.length,removed,linked,review,skipped,
+  requiresReview,held:held.count,staleClaims:stale.count,remainingPending:pending.count},
+  requiresReview||pending.count?207:200);
 }
 
 export async function GET(req){return withServiceCronMonitoring("contact-image-cleanup",req,()=>runServiceCron(req));}
