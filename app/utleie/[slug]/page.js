@@ -183,6 +183,7 @@ export default function RentalDetailPage(){
  const slug=decodeURIComponent(String(params?.slug||""));
  const [item,setItem]=useState(null);
  const [bookingOpen,setBookingOpen]=useState(false);
+ const [cartEnabled,setCartEnabled]=useState(false);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
  const [chosen,setChosen]=useState(null);
@@ -240,9 +241,9 @@ export default function RentalDetailPage(){
     if(!response.ok)throw new Error(data.error||"Utstyret kunne ikke lastes.");
     const found=(data.items||[])[0];
     if(!found)throw new Error("Utstyret ble ikke funnet.");
-    return {found,open:data.bookingOpen===true};
+    return {found,open:data.bookingOpen===true,cart:data.cartEnabled===true};
    })
-   .then(({found,open})=>{if(!cancelled){setItem(found);setBookingOpen(open);}})
+   .then(({found,open,cart})=>{if(!cancelled){setItem(found);setBookingOpen(open);setCartEnabled(cart);}})
    .catch(err=>{if(!cancelled)setError(err.message||"Utstyret kunne ikke lastes.")})
    .finally(()=>{if(!cancelled)setLoading(false)});
   return()=>{cancelled=true};
@@ -318,6 +319,7 @@ export default function RentalDetailPage(){
 
  return <main className="catalogPage rentalPage">
   <CatalogHeader rental/>
+  {bookingOpen&&cartEnabled&&<div className="catalogWrap" style={{paddingTop:16}}><Link className="catalogGoldButton" href={"/utleie/handlekurv?itemId="+encodeURIComponent(item.id)}>Legg utstyr i leiehandlekurv →</Link></div>}
 
   <section className="rentalDetailHero">
    <div className="catalogWrap">

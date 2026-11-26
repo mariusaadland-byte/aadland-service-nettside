@@ -76,7 +76,7 @@ export async function GET(req){
   });
  });
 
- if(!start)return NextResponse.json({items,categories,categorySetupRequired,bookingOpen:process.env.VERCEL_ENV==="production"&&process.env.RENTAL_PUBLIC_BOOKING_ENABLED==="true"},{headers:{"Cache-Control":"no-store"}});
+ if(!start)return NextResponse.json({items,categories,categorySetupRequired,bookingOpen:process.env.VERCEL_ENV==="production"&&process.env.RENTAL_PUBLIC_BOOKING_ENABLED==="true",cartEnabled:process.env.VERCEL_ENV==="production"&&process.env.RENTAL_PUBLIC_BOOKING_ENABLED==="true"&&process.env.RENTAL_CART_ENABLED==="true"},{headers:{"Cache-Control":"no-store"}});
  if(daysBetween(start,end)>365)return NextResponse.json({error:"Utleieperioden kan ikke være lengre enn 365 dager."},{status:400});
 
  const out=[];

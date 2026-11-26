@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {rentalCartInput,rentalCartTotals} from "../lib/rentalCart.mjs";
+const itemId="00000000-0000-4000-8000-000000000001",other="00000000-0000-4000-8000-000000000002",x={itemId,startDate:"2026-11-26",endDate:"2026-11-28",quantity:2};
+assert.equal(rentalCartInput({lines:[x,{...x,itemId:other}]},"2026-11-26").length,2);
+assert.equal(rentalCartInput({lines:[x,x]},"2026-11-26"),null);
+assert.equal(rentalCartInput({lines:[{...x,quantity:0}]},"2026-11-26"),null);
+assert.equal(rentalCartInput({lines:[{...x,endDate:"2026-02-30"}]},"2026-11-26"),null);
+assert.deepEqual(rentalCartTotals([{available:true,totalOre:10000,depositOre:20000,quantity:2},{available:true,totalOre:30000,depositOre:40000,quantity:1}]),{rentalOre:40000,depositOre:60000,quantity:3});
+assert.equal(rentalCartTotals([{available:false}]),null);
+const api=readFileSync("app/api/rental/cart-quote/route.js","utf8");
+assert.ok(api.includes('RENTAL_CART_ENABLED!=="true"')&&api.includes("peakRentalBookings")&&api.includes("reserved:false,checkoutEnabled:false"));
+assert.ok(!api.includes(".insert(")&&!api.includes(".update(")&&!api.includes(".rpc("));
+console.log("U-31 cart validation, combined price/deposit and read-only quote gates passed.");
