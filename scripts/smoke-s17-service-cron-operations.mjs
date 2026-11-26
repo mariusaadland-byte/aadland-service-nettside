@@ -32,7 +32,7 @@ assert.equal(serviceCronResponseStatus(200,{setupRequired:true}).state,"warning"
 assert.equal(serviceCronResponseStatus(503,{}).state,"failed");
 assert.equal(serviceCronResponseStatus(409,{}).state,"warning");
 const day="2026-11-23";
-let st=serviceCronDailyStatus(SERVICE_CRON_JOBS[0],[],day);
+let st=serviceCronDailyStatus(SERVICE_CRON_JOBS[0],[],day,Date.parse(day+"T14:30:00Z"));
 assert.equal(st.state,"missing");
 st=serviceCronDailyStatus(SERVICE_CRON_JOBS[0],[{
  job_key:SERVICE_CRON_JOBS[0].key,state:"ok",detail:"OK",
@@ -110,7 +110,22 @@ const nav=read("app/admin/AdminClient.js");
 assert.ok(nav.includes('["drift", "Driftskontroll"]'));
 console.log("S-17 bestått: 9 Service-jobber, skrivende kun intern driftslogg, manglende kjøringer, feil, advarsler og eierbeskyttet oversikt kontrollert uten e-post.");
 
-for(const key of ["service-order-confirmations","quote-response-confirmations","contact-image-cleanup"]){const job=SERVICE_CRON_JOBS.find(x=>x.key===key);assert.equal(serviceCronDailyStatus(job,[],"2026-11-26").state,"starting");assert.equal(serviceCronDailyStatus(job,[],"2026-11-27").state,"missing");}
+for(const key of ["service-order-confirmations","quote-response-confirmations","contact-image-cleanup"]){const job=SERVICE_CRON_JOBS.find(x=>x.key===key);assert.equal(serviceCronDailyStatus(job,[],"2026-11-26").state,"starting");assert.equal(serviceCronDailyStatus(job,[],"2026-11-27",Date.parse("2026-11-27T14:30:00Z")).state,"missing");}
 assert.equal(serviceCronResponseStatus(207,{ok:true,requiresReview:1}).state,"warning");
 assert.equal(serviceCronResponseStatus(200,{ok:true,review:1}).state,"warning");
-assert.ok(alert.includes('x.state!=="ok"&&x.state!=="starting"'));
+assert.ok(alert.includes('!["ok","starting","waiting"].includes(x.state)'));
+
+const job=SERVICE_CRON_JOBS[0],today="2026-11-26";
+const at=time=>Date.parse(today+"T"+time+"Z");
+const oldRun={job_key:job.key,state:"ok",started_at:"2026-11-25T08:00:00Z",finished_at:"2026-11-25T08:00:01Z"};
+assert.equal(serviceCronDailyStatus(job,[oldRun],today,at("07:59:59")).state,"waiting");
+assert.equal(serviceCronDailyStatus(job,[oldRun],today,at("08:59:59")).state,"waiting");
+assert.equal(serviceCronDailyStatus(job,[oldRun],today,at("09:00:00")).state,"missing");
+assert.equal(serviceCronDailyStatus(job,[oldRun],today,at("07:59:59")).lastSuccessAt,oldRun.finished_at);
+const running={job_key:job.key,state:"running",started_at:today+"T08:00:00Z"};
+assert.equal(serviceCronDailyStatus(job,[running],today,at("08:09:59")).state,"running");
+assert.equal(serviceCronDailyStatus(job,[running],today,at("08:10:00")).state,"warning");
+const newJob=SERVICE_CRON_JOBS.find(j=>j.key==="service-order-confirmations");
+assert.equal(serviceCronDailyStatus(newJob,[{...oldRun,job_key:newJob.key,started_at:today+"T10:25:00Z",finished_at:today+"T10:25:01Z"}],today,at("10:26:00")).state,"ok");
+assert.ok(page.includes('waiting:"Venter på dagens kjøring"'));
+console.log("S17: before schedule, grace period, missing, stale running and first-day observed success.");
