@@ -63,3 +63,24 @@ for(const phrase of ["200 % zoom","tilbudskladd","Avbryt","fakturaarkivet","MVA"
 }
 assert.ok(section.includes("IKKE registrer reell betaling"));
 console.log("S-15 bestått: statiske UI-regler for mobilmodal, tilbud, fakturaarkiv, MVA, kontrast og seks brukersteg. Ingen faktisk innlogget E2E-test.");
+
+const focusSource=read("app/admin/tilbud/quoteDialogFocus.js").replace("export function","function");
+const bindFocus=new Function(focusSource+";return bindQuoteDialogFocus;")();
+const listeners=new Map();let busy=false,closed=0;
+const doc={activeElement:null,addEventListener:(name,fn)=>listeners.set(name,fn),removeEventListener:name=>listeners.delete(name)};
+const makeNode=()=>({tabIndex:0,isConnected:true,getClientRects:()=>[{}],focus(){doc.activeElement=this;}});
+const opener=makeNode(),first=makeNode(),last=makeNode();
+const modal={...makeNode(),ownerDocument:doc,querySelectorAll:()=>[first,last],contains:node=>[modal,first,last].includes(node)};
+doc.activeElement=opener;
+const cleanup=bindFocus(modal,{isBusy:()=>busy,onClose:()=>closed++});
+assert.equal(doc.activeElement,modal);
+const key=(key,shiftKey=false)=>{let stopped=false;listeners.get("keydown")({key,shiftKey,preventDefault(){stopped=true;}});return stopped;};
+assert.equal(key("Tab"),true);assert.equal(doc.activeElement,first);
+assert.equal(key("Tab",true),true);assert.equal(doc.activeElement,last);
+assert.equal(key("Tab"),true);assert.equal(doc.activeElement,first);
+busy=true;key("Escape");assert.equal(closed,0);
+busy=false;key("Escape");assert.equal(closed,1);
+doc.activeElement=opener;listeners.get("focusin")({target:opener});assert.equal(doc.activeElement,first);
+cleanup();assert.equal(doc.activeElement,opener);assert.equal(listeners.size,0);
+assert.ok(editor.includes('bindQuoteDialogFocus(dialogRef.current')&&editor.includes('dialogBusyRef.current'));
+console.log("S15 quote dialog focus: mock keyboard containment, Escape busy guard, outside focus and restoration passed.");

@@ -86,3 +86,7 @@ Krypter databasedump og Storage-filer **før** de sendes til et uavhengig lagrin
 - [Supabase – CLI reference](https://supabase.com/docs/reference/cli/introduction)
 
 **Ingen produksjonsdata ble eksportert, endret, slettet eller gjenopprettet i S-14-kontrollen.** Dette dokumentet beviser ikke at en fungerende backup allerede eksisterer.
+
+## 7. Oppdatert inventar 26.11.2026 (kun lesing)
+
+Etter import av Byggmakker er databasen 106 MB (materialkatalogens totale relasjonsstørrelse 86 MB), med 96 914 aktive varer inkludert én egen vare. Privat bilagsbøtte har 70 objektregistreringer (73 370 342 bytes i metadata). Alle 70 referanser fra 68 kjøpsbilagvedlegg og to eksterne fakturaer matcher filmetadata, ingen mangler. Åtte fakturaer har PDF-data i databasen. Kontaktbilder: 0, produktbilder: 1 (506 978 bytes). Dette er ikke byte-verifisering, backup eller restore. Ingen faktiske originaler eller katalogdata er eksportert. Godkjent kryptert eksternt mål og isolert restore er fortsatt blokkerende. Tidligere inventar beholdes som historisk øyeblikksbilde. 

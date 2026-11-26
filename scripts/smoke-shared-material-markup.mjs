@@ -99,3 +99,20 @@ console.log("Price file feedback: preflight size and original headerless Byggmak
 
 assert.ok(calc.includes('importPreview&&<div className={styles.importPreview}>'));
 assert.ok(read("app/admin/kalkulator/calculator.module.css").includes(".importPreview h3,.importPreview p,.importPreview small,.importPreview b"));
+
+const statusRoute=read("app/api/admin/material-catalog/import/status/route.js");
+assert.ok(statusRoute.includes('user.role!=="owner"')&&statusRoute.includes('readMaterialImportStatus'));
+assert.ok(calc.includes('onClick={checkImportStatus}')&&calc.includes('state==="applied"'));
+const statusSource=workflow.slice(workflow.indexOf("export async function readMaterialImportStatus")).replace("export async function","async function");
+const checkStatus=new Function("reply","process",statusSource+";return readMaterialImportStatus;")((data,status=200)=>({data,status}),{env:{VERCEL_ENV:"production"}});
+const preview="11111111-1111-4111-8111-111111111111";
+const owner={role:"owner",id:"synthetic-owner"};
+let filters=[],selectFields="",row={id:preview,supplier_id:"synthetic",supplier_name:"Synthetic",summary:{incoming:87922},created_at:new Date().toISOString(),applied_at:new Date().toISOString()};
+const readDb={from(table){assert.equal(table,"material_import_previews");return {select(fields){selectFields=fields;return this},eq(k,v){filters.push([k,v]);return this},async maybeSingle(){return {data:row,error:null}}}}};
+assert.equal((await checkStatus(readDb,{role:"employee"},preview)).status,403);
+assert.equal((await checkStatus(readDb,owner,"bad")).status,400);
+let status=await checkStatus(readDb,owner,preview);assert.equal(status.data.state,"applied");assert.equal(status.data.imported,87922);assert.deepEqual(filters,[["id",preview],["owner_id",owner.id]]);assert.ok(!selectFields.split(",").includes("products"));
+row={...row,applied_at:null};assert.equal((await checkStatus(readDb,owner,preview)).data.state,"unconfirmed");
+row={...row,created_at:"2020-01-01T00:00:00Z"};assert.equal((await checkStatus(readDb,owner,preview)).data.state,"expired");
+row=null;assert.equal((await checkStatus(readDb,owner,preview)).status,404);
+console.log("Import recovery: read-only exact preview status, owner check, no staged products exposed, applied/unconfirmed/expired tested.");

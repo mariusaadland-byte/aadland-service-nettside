@@ -25,7 +25,7 @@ const style={
 };
 const labels={
  ok:"Siste kjøring OK",warning:"Krever gjennomgang",failed:"Feilet",missing:"Ingen kjøring registrert",
- running:"Kjører / ikke ferdig",starting:"Venter på oppstart"
+ running:"Kjører / ikke ferdig",starting:"Venter på oppstart",waiting:"Venter på dagens kjøring"
 };
 const colors={
  ok:{background:"#e5f2e6",color:"#28552d"},
@@ -33,7 +33,8 @@ const colors={
  failed:{background:"#fbe8e5",color:"#84271e"},
  missing:{background:"#fbe8e5",color:"#84271e"},
  running:{background:"#e8edf5",color:"#273c5d"},
- starting:{background:"#eeeae2",color:"#514a3c"}
+ starting:{background:"#eeeae2",color:"#514a3c"},
+ waiting:{background:"#eeeae2",color:"#514a3c"}
 };
 export default async function ServiceOperationsPage(){
  const admin=await getAdminUser();
@@ -54,8 +55,9 @@ export default async function ServiceOperationsPage(){
   if(r.error||a.error)error="Driftsdataene kunne ikke leses fullstendig. Kontroller Supabase og deploy.";
   else{rows=r.data||[];alerts=a.data||[];}
  }
- const day=new Date().toISOString().slice(0,10);
- const health=error?[]:SERVICE_CRON_JOBS.map(job=>serviceCronDailyStatus(job,rows,day));
+ const now=Date.now(),day=new Date(now).toISOString().slice(0,10);
+ const health=error?[]:SERVICE_CRON_JOBS.map(job=>serviceCronDailyStatus(job,rows,day,now));
+ const waiting=health.filter(x=>["waiting","starting","running"].includes(x.state)).length;
  const problems=health.filter(x=>["failed","missing","warning"].includes(x.state)).length;
  return <main style={style.main}>
   <p style={{margin:"0 0 16px",fontSize:14}}><Link href="/admin">Admin</Link> / Driftskontroll</p>
@@ -63,13 +65,14 @@ export default async function ServiceOperationsPage(){
   <p style={style.muted}>Eierbeskyttet, skrivebeskyttet oversikt over planlagte Service-jobber. Her kjøres ingen jobber, fakturaer, betalinger eller kundemeldinger.</p>
   <div style={style.surface}>
    <h2 style={{fontSize:20,margin:"0 0 8px"}}>Automatiske kjøringer</h2>
-   <p style={style.muted}>Dagens kontroll gjelder UTC-datoen <strong>{day}</strong>. Vercel kjører tidene i UTC. Tidspunktene nedenfor vises i norsk tid.</p>
+   <p style={style.muted}>Dagens kontroll gjelder UTC-datoen <strong>{day}</strong>. Vercel kjører tidene i UTC. Planlagte tider er UTC; loggførte tidspunkter vises i norsk tid. En jobb merkes først som manglende 60 minutter etter planlagt kjøring.</p>
    {day<SERVICE_CRON_FIRST_COMPLETE_DAY&&<p role="status" style={{padding:12,background:"#fff4df",color:"#613d17",borderRadius:9}}>
     Kontrollsystemet har nettopp blitt etablert. Første hele driftsdag som skal vurderes er <strong>{SERVICE_CRON_FIRST_COMPLETE_DAY}</strong>. Manglende historikk før denne datoen er ikke bevis for at eldre jobber ikke kjørte.
    </p>}
    {error&&<p role="alert" style={{padding:12,background:"#f9e8e6",color:"#8c2e26",borderRadius:9}}>{error}</p>}
    {!error&&day>=SERVICE_CRON_FIRST_COMPLETE_DAY&&<p role="status" style={style.muted}>
-     {problems?problems+" av "+health.length+" jobber krever gjennomgang.":"Ingen feil eller manglende kjøringer registrert for dagens overvåkede Service-jobber."}
+     {problems?problems+" av "+health.length+" jobber krever gjennomgang.":waiting?"Ingen registrerte feil hittil i dag.":"Alle dagens overvåkede jobber har meldt OK."}
+     {waiting?" "+waiting+" av "+health.length+" jobber venter på oppstart eller ferdigstillelse.":""}
      {" "}Dette er ikke bevis på at hver kunde-e-post er levert.
    </p>}
    {health.map(item=><div key={item.key} style={style.row}>
