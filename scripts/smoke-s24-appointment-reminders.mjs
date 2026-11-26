@@ -12,9 +12,9 @@ const shiftDateKey=(day,offset)=>{
 };
 const helperSource=read("lib/serviceAppointmentReminders.js")
  .replace(/^import .*;\n/gm,"").replace(/^export /gm,"");
-const {sameReminderAppointment,deliverAppointmentReminder}=new Function(
+const {sameReminderAppointment,deliverAppointmentReminder,appointmentReminderBacklog}=new Function(
  "osloDateKey","shiftDateKey",helperSource+
- ";return {sameReminderAppointment,deliverAppointmentReminder};"
+ ";return {sameReminderAppointment,deliverAppointmentReminder,appointmentReminderBacklog};"
 )(osloDateKey,shiftDateKey);
 const now=new Date("2026-11-21T12:00:00.000Z");
 const tomorrow=shiftDateKey(osloDateKey(now),1);
@@ -247,3 +247,10 @@ for(const kind of ["survey","job"])
  assert.ok(schedule.some(x=>x.path==="/api/cron/"+kind+"-reminders"));
 assert.ok(schedule.some(x=>x.path==="/api/cron/rental-reminders"),"Rental schedule unaffected");
 console.log("S-24 bestått: engangskrav, Resend-idempotens, uklar timeout uten retry, kansellert omplanlegging, feil mottaker, oppdatert sending og eieravstemming. Bare syntetiske data.");
+
+let counts={needs_review:2,claimed:1},countError=false,cutoffSeen=false;
+const countDb={from(table){assert.equal(table,"service_appointment_reminder_attempts");let state="";const q={select(key,opts){assert.equal(key,"id");assert.deepEqual(opts,{count:"exact",head:true});return q},eq(k,v){if(k==="kind")assert.equal(v,"survey");else{assert.equal(k,"state");state=v;}return q},lt(k,v){assert.equal(k,"claimed_at");assert.equal(v,"2026-11-21T11:50:00.000Z");cutoffSeen=true;return q},then(resolve,reject){return Promise.resolve({count:countError?null:counts[state],error:countError?{code:"TEST"}:null}).then(resolve,reject)}};return q}};
+assert.deepEqual(await appointmentReminderBacklog(countDb,"survey",now.getTime()),{ok:true,held:2,staleClaims:1,requiresReview:3});assert.ok(cutoffSeen);
+countError=true;assert.deepEqual(await appointmentReminderBacklog(countDb,"survey",now.getTime()),{ok:false});
+for(const kind of ["survey","job"]){const route=read("app/api/cron/"+kind+"-reminders/route.js");assert.ok(route.includes("appointmentReminderBacklog(s,"));assert.ok(route.includes(".limit(MAX_PER_RUN+1)")&&route.includes(".slice(0,MAX_PER_RUN)")&&route.includes("requiresReview||overflow?207:200"));}
+console.log("S24: unresolved earlier attempts and more than 25 candidates are reported without retry.");

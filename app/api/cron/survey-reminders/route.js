@@ -4,7 +4,7 @@ import {db} from "../../../../lib/supabase";
 import {cronGuard} from "../../../../lib/cronAuth";
 import {osloDateKey,shiftDateKey,osloDayStartIso,osloDayEndIso} from "../../../../lib/osloTime";
 import {serviceEmailFrom,serviceReplyTo} from "../../../../lib/serviceEmailConfig";
-import {deliverAppointmentReminder} from "../../../../lib/serviceAppointmentReminders";
+import {deliverAppointmentReminder,appointmentReminderBacklog} from "../../../../lib/serviceAppointmentReminders";
 
 export const runtime="nodejs";
 export const maxDuration=60;
@@ -84,7 +84,7 @@ async function runServiceCron(req){
   .gte("survey_date",from)
   .lte("survey_date",until)
   .order("survey_date",{ascending:true})
-  .limit(MAX_PER_RUN);
+  .limit(MAX_PER_RUN+1);
 
  if(error){
   if(["42703","42P01"].includes(String(error.code||""))){
@@ -101,7 +101,7 @@ async function runServiceCron(req){
  const failures=[];
 
  let skipped=0;
- for(const order of data||[]){
+ for(const order of (data||[]).slice(0,MAX_PER_RUN)){
   const outcome=await deliverAppointmentReminder(s,order,{
    kind:"survey",targetDate,
    makeEmail:current=>makeSurveyReminderEmail(current,base),
@@ -117,5 +117,9 @@ async function runServiceCron(req){
   }
  }
 
- return NextResponse.json({ok:failures.length===0,targetDate,checked:(data||[]).length,sent:sentCount,skipped,failed:failures.length,failures});
+ const overflow=(data||[]).length>MAX_PER_RUN;
+ const backlog=await appointmentReminderBacklog(s,"survey");
+ if(!backlog.ok)return NextResponse.json({ok:false,error:"Tidligere uavklarte påminnelser kunne ikke kontrolleres.",sent:sentCount},{status:503});
+ const requiresReview=Math.max(failures.length,backlog.requiresReview);
+ return NextResponse.json({ok:requiresReview===0&&!overflow,targetDate,checked:Math.min((data||[]).length,MAX_PER_RUN),sent:sentCount,skipped,failed:failures.length,failures,requiresReview,held:backlog.held,staleClaims:backlog.staleClaims,overflow},{status:requiresReview||overflow?207:200});
 }
