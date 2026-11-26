@@ -213,3 +213,16 @@ assert.ok(cron.includes("dispatchQueuedQuoteResponseNotices"));
 const schedule=JSON.parse(read("vercel.json")).crons;
 assert.ok(schedule.some(row=>row.path==="/api/cron/quote-response-confirmations"&&row.schedule==="40 10 * * *"));
 console.log("S-20 bestått: atomisk godkjenning, to uavhengige e-postkvitteringer, ukjent sendestatus, ingen dobbel sending, trygg eieravstemming og produksjons-sperre.");
+
+// Exercise the cron route with a read-only count mock, no real mail or DB.
+const cronSource=cron.replace(/^import .*;\n/gm,"").replace(/^export const .*;\n/gm,"").replace("export async function GET","async function GET");
+let backlog={needs_review:0,claimed:0,queued:0},countError=false,dispatchCalls=0,cutoffSeen=false;
+const backlogDb=()=>({from(table){assert.equal(table,"quote_response_notifications");let state="";const q={select(fields,opts){assert.equal(fields,"id");assert.deepEqual(opts,{count:"exact",head:true});return q},eq(k,v){assert.equal(k,"state");state=v;return q},lt(k,v){assert.equal(k,"claimed_at");assert.ok(Number.isFinite(Date.parse(v)));cutoffSeen=true;return q},then(resolve,reject){return Promise.resolve({count:countError?null:backlog[state],error:countError?{code:"TEST"}:null}).then(resolve,reject)}};return q}});
+const cronHandler=new Function("NextResponse","withServiceCronMonitoring","cronGuard","db","dispatchQueuedQuoteResponseNotices","process",cronSource+";return GET;")(NextResponse,async(key,req,fn)=>{assert.equal(key,"quote-response-confirmations");return fn()},()=>null,backlogDb,async()=>{dispatchCalls++;return {ok:true,checked:0,sent:0,requiresReview:0}},mockProcess);
+assert.equal((await cronHandler({})).status,200);
+backlog={needs_review:2,claimed:1,queued:0};
+let backlogResult=await cronHandler({});assert.equal(backlogResult.status,207);assert.equal(backlogResult.body.requiresReview,3);assert.equal(backlogResult.body.staleClaims,1);assert.ok(cutoffSeen);
+backlog={needs_review:0,claimed:0,queued:5};backlogResult=await cronHandler({});assert.equal(backlogResult.status,207);assert.equal(backlogResult.body.remainingQueued,5);
+countError=true;assert.equal((await cronHandler({})).status,503);
+assert.equal(dispatchCalls,4);
+console.log("S20 backlog: old held/claimed and remaining queued rows reported without requeue, count errors fail closed.");

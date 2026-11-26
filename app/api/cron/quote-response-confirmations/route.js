@@ -19,9 +19,19 @@ async function runServiceCron(req){
  const s=db();if(!s)return NextResponse.json({ok:false,error:"Database er utilgjengelig."},{status:503});
  const result=await dispatchQueuedQuoteResponseNotices(s,{limit:25});
  if(!result.ok)return NextResponse.json(result,{status:503});
+ // Also report unresolved deliveries from earlier runs. Never requeue them.
+ const cutoff=new Date(Date.now()-10*60*1000).toISOString();
+ const [held,stale,queued]=await Promise.all([
+  s.from("quote_response_notifications").select("id",{count:"exact",head:true}).eq("state","needs_review"),
+  s.from("quote_response_notifications").select("id",{count:"exact",head:true}).eq("state","claimed").lt("claimed_at",cutoff),
+  s.from("quote_response_notifications").select("id",{count:"exact",head:true}).eq("state","queued")
+ ]);
+ if([held,stale,queued].some(x=>x.error||!Number.isSafeInteger(x.count)||x.count<0))
+  return NextResponse.json({ok:false,error:"Kunne ikke kontrollere gjenstående bekreftelser.",checked:result.checked,sent:result.sent},{status:503,headers:{"Cache-Control":"no-store"}});
+ const requiresReview=Math.max(result.requiresReview,held.count+stale.count);
  return NextResponse.json({ok:true,checked:result.checked,sent:result.sent,
-  requiresReview:result.requiresReview},{
-  status:result.requiresReview?207:200,
+  requiresReview,held:held.count,staleClaims:stale.count,remainingQueued:queued.count},{
+  status:requiresReview||queued.count?207:200,
   headers:{"Cache-Control":"no-store"}
  });
 }
