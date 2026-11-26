@@ -238,3 +238,21 @@ assert.ok(homeUI.includes('getCheckoutIntent(payload,"aadland-custom-order-v1")'
 assert.ok(homeUI.includes("imageReceipts"));
 assert.equal(mailCalls,0);
 console.log("S-25 bestått: replay preserves order and stock, conflicting payload rejected, Vipps created only once, uncertain timeout holds order, parallel calls deduplicated, browser retains intent; synthetic data only.");
+
+// No new request identity just because the tab stayed open for more than a day.
+const clientSource=client.replace(/^export /gm,"");
+const storage=new Map();
+const mockGlobal={crypto:crypto.webcrypto,sessionStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}};
+const browser=new Function("globalThis",clientSource+";return {getCheckoutIntent,clearCheckoutIntent};")(mockGlobal);
+const sample={orderType:"order",items:[{productId:"test",quantity:1}]};
+const browserKey=await browser.getCheckoutIntent(sample,"test-checkout");
+const stored=JSON.parse(storage.get("test-checkout"));stored.createdAt=Date.now()-48*60*60*1000;storage.set("test-checkout",JSON.stringify(stored));
+assert.equal(await browser.getCheckoutIntent(sample,"test-checkout"),browserKey,"Identical unresolved request after 48h must reuse key");
+browser.clearCheckoutIntent("test-checkout");
+assert.notEqual(await browser.getCheckoutIntent(sample,"test-checkout"),browserKey);
+for(const payment_status of ["authorized","paid","partial","refunded","partially_refunded","cancelled","failed","unpaid",""]){
+ const replay=existingServiceOrderResponse({...payed,payment_status},"a".repeat(64));
+ assert.equal(replay.payload.payment?.redirectUrl,undefined,"Never redirect a non-pending payment: "+payment_status);
+}
+assert.equal(existingServiceOrderResponse({...payed,payment_status:"pending"},"a".repeat(64)).payload.payment.redirectUrl,payed.checkout_redirect_url);
+console.log("S25: unresolved identical request identity preserved after 48h, non-pending payments cannot reopen checkout.");
