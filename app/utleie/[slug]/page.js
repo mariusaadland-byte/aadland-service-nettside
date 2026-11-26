@@ -3,6 +3,7 @@
 import {useEffect,useRef,useState} from "react";
 import {rentalDaysInclusive,rentalCalendarReady,validRentalCalendarQuote} from "../../../lib/rentalCalendarSelection.mjs";
 import {useParams} from "next/navigation";
+import PickupWindows from "../PickupWindows";
 import {RENTAL_CHANGE_DEADLINE_HOURS} from "../../../lib/companyInfo";
 import {RENTAL_TERMS_VERSION,RENTAL_TERMS_PATH} from "../../../lib/rentalTermsVersion.mjs";
 import Link from "next/link";
@@ -184,6 +185,9 @@ export default function RentalDetailPage(){
  const [item,setItem]=useState(null);
  const [bookingOpen,setBookingOpen]=useState(false);
  const [cartEnabled,setCartEnabled]=useState(false);
+ const [windowConfig,setWindowConfig]=useState({enabled:false});
+ const [pickupWindow,setPickupWindow]=useState("");
+ const [returnWindow,setReturnWindow]=useState("");
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
  const [chosen,setChosen]=useState(null);
@@ -241,9 +245,9 @@ export default function RentalDetailPage(){
     if(!response.ok)throw new Error(data.error||"Utstyret kunne ikke lastes.");
     const found=(data.items||[])[0];
     if(!found)throw new Error("Utstyret ble ikke funnet.");
-    return {found,open:data.bookingOpen===true,cart:data.cartEnabled===true};
+    return {found,open:data.bookingOpen===true,cart:data.cartEnabled===true,windows:data.pickupWindows||{enabled:false}};
    })
-   .then(({found,open,cart})=>{if(!cancelled){setItem(found);setBookingOpen(open);setCartEnabled(cart);}})
+   .then(({found,open,cart,windows})=>{if(!cancelled){setItem(found);setBookingOpen(open);setCartEnabled(cart);setWindowConfig(windows);}})
    .catch(err=>{if(!cancelled)setError(err.message||"Utstyret kunne ikke lastes.")})
    .finally(()=>{if(!cancelled)setLoading(false)});
   return()=>{cancelled=true};
@@ -251,6 +255,7 @@ export default function RentalDetailPage(){
 
  function choosePeriod(startDate,endDate,pricing){
   setChosen({startDate,endDate,pricing});
+  setPickupWindow("");setReturnWindow("");setAccepted(false);
   const preferred=repeatFulfillment==="delivery"&&item.deliveryAvailable
    ?"delivery"
    :repeatFulfillment==="pickup"&&item.pickupAvailable
@@ -280,7 +285,7 @@ export default function RentalDetailPage(){
      customer,
      customerType,
      ...(customerType==="company"?{company}:{}),
-     fulfillment,
+     fulfillment,pickupWindow,returnWindow,
      acceptedTerms:accepted,termsVersion:RENTAL_TERMS_VERSION
     })
    });
@@ -390,12 +395,13 @@ export default function RentalDetailPage(){
       </div>
       <label><span>E-post *</span><input autoComplete="email" required type="email" value={customer.email} onChange={e=>setCustomer({...customer,email:e.target.value})}/></label>
       <label><span>Adresse{fulfillment==="delivery"?" *":""}</span><input autoComplete="street-address" required={fulfillment==="delivery"} value={customer.address} onChange={e=>setCustomer({...customer,address:e.target.value})}/></label>
-      <label><span>Henting / levering</span><select value={fulfillment} onChange={e=>setFulfillment(e.target.value)}>{item.pickupAvailable&&<option value="pickup">Jeg henter selv</option>}{item.deliveryAvailable&&<option value="delivery">Jeg ønsker levering</option>}</select></label>
+      <label><span>Henting / levering</span><select value={fulfillment} onChange={e=>{setFulfillment(e.target.value);setPickupWindow("");setReturnWindow("");setAccepted(false);}}>{item.pickupAvailable&&<option value="pickup">Jeg henter selv</option>}{item.deliveryAvailable&&<option value="delivery">Jeg ønsker levering</option>}</select></label>
+      {fulfillment==="pickup"&&windowConfig.enabled&&<PickupWindows config={windowConfig} start={chosen.startDate} end={chosen.endDate} pickup={pickupWindow} returning={returnWindow} onPickup={v=>{setPickupWindow(v);setAccepted(false);}} onReturn={v=>{setReturnWindow(v);setAccepted(false);}} disabled={booking}/>}
       <div className="rentalTermsNotice"><b>Endring og avbestilling</b><span>Gratis frem til {RENTAL_CHANGE_DEADLINE_HOURS} timer før avtalt leiestart. Se vilkårene for detaljer.</span></div>
       <label className="rentalTerms"><input type="checkbox" required checked={accepted} onChange={e=>setAccepted(e.target.checked)}/><span>Jeg har lest og godtar <a href={RENTAL_TERMS_PATH} target="_blank" rel="noreferrer">utleiebetingelsene ({RENTAL_TERMS_VERSION})</a>, inkludert fristene for endring og avbestilling.</span></label>
       <p className="muted">Slik behandler vi kontakt- og bookingopplysninger: <a href="/personvern" target="_blank" rel="noreferrer">Personvernerklæring</a>.</p>
       <div className="rentalBookingActions">
-       <button className="catalogGoldButton" disabled={booking}>{booking?"Sender …":"Send booking →"}</button>
+       <button className="catalogGoldButton" disabled={booking||(fulfillment==="pickup"&&windowConfig.enabled&&(!pickupWindow||!returnWindow))}>{booking?"Sender …":"Send booking →"}</button>
        <button type="button" className="rentalCancelButton" disabled={booking} onClick={()=>setChosen(null)}>Endre periode</button>
       </div>
      </div>

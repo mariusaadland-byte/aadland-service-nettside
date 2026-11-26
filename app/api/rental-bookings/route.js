@@ -1,3 +1,5 @@
+import {rentalWindowConfig,validateRentalWindowRequest,rentalWindowSummary} from "../../../lib/rentalPickupWindows.mjs";
+import {osloDateTimeLocal} from "../../../lib/osloTime";
 import {rateLimitRequest} from "../../../lib/rateLimit";
 import {sameOriginGuard} from "../../../lib/requestGuard";
 import {rentalOverlapOr,extendOverdueAvailability} from "../../../lib/rentalOverdue.mjs";
@@ -40,7 +42,7 @@ function money(ore){
  return (Number(ore||0)/100).toLocaleString("nb-NO",{minimumFractionDigits:0,maximumFractionDigits:2})+" kr";
 }
 
-function acknowledgementHtml({bookingNumber,name,item,startDate,endDate,totalOre,depositOre,minSideUrl,accountUrl,billing,guestPaymentUrl,pendingPayment=false}){
+function acknowledgementHtml({bookingNumber,name,item,startDate,endDate,totalOre,depositOre,minSideUrl,accountUrl,billing,guestPaymentUrl,pendingPayment=false,windowSummary=""}){
  const creditText=billing?.reason==="credit-limit"&&billing?.creditLimitOre
   ?`<p style="margin:12px 0 0;color:#d9b365;font-size:12px;line-height:1.55">Bookingen er reservert, men tilgjengelig kreditt må avklares før endelig leiebekreftelse sendes.</p>`
   :"";
@@ -57,6 +59,7 @@ function acknowledgementHtml({bookingNumber,name,item,startDate,endDate,totalOre
 <tr><td style="padding:12px 14px;color:#8e887f;font-size:11px;border-top:1px solid #2d2d2d">Leiepris</td><td style="padding:12px 14px;color:#fff;font-weight:700;text-align:right;border-top:1px solid #2d2d2d">${esc(money(totalOre))}</td></tr>
 ${depositOre?`<tr><td style="padding:12px 14px;color:#8e887f;font-size:11px;border-top:1px solid #2d2d2d">Depositum</td><td style="padding:12px 14px;color:#fff;font-weight:700;text-align:right;border-top:1px solid #2d2d2d">${esc(money(depositOre))}</td></tr>`:""}
 </table>
+${windowSummary?`<p style="color:#c9c3b8">${esc(windowSummary)}. Tidene er ønsker, ikke bekreftede avtaler.</p>`:""}
 <p style="color:#c9c3b8;line-height:1.65;margin:20px 0 0">${pendingPayment?"Fullfør Vipps-betalingen innen 30 minutter. Reservasjonen faller bort dersom betaling ikke blir startet innen fristen.":"Endelig leiebekreftelse sendes når betalingen er registrert, eller med en gang dersom kunden er godkjent for faktura/kreditt."}</p>
 ${creditText}
 ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-top:20px;background:#d7a74e;color:#111;text-decoration:none;font-weight:900;padding:13px 18px">Åpne Min side →</a>`:`<a href="${esc(minSideUrl)}" style="display:inline-block;margin-top:20px;border:1px solid #d7a74e;color:#d7a74e;text-decoration:none;font-weight:900;padding:12px 18px">Opprett Min side →</a><p style="margin:10px 0 0;color:#8e887f;font-size:11px;line-height:1.55">Opprett konto med samme e-postadresse, så kobles utleien automatisk til kontoen din.</p>`}
@@ -116,6 +119,8 @@ export async function POST(req){
    return NextResponse.json({error:"Valgt utleveringsmåte er ikke tilgjengelig."},{status:400});
   }
 
+  const windows=validateRentalWindowRequest(b,rentalWindowConfig(process.env),fulfillment,b.startDate,b.endDate,osloDateTimeLocal(new Date()));
+  if(windows===null)return NextResponse.json({error:"Velg gyldige tidsvinduer for henting og retur. Oppdater siden hvis tidene er endret."},{status:409});
   const address=String(b.customer?.address||"").trim().slice(0,300);
   if(fulfillment==="delivery"&&!address){
    return NextResponse.json({error:"Fyll inn leveringsadresse."},{status:400});
@@ -178,7 +183,7 @@ export async function POST(req){
    customer_user_id:customerUserId,
    booking_number:bookingNumber,
    rental_item_id:item.id,
-   customer:{name,email,phone,address,fulfillment,siteOrigin,
+   customer:{name,email,phone,address,fulfillment,siteOrigin,...windows,
     customerType:customerType.type,
     termsAcceptedAt:new Date().toISOString(),
     termsVersion:RENTAL_TERMS_VERSION,
@@ -252,7 +257,7 @@ export async function POST(req){
     try{
      const customerHtml=acknowledgementHtml({
       bookingNumber,name,item,startDate:b.startDate,endDate:b.endDate,
-      totalOre:p.totalOre,depositOre:p.depositOre,minSideUrl,accountUrl,billing,guestPaymentUrl,pendingPayment
+      totalOre:p.totalOre,depositOre:p.depositOre,minSideUrl,accountUrl,billing,guestPaymentUrl,pendingPayment,windowSummary:rentalWindowSummary(windows)
      });
      const result=await resend.emails.send({
       from:sender,
@@ -287,6 +292,7 @@ export async function POST(req){
       "Leiepris: "+money(p.totalOre),
       p.depositOre?"Depositum: "+money(p.depositOre):"",
       "Utlevering: "+(fulfillment==="delivery"?"Levering":"Henting"),
+      rentalWindowSummary(windows),
       address?"Adresse: "+address:"",
       "",
       confirmationSent
