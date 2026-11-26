@@ -53,3 +53,15 @@ assert.ok(admin.includes('user?.role==="owner" && <CustomerVerificationReview/>'
 console.log("S-29: konto beholdes ved usikker mail, engangslås og Resend-idempotens, trygg gjenutsending, eieravklaring og preview-sperre bestått.");
 
 await import("./smoke-s11-password-security.mjs");
+
+// Exercise the owner-only list with exact count, not a false empty result.
+const listSource=adminRoute.replace(/^import .*;\n/gm,"").replace(/^export async function /gm,"async function ");
+let listActor={role:"owner"},listCount=0,listRows=[],listError=null;
+const listDb=()=>({from(table){assert.equal(table,"customer_verification_delivery_attempts");const q={select(fields,opts){assert.deepEqual(opts,{count:"exact"});return q},in(k,v){assert.deepEqual(v,["sending","needs_review"]);return q},order(){return q},limit(n){assert.equal(n,50);return q},then(resolve,reject){return Promise.resolve({data:listRows,error:listError,count:listCount}).then(resolve,reject)}};return q}});
+const getList=new Function("NextResponse","sameOriginGuard","getAdminUser","db",listSource+";return GET;")({json:(body,opts={})=>({body,status:opts.status||200})},()=>null,async()=>listActor,listDb);
+assert.deepEqual((await getList()).body,{attempts:[],total:0,hasMore:false});
+listCount=null;assert.equal((await getList()).status,503);
+listCount=51;listRows=Array.from({length:50},(_,i)=>({id:"mock-"+i}));assert.equal((await getList()).body.hasMore,true);
+listError={code:"TEST"};assert.equal((await getList()).status,503);listActor={role:"staff"};assert.equal((await getList()).status,403);
+assert.ok(adminUi.includes("!loading&&!loadFailed&&total===0"));assert.ok(adminUi.includes("Viser {items.length} av {total}"));
+console.log("S29 review count: no false empty log, visible backlog, owner-only.");
