@@ -13,15 +13,23 @@ function esc(value){
  return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
 }
 
+// Defense in depth: do not serialize arbitrary persisted JSON to the customer.
+function publicFields(value,keys){
+ const row=value&&typeof value==="object"&&!Array.isArray(value)?value:{};
+ return Object.fromEntries(keys.filter(key=>["string","number","boolean"].includes(typeof row[key])).map(key=>[key,row[key]]));
+}
+function publicRows(value,keys){
+ return Array.isArray(value)?value.filter(row=>row&&typeof row==="object"&&!Array.isArray(row)).map(row=>publicFields(row,keys)):[];
+}
 function mapQuote(q){
  return {
   id:q.id,
   quoteNumber:q.quote_number,
   status:q.status||"draft",
   title:q.title||"",
-  customer:q.customer||{},
-  lineItems:Array.isArray(q.line_items)?q.line_items:[],
-  paymentPlan:Array.isArray(q.payment_plan)?q.payment_plan:[],
+  customer:publicFields(q.customer,["name","email","phone","address","customerType","organizationNumber","contactPerson","paymentTermsDays"]),
+  lineItems:publicRows(q.line_items,["id","type","description","quantity","unit","unitPriceOre","vatRate"]),
+  paymentPlan:publicRows(q.payment_plan,["id","label","percent","trigger"]),
   subtotalExVatOre:Number(q.subtotal_ex_vat_ore)||0,
   vatOre:Number(q.vat_ore)||0,
   totalIncVatOre:Number(q.total_inc_vat_ore)||0,
@@ -76,7 +84,7 @@ export async function GET(req,{params}){
  const id=String(resolved?.id||"").trim();
  const token=String(req.headers.get("x-quote-token")||new URL(req.url).searchParams.get("token")||"");
  const loaded=await loadQuote(id);
- if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status});
+ if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status,headers:privateHeaders});
  const publicLinkOk=verifyQuoteToken(loaded.data,token);
  if(!publicLinkOk&&!(await customerOwnsIssuedQuote(loaded.data)))
   return NextResponse.json({error:"Tilbudslenken er utløpt eller sperret. Logg inn på Min side for å se din tilbudshistorikk."},{status:403,headers:privateHeaders});
@@ -90,10 +98,10 @@ export async function POST(req,{params}){ const originError=sameOriginGuard(req)
  const body=await req.json().catch(()=>({}));
  const token=String(body.token||"");
  const action=String(body.action||"");
- if(!["accept","decline"].includes(action))return NextResponse.json({error:"Ugyldig handling."},{status:400});
+ if(!["accept","decline"].includes(action))return NextResponse.json({error:"Ugyldig handling."},{status:400,headers:privateHeaders});
 
  const loaded=await loadQuote(id);
- if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status});
+ if(loaded.error)return NextResponse.json({error:loaded.error},{status:loaded.status,headers:privateHeaders});
  const publicLinkOk=verifyQuoteToken(loaded.data,token);
  const authenticatedOwner=!publicLinkOk&&await customerOwnsIssuedQuote(loaded.data);
  if(!publicLinkOk&&!authenticatedOwner)
@@ -110,8 +118,8 @@ export async function POST(req,{params}){ const originError=sameOriginGuard(req)
  }
  if(["accepted","declined","cancelled","superseded"].includes(loaded.data.status))
   return NextResponse.json({error:loaded.data.status==="superseded"?"Denne tilbudsversjonen er erstattet av en nyere revisjon.":"Tilbudet er allerede ferdigbehandlet."},{status:409,headers:privateHeaders});
- if(loaded.data.status!=="sent")return NextResponse.json({error:"Tilbudet er ikke aktivt for svar ennå."},{status:409});
- if(expired(loaded.data))return NextResponse.json({error:"Tilbudet er utløpt."},{status:409});
+ if(loaded.data.status!=="sent")return NextResponse.json({error:"Tilbudet er ikke aktivt for svar ennå."},{status:409,headers:privateHeaders});
+ if(expired(loaded.data))return NextResponse.json({error:"Tilbudet er utløpt."},{status:409,headers:privateHeaders});
 
  // Preview must not mutate live quote decisions or send genuine customer mail.
  if(process.env.VERCEL_ENV!=="production")
