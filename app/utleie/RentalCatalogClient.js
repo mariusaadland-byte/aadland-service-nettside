@@ -11,6 +11,7 @@ const kr=o=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK",minim
 export default function RentalCatalogClient({initialItems=[],initialCategories=[],initialReady=false,initialBookingOpen=false}){
  const [items,setItems]=useState(initialItems);
  const [bookingOpen,setBookingOpen]=useState(initialBookingOpen);
+ const [cartEnabled,setCartEnabled]=useState(false);
  const [categories,setCategories]=useState(initialCategories);
  const [filter,setFilter]=useState("all");
  const [visibleCount,setVisibleCount]=useState(RENTAL_CATALOG_PAGE_SIZE);
@@ -35,6 +36,7 @@ export default function RentalCatalogClient({initialItems=[],initialCategories=[
     setCategories(nextCategories);
     setItems(nextItems);
     setBookingOpen(data.bookingOpen===true);
+    setCartEnabled(data.cartEnabled===true);
     setFilter("all");
     setSetup(!!data.setupRequired);
    })
@@ -66,6 +68,7 @@ export default function RentalCatalogClient({initialItems=[],initialCategories=[
 
  return <main className="catalogPage rentalPage">
   <CatalogHeader rental/>
+  {cartEnabled&&bookingOpen&&<div className="catalogWrap" style={{paddingTop:16}}><Link className="catalogGoldButton" href="/utleie/handlekurv">Åpne leiehandlekurv →</Link></div>}
 
   <section className="rentalHero">
    <div className="catalogWrap rentalHeroInner">
