@@ -35,7 +35,7 @@ const testIDs=[
  "custom-tripletex-original-pdf-20261120"
 ];
 const finalIDs=["service-final-calc","service-final-mobile","service-final-public-content","service-final-price-age","service-final-price-import","service-final-backup","service-final-auth","service-final-privacy","service-final-receipt-accounting","service-final-vat","service-final-invoice-tripletex","service-final-vipps-settlement","service-final-invoice-followup","service-final-vipps-payment","service-final-manual-payment","service-final-quote-mail","service-final-cron","service-final-quote-response","service-final-appointments","service-final-registration","service-final-order-mail","service-final-quote-links","service-final-contact-images","service-final-drawing-roles","service-final-history"];
-assert.deepEqual(Object.keys(APPROVAL_CHECKS).sort(),[...testIDs,...finalIDs].sort(),
+assert.deepEqual(Object.keys(APPROVAL_CHECKS).sort(),[...testIDs,...finalIDs,...Array.from({length:27},(_,i)=>"rental-final-u"+String(i+1).padStart(2,"0"))].sort(),
  "Every development plan task currently awaiting approval must have reviewed criteria");
 for(const [id,meta] of Object.entries(APPROVAL_CHECKS)){
  assert.ok(APPROVAL_GROUPS[meta.group],"Unknown approval group "+id);
