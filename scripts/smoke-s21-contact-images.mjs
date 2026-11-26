@@ -136,3 +136,13 @@ const cronList=JSON.parse(read("vercel.json")).crons;
 assert.ok(cronList.some(x=>x.path==="/api/cron/contact-image-cleanup"&&x.schedule==="50 12 * * *"));
 assert.ok(cronList.some(x=>x.path==="/api/cron/rental-reminders"),"Rental jobs untouched");
 console.log("S-21 bestått: kun kvitteringsbevis knytter private kundebilder til forespørsel, ubekreftet offentlig sletting 403, trygg 24t opprydding og uendrede utleiejobber. Kun syntetiske filer.");
+
+const cronCode=cron.replace(/^import .*;\n/gm,"").replace(/^export const .*;\n/gm,"").replace("export async function GET","async function GET");
+let backlog={cleanup_review:0,cleaning:0,pending:0},countError=false;
+const cleanupDb=()=>({from(table){assert.equal(table,"contact_image_uploads");let state="",countOnly=false;const q={select(fields,opts){countOnly=Boolean(opts?.head);return q},eq(k,v){assert.equal(k,"state");state=v;return q},lt(){return q},order(){return q},limit(){return q},then(resolve,reject){return Promise.resolve(countOnly?{count:countError?null:backlog[state],error:countError?{code:"TEST"}:null}:{data:[],error:null}).then(resolve,reject)}};return q}});
+const runCleanup=new Function("NextResponse","withServiceCronMonitoring","cronGuard","db","process",cronCode+";return GET;")(NextResponse,async(key,req,fn)=>{assert.equal(key,"contact-image-cleanup");return fn()},()=>null,cleanupDb,{env:{VERCEL_ENV:"production"}});
+assert.equal((await runCleanup({})).status,200);
+backlog={cleanup_review:2,cleaning:1,pending:0};let status=await runCleanup({});assert.equal(status.status,207);assert.equal(status.body.requiresReview,3);
+backlog={cleanup_review:0,cleaning:0,pending:5};status=await runCleanup({});assert.equal(status.status,207);assert.equal(status.body.remainingPending,5);
+countError=true;assert.equal((await runCleanup({})).status,503);
+console.log("S21 backlog: unresolved deletion attempts and overdue pending rows remain visible; no deletion or retry in count checks.");
