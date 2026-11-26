@@ -50,7 +50,7 @@ export default async function RentalDashboard(){
    <Stat label="Retur i dag" value={stats.due} href="/admin?vis=rentalCalendar" description="Utlevert utstyr"/>
    <Stat label="Forsinket retur" value={stats.late} href="/admin?vis=rentalBookings" description="Bruk filter for forsinkede returer"/>
    <Stat label="Returnert, ikke fullført" value={stats.returned} href="/admin?vis=rentalBookings" description="Kontroller oppgjør"/>
-  </div><nav className={styles.links}><Link href="/admin?vis=rentalBookings">Bookinger</Link><Link href="/admin?vis=rentalCalendar">Kalender</Link><Link href="/admin/utleie/depositum">Depositum og returkontroll</Link>{user.role==="owner"&&<Link href="/admin/utleie/manuell-booking">Ny manuell booking</Link>}</nav></section>}
+  </div><nav className={styles.links}><Link href="/admin?vis=rentalBookings">Bookinger</Link><Link href="/admin?vis=rentalCalendar">Kalender</Link><Link href="/admin/utleie/depositum">Depositum og returkontroll</Link>{user.role==="owner"&&<><Link href="/admin/utleie/manuell-booking">Ny manuell booking</Link><Link href="/admin/utleie/tidsvinduer">Henting og retur – tidsvinduer</Link></>}</nav></section>}
   {products&&<section><h2>Utstyrspark</h2><div className={styles.grid}>
    <Stat label="Produkter" value={stats.products} href="/admin/utleie" description="Alle registrerte produkttyper"/>
    <Stat label="Publisert og bookbart" value={stats.published} href="/admin/utleie" description="Ikke sanntids lagerkapasitet"/>
