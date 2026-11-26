@@ -12,7 +12,7 @@ export default function Personvern(){
   <div className="kicker">AADLAND SERVICE</div>
   <h1>Personvernerklæring</h1>
   <p className="legalLead">Her forklarer vi hvilke personopplysninger vi kan behandle når du besøker nettstedet, kontakter oss, får tilbud, bestiller varer eller tjenester, betaler eller bruker Min side.</p>
-  <p className="muted">Sist oppdatert: 25. november 2026.</p>
+  <p className="muted">Sist oppdatert: 26. november 2026.</p>
 
   <h2>1. Hvem er ansvarlig?</h2>
   <p><strong>{COMPANY_INFO.name}</strong> er behandlingsansvarlig for opplysninger som virksomheten samler inn og bruker til sine tjenester, også utleiedelen Aadland Utleie.</p>
@@ -64,7 +64,9 @@ export default function Personvern(){
 
   <h2>8. Informasjonskapsler og lokal lagring</h2>
   <p>Ved innlogging bruker vi nødvendige sesjonsinformasjonskapsler. Kundesesjonen kan vare i opptil 30 dager, og administrasjonssesjonen i opptil 14 dager dersom du ikke logger ut tidligere. Disse brukes til innlogging og tilgangsstyring, ikke til markedsføring.</p>
-  <p>Noen interne administrasjonsfunksjoner, blant annet kalkulator og utkast i materialverktøy, kan lagre arbeidsdata lokalt i nettleseren. Slik lokal lagring er ikke det samme som at opplysningene automatisk er sendt til en ekstern leverandør.</p>
+  <p>For å gjennomføre handlinger du selv velger, kan nettleseren midlertidig lagre valgt tjeneste, produktvalg for et gjenkjøp og tilgangsinformasjon til et tilbud i den aktuelle nettleserøkten. Tilgangsinformasjonen gir ikke lengre gyldighet enn det tilbudslenken tillater på serveren.</p>
+  <p>Noen interne administrasjonsfunksjoner, blant annet kalkulator, utkast i materialverktøy, testfremdrift og skriverinnstillinger, kan lagre arbeidsdata lokalt i nettleseren. Skriverens PIN kan lagres lokalt når administrator uttrykkelig velger dette, og kan fjernes i skannerverktøyet. På delt utstyr bør slik lagring unngås. Lokal lagring er ikke det samme som at opplysningene automatisk er sendt til en ekstern leverandør.</p>
+  <p>Du kan fjerne lokalt lagrede opplysninger og informasjonskapsler gjennom nettleserens innstillinger. Det kan føre til utlogging eller tap av lokale utkast. Sletting i nettleseren sletter ikke opplysninger som allerede er lagret på serveren.</p>
 
   <h2>9. Hvor lenge lagrer vi opplysninger?</h2>
   <p>Vi oppbevarer opplysningene så lenge de trengs for formålet de ble samlet inn for, for å følge opp et kundeforhold, håndtere eventuelle krav eller oppfylle lovpålagt dokumentasjonsplikt. Fakturaer og regnskapsbilag kan derfor bli oppbevart lenger enn vanlige henvendelser. Konkrete lagringstider avhenger av dokumenttype og gjeldende krav.</p>
