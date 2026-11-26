@@ -1,4 +1,5 @@
 "use client";
+import {rentalWindowSummary} from "../../lib/rentalPickupWindows.mjs";
 
 import {useEffect,useRef,useState} from "react";
 import Link from "next/link";
@@ -869,7 +870,7 @@ export default function MinSide(){
          {String(r.payment_provider||"").toLowerCase()==="vipps"&&Number(r.payment_reserved_ore)>0&&<span><small>Reservert i Vipps</small><b>{kr(r.payment_reserved_ore)}</b></span>}
          {Number(r.payment_captured_ore)>0&&<span><small>Registrert betalt</small><b>{kr(r.payment_captured_ore)}</b></span>}
          {String(r.payment_provider||"").toLowerCase()==="vipps"&&r.payment_capture_guaranteed_until&&<span><small>Reservasjon gyldig til</small><b>{dateTimeFull(r.payment_capture_guaranteed_until)}</b></span>}
-         <span><small>Utlevering</small><b>{fulfillmentStatus[r.customer?.fulfillment]||"Ikke registrert"}</b></span>
+         <span><small>Utlevering</small><b>{fulfillmentStatus[r.customer?.fulfillment]||"Ikke registrert"}</b></span>{rentalWindowSummary(r.customer)&&<span><small>Tidsønsker</small><b>{rentalWindowSummary(r.customer)}</b></span>}
          {Number(r.deposit_ore)>0&&<span><small>Depositum</small><b>{kr(r.deposit_ore)} · {depositStatus[r.deposit_status]||r.deposit_status||"Ikke registrert"}</b></span>}
         </div>
         {String(r.payment_provider||"").toLowerCase()==="vipps"&&r.payment_status==="authorized"&&<div className="customerPaymentConfirmation">
@@ -935,7 +936,7 @@ export default function MinSide(){
          <span><small>Periode</small><b>{date(r.start_date)} – {date(r.end_date)}</b></span>
          <span><small>Leiepris</small><b>{kr(r.total_ore)}</b></span>
          <span><small>Betaling</small><b>{paymentStatus[r.payment_status]||r.payment_status||"Ikke registrert"}</b></span>
-         <span><small>Utlevering</small><b>{fulfillmentStatus[r.customer?.fulfillment]||"Ikke registrert"}</b></span>
+         <span><small>Utlevering</small><b>{fulfillmentStatus[r.customer?.fulfillment]||"Ikke registrert"}</b></span>{rentalWindowSummary(r.customer)&&<span><small>Tidsønsker</small><b>{rentalWindowSummary(r.customer)}</b></span>}
          {Number(r.deposit_ore)>0&&<span><small>Depositum</small><b>{kr(r.deposit_ore)} · {depositStatus[r.deposit_status]||r.deposit_status||"Ikke registrert"}</b></span>}
         </div>
         {rentalPortalExpired(r,portalNow)&&<div className="customerPaymentConfirmation"><b>Reservasjonen er utløpt</b><span>Velg en ny ledig periode hvis du fortsatt ønsker å leie.</span></div>}

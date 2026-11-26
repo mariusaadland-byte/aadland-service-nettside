@@ -3,7 +3,8 @@ import {getAdminUser} from "../../../../../lib/auth";
 import {sameOriginGuard} from "../../../../../lib/requestGuard";
 import {rateLimitRequest} from "../../../../../lib/rateLimit";
 import {db,fromDbRentalItem} from "../../../../../lib/supabase";
-import {osloDateKey} from "../../../../../lib/osloTime";
+import {osloDateKey,osloDateTimeLocal} from "../../../../../lib/osloTime";
+import {rentalWindowConfig} from "../../../../../lib/rentalPickupWindows.mjs";
 import {calculateRentalPrice,rentalQuoteMatches} from "../../../../../lib/rentalPricing.mjs";
 import {countedRentalBookings,peakRentalBookings} from "../../../../../lib/rentalAvailability";
 import {rentalOverlapOr,extendOverdueAvailability} from "../../../../../lib/rentalOverdue.mjs";
@@ -16,7 +17,7 @@ export async function POST(req){
  const user=await getAdminUser();if(!user||user.role!=="owner")return json({error:"Ingen tilgang."},403);
  if(process.env.VERCEL_ENV!=="production"||process.env.RENTAL_MANUAL_BOOKING_ENABLED!=="true"||process.env.RENTAL_PUBLIC_BOOKING_ENABLED==="true")return json({error:"Manuell booking er ikke aktivert for denne klargjøringsfasen."},503);
  const limited=await rateLimitRequest(req,{scope:"rental-manual-booking",max:15,windowSeconds:900,message:"For mange forespørsler. Prøv igjen senere."});if(limited)return limited;
- const today=osloDateKey(new Date()),input=manualRentalInput(await req.json().catch(()=>null),today);
+ const today=osloDateKey(new Date()),input=manualRentalInput(await req.json().catch(()=>null),today,rentalWindowConfig(process.env),osloDateTimeLocal(new Date()));
  if(!input)return json({error:"Kontroller datoer, kundeopplysninger, pris og dokumentert kundegodkjenning."},400);
  const s=db();if(!s)return json({error:"Database utilgjengelig."},503);
  const number=manualRentalNumber(input.requestId),fields="id,booking_number,rental_item_id,start_date,end_date,total_ore,deposit_ore,terms_version,customer,status";

@@ -1,5 +1,6 @@
 "use client";
 
+import {rentalWindowSummary} from "../../lib/rentalPickupWindows.mjs";
 import {rentalHandoverChecklist} from "../../lib/rentalHandover.mjs";
 import RentalConditionPhotos from "./utleie/RentalConditionPhotos";
 import {rentalOverdue,rentalLateEstimate} from "../../lib/rentalOverdue.mjs";
@@ -4934,6 +4935,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymen
    {late.days>0&&<div className="notice"><b>Retur forsinket med {late.days} kalenderdager</b><p>Avtalt retur: {b.endDate}. Kontakt kunden og avklar faktisk retur.</p><p>{late.estimateOre===null?"Opprinnelig døgnpris mangler. Beregn manuelt.":"Veiledende ekstra leie ved ordinær avtalt døgnpris: "+nok(late.estimateOre)+" inkl. mva."} Dette er kun et anslag. Ingen gebyr, faktura eller belastning opprettes automatisk.</p></div>}
    {issue&&<div className="notice"><b>Krever oppmerksomhet</b><br/><span>{issue}</span></div>}
    <p><b>{b.customer?.name}</b><br/>{b.customer?.phone} · {b.customer?.email}<br/>{b.customer?.fulfillment==="delivery"?"Levering":"Henting"}{b.customer?.address?" · "+b.customer.address:""}</p>
+   {rentalWindowSummary(b.customer)&&<p><b>{rentalWindowSummary(b.customer)}</b></p>}
    <div className="rentalBookingSummary">
     <span><small>Periode</small><b>{b.startDate} – {b.endDate}</b></span>
     <span><small>Leiepris</small><b>{nok(b.totalOre)}</b></span>
