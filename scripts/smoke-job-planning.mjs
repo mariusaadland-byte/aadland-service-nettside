@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 const route=readFileSync("app/api/admin/jobs/plan/route.js","utf8").replace(/^import .*;\n/gm,"").replace(/export /g,"");
-const {validDate,savePlan}=new Function("NextResponse","getAdminUser","db","sameOriginGuard",route+"return {validDate,savePlan};")({},()=>null,()=>null,()=>null);
+const {validDate,savePlan,jobDelivery}=new Function("NextResponse","getAdminUser","db","sameOriginGuard",route+"return {validDate,savePlan,jobDelivery};")({},()=>null,()=>null,()=>null);
 assert.equal(validDate("2026-02-30T10:00:00Z"),null);
 assert.equal(validDate("2026-10-21T10:00:00Z"),"2026-10-21T10:00:00.000Z");
 assert.equal(validDate("2026-10-21T10:00:00+02:00"),null);
@@ -35,3 +35,14 @@ assert.ok(ui.includes("blockedByUnresolved"));
 assert.ok(ui.includes("Bekreftelse er sendt til "));
 assert.ok(ui.includes("function review()"));
 console.log("Oppdragsplanlegging S-27: atomisk revisjonslagring, dato, status og sikker UI bestått.");
+
+// A held attempt may be older than 40 other plan versions. Read it independently.
+const currentRevision="current-revision";
+const currentAttempt={id:"current",plan_revision:currentRevision,state:"sent",provider_email_id:"mock-provider"};
+const oldHeld={id:"old-held",plan_revision:"older-revision",state:"needs_review",recipient_email:"test@example.invalid",claimed_at:"2026-01-01T00:00:00Z"};
+let failPending=false,failCurrent=false,lookupCount=0;
+const deliveryDb={from(table){assert.equal(table,"job_plan_confirmation_attempts");let pending=false,revision=null;const q={select(){return q},eq(k,v){if(k==="order_id")assert.equal(v,"order");else{assert.equal(k,"plan_revision");revision=v;}return q},in(k,values){assert.equal(k,"state");assert.deepEqual(values,["sending","needs_review"]);pending=true;return q},order(){return q},limit(n){assert.equal(n,1);return q},async maybeSingle(){lookupCount++;if(pending)return {data:failPending?null:oldHeld,error:failPending?{code:"TEST"}:null};assert.equal(revision,currentRevision);return {data:failCurrent?null:currentAttempt,error:failCurrent?{code:"TEST"}:null}}};return q}};
+let delivery=await jobDelivery(deliveryDb,"order",currentRevision,null);assert.equal(delivery.status.state,"sent");assert.equal(delivery.status.unresolved.id,"old-held");assert.equal(lookupCount,2);
+failPending=true;assert.deepEqual(await jobDelivery(deliveryDb,"order",currentRevision,null),{error:true});failPending=false;failCurrent=true;assert.deepEqual(await jobDelivery(deliveryDb,"order",currentRevision,null),{error:true});failCurrent=false;
+delivery=await jobDelivery(deliveryDb,"order",null,null);assert.equal(delivery.status.state,"not_sent");assert.equal(delivery.status.unresolved.id,"old-held");
+console.log("S27 exact current and unresolved delivery lookups: no arbitrary history cutoff.");
