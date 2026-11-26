@@ -4,6 +4,8 @@ import {useCallback,useEffect,useState} from "react";
 const CONFIRM={sent:"BEKREFTET I RESEND",unsent:"IKKE SENDT"};
 export default function CustomerVerificationReview(){
  const [items,setItems]=useState([]);
+ const [total,setTotal]=useState(null);
+ const [loadFailed,setLoadFailed]=useState(false);
  const [loading,setLoading]=useState(true);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
@@ -14,18 +16,19 @@ export default function CustomerVerificationReview(){
  const [note,setNote]=useState("");
  const [confirmation,setConfirmation]=useState("");
  const load=useCallback(async()=>{
-  setLoading(true);setError("");
+  setLoading(true);setError("");setLoadFailed(false);setTotal(null);setItems([]);setOpenId(null);
   try{
    const result=await fetch("/api/admin/customer-verifications",{cache:"no-store"});
    const data=await result.json().catch(()=>({}));
    if(!result.ok)throw Error(data.error||"Kunne ikke hente sendeloggen.");
-   setItems(Array.isArray(data.attempts)?data.attempts:[]);
-  }catch(e){setError(e.message||"Kunne ikke hente sendeloggen.");}
+   if(!Array.isArray(data.attempts)||!Number.isSafeInteger(data.total)||data.total<data.attempts.length)throw Error("Sendeloggen kunne ikke bekreftes.");
+   setItems(data.attempts);setTotal(data.total);
+  }catch(e){setLoadFailed(true);setError(e.message||"Kunne ikke hente sendeloggen.");}
   finally{setLoading(false);}
  },[]);
  useEffect(()=>{load();},[load]);
  async function review(item){
-  if(busy||!item?.id||!CONFIRM[outcome])return;
+  if(busy||loading||loadFailed||!item?.id||!CONFIRM[outcome])return;
   if(confirmation!==CONFIRM[outcome]||note.trim().length<12||
    outcome==="sent"&&providerId.trim().length<8){
    setError("Kontroller Resend og fyll ut valgt resultat, begrunnelse, bekreftelsestekst og eventuell e-post-ID.");return;
@@ -57,8 +60,9 @@ export default function CustomerVerificationReview(){
    {loading?"Oppdaterer …":"Oppdater sendeloggen"}</button>
   {error&&<p role="alert" className="notice">{error}</p>}
   {success&&<p role="status" className="success">{success}</p>}
-  {!loading&&!items.length&&<p>Ingen uavklarte bekreftelsesmailer er registrert.</p>}
-  {items.map(item=><div key={item.id} className="card" style={{padding:16}}>
+  {!loading&&!loadFailed&&total===0&&<p>Ingen uavklarte bekreftelsesmailer er registrert.</p>}
+  {!loading&&!loadFailed&&total>0&&<p>Viser {items.length} av {total} uavklarte sendeforsøk. {total>items.length?"Eldre forsøk vises først. Oppdater etter avklaring for å se resten.":""}</p>}
+  {!loading&&!loadFailed&&items.map(item=><div key={item.id} className="card" style={{padding:16}}>
    <strong>{item.recipient_email}</strong>
    <p style={{margin:"8px 0"}}>Forsøk: {new Date(item.claimed_at).toLocaleString("nb-NO")} ·
     {item.state==="needs_review"?" Avventer kontroll":" Utsending pågår eller stoppet"}</p>
