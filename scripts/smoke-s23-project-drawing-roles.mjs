@@ -113,3 +113,22 @@ const adminAuth=read("lib/auth.js");
 assert.ok(adminAuth.includes("sameSessionVersion(session.version,currentVersion)"),
  "Permission uses authenticated, verified active admin session");
 console.log("S-23 bestått: view-only can GET but cannot POST/PATCH/DELETE; editors/owner can write; CSRF, invalid IDs, read-only 2D/3D viewer and PDF are protected. No production writes.");
+
+// Summary status must not silently treat an inaccessible publication table as empty.
+let publicationFails=true,pagesRead=0;
+const summaryDb=()=>({from(table){
+ let offset=0;
+ const q={select(){return q},order(){return q},limit(){return q},in(k,ids){assert.equal(k,"drawing_id");assert.deepEqual(ids,[id]);return q},range(from,to){offset=from;assert.equal(to,from+499);return q},then(resolve,reject){
+  if(table==="project_drawings")return Promise.resolve({data:[drawing],error:null}).then(resolve,reject);
+  assert.equal(table,"quote_drawing_publications");pagesRead++;
+  return Promise.resolve(publicationFails?{data:null,error:{code:"TEST"}}:{data:offset===0?Array.from({length:500},(_,i)=>({id:"p"+i,drawing_id:id})):[],error:null}).then(resolve,reject);
+ }};return q;
+}});
+const summaryActions=new Function("sameOriginGuard","NextResponse","getAdminUser","db","canReadProjectDrawings","canEditProjectDrawings",src+";return {GET};")(()=>null,NextResponse,async()=>({role:"owner",active:true}),summaryDb,canReadProjectDrawings,canEditProjectDrawings);
+const summaryRequest={url:"https://www.aadland-service.no/api/admin/project-drawings?summary=1"};
+let summaryResult=await summaryActions.GET(summaryRequest);
+assert.equal(summaryResult.status,503);assert.ok(!("publishedIds" in summaryResult.payload));
+publicationFails=false;pagesRead=0;summaryResult=await summaryActions.GET(summaryRequest);
+assert.equal(summaryResult.status,200);assert.deepEqual(summaryResult.payload.publishedIds,[id]);assert.equal(pagesRead,2);
+assert.ok(archiveUI.includes("Delingsstatus kunne ikke bekreftes."));
+console.log("S23: sharing summary fails closed, scoped and paginated publication reads, duplicate IDs deduplicated.");
