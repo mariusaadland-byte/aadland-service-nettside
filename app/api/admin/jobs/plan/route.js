@@ -74,13 +74,14 @@ export async function GET(req){
 }
 
 async function jobDelivery(s,id,revision,previousSentAt){
- const {data,error}=await s.from("job_plan_confirmation_attempts")
-  .select("id,plan_revision,state,recipient_email,claimed_at,sent_at,provider_email_id,issue")
-  .eq("order_id",id).order("claimed_at",{ascending:false}).limit(40);
- if(error)return {error:true};
- const attempts=data||[];
- const unresolved=attempts.find(a=>["sending","needs_review"].includes(a.state));
- const current=attempts.find(a=>a.plan_revision===revision);
+ const columns="id,plan_revision,state,recipient_email,claimed_at,sent_at,provider_email_id,issue";
+ const [pending,currentResult]=await Promise.all([
+  s.from("job_plan_confirmation_attempts").select(columns).eq("order_id",id)
+   .in("state",["sending","needs_review"]).order("claimed_at",{ascending:true}).order("id",{ascending:true}).limit(1).maybeSingle(),
+  revision?s.from("job_plan_confirmation_attempts").select(columns).eq("order_id",id).eq("plan_revision",revision).maybeSingle():Promise.resolve({data:null,error:null})
+ ]);
+ if(pending.error||currentResult.error)return {error:true};
+ const unresolved=pending.data,current=currentResult.data;
  return {status:{
   state:current?.state||(previousSentAt?"legacy_sent":"not_sent"),
   attemptId:current?.id||null,
@@ -219,16 +220,16 @@ export async function POST(req){ const originError=sameOriginGuard(req); if(orig
   await holdAttempt(s,attempt.id,"plan_or_recipient_changed",true);
   return NextResponse.json({error:"Planen ble endret før sending. Ingen e-post ble sendt; last inn gjeldende plan."},{status:409});
  }
- const title=loaded.quote?.title||"Oppdrag";
+ const title=preflight.quote?.title||"Oppdrag";
  const startText=new Date(saved.data.job_start_at).toLocaleString("nb-NO",{
   dateStyle:"long",timeStyle:"short",timeZone:"Europe/Oslo"
  });
- const customerName=clean(saved.data.customer?.name,180)||"kunde";
- const quoteNo=loaded.quote?.quote_number||"";
+ const customerName=clean(now.customer?.name,180)||"kunde";
+ const quoteNo=preflight.quote?.quote_number||"";
  const requestOrigin=new URL(req.url).origin;
  const configuredOrigin=String(process.env.NEXT_PUBLIC_SITE_URL||"").replace(/\/$/,"");
  const base=process.env.VERCEL_ENV==="preview"?requestOrigin:(configuredOrigin||requestOrigin);
- const accountUrl=saved.data.customer_user_id?base+"/min-side":"";
+ const accountUrl=now.customer_user_id?base+"/min-side":"";
  const html=`<!doctype html><html><body style="margin:0;background:#f3efe8;font-family:Arial,Helvetica,sans-serif;color:#181613">
  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3efe8;padding:28px 12px"><tr><td align="center">
  <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#fff;border:1px solid #ded7cb">
