@@ -55,3 +55,15 @@ for(const path of application){
   "Preview can fall back to production API key: "+path);
 }
 console.log("S-31 bestått: preview og lokal utvikling avviser selv ekte produksjonsnøkler, "+imports+" sendere er samlet bak sperren, prod-only SDK virker, begge testkvitteringer er blokkert.");
+
+// Actual Service test route: PDF only, no provider, no writes, no user input.
+const receiptSource=read("app/api/admin/test-receipt/route.js").replace(/^import .*;\n/gm,"").replace(/^export /gm,"");
+let receiptEnv={VERCEL_ENV:"preview"},actor={role:"owner"},permission=true,pdfCalls=0;
+const receiptRoutes=new Function("NextResponse","sameOriginGuard","getAdminUser","hasPermission","buildReceiptPdf","receiptPdfFilename","process",receiptSource+";return {GET,POST};")({json:(body,opts={})=>({body,status:opts.status||200})},()=>null,async()=>actor,async()=>permission,async data=>{pdfCalls++;assert.equal(data.test,true);assert.equal(data.totalOre,1055000);assert.equal(data.customerEmail,"test@example.invalid");return Buffer.from("%PDF-synthetic");},()=> "TEST.pdf",{env:receiptEnv});
+assert.equal((await receiptRoutes.POST({})).status,403);assert.equal(pdfCalls,0);
+receiptEnv.VERCEL_ENV="production";assert.equal((await receiptRoutes.GET()).status,404);assert.equal((await receiptRoutes.POST({})).status,404);assert.equal(pdfCalls,0);
+receiptEnv.VERCEL_ENV="preview";actor=null;assert.equal((await receiptRoutes.GET()).status,401);actor={role:"staff"};permission=false;assert.equal((await receiptRoutes.GET()).status,403);assert.equal(pdfCalls,0);
+permission=true;const pdfResponse=await receiptRoutes.GET();assert.equal(pdfResponse.status,200);assert.equal(pdfResponse.headers.get("Content-Type"),"application/pdf");assert.match(pdfResponse.headers.get("Cache-Control"),/no-store/);assert.equal(await pdfResponse.text(),"%PDF-synthetic");assert.equal(pdfCalls,1);
+assert.ok(!receiptSource.includes("Resend"));assert.ok(!receiptSource.includes(".send("));
+const receiptUi=read("app/admin/test-kvittering/TestReceiptClient.js");assert.ok(receiptUi.includes("Åpne testkvittering (PDF)"));assert.ok(!receiptUi.includes("type=\"email\""));assert.ok(!receiptUi.includes("fetch("));
+console.log("S31: authenticated preview-only synthetic PDF, no email sending path.");
