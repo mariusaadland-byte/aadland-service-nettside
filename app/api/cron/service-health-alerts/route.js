@@ -15,7 +15,7 @@ export async function GET(req){
  const denial=cronGuard(req);if(denial)return denial;
  if(process.env.VERCEL_ENV!=="production")
   return json({error:"Driftsvarsling kjøres bare i produksjon."},403);
- const day=new Date().toISOString().slice(0,10);
+ const now=Date.now(),day=new Date(now).toISOString().slice(0,10);
  if(day<SERVICE_CRON_FIRST_COMPLETE_DAY)
   return json({ok:true,monitored:false,reason:"Venter på første hele driftsdag."});
  const s=db();if(!s)return json({error:"Database ikke konfigurert."},503);
@@ -25,8 +25,8 @@ export async function GET(req){
   .order("started_at",{ascending:false}).limit(500);
  if(history.error||!Array.isArray(history.data)||history.data.length>=500)
   return json({error:"Driftsloggen kunne ikke leses fullstendig."},503);
- const health=SERVICE_CRON_JOBS.map(job=>serviceCronDailyStatus(job,history.data,day));
- const issues=health.filter(x=>x.state!=="ok"&&x.state!=="starting");
+ const health=SERVICE_CRON_JOBS.map(job=>serviceCronDailyStatus(job,history.data,day,now));
+ const issues=health.filter(x=>!["ok","starting","waiting"].includes(x.state));
  if(!issues.length)return json({ok:true,date:day,checked:health.length,problems:0,sent:0});
  if(!process.env.RESEND_API_KEY)
   return json({error:"Feil oppdaget, men e-postvarsling er ikke konfigurert."},503);
