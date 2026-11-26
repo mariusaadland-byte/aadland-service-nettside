@@ -3,7 +3,7 @@ import {readFileSync} from "node:fs";
 
 const policy=readFileSync("app/personvern/page.js","utf8");
 for(const phrase of [
- "25. november 2026","COMPANY_INFO","COMPANY_ADDRESS",
+ "26. november 2026","produktvalg for et gjenkjøp","tilgangsinformasjon til et tilbud","skriverinnstillinger","Sletting i nettleseren","COMPANY_INFO","COMPANY_ADDRESS",
  "personvernforordningen artikkel 6","Supabase","Vercel","Resend","Vipps","Tripletex",
  "Have I Been Pwned","Pwned Passwords","fem år etter regnskapsårets slutt",
  "fakturering","innsyn","sletting","begrensning","Datatilsynet",
@@ -21,3 +21,5 @@ assert.ok(sessions.includes("60*60*24*30"),"Customer session max age still 30 da
 assert.ok(admin.includes("60*60*24*14"),"Admin session max age still 14 days");
 assert.ok(readFileSync("app/HomeClient.js","utf8").includes('href="/personvern"'),"Contact form privacy link must remain");
 console.log("S-13: personverntekst, mottakere, behandlingsgrunnlag, lagring, rettigheter og cookie-fakta kontrollert.");
+
+for(const source of [sessions,admin])for(const setting of ["httpOnly:","sameSite:","secure:"])assert.ok(source.includes(setting));
