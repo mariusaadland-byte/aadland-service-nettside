@@ -12,11 +12,11 @@ export async function GET(){
  if(!admin)return NextResponse.json({error:"Bare eieren har tilgang."},{status:403});
  const s=db();
  if(!s)return NextResponse.json({error:"Databasen er utilgjengelig."},{status:503});
- const {data,error}=await s.from("customer_verification_delivery_attempts")
-  .select("id,recipient_email,state,claimed_at,issue")
-  .in("state",["sending","needs_review"]).order("claimed_at",{ascending:true}).limit(50);
- if(error)return NextResponse.json({error:"Sendeloggen kunne ikke hentes."},{status:503});
- return NextResponse.json({attempts:data||[]},{headers:{"Cache-Control":"no-store"}});
+ const {data,error,count}=await s.from("customer_verification_delivery_attempts")
+  .select("id,recipient_email,state,claimed_at,issue",{count:"exact"})
+  .in("state",["sending","needs_review"]).order("claimed_at",{ascending:true}).order("id",{ascending:true}).limit(50);
+ if(error||!Array.isArray(data)||!Number.isSafeInteger(count)||count<data.length)return NextResponse.json({error:"Sendeloggen kunne ikke hentes."},{status:503});
+ return NextResponse.json({attempts:data,total:count,hasMore:count>data.length},{headers:{"Cache-Control":"no-store"}});
 }
 export async function PATCH(req){
  const guard=sameOriginGuard(req);if(guard)return guard;
