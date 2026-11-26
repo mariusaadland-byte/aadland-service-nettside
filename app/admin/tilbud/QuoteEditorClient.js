@@ -5,7 +5,7 @@ import {bindQuoteDialogFocus} from "./quoteDialogFocus";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
 import {osloDateKey,shiftDateKey} from "../../../lib/osloTime";
-import {CATALOG_QUOTE_TRANSFER_KEY} from "../../../lib/calculatorQuoteLines";
+import {CATALOG_QUOTE_TRANSFER_KEY,sameCalculatorQuoteCustomer} from "../../../lib/calculatorQuoteLines";
 import QuoteCatalogSearch from "./QuoteCatalogSearch";
 import QuoteCustomerPicker from "./QuoteCustomerPicker";
 import QuoteLinkControls from "./QuoteLinkControls";
@@ -456,16 +456,13 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
       if(transfer?.quoteId===quoteId){
        sessionStorage.removeItem(CATALOG_QUOTE_TRANSFER_KEY);
        const expired=!Number.isFinite(transfer.createdAt)||Date.now()-transfer.createdAt>10*60*1000;
-       const expectedEmail=String(transfer.customer?.email||"").trim().toLowerCase();
-       const actualEmail=String(quote.customer?.email||"").trim().toLowerCase();
-       const sameCustomer=expectedEmail&&actualEmail
-        ?expectedEmail===actualEmail
-        :String(transfer.customer?.name||"").trim().toLowerCase()===String(quote.customer?.name||"").trim().toLowerCase();
+       const sameCustomer=sameCalculatorQuoteCustomer(transfer.customer,quote.customer);
        if(expired)transferProblem="Overføringen fra priskalkulatoren er utløpt. Prøv på nytt.";
        else if(quote.status!=="draft")transferProblem="Bare tilbudskladder kan få nye varer. Opprett en revisjon av sendte tilbud.";
        else if(!sameCustomer)transferProblem="Kunden i kalkulatoren er ikke den samme som på tilbudet. Varene er ikke lagt til.";
+       else if(!Array.isArray(transfer.lineItems)||transfer.lineItems.length>110)transferProblem="Overføringen har for mange eller ugyldige varelinjer. Ingen varer er lagt til.";
        else{
-        const incoming=(Array.isArray(transfer.lineItems)?transfer.lineItems:[]).slice(0,110).map(row=>({
+        const incoming=transfer.lineItems.map(row=>({
          id:lineId(),type:["work","material","other"].includes(row.type)?row.type:"material",
          description:String(row.description||"").trim().slice(0,500),
          quantity:Number(row.quantity)||1,

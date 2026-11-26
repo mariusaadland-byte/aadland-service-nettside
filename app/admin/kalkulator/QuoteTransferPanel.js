@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useMemo,useState} from "react";
-import {quoteLinesFromCalculator,CATALOG_QUOTE_TRANSFER_KEY} from "../../../lib/calculatorQuoteLines";
+import {quoteLinesFromCalculator,CATALOG_QUOTE_TRANSFER_KEY,sameCalculatorQuoteCustomer} from "../../../lib/calculatorQuoteLines";
 import styles from "./calculator.module.css";
 const norm=v=>String(v||"").trim().toLocaleLowerCase("nb-NO");
 export default function QuoteTransferPanel({form}){
@@ -22,9 +22,7 @@ export default function QuoteTransferPanel({form}){
  },[open]);
  const customer=selection==="new"?newContact:customers.find(row=>String(row.id||"")===selection)||null;
  const candidateQuotes=quotes.filter(q=>{
-  if(!customer?.name)return false;
-  const email=norm(customer.email),quoteEmail=norm(q.customer?.email);
-  return email&&quoteEmail?email===quoteEmail:norm(q.customer?.name)===norm(customer.name);
+  return sameCalculatorQuoteCustomer(customer,q.customer);
  });
  async function transfer(){
   setError("");
@@ -91,9 +89,10 @@ export default function QuoteTransferPanel({form}){
       <option value="">Velg tilbud …</option>{candidateQuotes.map(q=><option key={q.id} value={q.id}>{q.quoteNumber||"Kladd"} – {q.title}</option>)}
      </select></label>}
     </div>
+    {lines.length>110&&<p role="alert" className={styles.catalogError}>For mange linjer ({lines.length}). Del opp kalkylen før overføring. Ingen linjer er fjernet.</p>}
     <div className={styles.transferSummary}><span>{lines.length} prislinjer klare · priser eks. mva. og 25 % mva. i tilbud</span><small>Tilbudet åpnes som kladd. Du kontrollerer og lagrer det selv – ingenting sendes til kunden automatisk.</small></div>
     {error&&<p role="alert" className={styles.catalogError}>{error}</p>}
-    <button type="button" className={styles.quoteTransferSubmit} disabled={busy||!lines.length} onClick={transfer}>{busy?"Overfører …":destination==="existing"?"Legg til i valgt tilbudskladd":"Åpne nytt tilbud med varene →"}</button>
+    <button type="button" className={styles.quoteTransferSubmit} disabled={busy||!lines.length||lines.length>110} onClick={transfer}>{busy?"Overfører …":destination==="existing"?"Legg til i valgt tilbudskladd":"Åpne nytt tilbud med varene →"}</button>
    </>}
   </div>}
  </section>;

@@ -53,3 +53,16 @@ assert.ok(materialCatalogRoute.includes("export async function PATCH(req)"),"Sup
 assert.ok(materialCatalogRoute.includes("user.role!==\"owner\""),"Only owner may update shared markup");
 assert.ok(quoteEditorSource.includes("Array.isArray(data.drawings)?data.drawings:[]"),"quote editor must validate drawing list");
 assert.ok(quoteEditorSource.includes("typeof row.name===\"string\"?row.name:\"Tegning\""),"quote editor must sanitize drawing labels");
+
+const {sameCalculatorQuoteCustomer}=await import("data:text/javascript;base64,"+Buffer.from(source).toString("base64"));
+assert.equal(sameCalculatorQuoteCustomer({name:"Test",email:"a@example.invalid"},{name:"Test",email:"b@example.invalid"}),false);
+assert.equal(sameCalculatorQuoteCustomer({name:"Test"},{name:"Test"}),false);
+assert.equal(sameCalculatorQuoteCustomer({name:"Test",email:"a@example.invalid"},{name:"Test",phone:"12345678"}),false);
+assert.equal(sameCalculatorQuoteCustomer({name:"Test",email:"A@example.invalid"},{name:"Test",email:"a@example.invalid"}),true);
+assert.equal(sameCalculatorQuoteCustomer({name:"Test",phone:"+47 123 45 678"},{name:"test",phone:"12345678"}),true);
+assert.equal(sameCalculatorQuoteCustomer({name:"Test",phone:"12345678"},{name:"Test",phone:"98765432"}),false);
+const large=quoteLinesFromCalculator({materialItems:Array.from({length:121},(_,i)=>({name:"Test "+i,qty:1,costExVat:1}))});assert.equal(large.length,121,"No silently removed lines");
+const transferPanel=readFileSync("app/admin/kalkulator/QuoteTransferPanel.js","utf8");
+assert.ok(transferPanel.includes("sameCalculatorQuoteCustomer(customer,q.customer)")&&transferPanel.includes("lines.length>110"));
+assert.ok(quoteEditorSource.includes("sameCalculatorQuoteCustomer(transfer.customer,quote.customer)")&&quoteEditorSource.includes("transfer.lineItems.length>110"));
+console.log("Calculator transfer: no name-only customer matches, no silently truncated material lines.");
