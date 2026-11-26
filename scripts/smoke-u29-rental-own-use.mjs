@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {ownUseInput,ownUseMatches,ownUseReason} from "../lib/rentalOwnUse.mjs";
+const id="00000000-0000-4000-8000-000000000001",b={itemId:id,requestId:id,startDate:"2026-11-26",endDate:"2026-11-27",jobReference:"JOB-123",note:""};
+const x=ownUseInput(b,"2026-11-26");
+assert.equal(ownUseReason(x.reason),"JOB-123");assert.ok(ownUseMatches(x,x));assert.ok(!ownUseMatches(x,{...x,reason:"changed"}));
+assert.equal(ownUseInput({...b,startDate:"2026-11-25"},"2026-11-26"),null);assert.equal(ownUseInput({...b,endDate:"2026-02-30"},"2026-11-26"),null);assert.equal(ownUseInput({...b,jobReference:""},"2026-11-26"),null);
+const api=readFileSync("app/api/admin/rental/blocks/route.js","utf8");
+assert.ok(api.includes('internal&&process.env.RENTAL_PUBLIC_BOOKING_ENABLED==="true"'));assert.ok(api.includes("rentalOverlapOr("));assert.ok(api.includes("ownUseMatches"));assert.ok(api.includes("countedRentalBookings(bookings).length"));
+assert.ok(readFileSync("app/admin/utleie/eget-bruk/page.js","utf8").includes('hasPermission("canManageProducts")'));
+console.log("U-29 internal reservations, validation, replay identity and closed-public-booking guard passed.");
