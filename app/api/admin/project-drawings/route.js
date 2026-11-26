@@ -43,10 +43,21 @@ export async function GET(req){
  if(!summary)return NextResponse.json({drawings:(data||[]).map(map)},{headers:{"Cache-Control":"private, no-store"}});
  // The archive only needs metadata: no large plans transmitted until editing.
  const rows=(data||[]).map(row=>({...map(row),drawingData:undefined}));
- const {data:publications,error:pubError}=await s.from("quote_drawing_publications")
-  .select("drawing_id").not("drawing_id","is",null).limit(5000);
- const publishedIds=pubError?[]:[...new Set((publications||[]).map(row=>row.drawing_id).filter(Boolean))];
- return NextResponse.json({drawings:rows,publishedIds},{headers:{"Cache-Control":"private, no-store"}});
+ // Query only the returned drawings. Paginate because the database API may
+ // impose a lower row cap than the requested limit. Never infer private from error.
+ const published=new Set();
+ for(let start=0;start<rows.length;start+=100){
+  const ids=rows.slice(start,start+100).map(row=>row.id);
+  for(let offset=0;;offset+=500){
+   const {data:publications,error:pubError}=await s.from("quote_drawing_publications")
+    .select("id,drawing_id").in("drawing_id",ids).order("id",{ascending:true}).range(offset,offset+499);
+   if(pubError||!Array.isArray(publications))
+    return NextResponse.json({error:"Kunne ikke kontrollere hvilke tegninger som er delt med kunder. Prøv igjen."},{status:503,headers:{"Cache-Control":"private, no-store"}});
+   for(const row of publications)if(row.drawing_id)published.add(row.drawing_id);
+   if(publications.length<500)break;
+  }
+ }
+ return NextResponse.json({drawings:rows,publishedIds:[...published]},{headers:{"Cache-Control":"private, no-store"}});
 }
 export async function POST(req){ const originError=sameOriginGuard(req); if(originError)return originError;if(!(await allowed({write:true})))return NextResponse.json({error:"Kun ansatte med redigeringsrettighet kan endre eller slette tegninger."},{status:403});const b=await req.json();const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});const {data,error}=await s.from("project_drawings").insert(vals(b)).select("*").single();if(error){if(missing(error))return NextResponse.json({setupRequired:true,error:"Tegningslageret er ikke aktivert ennå."},{status:409});return NextResponse.json({error:error.message},{status:500})}return NextResponse.json({drawing:map(data)})}
 export async function PATCH(req){ const originError=sameOriginGuard(req); if(originError)return originError;if(!(await allowed({write:true})))return NextResponse.json({error:"Kun ansatte med redigeringsrettighet kan endre eller slette tegninger."},{status:403});const b=await req.json();if(!b.id)return NextResponse.json({error:"Tegning mangler."},{status:400});const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});const {data,error}=await s.from("project_drawings").update(vals(b)).eq("id",b.id).select("*").single();if(error){if(missing(error))return NextResponse.json({setupRequired:true,error:"Tegningslageret er ikke aktivert ennå."},{status:409});return NextResponse.json({error:error.message},{status:500})}return NextResponse.json({drawing:map(data)})}
