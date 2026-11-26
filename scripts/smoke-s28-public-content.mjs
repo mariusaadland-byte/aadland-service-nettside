@@ -35,14 +35,17 @@ assert.ok(home.includes("serviceActionLabel(service)"));
 assert.ok(!home.includes("Se alle tjenester →"));
 assert.ok(home.includes("Be om gratis befaring →"));
 assert.ok(home.includes('const showServices=siteSettings.showServices!==false&&homeServices.length>0;'));
-assert.ok(home.includes('data.services.length||data.configured===true'));
+assert.ok(home.includes('data.configured===false&&data.services.length===0?fallbackServices:data.services'));
+assert.ok(home.includes('const serviceSource=apiServices||[];'));
+assert.ok(home.includes('catch(()=>{if(alive)setApiServices([]);})'));
+assert.ok(services.includes('!Number.isSafeInteger(check.count)'));
 assert.ok(home.includes("{showServices&&<section id=\"tjenester\""));
 assert.ok(home.includes("{showServices&&<section className=\"serviceStrip\""));
 assert.ok(home.includes('imageUrl:safePublicImageUrl('));
 assert.ok(services.includes('{services,configured}'));
 assert.ok(services.includes('select("id",{count:"exact",head:true})'));
 assert.ok(services.includes("no-store"));
-assert.ok(servicePage.includes('data?.configured===false?fallback[slug]:null'),
+assert.ok(servicePage.includes('data?.configured===false&&Array.isArray(data.services)&&data.services.length===0&&Object.prototype.hasOwnProperty.call(fallback,slug)?fallback[slug]:null'),
  "Explicitly hidden services cannot fall back onto public static detail pages");
 assert.ok(projects.includes("imageUrls:Array.isArray(p.image_urls)?p.image_urls.map(safePublicImageUrl).filter(Boolean):[]"));
 assert.ok(projects.includes('block?.type==="image"?{...block,url:safePublicImageUrl(block.url)}:block'));
@@ -51,3 +54,11 @@ assert.ok(projectGallery.includes('Ingen prosjekter publisert ennå'));
 assert.ok(admin.includes('["services", "Tjenester"]'));
 assert.ok(admin.includes('["projects", "Tidligere oppdrag"]'));
 console.log("S-28 offentlig innhold: riktige tjenestelenker, skjult innhold, ærlig tomt galleri og trygge bilde-URL-er bestått.");
+
+// Actual service API handler: missing count must never authorize fallback.
+const serviceRoute=services.replace(/^import .*;\n/gm,"").replace("export async function GET","async function GET");
+let count=null,activeRows=[],queryError=null;
+const serviceDb=()=>({from(table){assert.equal(table,"services");let countOnly=false;const q={select(fields,opts){countOnly=Boolean(opts?.head);return q},eq(){return q},order(){return q},then(resolve,reject){return Promise.resolve(countOnly?{count,error:queryError}:{data:activeRows,error:null}).then(resolve,reject)}};return q}});
+const getServices=new Function("NextResponse","db","fromDbService",serviceRoute+";return GET;")({json:(body,opts={})=>({body,status:opts.status||200})},serviceDb,x=>x);
+assert.equal((await getServices()).status,503);count=0;assert.deepEqual((await getServices()).body,{services:[],configured:false});count=3;assert.deepEqual((await getServices()).body,{services:[],configured:true});queryError={code:"TEST"};assert.equal((await getServices()).status,503);
+console.log("S28 fallback requires confirmed empty configuration, missing count fails closed.");
