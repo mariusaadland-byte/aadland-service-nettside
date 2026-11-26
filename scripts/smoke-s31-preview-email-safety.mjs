@@ -32,15 +32,32 @@ function sources(directory){
  return readdirSync(directory,{withFileTypes:true}).flatMap(item=>{
   const full=path.join(directory,item.name);
   if(item.isDirectory())return sources(full);
-  return /\.(js|jsx|mjs|ts|tsx)$/.test(item.name)?[full.replaceAll("\\","/")]:[];
+  return /\.(js|jsx|mjs|cjs|ts|tsx|mts|cts)$/.test(item.name)?[full.replaceAll("\\","/")]:[];
  });
 }
+// Catch side-effect imports, package subpaths and whitespace variants too.
+// This is a source guard, not a complete JavaScript parser or network sandbox.
+function unguardedResendImport(source){
+ return /\b(?:from\s*|import\s*(?:\(\s*)?|require\s*\(\s*)["']resend(?:\/[^"']*)?["']/.test(source);
+}
+for(const example of [
+ 'import {Resend} from "resend";',
+ "import 'resend';",
+ 'await import ( "resend" )',
+ 'require ( "resend" )',
+ 'import {Client} from "resend/internal";',
+ "export {Resend} from 'resend';"
+])assert.ok(unguardedResendImport(example),"Must detect "+example);
+for(const example of [
+ 'import {Resend} from "./safeResend";',
+ 'import("resend-test-helper")',
+ 'require("./resend")'
+])assert.ok(!unguardedResendImport(example),"Must allow "+example);
 const application=[...sources("app"),...sources("lib")].filter(f=>f!=="lib/safeResend.js");
 let imports=0;
 for(const file of application){
  const s=read(file);
- const raw=/\b(?:from\s*["']resend["']|import\(\s*["']resend["']\s*\)|require\(\s*["']resend["']\s*\))/;
- assert.ok(!raw.test(s),"S31 unguarded Resend import in "+file);
+ assert.ok(!unguardedResendImport(s),"S31 unguarded Resend import in "+file);
  assert.ok(!s.includes("api.resend.com"),"S31 direct Resend provider request in "+file);
  if(/safeResend/.test(s))imports++;
 }
