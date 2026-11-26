@@ -184,5 +184,22 @@ assert.ok(followup.includes('.is("quote_link_disabled_at",null)'));
 assert.ok(followup.includes('Number(current.data.quote_link_generation)!==Number(quote.quote_link_generation)'));
 const migration=read("supabase/migrations/20261121153824_quote_link_controls_s19.sql");
 assert.ok(migration.includes("quote_link_generation")&&migration.includes("quote_link_disabled_at"));
+
+// Legacy or malformed stored JSON may contain arbitrary internal fields.
+// Both public token and session access must return only customer-facing scalars.
+quoteRow={...quote,customer:{...quote.customer,name:"Test",contactId:"private-reference",internalNotes:"private",phone:{secret:"nested"}},line_items:[{id:"L1",description:"Testvare",type:"material",quantity:2,unit:"stk",unitPriceOre:100,vatRate:25,internalUnitCostOre:42,supplierCost:10,internalNotes:"private"}],payment_plan:[{id:"P1",label:"Forskudd",percent:25,trigger:"Avtale",internalNotes:"private"}]};
+account=null;
+result=await parsed.GET(request(v2),opts);
+assert.equal(result.status,200);
+assert.deepEqual(result.body.quote.lineItems,[{id:"L1",type:"material",description:"Testvare",quantity:2,unit:"stk",unitPriceOre:100,vatRate:25}]);
+assert.deepEqual(result.body.quote.paymentPlan,[{id:"P1",label:"Forskudd",percent:25,trigger:"Avtale"}]);
+assert.deepEqual(result.body.quote.customer,{name:"Test",email:quote.customer.email});
+account={email:quote.customer.email};
+result=await parsed.GET(request(""),opts);
+assert.equal(result.status,200);
+assert.ok(!JSON.stringify(result.body).includes("internalUnitCostOre"));
+assert.ok(!JSON.stringify(result.body).includes("private-reference"));
+console.log("S19 public quote field isolation: historical internal fields and nested payloads excluded for token and session.");
+
 if(oldSecret==null)delete process.env.QUOTE_LINK_SECRET;else process.env.QUOTE_LINK_SECRET=oldSecret;
 console.log("S-19 bestått: utløpsdato, 60d HMAC, gamle lenker, revokering, eierkontroll, kundens innloggede historikk og null uønskede handlinger.");
