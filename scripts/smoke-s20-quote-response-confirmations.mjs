@@ -29,7 +29,8 @@ const quote={id:quoteId,status:"accepted",quote_number:"TEST-S20",title:"Utbedri
  customer:{name:"Test Kunde",email:"client@example.invalid"},total_inc_vat_ore:123456,
  accepted_at:new Date().toISOString(),planned_start_date:"2026-12-01"};
 let notices=[],sendCount=0,providerFails=false,dbWriteCount=0,quoteIsPresent=true;
-const now=new Date("2026-11-21T12:00:00.000Z");
+// Use a fresh fixture for dispatch, which intentionally uses the real clock.
+const now=new Date();
 function makeRows(){
  notices=[
   {id:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbb0001",quote_id:quoteId,
