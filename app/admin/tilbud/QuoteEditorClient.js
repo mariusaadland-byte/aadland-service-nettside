@@ -1,6 +1,7 @@
 "use client";
 
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
+import {bindQuoteDialogFocus} from "./quoteDialogFocus";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
 import {osloDateKey,shiftDateKey} from "../../../lib/osloTime";
@@ -88,6 +89,18 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
  const [paperBusy,setPaperBusy]=useState(false);
  const [showAlternateEmail,setShowAlternateEmail]=useState(false);
  const [alternateEmail,setAlternateEmail]=useState("");
+ const dialogRef=useRef(null);
+ const dialogBusyRef=useRef(false);
+ const dialogOpen=showPaperAccept||showAlternateEmail;
+ dialogBusyRef.current=showPaperAccept?paperBusy:sending;
+ useEffect(()=>{
+  if(!dialogOpen||!dialogRef.current)return;
+  return bindQuoteDialogFocus(dialogRef.current,{
+   isBusy:()=>dialogBusyRef.current,
+   onClose:()=>{setShowPaperAccept(false);setShowAlternateEmail(false);}
+  });
+ },[dialogOpen]);
+
  const [supplierSearch,setSupplierSearch]=useState({});
  const [minimumMaterialMarkup,setMinimumMaterialMarkup]=useState(15);
  const [defaultMaterialMarkup,setDefaultMaterialMarkup]=useState(15);
@@ -1203,15 +1216,15 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   </section>
 
   {showPaperAccept&&<div className="quoteModalBackdrop" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget&&!paperBusy)setShowPaperAccept(false)}}>
-   <div className="quoteModal" role="dialog" aria-modal="true" aria-labelledby="quotePaperAcceptTitle">
+   <div ref={dialogRef} tabIndex={-1} className="quoteModal" role="dialog" aria-modal="true" aria-labelledby="quotePaperAcceptTitle">
     <div>
      <div className="kicker">PAPIRGODKJENNING</div>
      <h2 id="quotePaperAcceptTitle">Registrer signert tilbud</h2>
      <p className="muted">Velg datoen kunden faktisk signerte papirutgaven.</p>
     </div>
     <div className="field">
-     <label>Signeringsdato</label>
-     <input type="date" max={osloDateKey(new Date())} value={paperAcceptDate} onChange={e=>setPaperAcceptDate(e.target.value)}/>
+     <label htmlFor="quotePaperAcceptDate">Signeringsdato</label>
+     <input id="quotePaperAcceptDate" type="date" max={osloDateKey(new Date())} value={paperAcceptDate} onChange={e=>setPaperAcceptDate(e.target.value)}/>
     </div>
     <div className="quoteModalActions">
      <button type="button" className="btn alt" disabled={paperBusy} onClick={()=>setShowPaperAccept(false)}>Avbryt</button>
@@ -1221,15 +1234,15 @@ export default function QuoteEditorClient({quoteId=null,sourceOrderId=null,initi
   </div>}
 
   {showAlternateEmail&&<div className="quoteModalBackdrop" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget&&!sending)setShowAlternateEmail(false)}}>
-   <div className="quoteModal" role="dialog" aria-modal="true" aria-labelledby="quoteAlternateEmailTitle">
+   <div ref={dialogRef} tabIndex={-1} className="quoteModal" role="dialog" aria-modal="true" aria-labelledby="quoteAlternateEmailTitle">
     <div>
      <div className="kicker">SEND KOPI</div>
      <h2 id="quoteAlternateEmailTitle">Send tilbudet til en annen e-post</h2>
      <p className="muted">Kundens lagrede e-postadresse blir ikke endret.</p>
     </div>
     <div className="field">
-     <label>E-postadresse</label>
-     <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck="false" value={alternateEmail} onChange={e=>setAlternateEmail(e.target.value)} placeholder="navn@epost.no" autoFocus/>
+     <label htmlFor="quoteAlternateEmailInput">E-postadresse</label>
+     <input id="quoteAlternateEmailInput" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck="false" value={alternateEmail} onChange={e=>setAlternateEmail(e.target.value)} placeholder="navn@epost.no"/>
     </div>
     <div className="quoteModalActions">
      <button type="button" className="btn alt" disabled={sending} onClick={()=>setShowAlternateEmail(false)}>Avbryt</button>
