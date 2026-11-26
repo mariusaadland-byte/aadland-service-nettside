@@ -20,8 +20,8 @@ export async function GET() {
   let configured=(data||[]).length>0;
   if(!configured){
     const check=await s.from("services").select("id",{count:"exact",head:true});
-    if(check.error)return NextResponse.json({error:"Tjenestestatus kunne ikke kontrolleres."},{status:503});
-    configured=(check.count||0)>0;
+    if(check.error||!Number.isSafeInteger(check.count)||check.count<0)return NextResponse.json({error:"Tjenestestatus kunne ikke kontrolleres."},{status:503});
+    configured=check.count>0;
   }
   return NextResponse.json({services,configured},{headers:{"Cache-Control":"no-store"}});
 }

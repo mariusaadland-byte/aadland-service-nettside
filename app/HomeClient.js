@@ -107,11 +107,12 @@ export default function Home(){
 
  useEffect(()=>{
   let alive=true;
-  fetch("/api/services").then(r=>r.ok?r.json():null).then(data=>{
-   // If all configured services are unpublished, do not reveal the static fallback.
-   if(alive&&Array.isArray(data?.services)&&(data.services.length||data.configured===true))
-    setApiServices(data.services);
-  }).catch(()=>{});
+  fetch("/api/services",{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("Tjenestene kunne ikke hentes.");return r.json();}).then(data=>{
+   if(!alive)return;
+   // Only an explicit, successful empty configuration permits static defaults.
+   if(!Array.isArray(data?.services)||typeof data.configured!=="boolean"){setApiServices([]);return;}
+   setApiServices(data.configured===false&&data.services.length===0?fallbackServices:data.services);
+  }).catch(()=>{if(alive)setApiServices([]);});
   return()=>{alive=false};
  },[]);
 
@@ -128,7 +129,7 @@ export default function Home(){
  const now=Date.now();
  const todayOslo=osloDateKey(new Date());
  const seasonalVisible=siteSettings.showSeasonal===true&&siteSettings.seasonalTitle&&(!siteSettings.seasonalFrom||siteSettings.seasonalFrom<=todayOslo)&&(!siteSettings.seasonalUntil||siteSettings.seasonalUntil>=todayOslo);
- const serviceSource=apiServices||fallbackServices;
+ const serviceSource=apiServices||[];
  const services=serviceSource.map(normalizeService)
   .filter(service=>service.active!==false)
   .filter(service=>!service.publishFrom||new Date(service.publishFrom).getTime()<=now)

@@ -15,14 +15,14 @@ export default function ServicePage(){
  useEffect(()=>{
   let active=true;
   setLoading(true);
-  fetch("/api/services")
+  fetch("/api/services",{cache:"no-store"})
    .then(r=>{if(!r.ok)throw Error("Tjenestene kunne ikke hentes.");return r.json();})
    .then(data=>{
     if(!active)return;
-    const found=(data?.services||[]).find(s=>s.slug===slug&&s.active!==false);
+    const found=(Array.isArray(data?.services)?data.services:[]).find(s=>s?.slug===slug&&s.active!==false);
     // Old hard-coded pages exist only while no services have ever been configured.
     // Once content is administered, a hidden service must not remain public.
-    setService(found||(data?.configured===false?fallback[slug]:null)||null);
+    setService(found||(data?.configured===false&&Array.isArray(data.services)&&data.services.length===0&&Object.prototype.hasOwnProperty.call(fallback,slug)?fallback[slug]:null)||null);
    })
    .catch(()=>{if(active)setService(null);})
    .finally(()=>{if(active)setLoading(false);});
@@ -30,7 +30,7 @@ export default function ServicePage(){
  },[slug]);
  if(loading)return <main className="catalogPage serviceDetail"><CatalogHeader/><div className="serviceDetailWrap"><p>Laster …</p></div><CatalogFooter/></main>;
  if(!service)return <main className="catalogPage serviceDetail"><CatalogHeader/><div className="serviceDetailWrap"><a href="/">← Forsiden</a><h1>Tjenesten ble ikke funnet</h1></div><CatalogFooter/></main>;
- const details=fallback[slug],points=details?.points||["Vi avklarer behov og ønsket resultat","Du får ryddig oppfølging gjennom prosjektet","Løsningen tilpasses jobben og stedet"];
+ const details=Object.prototype.hasOwnProperty.call(fallback,slug)?fallback[slug]:null,points=details?.points||["Vi avklarer behov og ønsket resultat","Du får ryddig oppfølging gjennom prosjektet","Løsningen tilpasses jobben og stedet"];
  const heroImage=safePublicImageUrl(service.imageUrl||"");
  function survey(){sessionStorage.setItem("aadland-service",service.title)}
  return <main className="catalogPage serviceDetail">
