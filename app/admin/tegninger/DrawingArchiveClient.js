@@ -30,7 +30,7 @@ export default function DrawingArchiveClient({canEdit=false}){
   setQuery(customer);
   let live=true;
   Promise.all([
-   fetch("/api/admin/project-drawings?summary=1",{cache:"no-store"}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"Kunne ikke hente tegninger");return d}),
+   fetch("/api/admin/project-drawings?summary=1",{cache:"no-store"}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"Kunne ikke hente tegninger");if(d.setupRequired)throw Error("Tegningslageret er ikke aktivert.");if(!Array.isArray(d.publishedIds))throw Error("Delingsstatus kunne ikke bekreftes.");return d}),
    fetch("/api/admin/customer-contacts",{cache:"no-store"}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"Kunne ikke hente kunder");return d.contacts||[]}).catch(()=>[])
   ]).then(([data,list])=>{
    if(!live)return;
@@ -85,9 +85,9 @@ export default function DrawingArchiveClient({canEdit=false}){
    <div className={styles.heading}><div><h1>Tegningsarkiv</h1><p>{canEdit?"Alle tegninger som er lagret på serveren, også uten prosjekt eller oppdrag. Finn dem igjen når du skal lage tilbud.":"Du har lesetilgang til prosjekttegninger. Endringer og sletting krever egne redigeringsrettigheter."}</p></div>{canEdit&&<Link className={styles.newButton} href="/admin/tegning">＋ Ny tegning</Link>}</div>
   </header>
   <section className={styles.stats} aria-label="Arkivstatus">
-   <div><span>Lagret i admin</span><strong>{drawings.length}</strong></div>
-   <div><span>Valgte tegninger</span><strong>{matches.length}</strong></div>
-   <div><span>Delt via tilbud / Min side</span><strong>{drawings.filter(row=>published.has(row.id)||row.customerVisible).length}</strong></div>
+   <div><span>Lagret i admin</span><strong>{loading||error?"—":drawings.length}</strong></div>
+   <div><span>Valgte tegninger</span><strong>{loading||error?"—":matches.length}</strong></div>
+   <div><span>Delt via tilbud / Min side</span><strong>{loading||error?"—":drawings.filter(row=>published.has(row.id)||row.customerVisible).length}</strong></div>
   </section>
   <section className={styles.toolbar} aria-label="Finn tegning">
    <label>Søk i arkivet<input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Navn, kunde, adresse eller tegning" /></label>
