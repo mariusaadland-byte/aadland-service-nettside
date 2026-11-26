@@ -5,6 +5,8 @@ const LABEL={capture:"Trekk betaling",cancel:"Kanseller reservasjon",refund:"Ref
 const money=ore=>(Number(ore||0)/100).toLocaleString("nb-NO",{style:"currency",currency:"NOK"});
 export default function ServiceVippsReview(){
  const [attempts,setAttempts]=useState([]);
+ const [total,setTotal]=useState(null);
+ const [loadFailed,setLoadFailed]=useState(false);
  const [loading,setLoading]=useState(true);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
@@ -16,13 +18,14 @@ export default function ServiceVippsReview(){
  const [note,setNote]=useState("");
  const [confirmation,setConfirmation]=useState("");
  const load=useCallback(async()=>{
-  setLoading(true);setError("");
+  setLoading(true);setError("");setLoadFailed(false);setTotal(null);setAttempts([]);setOpenId("");setDetails(null);
   try{
    const r=await fetch("/api/admin/vipps-service-review",{cache:"no-store"});
    const body=await r.json().catch(()=>({}));
    if(!r.ok)throw Error(body.error||"Kunne ikke hente sendeloggen.");
-   setAttempts(Array.isArray(body.attempts)?body.attempts:[]);
-  }catch(e){setError(e.message||"Kunne ikke hente Vipps-oversikten.");}
+   if(!Array.isArray(body.attempts)||!Number.isSafeInteger(body.total)||body.total<body.attempts.length)throw Error("Kontrollisten kunne ikke bekreftes.");
+   setAttempts(body.attempts);setTotal(body.total);
+  }catch(e){setLoadFailed(true);setError(e.message||"Kunne ikke hente Vipps-oversikten.");}
   finally{setLoading(false);}
  },[]);
  useEffect(()=>{load();},[load]);
@@ -41,7 +44,7 @@ export default function ServiceVippsReview(){
   finally{setBusy(false);}
  }
  async function review(item){
-  if(busy||!item||!CONFIRM[outcome])return;
+  if(busy||loading||loadFailed||!item||!CONFIRM[outcome])return;
   if(confirmation!==CONFIRM[outcome]||note.length<16||evidence.trim().length<8){
    setError("Kontroller Vipps-hendelsene og fyll inn referanse, begrunnelse og bekreftelsestekst.");return;
   }
@@ -65,8 +68,9 @@ export default function ServiceVippsReview(){
    {loading?"Henter …":"Oppdater kontrolliste"}</button>
   {error&&<p role="alert" className="notice">{error}</p>}
   {message&&<p role="status" className="success">{message}</p>}
-  {!loading&&!attempts.length&&<p>Ingen uavklarte Service-Vipps-handlinger.</p>}
-  {attempts.map(item=><div className="card" style={{padding:16}} key={item.id}>
+  {!loading&&!loadFailed&&total===0&&<p>Ingen uavklarte Service-Vipps-handlinger.</p>}
+  {!loading&&!loadFailed&&total>0&&<p>Viser {attempts.length} av {total} uavklarte handlinger. {total>attempts.length?"Eldste forsøk først. Oppdater etter avklaring.":""}</p>}
+  {!loading&&!loadFailed&&attempts.map(item=><div className="card" style={{padding:16}} key={item.id}>
    <b>{LABEL[item.action]||item.action} – {money(item.amount_ore)}</b>
    <p>Vipps-referanse: {item.payment_reference}</p>
    <p>Forsøk: {new Date(item.claimed_at).toLocaleString("nb-NO")} · {item.state==="needs_review"?"Trenger kontroll":"Under behandling / usikkert"}</p>
@@ -74,8 +78,8 @@ export default function ServiceVippsReview(){
    {openId===item.id&&<div style={{display:"grid",gap:12,marginTop:16}}>
     {!details?<p>Vipps-data kunne ikke hentes. Kontroller transaksjonen i Vipps-portalen før du registrerer et resultat.</p>:<>
      <p><strong>Vipps-status:</strong> Trukket {money(details.aggregates?.capturedOre)} · Refundert {money(details.aggregates?.refundedOre)} · Kansellert {money(details.aggregates?.cancelledOre)}</p>
-     <p><strong>Hendelser:</strong> {details.events?.length||0} vist. Kontroller tidspunkt, beløp og idempotensnøkkel. Manglende hendelse betyr ikke automatisk at ingenting skjedde.</p>
-     {(details.events||[]).slice(-12).map((ev,i)=><p key={i} style={{margin:0,fontSize:13}}>
+     <p><strong>Hendelser:</strong> {details.events?.length||0} av {details.eventCount} hentede hendelser vist. {details.matchingEventCount} matcher forsøket. Kontroller tidspunkt, beløp og idempotensnøkkel. Manglende hendelse betyr ikke automatisk at ingenting skjedde.</p>
+     {(details.events||[]).map((ev,i)=><p key={i} style={{margin:0,fontSize:13}}>
       {ev.timestamp||"Ukjent tidspunkt"} · {ev.name} · {money(ev.amountOre)}
       {ev.matchesAttempt?" · Matcher dette forsøket":""} · {ev.success?"Godkjent":"Ikke bekreftet"}
      </p>)}
