@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {rentalAppointmentTime,rentalAppointmentInput,rentalAppointmentLabel} from "../lib/rentalAppointments.mjs";
+const b={status:"confirmed",start_date:"2026-11-27",end_date:"2026-11-27",customer:{}},v={pickupTime:"09:00",returnTime:"16:30",customerAgreed:true};
+assert.deepEqual(rentalAppointmentInput(b,v),{pickupTime:"09:00",returnTime:"16:30"});
+assert.equal(rentalAppointmentTime("24:00"),null);
+assert.equal(rentalAppointmentInput(b,{...v,returnTime:"09:00"}),null);
+assert.equal(rentalAppointmentInput(b,{...v,customerAgreed:false}),null);
+assert.equal(rentalAppointmentInput({...b,archived_at:"x"},v),null);
+assert.equal(rentalAppointmentInput({...b,status:"active"},v),null);
+assert.ok(rentalAppointmentInput({...b,status:"active",customer:{pickupTime:"09:00"}},v));
+assert.equal(rentalAppointmentLabel("2026-11-27",""),"2026-11-27 · klokkeslett avtales");
+const api=readFileSync("app/api/admin/rental-bookings/route.js","utf8"),action=api.slice(api.indexOf('if(action==="save-appointments")'),api.indexOf('if(action==="archive-cleanup"'));
+assert.ok(action.includes('b.expectedUpdatedAt!==current.updated_at')&&action.includes('.eq("updated_at",current.updated_at)')&&action.includes('...current.customer'));
+assert.ok(!action.includes("total_ore:")&&!action.includes("start_date:")&&!action.includes("sendRentalConfirmation"));
+assert.ok(readFileSync("app/min-side/page.js","utf8").includes("rentalAppointmentValues(r.customer)"));
+assert.ok(readFileSync("lib/rentalConfirmationEmail.js","utf8").includes("appointments.returnTime"));
+console.log("U-32 appointment validation, customer agreement, optimistic update and display passed.");

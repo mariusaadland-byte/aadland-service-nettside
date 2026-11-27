@@ -1,5 +1,6 @@
 import {rentalOverlapOr,extendOverdueAvailability} from "../../../../lib/rentalOverdue.mjs";
 import {osloDateKey} from "../../../../lib/osloTime";
+import {rentalAppointmentInput} from "../../../../lib/rentalAppointments.mjs";
 import {rentalHandoverRecord} from "../../../../lib/rentalHandover.mjs";
 import {rentalDateChangeAttempt} from "../../../../lib/rentalChangeRequest.mjs";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
@@ -229,6 +230,15 @@ export async function PATCH(req){
  if(rentalDateChangeAttempt(b,current))return NextResponse.json({error:"Datoendring er ikke tilgjengelig som direkte oppdatering. Avklar ny tilgjengelighet, pris og oppgjør før ombooking."},{status:409});
 
  const action=String(b.action||"");
+ if(action==="save-appointments"){
+  if(typeof b.expectedUpdatedAt!=="string"||b.expectedUpdatedAt!==current.updated_at)return NextResponse.json({error:"Bookingen er endret. Oppdater før du lagrer."},{status:409});
+  const appointment=rentalAppointmentInput(current,b.appointments);
+  if(!appointment)return NextResponse.json({error:"Kontroller status, klokkeslett og kundens godkjenning. Retur samme dag må være etter henting."},{status:400});
+  const saved=await s.from("rental_bookings").update({customer:{...current.customer,...appointment,appointmentRecordedAt:new Date().toISOString()},updated_at:new Date().toISOString()}).eq("id",current.id).eq("status",current.status).eq("updated_at",current.updated_at).is("archived_at",null).select("id").maybeSingle();
+  if(saved.error)return NextResponse.json({error:"Tidsavtalen kunne ikke lagres."},{status:503});
+  if(!saved.data)return NextResponse.json({error:"Bookingen er endret. Oppdater før du lagrer."},{status:409});
+  return NextResponse.json({ok:true});
+ }
  if(action==="archive-cleanup"||action==="restore-cleanup"){
   const owner=await getAdminUser();
   if(owner?.role!=="owner")return NextResponse.json({error:"Bare eieren kan rydde bort utleiebookinger."},{status:403});

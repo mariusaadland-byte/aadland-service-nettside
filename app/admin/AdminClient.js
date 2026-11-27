@@ -2,6 +2,8 @@
 
 import {rentalHandoverChecklist} from "../../lib/rentalHandover.mjs";
 import RentalConditionPhotos from "./utleie/RentalConditionPhotos";
+import RentalAppointmentControl from "./utleie/RentalAppointmentControl";
+import {rentalAppointmentValues,rentalAppointmentLabel} from "../../lib/rentalAppointments.mjs";
 import {rentalOverdue,rentalLateEstimate} from "../../lib/rentalOverdue.mjs";
 import {rentalAccountingReview} from "../../lib/rentalAccountingReview.mjs";
 import { useEffect, useState } from "react";
@@ -4567,7 +4569,7 @@ function RentalCalendar({items,bookings,blocks,onOpenBooking,onOpenBlock}){
   const d=iso(day),out=[];
   (bookings||[]).filter(b=>b.status!=="cancelled"&&b.startDate<=d&&b.endDate>=d).forEach(b=>out.push({
    id:b.id,kind:"booking",label:(b.itemName||"Utstyr")+" · "+(b.customer?.name||"Kunde"),
-   title:b.bookingNumber||"Utleiebooking",meta:b.startDate+" – "+b.endDate
+   title:b.bookingNumber||"Utleiebooking",meta:rentalAppointmentLabel(b.startDate,rentalAppointmentValues(b.customer).pickupTime)+" – "+rentalAppointmentLabel(b.endDate,rentalAppointmentValues(b.customer).returnTime)
   }));
   (blocks||[]).filter(b=>b.startDate<=d&&b.endDate>=d).forEach(b=>{
    const item=(items||[]).find(i=>i.id===b.itemId);
@@ -4950,6 +4952,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymen
    <div className="field"><label>Status</label><select disabled={!canUpdate||savingId===b.id||statusChoices(b).length===1||["confirmed","active"].includes(b.status)} value={b.status} onChange={e=>patch(b.id,{status:e.target.value})}>{statusChoices(b).map(value=><option key={value} value={value}>{statuses[value]||value}</option>)}</select>{b.status==="new"&&<small className="muted">Bekreft eller avbryt bookingen med knappene nederst, slik at kunden alltid varsles.</small>}{b.status==="returned"&&settlementIssue(b)&&<small className="muted">Kan ikke settes som ferdig: {settlementIssue(b)}</small>}</div>
 
    {canUpdate&&["confirmed","active"].includes(b.status)&&<RentalHandoverControl key={b.id+":"+b.status} booking={b} busy={savingId===b.id} onSubmit={changes=>patch(b.id,changes)}/>}
+   <RentalAppointmentControl key={b.id+":"+b.updatedAt} booking={b} canUpdate={canUpdate} busy={savingId===b.id} onSave={changes=>patch(b.id,changes)}/>
    <RentalConditionPhotos key={b.id} booking={b} canUpdate={canUpdate}/>
    <section className="orderPaymentPanel">
     <h4>Regnskapsgrunnlag – Aadland Utleie</h4>
