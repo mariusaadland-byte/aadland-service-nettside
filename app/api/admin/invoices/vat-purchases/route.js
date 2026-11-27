@@ -2,6 +2,8 @@ import {NextResponse} from "next/server";
 import {getAdminUser} from "../../../../../lib/auth";
 import {db} from "../../../../../lib/supabase";
 import {sameOriginGuard} from "../../../../../lib/requestGuard";
+import {costAllocationEnabled} from "../../../../../lib/costAllocationConfig";
+import {validCostUnit} from "../../../../../lib/purchaseCostAllocation.mjs";
 import {validateVatPurchaseInput} from "../../../../../lib/invoiceInputVat";
 import {checkVatPurchaseDuplicate,vatDuplicateKey} from "../../../../../lib/vatPurchaseDuplicateCheck";
 export const runtime="nodejs";
@@ -45,6 +47,9 @@ export async function POST(req){
   return json({ok:true,id:updated.data.id});
  }
  if(body.action!=="register")return json({error:"Ukjent bilagshandling."},400);
+ const allocate=costAllocationEnabled();
+ if(allocate&&!validCostUnit(body.costUnit))return json({error:"Velg Aadland Service, Aadland Utleie eller felles kostnad."},400);
+ if(!allocate&&body.costUnit!==undefined)return json({error:"Kostnadsfordeling er ikke aktivert."},409);
  let entry;
  try{entry=validateVatPurchaseInput(body);}catch(e){return json({error:e.message},400);}
  // Important: the client preflight is only a convenience. Even requests
@@ -65,7 +70,7 @@ export async function POST(req){
    duplicate:result},409);
  if(result.status!=="clear"&&result.status!=="possible")
   return json({error:"Bilagsnummeret kunne ikke bekreftes. Ingen registrering ble utført."},503);
- const inserted=await s.from("vat_purchase_documents").insert({...entry,confirmed_by:user.id})
+ const inserted=await s.from("vat_purchase_documents").insert({...entry,confirmed_by:user.id,...(allocate?{cost_unit:body.costUnit}:{})})
   .select("id,supplier_name,supplier_document_number,document_date,kind,base_ore,vat_ore,deductible_vat_ore")
   .single();
  if(inserted.error){

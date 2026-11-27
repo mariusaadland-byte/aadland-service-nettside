@@ -15,7 +15,7 @@ import styles from "./VatTermPage.module.css";
 const money=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format((Number(n)||0)/100);
 const labels=["Januar–februar","Mars–april","Mai–juni","Juli–august","September–oktober","November–desember"];
 const rates=[0,12,15,25];
-export default function InvoiceVatTermClient(){
+export default function InvoiceVatTermClient({costAllocationEnabled=false}){
  const now=new Date();
  const [year,setYear]=useState(String(now.getFullYear()));
  const [term,setTerm]=useState(String(Math.ceil((now.getMonth()+1)/2)));
@@ -147,7 +147,7 @@ export default function InvoiceVatTermClient(){
    {view==="more"&&<VatRetroCandidatesClient period={report.period} registrationReview={report.registrationReview}
     reload={reload} onOpenDate={date=>onDocumentSaved({documentDate:date})}/>}
    <div id="mobilkvittering" hidden={view!=="receipt"}>
-    <InputVatRegisterClient purchases={report.purchases.rows} period={report.period}
+    <InputVatRegisterClient costAllocationEnabled={costAllocationEnabled} purchases={report.purchases.rows} period={report.period}
      onChanged={onDocumentSaved}/>
    </div>
    {view==="more"&&<div id="flere-funksjoner">

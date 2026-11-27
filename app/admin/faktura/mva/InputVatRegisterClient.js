@@ -6,6 +6,7 @@ import VatChromeOsScanner from "./VatChromeOsScanner";
 import VatPrinterWebscan from "./VatPrinterWebscan";
 import VatInvoicePdfViewer from "./VatInvoicePdfViewer";
 import VatDuplicateOriginalPreview from "./VatDuplicateOriginalPreview";
+import {costUnits,validCostUnit} from "../../../../lib/purchaseCostAllocation.mjs";
 import styles from "./VatSimpleForm.module.css";
 import {vatDocumentPeriod} from "../../../../lib/vatDocumentPeriod";
 import {emptyVatOcrSuggestion,snapshotVatOcrSuggestion,mergeVatReceiptSuggestions,startNewVatReceiptDraft} from "../../../../lib/vatReceiptAutofill";
@@ -28,13 +29,14 @@ const BATCH_MAX_BYTES=125*1024*1024;
 const BATCH_MAX_IMAGE_BYTES=25*1024*1024;
 const BATCH_MAX_PDF_BYTES=4*1024*1024;
 const BATCH_ACCEPTED=/\.(?:pdf|jpe?g|png|webp|heic|heif)$/i;
-export default function InputVatRegisterClient({purchases,period,onChanged}){
+export default function InputVatRegisterClient({purchases,period,onChanged,costAllocationEnabled=false}){
  const [form,setForm]=useState({
   supplierName:"",documentNumber:"",documentDate:"",kind:"purchase",
   originalDocumentNumber:"",evidenceReference:"",businessPurpose:"",
   deductionPercent:"100",groups:blank(),documentConfirmed:false,
   deductionConfirmed:false,bankConditionConfirmed:false
  });
+ const [costUnit,setCostUnit]=useState("");
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[success,setSuccess]=useState("");
  const [receiptFile,setReceiptFile]=useState(null);
  const [receiptPreviewUrl,setReceiptPreviewUrl]=useState("");
@@ -120,7 +122,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    // manually corrected amount, supplier, VAT rate or purpose to this one.
    // This is NOT called on a crop or OCR retry of the same receipt.
    previousOcr.current=emptyVatOcrSuggestion();
-   setForm(x=>startNewVatReceiptDraft(x));
+   setForm(x=>startNewVatReceiptDraft(x));setCostUnit("");
    setShowMoreRates(false);
    setCustomPurpose(false);
    return;
@@ -259,6 +261,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    setError("Forrige bilag er registrert, men originalvedlegget mangler. Bruk opplastingsknappen for det bilaget før du oppretter et nytt.");
    return;
   }
+  if(costAllocationEnabled&&!validCostUnit(costUnit)){setError("Velg hvilken virksomhetsdel kostnaden gjelder.");return;}
   if(scanBusy){setError("Kvitteringen leses fortsatt. Vent til lesingen er ferdig.");return;}
   if(receiptUploadIssue){setError(receiptUploadIssue);return;}
   if(!validDuplicateInput){setError("Oppgi leverandør og bilagsnummer før dublettkontrollen.");return;}
@@ -292,13 +295,13 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    const question="Registrere et kontrollert leverandørbilag i intern MVA-avstemming?\n\n"+
    form.supplierName+" – "+form.documentNumber+"\nDokumentdato: "+form.documentDate+
    "\n"+(form.kind==="credit"?"Kreditnota":"Kjøpsfaktura")+
-   "\nBrutto beløp: "+money(netTotal+vatTotal)+
+   (costAllocationEnabled?"\nKostnad: "+costUnits[costUnit]:"")+"\nBrutto beløp: "+money(netTotal+vatTotal)+
    "\nFradragsandel: "+percent+" %\nFradragsberettiget inngående MVA: "+
    money(deductible)+"\n\nOriginalbilaget må fortsatt bevares i regnskapssystemet.";
    if(!window.confirm(question))return;
    const response=await fetch("/api/admin/invoices/vat-purchases",{
     method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({...form,action:"register",
+    body:JSON.stringify({...form,action:"register",...(costAllocationEnabled?{costUnit}:{}),
      ...(latestDuplicate.status==="possible"&&duplicateReviewed
       ?{possibleDuplicateReviewed:true,possibleDuplicateMatchId:latestDuplicate.match.id}:{})})
    });
@@ -341,7 +344,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
    grossManuallyEdited.current=false;rateManuallyChosen.current=false;grossCalculated.current=false;
    manualVatRates.current.clear();
    previousOcr.current=emptyVatOcrSuggestion();
-   setForm(x=>({...x,supplierName:"",documentNumber:"",documentDate:"",originalDocumentNumber:"",
+   setCostUnit("");setForm(x=>({...x,supplierName:"",documentNumber:"",documentDate:"",originalDocumentNumber:"",
     evidenceReference:"",businessPurpose:"",kind:"purchase",deductionPercent:"100",groups:blank(),
     documentConfirmed:false,deductionConfirmed:false,bankConditionConfirmed:false}));
    setShowMoreRates(false);setCustomPurpose(false);
@@ -442,7 +445,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
     }}>Fjern vedlegg</button>
   </div>}
   {receiptUploadIssue&&<p role="alert" className={styles.notice}>{receiptUploadIssue}</p>}
-  <form onSubmit={submit} className={styles.form}>
+  <form onSubmit={submit} className={styles.form}>{costAllocationEnabled&&<label className={styles.fullWidth}>Kostnaden gjelder<select required value={costUnit} disabled={busy} onChange={e=>setCostUnit(e.target.value)}><option value="">Velg virksomhetsdel</option>{Object.entries(costUnits).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select><small>Felles kostnad gjelder begge virksomhetsdeler. Kreditnota skal følge opprinnelig kjøp.</small></label>}
    <section className={styles.section}>
     <h3 className={styles.groupTitle}>2. Opplysninger</h3>
     <div className={styles.fieldGrid}>
@@ -637,7 +640,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged}){
       <span>Jeg har kontrollert bankbetalingskravet for kjøp på minst 10 000 kr inkl. MVA. Hvis fakturaen ikke er betalt ennå, skal den senere betales via bank eller godkjent betalingsformidler.</span>
      </label>}
     </div>
-    <button className={styles.submit} type="submit" disabled={busy||scanBusy||duplicateBlocking||Boolean(attachmentIssue)||Boolean(receiptUploadIssue)||editedGrossMismatch||(ocrGrossMismatch&&!ocrMismatchChecked)||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||
+    <button className={styles.submit} type="submit" disabled={busy||(costAllocationEnabled&&!validCostUnit(costUnit))||scanBusy||duplicateBlocking||Boolean(attachmentIssue)||Boolean(receiptUploadIssue)||editedGrossMismatch||(ocrGrossMismatch&&!ocrMismatchChecked)||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||
      (form.kind==="purchase"&&netTotal+vatTotal>=1000000&&!form.bankConditionConfirmed)}>
      {busy?"Lagrer …":"Registrer kontrollert bilag"}
     </button>
