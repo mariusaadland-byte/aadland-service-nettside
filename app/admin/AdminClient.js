@@ -3,6 +3,8 @@
 import {rentalHandoverChecklist} from "../../lib/rentalHandover.mjs";
 import RentalConditionPhotos from "./utleie/RentalConditionPhotos";
 import RentalAppointmentControl from "./utleie/RentalAppointmentControl";
+import {RentalAccessoryFields,RentalAccessorySummary,initialAccessoryInput} from "./utleie/RentalAccessoryControl";
+import {rentalAccessoryRecord} from "../../lib/rentalAccessories.mjs";
 import {rentalAppointmentValues,rentalAppointmentLabel} from "../../lib/rentalAppointments.mjs";
 import {rentalOverdue,rentalLateEstimate} from "../../lib/rentalOverdue.mjs";
 import {rentalAccountingReview} from "../../lib/rentalAccountingReview.mjs";
@@ -4623,16 +4625,20 @@ function RentalHandoverControl({booking,busy,onSubmit}){
  const [checks,setChecks]=useState({});
  const [note,setNote]=useState("");
  const [deviation,setDeviation]=useState(false);
+ const [accessories,setAccessories]=useState(()=>initialAccessoryInput(booking,next));
+ const accessoryCheck=rentalAccessoryRecord({customer:booking.customer},next,accessories,"preview");
  const missingDeposit=next==="active"&&Number(booking.depositOre)>0&&(booking.depositStatus!=="held"||Number(booking.depositHeldOre)<Number(booking.depositOre));
- const ready=fields.every(([key])=>checks[key]===true)&&(!(deviation||missingDeposit)||note.trim().length>=10);
+ const ready=fields.every(([key])=>checks[key]===true)&&!accessoryCheck.error&&(!(deviation||missingDeposit||accessoryCheck.deviation)||note.trim().length>=10);
  return <section className="orderPaymentPanel rentalHandoverPanel">
   <h4>{next==="active"?"Kontroll før utlevering":"Kontroll ved tilbakelevering"}</h4>
   <p className="muted">Bekreft hvert punkt. Registreringen endrer status og legger kontrollen i internt notat, men flytter ikke penger.</p>
   {fields.map(([key,label])=><label key={key} style={{display:"flex",alignItems:"center",gap:10,minHeight:44}}><input type="checkbox" checked={checks[key]===true} onChange={e=>setChecks(v=>({...v,[key]:e.target.checked}))}/>{label}</label>)}
+  <RentalAccessoryFields booking={booking} next={next} value={accessories} onChange={setAccessories} busy={busy}/>
+  {accessoryCheck.deviation&&<p className="notice">Beskriv mangler, skader eller grunnlaget for eldre retur i kontrollmerknaden.</p>}
   <label style={{display:"flex",alignItems:"center",gap:10,minHeight:44}}><input type="checkbox" checked={deviation} onChange={e=>setDeviation(e.target.checked)}/>Avvik eller skade må følges opp</label>
   {missingDeposit&&<p className="notice">Depositum er ikke registrert fullt mottatt/holdt. Beskriv avtalt avvik før utlevering.</p>}
   <div className="field"><label>Kontrollmerknad / avtalt avvik</label><textarea rows={3} maxLength={700} value={note} onChange={e=>setNote(e.target.value)}/></div>
-  <button type="button" className="btn" disabled={busy||!ready} onClick={()=>onSubmit({status:next,handoverChecklist:{checks,note,deviation}})}>{busy?"Lagrer …":next==="active"?"Registrer utlevert":"Registrer returnert"}</button>
+  <button type="button" className="btn" disabled={busy||!ready} onClick={()=>onSubmit({status:next,expectedUpdatedAt:booking.updatedAt,accessories,handoverChecklist:{checks,note,deviation:deviation||accessoryCheck.deviation}})}>{busy?"Lagrer …":next==="active"?"Registrer utlevert":"Registrer returnert"}</button>
  </section>;
 }
 
@@ -4951,7 +4957,8 @@ function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymen
 
    <div className="field"><label>Status</label><select disabled={!canUpdate||savingId===b.id||statusChoices(b).length===1||["confirmed","active"].includes(b.status)} value={b.status} onChange={e=>patch(b.id,{status:e.target.value})}>{statusChoices(b).map(value=><option key={value} value={value}>{statuses[value]||value}</option>)}</select>{b.status==="new"&&<small className="muted">Bekreft eller avbryt bookingen med knappene nederst, slik at kunden alltid varsles.</small>}{b.status==="returned"&&settlementIssue(b)&&<small className="muted">Kan ikke settes som ferdig: {settlementIssue(b)}</small>}</div>
 
-   {canUpdate&&["confirmed","active"].includes(b.status)&&<RentalHandoverControl key={b.id+":"+b.status} booking={b} busy={savingId===b.id} onSubmit={changes=>patch(b.id,changes)}/>}
+   {canUpdate&&["confirmed","active"].includes(b.status)&&<RentalHandoverControl key={b.id+":"+b.status+":"+b.updatedAt} booking={b} busy={savingId===b.id} onSubmit={changes=>patch(b.id,changes)}/>}
+   <RentalAccessorySummary booking={b}/>
    <RentalAppointmentControl key={b.id+":"+b.updatedAt} booking={b} canUpdate={canUpdate} busy={savingId===b.id} onSave={changes=>patch(b.id,changes)}/>
    <RentalConditionPhotos key={b.id} booking={b} canUpdate={canUpdate}/>
    <section className="orderPaymentPanel">
