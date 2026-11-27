@@ -1,0 +1,7 @@
+import assert from "node:assert/strict";
+import {rentalInvoiceCandidate,rentalReportReview} from "../lib/rentalGroupAccounting.mjs";
+const ref="AUG-00000000-0000-4000-8000-000000000001",psp="demo-psp",accounting={reference:"rental-group:demo",lines:[{kind:"rental",quantity:1,grossOre:60000,netOre:48000,vatOre:12000},{kind:"goods",quantity:2,grossOre:15000,netOre:12000,vatOre:3000}],grossOre:75000,netOre:60000,vatOre:15000,depositExpectedOre:150000,signed:true,captureRecorded:true};
+const invoice=rentalInvoiceCandidate({accounting,groupStatus:"fulfilled",paidAt:"2026-11-27T12:00:00Z",reference:ref,pspReference:psp});assert.equal(invoice.grossOre,75000);assert.equal(invoice.readyToPost,false);
+const capture={type:"capture",reference:ref,pspReference:psp,amountOre:75000},fee={type:"capture-fee",reference:ref,pspReference:psp,amountOre:1500},args={reference:ref,pspReference:psp,expectedOre:75000,funds:[capture],fees:[fee]};
+const r=rentalReportReview(args);assert.equal(r.status,"capture_matched");assert.equal(r.assessedFeeOre,1500);assert.equal(r.afterAssessedFeeOre,73500);assert.equal(r.bankPayoutOre,null);assert.equal(r.retainedFeeOre,null);assert.equal(rentalReportReview({...args,funds:[capture,capture]}).status,"review");assert.equal(rentalReportReview({...args,fees:[]}).assessedFeeOre,null);assert.equal(rentalReportReview({...args,fees:[{...fee,reference:"different"}]}).assessedFeeOre,null);
+console.log("U-39M invoice and separate rental report review passed");
