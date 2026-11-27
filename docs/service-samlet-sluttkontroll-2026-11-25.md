@@ -47,3 +47,7 @@ Bruk isolerte testdata og egne testkontoer; preview skal ikke sende ekte e-post 
 
 ## Admin-testvindu
 25 separate Service-testbokser, tre kontrollsteg per boks, i eksisterende /admin/utviklingsplan. Tidligere oppgaver beholdes i eget filter. Lokale delsteg, serverlagret endelig eiergodkjenning og feilnotater. Ingen test er godkjent automatisk. S-10 dokumentert teknisk lukket og S-34 oppfølging ved vekst beholdes i denne listen, ikke som brukerprøve.
+
+## Samlet oppfølging 27.11.2026
+
+S01–S36 er gjennomgått teknisk. Ingen av de 25 nye Service-testoppgavene har lagret eierstatus i databasen ved kontroll; standardstatus er test. Det er ikke et bevis på gjennomført praktisk test. De siste S32–S35-produksjonsbyggene er READY; S36-rettelsen (#288) har godkjent preview og er sammenslått, men siste produksjonsbygg var ennå ikke bekreftet. S34 målte materialregisterets søketid og dokumenterte forbedringsbehov; ingen ny ytelsesgevinst påstås. S36 bekreftet aktive varer: 87 922 Byggmakker, 8 991 Bygger’n og én egen vare, ingen uferdige importdeler. Ingen ny import er nødvendig for sluttkontroll. Oppdatert testkø beholder 25 bokser med tre steg, viser alle Service-boksene som standard og sperrer lagring av Service-sluttkontroll utenfor produksjon. Eventuelle lokale tidligere avkrysninger må startes på nytt for oppdaterte kriterier; ingen servergodkjenninger er endret. Utleie uendret.
