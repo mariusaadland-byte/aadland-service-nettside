@@ -112,6 +112,8 @@ export async function POST(req){
 
   const item=fromDbRentalItem(raw);
   const fulfillment=b.fulfillment==="delivery"?"delivery":"pickup";
+  // Delivery requires an agreed, server-verified transport price before checkout.
+  if(fulfillment==="delivery")return NextResponse.json({code:"RENTAL_DELIVERY_QUOTE_REQUIRED",error:"Levering må avtales separat. Kontakt oss for pris før bestilling."},{status:409});
   if((fulfillment==="delivery"&&!item.deliveryAvailable)||(fulfillment==="pickup"&&!item.pickupAvailable)){
    return NextResponse.json({error:"Valgt utleveringsmåte er ikke tilgjengelig."},{status:400});
   }
