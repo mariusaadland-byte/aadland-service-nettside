@@ -63,7 +63,7 @@ for(const check of [
  "summarizeInvoiceActivity(invoices,vippsPayments,creditNotes)",
  '["invoice_vipps_payments","id,invoice_id,state,captured_ore,refunded_ore",vippsPayments]',
  '["invoice_credit_notes","id,invoice_id,total_ore,sent_at",creditNotes]',
- "if(error)throw Error(\"Avstemming av betalinger og kreditnotaer kunne ikke gjennomføres.\")",
+ "if(error||!Array.isArray(data))throw Error(\"Avstemming av betalinger og kreditnotaer kunne ikke gjennomføres.\")",
  "range(offset,offset+499)"
 ])assert.ok(cronSource.includes(check),"Missing cron reconciliation: "+check);
 
@@ -129,3 +129,14 @@ assert.equal(emailCount,0,"No misleading owner email on unavailable credit data"
 assert.equal(batch,null);
 
 console.log("S-04 bestått: full kreditering, delkreditering, Vipps, uavstemte beløp, trygge varsler og fail-closed ved utilgjengelige bilag.");
+
+readFailure=false;dbRows={invoices:[normal],credits:null,payments:[]};
+response=await route.GET(request);
+assert.equal(response.status,500);assert.equal(emailCount,0);assert.equal(batch,null,"Malformed credit history cannot be treated as empty");
+for(const created_at of [null,"invalid",new Date(Date.now()+60000).toISOString(),new Date(Date.now()-23*3600000).toISOString()]){
+ batch={id:"mock-old",created_at,status:"pending",subject:"Test",body:"Test",items:[{invoiceId:"test"}]};
+ response=await route.GET(request);assert.equal(response.status,409);assert.equal(emailCount,0);
+}
+batch={id:"mock-invalid",created_at:new Date().toISOString(),status:"pending",subject:"Test",body:"Test",items:[]};
+response=await route.GET(request);assert.equal(response.status,409);assert.equal(emailCount,0);
+console.log("S16: invalid source data and invalid, future, stale or incomplete frozen digest cannot send.");

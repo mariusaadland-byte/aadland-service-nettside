@@ -29,7 +29,7 @@ async function runServiceCron(req){
    const invoices=[],notices=[];
    for(let offset=0;;offset+=500){
     const {data,error}=await s.from("invoice_drafts").select("id,invoice_number,status,customer,line_items,due_date,paid_ore,credited_ore").in("status",["issued","sent"]).order("id").range(offset,offset+499);
-    if(error)throw Error("Fakturaene kunne ikke hentes.");invoices.push(...data);if(data.length<500)break;
+    if(error||!Array.isArray(data))throw Error("Fakturaene kunne ikke hentes.");invoices.push(...data);if(data.length<500)break;
    }
    if(!invoices.length)return NextResponse.json({ok:true,sent:0,needsReview:0});
    // Invoice balance alone is not sufficient: compare both credit-note
@@ -47,15 +47,15 @@ async function runServiceCron(req){
      for(let offset=0;;offset+=500){
       const {data,error}=await s.from(table).select(columns)
        .in("invoice_id",ids).order("id",{ascending:true}).range(offset,offset+499);
-      if(error)throw Error("Avstemming av betalinger og kreditnotaer kunne ikke gjennomføres.");
-      target.push(...(data||[]));
-      if((data||[]).length<500)break;
+      if(error||!Array.isArray(data))throw Error("Avstemming av betalinger og kreditnotaer kunne ikke gjennomføres.");
+      target.push(...data);
+      if(data.length<500)break;
      }
     }
    }
    for(let offset=0;;offset+=500){
     const {data,error}=await s.from("invoice_reminder_sends").select("id,invoice_id,status,kind,due_date,sent_at,created_at").order("id").range(offset,offset+499);
-    if(error)throw Error("Purringshistorikken kunne ikke hentes.");notices.push(...data);if(data.length<500)break;
+    if(error||!Array.isArray(data))throw Error("Purringshistorikken kunne ikke hentes.");notices.push(...data);if(data.length<500)break;
    }
    const reconciled=summarizeInvoiceActivity(invoices,vippsPayments,creditNotes);
    const items=invoiceReviewAlerts(reconciled,notices,today);
@@ -68,7 +68,8 @@ async function runServiceCron(req){
    if(fresh.error||!fresh.data)throw Error("Varslingen kunne ikke hentes.");batch=fresh.data;
   }
   if(batch.status==="sent")return NextResponse.json({ok:true,alreadySent:true,sent:0});
-  if(Date.now()-new Date(batch.created_at).getTime()>23*60*60*1000)return NextResponse.json({error:"Dagens tidligere sendeforsøk må kontrolleres i e-postloggen."},{status:409});
+  const batchAge=Date.now()-Date.parse(batch.created_at);
+  if(!Number.isFinite(batchAge)||batchAge<0||batchAge>=23*60*60*1000||!batch.id||!Array.isArray(batch.items)||!batch.items.length||typeof batch.subject!=="string"||!batch.subject.trim()||typeof batch.body!=="string"||!batch.body.trim())return NextResponse.json({error:"Dagens tidligere sendeforsøk må kontrolleres i e-postloggen."},{status:409});
   const {Resend}=await import("../../../../lib/safeResend");const resend=new Resend(key);
   let result;
   for(let attempt=0;attempt<3;attempt++){

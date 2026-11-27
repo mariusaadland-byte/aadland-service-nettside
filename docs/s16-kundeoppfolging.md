@@ -60,3 +60,7 @@ Kilder: [Finanstilsynet – Inkassovirksomhet](https://www.finanstilsynet.no/for
 4. Eieren avklarer rutine for usikker tidligere sendestatus og tvist/innsigelse før eventuell videre inndriving.
 
 Ingen ekte melding, betaling, juridisk krav, kundekreditering, Vipps-handling eller regnskapstransaksjon ble utført som del av S-16.
+
+## Oppfølging 27.11.2026
+
+Produksjonskontroll kun lesing: åtte utstedte/sendte fakturaer, fire med passert forfallsdato (tre med dato minst 14 dager tilbake). Dette er datofelt, ikke utestående saldo. Ingen registrerte formelle varsler, kreditnotaer eller eierdigest-batcher; to paid og to cancelled Vipps-betalingsrader. Daglig eierdigest stopper nå også ved manglende eller ugyldige arrays fra alle tre kildene, og avviser ufullstendig frosset digest samt ugyldig, fremtidig eller minst 23 timer gammelt sendeforsøk. Ikke endret kundevarsel, innkrevingsregler eller tidsplan. E-posttesten bruker bare stubs; faktisk mottak hos eier og innlogget sluttbrukertest gjenstår. Ingen reelle e-poster eller økonomiske handlinger.
