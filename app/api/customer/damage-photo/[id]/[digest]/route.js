@@ -14,7 +14,7 @@ export async function GET(req,{params}){
  const {id,digest}=await params;if(!digestValid(digest))return fail();
  const limited=await rateLimitValue(customerId,{scope:"damage-photo-read",max:60,windowSeconds:300,requireExplicitAllowance:true});if(limited)return limited;
  const r=await customerDamageClaims(customerId,id);if(!r.ok)return fail(503);
- const claim=r.rows[0];if(!claim||!claim.photos.some(x=>x.digest===digest))return fail();
+ const claim=r.rows[0];if(!claim||!(claim.photos.some(x=>x.digest===digest)||claim.costDocument?.digest===digest))return fail();
  const path=damagePhotoPath(claim.groupId,claim.bookingId,digest),s=db();if(!path||!s)return fail(503);
  const bucket=await s.storage.getBucket(DAMAGE_BUCKET);if(bucket.error||bucket.data?.public!==false)return fail(503);
  const result=await s.storage.from(DAMAGE_BUCKET).download(path);

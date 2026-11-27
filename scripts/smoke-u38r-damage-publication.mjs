@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import {damagePhoto} from "../lib/damageEvidence.mjs";
+import {canonicalDamageClaim,storeDamageObject,damagePublicationPlan,damageNoticePayload} from "../lib/damagePublication.mjs";
+const [g,b,c,u]=Array.from({length:4},(_,i)=>"00000000-0000-4000-8000-00000000000"+(i+1));
+const objects=new Map(),storage={upload:async(path,bytes,options)=>{assert.equal(options.upsert,false);if(objects.has(path))return {error:true};objects.set(path,new Blob([bytes],{type:options.contentType}));return {error:null}},download:async path=>({data:objects.get(path),error:!objects.has(path)})};
+const photo=await storeDamageObject({storage,groupId:g,bookingId:b,bytes:Buffer.from([255,216,255,1]),type:"image/jpeg"});
+const cost=await storeDamageObject({storage,groupId:g,bookingId:b,bytes:Buffer.from([255,216,255,2]),type:"image/jpeg"});
+assert.ok(photo&&cost);
+const group={id:g,status:"fulfilled",customer_user_id:u},booking={id:b,group_id:g,customer_user_id:u},returned={group_id:g,booking_id:b,condition:"damage"},claim={id:c,group_id:g,booking_id:b,description:"Demo",amount_ore:45000,photo_digests:[photo.digest],cost_proof_digest:cost.digest};
+const plan=await damagePublicationPlan({storage,group,booking,returned,claim});assert.ok(plan);
+assert.notEqual(canonicalDamageClaim({...claim,amount_ore:45001}),plan.claim_digest);
+assert.equal(await damagePublicationPlan({storage,group,booking,returned,claim:{...claim,cost_proof_digest:"a".repeat(64)}}),null);
+assert.equal(canonicalDamageClaim({...claim,cost_proof_digest:photo.digest}),null);
+const msg=damageNoticePayload({claim:plan,group,account:{id:u,email:"demo@example.invalid",email_confirmed_at:"2026-11-27"}});assert.ok(msg);assert.ok(!msg.text.includes("45000"));
+assert.equal(damageNoticePayload({claim:{...plan,amount_ore:1},group,account:{id:u,email:"demo@example.invalid",email_confirmed_at:"2026-11-27"}}),null);
+console.log("U-38R damage publication, immutable storage adapter and private notice tests passed");
