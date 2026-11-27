@@ -56,4 +56,4 @@ begin
  perform pg_temp.require(public.draft_group_return_close(g,settlement,50000,'refund-ci',repeat('e',64))='existing','refund replay');
  perform pg_temp.require((select stock_quantity=3 and reserved_quantity=0 from public.rental_consumables where id=goods),'sold consumables not returned to stock');
  perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_return_close(uuid,uuid,integer,text,text)','EXECUTE'),'client cannot close settlement');
-end $;
+end $$;
