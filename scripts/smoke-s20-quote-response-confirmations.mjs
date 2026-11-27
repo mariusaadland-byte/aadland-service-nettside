@@ -227,3 +227,16 @@ backlog={needs_review:0,claimed:0,queued:5};backlogResult=await cronHandler({});
 countError=true;assert.equal((await cronHandler({})).status,503);
 assert.equal(dispatchCalls,4);
 console.log("S20 backlog: old held/claimed and remaining queued rows reported without requeue, count errors fail closed.");
+
+const reviewSource=admin.replace(/^import .*;\n/gm,"").replace(/^export const .*;\n/gm,"").replace(/^export async function /gm,"async function ");
+let reviewEnv="preview",reviewRole="owner",reviewWrites=0,reviewAck={ok:true,state:"queued"};
+const reviewPatch=new Function("NextResponse","getAdminUser","sameOriginGuard","db","process",reviewSource+";return PATCH;")(NextResponse,async()=>({role:reviewRole,id:"test-owner"}),()=>null,()=>({async rpc(name,args){assert.equal(name,"review_customer_quote_response_notice");assert.equal(args.p_action,"release_unsent");reviewWrites++;return {data:reviewAck,error:null}}}),{env:{get VERCEL_ENV(){return reviewEnv}}});
+const reviewPayload={notificationId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbb0001",action:"release_unsent",confirmation:"IKKE SENDT",note:"Kontrollert i simulert sendelogg.",quoteNumber:"TEST-S20"};
+const tryReview=body=>reviewPatch({json:async()=>body});
+assert.equal((await tryReview(reviewPayload)).status,403);assert.equal(reviewWrites,0);
+reviewEnv="production";reviewRole="staff";assert.equal((await tryReview(reviewPayload)).status,403);assert.equal(reviewWrites,0);
+reviewRole="owner";assert.equal((await tryReview(null)).status,400);assert.equal(reviewWrites,0);
+for(const ack of [null,{ok:true,state:"sent"},{ok:1,state:"queued"}]){reviewAck=ack;assert.equal((await tryReview(reviewPayload)).status,503);}
+reviewAck={ok:true,state:"queued"};assert.equal((await tryReview(reviewPayload)).body.state,"queued");
+assert.ok(component.includes("json.ok!==true||json.state!=="));
+console.log("S20 review: no preview mutation, exact acknowledgement and valid list required.");

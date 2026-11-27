@@ -16,14 +16,14 @@ export default function QuoteResponseDeliveryPanel({quoteId}){
  const load=useCallback(async()=>{
   const response=await fetch("/api/admin/quotes/response-notifications?id="+encodeURIComponent(quoteId),{cache:"no-store"});
   const json=await response.json().catch(()=>({}));
-  if(!response.ok)throw Error(json.error||"Kunne ikke lese utsendingsstatus.");
+  if(!response.ok||!Array.isArray(json.notifications))throw Error(json.error||"Kunne ikke lese utsendingsstatus.");
   setData(json);
  },[quoteId]);
  useEffect(()=>{
   let active=true;
   setData(null);setError("");setNotice("");
   fetch("/api/admin/quotes/response-notifications?id="+encodeURIComponent(quoteId),{cache:"no-store"})
-   .then(async res=>{const j=await res.json().catch(()=>({}));if(!res.ok)throw Error(j.error||"Kunne ikke hente status.");return j;})
+   .then(async res=>{const j=await res.json().catch(()=>({}));if(!res.ok||!Array.isArray(j.notifications))throw Error(j.error||"Kunne ikke hente status.");return j;})
    .then(j=>{if(active)setData(j)})
    .catch(err=>{if(active)setError(err.message||"Status mangler.");});
   return()=>{active=false;};
@@ -50,7 +50,7 @@ export default function QuoteResponseDeliveryPanel({quoteId}){
     })
    });
    const json=await response.json().catch(()=>({}));
-   if(!response.ok)throw Error(json.error||"Avstemming feilet.");
+   if(!response.ok||json.ok!==true||json.state!==(approve?"sent":"queued"))throw Error(json.error||"Avstemming er uavklart. Oppdater sendestatus før nytt forsøk.");
    setNotice(json.message||"Status ble oppdatert.");
    await load();
   }catch(err){setError(err.message||"Avstemming feilet.");}

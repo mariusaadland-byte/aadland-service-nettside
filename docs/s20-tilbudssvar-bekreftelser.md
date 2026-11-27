@@ -52,3 +52,7 @@ Begge tabeller har **RLS**; `anon` og `authenticated` har ingen tabelltilgang. B
 - Prosedyre for kunder med manglende registrert e-post og manuelt arkiv/kopi
 
 Dette arbeidet innebærer **ingen automatisk gjenutsending av gamle historiske tilbud**. Eieren må verifisere faktisk leveranse, og må aldri velge «IKKE SENDT» uten sikre bevis i Resend.
+
+## Oppfølging 27.11.2026
+
+Kun lesende produksjonskontroll: tre kladder, to tidligere godkjente tilbud, null aktive sendte tilbud, null nye varslingsrader og null uavklarte bekreftelser. To dokumenterte OK-kjøringer av tilbudssvar-cron (nå integrert i S17). Ny sperre: eierens manuelle avstemming kan bare lagres i produksjon, ugyldige journalresultater og feil sluttilstand gir ikke falsk suksess. Syntetiske tester lagt til. Tidligere godkjenninger står urørt; ingen e-post eller tilbudssvar utløst. Faktisk kundeaksept og levering gjenstår. Dette er eksisterende digital tilbudsgodkjenning, ikke en påstand om BankID/Vipps-signatur.

@@ -19,11 +19,11 @@ export async function GET(req){
    .select("id,recipient_kind,recipient_email,action,state,attempt_number,provider_email_id,claimed_at,sent_at,created_at,updated_at,last_issue")
    .eq("quote_id",id).order("created_at",{ascending:true})
  ]);
- if(q.error||n.error)return json({error:"Bekreftelseshistorikken kunne ikke leses."},503);
+ if(q.error||n.error||!Array.isArray(n.data))return json({error:"Bekreftelseshistorikken kunne ikke leses."},503);
  if(!q.data)return json({error:"Tilbudet ble ikke funnet."},404);
  return json({quoteNumber:q.data.quote_number,quoteStatus:q.data.status,
   responseAt:q.data.accepted_at||q.data.declined_at||null,
-  notifications:n.data||[],historicalNoLog:(!n.data?.length&&
+  notifications:n.data,historicalNoLog:(!n.data.length&&
    ["accepted","declined"].includes(q.data.status))});
 }
 
@@ -31,7 +31,9 @@ export async function PATCH(req){
  const originError=sameOriginGuard(req);if(originError)return originError;
  const user=await owner();
  if(!user)return json({error:"Bare eier kan avklare uavklarte bekreftelser."},403);
+ if(process.env.VERCEL_ENV!=="production")return json({error:"Avstemming kan bare lagres i produksjon."},403);
  const body=await req.json().catch(()=>({}));
+ if(!body||typeof body!=="object"||Array.isArray(body))return json({error:"Ugyldig handling."},400);
  const action=String(body.action||""),id=String(body.notificationId||"");
  if(!UUID.test(id)||!["confirm_sent","release_unsent"].includes(action))
   return json({error:"Ugyldig handling."},400);
@@ -55,7 +57,9 @@ export async function PATCH(req){
    "Utsendelsen kan fortsatt pågå. Kontroller igjen når minst fem minutter har gått.":
    "Bekreftelsen kunne ikke avstemmes. Kontroller tilbudsnummer, Resend, sendestatus og begrunnelse."},409);
  }
- return json({ok:true,state:data?.state,
+ const expected=action==="confirm_sent"?"sent":"queued";
+ if(data?.ok!==true||data.state!==expected)return json({error:"Lagringsstatus er uavklart. Oppdater sendeloggen før nytt forsøk."},503);
+ return json({ok:true,state:expected,
   message:action==="confirm_sent"?
    "Registrert som bekreftet hos Resend. Ingen ny e-post er sendt.":
    "Etter din kontroll er sendingen lagt i kø med ny idempotensnøkkel. Neste cron-kjøring kan sende den. Ingen e-post er sendt nå."});
