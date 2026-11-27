@@ -59,15 +59,36 @@ begin
  if n<1 or n<>jsonb_array_length(p_units) or n<>(select count(distinct x->>'bookingId') from jsonb_array_elements(p_units) x) or n<>(select count(distinct x->>'unitId') from jsonb_array_elements(p_units) x) then return 'review'; end if;
  for r in select distinct rental_item_id from public.rental_bookings where group_id=g.id order by rental_item_id loop perform pg_advisory_xact_lock(hashtext(r.rental_item_id::text)); end loop;
  for r in select (x->>'bookingId')::uuid booking_id,(x->>'unitId')::uuid unit_id from jsonb_array_elements(p_units) x order by (x->>'unitId')::uuid loop
-  perform 1 from public.rental_equipment_units where id=r.unit_id for update;
+  perform pg_advisory_xact_lock(hashtextextended(r.unit_id::text,4020));
+  perform 1 from public.rental_equipment_units where id=r.unit_id;
   if not found or not exists(select 1 from public.rental_bookings b join public.rental_equipment_units u on u.rental_item_id=b.rental_item_id where b.id=r.booking_id and b.group_id=g.id and b.status=case when g.status='confirmed' then 'confirmed' else 'new' end and b.start_date<=today and b.end_date>=today and u.id=r.unit_id) or exists(select 1 from public.rental_group_unit_assignments where unit_id=r.unit_id and released_at is null) then return 'review'; end if;
-  if not exists(select 1 from (select condition,next_due_on from public.rental_unit_maintenance_events where unit_id=r.unit_id order by performed_on desc,created_at desc,id desc limit 1) m where m.condition='ok' and (m.next_due_on is null or m.next_due_on>=today)) then return 'review'; end if;
+  if not exists(select 1 from (select condition,next_due_on,performed_on from public.rental_unit_maintenance_events where unit_id=r.unit_id order by performed_on desc,created_at desc,id desc limit 1) m where m.condition='ok' and m.performed_on<=today and (m.next_due_on is null or m.next_due_on>=today)) then return 'review'; end if;
  end loop;
  insert into public.rental_group_handover_reports(id,group_id,actor_id,note,report_digest) values(p_report,g.id,p_actor,p_note,p_digest);
  insert into public.rental_group_unit_assignments(booking_id,report_id,unit_id) select (x->>'bookingId')::uuid,p_report,(x->>'unitId')::uuid from jsonb_array_elements(p_units) x;
  return 'prepared';
 end $$;
 revoke all on function public.draft_group_prepare_handover(uuid,uuid,uuid,text,text,jsonb,boolean,boolean,boolean) from public,anon,authenticated,service_role;
+-- Group row must already be locked. Take item locks then unit advisory locks
+-- in canonical order. The maintenance insert trigger shares the unit lock.
+create function public.draft_group_handover_units_safe(p_group uuid,p_report uuid,p_status text)
+returns boolean language plpgsql security invoker set search_path=pg_catalog,public as $$
+declare r record; n integer; today date:=(clock_timestamp() at time zone 'Europe/Oslo')::date;
+begin
+ select count(*) into n from public.rental_bookings where group_id=p_group;
+ if n<1 or n<>(select count(*) from public.rental_group_unit_assignments where report_id=p_report and released_at is null) then return false;end if;
+ for r in select distinct rental_item_id from public.rental_bookings where group_id=p_group order by rental_item_id loop
+  perform pg_advisory_xact_lock(hashtext(r.rental_item_id::text));
+ end loop;
+ for r in select unit_id from public.rental_group_unit_assignments where report_id=p_report order by unit_id loop
+  perform pg_advisory_xact_lock(hashtextextended(r.unit_id::text,4020));
+ end loop;
+ if exists(select 1 from public.rental_bookings b left join public.rental_group_unit_assignments a on a.booking_id=b.id and a.report_id=p_report and a.released_at is null left join public.rental_equipment_units u on u.id=a.unit_id left join public.rental_items i on i.id=b.rental_item_id
+ where b.group_id=p_group and (a.unit_id is null or u.rental_item_id is distinct from b.rental_item_id or b.status is distinct from p_status or b.start_date>today or b.end_date<today or i.active is distinct from true or i.status is distinct from 'available' or not exists(select 1 from (select condition,next_due_on,performed_on from public.rental_unit_maintenance_events where unit_id=a.unit_id order by performed_on desc,created_at desc,id desc limit 1) m where m.condition='ok' and m.performed_on<=today and (m.next_due_on is null or m.next_due_on>=today)))) then return false;end if;
+ return true;
+end $$;
+revoke all on function public.draft_group_handover_units_safe(uuid,uuid,text) from public,anon,authenticated,service_role;
+
 -- Trusted server calls only after fresh authenticated provider GET confirms full authorization.
 create function public.draft_group_capture_claim(p_group uuid,p_report uuid,p_actor uuid,p_psp text,p_amount integer)
 returns text language plpgsql security invoker set search_path=pg_catalog,public as $$
@@ -78,7 +99,7 @@ begin
  select * into c from public.rental_group_payment_claims where group_id=g.id;
  if not found or c.reference is distinct from g.payment_reference or c.amount_ore is distinct from p_amount or c.captured_at is not null or not public.draft_group_payment_binding(g.id,c.agreement_id,c.document_digest,c.evidence_seal) then return 'review'; end if;
  if not exists(select 1 from public.rental_group_handover_reports where id=p_report and group_id=g.id) or (g.deposit_ore>0 and not exists(select 1 from public.rental_group_deposit_receipts where group_id=g.id and amount_ore=g.deposit_ore)) then return 'review'; end if;
- if exists(select 1 from public.rental_group_unit_assignments a where a.report_id=p_report and not exists(select 1 from (select condition,next_due_on from public.rental_unit_maintenance_events where unit_id=a.unit_id order by performed_on desc,created_at desc,id desc limit 1) m where m.condition='ok' and (m.next_due_on is null or m.next_due_on>=(clock_timestamp() at time zone 'Europe/Oslo')::date))) then return 'review'; end if;
+ if not public.draft_group_handover_units_safe(g.id,p_report,'new') then return 'review';end if;
  select * into r from public.rental_group_capture_requests where group_id=g.id;
  if found then if r.report_id=p_report and r.psp_reference=p_psp and r.amount_ore=p_amount then return 'existing'; end if;return 'review';end if;
  insert into public.rental_group_capture_requests(group_id,report_id,psp_reference,amount_ore,actor_id) values(g.id,p_report,p_psp,p_amount,p_actor);
@@ -93,7 +114,7 @@ begin
  select * into g from public.rental_order_groups where id=p_group for update;
  if not found or not exists(select 1 from public.rental_group_handover_reports where id=p_report and group_id=g.id) or (g.deposit_ore>0 and not exists(select 1 from public.rental_group_deposit_receipts where group_id=g.id and amount_ore=g.deposit_ore)) then return 'review';end if;
  if g.status='fulfilled' then return public.draft_group_fulfill(g.id,p_reference,p_psp,p_report,g.deposit_ore); end if;
- if (select count(*) from public.rental_group_unit_assignments where report_id=p_report and released_at is null)<>(select count(*) from public.rental_bookings where group_id=g.id) then return 'review';end if;
+ if g.status<>'confirmed' or not public.draft_group_handover_units_safe(g.id,p_report,'confirmed') then return 'review';end if;
  return public.draft_group_fulfill(g.id,p_reference,p_psp,p_report,g.deposit_ore);
 end $$;
 revoke all on function public.draft_group_verified_handover(uuid,uuid,text,text) from public,anon,authenticated,service_role;

@@ -13,7 +13,7 @@ export default function GroupOrderActions({row,demo,enabled}){
  function open(a){setAction(a);setDraft({id:crypto.randomUUID(),reference:"",proofDigest:"",note:"",unitId:"",bookingId:"",maintenanceEventId:"",condition:"",checks:{},units:{},confirmed:false});setNotice("");setDone(false);setSnapshot(null);}
  const update=(k,v)=>setDraft(d=>({...d,[k]:v,...(k==="reference"?{proofDigest:""}:{})}));
  const choose=action==="receive"||action==="resolve";
- const units=row.units.filter(u=>action==="receive"?u.unitId&&!u.condition&&u.status==="active":u.unitId&&u.condition&&u.condition!=="ok"&&!u.released);
+ const units=row.units.filter(u=>action==="receive"?u.unitId&&!u.condition&&u.status==="active":u.unitId&&u.condition&&!u.released);
  const unit=units.find(u=>u.id===draft?.bookingId);
  const amount=action==="record_refund"?row.settlement?.refundOre??(demo?row.depositOre:null):row.depositOre;
  const proofRequired=action==="deposit"||action==="record_refund"&&amount>0;
@@ -37,7 +37,7 @@ export default function GroupOrderActions({row,demo,enabled}){
  const p=snapshot||payload();setSnapshot(p);
  try{
  const r=demo?{status:actionSuccess[action][0]}:await fetch("/api/admin/rental/"+(returnActions.includes(action)?"group-return":"group-handover"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p),cache:"no-store"}).then(r=>r.json());
- if(actionSuccess[action].includes(r.status)){setDone(true);setNotice(demo?"Demohandling fullført. Ingen endringer.":"Handling bekreftet. Oppdaterer registrert ordrestatus.");if(!demo)router.refresh();}
+ if(actionSuccess[action].includes(r.status)){setDone(true);setNotice(demo?"Demohandling fullført. Ingen endringer.":r.status==="received_inspection_required"?"Retur registrert. Utstyret er sperret til ny vedlikeholdskontroll.":"Handling bekreftet. Oppdaterer registrert ordrestatus.");if(!demo)router.refresh();}
  else setNotice("Ikke bekreftet: "+String(r.status||"ukjent")+". Kontroller status før du forsøker samme handling igjen.");
  }catch{setNotice("Resultatet er ukjent. Oppdater ordren og kontroller før samme forespørsel gjentas.");}finally{lock.current=false;setBusy(false);}
  }

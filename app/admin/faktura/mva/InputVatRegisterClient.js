@@ -640,7 +640,7 @@ export default function InputVatRegisterClient({purchases,period,onChanged,costA
       <span>Jeg har kontrollert bankbetalingskravet for kjøp på minst 10 000 kr inkl. MVA. Hvis fakturaen ikke er betalt ennå, skal den senere betales via bank eller godkjent betalingsformidler.</span>
      </label>}
     </div>
-    <button className={styles.submit} type="submit" disabled={busy||scanBusy||duplicateBlocking||(costAllocationEnabled&&!validCostUnit(costUnit))||Boolean(attachmentIssue)||Boolean(receiptUploadIssue)||editedGrossMismatch||(ocrGrossMismatch&&!ocrMismatchChecked)||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||
+    <button className={styles.submit} type="submit" disabled={busy||scanBusy||duplicateBlocking||Boolean(attachmentIssue)||Boolean(receiptUploadIssue)||editedGrossMismatch||(ocrGrossMismatch&&!ocrMismatchChecked)||!valid||netTotal<=0||!form.documentConfirmed||!form.deductionConfirmed||(costAllocationEnabled&&!validCostUnit(costUnit))||
      (form.kind==="purchase"&&netTotal+vatTotal>=1000000&&!form.bankConditionConfirmed)}>
      {busy?"Lagrer …":"Registrer kontrollert bilag"}
     </button>
