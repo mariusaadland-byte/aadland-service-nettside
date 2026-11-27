@@ -1,5 +1,5 @@
 do $$
-declare u uuid:=gen_random_uuid(); item uuid:=gen_random_uuid(); goods uuid:=gen_random_uuid(); req uuid:=gen_random_uuid(); req2 uuid:=gen_random_uuid(); req3 uuid:=gen_random_uuid(); g uuid; g2 uuid; q text:=repeat('c',64); day date:=(clock_timestamp() at time zone 'Europe/Oslo')::date+2; snap jsonb; rejected boolean:=false;
+declare u uuid:=gen_random_uuid(); item uuid:=gen_random_uuid(); goods uuid:=gen_random_uuid(); req uuid:=gen_random_uuid(); req2 uuid:=gen_random_uuid(); req3 uuid:=gen_random_uuid(); g uuid; g2 uuid; g3 uuid; q text:=repeat('c',64); day date:=(clock_timestamp() at time zone 'Europe/Oslo')::date+2; snap jsonb; rejected boolean:=false;
 begin
  insert into auth.users values(u,'cancel-ci@example.invalid',clock_timestamp());
  insert into public.rental_items(id,name,slug,quantity,daily_price_ore,deposit_ore) values(item,'Cancel demo','ci-'||item::text,3,30000,50000);
@@ -17,5 +17,16 @@ begin
  update public.rental_order_groups set status='payment_pending',payment_reference='AUG-'||g2::text where id=g2;
  perform pg_temp.require(public.draft_group_cancel_request(u,req3)='payment_review','payment pending blocked');
  perform pg_temp.require((select reserved_quantity=2 from public.rental_consumables where id=goods),'payment pending stock retained');
+ g3:=public.draft_group_reserve(u,gen_random_uuid(),q,snap);
+ update public.rental_order_groups set expires_at=clock_timestamp()-interval '1 minute' where id in (g2,g3);
+ perform pg_temp.require(exists(select 1 from public.draft_group_expiry_candidates() where group_id=g3),'expired unpaid candidate');
+ perform pg_temp.require(not exists(select 1 from public.draft_group_expiry_candidates() where group_id=g2),'pending payment excluded');
+ perform pg_temp.require(public.draft_group_expiry_attempt(g2)='skipped','worker cannot release payment pending');
+ perform pg_temp.require(public.draft_group_expiry_attempt(g3)='released','worker releases unpaid');
+ perform pg_temp.require(public.draft_group_expiry_attempt(g3)='skipped','worker replay');
+ perform pg_temp.require((select reserved_quantity=2 from public.rental_consumables where id=goods),'only unpaid goods released');
+ perform pg_temp.require(exists(select 1 from jsonb_array_elements(public.draft_group_followup_snapshot()->'rows') r where r->>'id'=g2::text and r->>'reason'='payment_review'),'pending payment visible to owner');
+ perform pg_temp.require(not exists(select 1 from jsonb_array_elements(public.draft_group_followup_snapshot()->'rows') r where r->>'id'=g3::text),'released excluded');
+ perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_expiry_attempt(uuid)','EXECUTE'),'no client expiry grant');
  perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_cancel_request(uuid,uuid)','EXECUTE'),'client cannot call RPC');
 end $$;
