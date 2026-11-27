@@ -12,6 +12,6 @@ export default async function AccountingPage({searchParams}){
  const view=views.has(params?.vis)?params.vis:"oversikt";
  return <main className="admin" style={{maxWidth:1250,margin:"0 auto",padding:"24px 18px 70px"}}>
   <p style={{margin:"0 0 14px",fontSize:13}}><Link href="/admin">← Tilbake til administrasjonen</Link></p>
-  <AccountingOverviewClient initialView={view}/>
+  <p><Link href="/admin/regnskap/felles">Felles økonomikontroll – Service og Utleie</Link></p><AccountingOverviewClient initialView={view}/>
  </main>;
 }
