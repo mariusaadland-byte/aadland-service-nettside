@@ -1,7 +1,7 @@
 import {NextResponse} from "next/server";
 import {invoiceVippsReference,reconcileInvoiceVipps} from "../../../../lib/invoiceVipps";
 import {db} from "../../../../lib/supabase";
-import {vippsPaymentsEnabled} from "../../../../lib/vippsClient";
+import {getVippsPayment,vippsPaymentsEnabled} from "../../../../lib/vippsClient";
 import {verifyVippsWebhookRequest} from "../../../../lib/vippsWebhook";
 import {sendVippsPaymentReceiptIfNeeded} from "../../../../lib/vippsPaymentReceipt";
 import {sendVippsRefundNoticeIfNeeded} from "../../../../lib/vippsRefundNotice";
@@ -97,7 +97,7 @@ export async function POST(req){
   }catch(e){console.error("INVOICE VIPPS WEBHOOK",{reference,message:e.message});return NextResponse.json({error:"Invoice payment processing failed."},{status:503});}
  }
 
- const {data:processed,error:processError}=await s.rpc("process_vipps_payment_event_once",{
+ const eventArgs={
   event_unit:unit,
   event_idempotency_key:idempotencyKey,
   event_psp_reference:pspReference,
@@ -107,7 +107,42 @@ export async function POST(req){
   event_timestamp_value:timestamp,
   capture_guaranteed_until_value:captureGuaranteedUntil,
   event_payload:payload
- });
+ };
+
+ let processed,processError;
+ if(unit==="service"&&["CAPTURED","REFUNDED"].includes(eventName)){
+  // Status checks can already have written this payment's cumulative totals.
+  // Apply the same provider totals, never add the webhook amount on top.
+  if(payload?.amount?.currency!=="NOK"||amountOre===0)
+   return NextResponse.json({error:"Invalid payment amount."},{status:400});
+  try{
+   const payment=await getVippsPayment(unit,reference);
+   const aggregate=payment?.aggregate;
+   const fields=["authorizedAmount","cancelledAmount","capturedAmount","refundedAmount"];
+   if(payment?.reference!==reference||payment?.state!=="AUTHORIZED"||
+      !fields.every(key=>aggregate?.[key]?.currency==="NOK"&&
+       Number.isInteger(aggregate[key].value)&&aggregate[key].value>=0&&aggregate[key].value<=2147483647))
+    throw new Error("VIPPS_INVALID_PAYMENT_SNAPSHOT");
+   const {event_unit,...serviceEvent}=eventArgs;
+   const result=await s.rpc("process_service_vipps_economic_webhook",{
+    ...serviceEvent,
+    snapshot_psp_reference:payment.pspReference||null,
+    snapshot_authorized_ore:aggregate.authorizedAmount.value,
+    snapshot_cancelled_ore:aggregate.cancelledAmount.value,
+    snapshot_captured_ore:aggregate.capturedAmount.value,
+    snapshot_refunded_ore:aggregate.refundedAmount.value
+   });
+   processed=result.data;
+   processError=result.error;
+  }catch(error){
+   console.error("SERVICE VIPPS WEBHOOK SNAPSHOT UNAVAILABLE",{reference,eventName,code:error?.code,status:error?.status});
+   return NextResponse.json({error:"Payment status unavailable."},{status:503});
+  }
+ }else{
+  const result=await s.rpc("process_vipps_payment_event_once",eventArgs);
+  processed=result.data;
+  processError=result.error;
+ }
 
  if(processError){
   console.error("VIPPS WEBHOOK PROCESS ERROR",{
