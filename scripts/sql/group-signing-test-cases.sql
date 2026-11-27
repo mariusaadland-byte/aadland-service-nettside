@@ -11,7 +11,7 @@ declare
  n integer; rejected boolean;
 begin
  insert into auth.users values(u,'group-demo@example.invalid',clock_timestamp()),(u2,'other-group@example.invalid',clock_timestamp());
- insert into public.rental_items(id,name,quantity,daily_price_ore,deposit_ore) values(item,'Demo drill',3,30000,50000);
+ insert into public.rental_items(id,name,slug,quantity,daily_price_ore,deposit_ore) values(item,'Demo drill','ci-'||item::text,3,30000,50000);
  insert into public.rental_consumables(id,rental_item_id,name,sku,price_ore,stock_quantity,active) values(goods,item,'Demo bit','CI-BIT',2500,5,true);
  snap:=jsonb_build_object('version',1,'termsVersion','2026-11-25','fulfillment','pickup',
  'rentals',jsonb_build_array(jsonb_build_object('itemId',item,'name','Demo drill','startDate',day,'endDate',day,'quantity',2,'totalOre',60000,'depositOre',100000)),

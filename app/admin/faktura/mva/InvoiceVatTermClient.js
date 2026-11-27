@@ -147,7 +147,7 @@ export default function InvoiceVatTermClient({costAllocationEnabled=false}){
    {view==="more"&&<VatRetroCandidatesClient period={report.period} registrationReview={report.registrationReview}
     reload={reload} onOpenDate={date=>onDocumentSaved({documentDate:date})}/>}
    <div id="mobilkvittering" hidden={view!=="receipt"}>
-    <InputVatRegisterClient costAllocationEnabled={costAllocationEnabled} purchases={report.purchases.rows} period={report.period}
+    <InputVatRegisterClient purchases={report.purchases.rows} period={report.period} costAllocationEnabled={costAllocationEnabled}
      onChanged={onDocumentSaved}/>
    </div>
    {view==="more"&&<div id="flere-funksjoner">

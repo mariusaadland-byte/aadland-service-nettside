@@ -9,7 +9,7 @@ declare
  pdf bytea:=convert_to('%PDF-1.4 synthetic settlement','UTF8'); digest text; evidence text; ref text;
 begin
  insert into auth.users values(u,'settlement@example.invalid',clock_timestamp());
- insert into public.rental_items(id,name,quantity,daily_price_ore,deposit_ore) values(item,'Demo saw',2,30000,50000);
+ insert into public.rental_items(id,name,slug,quantity,daily_price_ore,deposit_ore) values(item,'Demo saw','ci-'||item::text,2,30000,50000);
  insert into public.rental_consumables(id,rental_item_id,name,sku,price_ore,stock_quantity,active) values(goods,item,'Demo blade','CI-BLADE',2500,5,true);
  snap:=jsonb_build_object('version',1,'termsVersion','2026-11-25','fulfillment','pickup',
  'rentals',jsonb_build_array(jsonb_build_object('itemId',item,'name','Demo saw','startDate',day,'endDate',day,'quantity',1,'totalOre',30000,'depositOre',50000)),

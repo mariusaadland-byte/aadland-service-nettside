@@ -1,0 +1,13 @@
+# U-40B – Produksjonskartlegging (27.11.2026)
+
+U-40A GitHub-run 46077175910 completed successfully, including the separate synthetic file and database restore. Vercel failed on an old literal assertion in smoke-vat-chromeos-batch-queue.mjs; preserve the established InputVatRegisterClient prop prefix and append the cost allocation prop. New build pending.
+
+Read-only Supabase inventory on the existing shared project (no record contents exported):
+- PostgreSQL 17.6; database size 111,815,827 bytes; 83 ordinary public-schema tables; zero without RLS enabled. RLS enabled does not prove that policies or RPC privileges are secure.
+- Existing rental tables: rental_blocks, rental_bookings, rental_categories, rental_deposit_alert_batches, rental_deposit_inspection_events, rental_items. New group, unit, signing, report and transfer tables absent. Existing two rental item and two booking rows must be preserved.
+- 69 purchase documents, 68 purchase-file rows, two external invoices. No active purchase missing an attachment reference; no referenced storage metadata missing. This does not verify file bytes.
+- Three storage buckets: aadland-vat-documents 70 objects / 73,370,342 metadata bytes (private); contact-images zero (private); product-images one / 506,978 bytes (public). 73,877,320 metadata bytes total, not a backup size. Six Auth users.
+- Actual rental_items requires slug with no default, unique; valid statuses available/unavailable/hidden/maintenance. Actual rental_bookings status check new/confirmed/active/returned/completed/cancelled; customer_user_id FK ON DELETE SET NULL. Rental blocks and bookings date bounds enforced; blocks FK ON DELETE CASCADE. Added those properties and RLS to minimal synthetic fixture; updated fixture inserts. Not a full production-schema clone; actual defaults, policies, triggers, indexes, old booking writers, grants, migration history and concurrent interactions need further validation.
+- Existing vat_purchase_documents has no cost_unit; no history table. Existing customer_profiles includes name and email.
+- Reusable read-only metadata SQL in scripts/u40b-production-preflight.sql. No real rows, passwords, API tokens or original files in Git. No migrations, production config changes, backup export or staging project created. Supabase migration list response not fully inspected; do not treat repository filenames as proof of applied history.
+Next: review shared inventory locking, unit assignment/release and physical return, test against improved fixture. Actual full shared DB and separate Storage backup to approved independent encrypted location and restore on isolated environment remain release blockers.

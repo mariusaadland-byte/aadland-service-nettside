@@ -3,7 +3,7 @@ do $$
 declare u uuid:=gen_random_uuid(); actor uuid:=gen_random_uuid(); item uuid:=gen_random_uuid(); g uuid:=gen_random_uuid(); b uuid:=gen_random_uuid(); claim uuid:=gen_random_uuid(); req uuid:=gen_random_uuid(); digest text:=repeat('d',64); photo text:=repeat('a',64); proof text:=repeat('b',64);
 begin
  insert into auth.users values(u,'damage-demo@example.invalid',clock_timestamp());
- insert into public.rental_items(id,name,quantity,daily_price_ore,deposit_ore) values(item,'Damage demo',1,30000,50000);
+ insert into public.rental_items(id,name,slug,quantity,daily_price_ore,deposit_ore) values(item,'Damage demo','ci-'||item::text,1,30000,50000);
  insert into public.rental_order_groups(id,customer_user_id,request_id,quote_digest,quote_snapshot,terms_version,rental_ore,sales_ore,deposit_ore,payable_ore,status,expires_at) values(g,u,gen_random_uuid(),digest,'{}','2026-11-25',30000,0,50000,30000,'confirmed',clock_timestamp()+interval '30 minutes');
  perform pg_temp.require(public.draft_group_deposit_record(g,'damage-deposit-ci',50000,proof,actor)='recorded','damage fixture deposit');
  update public.rental_order_groups set status='fulfilled' where id=g;
