@@ -1,6 +1,8 @@
 import {rentalOverlapOr,extendOverdueAvailability} from "../../../../lib/rentalOverdue.mjs";
 import {osloDateKey} from "../../../../lib/osloTime";
 import {rentalAppointmentInput} from "../../../../lib/rentalAppointments.mjs";
+import {createHash} from "node:crypto";
+import {rentalSigningReview,rentalSigningInput,rentalSignatureSummary,RENTAL_SIGNING_VERSION} from "../../../../lib/rentalSigning.mjs";
 import {rentalAccessoryRecord} from "../../../../lib/rentalAccessories.mjs";
 import {rentalHandoverRecord} from "../../../../lib/rentalHandover.mjs";
 import {rentalDateChangeAttempt} from "../../../../lib/rentalChangeRequest.mjs";
@@ -40,6 +42,9 @@ const map=b=>({
  itemId:b.rental_item_id,
  itemName:b.rental_items?.name||"",
  customer:b.customer||{},
+ signingEnabled:process.env.RENTAL_SIGNING_ENABLED==="true"&&Object.prototype.hasOwnProperty.call(b,"handover_signatures"),
+ signatureSetupRequired:process.env.RENTAL_SIGNING_ENABLED==="true"&&!Object.prototype.hasOwnProperty.call(b,"handover_signatures"),
+ signatures:rentalSignatureSummary(b.handover_signatures),
  vippsPushEnabled:process.env.VIPPS_RENTAL_PUSH_ENABLED==="true",
  customerUserId:b.customer_user_id||null,
  startDate:b.start_date,
@@ -211,7 +216,8 @@ export async function GET(){
 export async function PATCH(req){
  if(process.env.VERCEL_ENV!=="production")return NextResponse.json({error:"Utleieendringer er sperret utenfor produksjon."},{status:403,headers:{"Cache-Control":"no-store"}});
  const originError=sameOriginGuard(req); if(originError)return originError;
- if(!(await getAdminUser())||!(await hasPermission("canUpdateOrders")))return NextResponse.json({error:"Ingen tilgang."},{status:403});
+ const actingAdmin=await getAdminUser();
+ if(!actingAdmin||!(await hasPermission("canUpdateOrders")))return NextResponse.json({error:"Ingen tilgang."},{status:403});
  const s=db();
  if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
 
@@ -606,6 +612,17 @@ export async function PATCH(req){
    if(checked.error)return NextResponse.json({error:checked.error},{status:409});
    changes.admin_note=checked.note;
    changes.customer=accessory.customer;
+   if(process.env.RENTAL_SIGNING_ENABLED==="true"){
+    if(!Object.prototype.hasOwnProperty.call(current,"handover_signatures"))return NextResponse.json({error:"Signeringsregisteret er ikke klargjort."},{status:503});
+    const prior=current.handover_signatures||{};
+    if(prior[b.status])return NextResponse.json({error:"Denne kontrollen er allerede signert."},{status:409});
+    const review=rentalSigningReview(current,b.status,accessory,b.handoverChecklist);
+    const signature=rentalSigningInput(review,b.signature);
+    if(!signature)return NextResponse.json({error:"Kunden må bekrefte den gjeldende kontrollrapporten og oppgi navn. Bekreft også at signeringen ble gjort foran deg."},{status:400});
+    const record={version:RENTAL_SIGNING_VERSION,method:"typed_in_person",name:signature.name,recordedAt:now,witnessAdminId:actingAdmin.id,review:signature.review};
+    const digest=createHash("sha256").update(JSON.stringify(record)).digest("hex");
+    changes.handover_signatures={...prior,[b.status]:{...record,digest}};
+   }else if(b.signature!==undefined)return NextResponse.json({error:"Digital signering er ikke aktivert."},{status:409});
   }
   if(b.status==="completed"&&current.status!=="completed"){
    const total=Math.max(0,Number(current.total_ore)||0);
