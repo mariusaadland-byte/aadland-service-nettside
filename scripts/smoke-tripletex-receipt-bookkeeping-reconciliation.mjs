@@ -95,7 +95,7 @@ assert.equal(result.body.remote.number,518);
 assert.equal(result.body.document.grossOre,10000);
 assert.equal(saved.length,0,"Read-only check may never mark a voucher booked");
 const confirmation={
- action:"confirm",expectedVoucherNumber:518,expectedVoucherYear:2026,
+ action:"confirm",expectedVoucherId:12345,expectedVoucherNumber:518,expectedVoucherYear:2026,
  expectedSupplierDocumentNumber:sourceDoc.supplier_document_number,
  originalSha256:sourceFile.sha256,
  vatCode:"1",accountCode:"6550",
@@ -110,6 +110,10 @@ result=await post({...confirmation,expectedVoucherNumber:517});
 assert.equal(result.status,409);assert.equal(saved.length,0);
 result=await post({...confirmation,vatCode:"",accountCode:"6550"});
 assert.equal(result.status,400);assert.equal(saved.length,0);
+result=await post({...confirmation,expectedVoucherId:12346});
+assert.equal(result.status,409);assert.equal(saved.length,0);
+result=await post({...confirmation,expectedVoucherId:undefined});
+assert.equal(result.status,409);assert.equal(saved.length,0);
 result=await post(confirmation);
 assert.equal(result.status,200);assert.equal(result.body.status,"owner_verified_booked");
 assert.equal(saved.length,1);
@@ -159,3 +163,7 @@ assert.ok(panel.includes('action:"check"')&&panel.includes('action:"confirm"'));
 assert.ok(panel.includes("vatAndDeduction"));
 assert.ok(panel.includes("noDuplicate"));
 console.log("S-05 bestått: e-post akseptert ≠ bokført, API kun lesing, eierbekreftelse, original/MVA/duplikat og ingen reell regnskapsskriving.");
+
+assert.ok(panel.includes("expectedVoucherId:checkedVoucher.remote.voucherId")&&panel.includes("value={voucherId} disabled={busy}"));
+assert.ok(panel.includes("data.status!==\"owner_verified_booked\""));
+console.log("S05: exact checked voucher ID binding and malformed confirmation guard.");
