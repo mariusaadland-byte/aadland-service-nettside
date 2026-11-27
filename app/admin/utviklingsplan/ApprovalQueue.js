@@ -23,7 +23,7 @@ export default function ApprovalQueue({
  const [isOpen,setIsOpen]=useState(false);
  const [progress,setProgress]=useState({});
  const [hydrated,setHydrated]=useState(false);
- const [showAll,setShowAll]=useState(false);
+ const [showAll,setShowAll]=useState(initialScope==="service-final");
  const [busy,setBusy]=useState(false);
  const [showIssue,setShowIssue]=useState(false);
  const [issueText,setIssueText]=useState("");
@@ -159,12 +159,12 @@ export default function ApprovalQueue({
    <div className={styles.approvalCount}><strong>{queue.length}</strong><span>venter på test</span></div>
   </div>
   <div className={styles.approvalBuckets}>
-   <button type="button" className={styles.approvalOpen} aria-pressed={scope==="service-final"} disabled={busy||Boolean(savingId)} onClick={()=>{setScope("service-final");setSelectedId(null);setIsOpen(false);setShowAll(false);}}>Service-sluttkontroll ({finalCount})</button>
+   <button type="button" className={styles.approvalOpen} aria-pressed={scope==="service-final"} disabled={busy||Boolean(savingId)} onClick={()=>{setScope("service-final");setSelectedId(null);setIsOpen(false);setShowAll(true);}}>Service-sluttkontroll ({finalCount})</button>
    <button type="button" className={styles.approvalOpen} aria-pressed={scope==="rental-final"} disabled={busy||Boolean(savingId)} onClick={()=>{setScope("rental-final");setSelectedId(null);setIsOpen(false);setShowAll(true);}}>Utleie-sluttkontroll ({rentalCount})</button>
    <button type="button" className={styles.approvalOpen} aria-pressed={scope==="earlier"} disabled={busy||Boolean(savingId)} onClick={()=>{setScope("earlier");setSelectedId(null);setIsOpen(false);setShowAll(false);}}>Tidligere oppgaver ({earlierCount})</button>
   </div>
   {scope==="rental-final"&&<p className={styles.wizardTip}>Aadland Utleie · {rentalApproved} av 27 godkjent. Bruk bare lesende kontroll i produksjon, isolert testdatabase for endringer og særskilt godkjent betalings- og e-postoppsett. Testboksene er ikke et isolert testmiljø. Ikke godkjenn manglende funksjoner eller oppsett.</p>}
-  {scope==="service-final"&&<p className={styles.wizardTip}>Kun Aadland Service. Bruk isolerte testdata og egne testkontoer. Godkjenn bare etter faktisk kontroll; uavklart ekstern bekreftelse skal stå åpen. Delsteg lagres i denne nettleseren, endelig godkjenning lagres på serveren.</p>}
+  {scope==="service-final"&&<p className={styles.wizardTip}>Kun Aadland Service. Testboksene er ikke et isolert testmiljø. Bruk isolerte testdata og egne testkontoer. Godkjenn bare etter faktisk kontroll; uavklart ekstern bekreftelse skal stå åpen. Delsteg lagres i denne nettleseren, endelig godkjenning lagres på serveren.</p>}
   <div className={styles.approvalBuckets}>
    <span><strong>{remaining.quick}</strong> raske kontroller</span>
    <span><strong>{remaining.workflow}</strong> hele testflyter</span>
