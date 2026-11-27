@@ -172,9 +172,9 @@ const db=()=>({from:table=>{
  };return q;
 }});
 const GET=new Function("NextResponse","getAdminUser","db","osloDateKey",
- "buildAccountingOverview","accountingOverviewCsv",
+ "buildAccountingOverview","accountingOverviewCsv","costAllocationEnabled","costHistoryEnabled","purchaseCostAllocation",
  clean+";return GET;")(NextResponse,async()=>({role}),db,()=>"2026-11-18",
- buildAccountingOverview,accountingOverviewCsv);
+ buildAccountingOverview,accountingOverviewCsv,()=>false,()=>false,()=>{throw Error("Disabled allocation must not run");});
 const request=part=>new Request("https://example.invalid/api/admin/regnskap"+part);
 let response=await GET(request("?year=2026"));
 assert.equal(response.status,200);

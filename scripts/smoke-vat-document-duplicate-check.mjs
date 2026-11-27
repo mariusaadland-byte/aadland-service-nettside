@@ -114,7 +114,7 @@ assert.ok(form.includes('const latestDuplicate=await checkDuplicate(form)'),
 assert.ok(form.includes('latestDuplicate.status==="duplicate"'),"Stop confirmed duplicates from being posted");
 assert.ok(form.includes('duplicateCheck.status==="possible"&&!duplicateReviewed'),
  "Do not permit an ambiguous number without explicit owner review");
-assert.ok(form.includes('disabled={busy||scanBusy||duplicateBlocking||'),
+assert.ok(form.includes('disabled={busy||(costAllocationEnabled&&!validCostUnit(costUnit))||scanBusy||duplicateBlocking||'),
  "Keep the save action locked while checking, if duplicate, or if database is unavailable");
 assert.ok(form.includes('Registrert fra før')||form.includes('Allerede registrert'));
 assert.ok(form.includes('Kontrollerer bilagsnummeret mot tidligere terminer'));
@@ -125,7 +125,7 @@ assert.ok(form.includes('duplicateCheck.match?.grossOre'),
  "Show the previous amount so the owner can compare invoices");
 assert.ok(route.includes('base_ore,vat_ore,voided_at'),"Preflight includes previous totals");
 
-assert.ok(route.includes('insert({...entry,confirmed_by:user.id})'),
+assert.ok(route.includes('insert({...entry,confirmed_by:user.id,...(allocate?{cost_unit:body.costUnit}:{})})'),
  "Existing server-side and database collision protection stays in place");
 assert.ok(route.includes('inserted.error.code==="23505"'),
  "Concurrent exact duplicates are still rejected atomically");
