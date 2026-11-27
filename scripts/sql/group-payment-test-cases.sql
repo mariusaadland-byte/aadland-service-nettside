@@ -3,6 +3,7 @@ do $$
 declare
  u uuid:=gen_random_uuid(); item uuid:=gen_random_uuid(); goods uuid:=gen_random_uuid();
  g uuid; a uuid:=gen_random_uuid(); c uuid:=gen_random_uuid(); report uuid:=gen_random_uuid();
+ booking uuid; receipt uuid:=gen_random_uuid(); settlement uuid:=gen_random_uuid();
  q text:=repeat('e',64); mac text:=repeat('b',64); seal text:=repeat('c',64);
  day date:=(clock_timestamp() at time zone 'Europe/Oslo')::date+3; snap jsonb;
  pdf bytea:=convert_to('%PDF-1.4 synthetic settlement','UTF8'); digest text; evidence text; ref text;
@@ -32,6 +33,8 @@ begin
  perform pg_temp.require(public.draft_group_payment_confirm(g,ref,'psp-ci','NOK',35000,35000,0,0)='confirmed','full capture confirms group');
  perform pg_temp.require(public.draft_group_payment_confirm(g,ref,'psp-ci','NOK',35000,35000,0,0)='existing','duplicate payment ignored');
  perform pg_temp.require((select stock_quantity=5 and reserved_quantity=2 from public.rental_consumables where id=goods),'confirmation retains held stock');
+ perform pg_temp.require(public.draft_group_deposit_record(g,'deposit-ci',50000,repeat('a',64),u)='recorded','separate deposit recorded');
+ perform pg_temp.require(public.draft_group_deposit_record(g,'deposit-ci',50000,repeat('a',64),u)='existing','deposit replay');
  perform pg_temp.require(public.draft_group_fulfill(g,ref,'psp-ci',report,0)='review','deposit mismatch blocks fulfillment');
  perform pg_temp.require(public.draft_group_fulfill(g,ref,'psp-ci',null,50000)='review','missing report blocks fulfillment');
  perform pg_temp.require(public.draft_group_fulfill(g,ref,'psp-ci',report,50000)='fulfilled','handover deducts goods');
@@ -41,4 +44,16 @@ begin
  perform pg_temp.require((select count(*)=1 from public.rental_bookings where group_id=g and status='active'),'equipment active not sold');
  perform pg_temp.require((select count(*)=3 from public.rental_group_events where group_id=g and event in ('payment_start','confirm','fulfill')),'unique settlement events');
  perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_payment_confirm(uuid,text,text,text,integer,integer,integer,integer)','EXECUTE'),'client cannot confirm payment');
-end $$;
+ select id into booking from public.rental_bookings where group_id=g;
+ perform pg_temp.require(public.draft_group_return_plan(g,settlement,u,50000,0,repeat('d',64))='review','cannot settle before return');
+ perform pg_temp.require(public.draft_group_receive_return(g,booking,receipt,u,'ok','',repeat('a',64))='received','physical return recorded');
+ perform pg_temp.require(public.draft_group_receive_return(g,booking,receipt,u,'ok','',repeat('a',64))='existing','return replay');
+ perform pg_temp.require(public.draft_group_receive_return(g,booking,gen_random_uuid(),u,'damage','new claim',repeat('b',64))='review','cannot overwrite return');
+ perform pg_temp.require(public.draft_group_return_plan(g,settlement,u,40000,10000,repeat('d',64))='review','automatic retention blocked');
+ perform pg_temp.require(public.draft_group_return_plan(g,settlement,u,50000,0,repeat('d',64))='planned','full deposit refund plan');
+ perform pg_temp.require(public.draft_group_return_close(g,settlement,50000,null,null)='review','no refund evidence no close');
+ perform pg_temp.require(public.draft_group_return_close(g,settlement,50000,'refund-ci',repeat('e',64))='closed','external refund recorded');
+ perform pg_temp.require(public.draft_group_return_close(g,settlement,50000,'refund-ci',repeat('e',64))='existing','refund replay');
+ perform pg_temp.require((select stock_quantity=3 and reserved_quantity=0 from public.rental_consumables where id=goods),'sold consumables not returned to stock');
+ perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_return_close(uuid,uuid,integer,text,text)','EXECUTE'),'client cannot close settlement');
+end $;
