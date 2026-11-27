@@ -18,6 +18,17 @@ if (Object.values(credentials).some(value => !value)) {
  console.log("Vipps sandbox authentication skipped: preview credentials are incomplete.");
  process.exit(0);
 }
+const configuredMsn = credentials["Merchant-Serial-Number"];
+if (!/^\d{4,10}$/.test(configuredMsn)) {
+ const copiedNumber = configuredMsn.match(/^(?:MSN\s*[:=#-]?\s*)?["']?(\d{4,10})["']?$/i)?.[1];
+ if (copiedNumber) {
+  credentials["Merchant-Serial-Number"] = copiedNumber;
+  console.log("Vipps sandbox authentication metadata: digits recovered from formatting.");
+ } else {
+  delete credentials["Merchant-Serial-Number"];
+  console.log("Vipps sandbox authentication metadata: invalid MSN omitted from access-token request.");
+ }
+}
 try {
  const response = await fetch("https://apitest.vipps.no/accesstoken/get", {
   method: "POST",
@@ -34,7 +45,7 @@ try {
    console.log("Vipps sandbox authentication diagnosis: client secret was refused.");
   else if (/invalid subscription key|subscription not found/i.test(error))
    console.log("Vipps sandbox authentication diagnosis: subscription key was refused.");
-  else if (!/^\d{4,10}$/.test(credentials["Merchant-Serial-Number"]))
+  else if (!/^\d{4,10}$/.test(configuredMsn))
    console.log("Vipps sandbox authentication diagnosis: sales unit number has invalid format.");
   console.log("Vipps sandbox authentication rejected: HTTP " + response.status + ".");
  } else {
