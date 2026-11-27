@@ -1,7 +1,7 @@
 name: Isolated signing database test
 on:
   push:
-    branches: [u38k-signing-db-tests-20261127]
+    branches: [u38k-signing-db-tests-20261127, u38l-signing-concurrency-20261127]
   workflow_dispatch:
 permissions:
   contents: read
@@ -29,3 +29,6 @@ jobs:
           persist-credentials: false
       - name: Run isolated signing SQL
         run: bash scripts/test-signing-db.sh
+
+      - name: Run concurrent signing SQL
+        run: bash scripts/test-signing-concurrency.sh
