@@ -52,6 +52,7 @@ export async function PATCH(request){
  const body=await request.json().catch(()=>({})),id=clean(body.id,100);
  if(!id)return NextResponse.json({error:"Velg en oppgave."},{status:400});
  if(id.startsWith("rental-final-")&&process.env.VERCEL_ENV!=="production")return NextResponse.json({error:"Godkjenning av utleietester lagres bare i produksjon."},{status:403});
+ if(id.startsWith("service-final-")&&process.env.VERCEL_ENV!=="production")return NextResponse.json({error:"Service-sluttkontroll lagres bare i produksjon."},{status:403});
  const s=db();if(!s)return NextResponse.json({error:"Databasen er ikke tilgjengelig."},{status:503});
  const initial=DEVELOPMENT_TASKS.find(item=>item.id===id);
  const {data:stored,error:findError}=await s.from(TABLE).select(FIELDS).eq("id",id).maybeSingle();
