@@ -213,3 +213,7 @@ Rekkefølge: tilgang til tegninger (S-23), betalings/idempotens for Vipps og ord
 
 ## Neste arbeidsrunde
 Gjennomgå hvert funn i prioritert rekkefølge etter at kartleggingen er ferdig. Dokumenter test, utbedring, produksjonspublisering og godkjenning per ID. Hold utleie adskilt.
+
+### S-05 – Eierens avgrensning 27.11.2026
+
+Tidligere krav om manuell bokføringsavstemming i Aadland Service erstattes av kontroll av originalvedlegg, beløp/MVA, bekreftet overføring, mottaker og duplikatsperre. Tripletex er regnskapssystemet; akseptert sending betyr ikke bekreftet mottak eller bokføring. Overføringsoversikten viser Ikke overført, Overført og Overføringsfeil / uklar status. Tidligere avstemmingskode og historikk beholdes, men ordinær oversikt henter ikke bokføringsstatus og viser ikke avstemmingsknapper. Første prøvekvitteringskontroll ved masseutsending beholdes som mottakersikring, ikke bokføringskontroll. Tidligere historiske krav ovenfor er erstattet av denne avgrensningen. Ingen data slettet, ingen e-post sendt, ingen MVA-varsling, Vipps eller utleie endret.
