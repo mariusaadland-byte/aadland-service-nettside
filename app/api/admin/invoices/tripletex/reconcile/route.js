@@ -83,7 +83,8 @@ export async function POST(req){
   }
   if(!voucher.canReview)
    return json({error:"Tripletex bekrefter ikke et ikke-midlertidig bilag. Kontroller bilaget før bokføring merkes som verifisert."},409);
-  if(Number(body.expectedVoucherNumber)!==voucher.number||
+  if(positiveTripletexVoucherId(body.expectedVoucherId)!==voucher.voucherId||
+     Number(body.expectedVoucherNumber)!==voucher.number||
      Number(body.expectedVoucherYear)!==voucher.year||
      clean(body.expectedSupplierDocumentNumber)!==clean(doc.data.supplier_document_number)||
      clean(body.originalSha256)!==clean(file.data.sha256))
