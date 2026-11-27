@@ -55,6 +55,16 @@ revoke all on sequence public.rental_order_groups_order_number_seq from public,a
 -- U-37F: isolated candidate functions. No grants to runtime roles.
 -- Only a trusted server may construct the snapshot/digest from freshly accepted terms.
 -- Full integration with existing writers is deliberately not enabled.
+-- Request cancellation tombstone also prevents delayed reserve after cancel.
+create table public.rental_group_cancelled_requests(
+ customer_user_id uuid not null references auth.users(id) on delete restrict,
+ request_id uuid not null,
+ cancelled_at timestamptz not null default clock_timestamp(),
+ primary key(customer_user_id,request_id)
+);
+alter table public.rental_group_cancelled_requests enable row level security;
+revoke all on public.rental_group_cancelled_requests from public,anon,authenticated,service_role;
+
 create function public.draft_group_reserve(
  p_customer uuid,p_request uuid,p_digest text,p_snapshot jsonb
 ) returns uuid language plpgsql security invoker set search_path=pg_catalog,public as $$
@@ -77,6 +87,7 @@ begin
  then raise exception 'GROUP_INVALID'; end if;
  if jsonb_array_length(p_snapshot->'rentals') not between 1 and 10 or jsonb_array_length(p_snapshot->'goods')>20 then raise exception 'GROUP_INVALID'; end if;
  perform pg_advisory_xact_lock(hashtextextended(p_customer::text||':'||p_request::text,3706));
+ if exists(select 1 from public.rental_group_cancelled_requests where customer_user_id=p_customer and request_id=p_request) then raise exception 'GROUP_REQUEST_CANCELLED'; end if;
  select * into old_group from public.rental_order_groups where customer_user_id=p_customer and request_id=p_request;
  if found then
   if old_group.quote_digest=p_digest and old_group.quote_snapshot=p_snapshot then return old_group.id; end if;

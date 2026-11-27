@@ -8,7 +8,7 @@ const msg={wrong_code:"Feil kode. Kontroller e-posten.",limited:"For mange fors�
 const demoAgreement="00000000-0000-4000-8000-000000000901",demoGroup="00000000-0000-4000-8000-000000000902",demoChallenge="00000000-0000-4000-8000-000000000903";
 export default function GroupCheckout({quote,lines=[],sales=[],enabled=false,customerScope="",demo=false,onLocked}){
  const key="aadland-group-checkout-v1:"+customerScope;
- const [pending,setPending]=useState(null),[ready,setReady]=useState(false),[terms,setTerms]=useState(false),[agreement,setAgreement]=useState(null),[name,setName]=useState(""),[consent,setConsent]=useState(false),[challenge,setChallenge]=useState(null),[code,setCode]=useState(""),[signed,setSigned]=useState(false),[busy,setBusy]=useState(false),[notice,setNotice]=useState(""),[checkedStatus,setCheckedStatus]=useState(false);
+ const [pending,setPending]=useState(null),[ready,setReady]=useState(false),[terms,setTerms]=useState(false),[agreement,setAgreement]=useState(null),[name,setName]=useState(""),[consent,setConsent]=useState(false),[challenge,setChallenge]=useState(null),[code,setCode]=useState(""),[signed,setSigned]=useState(false),[busy,setBusy]=useState(false),[notice,setNotice]=useState(""),[checkedStatus,setCheckedStatus]=useState(false),[cancelConfirm,setCancelConfirm]=useState(false);
  const lock=useRef(false),snapshot=useRef(null);
  useEffect(()=>{let p=null;if(enabled&&!demo&&customerScope){try{const x=JSON.parse(sessionStorage.getItem(key)||"null");if(isCheckoutId(x?.requestId)&&typeof x.quoteDigest==="string"&&Array.isArray(x.lines)&&Array.isArray(x.consumables))p=x;}catch{}}setPending(p);setReady(true);onLocked?.(!!p);},[key,enabled,demo]);
  const available=enabled||demo;
@@ -56,7 +56,14 @@ export default function GroupCheckout({quote,lines=[],sales=[],enabled=false,cus
    else{setNotice(msg[r.status]||msg.unconfirmed);setCode("");if(["expired","locked","closed"].includes(r.status))setChallenge(null);}
   }catch{setNotice(msg.unconfirmed);}finally{lock.current=false;setBusy(false);}
  }
- function resetDemo(){setPending(null);setAgreement(null);setChallenge(null);setSigned(false);setCode("");setName("");setTerms(false);setConsent(false);setCheckedStatus(false);setNotice("");onLocked?.(false);}
+ async function cancel(){
+  if(!pending||!cancelConfirm||lock.current)return;lock.current=true;setBusy(true);setNotice("");
+  try{const result=demo?{status:"cancelled"}:await post("/api/customer/group-cancel",{requestId:pending.requestId,confirmed:true});
+   if(result.status!=="cancelled"){setNotice(result.status==="payment_review"?"Betaling kan være påbegynt. Reservasjonen beholdes til oppgjøret er avklart.":msg[result.status]||msg.unconfirmed);return;}
+   if(!demo)sessionStorage.removeItem(key);resetDemo();setCancelConfirm(false);setNotice(demo?"Demoreservasjon avbrutt.":"Reservasjonen er avbrutt. Du kan kontrollere handlekurven på nytt.");
+  }catch{setNotice(msg.unconfirmed);}finally{lock.current=false;setBusy(false);}
+ }
+ function resetDemo(){setPending(null);setAgreement(null);setChallenge(null);setSigned(false);setCode("");setName("");setTerms(false);setConsent(false);setCheckedStatus(false);setCancelConfirm(false);setNotice("");onLocked?.(false);}
  if(!available||!ready)return null;
  if(!demo&&!customerScope)return <section className={styles.root+" "+styles.line+" "+styles.checkout}><h2>Logg inn før bestilling</h2><Link href="/min-side">Gå til Min side</Link><p>Gå tilbake til handlekurven etter innlogging.</p></section>;
  return <section className={styles.root+" "+styles.line+" "+styles.checkout}><h2>{demo?"TESTMODUS – reservasjon og signering":"Reservasjon og signering"}</h2>{demo&&<p>Fiktive data. Ingen database, e-post eller betaling.</p>}
@@ -68,5 +75,6 @@ export default function GroupCheckout({quote,lines=[],sales=[],enabled=false,cus
  {checkedStatus&&!signed&&<><label>Fullt navn<input value={name} maxLength={120} disabled={busy||!!challenge} onChange={e=>setName(e.target.value)}/></label><label><input type="checkbox" checked={consent} disabled={busy||!!challenge} onChange={e=>setConsent(e.target.checked)}/>Jeg har lest den viste leieavtalen og godtar den avtalte betalingsforpliktelsen og ansvaret som følger av avtalen.</label>
  {!challenge?<button type="button" disabled={busy||!consentInput} onClick={issue}>Send engangskode</button>:<><label>Engangskode<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,""))}/></label><button type="button" disabled={busy||code.length!==6} onClick={verify}>Signer avtalen</button><button type="button" disabled={busy} onClick={issue}>Be om ny kode</button><small>Koden gjelder i maksimalt ti minutter. Ny kode er underlagt ventetid.</small></>}</>}
  {signed&&<><h3>✓ Avtalen er signert{demo?" (demo)":""}</h3><p>Betaling er ikke gjennomført. Vipps-betalingen er ikke koblet til denne flyten ennå.</p>{!demo&&<Link href="/min-side/signering">Mine avtaler</Link>}</>}</>}
+ {pending&&<div><button type="button" disabled={busy} onClick={()=>setCancelConfirm(v=>!v)}>Avbryt reservasjon</button>{cancelConfirm&&<><p>Avbryt denne forespørselen? Ubetalt reservasjon frigjøres bare etter bekreftelse fra serveren. Påbegynt betaling må avklares separat.</p><button type="button" disabled={busy} onClick={cancel}>Bekreft avbrytelse</button><button type="button" disabled={busy} onClick={()=>setCancelConfirm(false)}>Behold bestilling</button></>}</div>}
  {notice&&<p role="status">{notice}</p>}{demo&&<button type="button" disabled={busy} onClick={resetDemo}>Start testen på nytt</button>}</section>;
 }
