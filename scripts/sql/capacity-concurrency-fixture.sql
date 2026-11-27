@@ -3,9 +3,9 @@ do $$
 declare label text; item uuid; u uuid; unit uuid;
 begin
  if current_database()<>'aadland_signing_test' then raise exception 'WRONG_DATABASE';end if;
- foreach label in array array['group-group','group-legacy','legacy-group','maintenance-group'] loop
+ foreach label in array array['group-group','group-legacy','legacy-group','maintenance-group','block-group','group-block','group-reduce','closed-group'] loop
   item:=signing_ci.uid('capacity:'||label);
-  insert into public.rental_items(id,name,slug,quantity,daily_price_ore,deposit_ore) values(item,'Race drill','race-'||label,1,30000,0);
+  insert into public.rental_items(id,name,slug,quantity,daily_price_ore,deposit_ore) values(item,'Race drill','race-'||label,case when label='group-reduce' then 2 else 1 end,30000,0);
   foreach u in array array[signing_ci.uid(label||':a'),signing_ci.uid(label||':b')] loop
    insert into auth.users values(u,u::text||'@example.invalid',clock_timestamp());
   end loop;
@@ -22,6 +22,16 @@ declare item uuid:=signing_ci.uid('capacity:'||label); u uuid:=signing_ci.uid(la
  d date:=(clock_timestamp() at time zone 'Europe/Oslo')::date+2;
  snap jsonb; record_data jsonb; result uuid;
 begin
+ if kind='block' then
+  insert into public.rental_blocks(rental_item_id,start_date,end_date) values(item,d,d);
+  return 'blocked';
+ elsif kind='close' then
+  update public.rental_items set status='maintenance' where id=item;
+  return 'blocked';
+ elsif kind='reduce' then
+  update public.rental_items set quantity=1 where id=item;
+  return 'reduced';
+ end if;
  if kind='fault' then
   insert into public.rental_unit_maintenance_events(id,unit_id,kind,condition,performed_on,note,created_by)
   values(gen_random_uuid(),signing_ci.uid(label||':unit'),'fault','out_of_service',d-2,'Synthetic competing maintenance',u);
@@ -38,6 +48,6 @@ begin
  if result is null then raise exception 'NULL_RESERVATION';end if;
  return 'reserved';
 exception when raise_exception then
- if sqlerrm in ('GROUP_UNAVAILABLE','RENTAL_UNAVAILABLE') then return 'unavailable';end if;
+ if sqlerrm in ('GROUP_UNAVAILABLE','RENTAL_UNAVAILABLE','RENTAL_CAPACITY_BUSY') then return 'unavailable';end if;
  raise;
 end $$;
