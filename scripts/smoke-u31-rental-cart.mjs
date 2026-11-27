@@ -9,6 +9,10 @@ assert.equal(rentalCartInput({lines:[{...x,endDate:"2026-02-30"}]},"2026-11-26")
 assert.deepEqual(rentalCartTotals([{available:true,totalOre:10000,depositOre:20000,quantity:2},{available:true,totalOre:30000,depositOre:40000,quantity:1}]),{rentalOre:40000,depositOre:60000,quantity:3});
 assert.equal(rentalCartTotals([{available:false}]),null);
 const api=readFileSync("app/api/rental/cart-quote/route.js","utf8");
-assert.ok(api.includes('RENTAL_CART_ENABLED!=="true"')&&api.includes("peakRentalBookings")&&api.includes("reserved:false,checkoutEnabled:false"));
+assert.ok(api.includes('RENTAL_CART_ENABLED!=="true"')&&api.includes("peakRentalBookings")&&api.includes("reserved:false,checkoutEnabled:!!group&&checkoutSigningEnabled()"));
+const gate=readFileSync("lib/checkoutSigning.js","utf8"),reserveGate=readFileSync("lib/rentalCheckoutAgreement.js","utf8"),archiveGate=readFileSync("lib/signingArchiveConfig.js","utf8");
+assert.ok(gate.includes('groupCheckoutEnabled()&&process.env.AADLAND_CHECKOUT_SIGNING_ENABLED==="true"'));
+assert.ok(reserveGate.includes('process.env.AADLAND_GROUP_CHECKOUT_ENABLED==="true"')&&reserveGate.includes('process.env.RENTAL_PUBLIC_BOOKING_ENABLED==="true"')&&reserveGate.includes('process.env.RENTAL_CART_ENABLED==="true"'));
+assert.ok(archiveGate.includes('process.env.VERCEL_ENV==="production"')&&archiveGate.includes('process.env.AADLAND_SIGNING_ENABLED==="true"')&&archiveGate.includes('process.env.AADLAND_SIGNING_ARCHIVE_ENABLED==="true"'));
 assert.ok(!api.includes(".insert(")&&!api.includes(".update(")&&!api.includes(".rpc("));
 console.log("U-31 cart validation, combined price/deposit and read-only quote gates passed.");

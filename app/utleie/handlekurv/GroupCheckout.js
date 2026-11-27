@@ -58,8 +58,8 @@ export default function GroupCheckout({quote,lines=[],sales=[],enabled=false,cus
  }
  function resetDemo(){setPending(null);setAgreement(null);setChallenge(null);setSigned(false);setCode("");setName("");setTerms(false);setConsent(false);setCheckedStatus(false);setNotice("");onLocked?.(false);}
  if(!available||!ready)return null;
- if(!demo&&!customerScope)return <section className={styles.line}><h2>Logg inn før bestilling</h2><Link href="/min-side">Gå til Min side</Link><p>Gå tilbake til handlekurven etter innlogging.</p></section>;
- return <section className={styles.line}><h2>{demo?"TESTMODUS – reservasjon og signering":"Reservasjon og signering"}</h2>{demo&&<p>Fiktive data. Ingen database, e-post eller betaling.</p>}
+ if(!demo&&!customerScope)return <section className={styles.root+" "+styles.line+" "+styles.checkout}><h2>Logg inn før bestilling</h2><Link href="/min-side">Gå til Min side</Link><p>Gå tilbake til handlekurven etter innlogging.</p></section>;
+ return <section className={styles.root+" "+styles.line+" "+styles.checkout}><h2>{demo?"TESTMODUS – reservasjon og signering":"Reservasjon og signering"}</h2>{demo&&<p>Fiktive data. Ingen database, e-post eller betaling.</p>}
  {!pending&&!agreement&&quote?.snapshot&&<><p>Leie og varer: <strong>{kr(quote.snapshot.payableOre)}</strong> · Depositum separat: {kr(quote.snapshot.depositOre)}</p><label><input type="checkbox" checked={terms} onChange={e=>setTerms(e.target.checked)}/>Jeg godtar <a href="/vilkar/utleie/2026-11-25" target="_blank" rel="noreferrer">utleievilkårene</a> og ønsker å reservere.</label></>}
  {!agreement&&(pending||quote?.snapshot)&&<button type="button" disabled={busy||!pending&&!terms} onClick={reserve}>{busy?"Kontrollerer …":pending?"Gjenoppta samme reservasjon":"Reserver og hent leieavtale"}</button>}
  {pending&&!agreement&&<p>Samme forespørsels-ID beholdes ved nytt forsøk. Ikke opprett en ny ordre hvis resultatet er ukjent.</p>}
