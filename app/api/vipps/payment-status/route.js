@@ -73,7 +73,7 @@ export async function GET(req){
   const service=unit==="service";
   const providerReference=service?String(target.payment_reference||"").trim():reference;
   const canRefresh=refresh&&!state.terminal&&process.env.VERCEL_ENV==="production"&&referencePattern.test(providerReference);
-  const refreshBlocked=canRefresh&&service?await rateLimitValue(target.id,{scope:"vipps-service-public-refresh",max:1,windowSeconds:10}):null;
+  const refreshBlocked=canRefresh&&service?await rateLimitValue(target.id,{scope:"vipps-service-public-refresh",max:1,windowSeconds:10,requireExplicitAllowance:true}):null;
 
   if(canRefresh&&!refreshBlocked){
    const readiness=await vippsUnitReadiness(s,unit);
@@ -108,7 +108,7 @@ export async function GET(req){
    unit,
    status:state.status,
    terminal:state.terminal
-  });
+  },service?{headers:{"Cache-Control":"private, no-store"}}:undefined);
  }catch(error){
   console.error("VIPPS PUBLIC STATUS ERROR",{unit,reference,message:error?.message});
   return NextResponse.json({error:"Status kunne ikke hentes akkurat nå."},{status:500});
