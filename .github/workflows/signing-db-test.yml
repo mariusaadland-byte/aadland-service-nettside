@@ -1,0 +1,31 @@
+name: Isolated signing database test
+on:
+  push:
+    branches: [u38k-signing-db-tests-20261127]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  signing-db:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: local_fixture_only
+          POSTGRES_DB: aadland_signing_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d aadland_signing_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Run isolated signing SQL
+        run: bash scripts/test-signing-db.sh
