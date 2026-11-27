@@ -154,9 +154,9 @@ for(const marker of [
 assert.ok(!routeSource.includes("tripletexCreate")&&!routeSource.includes("sendToLedger")&&!routeSource.includes(".emails.send"));
 const ui=read("app/admin/faktura/mva/tripletex/TripletexReceiptsClient.js");
 const panel=read("app/admin/faktura/mva/tripletex/TripletexReceiptReconciliationPanel.js");
-assert.ok(ui.includes("Bokføring ikke verifisert"));
-assert.ok(ui.includes("Kontroller bokføring"));
-assert.ok(ui.includes("verifiedLoaded?bookedCount"));
+assert.ok(!ui.includes("Bokføring ikke verifisert"));
+assert.ok(!ui.includes("Kontroller bokføring"));
+assert.ok(!ui.includes("verifiedLoaded")&&!ui.includes("TripletexReceiptReconciliationPanel")&&!ui.includes("/reconcile"));
 assert.ok(panel.includes("bookedInTripletex"));
 assert.ok(panel.includes("Bekreft kontrollert bokføring"));
 assert.ok(panel.includes('action:"check"')&&panel.includes('action:"confirm"'));
