@@ -40,7 +40,7 @@ function ServiceHistoryMore({kind,meta,busy,error,onMore}){
  if(!meta)return null;
  const label=kind==="drawings"?"tegningsoppføringer (inkl. delte versjoner)":kind==="quotes"?"tilbud":"bestillinger og oppdrag samlet";
  return <div className="card customerEmpty" style={{marginTop:16}}>
-  <p aria-live="polite">{meta.total===null?"Totalt antall er ikke tilgjengelig.":"Hentet "+Math.min(meta.loadedThrough,meta.total)+" av "+meta.total+" "+label+"."}</p>
+  <p aria-live="polite">{meta.unavailable?"Hele historikken kunne ikke hentes. Oppdater Min side før du regner oversikten som fullstendig.":meta.total===null?"Totalt antall er ikke tilgjengelig.":"Hentet "+Math.min(meta.loadedThrough,meta.total)+" av "+meta.total+" "+label+"."}</p>
   {meta.hasMore&&<button type="button" className="btn alt" disabled={Boolean(busy)} onClick={()=>onMore(kind)}>{busy===kind?"Henter eldre historikk …":"Vis eldre historikk"}</button>}
   {error&&<p role="alert" className="notice">{error}</p>}
  </div>;
@@ -79,6 +79,7 @@ export default function MinSide(){
    const next=await r.json();
    if(!r.ok)throw Error(next.error||"Historikken kunne ikke hentes.");
    if(generation!==historyGeneration.current||next.customer?.id!==owner)return;
+   if(!Array.isArray(next[kind])||next.serviceHistory?.[kind]?.page!==meta.page+1||next.serviceHistory[kind].unavailable)throw Error("Historikksiden kunne ikke bekreftes. Prøv igjen.");
    setData(prev=>{
     if(!prev||prev.customer?.id!==owner||prev.serviceHistory?.[kind]?.page!==meta.page)return prev;
     const merged=new Map((prev[kind]||[]).map(row=>[row.id,row]));
@@ -381,7 +382,7 @@ export default function MinSide(){
  const pendingRentalRows=rentals.filter(r=>rentalPortalGroup(r,portalNow)==="active"&&(r.status==="new"||(r.status==="confirmed"&&!r.confirmation_sent_at)));
  const readyPurchaseRows=purchases.filter(o=>o.status==="ready");
  const portalAttentionCount=openQuotes+pendingRentalRows.length+readyPurchaseRows.length;
- const partialServiceHistory=Boolean(data.serviceHistory?.orders?.hasMore||data.serviceHistory?.quotes?.hasMore);
+ const partialServiceHistory=Boolean(data.serviceHistory?.orders?.hasMore||data.serviceHistory?.quotes?.hasMore||data.serviceHistory?.orders?.unavailable||data.serviceHistory?.quotes?.unavailable);
  const recentActivity=[
   ...quotes.map(q=>({
    key:"quote-"+q.id,
