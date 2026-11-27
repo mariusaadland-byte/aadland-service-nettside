@@ -65,3 +65,9 @@ assert.ok(endpoint.includes("tripletexOpenBalance"));
 const reconciliation=read("lib/vippsReadOnlyReconciliation.js");
 assert.ok(reconciliation.includes("matching balances do not close open postings"));
 console.log("S-09 bestått: 2 x 1 kr Vipps, 2 x 1,03 kr gebyr, saldo -0,06 kr, ingen planlagt utbetaling, ingen fiktiv bankføring, kun Service og manuell Tripletex-avstemming.");
+
+for(const key of ["refundsOre","payoutScheduledOre","numberOfPayouts"]){const totals={...base.totals};delete totals[key];assert.equal(review({...base,totals}).status,"missing");}
+for(const value of [undefined,null,-1,"0",1])assert.equal(review({...base,unknownEntryTypes:value}).status,"review");
+assert.equal(review({...withPayout,totals:{...withPayout.totals,numberOfPayouts:0}}).status,"review");
+assert.equal(review({...withPayout,payoutRows:[{...payout,tripletexStatus:"confirmed"}],feeRows:[{...base.feeRows[0],tripletexStatus:"needs_review"},base.feeRows[1]]}).status,"fee_review","Confirmed payout cannot conceal unresolved fees");
+console.log("S09: missing totals, invalid entry count, inconsistent payout count and unresolved fee after confirmed payout guarded.");
