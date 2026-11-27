@@ -40,7 +40,7 @@ export default function CustomerVerificationReview(){
     body:JSON.stringify({attemptId:item.id,outcome,providerId,note,confirmation})
    });
    const data=await response.json().catch(()=>({}));
-   if(!response.ok||!data.ok)throw Error(data.error||"Kunne ikke registrere kontrollen.");
+   if(!response.ok||data.ok!==true||data.state!==(outcome==="sent"?"reviewed_sent":"reviewed_unsent"))throw Error(data.error||"Lagringsstatus er uavklart. Oppdater sendeloggen før nytt forsøk.");
    setOpenId(null);setOutcome("");setProviderId("");setNote("");setConfirmation("");
    setSuccess("Kontrollen er registrert. Ingen ny e-post ble sendt.");
    await load();

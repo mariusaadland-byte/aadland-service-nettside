@@ -65,3 +65,17 @@ listCount=51;listRows=Array.from({length:50},(_,i)=>({id:"mock-"+i}));assert.equ
 listError={code:"TEST"};assert.equal((await getList()).status,503);listActor={role:"staff"};assert.equal((await getList()).status,403);
 assert.ok(adminUi.includes("!loading&&!loadFailed&&total===0"));assert.ok(adminUi.includes("Viser {items.length} av {total}"));
 console.log("S29 review count: no false empty log, visible backlog, owner-only.");
+
+// Test the mutation separately, with no real database or email calls.
+let actor={role:"owner",id:"mock-owner"},env="preview",writes=0,ack={reviewed:true,state:"reviewed_unsent"};
+const patchDb=()=>({async rpc(name,args){assert.equal(name,"review_customer_verification_delivery");assert.equal(args.p_result,"unsent");writes++;return {data:ack,error:null}}});
+const patch=new Function("NextResponse","sameOriginGuard","getAdminUser","db","process",listSource+";return PATCH;")({json:(body,opts={})=>({body,status:opts.status||200,headers:opts.headers})},()=>null,async()=>actor,patchDb,{env:{get VERCEL_ENV(){return env}}});
+const payload={attemptId:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",outcome:"unsent",note:"Kontrollert i testlogg.",confirmation:"IKKE SENDT"};
+const review=body=>patch({json:async()=>body});
+assert.equal((await review(payload)).status,403);assert.equal(writes,0);
+env="production";actor={role:"staff"};assert.equal((await review(payload)).status,403);assert.equal(writes,0);
+actor={role:"owner",id:"mock-owner"};assert.equal((await review(null)).status,400);assert.equal(writes,0);
+for(const bad of [null,{reviewed:true,state:"reviewed_sent"},{reviewed:1,state:"reviewed_unsent"}]){ack=bad;assert.equal((await review(payload)).status,503);}
+ack={reviewed:true,state:"reviewed_unsent"};const reviewed=await review(payload);assert.equal(reviewed.status,200);assert.equal(reviewed.body.ok,true);assert.equal(reviewed.headers["Cache-Control"],"private, no-store");
+assert.ok(adminUi.includes('data.ok!==true||data.state!=='));
+console.log("S29 owner review: production-only writes, malformed requests and exact DB acknowledgment.");

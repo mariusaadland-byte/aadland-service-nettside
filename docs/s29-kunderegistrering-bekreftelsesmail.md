@@ -30,3 +30,7 @@
 - Vurder en tydelig melding til kundeservice om uavklarte bekreftelser. Et uavklart sendeforsøk **blokkerer nye e-poster** til eier har kontrollert det; kontoen slettes ikke.
 
 S-29 er ikke praktisk sluttgodkjent uten disse kontrollerte testene.
+
+## Oppfølgingskontroll 27.11.2026
+
+Skrivebeskyttet produksjonskontroll: seks Auth-kontoer, fire kundeprofiler, null foreldreløse profiler, null sendeforsøk og null uavklarte bekreftelser. Alle fem S29-funksjoner har execute nektet for anon/authenticated og tillatt for service_role. Eierpanelets PATCH sperres nå utenfor produksjon, avviser ugyldig forespørsel og krever eksakt reviewed=true og forventet sluttilstand fra databasen. UI viser ikke suksess ved feil sluttilstand; vellykkede svar er private/no-store. Simulerte tester lagt til. Dette endrer ikke felles kunderegistrering, innlogging, e-postutsending eller utleieflyt. Reell registrering, e-postmottak og innlogget isolasjonstest gjenstår. Ingen ekte brukere eller journaler endret.

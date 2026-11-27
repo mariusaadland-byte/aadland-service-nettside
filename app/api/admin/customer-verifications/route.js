@@ -7,6 +7,7 @@ async function owner(){
  const user=await getAdminUser();
  return user?.role==="owner"?user:null;
 }
+const privateHeaders={"Cache-Control":"private, no-store","X-Robots-Tag":"noindex,nofollow,noarchive"};
 export async function GET(){
  const admin=await owner();
  if(!admin)return NextResponse.json({error:"Bare eieren har tilgang."},{status:403});
@@ -16,13 +17,15 @@ export async function GET(){
   .select("id,recipient_email,state,claimed_at,issue",{count:"exact"})
   .in("state",["sending","needs_review"]).order("claimed_at",{ascending:true}).order("id",{ascending:true}).limit(50);
  if(error||!Array.isArray(data)||!Number.isSafeInteger(count)||count<data.length)return NextResponse.json({error:"Sendeloggen kunne ikke hentes."},{status:503});
- return NextResponse.json({attempts:data,total:count,hasMore:count>data.length},{headers:{"Cache-Control":"no-store"}});
+ return NextResponse.json({attempts:data,total:count,hasMore:count>data.length},{headers:privateHeaders});
 }
 export async function PATCH(req){
  const guard=sameOriginGuard(req);if(guard)return guard;
  const admin=await owner();
  if(!admin)return NextResponse.json({error:"Bare eieren kan kontrollere ukjente sendeforsøk."},{status:403});
+ if(process.env.VERCEL_ENV!=="production")return NextResponse.json({error:"Sendekontroll kan bare lagres i produksjon."},{status:403,headers:privateHeaders});
  const body=await req.json().catch(()=>({}));
+ if(!body||typeof body!=="object"||Array.isArray(body))return NextResponse.json({error:"Ugyldig kontroll."},{status:400,headers:privateHeaders});
  const attemptId=String(body.attemptId||"");
  const outcome=body.outcome;
  const note=String(body.note||"").trim();
@@ -42,5 +45,7 @@ export async function PATCH(req){
  if(error)return NextResponse.json({
   error:"Sendeforsøket kunne ikke avklares. Kontroller Resend og vent minst fem minutter."
  },{status:409});
- return NextResponse.json({ok:data?.reviewed===true,state:data?.state});
+ const expected=outcome==="sent"?"reviewed_sent":"reviewed_unsent";
+ if(data?.reviewed!==true||data?.state!==expected)return NextResponse.json({error:"Lagringsstatus er uavklart. Oppdater sendeloggen og kontroller før nytt forsøk."},{status:503,headers:privateHeaders});
+ return NextResponse.json({ok:true,state:expected},{headers:privateHeaders});
 }
