@@ -34,6 +34,8 @@ if [[ "${CI:-}" != true ]]; then echo "Run only in the dedicated disposable CI s
  cat supabase/migrations/20261024222000_vat_purchase_documents.sql
  sed -e '/^begin;$/d' -e '/^rollback;$/d' docs/u39u-cost-allocation.draft.sql
  cat scripts/sql/cost-allocation-test-cases.sql
+ sed -e '/^begin;$/d' -e '/^rollback;$/d' docs/u39v-cost-history.draft.sql
+ cat scripts/sql/cost-history-test-cases.sql
  cat scripts/sql/signing-test-cases.sql
  cat scripts/sql/group-signing-test-cases.sql
  cat scripts/sql/group-payment-test-cases.sql

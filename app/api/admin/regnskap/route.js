@@ -2,7 +2,7 @@ import {NextResponse} from "next/server";
 import {getAdminUser} from "../../../../lib/auth";
 import {db} from "../../../../lib/supabase";
 import {osloDateKey} from "../../../../lib/osloTime";
-import {costAllocationEnabled} from "../../../../lib/costAllocationConfig";
+import {costAllocationEnabled,costHistoryEnabled} from "../../../../lib/costAllocationConfig";
 import {purchaseCostAllocation} from "../../../../lib/purchaseCostAllocation.mjs";
 import {buildAccountingOverview,accountingOverviewCsv} from "../../../../lib/adminAccountingOverview";
 
@@ -39,7 +39,7 @@ export async function GET(req){
   const allocationEnabled=costAllocationEnabled();
   const [invoices,purchases,payments,transfers,files,externalInvoices,externalImports]=await Promise.all([
    rows(s,"invoice_drafts","id,status,customer,invoice_number,issued_date,due_date,paid_ore,credited_ore,sent_at,line_items",q=>q.eq("status","sent")),
-   rows(s,"vat_purchase_documents","id,document_date,supplier_name,supplier_document_number,kind,base_ore,vat_ore,deductible_vat_ore,voided_at"+(allocationEnabled?",cost_unit":"")),
+   rows(s,costHistoryEnabled()?"vat_purchase_cost_effective":"vat_purchase_documents","id,document_date,supplier_name,supplier_document_number,kind,base_ore,vat_ore,deductible_vat_ore,voided_at"+(allocationEnabled?",cost_unit":"")),
    rows(s,"invoice_payments","id,invoice_id,paid_on,amount_ore,reversed_at,vipps_reference"),
    rows(s,"vat_tripletex_receipt_transfers","id,purchase_document_id,recipient,status,attempted_at"),
    rows(s,"vat_purchase_document_files","id,purchase_document_id"),

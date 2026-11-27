@@ -9,6 +9,7 @@ const {validateVatPurchaseInput}=new Function("vatTermBounds",source+
 const helper=readFileSync("lib/vatPurchaseDuplicateCheck.js","utf8").replace(/^export /gm,"");
 const {checkVatPurchaseDuplicate,vatDuplicateKey}=new Function(helper+
  ";return {checkVatPurchaseDuplicate,vatDuplicateKey};")();
+let allocation=false;
 let role="owner",guarded=false,preview=false,writeCount=0,readCount=0,
  duplicate=false,voidMissing=false,dbError=false,existing=[];
 const documentId="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaa0404";
@@ -46,10 +47,10 @@ const raw=readFileSync("app/api/admin/invoices/vat-purchases/route.js","utf8")
  .replace(/^import .*;\n/gm,"").replace(/^export const .*;\n/gm,"")
  .replace(/^export async function /gm,"async function ");
 const POST=new Function("NextResponse","getAdminUser","db","sameOriginGuard","validateVatPurchaseInput",
- "checkVatPurchaseDuplicate","vatDuplicateKey","process",
+ "checkVatPurchaseDuplicate","vatDuplicateKey","process","costAllocationEnabled","validCostUnit",
  raw+";return POST;")(NextResponse,async()=>role==="owner"?{role,id:"test-owner"}:{role,id:"test-guest"},
  db,()=>guarded?{status:403}:null,validateVatPurchaseInput,checkVatPurchaseDuplicate,vatDuplicateKey,
- {env:{get VERCEL_ENV(){return preview?"preview":"production";}}});
+ {env:{get VERCEL_ENV(){return preview?"preview":"production";}}},()=>allocation,v=>["service","rental","shared"].includes(v));
 const body={
  action:"register",supplierName:"Byggern",documentNumber:"INV-123",
  documentDate:"2026-10-24",kind:"purchase",evidenceReference:"Systemia 123",
@@ -124,4 +125,5 @@ assert.equal(response.status,400);
 response=await submit({action:"void",id:documentId,reason:"",confirmed:true});
 assert.equal(response.status,400);
 assert.equal(writeCount,beforeVoid+2);
+allocation=true;voidMissing=false;response=await submit(body);assert.equal(response.status,400);response=await submit({...body,costUnit:"rental"});assert.equal(response.status,201);
 console.log("Inngående MVA-API bestått: eier, opprinnelse, preview, eksakt dublett, OCR-variant, bekreftet treff-ID, bank/datafeil og oppheving.");
