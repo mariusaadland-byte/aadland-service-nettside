@@ -7,6 +7,7 @@ import {COMPANY_INFO,RENTAL_CHANGE_DEADLINE_HOURS} from "../../lib/companyInfo";
 import {rentalChangeChoices,rentalChangeMailto,rentalChangeLabel} from "../../lib/rentalChangeRequest.mjs";
 import {rentalPortalExpired,rentalPortalGroup,rentalPortalCanPay,rentalPortalOverdue,rentalPortalDeposit} from "../../lib/rentalCustomerPortal.mjs";
 import CustomerDrawingViewer from "./CustomerDrawingViewer";
+import {rentalAppointmentValues} from "../../lib/rentalAppointments.mjs";
 
 function paymentAmounts(plan,total){
  const rows=Array.isArray(plan)?plan:[];
@@ -864,6 +865,8 @@ export default function MinSide(){
        <div className="customerRentalDetails">
         <div className="customerCardMeta">
          <span><small>Periode</small><b>{date(r.start_date)} – {date(r.end_date)}</b></span>
+         <span><small>Avtalt utlevering</small><b>{rentalAppointmentValues(r.customer).pickupTime?"kl. "+rentalAppointmentValues(r.customer).pickupTime:"Avtales"}</b></span>
+         <span><small>Avtalt retur</small><b>{rentalAppointmentValues(r.customer).returnTime?"kl. "+rentalAppointmentValues(r.customer).returnTime:"Avtales"}</b></span>
          <span><small>Leiepris</small><b>{kr(r.total_ore)}</b></span>
          <span><small>Betaling</small><b>{paymentStatus[r.payment_status]||r.payment_status||"Ikke registrert"}</b></span>
          {String(r.payment_provider||"").toLowerCase()==="vipps"&&Number(r.payment_reserved_ore)>0&&<span><small>Reservert i Vipps</small><b>{kr(r.payment_reserved_ore)}</b></span>}
@@ -933,6 +936,8 @@ export default function MinSide(){
        <div className="customerRentalDetails">
         <div className="customerCardMeta">
          <span><small>Periode</small><b>{date(r.start_date)} – {date(r.end_date)}</b></span>
+         <span><small>Avtalt utlevering</small><b>{rentalAppointmentValues(r.customer).pickupTime?"kl. "+rentalAppointmentValues(r.customer).pickupTime:"Avtales"}</b></span>
+         <span><small>Avtalt retur</small><b>{rentalAppointmentValues(r.customer).returnTime?"kl. "+rentalAppointmentValues(r.customer).returnTime:"Avtales"}</b></span>
          <span><small>Leiepris</small><b>{kr(r.total_ore)}</b></span>
          <span><small>Betaling</small><b>{paymentStatus[r.payment_status]||r.payment_status||"Ikke registrert"}</b></span>
          <span><small>Utlevering</small><b>{fulfillmentStatus[r.customer?.fulfillment]||"Ikke registrert"}</b></span>
