@@ -11,7 +11,8 @@ create table public.rental_group_unit_assignments(
  report_id uuid not null references public.rental_group_handover_reports(id),
  unit_id uuid not null references public.rental_equipment_units(id),
  released_at timestamptz,
- release_digest text check(release_digest ~ '^[0-9a-f]{64}
+ release_digest text check(release_digest ~ '^[0-9a-f]{64}$'),
+ check((released_at is null)=(release_digest is null))
 );
 create unique index rental_group_unit_active_unique on public.rental_group_unit_assignments(unit_id) where released_at is null;
 create table public.rental_group_capture_requests(
