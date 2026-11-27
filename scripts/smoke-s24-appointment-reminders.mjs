@@ -254,3 +254,22 @@ assert.deepEqual(await appointmentReminderBacklog(countDb,"survey",now.getTime()
 countError=true;assert.deepEqual(await appointmentReminderBacklog(countDb,"survey",now.getTime()),{ok:false});
 for(const kind of ["survey","job"]){const route=read("app/api/cron/"+kind+"-reminders/route.js");assert.ok(route.includes("appointmentReminderBacklog(s,"));assert.ok(route.includes(".limit(MAX_PER_RUN+1)")&&route.includes(".slice(0,MAX_PER_RUN)")&&route.includes("requiresReview||overflow?207:200"));}
 console.log("S24: unresolved earlier attempts and more than 25 candidates are reported without retry.");
+
+const reminderReviewSource=admin.replace(/^import .*;\n/gm,"").replace(/^export const .*;\n/gm,"").replace(/^export async function /gm,"async function ");
+let reviewRole="owner",reviewEnv="preview",reviewCount=0,reviewRows=[],reviewWrites=0,reviewAck={ok:true,state:"reviewed_unsent"};
+const reviewDb=()=>({from(){const q={select(){return q},in(){return q},order(){return q},limit(n){return Promise.resolve(n===100?{data:reviewRows,count:reviewCount,error:null}:{data:[],error:null})}};return q},async rpc(){reviewWrites++;return {data:reviewAck,error:null}}});
+const reviewApi=new Function("NextResponse","getAdminUser","sameOriginGuard","db","process",reminderReviewSource+";return {GET,PATCH};")({json:(body,opts={})=>({body,status:opts.status||200})},async()=>({role:reviewRole,id:"test-owner"}),()=>null,reviewDb,{env:{get VERCEL_ENV(){return reviewEnv}}});
+assert.equal((await reviewApi.GET()).body.needsReview,0);
+reviewCount=null;assert.equal((await reviewApi.GET()).status,503);
+reviewRows=null;reviewCount=0;assert.equal((await reviewApi.GET()).status,503);
+reviewRows=Array.from({length:100},(_,i)=>({id:"synthetic-"+i,state:"claimed"}));reviewCount=125;
+assert.equal((await reviewApi.GET()).body.needsReview,125);assert.equal((await reviewApi.GET()).body.outstandingLimitReached,true);
+const reviewInput={id:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",outcome:"unsent",confirmation:"IKKE SENDT",note:"Kontrollert i simulert logg."};
+const submitReview=body=>reviewApi.PATCH({json:async()=>body});
+assert.equal((await submitReview(reviewInput)).status,403);assert.equal(reviewWrites,0);
+reviewEnv="production";reviewRole="staff";assert.equal((await submitReview(reviewInput)).status,403);assert.equal(reviewWrites,0);
+reviewRole="owner";assert.equal((await submitReview(null)).status,400);assert.equal(reviewWrites,0);
+reviewAck=null;assert.equal((await submitReview(reviewInput)).status,503);
+reviewAck={ok:true,state:"reviewed_sent"};assert.equal((await submitReview(reviewInput)).status,503);
+reviewAck={ok:true,state:"reviewed_unsent"};assert.equal((await submitReview(reviewInput)).body.state,"reviewed_unsent");
+console.log("S24: exact backlog count, malformed list guard, production-only review, exact acknowledgment.");
