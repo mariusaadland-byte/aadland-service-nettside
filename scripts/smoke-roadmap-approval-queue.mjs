@@ -106,3 +106,9 @@ console.log("Utviklingsplan testvindu: 30 testoppgaver, 13 raske, 11 fullflyt, 6
 
 const finalQueue=developmentApprovalQueue(finalIDs.map(id=>({id,status:'test'})));assert.equal(finalQueue.length,25);assert.ok(finalQueue.every(t=>t.approval.checks.length===3));
 const seed=read('lib/developmentTasks.js');for(const id of finalIDs)assert.ok(seed.includes('id:'+JSON.stringify(id)));console.log('Service sluttkontroll: 25 egne testbokser, tre steg hver.');
+
+assert.ok(route.includes('id.startsWith("service-final-")&&process.env.VERCEL_ENV!=="production"'));
+assert.ok(ui.includes('useState(initialScope==="service-final")'));
+assert.ok(APPROVAL_CHECKS["service-final-price-import"].checks[2].includes("riktig leverandør og antall"));
+assert.ok(APPROVAL_CHECKS["service-final-history"].checks[2].includes("mislykket oppslag"));
+console.log("Service final: updated criteria, all boxes visible by default and preview writes blocked.");
