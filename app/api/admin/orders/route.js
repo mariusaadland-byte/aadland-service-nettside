@@ -714,8 +714,13 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     if(!customerEmail)return NextResponse.json({error:"Kunden mangler e-postadresse."},{status:400});
 
     const now=new Date().toISOString();
-    const {error:updateError}=await s.from("orders").update({status:"ready",updated_at:now}).eq("id",id);
+    let readyUpdate=s.from("orders").update({status:"ready",updated_at:now})
+      .eq("id",id).eq("status",order.status)
+      .eq("fulfillment_type",order.fulfillment_type).is("archived_at",null);
+    readyUpdate=order.updated_at==null?readyUpdate.is("updated_at",null):readyUpdate.eq("updated_at",order.updated_at);
+    const {data:readyOrder,error:updateError}=await readyUpdate.select("*").maybeSingle();
     if(updateError)return NextResponse.json({error:"Bestillingen kunne ikke settes som klar."},{status:500});
+    if(!readyOrder)return NextResponse.json({error:"Ordren ble endret. Oppdater oversikten og kontroller status før du prøver igjen."},{status:409});
 
     const resendKey=process.env.VERCEL_ENV==="preview"?(process.env.RESEND_PREVIEW_API_KEY):process.env.RESEND_API_KEY;
     if(!resendKey)return NextResponse.json({error:"Bestillingen er satt som klar, men e-post er ikke konfigurert.",statusSaved:true},{status:503});

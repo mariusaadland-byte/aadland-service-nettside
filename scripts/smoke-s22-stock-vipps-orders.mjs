@@ -102,3 +102,51 @@ assert.equal(results.find(x=>x.status===200).data.paymentStatus,"paid");
 assert.equal(fixture.notices.length,1);
 assert.equal(fixture.notices[0].kind,"delivered");
 console.log("Product fulfillment: concurrent completion, stale tracking and cancelled order checks passed.");
+
+// Run the ready transition up to the email boundary, without sending mail.
+const readyStart=adminRoute.indexOf('  if(action==="mark-ready-and-notify"){');
+const readyEnd=adminRoute.indexOf('    const resendKey=',readyStart);
+assert.ok(readyStart>=0&&readyEnd>readyStart);
+const readyPreflight=new Function("s","NextResponse","id","action",
+ "return (async()=>{"+adminRoute.slice(readyStart,readyEnd)+
+ 'return NextResponse.json({ok:true});}})()'
+);
+function readyFixture(beforeUpdate=()=>{}){
+ const order={id:"synthetic-ready",order_type:"order",status:"in_progress",
+  fulfillment_type:"pickup",archived_at:null,updated_at:"2026-11-01T00:00:00Z",
+  customer:{email:"test@example.invalid"}};
+ let transitions=0;
+ const s={from(){
+  let patch;
+  const filters={};
+  const q={
+   select(){return q;},eq(k,v){filters[k]=v;return q;},is(k,v){filters[k]=v;return q;},
+   update(p){patch=p;return q;},async single(){return {data:{...order}};},
+   async maybeSingle(){
+    beforeUpdate(order);
+    if(!Object.entries(filters).every(([k,v])=>order[k]===v))return {data:null};
+    transitions++;Object.assign(order,patch);return {data:{...order}};
+   },
+   then(resolve,reject){return q.maybeSingle().then(resolve,reject);}
+  };return q;
+ }};
+ const run=()=>readyPreflight(s,{json:(data,{status=200}={})=>({data,status})},order.id,"mark-ready-and-notify");
+ return {run,order,count:()=>transitions};
+}
+let ready=readyFixture();
+results=await Promise.all([ready.run(),ready.run()]);
+assert.deepEqual(results.map(x=>x.status).sort(),[200,409]);
+assert.equal(ready.count(),1);
+assert.equal((await ready.run()).status,200,"Explicit resend on an already-ready order remains available");
+for(const change of [
+ current=>{current.status="cancelled";},
+ current=>{current.status="completed";},
+ current=>{current.archived_at="2026-11-02T00:00:00Z";},
+ current=>{current.fulfillment_type="shipping";},
+ current=>{current.updated_at="2026-11-03T00:00:00Z";}
+]){
+ ready=readyFixture(change);
+ assert.equal((await ready.run()).status,409);
+ assert.equal(ready.count(),0);
+}
+console.log("Ready notices: stale orders rejected and explicit resend preserved.");
