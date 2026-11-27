@@ -79,7 +79,7 @@ export default function RentalInventoryClient(){
        <div><small>Antall</small><strong>{item.quantity}</strong></div>
       </div>
       <div className={styles.cardActions}>
-       <Link href={"/admin/utleie/"+encodeURIComponent(item.id)} className={styles.edit}>Rediger</Link>
+       <Link href={"/admin/utleie/"+encodeURIComponent(item.id)} className={styles.edit}>Rediger</Link><Link href={"/admin/utleie/bruksanvisning/"+encodeURIComponent(item.id)}>Bruksanvisning og QR</Link>
        {published&&item.slug?<Link href={"/utleie/"+encodeURIComponent(item.slug)} target="_blank" rel="noreferrer">Se produkt</Link>:
         <span className={styles.hint}>Kun synlig i admin</span>}
       </div>

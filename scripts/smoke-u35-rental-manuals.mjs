@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {rentalManualInput,rentalManualPageUrl,rentalManualUrl,rentalManualMatches} from "../lib/rentalManuals.mjs";
+const id="00000000-0000-4000-8000-000000000001",v={requestId:id,itemId:id,manufacturer:"Test",model:"Modell A",url:"https://manufacturer.example/manual.pdf",language:"Norsk",safetyNote:"",verified:true,published:false};
+assert.ok(rentalManualInput(v));assert.equal(rentalManualInput({...v,verified:false}),null);assert.equal(rentalManualInput({...v,model:""}),null);
+for(const url of ["javascript:alert(1)","http://example.com","https://user:pw@example.com","https://127.0.0.1","https://example.local","//example.com"])assert.equal(rentalManualUrl(url),null);
+assert.ok(rentalManualMatches(rentalManualInput(v),rentalManualInput(v)));
+assert.ok(rentalManualPageUrl(id).includes("/utleie/bruksanvisning/")&&!rentalManualPageUrl(id).includes("/admin/"));
+const page=readFileSync("app/utleie/bruksanvisning/[id]/page.js","utf8");
+assert.ok(page.includes('RENTAL_MANUALS_PUBLIC_ENABLED==="true"')&&page.includes('b.data?.published===true')&&page.includes('.neq("status","hidden")'));
+const sql=readFileSync("docs/u35-rental-manual-versions.draft.sql","utf8");assert.ok(sql.includes("enable row level security")&&sql.includes("revoke all")&&sql.includes("grant select,insert"));
+console.log("U-35 manual URL validation, version publication guard and customer QR route passed.");
