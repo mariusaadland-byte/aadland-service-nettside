@@ -15,7 +15,7 @@ export default async function Page(){
   const result=await customerSigningArchive(customerId);
   return <main style={{maxWidth:1100,margin:"auto",padding:16}}><Link href="/min-side">← Min side</Link><section className={styles.portal}><div className={styles.brand}><span>AADLAND SIGNERING</span><h1>Mine avtaler</h1><p>Private dokumenter og avtaleversjoner</p></div>
   {!result.ok?<p role="alert" className={styles.notice}>Avtalearkivet kunne ikke hentes fullstendig. Prøv igjen eller kontakt oss.</p>:result.rows.length===0?<p>Ingen avtaler registrert.</p>:<div className={styles.list}>{result.rows.map(r=><article key={r.id} className={styles.row}><div><h2>Ordre {r.orderNumber} · Versjon {r.revision}</h2><p>{r.current?"Gjeldende versjon":"Tidligere versjon"}</p><p>{r.signedAt?"Signert "+new Date(r.signedAt).toLocaleString("nb-NO",{timeZone:"Europe/Oslo"}):"Ingen registrert signatur"}</p></div><div className={styles.actions}><a className="btn alt" href={r.documentUrl}>Last ned avtale</a>{r.proofUrl&&<a className="btn alt" href={r.proofUrl}>Last ned signeringsbevis</a>}</div></article>)}</div>}
-  <p>Signering er ikke en betalingsbekreftelse.</p></section></main>;
+  {process.env.AADLAND_DAMAGE_PORTAL_ENABLED==="true"&&<p><Link href="/min-side/skadesaker">Mine skadesaker</Link></p>}<p>Signering er ikke en betalingsbekreftelse.</p></section></main>;
  }
  return <main style={{maxWidth:1100,margin:"auto",padding:16}}><Link href="/min-side">← Min side</Link><SigningPortalDemo/></main>;
 }

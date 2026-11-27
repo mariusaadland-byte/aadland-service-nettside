@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import {damagePhoto,damagePhotoPath,damageClaimProjection,damageResponseInput,DAMAGE_MAX_BYTES} from "../lib/damageEvidence.mjs";
+const ids=Array.from({length:5},(_,i)=>"00000000-0000-4000-8000-00000000000"+(i+1));
+const [g,b,c,u,other]=ids,bytes=Buffer.from([255,216,255,217]),photo=damagePhoto(bytes,"image/jpeg");
+assert.ok(photo);assert.equal(damagePhoto(bytes,"image/png"),null);assert.equal(damagePhoto(Buffer.alloc(DAMAGE_MAX_BYTES+1),"image/jpeg"),null);
+assert.equal(damagePhotoPath(g,b,"../bad"),null);
+const group={id:g,customer_user_id:u,order_number:125,deposit_ore:200000},booking={id:b,group_id:g,customer_user_id:u},claim={id:c,group_id:g,booking_id:b,amount_ore:45000,description:"Demo",claim_digest:"a".repeat(64),cost_proof_digest:"b".repeat(64),photo_digests:[photo.digest]};
+const args={group,booking,claim,actor:{kind:"customer",id:u}};
+assert.ok(damageClaimProjection(args));assert.equal(damageClaimProjection({...args,actor:{kind:"customer",id:other}}),null);assert.equal(damageClaimProjection({...args,booking:{...booking,group_id:other}}),null);
+assert.equal(damageClaimProjection({...args,response:{claim_id:c,customer_id:other,claim_digest:claim.claim_digest,response:"accepted"}}),null);
+assert.equal(damageResponseInput({claimId:c,claimDigest:claim.claim_digest,response:"accepted",note:""}).claimId,c);
+assert.equal(damageResponseInput({claimId:c,claimDigest:claim.claim_digest,response:"auto",note:""}),null);
+console.log("U-38Q damage evidence validation and customer ownership passed");
