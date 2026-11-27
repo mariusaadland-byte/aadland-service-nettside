@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import {groupQuoteSnapshot} from "../lib/rentalGroupQuote.mjs";
+import {rentalFinanceSnapshot} from "../lib/rentalFinanceSnapshot.mjs";
+const id="00000000-0000-4000-8000-000000000001",today="2026-11-27",q=groupQuoteSnapshot({today,rentals:[{itemId:id,name:"Demo",startDate:today,endDate:today,quantity:1,available:true,totalOre:30000,depositOre:50000}]});
+const g={id,order_number:125,status:"fulfilled",quote_snapshot:q.snapshot,quote_digest:q.digest,terms_version:q.snapshot.termsVersion,rental_ore:30000,sales_ore:0,deposit_ore:50000,payable_ore:30000,payment_reference:"AUG-"+id,claim:{group_id:id,reference:"AUG-"+id,amount_ore:30000,psp_reference:"demo",captured_at:today},deposit:{amount_ore:50000,documented:true},invoice:{state:"confirmed",gross_ore:30000,remote_invoice_id:123},payment:null};
+const run=g=>rentalFinanceSnapshot({complete:true,rows:[g]});
+let t=run(g).totals;assert.equal(t.grossOre,30000);assert.equal(t.depositUnsettledOre,50000);assert.equal(t.feeOre,null);assert.equal(t.transferPending,1);
+t=run({...g,settlement:{deposit_ore:50000,refund_ore:40000,retained_ore:10000,closed_at:today,documented:true},payment:{state:"confirmed",remote_invoice_id:123,amount_ore:30000}}).totals;
+assert.equal(t.depositUnsettledOre,0);assert.equal(t.depositRefundedOre,40000);assert.equal(t.depositRetainedOre,10000);assert.equal(t.grossOre,30000);assert.equal(t.paymentConfirmed,1);
+assert.equal(run({...g,claim:null}),null);assert.equal(rentalFinanceSnapshot({complete:false}),null);assert.equal(rentalFinanceSnapshot({complete:true,rows:[g,g]}),null);assert.equal(run({...g,payment:{state:"confirmed",remote_invoice_id:456,amount_ore:30000}}),null);
+console.log("U-39P finance totals, incomplete data and separate deposit passed");

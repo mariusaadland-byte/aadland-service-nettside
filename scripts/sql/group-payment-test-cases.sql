@@ -81,6 +81,9 @@ begin
  perform pg_temp.require(public.draft_group_tripletex_payment_finish(g,123,repeat('a',64),true)='confirmed','payment readback recorded');
  perform pg_temp.require(public.draft_group_tripletex_payment_finish(g,123,repeat('a',64),true)='existing','payment readback replay');
  perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_tripletex_payment_claim(uuid,bigint,bigint,bigint,date,integer,text,text,uuid)','EXECUTE'),'no client payment grant');
+ perform pg_temp.require((public.draft_group_finance_snapshot()->>'complete')::boolean,'finance snapshot complete');
+ perform pg_temp.require(exists(select 1 from jsonb_array_elements(public.draft_group_finance_snapshot()->'rows') x where x->>'id'=g::text and x->'invoice'->>'state'='confirmed' and x->'payment'->>'state'='confirmed' and (x->'deposit'->>'documented')::boolean=false),'finance snapshot distinguishes confirmed transfer and missing bank proof');
+ perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_finance_snapshot()','EXECUTE'),'finance snapshot restricted');
  perform pg_temp.require((select stock_quantity=3 and reserved_quantity=0 from public.rental_consumables where id=goods),'sold consumables not returned to stock');
  perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_return_close(uuid,uuid,integer,text,text)','EXECUTE'),'client cannot close settlement');
 end $$;
