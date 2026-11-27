@@ -42,7 +42,7 @@ export async function GET(req){
  const wants=k=>!kind||kind===k;
  const empty={data:[],count:0,error:null};
  const range=(size)=>[(page-1)*size,page*size-1];
- const meta=(result,size)=>({page,total:Number.isInteger(result.count)?result.count:null,loadedThrough:(page-1)*size+(result.data||[]).length,hasMore:!result.error&&(Number.isInteger(result.count)?page*size<result.count:(result.data||[]).length===size)});
+ const meta=(result,size)=>({page,unavailable:Boolean(result.error)||!Array.isArray(result.data),total:!result.error&&Number.isSafeInteger(result.count)&&result.count>=0?result.count:null,loadedThrough:(page-1)*size+(result.data||[]).length,hasMore:!result.error&&(Number.isSafeInteger(result.count)?page*size<result.count:(result.data||[]).length===size)});
  if(!kind&&customerEmail){
   const [orderLink,rentalLink]=await Promise.all([
    s.from("orders").update({customer_user_id:customer.id})
@@ -228,7 +228,7 @@ export async function GET(req){
 
  if(kind==="drawings"&&(directResult.error||publicationResult.error))return NextResponse.json({error:"Tegningshistorikken kunne ikke hentes."},{status:503});
  const direct=meta(directResult,50),published=meta(publicationResult,150);
- const serviceHistory={orders:meta(ordersResult,100),quotes:meta(quotesResult,100),drawings:{page,hasMore:direct.hasMore||published.hasMore,total:direct.total===null||published.total===null?null:direct.total+published.total,loadedThrough:Math.min(direct.total??Infinity,direct.loadedThrough)+Math.min(published.total??Infinity,published.loadedThrough)}};
+ const serviceHistory={orders:meta(ordersResult,100),quotes:meta(quotesResult,100),drawings:{page,unavailable:direct.unavailable||published.unavailable,hasMore:direct.hasMore||published.hasMore,total:direct.total===null||published.total===null?null:direct.total+published.total,loadedThrough:Math.min(direct.total??Infinity,direct.loadedThrough)+Math.min(published.total??Infinity,published.loadedThrough)}};
  return NextResponse.json({
   customer,
   serviceHistory,
