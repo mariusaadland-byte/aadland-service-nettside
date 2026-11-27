@@ -65,11 +65,22 @@ export async function GET(req){
 
  if(!q)return NextResponse.json({suppliers,products:[],companyMarkup});
 
- const {data,error}=await s.rpc("search_material_supplier_products",{
-  search_query:q,
-  supplier_filter:supplier||null,
-  result_limit:limit
- });
+ // Explicit exact SKU mode uses the existing (supplier_id,supplier_sku)
+ // primary key. The normal name/EAN/partial search remains unchanged.
+ let data,error;
+ if(params.get("exact")==="1"){
+  const selected=suppliers.find(row=>row.id===supplier);
+  if(!selected||q.length>120)return NextResponse.json({error:"Velg en aktiv leverandør og skriv inn hele varenummeret."},{status:400});
+  const result=await s.from("material_supplier_products")
+   .select("supplier_id,supplier_sku,name,unit,cost_ex_vat_ore,category_code,category_name,ean,module_number")
+   .eq("supplier_id",supplier).eq("supplier_sku",q).eq("active",true).maybeSingle();
+  error=result.error;
+  data=result.data?[{...result.data,product_name:result.data.name,supplier_name:selected.name,supplier_is_primary:selected.isPrimary}]:[];
+ }else{
+  ({data,error}=await s.rpc("search_material_supplier_products",{
+   search_query:q,supplier_filter:supplier||null,result_limit:limit
+  }));
+ }
  if(error)return NextResponse.json({error:"Kunne ikke søke i materialkatalogen."},{status:500});
  const markupBySupplier=new Map(suppliers.map(row=>[row.id,row.defaultMarkupPercent]));
  const freshnessBySupplier=new Map(suppliers.map(row=>[row.id,{priceStatus:row.priceStatus,priceReviewRequired:row.priceReviewRequired,priceAgeDays:row.priceAgeDays,lastImportAt:row.lastImportAt}]));

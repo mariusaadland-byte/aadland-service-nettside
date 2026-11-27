@@ -64,6 +64,7 @@ export default function CalculatorClient(){
  const [catalogSuppliers,setCatalogSuppliers]=useState([]);
  const [catalogSupplier,setCatalogSupplier]=useState("byggern");
  const [materialQuery,setMaterialQuery]=useState("");
+ const [exactSku,setExactSku]=useState(false);
  const [materialResults,setMaterialResults]=useState([]);
  const [catalogBusy,setCatalogBusy]=useState(false);
  const [catalogError,setCatalogError]=useState("");
@@ -149,26 +150,29 @@ export default function CalculatorClient(){
 
  useEffect(()=>{
   const query=materialQuery.trim();
-  if(query.length<2){setMaterialResults([]);setCatalogError("");setCatalogBusy(false);return}
+  const exact=exactSku&&Boolean(catalogSupplier);
+  if(query.length<(exact?1:2)){setMaterialResults([]);setCatalogError("");setCatalogBusy(false);return}
   const controller=new AbortController();
+  setCatalogBusy(true);setCatalogError("");setMaterialResults([]);
   const timer=setTimeout(async()=>{
-   setCatalogBusy(true);setCatalogError("");
    try{
     const params=new URLSearchParams({q:query,limit:"20"});
     if(catalogSupplier)params.set("supplier",catalogSupplier);
+    if(exact)params.set("exact","1");
     const response=await fetch("/api/admin/material-catalog?"+params.toString(),{signal:controller.signal,cache:"no-store"});
     const data=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(data.error||"Kunne ikke søke i materialkatalogen.");
+    if(!response.ok||!Array.isArray(data.products))throw new Error(data.error||"Kunne ikke søke i materialkatalogen.");
+    if(controller.signal.aborted)return;
     setMaterialResults(Array.isArray(data.products)?data.products:[]);
     if(Array.isArray(data.suppliers)&&data.suppliers.length)setCatalogSuppliers(data.suppliers);
    }catch(error){
-    if(error?.name!=="AbortError")setCatalogError(error?.message||"Kunne ikke søke i materialkatalogen.");
+    if(!controller.signal.aborted&&error?.name!=="AbortError")setCatalogError(error?.message||"Kunne ikke søke i materialkatalogen.");
    }finally{
     if(!controller.signal.aborted)setCatalogBusy(false);
    }
   },250);
   return()=>{clearTimeout(timer);controller.abort()};
- },[materialQuery,catalogSupplier]);
+ },[materialQuery,catalogSupplier,exactSku]);
 
  async function loadSuppliers(preferred){
   try{
@@ -376,16 +380,17 @@ export default function CalculatorClient(){
         <input id="calculator-product-search" type="search" value={materialQuery} onChange={e=>{setMaterialQuery(e.target.value);setAddedNotice("")}} placeholder="Søk for eksempel terrassebord, gips eller 49604414 …" autoComplete="off"/>
        </Field>
        <details className={styles.catalogFilter}><summary>Leverandør: {catalogSuppliers.find(item=>item.id===catalogSupplier)?.name||"Alle leverandører"} · Endre</summary>
-        <Field label="Søk hos"><select value={catalogSupplier} onChange={e=>setCatalogSupplier(e.target.value)}>
+        <Field label="Søk hos"><select value={catalogSupplier} onChange={e=>{setCatalogSupplier(e.target.value);if(!e.target.value)setExactSku(false);}}>
          <option value="">Alle leverandører</option>{catalogSuppliers.filter(item=>item.id!=="egne-varer").map(item=><option key={item.id} value={item.id}>{item.name}{item.isPrimary?" · primær":""}</option>)}
         </select></Field>
        </details>
+       {catalogSupplier&&<button type="button" className={styles.secondary} aria-pressed={exactSku} onClick={()=>setExactSku(v=>!v)}>{exactSku?"Eksakt varenummer: PÅ – bytt til vanlig søk":"Hurtigsøk: eksakt varenummer"}</button>}
       </div>
       {catalogSupplier&&catalogSuppliers.find(row=>row.id===catalogSupplier)&&<p className={styles.catalogFreshness} role="status">{supplierPriceNotice(catalogSuppliers.find(row=>row.id===catalogSupplier))}</p>}
        {catalogError&&<div className={styles.catalogError}>{catalogError}</div>}
-      {materialQuery.trim().length>=2&&<div className={styles.searchResults}>
+      {materialQuery.trim().length>=(exactSku&&catalogSupplier?1:2)&&<div className={styles.searchResults}>
        {catalogBusy&&<div className={styles.catalogEmpty}>Søker …</div>}
-       {!catalogBusy&&!catalogError&&materialResults.length===0&&<div className={styles.catalogEmpty}>Ingen treff. Prøv et annet varenummer eller kortere navn.</div>}
+       {!catalogBusy&&!catalogError&&materialResults.length===0&&<div className={styles.catalogEmpty}>{exactSku&&catalogSupplier?"Ingen eksakt treff. Kontroller varenummeret, eller bytt til vanlig søk.":"Ingen treff. Prøv et annet varenummer eller kortere navn."}</div>}
        {!catalogBusy&&materialResults.map(product=><button type="button" key={product.supplierId+"::"+product.sku} className={styles.productResult} onClick={()=>addMaterial(product)}>
         <span><b>{product.name}</b><small>{product.supplierName} · varenr. {product.sku}{product.priceReviewRequired?" · Eldre importpris – kontroller":""}</small></span>
         <span><strong>{money(product.costExVat)}</strong><small>innkjøp eks. mva / {product.unit||"stk"}</small></span><em>+ Legg til</em>
