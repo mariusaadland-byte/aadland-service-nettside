@@ -42,7 +42,12 @@ export async function GET(req){
  const wants=k=>!kind||kind===k;
  const empty={data:[],count:0,error:null};
  const range=(size)=>[(page-1)*size,page*size-1];
- const meta=(result,size)=>({page,unavailable:Boolean(result.error)||!Array.isArray(result.data),total:!result.error&&Number.isSafeInteger(result.count)&&result.count>=0?result.count:null,loadedThrough:(page-1)*size+(result.data||[]).length,hasMore:!result.error&&(Number.isSafeInteger(result.count)?page*size<result.count:(result.data||[]).length===size)});
+ const validRows=result=>!result.error&&Array.isArray(result.data);
+ const meta=(result,size)=>{
+  const available=validRows(result),length=available?result.data.length:0;
+  const count=available&&Number.isSafeInteger(result.count)&&result.count>=0?result.count:null;
+  return {page,unavailable:!available,total:count,loadedThrough:(page-1)*size+length,hasMore:available&&(count!==null?page*size<count:length===size)};
+ };
  if(!kind&&customerEmail){
   const [orderLink,rentalLink]=await Promise.all([
    s.from("orders").update({customer_user_id:customer.id})
@@ -80,7 +85,7 @@ export async function GET(req){
    .range(...range(100)):Promise.resolve(empty)
  ]);
 
- if(ordersResult.error||rentalsResult.error||(kind==="quotes"&&quotesResult.error)){
+ if(!validRows(ordersResult)||rentalsResult.error||(kind==="quotes"&&!validRows(quotesResult))){
   return NextResponse.json({error:"Historikken kunne ikke hentes."},{status:500});
  }
  const rentalPaymentById=new Map();
@@ -99,7 +104,7 @@ export async function GET(req){
    console.error("CUSTOMER QUOTE HISTORY",quotesResult.error);
   }
  }else{
-  quotes=(quotesResult.data||[]).map(mapQuote);
+  quotes=validRows(quotesResult)?quotesResult.data.map(mapQuote):[];
  }
 
  const orderRows=ordersResult.data||[];
@@ -181,7 +186,7 @@ export async function GET(req){
  if(drawingError){
   if(!["42P01","42703"].includes(String(drawingError.code||"")))console.error("CUSTOMER DRAWINGS",drawingError);
  }else{
-  drawings=(drawingRows||[]).map(row=>({
+  drawings=(validRows(directResult)?drawingRows:[]).map(row=>({
    id:row.id,
    orderId:row.order_id||"",
    name:row.name||"Tegning",
@@ -207,7 +212,7 @@ export async function GET(req){
    console.error("CUSTOMER PUBLISHED DRAWINGS",publishedError);
   }else{
    const seen=new Set(drawings.map(row=>row.id));
-   for(const row of published||[]){
+   for(const row of validRows(publicationResult)?published:[]){
     const id=row.drawing_id||row.id;
     if(seen.has(id))continue;
     seen.add(id);
@@ -226,7 +231,7 @@ export async function GET(req){
   }
  }
 
- if(kind==="drawings"&&(directResult.error||publicationResult.error))return NextResponse.json({error:"Tegningshistorikken kunne ikke hentes."},{status:503});
+ if(kind==="drawings"&&(!validRows(directResult)||!validRows(publicationResult)))return NextResponse.json({error:"Tegningshistorikken kunne ikke hentes."},{status:503});
  const direct=meta(directResult,50),published=meta(publicationResult,150);
  const serviceHistory={orders:meta(ordersResult,100),quotes:meta(quotesResult,100),drawings:{page,unavailable:direct.unavailable||published.unavailable,hasMore:direct.hasMore||published.hasMore,total:direct.total===null||published.total===null?null:direct.total+published.total,loadedThrough:Math.min(direct.total??Infinity,direct.loadedThrough)+Math.min(published.total??Infinity,published.loadedThrough)}};
  return NextResponse.json({

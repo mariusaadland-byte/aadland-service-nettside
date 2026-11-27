@@ -748,7 +748,7 @@ export default function MinSide(){
     <div><div className="kicker">TEGNINGER</div><h2>Mine tegninger</h2><p>Her ser du tegninger Aadland Service har delt med deg. Du kan veksle mellom plantegning og 3D, og dra 3D-visningen rundt for å se løsningen fra flere vinkler.</p></div>
     <span>{drawings.length}</span>
    </div>
-   {!drawings.length?<div className="card customerEmpty"><p>Ingen tegninger er delt med kontoen din ennå.</p></div>:<div className="customerDrawingList">
+   {!drawings.length?<div className="card customerEmpty"><p>{data.serviceHistory?.drawings?.unavailable?"Tegningshistorikken kunne ikke lastes fullstendig.":"Ingen tegninger er delt med kontoen din ennå."}</p></div>:<div className="customerDrawingList">
     {drawings.map(drawing=><article className="card customerDrawingCard" key={drawing.id}>
      <header><div><small>TEGNING</small><h3>{drawing.name||"Tegning"}</h3>{drawing.address&&<p>{drawing.address}</p>}</div><span>Sist oppdatert {dateTime(drawing.updatedAt)}</span></header>
      {drawing.notes&&<p className="customerDrawingNote">{drawing.notes}</p>}
