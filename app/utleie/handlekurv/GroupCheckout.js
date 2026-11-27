@@ -2,11 +2,12 @@
 import {useEffect,useRef,useState} from "react";
 import Link from "next/link";
 import {checkoutRequest,checkoutAgreementResponse,checkoutConsent,isCheckoutId} from "../../../lib/rentalCheckoutUi.mjs";
+import GroupPaymentPanel from "./GroupPaymentPanel";
 import styles from "./cart.module.css";
 const kr=n=>new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(n/100);
 const msg={wrong_code:"Feil kode. Kontroller e-posten.",limited:"For mange forsøk. Vent før du prøver igjen.",expired:"Koden er utløpt. Be om ny kode dersom reservasjonen fortsatt er aktiv.",locked:"Koden er låst.",delivery_unconfirmed:"E-postlevering er ikke bekreftet.",login_required:"Logg inn på Min side og gå tilbake.",quote_changed:"Pris eller tilgjengelighet er endret. Kontroller bestillingen på nytt.",unavailable:"Reservasjonen eller avtalen er ikke tilgjengelig. Kontakt oss før du oppretter en ny bestilling.",disabled:"Bestilling er ikke åpnet.",invalid_document:"Avtalen kunne ikke genereres. Kontakt oss.",invalid:"Kontroller opplysningene.",unconfirmed:"Resultatet er ikke bekreftet. Bruk samme forespørsel ved nytt forsøk.",retry:"Forsøk igjen med samme kode."};
 const demoAgreement="00000000-0000-4000-8000-000000000901",demoGroup="00000000-0000-4000-8000-000000000902",demoChallenge="00000000-0000-4000-8000-000000000903";
-export default function GroupCheckout({quote,lines=[],sales=[],enabled=false,customerScope="",demo=false,onLocked}){
+export default function GroupCheckout({quote,lines=[],sales=[],enabled=false,customerScope="",demo=false,paymentEnabled=false,onLocked}){
  const key="aadland-group-checkout-v1:"+customerScope;
  const [pending,setPending]=useState(null),[ready,setReady]=useState(false),[terms,setTerms]=useState(false),[agreement,setAgreement]=useState(null),[name,setName]=useState(""),[consent,setConsent]=useState(false),[challenge,setChallenge]=useState(null),[code,setCode]=useState(""),[signed,setSigned]=useState(false),[busy,setBusy]=useState(false),[notice,setNotice]=useState(""),[checkedStatus,setCheckedStatus]=useState(false),[cancelConfirm,setCancelConfirm]=useState(false);
  const lock=useRef(false),snapshot=useRef(null);
@@ -74,7 +75,7 @@ export default function GroupCheckout({quote,lines=[],sales=[],enabled=false,cus
  {!checkedStatus&&!signed&&<button type="button" disabled={busy} onClick={refreshStatus}>Kontroller signeringsstatus</button>}
  {checkedStatus&&!signed&&<><label>Fullt navn<input value={name} maxLength={120} disabled={busy||!!challenge} onChange={e=>setName(e.target.value)}/></label><label><input type="checkbox" checked={consent} disabled={busy||!!challenge} onChange={e=>setConsent(e.target.checked)}/>Jeg har lest den viste leieavtalen og godtar den avtalte betalingsforpliktelsen og ansvaret som følger av avtalen.</label>
  {!challenge?<button type="button" disabled={busy||!consentInput} onClick={issue}>Send engangskode</button>:<><label>Engangskode<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,""))}/></label><button type="button" disabled={busy||code.length!==6} onClick={verify}>Signer avtalen</button><button type="button" disabled={busy} onClick={issue}>Be om ny kode</button><small>Koden gjelder i maksimalt ti minutter. Ny kode er underlagt ventetid.</small></>}</>}
- {signed&&<><h3>✓ Avtalen er signert{demo?" (demo)":""}</h3><p>Betaling er ikke gjennomført. Vipps-betalingen er ikke koblet til denne flyten ennå.</p>{!demo&&<Link href="/min-side/signering">Mine avtaler</Link>}</>}</>}
+ {signed&&<><h3>✓ Avtalen er signert{demo?" (demo)":""}</h3>{demo||paymentEnabled?<GroupPaymentPanel key={agreement.groupId} groupId={agreement.groupId} amountOre={agreement.payableOre} canStart demo={demo}/>:<p>Betaling er ikke gjennomført. Vipps Utleie er ikke åpnet.</p>}{!demo&&<Link href="/min-side/signering">Mine avtaler</Link>}</>}</>}
  {pending&&<div><button type="button" disabled={busy} onClick={()=>setCancelConfirm(v=>!v)}>Avbryt reservasjon</button>{cancelConfirm&&<><p>Avbryt denne forespørselen? Ubetalt reservasjon frigjøres bare etter bekreftelse fra serveren. Påbegynt betaling må avklares separat.</p><button type="button" disabled={busy} onClick={cancel}>Bekreft avbrytelse</button><button type="button" disabled={busy} onClick={()=>setCancelConfirm(false)}>Behold bestilling</button></>}</div>}
  {notice&&<p role="status">{notice}</p>}{demo&&<button type="button" disabled={busy} onClick={resetDemo}>Start testen på nytt</button>}</section>;
 }

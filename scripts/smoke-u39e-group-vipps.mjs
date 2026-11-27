@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import {groupPaymentStatus} from "../lib/groupVippsCheckout.mjs";
+import {groupVippsRedirect} from "../lib/groupVippsRedirect.mjs";
+import {groupQuoteSnapshot} from "../lib/rentalGroupQuote.mjs";
+const id="00000000-0000-4000-8000-000000000001",ref="AUG-"+id,today="2026-11-27",q=groupQuoteSnapshot({today,rentals:[{itemId:id,name:"Demo",startDate:today,endDate:today,quantity:1,available:true,totalOre:30000,depositOre:50000}]});
+const group={id,status:"payment_pending",payment_reference:ref,payable_ore:30000,rental_ore:30000,sales_ore:0,deposit_ore:50000,quote_digest:q.digest,quote_snapshot:q.snapshot,terms_version:q.snapshot.termsVersion},claim={group_id:id,reference:ref,amount_ore:30000};
+const amount=value=>({currency:"NOK",value}),payment={reference:ref,pspReference:"demo-psp",amount:amount(30000),state:"AUTHORIZED",aggregate:{authorizedAmount:amount(30000),cancelledAmount:amount(0),capturedAmount:amount(0),refundedAmount:amount(0)}};
+let confirms=0;const store={confirm:async()=>{confirms++;return "confirmed"}};
+const args={group,claim,store,provider:{get:async()=>payment}};
+assert.equal((await groupPaymentStatus(args)).status,"authorized_not_captured");assert.equal(confirms,0);
+assert.equal((await groupPaymentStatus({...args,provider:{get:async()=>({...payment,aggregate:{...payment.aggregate,capturedAmount:amount(30000)}})}})).status,"confirmed");assert.equal(confirms,1);
+assert.equal((await groupPaymentStatus({...args,provider:{get:async()=>{throw Error("unknown")}}})).status,"unconfirmed");
+assert.equal((await groupPaymentStatus({...args,claim:{...claim,amount_ore:1}})).status,"review");
+assert.equal(groupVippsRedirect("https://landing.vipps.no?token=demo"),"https://landing.vipps.no?token=demo");assert.equal(groupVippsRedirect("https://landing.vipps.no.evil.invalid/"),null);assert.equal(groupVippsRedirect("https://evil.invalid@landing.vipps.no/"),null);
+console.log("U-39E provider status and redirect guard passed");
