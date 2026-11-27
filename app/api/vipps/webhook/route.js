@@ -1,5 +1,7 @@
 import {NextResponse} from "next/server";
 import {invoiceVippsReference,reconcileInvoiceVipps} from "../../../../lib/invoiceVipps";
+import {reconcileGroupVippsWebhook} from "../../../../lib/groupVippsCheckout";
+import {isGroupVippsReference} from "../../../../lib/rentalGroupVipps.mjs";
 import {db} from "../../../../lib/supabase";
 import {vippsPaymentsEnabled} from "../../../../lib/vippsClient";
 import {verifyVippsWebhookRequest} from "../../../../lib/vippsWebhook";
@@ -87,7 +89,13 @@ export async function POST(req){
  // Group references are reserved: no fallback to single-booking or product processing.
  if(/^AUG-/i.test(reference)){
   if(unit!=="rental")return NextResponse.json({error:"Group payment belongs to rental unit."},{status:409});
-  return NextResponse.json({error:"Group payment reconciliation unavailable."},{status:503});
+  if(!isGroupVippsReference(reference)||payload?.amount?.currency!=="NOK"||!registeredMsn||!payloadMsn||!safeMsnMatch(registeredMsn,payloadMsn))return NextResponse.json({error:"Invalid group webhook."},{status:409});
+  try{
+   const result=await reconcileGroupVippsWebhook(reference);
+   if(["confirmed","await_customer","authorized_not_captured"].includes(result.status))return NextResponse.json({ok:true});
+   // Unknown, refund, terminal release and partial capture require further reconciliation.
+   return NextResponse.json({error:"Group payment reconciliation unavailable."},{status:503});
+  }catch{return NextResponse.json({error:"Group payment reconciliation unavailable."},{status:503});}
  }
 
  // Invoice payments belong to the service sales unit only. Never pass an invoice

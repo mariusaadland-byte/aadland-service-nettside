@@ -1,7 +1,7 @@
 name: Isolated signing database test
 on:
   push:
-    branches: [u38k-signing-db-tests-20261127, u38l-signing-concurrency-20261127, u38m-group-stock-signing-tests-20261127, u38n-group-payment-settlement-20261127, u38o-return-deposit-settlement-20261127, u38p-damage-claims-20261127, u38r-damage-evidence-publication-20261127, u39a-checkout-agreement-20261127, u39b-checkout-signing-20261127, u39d-cancel-payment-claim-20261127]
+    branches: [u38k-signing-db-tests-20261127, u38l-signing-concurrency-20261127, u38m-group-stock-signing-tests-20261127, u38n-group-payment-settlement-20261127, u38o-return-deposit-settlement-20261127, u38p-damage-claims-20261127, u38r-damage-evidence-publication-20261127, u39a-checkout-agreement-20261127, u39b-checkout-signing-20261127, u39d-cancel-payment-claim-20261127, u39f-vipps-reconcile-confirmation-20261127]
   workflow_dispatch:
 permissions:
   contents: read

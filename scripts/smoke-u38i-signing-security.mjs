@@ -16,5 +16,6 @@ assert.ok(checkFrozenGroupQuote({...g,quote_snapshot:Object.fromEntries(Object.e
 assert.match(readFileSync("lib/startRentalVippsPayment.js","utf8"),/booking.group_id/);
 assert.match(readFileSync("app/api/customer/rental-vipps/route.js","utf8"),/\.select\("\*"\)/);
 assert.match(readFileSync("app/api/rental-payment-link/route.js","utf8"),/booking.group_id/);
-assert.match(readFileSync("app/api/vipps/webhook/route.js","utf8"),/Group payment reconciliation unavailable/);
+const webhook=readFileSync("app/api/vipps/webhook/route.js","utf8");
+assert.match(webhook,/Group payment reconciliation unavailable/);assert.match(webhook,/reconcileGroupVippsWebhook\(reference\)/);assert.ok(webhook.indexOf("reconcileGroupVippsWebhook(reference)")<webhook.indexOf("process_vipps_payment_event_once"));
 console.log("U-38I frozen price binding and legacy isolation smoke passed");

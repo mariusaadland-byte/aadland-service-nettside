@@ -32,6 +32,12 @@ begin
  perform pg_temp.require(public.draft_group_payment_confirm(g,ref,'psp-ci','NOK',35000,35000,0,100)='review','refund requires review');
  perform pg_temp.require(public.draft_group_payment_confirm(g,ref,'psp-ci','NOK',35000,35000,0,0)='confirmed','full capture confirms group');
  perform pg_temp.require(public.draft_group_payment_confirm(g,ref,'psp-ci','NOK',35000,35000,0,0)='existing','duplicate payment ignored');
+ perform pg_temp.require((select count(*)=1 from public.rental_group_confirmation_outbox where group_id=g and state='pending'),'one queued confirmation');
+ perform pg_temp.require(public.draft_group_confirmation_claim(g),'confirmation worker claims');
+ perform pg_temp.require(not public.draft_group_confirmation_claim(g),'duplicate worker blocked');
+ perform pg_temp.require(public.draft_group_confirmation_finish(g,'demo-mail-id'),'provider acceptance recorded');
+ perform pg_temp.require(not public.draft_group_confirmation_claim(g),'accepted notice never requeued');
+ perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_confirmation_claim(uuid)','EXECUTE'),'no customer outbox grant');
  perform pg_temp.require((select stock_quantity=5 and reserved_quantity=2 from public.rental_consumables where id=goods),'confirmation retains held stock');
  perform pg_temp.require(public.draft_group_deposit_record(g,'deposit-ci',50000,repeat('a',64),u)='recorded','separate deposit recorded');
  perform pg_temp.require(public.draft_group_deposit_record(g,'deposit-ci',50000,repeat('a',64),u)='existing','deposit replay');

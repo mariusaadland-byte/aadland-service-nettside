@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import {demoSignedRental} from "./fixtures/demoSignedRental.mjs";
+import {paidGroupConfirmation} from "../lib/paidGroupConfirmation.mjs";
+const id="00000000-0000-4000-8000-000000000001",customerId="00000000-0000-4000-8000-000000000002",now="2026-11-27T14:00:00Z",ref="AUG-"+id;
+const f=demoSignedRental({id,customerId,now,group:{id,customer_user_id:customerId,status:"confirmed",payment_reference:ref,payable_ore:135300,deposit_ore:200000,expires_at:"2026-11-27T14:30:00Z",order_number:125}});
+const email=JSON.parse(f.record.evidence_text).email,agreement={...f.agreement,signing_email:email},account={id:customerId,email,email_confirmed_at:now};
+const claim={group_id:id,agreement_id:agreement.id,document_digest:agreement.document_digest,evidence_seal:f.record.evidence_seal,reference:ref,amount_ore:f.group.payable_ore,psp_reference:"demo-psp",captured_at:now};
+const amount=value=>({currency:"NOK",value}),payment={reference:ref,pspReference:"demo-psp",state:"AUTHORIZED",amount:amount(claim.amount_ore),aggregate:{authorizedAmount:amount(claim.amount_ore),capturedAmount:amount(claim.amount_ore),cancelledAmount:amount(0),refundedAmount:amount(0)}};
+const args={...f,agreement,claim,account,payment,now};
+const result=paidGroupConfirmation(args);assert.ok(result);assert.equal(result.attachments.length,2);
+assert.equal(paidGroupConfirmation({...args,payment:{...payment,aggregate:{...payment.aggregate,capturedAmount:amount(0)}}}),null);
+assert.equal(paidGroupConfirmation({...args,account:{...account,email:"changed@example.invalid"}}),null);
+assert.equal(paidGroupConfirmation({...args,claim:{...claim,psp_reference:"wrong"}}),null);
+console.log("U-39F paid confirmation requires actual capture, original account and proof");
