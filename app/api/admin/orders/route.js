@@ -812,10 +812,19 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     const patch=action==="mark-dispatched"
       ?{status:"completed",dispatched_at:order.dispatched_at||now,updated_at:now}
       :{status:"completed",delivered_at:order.delivered_at||now,updated_at:now};
-    const {error:updateError}=await s.from("orders").update(patch).eq("id",id);
+    // Only the request that completes the current order can send its notice.
+    let completion=s.from("orders").update(patch)
+      .eq("id",id).eq("status",order.status)
+      .eq("fulfillment_type",order.fulfillment_type).is("archived_at",null);
+    if(action==="mark-dispatched"){
+      for(const field of ["tracking_number","tracking_url"]){
+        completion=order[field]==null?completion.is(field,null):completion.eq(field,order[field]);
+      }
+    }
+    const {data:updatedOrder,error:updateError}=await completion.select("*").maybeSingle();
     if(updateError)return NextResponse.json({error:"Handlingen kunne ikke lagres."},{status:500});
+    if(!updatedOrder)return NextResponse.json({error:"Ordren ble endret. Oppdater oversikten og kontroller status før du prøver igjen."},{status:409});
 
-    const updatedOrder={...order,...patch};
     try{
       const notice=await sendOrderStatusNotice({
         s,
@@ -826,8 +835,8 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
       return NextResponse.json({
         ok:true,
         ...notice,
-        paymentCaptureRequired:order.payment_status==="authorized",
-        paymentStatus:order.payment_status||"unpaid"
+        paymentCaptureRequired:updatedOrder.payment_status==="authorized",
+        paymentStatus:updatedOrder.payment_status||"unpaid"
       });
     }catch(error){
       console.error("ORDER STATUS NOTICE ERROR",error);
@@ -838,8 +847,8 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
       return NextResponse.json({
         error:customerError,
         statusSaved:true,
-        paymentCaptureRequired:order.payment_status==="authorized",
-        paymentStatus:order.payment_status||"unpaid"
+        paymentCaptureRequired:updatedOrder.payment_status==="authorized",
+        paymentStatus:updatedOrder.payment_status||"unpaid"
       },{status:500});
     }
   }

@@ -36,3 +36,69 @@ assert.ok(adminUi.includes("Historisk avvik: Ordren er avsluttet og arkivert, me
 assert.ok(adminRoute.includes('order.status==="completed"&&["pending","unpaid","partial","authorized"].includes(paymentStatus)'));
 assert.ok(adminRoute.includes('action === "archive"'));
 console.log("S-22 bestått: lagerreservering og Vipps-referanse fortsatt atomisk etter S25, sikker feilavvisning og arkivvarsel beholdt. Ingen kundedata.");
+
+// Execute the admin transition with two requests reading the same order.
+const completionStart=adminRoute.indexOf('  if (action === "mark-dispatched" || action === "mark-delivered")');
+const completionEnd=adminRoute.indexOf("  let surveyOrder=null;",completionStart);
+assert.ok(completionStart>=0&&completionEnd>completionStart);
+const completeOrder=new Function("s","NextResponse","safeHttpsUrl","sendOrderStatusNotice","req","id","action",
+ "return (async()=>{"+adminRoute.slice(completionStart,completionEnd)+"})()"
+);
+
+function fulfillmentFixture(order, beforeUpdate=()=>{}){
+ const notices=[];
+ const s={
+  from(table){
+   assert.equal(table,"orders");
+   const filters={};
+   let patch;
+   const builder={
+    select(){return builder;},
+    eq(field,value){filters[field]=value;return builder;},
+    is(field,value){filters[field]=value;return builder;},
+    update(values){patch=values;return builder;},
+    async single(){return {data:{...order}};},
+    async maybeSingle(){
+     beforeUpdate(order);
+     if(!Object.entries(filters).every(([field,value])=>order[field]===value))return {data:null};
+     Object.assign(order,patch);
+     return {data:{...order}};
+    },
+    then(resolve,reject){
+     return builder.maybeSingle().then(resolve,reject);
+    }
+   };
+   return builder;
+  }
+ };
+ const run=action=>completeOrder(s,
+  {json:(data,{status=200}={})=>({data,status})},
+  value=>String(value||"").startsWith("https://"),
+  async ({order:updated,kind})=>{notices.push({updated,kind});return {sentAt:"synthetic"};},
+  {url:"https://test.example.invalid/api/admin/orders"},order.id,action);
+ return {run,notices};
+}
+const shipment={id:"synthetic-shipping",order_type:"order",status:"in_progress",fulfillment_type:"shipping",
+ archived_at:null,tracking_number:"synthetic-tracking",tracking_url:null,payment_status:"authorized"};
+let fixture=fulfillmentFixture({...shipment});
+let results=await Promise.all([fixture.run("mark-dispatched"),fixture.run("mark-dispatched")]);
+assert.deepEqual(results.map(x=>x.status).sort(),[200,409]);
+assert.equal(fixture.notices.length,1);
+assert.equal(fixture.notices[0].kind,"dispatched");
+assert.equal(fixture.notices[0].updated.tracking_number,shipment.tracking_number);
+
+fixture=fulfillmentFixture({...shipment},current=>{current.tracking_number=null;});
+assert.equal((await fixture.run("mark-dispatched")).status,409);
+assert.equal(fixture.notices.length,0);
+fixture=fulfillmentFixture({...shipment},current=>{current.status="cancelled";});
+assert.equal((await fixture.run("mark-dispatched")).status,409);
+assert.equal(fixture.notices.length,0);
+
+fixture=fulfillmentFixture({...shipment,status:"ready",fulfillment_type:"pickup"},
+ current=>{current.payment_status="paid";});
+results=await Promise.all([fixture.run("mark-delivered"),fixture.run("mark-delivered")]);
+assert.deepEqual(results.map(x=>x.status).sort(),[200,409]);
+assert.equal(results.find(x=>x.status===200).data.paymentStatus,"paid");
+assert.equal(fixture.notices.length,1);
+assert.equal(fixture.notices[0].kind,"delivered");
+console.log("Product fulfillment: concurrent completion, stale tracking and cancelled order checks passed.");
