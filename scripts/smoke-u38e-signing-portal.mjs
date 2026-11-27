@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {demoSigningRows,signingPortalCounts,signingPortalFilter} from "../lib/signingPortalDemo.mjs";
+const admin=demoSigningRows("admin"),customer=demoSigningRows("customer");
+assert.equal(admin.length,5);assert.equal(customer.length,4);
+assert.equal(customer.some(r=>"customer" in r),false);
+assert.equal(customer.some(r=>r.order==="DEMO-099"),false);
+assert.deepEqual(signingPortalCounts(admin),{waiting:1,signed:1,expired:2,superseded:1});
+assert.equal(signingPortalFilter(admin,"waiting","borhammer").length,1);
+assert.equal(signingPortalFilter(customer,"all","DEMO-125").length,2);
+assert.equal(demoSigningRows("unknown").length,0);
+assert.match(readFileSync("app/admin/utleie/signering/page.js","utf8"),/user.role!=="owner"/);
+assert.match(readFileSync("app/min-side/signering/page.js","utf8"),/VERCEL_ENV==="production"/);
+console.log("U-38E demo portal filters and route guards passed");
