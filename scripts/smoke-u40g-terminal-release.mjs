@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import {reconcileGroupPayment} from "../lib/groupPaymentBridge.mjs";
+const id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",ref="AUG-"+id,group={id,status:"payment_pending",payment_reference:ref,payable_ore:35000};
+const a=value=>({currency:"NOK",value});
+const p={reference:ref,pspReference:"terminal-demo",state:"ABORTED",amount:a(35000),aggregate:{authorizedAmount:a(35000),cancelledAmount:a(35000),capturedAmount:a(0),refundedAmount:a(0)}};
+let calls=0;const store={release:async x=>{calls++;assert.equal(x.cancelled,35000);return calls===1?"released":"existing";}};
+assert.equal((await reconcileGroupPayment({group,payment:p,store:{}})).status,"release_candidate");
+assert.equal((await reconcileGroupPayment({group,payment:{...p,aggregate:{...p.aggregate,cancelledAmount:a(0)}},store})).status,"review");assert.equal(calls,0);
+assert.equal((await reconcileGroupPayment({group,payment:p,store})).status,"released");
+assert.equal((await reconcileGroupPayment({group:{...group,status:"released"},payment:p,store})).status,"released");assert.equal(calls,2);
+assert.equal((await reconcileGroupPayment({group,payment:null,store})).status,"review");assert.equal(calls,2);
+console.log("U-40G terminal payment release, unknown status and replay passed");

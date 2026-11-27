@@ -92,7 +92,7 @@ export async function POST(req){
   if(!isGroupVippsReference(reference)||payload?.amount?.currency!=="NOK"||!registeredMsn||!payloadMsn||!safeMsnMatch(registeredMsn,payloadMsn))return NextResponse.json({error:"Invalid group webhook."},{status:409});
   try{
    const result=await reconcileGroupVippsWebhook(reference);
-   if(["confirmed","await_customer","authorized_not_captured"].includes(result.status))return NextResponse.json({ok:true});
+   if(["confirmed","await_customer","authorized_not_captured","released"].includes(result.status))return NextResponse.json({ok:true});
    // Unknown, refund, terminal release and partial capture require further reconciliation.
    return NextResponse.json({error:"Group payment reconciliation unavailable."},{status:503});
   }catch{return NextResponse.json({error:"Group payment reconciliation unavailable."},{status:503});}
