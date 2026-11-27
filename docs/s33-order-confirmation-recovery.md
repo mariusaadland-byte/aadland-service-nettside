@@ -5,3 +5,5 @@ Utkast, ikke produksjonsklart. Nye manuelle produktordre fra nettbutikken får e
 Oppdatert: Vercel-preview bestått på tidligere gren etter S25 testtilpasning. Samlet filter og eieravstemming er implementert. SQL testet med syntetisk ordre, eksklusiv claim, dobbelt-ack, tidlig avstemmingssperre og rolleprivilegier; ROLLBACK verifisert med 0 testordre og ingen ny tabell. Ny branch bygger på U12; reell e-post og innlogget UI-test gjenstår. Databasemigrasjon skal aktiveres før merge.
 
 Produksjon: migrasjon 20261125184359 installert 25.11.2026 etter godkjent preview. Køen er tom; anon SELECT og authenticated claim er avvist, service_role claim er tillatt. Koden venter på siste merge/utrulling; ingen e-post sendt.
+
+**27.11.2026:** Opprinnelig S33 er publisert. Lese-kontroll av produksjon: 0 køoppføringer, én registrert vellykket cron 26.11 kl. 10:25 UTC. Ny oppfølging i kode: eksakte tellinger av needs_review, claimed eldre enn 10 minutter og queued eldre enn 5 minutter etter ordinær kjøring. Uavklart kø gir HTTP 207; ukjent telling gir 503. Ingen ny retry eller endring i utsendingsgrensen. Byggetest og praktisk e-posttest gjenstår.

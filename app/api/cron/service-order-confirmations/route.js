@@ -17,7 +17,16 @@ async function runServiceCron(req){
   try{const result=await sendManualOrderConfirmationOnce({s,id:row.order_id});if(result.state==="accepted")accepted++;else if(result.state==="needs_review")review++;else if(result.state==="unavailable")failed++;}
   catch{failed++;}
  }
- return NextResponse.json({ok:failed===0,checked:(data||[]).length,accepted,review,failed},{status:failed?503:200,headers:{"Cache-Control":"no-store"}});
+ const staleCutoff=new Date(Date.now()-10*60*1000).toISOString();
+ const [held,stale,queued]=await Promise.all([
+  s.from("service_order_confirmation_outbox").select("order_id",{count:"exact",head:true}).eq("state","needs_review"),
+  s.from("service_order_confirmation_outbox").select("order_id",{count:"exact",head:true}).eq("state","claimed").lt("claimed_at",staleCutoff),
+  s.from("service_order_confirmation_outbox").select("order_id",{count:"exact",head:true}).eq("state","queued").lt("created_at",cutoff)
+ ]);
+ if([held,stale,queued].some(x=>x.error||!Number.isSafeInteger(x.count)||x.count<0))
+  return NextResponse.json({ok:false,error:"Ordrebekreftelseskøen kunne ikke kontrolleres.",accepted},{status:503,headers:{"Cache-Control":"no-store"}});
+ const requiresReview=Math.max(review,held.count+stale.count);
+ return NextResponse.json({ok:failed===0&&requiresReview===0&&queued.count===0,checked:(data||[]).length,accepted,review,failed,requiresReview,held:held.count,staleClaims:stale.count,remainingQueued:queued.count},{status:failed?503:requiresReview||queued.count?207:200,headers:{"Cache-Control":"no-store"}});
 }
 
 export async function GET(req){return withServiceCronMonitoring("service-order-confirmations",req,()=>runServiceCron(req));}
