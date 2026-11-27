@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import {buildRentalAgreementPdf} from "../lib/rentalAgreementPdf.mjs";
+import {groupQuoteSnapshot} from "../lib/rentalGroupQuote.mjs";
+import {TERMS_2026_11_25} from "../lib/rentalAgreementTerms20261125.mjs";
+const id="00000000-0000-4000-8000-000000000001",customerId="00000000-0000-4000-8000-000000000002",today="2026-11-27";
+const quote=groupQuoteSnapshot({rentals:[{itemId:id,name:"Borhammer",available:true,startDate:today,endDate:"2026-11-28",quantity:1,totalOre:60000,depositOre:150000}],today});
+const x={agreementId:id,customerId,customerName:"Test Øst",email:"demo@example.invalid",orderNumber:"DEMO-001",revision:1,quote,today};
+const p=buildRentalAgreementPdf(x);
+assert.equal(p.bytes.subarray(0,8).toString(),"%PDF-1.4");
+assert.equal(p.documentDigest,buildRentalAgreementPdf(x).documentDigest);
+assert.notEqual(p.documentDigest,buildRentalAgreementPdf({...x,revision:2}).documentDigest);
+assert.throws(()=>buildRentalAgreementPdf({...x,quote:{...quote,digest:"a".repeat(64)}}));
+assert.equal(TERMS_2026_11_25.filter(x=>x.heading).length,14);
+const source=p.bytes.toString("ascii"),xref=Number(source.match(/startxref\n(\d+)/)[1]);
+assert.equal(source.slice(xref,xref+4),"xref");
+assert.match(source,/\/Count [2-9]/);
+console.log("U-38B deterministic PDF and frozen terms tests passed");
