@@ -1,6 +1,7 @@
 import {rentalOverlapOr,extendOverdueAvailability} from "../../../../lib/rentalOverdue.mjs";
 import {osloDateKey} from "../../../../lib/osloTime";
 import {rentalAppointmentInput} from "../../../../lib/rentalAppointments.mjs";
+import {rentalAccessoryRecord} from "../../../../lib/rentalAccessories.mjs";
 import {rentalHandoverRecord} from "../../../../lib/rentalHandover.mjs";
 import {rentalDateChangeAttempt} from "../../../../lib/rentalChangeRequest.mjs";
 import {sameOriginGuard} from "../../../../lib/requestGuard";
@@ -597,9 +598,14 @@ export async function PATCH(req){
   }
   if(b.status!==current.status&&["active","returned"].includes(b.status)){
    if(b.adminNote!==undefined)return NextResponse.json({error:"Lagre internt notat separat fra kontrollen."},{status:400});
+   if(b.expectedUpdatedAt!==current.updated_at)return NextResponse.json({error:"Bookingen er endret. Last den inn på nytt før kontrollen."},{status:409});
+   const accessory=rentalAccessoryRecord(current,b.status,b.accessories,now);
+   if(accessory.error)return NextResponse.json({error:accessory.error},{status:409});
+   if(accessory.deviation&&String(b.handoverChecklist?.note||"").trim().length<10)return NextResponse.json({error:"Beskriv manglende/skadet tilbehør eller grunnlaget for eldre retur med minst 10 tegn."},{status:409});
    const checked=rentalHandoverRecord(current,b.status,b.handoverChecklist,now);
    if(checked.error)return NextResponse.json({error:checked.error},{status:409});
    changes.admin_note=checked.note;
+   changes.customer=accessory.customer;
   }
   if(b.status==="completed"&&current.status!=="completed"){
    const total=Math.max(0,Number(current.total_ore)||0);
