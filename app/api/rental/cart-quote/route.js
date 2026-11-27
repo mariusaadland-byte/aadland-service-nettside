@@ -8,6 +8,7 @@ import {rentalCartInput,rentalCartTotals} from "../../../../lib/rentalCart.mjs";
 import {countedRentalBookings,peakRentalBookings} from "../../../../lib/rentalAvailability";
 import {rentalOverlapOr,extendOverdueAvailability} from "../../../../lib/rentalOverdue.mjs";
 import {consumableInput,consumableQuote,mixedQuoteTotals} from "../../../../lib/rentalConsumables.mjs";
+import {checkoutSigningEnabled} from "../../../../lib/checkoutSigning";
 import {groupQuoteSnapshot} from "../../../../lib/rentalGroupQuote.mjs";
 export const runtime="nodejs";
 const json=(b,status=200)=>NextResponse.json(b,{status,headers:{"Cache-Control":"no-store"}});
@@ -43,13 +44,13 @@ export async function POST(req){
   return {...line,name:item.name,available:true,totalOre,depositOre,days:p.days};
  }));
  const totals=rentalCartTotals(result);
- if(!sales.length){const group=totals?groupQuoteSnapshot({rentals:result,today}):null;return json({lines:result,totals,group,reserved:false,checkoutEnabled:false});}
+ if(!sales.length){const group=totals?groupQuoteSnapshot({rentals:result,today}):null;return json({lines:result,totals,group,reserved:false,checkoutEnabled:!!group&&checkoutSigningEnabled()});}
  const q=await s.from("rental_consumables").select("id,name,sku,rental_item_id,active,price_ore,stock_quantity").in("id",sales.map(x=>x.id)).eq("active",true);
  if(q.error)throw Error("Varekontroll mislyktes");
  const sale=consumableQuote(sales,q.data||[],lines.map(x=>x.itemId));
  const mixed=mixedQuoteTotals(totals,sale);
  const skus=new Map((q.data||[]).map(x=>[x.id,x.sku]));
  const group=mixed?groupQuoteSnapshot({rentals:result,goods:sale.lines.map(x=>({...x,sku:skus.get(x.id)})),today}):null;
- return json({lines:result,consumables:sale?.lines||[],totals:mixed,group,reserved:false,checkoutEnabled:false});
+ return json({lines:result,consumables:sale?.lines||[],totals:mixed,group,reserved:false,checkoutEnabled:!!group&&checkoutSigningEnabled()});
  }catch{return json({error:"Tilgjengeligheten kunne ikke kontrolleres fullstendig."},503);}
 }
