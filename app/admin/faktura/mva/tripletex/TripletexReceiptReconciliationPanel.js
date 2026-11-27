@@ -23,14 +23,14 @@ export default function TripletexReceiptReconciliationPanel({row,onClose,onVerif
  const [error,setError]=useState("");
  const [info,setInfo]=useState("");
  const doc=row.document;
- const ready=checkedVoucher?.remote?.canReview===true&&checks.every(([key])=>checked[key]===true)&&
+ const ready=checkedVoucher?.remote?.canReview===true&&checkedVoucher.remote.voucherId===Number(voucherId)&&checks.every(([key])=>checked[key]===true)&&
   vatCode.trim()!==""&&/^\d{3,8}$/.test(accountCode.trim())&&note.trim().length>=12;
 
  async function request(body){
   const response=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},
    body:JSON.stringify({documentId:doc.id,voucherId,...body})});
   const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw Error(data.error||"Tripletex-kontrollen kunne ikke fullføres.");
+  if(!response.ok||data.ok!==true)throw Error(data.error||"Tripletex-kontrollen kunne ikke fullføres.");
   return data;
  }
  async function checkVoucher(){
@@ -38,6 +38,7 @@ export default function TripletexReceiptReconciliationPanel({row,onClose,onVerif
   setBusy(true);setError("");setInfo("");setCheckedVoucher(null);setChecked({});
   try{
    const data=await request({action:"check"});
+   if(data.remote?.voucherId!==Number(voucherId)||typeof data.remote.canReview!=="boolean"||!Array.isArray(data.remote.accounts)||!Array.isArray(data.remote.vatCodes))throw Error("Tripletex-bilaget kunne ikke bekreftes.");
    setCheckedVoucher(data);
    setInfo("Bilaget er funnet i Tripletex. Kontroller at dette er riktig kjøp før du bekrefter bokføringen.");
   }catch(e){setError(e.message);}
@@ -49,13 +50,14 @@ export default function TripletexReceiptReconciliationPanel({row,onClose,onVerif
   setBusy(true);setError("");setInfo("");
   try{
    const data=await request({
-    action:"confirm",expectedVoucherNumber:checkedVoucher.remote.number,
+    action:"confirm",expectedVoucherId:checkedVoucher.remote.voucherId,expectedVoucherNumber:checkedVoucher.remote.number,
     expectedVoucherYear:checkedVoucher.remote.year,
     expectedSupplierDocumentNumber:doc.supplier_document_number,
     originalSha256:row.attachment.sha256,
     vatCode:vatCode.trim(),accountCode:accountCode.trim(),
     note:note.trim(),confirmed:checked
    });
+   if(data.status!=="owner_verified_booked"||data.voucherId!==checkedVoucher.remote.voucherId)throw Error("Avstemmingsstatus er uavklart. Oppdater oversikten før nytt forsøk.");
    setInfo(data.message||"Bokføringskontrollen er registrert.");
    await onVerified();
   }catch(e){setError(e.message);}
@@ -69,7 +71,7 @@ export default function TripletexReceiptReconciliationPanel({row,onClose,onVerif
   </p>
   <div className={styles.reconcileActions}>
    <label>Tripletex bilags-ID (ikke leverandørens fakturanummer)
-    <input type="text" inputMode="numeric" pattern="[0-9]*" value={voucherId}
+    <input type="text" inputMode="numeric" pattern="[0-9]*" value={voucherId} disabled={busy}
      onChange={e=>{setVoucherId(e.target.value.replace(/[^0-9]/g,""));setCheckedVoucher(null);setChecked({});}} placeholder="Bilags-ID i Tripletex" autoComplete="off"/>
    </label>
    <button type="button" className={styles.primary} disabled={busy||!voucherId.trim()} onClick={checkVoucher}>
