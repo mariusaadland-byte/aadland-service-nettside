@@ -120,15 +120,8 @@ begin
   if exists(select 1 from public.rental_blocks b where b.rental_item_id=item_uuid and b.start_date<=last_day+buffer and b.end_date>=first_day-buffer) then raise exception 'GROUP_UNAVAILABLE'; end if;
   -- Group children ALWAYS count until explicit group release. Old active overdue
   -- rentals block through the requested end, not merely their scheduled end.
-  select coalesce(max(c),0) into peak from (
-   select count(b.id) c from generate_series(first_day::timestamp,last_day::timestamp,interval '1 day') day
-   left join public.rental_bookings b on b.rental_item_id=item_uuid and b.status in ('new','confirmed','active')
-    and (b.group_id is not null or b.status<>'new' or b.payment_due_at is null or b.payment_due_at>clock_timestamp() or b.payment_status is distinct from 'unpaid' or b.payment_reference is not null)
-    and b.start_date<=day::date+buffer
-    and (b.end_date>=day::date-buffer or (b.status='active' and b.end_date<today))
-   group by day
-  ) counts;
-  if peak+n>item.quantity then raise exception 'GROUP_UNAVAILABLE'; end if;
+  select min(free_units) into peak from public.draft_rental_availability_days(item_uuid,first_day,last_day);
+  if peak is null or peak<n then raise exception 'GROUP_UNAVAILABLE'; end if;
   rental_sum:=rental_sum+unit_price*n; deposit_sum:=deposit_sum+item.deposit_ore::bigint*n;
  end loop;
  for g in select x from jsonb_array_elements(p_snapshot->'goods') x order by (x->>'id')::uuid loop

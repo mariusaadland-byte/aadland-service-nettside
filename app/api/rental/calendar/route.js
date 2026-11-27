@@ -61,6 +61,13 @@ export async function GET(req){
  const item=fromDbRentalItem(raw);
  const bounds=monthBounds(month);
  const buffer=Math.max(0,Number(item.bufferDays)||0);
+ // New schema deliberately gated until grants, migration and staged checks pass.
+ if(process.env.VERCEL_ENV==="production"&&process.env.AADLAND_GROUP_CAPACITY_ENABLED==="true"){
+  const days=eachDate(bounds.start,bounds.end);
+  const result=await s.rpc("draft_rental_availability_days",{p_item:item.id,p_start:bounds.start,p_end:bounds.end});
+  if(result.error||!Array.isArray(result.data)||result.data.length!==days.length||result.data.some((r,i)=>r.day!==days[i]||!Number.isSafeInteger(r.free_units)||r.free_units<0||r.free_units>Number(item.quantity)))return NextResponse.json({error:"Tilgjengeligheten kunne ikke bekreftes."},{status:503});
+  return NextResponse.json({itemId:item.id,month,unavailableDates:result.data.filter(r=>r.free_units===0).map(r=>r.day),bufferDays:buffer,quantity:item.quantity},{headers:{"Cache-Control":"no-store"}});
+ }
  const queryStart=shiftDate(bounds.start,-buffer);
  const queryEnd=shiftDate(bounds.end,buffer);
 
