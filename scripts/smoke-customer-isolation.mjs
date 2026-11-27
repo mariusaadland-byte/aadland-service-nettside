@@ -13,14 +13,14 @@ const tables={
  project_drawings:[{id:"drawing-a",customer_user_id:"customer-a",customer_visible:true},{id:"hidden-a",customer_user_id:"customer-a",customer_visible:false},{id:"drawing-b",customer_user_id:"customer-b",customer_visible:true}],
  quote_drawing_publications:[{id:"publication-a",drawing_id:"published-a",customer_email:"a@example.invalid"},{id:"publication-b",drawing_id:"published-b",customer_email:"b@example.invalid"}]
 };
-let queries=0,failedTable=null;
+let queries=0,failedTable=null,malformedTable=null;
 const db={from(table){queries++;let filters=[],updating=false,windowRange=null;const chain={
  select(){return chain},update(){updating=true;return chain},order(){return chain},limit(){return chain},range(start,end){windowRange=[start,end];return chain},
  eq:(key,value)=>{filters.push(row=>row[key]===value);return chain},
  is:(key,value)=>{filters.push(row=>row[key]==value);return chain},
  in:(key,values)=>{filters.push(row=>values.includes(row[key]));return chain},
  contains:(key,value)=>{filters.push(row=>Object.entries(value).every(([k,v])=>row[key]?.[k]===v));return chain},
- then(resolve){const rows=updating?[]:(tables[table]||[]).filter(row=>filters.every(test=>test(row)));resolve(table===failedTable?{data:null,count:null,error:{code:'TEST'}}:{data:windowRange?rows.slice(windowRange[0],windowRange[1]+1):rows,count:rows.length,error:null});}
+ then(resolve){const rows=updating?[]:(tables[table]||[]).filter(row=>filters.every(test=>test(row)));resolve(table===failedTable?{data:null,count:null,error:{code:'TEST'}}:table===malformedTable&&!updating?{data:{unexpected:true},count:0,error:null}:{data:windowRange?rows.slice(windowRange[0],windowRange[1]+1):rows,count:rows.length,error:null});}
  };return chain;}};
 const GET=new Function("NextResponse","getCustomer","db","safeHttpsUrl",source+"return GET;")({json:(body,options={})=>({body,status:options.status||200,headers:options.headers||{}})},async()=>customer,()=>db,()=>null);
 const result=await GET();assert.equal(result.status,200);
@@ -67,3 +67,10 @@ failedTable="quote_drawing_publications";incomplete=await GET();assert.equal(inc
 failedTable=null;assert.equal((await GET()).body.serviceHistory.drawings.unavailable,false);
 assert.ok(ui.includes("Hele historikken kunne ikke hentes."));assert.ok(ui.includes("Historikksiden kunne ikke bekreftes."));
 console.log("S35 failed history reads never appear as verified empty totals.");
+
+for(const table of ["quotes","project_drawings","quote_drawing_publications"]){
+ malformedTable=table;const section=table==="quotes"?"quotes":"drawings";const result=await GET();assert.equal(result.status,200);assert.equal(result.body.serviceHistory[section].unavailable,true);assert.equal(result.body.serviceHistory[section].total,null);assert.equal((await GET(request(section,2))).status,section==="quotes"?500:503);
+}
+malformedTable="orders";assert.equal((await GET(request("orders",2))).status,500);malformedTable=null;
+assert.ok(ui.includes("data.serviceHistory?.drawings?.unavailable?"));
+console.log("S35 malformed history payloads cannot masquerade as empty lists; existing ownership filters unchanged.");
