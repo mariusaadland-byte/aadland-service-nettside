@@ -16,3 +16,7 @@ Lese-baseline med EXPLAIN (ANALYZE, BUFFERS) av faktisk search_material_supplier
 | 11303641 | Byggmakker | 608,334 ms | 1 |
 
 Begge enkeltmålinger var med buffer-treff og ingen disklesing. Ingen produktpriser eller kundeopplysninger hentet ut. Dette er ikke nettleser-/API-responstid eller p95. Søket bruker flere lower(... ) LIKE '%...%' OR fulltekstsøk og rangerer eksakte treff først. GIN alene dekker ikke hele OR-predikatet. Før eventuell ny søkeindeks eller omskriving må resultatsett, rangering, flere søketyper, leverandørfilter, importkostnad og plassbehov måles i isolert test. Ingen målt gevinst eller ny indeks påstås. Ingen DDL, sletting av indekser eller endring i utleie.
+
+### Eksakt varenummer – målt alternativ 27.11
+
+Read-only EXPLAIN ANALYZE for supplier_id=byggmakker, supplier_sku=11303641, active=true: 4,770 ms execution, 4 buffer hits, existing composite primary-key index scan, 1 row. Earlier full-text/substring lookup for same SKU and supplier: 608,334 ms (1 row). These are separate single measurements, not end-to-end latency or a guaranteed speedup. Explicit exact SKU mode in calculator uses this lookup and requires selected active supplier, preserves leading zeros and exact case, and returns no partial matches. Normal search remains unchanged. No extra indexes or catalog writes. New UI clears old results and ignores aborted responses. Build and browser verification pending. General search tuning remains separate.
