@@ -91,6 +91,12 @@ begin
  perform pg_temp.require(public.draft_rental_bank_match(day-1,repeat('c',64),'123456','demo-rental','payout-ci',29400,day,'bank-ci',encode(sha256(decode('ffd8ff'||repeat('00',40),'hex')),'hex'),decode('ffd8ff'||repeat('00',40),'hex'),u)='recorded','bank match evidence recorded');
  perform pg_temp.require(public.draft_rental_bank_match(day-1,repeat('c',64),'123456','demo-rental','payout-ci',29400,day,'bank-ci',encode(sha256(decode('ffd8ff'||repeat('00',40),'hex')),'hex'),decode('ffd8ff'||repeat('00',40),'hex'),u)='existing','bank match replay');
  perform pg_temp.require(public.draft_rental_bank_match(day-1,repeat('b',64),'123456','demo-rental','payout-ci',29400,day,'bank-ci',encode(sha256(decode('ffd8ff'||repeat('00',40),'hex')),'hex'),decode('ffd8ff'||repeat('00',40),'hex'),u)='review','stale report blocked');
+ perform pg_temp.require(public.draft_rental_voucher_claim('payout','payout-ci',day-1,repeat('c',64),1,2,4,29400,day,repeat('a',64),'AU-VP-'||repeat('a',40),u)='claimed','bank voucher claim');
+ perform pg_temp.require(public.draft_rental_voucher_claim('payout','payout-ci',day-1,repeat('c',64),1,2,4,29400,day,repeat('a',64),'AU-VP-'||repeat('a',40),u)='existing','voucher replay locked');
+ perform pg_temp.require(public.draft_rental_voucher_claim('payout','payout-ci',day-1,repeat('c',64),1,2,5,29400,day,repeat('a',64),'AU-VP-'||repeat('a',40),u)='review','changed account blocked');
+ perform pg_temp.require(public.draft_rental_voucher_finish('payout','payout-ci',repeat('a',64),null)='review','unknown voucher stays locked');
+ perform pg_temp.require(public.draft_rental_voucher_finish('payout','payout-ci',repeat('a',64),123)='review','unknown requires separate reconciliation');
+ perform pg_temp.require(not has_function_privilege('authenticated','public.draft_rental_voucher_claim(text,text,date,text,bigint,bigint,bigint,integer,date,text,text,uuid)','EXECUTE'),'voucher claim restricted');
  perform pg_temp.require((public.draft_group_finance_snapshot()->>'complete')::boolean,'finance snapshot complete');
  perform pg_temp.require(exists(select 1 from jsonb_array_elements(public.draft_group_finance_snapshot()->'rows') x where x->>'id'=g::text and x->'invoice'->>'state'='confirmed' and x->'payment'->>'state'='confirmed' and (x->'deposit'->>'documented')::boolean=false),'finance snapshot distinguishes confirmed transfer and missing bank proof');
  perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_finance_snapshot()','EXECUTE'),'finance snapshot restricted');
