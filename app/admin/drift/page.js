@@ -52,7 +52,7 @@ export default async function ServiceOperationsPage(){
     .select("alert_day,state,issue_count,created_at,sent_at")
     .order("alert_day",{ascending:false}).limit(7)
   ]);
-  if(r.error||a.error)error="Driftsdataene kunne ikke leses fullstendig. Kontroller Supabase og deploy.";
+  if(r.error||a.error||!Array.isArray(r.data)||!Array.isArray(a.data))error="Driftsdataene kunne ikke leses fullstendig. Kontroller Supabase og deploy.";
   else{rows=r.data||[];alerts=a.data||[];}
  }
  const now=Date.now(),day=new Date(now).toISOString().slice(0,10);

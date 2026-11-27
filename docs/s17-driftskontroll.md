@@ -64,3 +64,7 @@ Begge nye tabeller har **RLS aktivert**, alle generelle rettigheter fjernet fra 
 **S-17 kan først sluttgodkjennes når**: kjøringene 23.11.2026 og etterfølgende dag faktisk har opprettet journalrader for alle seks jobber, et kontrollert feilscenario er håndtert uten kundesending, og eierens avviksvarsel er bekreftet mottatt. Eksternt uavhengig vakthold er dessuten anbefalt.
 
 **Regel for feil:** Ikke automatisk gjenforsøk av utsendelser med uklar status. Kontroller Resend, opprinnelig faktura/oppdrag og betalingslogger først.
+
+## Oppfølgingskontroll 27.11.2026 kl. 12:30 UTC
+
+Produksjonsjournalen viser 41 registrerte kjøringer, alle ok: seks hver for fakturaoppfølging, MVA, befaring, oppstart, tilbudsoppfølging og planlagte fakturaer, to hver for ordre- og tilbudssvarbekreftelser, én for kontaktbildeopprydding. Åtte av ni jobber har meldt ok 27.11; kontaktbildeopprydding planlagt 12:50 UTC, sist ok 26.11. Ingen manuelle produksjonsjobber startet. Dette er dokumenterte svar, ikke verifisert levering av e-post eller bokføring. Driftsvarslingens faktiske eierlevering og uavhengig overvåking gjenstår. Ny rettelse klassifiserer uleselig JSON, uventet HTTP-status og eksplisitt API-feil som advarsel, uten å endre det opprinnelige svaret eller utføre nytt sendeforsøk. Oversikten avviser ugyldige loggresultater. Syntetiske regresjonstester lagt til. Ingen endring i tidsplan, kundesending, utleie eller database.
