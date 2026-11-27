@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import {groupQuoteSnapshot} from "../lib/rentalGroupQuote.mjs";
+import {checkoutAgreement} from "../lib/rentalCheckoutAgreement.mjs";
+const [g,u,item,req]=Array.from({length:4},(_,i)=>"00000000-0000-4000-8000-00000000000"+(i+1));
+const today="2026-11-27",now=today+"T12:00:00Z",rentals=[{itemId:item,startDate:today,endDate:today,quantity:1,name:"Demo bor",available:true,totalOre:30000,depositOre:50000}],quote=groupQuoteSnapshot({rentals,today});
+const body={requestId:req,quoteDigest:quote.digest,acceptedTerms:true,termsVersion:"2026-11-25",lines:rentals},account={id:u,email:"demo@example.invalid",email_confirmed_at:now};
+let group,agreement,reserves=0,attaches=0,fail=true;
+const store={find:async()=>group,reserve:async()=>{reserves++;group={id:g,customer_user_id:u,request_id:req,quote_digest:quote.digest,quote_snapshot:quote.snapshot,terms_version:"2026-11-25",rental_ore:30000,sales_ore:0,payable_ore:30000,deposit_ore:50000,status:"held",expires_at:today+"T12:30:00Z",order_number:1};return g},current:async()=>agreement,attach:async({agreementId,pdf})=>{if(fail){fail=false;throw Error("simulated interruption")}attaches++;agreement={id:agreementId,group_id:g,customer_user_id:u,quote_digest:quote.digest,terms_version:"2026-11-25",document_bytes:pdf.bytes,document_digest:pdf.documentDigest};return agreementId}};
+const args={body,account,customerName:"Demo Kunde",today,now,store,price:async()=>({rentals,goods:[]})};
+await assert.rejects(checkoutAgreement(args));
+const a=await checkoutAgreement(args);assert.equal(a.status,"agreement_ready");
+const b=await checkoutAgreement(args);assert.equal(b.agreementId,a.agreementId);assert.equal(reserves,1);assert.equal(attaches,1);
+assert.equal((await checkoutAgreement({...args,body:{...body,quoteDigest:"a".repeat(64)}})).status,"unavailable");
+assert.equal((await checkoutAgreement({...args,now:today+"T13:00:00Z"})).status,"unavailable");
+console.log("U-39A recoverable reservation and immutable agreement passed");
