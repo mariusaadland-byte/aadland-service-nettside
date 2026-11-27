@@ -234,6 +234,8 @@ export async function PATCH(req){
   .eq("id",b.id)
   .maybeSingle();
  if(currentError||!current)return NextResponse.json({error:"Bookingen ble ikke funnet."},{status:404});
+ // A child of a grouped order must never be changed by the legacy single-booking writer.
+ if(current.group_id)return NextResponse.json({error:"Denne bookingen tilhører en samlet ordre. Bruk samlet ordrebehandling. Ved fysisk retur, ta imot utstyret og registrer avvik manuelt inntil gruppefunksjonen er aktiv."},{status:409});
  if(rentalDateChangeAttempt(b,current))return NextResponse.json({error:"Datoendring er ikke tilgjengelig som direkte oppdatering. Avklar ny tilgjengelighet, pris og oppgjør før ombooking."},{status:409});
 
  const action=String(b.action||"");
