@@ -129,3 +129,18 @@ assert.equal((await activate(activationDb,owner,{previewId:preview,phrase:"GODKJ
 activationResult={supplierId:"synthetic",imported:0};assert.equal((await activate(activationDb,owner,{previewId:preview})).status,503);
 activationResult={supplierId:"synthetic"};assert.equal((await activate(activationDb,owner,{previewId:preview})).status,503);
 console.log("Import recovery: read-only exact preview status, owner check, no staged products exposed, applied/unconfirmed/expired tested.");
+
+// Exact SKU lookup uses the selected supplier and active product only, preserving price metadata.
+const catalogCode=catalog.replace(/^import .*;\n/gm,"").replace(/^export /gm,"");
+let searchCalls=0,exactFilters=[],catalogUser={role:"owner"},exactRow={supplier_id:"mock",supplier_sku:"00123",name:"Synthetic item",unit:"STK",cost_ex_vat_ore:10000};
+const catalogDb={from(table){const q={select(){return q},eq(k,v){if(table==="material_supplier_products")exactFilters.push([k,v]);return q},order(){return q},async maybeSingle(){return {data:table==="quote_admin_preferences"?{default_material_markup:15}:exactRow,error:null}},then(resolve,reject){return Promise.resolve({data:[{id:"mock",name:"Synthetic supplier",is_primary:true,default_markup_percent:null,last_import_at:new Date().toISOString()}],error:null}).then(resolve,reject)}};return q},rpc:async()=>{searchCalls++;return {data:[],error:null}}};
+const catalogGet=new Function("sameOriginGuard","NextResponse","getAdminUser","hasPermission","db","materialMarkupOrFallback","supplierPriceFreshness",catalogCode+";return GET;")(()=>null,{json:(body,opts={})=>({body,status:opts.status||200})},async()=>catalogUser,async()=>false,()=>catalogDb,materialMarkupOrFallback,supplierPriceFreshness);
+const skuRequest=(params)=>({url:"https://example.invalid/api/admin/material-catalog?"+params});
+let exactResult=await catalogGet(skuRequest("q=00123&supplier=mock&exact=1"));
+assert.equal(exactResult.status,200);assert.equal(exactResult.body.products[0].sku,"00123");assert.equal(exactResult.body.products[0].costExVat,100);assert.equal(exactResult.body.products[0].defaultMarkupPercent,15);assert.deepEqual(exactFilters,[["supplier_id","mock"],["supplier_sku","00123"],["active",true]]);assert.equal(searchCalls,0);
+exactRow=null;assert.deepEqual((await catalogGet(skuRequest("q=00123&supplier=mock&exact=1"))).body.products,[]);assert.equal(searchCalls,0);
+assert.equal((await catalogGet(skuRequest("q=00123&exact=1"))).status,400);
+await catalogGet(skuRequest("q=00123&supplier=mock"));assert.equal(searchCalls,1);
+catalogUser=null;assert.equal((await catalogGet(skuRequest("q=00123&supplier=mock&exact=1"))).status,403);
+assert.ok(calc.includes('if(controller.signal.aborted)return;')&&calc.includes('Hurtigsøk: eksakt varenummer'));
+console.log("S34 exact SKU path: existing index lookup, leading zeros retained, active supplier, normal search unchanged, admin-only.");
