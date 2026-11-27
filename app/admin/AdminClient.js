@@ -4,6 +4,8 @@ import {rentalHandoverChecklist} from "../../lib/rentalHandover.mjs";
 import RentalConditionPhotos from "./utleie/RentalConditionPhotos";
 import RentalAppointmentControl from "./utleie/RentalAppointmentControl";
 import {RentalAccessoryFields,RentalAccessorySummary,initialAccessoryInput} from "./utleie/RentalAccessoryControl";
+import RentalSigningControl from "./utleie/RentalSigningControl";
+import {rentalSigningReview,rentalSigningInput} from "../../lib/rentalSigning.mjs";
 import {rentalAccessoryRecord} from "../../lib/rentalAccessories.mjs";
 import {rentalAppointmentValues,rentalAppointmentLabel} from "../../lib/rentalAppointments.mjs";
 import {rentalOverdue,rentalLateEstimate} from "../../lib/rentalOverdue.mjs";
@@ -4626,9 +4628,13 @@ function RentalHandoverControl({booking,busy,onSubmit}){
  const [note,setNote]=useState("");
  const [deviation,setDeviation]=useState(false);
  const [accessories,setAccessories]=useState(()=>initialAccessoryInput(booking,next));
+ const [signature,setSignature]=useState(null);
  const accessoryCheck=rentalAccessoryRecord({customer:booking.customer},next,accessories,"preview");
  const missingDeposit=next==="active"&&Number(booking.depositOre)>0&&(booking.depositStatus!=="held"||Number(booking.depositHeldOre)<Number(booking.depositOre));
- const ready=fields.every(([key])=>checks[key]===true)&&!accessoryCheck.error&&(!(deviation||missingDeposit||accessoryCheck.deviation)||note.trim().length>=10);
+ const control={checks,note,deviation:deviation||accessoryCheck.deviation};
+ const review=rentalSigningReview(booking,next,accessoryCheck,control);
+ const signed=booking.signingEnabled?rentalSigningInput(review,signature):true;
+ const ready=fields.every(([key])=>checks[key]===true)&&!accessoryCheck.error&&(!(deviation||missingDeposit||accessoryCheck.deviation)||note.trim().length>=10)&&!!signed&&!booking.signatureSetupRequired;
  return <section className="orderPaymentPanel rentalHandoverPanel">
   <h4>{next==="active"?"Kontroll før utlevering":"Kontroll ved tilbakelevering"}</h4>
   <p className="muted">Bekreft hvert punkt. Registreringen endrer status og legger kontrollen i internt notat, men flytter ikke penger.</p>
@@ -4638,7 +4644,9 @@ function RentalHandoverControl({booking,busy,onSubmit}){
   <label style={{display:"flex",alignItems:"center",gap:10,minHeight:44}}><input type="checkbox" checked={deviation} onChange={e=>setDeviation(e.target.checked)}/>Avvik eller skade må følges opp</label>
   {missingDeposit&&<p className="notice">Depositum er ikke registrert fullt mottatt/holdt. Beskriv avtalt avvik før utlevering.</p>}
   <div className="field"><label>Kontrollmerknad / avtalt avvik</label><textarea rows={3} maxLength={700} value={note} onChange={e=>setNote(e.target.value)}/></div>
-  <button type="button" className="btn" disabled={busy||!ready} onClick={()=>onSubmit({status:next,expectedUpdatedAt:booking.updatedAt,accessories,handoverChecklist:{checks,note,deviation:deviation||accessoryCheck.deviation}})}>{busy?"Lagrer …":next==="active"?"Registrer utlevert":"Registrer returnert"}</button>
+  {booking.signatureSetupRequired&&<p className="notice">Signering er ikke klargjort i databasen. Kontroll kan ikke lagres før oppsettet er rettet.</p>}
+  {booking.signingEnabled?<RentalSigningControl key={JSON.stringify(review)} review={review} onChange={setSignature} busy={busy}/>:<p className="muted">Digital signering er foreløpig ikke aktivert.</p>}
+  <button type="button" className="btn" disabled={busy||!ready} onClick={()=>onSubmit({status:next,expectedUpdatedAt:booking.updatedAt,accessories,handoverChecklist:control,...(booking.signingEnabled?{signature}:{})})}>{busy?"Lagrer …":next==="active"?"Registrer utlevert":"Registrer returnert"}</button>
  </section>;
 }
 
@@ -4959,6 +4967,7 @@ function RentalBookings({bookings,reload,setError,canUpdate,isOwner=false,paymen
 
    {canUpdate&&["confirmed","active"].includes(b.status)&&<RentalHandoverControl key={b.id+":"+b.status+":"+b.updatedAt} booking={b} busy={savingId===b.id} onSubmit={changes=>patch(b.id,changes)}/>}
    <RentalAccessorySummary booking={b}/>
+   {Object.entries(b.signatures||{}).map(([phase,s])=><div key={phase} className="orderPaymentPanel"><h4>{phase==="active"?"Signert utleveringskontroll":"Signert returkontroll"}</h4><p>{s.name} · {new Date(s.recordedAt).toLocaleString("nb-NO")}</p><p className="muted">Navnesignatur med fysisk tilstedeværelse, ikke BankID.</p></div>)}
    <RentalAppointmentControl key={b.id+":"+b.updatedAt} booking={b} canUpdate={canUpdate} busy={savingId===b.id} onSave={changes=>patch(b.id,changes)}/>
    <RentalConditionPhotos key={b.id} booking={b} canUpdate={canUpdate}/>
    <section className="orderPaymentPanel">
