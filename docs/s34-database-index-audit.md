@@ -26,3 +26,23 @@ Read-only EXPLAIN ANALYZE for supplier_id=byggmakker, supplier_sku=11303641, act
 Første omskriving med strpos og materialisert parameter-CTE var tregere (3486,479 ms for 48x98), avvist. Deretter ble pg_trgm og en midlertidig tabell med katalogens søkefelter og tekstindekser opprettet i en transaksjon med ROLLBACK, uten produktpriser og uten vedvarende endring. To enkeltmålinger av kandidatsøk (ikke direkte API-sammenligning): 48x98, 6,704 ms / 2 rader (første uttrykksvariant lower over sammensatt tekst); terrassebord, 12,974 ms / 20 rader (endelig variant lower per felt). Dagens RPC terrassebord 690,953 ms / 20 rader. BitmapOr brukte ny GIN-trigramindeks og fulltekstindeks. pg_trgm er verifisert ikke installert etter rollback.
 
 Endelig kandidat har ekstra indeksvennlig prefilter på sammensatt tekst eller fulltekst, deretter eksakt samme tidligere OR-predikat og sortering. Søkeord med under tre tegn, prosent, understrek eller backslash går uten ekstra prefilter. Alle ni lesende kontrollsøk ga samme antall og treffmengde (kandidaten er en delmengde av originalpredikatet): 48x98=2, terrassebord=41, 11303641=1, gips=557, skru=3744, ø=19225, 48%98=514, a_b=3072, backslash=47. Ingen prisdata hentet ut. Ingen permanent indeks eller funksjonsendring. Kandidat i scripts/sql-s34-general-material-search-candidate.sql er IKKE migrasjon. Gjenstår: mål plassbehov, fullskala importkostnad, faktisk RPC-plan med dynamiske argumenter, leverandørfilter og rangering ved lik score, samt sikker utrulling med kort låsetid og verifisert rollback. Midlertidig test er ikke dokumentasjon på produksjonshastighet.
+
+
+### Importkostnad og parameterstyrt søk – 27.11.2026
+
+Midlertidige kopier med eksisterende indekser og 96 914 katalograder, syntetiske priser, ingen vedvarende endringer. Samme INSERT ON CONFLICT DO UPDATE som i S36 for 87 922 Byggmakker-rader: 7213,808 ms uten ny indeks; 11576,892 ms med ny indeks (ca. 60,5 % ekstra i denne enkeltmålingen). Indeksbygg 2080,294 ms, 10 379 264 byte før oppdatering, 22 380 544 byte etter. Dette måler upsert, ikke full S36 RPC med fingerprint, JSON-parsing, WAL, låseventing, journal og nettverk. Midlertidige tabeller har annen I/O og WAL-kostnad enn produksjon.
+
+Første parameterstyrte SQL-kandidat ga samme sorterte treff i 8/8 funksjonstester med force_custom_plan / force_generic_plan, men bare moderat gevinst (ny tid 143–485 ms). Ny variant velger originalt eller indeksert predikat før parameterisert EXECUTE USING, uten interpolasjon av søkeord. Midlertidig funksjonstest med force_generic_plan:
+
+| Søk | Leverandør | Original ms | Ny ms | Samme sorterte treff |
+| --- | --- | ---: | ---: | --- |
+| 48x98 | Alle | 752,475 | 5,720 | Ja |
+| terrassebord | Alle | 684,978 | 9,686 | Ja |
+| 11303641 | Byggmakker | 571,653 | 5,005 | Ja |
+| gips | Bygger’n | 88,823 | 5,002 | Ja |
+| 48%98 | Alle | 656,522 | 652,990 | Ja |
+| ø | Alle | 669,749 | 659,268 | Ja |
+
+Fallback i testfunksjonen kalte midlertidig originalfunksjon; ferdig SQL-kandidat under scripts/sql-s34-material-search-replan-candidate.sql bruker tilsvarende originale SELECT som separat parameterisert EXECUTE-gren. Denne eksakte filen er ennå ikke kjørt som migrasjon. Korte søk og wildcard beholder gamle treffregler og forventes ikke vesentlig raskere. Uavklart sortering ved lik score er uendret; ikke innført ny tie-break.
+
+**Beslutning:** Ikke aktiver permanent ennå. Tidligere import har allerede truffet REST-timeout. Før produksjon må full 87 922-raders S36-aktivering testes isolert, inkludert import av endrede navn, fingerprint, tilbakerulling, reell API-grense, plassbehov og kontrollert indeksbygg. Ingen permanent utvidelse/indeks, prisendring eller ny import. Etter første importbenchmark bekreftet 87 922 Byggmakker, 8 991 Bygger’n, 1 egen vare og 0 uferdige importdeler. 
