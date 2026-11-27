@@ -9,6 +9,8 @@ const request={
 };
 let paymentsEnabled=true,authenticatedUnit="service",authQueries=0,verified=0;
 let invoiceSyncs=0,genericCalls=0,receiptFailures=1,realReceiptSent=false;
+let serviceSnapshotCalls=0,serviceEconomicWrites=0,invalidSnapshot=false;
+const productReference="AS-12345678-ABCD";
 const db=()=>({
  async rpc(name,args){
   if(name==="get_vipps_webhook_auth"){
@@ -20,6 +22,15 @@ const db=()=>({
   if(name==="process_vipps_payment_event_once"){
    genericCalls++;
    return {data:{duplicate:false},error:null};
+  }
+  if(name==="process_service_vipps_economic_webhook"){
+   serviceEconomicWrites++;
+   assert.equal(args.event_payment_reference,productReference);
+   assert.equal(args.event_name,"REFUNDED");
+   assert.equal(args.event_amount_ore,250);
+   assert.equal(args.snapshot_captured_ore,1000);
+   assert.equal(args.snapshot_refunded_ore,400);
+   return {data:{duplicate:false,applied:{id:"test-order"}},error:null};
   }
   throw Error("Unexpected RPC: "+name);
  }
@@ -38,7 +49,7 @@ const source=readFileSync("app/api/vipps/webhook/route.js","utf8")
 const webhook=new Function(
  "NextResponse","invoiceVippsReference","reconcileInvoiceVipps","db","vippsPaymentsEnabled",
  "verifyVippsWebhookRequest","sendVippsPaymentReceiptIfNeeded",
- "sendVippsRefundNoticeIfNeeded","sendPaidRentalConfirmationIfNeeded",
+ "sendVippsRefundNoticeIfNeeded","sendPaidRentalConfirmationIfNeeded","getVippsPayment",
  source+";return POST;"
 )(
  NextResponse,value=>/^INV-[0-9a-f-]{36}$/.test(value),reconcile,db,()=>paymentsEnabled,
@@ -46,7 +57,16 @@ const webhook=new Function(
   verified++;assert.equal(secret,"fake-webhook-secret");
   return req.headers.get("test-valid-signature")==="yes"?{ok:true}:{ok:false,error:"invalid"};
  },
- async()=>({sent:false}),async()=>({sent:false}),async()=>({sent:false})
+ async()=>({sent:false}),async()=>({sent:false}),async()=>({sent:false}),
+ async(unit,reference)=>{
+  serviceSnapshotCalls++;
+  assert.equal(unit,"service");
+  assert.equal(reference,productReference);
+  const ore=value=>({value,currency:"NOK"});
+  return {reference:invalidSnapshot?"different-reference":reference,state:"AUTHORIZED",aggregate:{
+   authorizedAmount:ore(1000),cancelledAmount:ore(0),capturedAmount:ore(1000),refundedAmount:ore(400)
+  }};
+ }
 );
 function req(body=request,opts={}){
  const headers=new Map([["webhook-id","test-hook"],["test-valid-signature","yes"],...Object.entries(opts.headers||{})]);
@@ -73,6 +93,17 @@ assert.equal(invoiceSyncs,1);
 response=await webhook(req());
 assert.equal(response.status,200,"Retry same callback without new payment");
 assert.equal(invoiceSyncs,2);assert.equal(genericCalls,0);assert.equal(realReceiptSent,true);
+const refund={...request,reference:productReference,name:"REFUNDED",amount:{currency:"NOK",value:250}};
+response=await webhook(req(refund));
+assert.equal(response.status,200);
+assert.equal(serviceSnapshotCalls,1);assert.equal(serviceEconomicWrites,1);assert.equal(genericCalls,0);
+invalidSnapshot=true;
+response=await webhook(req(refund));
+assert.equal(response.status,503);assert.equal(serviceEconomicWrites,1);
+authenticatedUnit="rental";
+response=await webhook(req({...refund,name:"AUTHORIZED"}));
+assert.equal(response.status,200);assert.equal(genericCalls,1);
+assert.equal(serviceSnapshotCalls,2,"Rental webhooks do not fetch Service payment totals");
 const statusSource=readFileSync("app/api/invoice-vipps-status/route.js","utf8")
  .replace(/^import .*;\n/gm,"").replace(/^export /gm,"");
 const statusHandler=new Function("NextResponse","db","rateLimitRequest","sameOriginGuard","invoiceVippsReference","reconcileInvoiceVipps",statusSource+";return POST;")(

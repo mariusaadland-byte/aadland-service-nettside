@@ -156,8 +156,8 @@ export async function GET() {
     const {data:paymentReceipts,error:receiptError}=await s.from("manual_order_payment_receipts")
       .select("order_id,receipt_state,provider_email_id,last_issue,paid_at,sent_at")
       .in("order_id",orderIds);
-    if(!receiptError)for(const receipt of paymentReceipts||[])manualReceiptByOrder.set(receipt.order_id,receipt);
-    else{manualReceiptListError=true;console.error("MANUAL PRODUCT RECEIPT LIST ERROR",{code:receiptError.code});}
+    if(!receiptError&&Array.isArray(paymentReceipts))for(const receipt of paymentReceipts)manualReceiptByOrder.set(receipt.order_id,receipt);
+    else{manualReceiptListError=true;console.error("MANUAL PRODUCT RECEIPT LIST ERROR",{code:receiptError?.code||"invalid_response"});}
   }
   return NextResponse.json({
     orders: await Promise.all(orderRows.map(async order=>{
@@ -620,7 +620,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
   }
 
   if(action==="review-manual-receipt"){
-    if(process.env.VERCEL_ENV==="preview")
+    if(process.env.VERCEL_ENV!=="production")
       return NextResponse.json({error:"Ekte kvitteringshistorikk kan ikke endres i forhåndsvisning."},{status:403});
     if(currentUser.role!=="owner")
       return NextResponse.json({error:"Bare eieren kan avstemme uavklarte kvitteringer."},{status:403});
@@ -638,7 +638,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
       p_order_id:id,p_reviewer_id:currentUser.id,p_result:outcome,
       p_note:note,p_provider_email_id:outcome==="sent"?emailId:null
     });
-    if(review.error||!review.data?.ok){
+    if(review.error||review.data?.ok!==true||review.data.state!==(outcome==="sent"?"reviewed_sent":"reviewed_unsent")){
       const still=String(review.error?.message||"").includes("S26_RECEIPT_MAY_STILL_BE_SENDING");
       return NextResponse.json({error:still?
         "Kvitteringen kan fortsatt være under sending. Kontroller Resend på nytt etter fem minutter.":
@@ -649,7 +649,7 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
   }
 
   if(action==="record-paid-and-send-receipt"||action==="send-queued-manual-receipt"){
-    if(process.env.VERCEL_ENV==="preview")
+    if(process.env.VERCEL_ENV!=="production")
       return NextResponse.json({error:"Ekte betalingsregistrering og kvitteringer er sperret i forhåndsvisningen."},{status:403});
     const registering=action==="record-paid-and-send-receipt";
     if(registering){

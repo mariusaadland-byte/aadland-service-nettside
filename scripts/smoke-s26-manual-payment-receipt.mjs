@@ -257,3 +257,18 @@ assert.ok(route.includes("manualReceiptListError=true"));
 assert.ok(route.includes('mapped.manualReceiptState="unavailable"'));
 assert.ok(ui.includes('order.manualReceiptState==="unavailable"?"Kvitteringsjournalen kunne ikke hentes.'));
 console.log("S26: unavailable receipt journal is distinct from missing historical receipt.");
+
+for(const environment of ["development","",undefined]){
+ mockEnv.env.VERCEL_ENV=environment;
+ const before={calls,sendCalls,paymentWrites};
+ for(const action of ["record-paid-and-send-receipt","send-queued-manual-receipt","review-manual-receipt"]){
+  x=await PATCH(req({action,paymentReference:"BANK-S26",paymentVerified:true,receiptReviewResult:"unsent",receiptReviewConfirmation:"IKKE SENDT",receiptReviewNote:"Syntetisk Resend-kontroll"}));
+  assert.equal(x.status,403);
+ }
+ assert.deepEqual({calls,sendCalls,paymentWrites},before);
+}
+mockEnv.env.VERCEL_ENV="production";
+assert.ok(ui.includes('if(order.manualReceiptState==="unavailable"){setMessage('));
+assert.ok(ui.includes('||order.manualReceiptState==="unavailable"} onClick={()=>registerPayment(order)}'));
+assert.ok(route.includes("!receiptError&&Array.isArray(paymentReceipts)"));
+console.log("S26: all nonproduction manual receipt mutations blocked; unavailable journal blocks payment UI.");
