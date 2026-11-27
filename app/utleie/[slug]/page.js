@@ -332,6 +332,7 @@ export default function RentalDetailPage(){
       <span className="catalogEyebrow">{item.categoryName||"UTLEIE"}</span>
       <h1>{item.name}</h1>
       {item.description&&<p>{item.description}</p>}
+      <p><Link href={"/utleie/bruksanvisning/"+encodeURIComponent(item.id)}>Bruksanvisning og sikkerhetsinformasjon</Link></p>
       <div className="rentalDetailPricing">
        <div><small>Døgnpris</small><b>{kr(item.dailyPriceOre)}</b></div>
        {item.weekendPriceOre!=null&&<div><small>Helgepris</small><b>{kr(item.weekendPriceOre)}</b></div>}
