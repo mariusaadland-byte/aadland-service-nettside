@@ -19,13 +19,13 @@ export default function ServiceReminderReviewClient(){
  const load=useCallback(async()=>{
   const response=await fetch("/api/admin/service-reminders",{cache:"no-store"});
   const body=await response.json().catch(()=>({}));
-  if(!response.ok)throw Error(body.error||"Påminnelsesloggen kunne ikke lastes.");
+  if(!response.ok||!Array.isArray(body.attempts)||!Number.isSafeInteger(body.needsReview)||body.needsReview<0)throw Error(body.error||"Påminnelsesloggen kunne ikke lastes.");
   setData(body);
  },[]);
  useEffect(()=>{
   let active=true;
   fetch("/api/admin/service-reminders",{cache:"no-store"})
-   .then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error||"Kunne ikke hente logg.");return j})
+   .then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok||!Array.isArray(j.attempts)||!Number.isSafeInteger(j.needsReview)||j.needsReview<0)throw Error(j.error||"Kunne ikke hente logg.");return j})
    .then(j=>{if(active)setData(j)})
    .catch(e=>{if(active)setError(e.message||"Kunne ikke hente logg.")});
   return()=>{active=false};
@@ -48,7 +48,7 @@ export default function ServiceReminderReviewClient(){
     body:JSON.stringify({id:item.id,outcome:result,resendId,note,confirmation})
    });
    const d=await r.json().catch(()=>({}));
-   if(!r.ok)throw Error(d.error||"Kontrollen ble ikke lagret.");
+   if(!r.ok||d.ok!==true||d.state!==(result==="sent"?"reviewed_sent":"reviewed_unsent"))throw Error(d.error||"Lagringsstatus er uavklart. Oppdater sendeloggen før nytt forsøk.");
    setMessage(d.message||"Status oppdatert.");
    await load();
   }catch(e){setError(e.message||"Kontrollen mislyktes.");}
@@ -66,8 +66,8 @@ export default function ServiceReminderReviewClient(){
   {error&&<p role="alert" style={{padding:10,border:"1px solid #b65c53",borderRadius:8}}>{error}</p>}
   {message&&<p role="status" style={{padding:10,background:"#e4efe6",color:"#1a4c2b",borderRadius:8}}>{message}</p>}
   {!data&&!error&&<p>Henter påminnelseslogg …</p>}
-  {data&&<p role="status"><strong>{data.needsReview} uavklarte</strong> i gjennomgangen.{data.outstandingLimitReached?" Listen er begrenset til de 100 eldste uavklarte. Kontroller databasen for resten.":""}</p>}
-  {data&&pending.length===0&&<p style={{fontSize:13,color:"#51483f"}}>Ingen uavklarte påminnelser registrert. Dette beviser ikke levering av eldre e-poster.</p>}
+  {data&&<p role="status"><strong>{data.needsReview} uavklarte</strong> i gjennomgangen.{data.outstandingLimitReached?" De eldste 100 uavklarte er hentet. Oppdater listen etter avklaring for å se resten.":""}</p>}
+  {data&&!error&&data.needsReview===0&&<p style={{fontSize:13,color:"#51483f"}}>Ingen uavklarte påminnelser registrert. Dette beviser ikke levering av eldre e-poster.</p>}
   {[...pending,...others].map(a=><article key={a.id} style={{borderTop:"1px solid #e8e1d7",padding:"14px 0"}}>
    <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
     <strong>{a.kind==="survey"?"Befaring":"Oppstart"} · {fmt(a.appointment_at)}</strong>
