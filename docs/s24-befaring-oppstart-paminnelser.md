@@ -59,3 +59,7 @@ Tabellen har RLS og ingen tabelltilgang for `anon` eller `authenticated`; bare `
 6. Tidligere bekreftelsesutsendinger i `app/api/admin/jobs/plan` / `app/api/admin/orders` er ikke omskrevet i S-24. Deres eventuelle usikre utsending/omplanlegging vurderes separat – S-24 sikrer **cron-påminnelsene**.
 
 **Ingen ekte ordre, plan, historiske sendemarkører, kundeopplysninger eller utleiedata ble endret.**
+
+## Oppfølgingskontroll 27.11.2026
+
+Kun lesende produksjonskontroll: 0 aktive bekreftede oppdrag, 0 påminnelsesforsøk, 0 oppstartsbekreftelsesforsøk og 0 ordrebekreftelsesforsøk i nye journaler. Seks OK-kjøringer hver for befaring og oppstart, to OK-kjøringer for ordrebekreftelser. Eierens påminnelseslogg bruker eksakt antall uavklarte, validerer svar og avviser endring utenfor produksjon eller uklar lagringskvittering. Syntetiske regresjonstester lagt til. Ingen endring i avtaler, utsendingsplan, kundemail eller utleie. Faktisk mottak og innlogget brukertest gjenstår.
