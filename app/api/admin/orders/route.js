@@ -210,7 +210,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     );
   }
 
-  const { confirmationReview, id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, paymentVerified, receiptReviewResult, receiptReviewNote, receiptReviewProviderId, receiptReviewConfirmation, cancellationReason, progressStatus, refundOre, refundReference, refundNote, deliveryWithinRadius, cleanupConfirmation } = await req.json();
+  const { resendCancellation, confirmationReview, id, status, surveyDate, adminNote, trackingNumber, trackingUrl, action, sendSurveyConfirmation, paymentReference, paymentVerified, receiptReviewResult, receiptReviewNote, receiptReviewProviderId, receiptReviewConfirmation, cancellationReason, progressStatus, refundOre, refundReference, refundNote, deliveryWithinRadius, cleanupConfirmation } = await req.json();
   if(adminNote!==undefined&&String(adminNote||"").length>5000)return NextResponse.json({error:"Internt notat kan være maks 5000 tegn."},{status:400});
   if(paymentReference!==undefined&&String(paymentReference||"").length>120)return NextResponse.json({error:"Betalingsreferansen er for lang."},{status:400});
   if(cancellationReason!==undefined&&String(cancellationReason||"").length>1000)return NextResponse.json({error:"Kanselleringsårsaken kan være maks 1000 tegn."},{status:400});
@@ -290,6 +290,7 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
     if(order.order_type!=="order")return NextResponse.json({error:"Denne kanselleringsflyten gjelder produktbestillinger."},{status:400});
     if(order.status==="completed")return NextResponse.json({error:"En fullført bestilling kan ikke kanselleres."},{status:409});
 
+    if(resendCancellation===true&&order.status!=="cancelled")return NextResponse.json({error:"Bestillingen må være kansellert før varselet kan sendes på nytt."},{status:409});
     const reason=String(cancellationReason??order.cancellation_reason??"").trim().slice(0,1000);
     const {data:cancelResult,error:cancelError}=await s.rpc("cancel_product_order_once",{
       target_order_id:id,
@@ -300,6 +301,13 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
       const message=String(cancelError.message||"");
       if(message.includes("ORDER_ALREADY_COMPLETED"))return NextResponse.json({error:"En fullført bestilling kan ikke kanselleres."},{status:409});
       return NextResponse.json({error:"Bestillingen kunne ikke kanselleres."},{status:500});
+    }
+
+    if(cancelResult?.ok!==true||typeof cancelResult.alreadyCancelled!=="boolean"){
+      return NextResponse.json({error:"Kanselleringen kunne ikke bekreftes. Oppdater oversikten før du prøver igjen."},{status:503});
+    }
+    if(cancelResult.alreadyCancelled&&resendCancellation!==true){
+      return NextResponse.json({error:"Ordren er allerede kansellert. Oppdater oversikten for å se status.",statusSaved:true},{status:409});
     }
 
     const customerEmail=String(order.customer?.email||"").trim().toLowerCase();
