@@ -81,6 +81,12 @@ begin
  perform pg_temp.require(public.draft_group_tripletex_payment_finish(g,123,repeat('a',64),true)='confirmed','payment readback recorded');
  perform pg_temp.require(public.draft_group_tripletex_payment_finish(g,123,repeat('a',64),true)='existing','payment readback replay');
  perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_tripletex_payment_claim(uuid,bigint,bigint,bigint,date,integer,text,text,uuid)','EXECUTE'),'no client payment grant');
+ perform pg_temp.require(public.draft_rental_report_store('123456','demo-rental',day-1,'[]','[]',repeat('a',64),clock_timestamp()-interval '2 seconds')='stored','rental report stored');
+ perform pg_temp.require(public.draft_rental_report_store('123456','demo-rental',day-1,'[]','[]',repeat('b',64),clock_timestamp()-interval '3 seconds')='existing','older report cannot overwrite');
+ perform pg_temp.require(public.draft_rental_report_store('123456','demo-rental',day-1,'[]','[]',repeat('c',64),clock_timestamp()-interval '1 second')='stored','new report replaces day');
+ perform pg_temp.require((select count(*)=1 from public.rental_vipps_report_days),'one row per report day');
+ perform pg_temp.require(public.draft_rental_report_store('999999','demo-other',day-1,'[]','[]',repeat('c',64),clock_timestamp())='review','other merchant blocked');
+ perform pg_temp.require(not has_function_privilege('authenticated','public.draft_rental_report_store(text,text,date,jsonb,jsonb,text,timestamptz)','EXECUTE'),'report write restricted');
  perform pg_temp.require((public.draft_group_finance_snapshot()->>'complete')::boolean,'finance snapshot complete');
  perform pg_temp.require(exists(select 1 from jsonb_array_elements(public.draft_group_finance_snapshot()->'rows') x where x->>'id'=g::text and x->'invoice'->>'state'='confirmed' and x->'payment'->>'state'='confirmed' and (x->'deposit'->>'documented')::boolean=false),'finance snapshot distinguishes confirmed transfer and missing bank proof');
  perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_finance_snapshot()','EXECUTE'),'finance snapshot restricted');

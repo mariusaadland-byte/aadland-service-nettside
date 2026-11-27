@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import {rentalReportLedger,rentalReportDay,rentalReportPeriod} from "../lib/rentalVippsReports.mjs";
+const d="2026-11-26",msn="123456",ledger="rental-demo";
+assert.equal(rentalReportLedger([{currency:"NOK",ledgerId:ledger,settlesForRecipientHandles:["api:"+msn]}],msn,"999999"),ledger);
+assert.equal(rentalReportLedger([{currency:"NOK",ledgerId:ledger,settlesForRecipientHandles:["api:"+msn,"api:999999"]}],msn,"999999"),null);
+const e=(type,amountOre,topic="funds")=>({type,amountOre,topic,date:d,reference:"demo",pspReference:"demo"});
+const built=rentalReportDay(d,[e("capture",30000),e("fees-retained",-600),e("payout-scheduled",-29400)],[e("capture-fee",600,"fees")]);
+const row={...built,report_date:d,msn,ledger_id:ledger,checked_at:d+"T12:00:00Z"};
+const r=rentalReportPeriod([d],[row],msn);assert.equal(r.totals.capturesOre,30000);assert.equal(r.totals.retainedFeeReportOre,600);assert.equal(r.totals.bankConfirmedOre,null);assert.equal(r.payouts[0].bankConfirmed,false);
+assert.equal(rentalReportPeriod([d],[],msn).totals,null);assert.equal(rentalReportPeriod([d],[{...row,msn:"999999"}],msn),null);assert.equal(rentalReportPeriod([d],[{...row,fingerprint:"a".repeat(64)}],msn),null);
+console.log("U-39Q isolated merchant, daily integrity, missing days and payout distinction passed");
