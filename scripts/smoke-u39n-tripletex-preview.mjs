@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import {rentalCustomerMatch,rentalTripletexPreview,transferFingerprint} from "../lib/rentalTripletexPreview.mjs";
+const id="00000000-0000-4000-8000-000000000001",customer={name:"Demo Kunde",email:"demo@example.invalid"},remote={...customer,id:9};
+assert.equal(rentalCustomerMatch(customer,[remote]).status,"matched");
+assert.equal(rentalCustomerMatch(customer,[remote,{...remote,id:10}]).status,"review");
+assert.equal(rentalCustomerMatch(customer,[remote],{status:"linked",tripletex_customer_id:10}).status,"review");
+assert.equal(rentalCustomerMatch(customer,[]).status,"missing");
+const invoice={reference:"rental-group:"+id,grossOre:30000,blockers:[]};
+const p=rentalTripletexPreview({groupId:id,invoice,customerMatch:rentalCustomerMatch(customer,[remote]),vatTypes:[{id:3,number:"3",typeOfVat:"OUTGOING"}],prior:{state:"claimed"}});
+assert.equal(p.readyToPost,false);assert.equal(p.transferStatus,"claimed");assert.equal(p.vatTypeId,3);
+const args={groupId:id,quoteDigest:"a".repeat(64),agreementId:id,documentDigest:"b".repeat(64),paymentReference:"AUG-"+id,pspReference:"demo-psp",customerId:9,vatTypeId:3,grossOre:30000,invoiceDay:"2026-11-27",deliveryDay:"2026-11-27",companyId:1};
+assert.equal(transferFingerprint(args).length,64);assert.notEqual(transferFingerprint(args),transferFingerprint({...args,customerId:10}));assert.equal(transferFingerprint({...args,invoiceDay:"2026-02-31"}),null);
+console.log("U-39N customer match and transfer binding passed");

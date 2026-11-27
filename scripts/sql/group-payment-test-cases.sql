@@ -65,6 +65,15 @@ begin
  perform pg_temp.require(public.draft_group_return_close(g,settlement,50000,null,null)='review','no refund evidence no close');
  perform pg_temp.require(public.draft_group_record_deposit_refund(g,settlement,u,50000,'refund-ci',repeat('e',64))='closed','external refund recorded');
  perform pg_temp.require(public.draft_group_record_deposit_refund(g,settlement,u,50000,'refund-ci',repeat('e',64))='existing','refund replay');
+ perform pg_temp.require(public.draft_group_tripletex_claim(g,1,2,3,85000,repeat('f',64),u)='review','deposit excluded');
+ perform pg_temp.require(public.draft_group_tripletex_claim(g,1,2,3,35000,repeat('f',64),u)='claimed','first transfer claim');
+ perform pg_temp.require(public.draft_group_tripletex_claim(g,1,2,3,35000,repeat('f',64),u)='existing','repeat must not create invoice');
+ perform pg_temp.require(public.draft_group_tripletex_claim(g,2,2,3,35000,repeat('f',64),u)='review','different company cannot create duplicate');
+ perform pg_temp.require(public.draft_group_tripletex_finish(g,repeat('f',64),1,2,35000,'AU-GROUP-'||g::text,null)='review','uncertain transfer');
+ perform pg_temp.require(public.draft_group_tripletex_claim(g,1,2,3,35000,repeat('f',64),u)='existing','uncertain transfer remains locked');
+ perform pg_temp.require(public.draft_group_tripletex_finish(g,repeat('f',64),1,2,35000,'AU-GROUP-'||g::text,123)='confirmed','trusted readback recorded');
+ perform pg_temp.require(public.draft_group_tripletex_finish(g,repeat('f',64),1,2,35000,'AU-GROUP-'||g::text,124)='review','cannot overwrite invoice ID');
+ perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_tripletex_claim(uuid,bigint,bigint,bigint,integer,text,uuid)','EXECUTE'),'no client claim grant');
  perform pg_temp.require((select stock_quantity=3 and reserved_quantity=0 from public.rental_consumables where id=goods),'sold consumables not returned to stock');
  perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_return_close(uuid,uuid,integer,text,text)','EXECUTE'),'client cannot close settlement');
 end $$;
