@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {readFileSync,readdirSync} from "node:fs";
+import {readFileSync,readdirSync,existsSync} from "node:fs";
 import path from "node:path";
 const read=p=>readFileSync(p,"utf8");
 const gateway=read("lib/safeResend.js");
@@ -32,15 +32,21 @@ function sources(directory){
  return readdirSync(directory,{withFileTypes:true}).flatMap(item=>{
   const full=path.join(directory,item.name);
   if(item.isDirectory())return sources(full);
-  return /\.(js|jsx|mjs|ts|tsx)$/.test(item.name)?[full.replaceAll("\\","/")]:[];
+  return /\.(js|jsx|mjs|cjs|ts|tsx|cts|mts)$/.test(item.name)?[full.replaceAll("\\","/")]:[];
  });
 }
-const application=[...sources("app"),...sources("lib")].filter(f=>f!=="lib/safeResend.js");
+// Cover additional application directories and root entry points if introduced.
+const application=[...["app","lib","src","pages","components"].filter(existsSync).flatMap(sources),
+ ...readdirSync(".",{withFileTypes:true}).filter(item=>item.isFile()&&/\.(js|jsx|mjs|cjs|ts|tsx|cts|mts)$/.test(item.name)).map(item=>item.name)
+].filter(f=>f!=="lib/safeResend.js");
+const rawResendImport=/\b(?:from\s*["']resend(?:\/[^"']*)?["']|import\s*["']resend(?:\/[^"']*)?["']|(?:import|require)\s*\(\s*["']resend(?:\/[^"']*)?["'])/;
+for(const sample of ['import "resend";','export {Resend} from "resend";','require ("resend")','import ("resend/subpath")',"import {Resend} from 'resend'"])
+ assert.ok(rawResendImport.test(sample),"Missed unsafe SDK import: "+sample);
+assert.ok(!rawResendImport.test('import {Resend} from "./safeResend";'));
 let imports=0;
 for(const file of application){
  const s=read(file);
- const raw=/\b(?:from\s*["']resend["']|import\(\s*["']resend["']\s*\)|require\(\s*["']resend["']\s*\))/;
- assert.ok(!raw.test(s),"S31 unguarded Resend import in "+file);
+ assert.ok(!rawResendImport.test(s),"S31 unguarded Resend import in "+file);
  assert.ok(!s.includes("api.resend.com"),"S31 direct Resend provider request in "+file);
  if(/safeResend/.test(s))imports++;
 }
