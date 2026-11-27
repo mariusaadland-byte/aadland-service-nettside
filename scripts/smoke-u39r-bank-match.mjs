@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import {rentalReportDay} from "../lib/rentalVippsReports.mjs";
+import {bankMatchInput,payoutFromReport,bankAndFeeReview} from "../lib/rentalBankReview.mjs";
+const day="2026-11-26",e=(type,amountOre,pspReference)=>({type,amountOre,pspReference,reference:"demo",date:day,topic:"funds"});
+const built=rentalReportDay(day,[e("payout-scheduled",-29400,"payout"),e("fees-retained",-600,"fee")],[]);
+const r={...built,report_date:day,msn:"123456",ledger_id:"demo"};
+assert.equal(payoutFromReport(r,"payout").amountOre,29400);
+assert.equal(bankMatchInput({reportDate:day,bankDate:day,reportDigest:r.fingerprint,pspReference:"payout",bankReference:"bank-1",amountOre:29400,confirmed:true},day).amountOre,29400);
+const m={payout_psp:"payout",report_date:day,report_digest:r.fingerprint,amount_ore:29400,msn:r.msn,ledger_id:r.ledger_id,proof_digest:"a".repeat(64),bank_date:day};
+let v=bankAndFeeReview([r],[m]);assert.equal(v.attestedOre,29400);assert.equal(v.bankConfirmedOre,null);assert.equal(v.feeCandidates[0].status,"candidate");assert.equal(v.readyToPost,false);
+v=bankAndFeeReview([r],[{...m,report_digest:"b".repeat(64)}]);assert.equal(v.payouts[0].status,"review");assert.equal(v.attestedOre,null);
+assert.equal(bankAndFeeReview([r],[]).payouts[0].eligible,true);
+console.log("U-39R manual bank evidence, stale report and fee candidate passed");

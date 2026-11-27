@@ -1,0 +1,16 @@
+"use client";
+import {useState,useRef} from "react";
+import styles from "../admin/utleie/oversikt/dashboard.module.css";
+const kr=n=>n==null?"Ikke dokumentert":new Intl.NumberFormat("nb-NO",{style:"currency",currency:"NOK"}).format(n/100);
+export default function RentalBankMatch({review,enabled,onSaved}){
+ const [selected,setSelected]=useState(null),[date,setDate]=useState(""),[ref,setRef]=useState(""),[file,setFile]=useState(null),[confirmed,setConfirmed]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState("");const lock=useRef(false);
+ async function save(){if(lock.current||!enabled||!selected||!date||!ref.trim()||!file||!confirmed)return;lock.current=true;setBusy(true);setMessage("");
+ try{const form=new FormData();for(const [k,v] of Object.entries({reportDate:selected.date,reportDigest:selected.reportDigest,pspReference:selected.pspReference,amountOre:selected.amountOre,bankDate:date,bankReference:ref.trim(),confirmed:"true"}))form.set(k,String(v));form.set("file",file);
+ const r=await fetch("/api/admin/rental/vipps-bank-match",{method:"POST",body:form,cache:"no-store"}).then(x=>x.json());
+ if(["recorded","existing"].includes(r.status)){setSelected(null);setMessage("Manuell bankkontroll registrert.");onSaved();}else setMessage("Ikke bekreftet. Kontroller rapport, bankreferanse og dokumentasjon.");
+ }catch{setMessage("Ukjent resultat. Last rapporten på nytt før ny registrering.");}finally{lock.current=false;setBusy(false);}}
+ if(!review)return null;
+ return <section><h3>Bankkontroll</h3><p>Dokumentert av eier: {kr(review.attestedOre)}. Ikke automatisk bankavstemming.</p>{review.payouts.map((p,i)=><div key={i} className={styles.stat}><span>{p.date} · {kr(p.amountOre)}</span><span>{p.status==="attested"?"Manuelt dokumentert":p.status==="review"?"Må kontrolleres":"Avventer bankdokumentasjon"}</span>{p.eligible&&<button disabled={!enabled||busy} onClick={()=>{setSelected(p);setDate("");setRef("");setFile(null);setConfirmed(false);setMessage("");}}>Registrer bankinnskudd</button>}</div>)}
+ {selected&&<div className={styles.stat}><strong>Bankinnskudd {kr(selected.amountOre)}</strong><p>Kontroller riktig mottakskonto, banktransaksjon og beløp. Ingen penger overføres.</p><label>Dato i banken<input type="date" disabled={busy} value={date} onChange={e=>setDate(e.target.value)}/></label><label>Unik bankreferanse<input disabled={busy} value={ref} onChange={e=>setRef(e.target.value)}/></label><label>Dokumentbilde (JPG, PNG, WebP)<input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={e=>setFile(e.target.files?.[0]||null)}/></label><label><input type="checkbox" disabled={busy} checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> Jeg har kontrollert bankinnskuddet mot Vipps-oppgjøret.</label><button disabled={busy||!enabled||!date||!ref.trim()||!file||!confirmed} onClick={save}>Lagre bankkontroll</button><button disabled={busy} onClick={()=>setSelected(null)}>Avbryt</button></div>}
+ {message&&<p role="status">{message}</p>}<h3>Gebyrgrunnlag for Tripletex</h3>{review.feeCandidates.map((x,i)=><p key={i}>{x.date} · {kr(x.amountOre)} · {x.status==="candidate"?"Rapportkandidat – ikke bokført":"Manuell kontroll"}</p>)}<p>Gebyrer må kontrolleres mot kontoplan og tidligere bilag. Ingen overføring er aktivert.</p></section>;
+}

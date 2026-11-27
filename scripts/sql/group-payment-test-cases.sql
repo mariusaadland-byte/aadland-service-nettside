@@ -87,6 +87,10 @@ begin
  perform pg_temp.require((select count(*)=1 from public.rental_vipps_report_days),'one row per report day');
  perform pg_temp.require(public.draft_rental_report_store('999999','demo-other',day-1,'[]','[]',repeat('c',64),clock_timestamp())='review','other merchant blocked');
  perform pg_temp.require(not has_function_privilege('authenticated','public.draft_rental_report_store(text,text,date,jsonb,jsonb,text,timestamptz)','EXECUTE'),'report write restricted');
+ update public.rental_vipps_report_days set funds=jsonb_build_array(jsonb_build_object('topic','funds','date',(day-1)::text,'type','payout-scheduled','pspReference','payout-ci','amountOre',-29400)) where report_date=day-1;
+ perform pg_temp.require(public.draft_rental_bank_match(day-1,repeat('c',64),'123456','demo-rental','payout-ci',29400,day,'bank-ci',encode(sha256(decode('ffd8ff'||repeat('00',40),'hex')),'hex'),decode('ffd8ff'||repeat('00',40),'hex'),u)='recorded','bank match evidence recorded');
+ perform pg_temp.require(public.draft_rental_bank_match(day-1,repeat('c',64),'123456','demo-rental','payout-ci',29400,day,'bank-ci',encode(sha256(decode('ffd8ff'||repeat('00',40),'hex')),'hex'),decode('ffd8ff'||repeat('00',40),'hex'),u)='existing','bank match replay');
+ perform pg_temp.require(public.draft_rental_bank_match(day-1,repeat('b',64),'123456','demo-rental','payout-ci',29400,day,'bank-ci',encode(sha256(decode('ffd8ff'||repeat('00',40),'hex')),'hex'),decode('ffd8ff'||repeat('00',40),'hex'),u)='review','stale report blocked');
  perform pg_temp.require((public.draft_group_finance_snapshot()->>'complete')::boolean,'finance snapshot complete');
  perform pg_temp.require(exists(select 1 from jsonb_array_elements(public.draft_group_finance_snapshot()->'rows') x where x->>'id'=g::text and x->'invoice'->>'state'='confirmed' and x->'payment'->>'state'='confirmed' and (x->'deposit'->>'documented')::boolean=false),'finance snapshot distinguishes confirmed transfer and missing bank proof');
  perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_finance_snapshot()','EXECUTE'),'finance snapshot restricted');
