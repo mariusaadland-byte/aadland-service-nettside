@@ -17,6 +17,10 @@ let queries=0,failedTable=null,malformedTable=null;
 const db={from(table){queries++;let filters=[],updating=false,windowRange=null;const chain={
  select(){return chain},update(){updating=true;return chain},order(){return chain},limit(){return chain},range(start,end){windowRange=[start,end];return chain},
  eq:(key,value)=>{filters.push(row=>row[key]===value);return chain},
+ or:(conditions)=>{
+  assert.equal(conditions,"archived_at.is.null,archive_reason.is.null,archive_reason.neq.test");
+  filters.push(row=>row.archived_at==null||row.archive_reason!=="test");return chain;
+ },
  is:(key,value)=>{filters.push(row=>row[key]==value);return chain},
  in:(key,values)=>{filters.push(row=>values.includes(row[key]));return chain},
  contains:(key,value)=>{filters.push(row=>Object.entries(value).every(([k,v])=>row[key]?.[k]===v));return chain},
@@ -40,8 +44,11 @@ console.log("Kundeavgrensning bestått: egne tilbud/oppdrag/leier/tegninger, fei
 customer={id:"customer-a",email:"a@example.invalid"};
 const request=(kind,page)=>({url:"https://example.invalid/api/customer/me?serviceHistory="+kind+"&page="+page});
 tables.orders=Array.from({length:105},(_,i)=>({id:"a-"+i,order_type:"order",customer_user_id:"customer-a",items:[]}));
+tables.orders[0].archived_at="2026-11-27T00:00:00Z";
+tables.orders.unshift({id:"test-order",order_type:"order",customer_user_id:"customer-a",archived_at:"2026-11-27T00:00:00Z",archive_reason:"test",items:[]});
 tables.orders.splice(101,0,{id:"other",order_type:"order",customer_user_id:"customer-b",items:[]});
 let page1=await GET(request("orders",1)),page2=await GET(request("orders",2));
+assert.equal(page1.body.orders[0].id,"a-0","Ordinary archived history stays visible while archived tests are excluded");
 assert.equal(page1.body.orders.length,100);assert.equal(page1.body.serviceHistory.orders.total,105);assert.equal(page1.body.serviceHistory.orders.hasMore,true);
 assert.equal(page2.body.orders.length,5);assert.equal(page2.body.serviceHistory.orders.hasMore,false);assert.equal(page2.body.serviceHistory.orders.loadedThrough,105);
 assert.equal(new Set([...page1.body.orders,...page2.body.orders].map(x=>x.id)).size,105);
