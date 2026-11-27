@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import {consumableAdminInput,stockAdjustmentInput,parseOre,stockStatus} from "../lib/rentalConsumableAdmin.mjs";
+const id="00000000-0000-4000-8000-000000000001",requestId="00000000-0000-4000-8000-000000000002";
+const x={name:"Bor",sku:"B-1",rentalItemId:id,priceOre:7900,costOre:3000,threshold:5,active:true,stock_quantity:999};
+assert.equal(consumableAdminInput(x).stock_quantity,undefined);
+assert.equal(consumableAdminInput({...x,priceOre:0}),null);
+assert.equal(consumableAdminInput({...x,costOre:-1}),null);
+assert.equal(parseOre("79,50"),7950);assert.equal(parseOre(""),null);assert.equal(parseOre("1.005"),null);
+assert.equal(stockStatus({active:true,stock_quantity:5,low_stock_threshold:5}),"low");
+assert.equal(stockStatus({active:false,stock_quantity:0,low_stock_threshold:5}),"inactive");
+const a={id,requestId,revision:0,delta:10,reason:"purchase",note:"Innkjøp"};
+assert.equal(stockAdjustmentInput(a).delta,10);
+assert.equal(stockAdjustmentInput({...a,delta:-10}),null);
+assert.equal(stockAdjustmentInput({...a,reason:"loss"}),null);
+assert.equal(stockAdjustmentInput({...a,note:""}),null);
+assert.equal(stockAdjustmentInput({...a,revision:-1}),null);
+console.log("U-37B input and stock status checks passed");
