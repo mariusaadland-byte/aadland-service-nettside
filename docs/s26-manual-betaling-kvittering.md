@@ -66,3 +66,7 @@ Vercel-preview avviser betalingsregistrering, kvitteringsutsending og kvittering
 **Gjenstår før full operativ godkjenning:** Kontrollert intern produktordre med dokumentert testbetaling i et egnet testmiljø, kontrollert mottak av PDF-kvittering i testinnboks, konkret utprøving av dobbeltklikk/nedetid i nettleser, og en fast rutine for gammel betaling uten S-26-journal og uavklarte sendetilstander. Eventuell ny kvittering etter dokumentert ikke-utsending må planlegges som en egen, kontrollert handling, ikke automatisk retry.
 
 **Ingen ekte ordre, betalingshendelser, e-poster, pris-/lageroppføringer eller utleiedata ble endret under arbeidet.**
+
+## Oppfølging 27.11.2026
+
+Skrivebeskyttet kontroll: tre aktive produkter, ingen lagerførte aktive produkter eller negative lagerverdier; to produktbestillinger, ingen Vipps-produktbestillinger, ingen nye manuelle kvitterings-, Vipps-handlings- eller ordrebekreftelsesjournaler. Manuell betalingsregistrering, kvitteringsutsending og eieravstemming krever nå eksplisitt produksjonsmiljø (ikke bare fravær av preview). Uleselig kvitteringsjournal gir utilgjengelig status og sperrer registreringsknappen. Eieravstemming krever eksakt forventet sluttilstand. Syntetiske tester lagt til. Ingen ekte betaling, lagerendring, e-post eller utleieendring. Reell lagerført checkout og betaling er ikke verifisert.
