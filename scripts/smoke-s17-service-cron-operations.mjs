@@ -129,3 +129,11 @@ const newJob=SERVICE_CRON_JOBS.find(j=>j.key==="service-order-confirmations");
 assert.equal(serviceCronDailyStatus(newJob,[{...oldRun,job_key:newJob.key,started_at:today+"T10:25:00Z",finished_at:today+"T10:25:01Z"}],today,at("10:26:00")).state,"ok");
 assert.ok(page.includes('waiting:"Venter på dagens kjøring"'));
 console.log("S17: before schedule, grace period, missing, stale running and first-day observed success.");
+
+for(const value of [null,undefined,[],true,"ok",17])assert.equal(serviceCronResponseStatus(200,value).state,"warning");
+assert.equal(serviceCronResponseStatus(302,{ok:true}).state,"warning");
+assert.equal(serviceCronResponseStatus(200,{error:"synthetic"}).state,"warning");
+resp=await withServiceCronMonitoring("survey-reminders",{headers:new Headers({authorization:auth})},async()=>new Response("not JSON",{status:200,headers:{"content-type":"application/json"}}));
+assert.equal(resp.status,200);assert.equal(updates.at(-1).state,"warning");assert.equal(await resp.text(),"not JSON");
+assert.ok(page.includes("!Array.isArray(r.data)||!Array.isArray(a.data)"));
+console.log("S17: unreadable JSON, redirect and explicit error never classified as OK; original response unchanged.");
