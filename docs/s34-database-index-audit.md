@@ -46,3 +46,15 @@ Første parameterstyrte SQL-kandidat ga samme sorterte treff i 8/8 funksjonstest
 Fallback i testfunksjonen kalte midlertidig originalfunksjon; ferdig SQL-kandidat under scripts/sql-s34-material-search-replan-candidate.sql bruker tilsvarende originale SELECT som separat parameterisert EXECUTE-gren. Denne eksakte filen er ennå ikke kjørt som migrasjon. Korte søk og wildcard beholder gamle treffregler og forventes ikke vesentlig raskere. Uavklart sortering ved lik score er uendret; ikke innført ny tie-break.
 
 **Beslutning:** Ikke aktiver permanent ennå. Tidligere import har allerede truffet REST-timeout. Før produksjon må full 87 922-raders S36-aktivering testes isolert, inkludert import av endrede navn, fingerprint, tilbakerulling, reell API-grense, plassbehov og kontrollert indeksbygg. Ingen permanent utvidelse/indeks, prisendring eller ny import. Etter første importbenchmark bekreftet 87 922 Byggmakker, 8 991 Bygger’n, 1 egen vare og 0 uferdige importdeler. 
+
+### Full S36-kjedetest med trigramindeks – 27.11.2026
+
+Kopierte eksisterende katalogstruktur/indekser til midlertidige tabeller, brukte søkefeltene i databasen og syntetiske innkjøps-/salgspriser samt 17 % syntetisk påslag. Hentet gjeldende definisjoner av fingerprint, finish_large_material_import, preview_material_import og activate_material_import fra produksjonskatalogen og omdirigerte alle public-referanser til pg_temp. Ingen endring av produksjonsfunksjoner. 87 922 varer i 18 deler, 100 endrede varenavn og alle syntetiske innkjøpspriser endret. Første samlet DO-test avbrutt av statement_timeout under upsert; kontroll etterpå bekreftet rollback. Andre test delte forhåndsvisning, aktivering og gjentakelse i egne SQL-statements med 30 sekunders statement_timeout.
+
+| Steg | Målt tid |
+| --- | ---: |
+| Sammenstilling av deler og forhåndsvisning | 27 501 ms |
+| Aktivering inkl. fingerprint, upsert og journal | 27 343 ms |
+| Gjentatt aktivering av samme kladd | 23 ms |
+
+Alle 87 922 testvarer oppdatert, test-salgspriser og leverandørpåslag bevart, andre leverandørdata uendret, kladdjournal registrert, staging tømt og gjentatt aktivering idempotent. ROLLBACK etter test. Målingene inkluderer mellomliggende SQL-overhead; ikke reell REST-, Vercel- eller WAL-belastning, og ikke test av samtidige forbindelser. Ingen permanent pg_trgm eller indeks. For liten tidsmargin (ca. 2,5–2,7 s) og første timeout gjør permanent aktivering uforsvarlig uten videre optimalisering. Behold dagens søk og eksakt varenummersøk; neste steg er å profilere fingerprint, chunk-sammenstilling og upsert individuelt i midlertidig oppsett, deretter vurdere mindre kostbar importstrategi uten å svekke atomicitet, godkjenning eller kontroll av samtidige endringer. Ikke øk tidsgrensen eller endre prisene bare for å få en grønn test.
