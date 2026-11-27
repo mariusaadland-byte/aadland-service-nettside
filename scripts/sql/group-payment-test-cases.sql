@@ -33,10 +33,15 @@ begin
  perform pg_temp.require(public.draft_group_payment_confirm(g,ref,'psp-ci','NOK',35000,35000,0,0)='confirmed','full capture confirms group');
  perform pg_temp.require(public.draft_group_payment_confirm(g,ref,'psp-ci','NOK',35000,35000,0,0)='existing','duplicate payment ignored');
  perform pg_temp.require((select count(*)=1 from public.rental_group_confirmation_outbox where group_id=g and state='pending'),'one queued confirmation');
+ perform pg_temp.require(exists(select 1 from public.draft_group_confirmation_candidates() where group_id=g),'pending confirmation candidate');
  perform pg_temp.require(public.draft_group_confirmation_claim(g),'confirmation worker claims');
+ perform pg_temp.require(not exists(select 1 from public.draft_group_confirmation_candidates() where group_id=g),'claimed not retried');
+ update public.rental_group_confirmation_outbox set claimed_at=clock_timestamp()-interval '11 minutes' where group_id=g;
+ perform pg_temp.require(exists(select 1 from jsonb_array_elements(public.draft_group_confirmation_snapshot()->'rows') r where r->>'group_id'=g::text and r->>'display_state'='stale'),'stale claim visible');
  perform pg_temp.require(not public.draft_group_confirmation_claim(g),'duplicate worker blocked');
  perform pg_temp.require(public.draft_group_confirmation_finish(g,'demo-mail-id'),'provider acceptance recorded');
  perform pg_temp.require(not public.draft_group_confirmation_claim(g),'accepted notice never requeued');
+ perform pg_temp.require(not exists(select 1 from public.draft_group_confirmation_candidates() where group_id=g),'accepted not queued');
  perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_confirmation_claim(uuid)','EXECUTE'),'no customer outbox grant');
  perform pg_temp.require((select stock_quantity=5 and reserved_quantity=2 from public.rental_consumables where id=goods),'confirmation retains held stock');
  perform pg_temp.require(public.draft_group_deposit_record(g,'deposit-ci',50000,repeat('a',64),u)='recorded','separate deposit recorded');

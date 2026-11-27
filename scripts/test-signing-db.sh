@@ -41,6 +41,7 @@ if [[ "${CI:-}" != true ]]; then echo "Run only in the dedicated disposable CI s
  sed -e '/^begin;$/d' -e '/^rollback;$/d' docs/u40f-admin-capacity.draft.sql
  sed -e '/^begin;$/d' -e '/^rollback;$/d' docs/u40g-terminal-payment-release.draft.sql
  sed -e '/^begin;$/d' -e '/^rollback;$/d' docs/u40h-expiry-followup.draft.sql
+ sed -e '/^begin;$/d' -e '/^rollback;$/d' docs/u40j-confirmation-queue.draft.sql
  cat scripts/sql/signing-test-cases.sql
  cat scripts/sql/group-signing-test-cases.sql
  cat scripts/sql/group-payment-test-cases.sql
