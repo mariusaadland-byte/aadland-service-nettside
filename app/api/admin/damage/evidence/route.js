@@ -19,7 +19,8 @@ export async function POST(req){
  const photo=await saveDamageImage({context,bytes:Buffer.from(await file.arrayBuffer()),type:file.type});
  return photo?reply({ok:true,photo}):reply({error:"Dokumentet kunne ikke verifiseres."},409);
  }
- const input=await req.json(),context=await damageWriteContext(input?.group_id,input?.booking_id);
+ const input=await req.json();if(input?.approved!==true)return reply({error:"Kravet må godkjennes eksplisitt før publisering."},400);
+ const context=await damageWriteContext(input?.group_id,input?.booking_id);
  if(!context)return reply({error:"Skadesaken kunne ikke kontrolleres."},409);
  const result=await publishDamageClaim({context,actor:user.id,claim:{id:input.id,group_id:input.group_id,booking_id:input.booking_id,description:input.description,amount_ore:input.amount_ore,photo_digests:input.photo_digests,cost_proof_digest:input.cost_proof_digest}});
  return result?reply({ok:true,...result}):reply({error:"Kravet kunne ikke registreres."},409);
