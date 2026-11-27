@@ -74,6 +74,13 @@ begin
  perform pg_temp.require(public.draft_group_tripletex_finish(g,repeat('f',64),1,2,35000,'AU-GROUP-'||g::text,123)='confirmed','trusted readback recorded');
  perform pg_temp.require(public.draft_group_tripletex_finish(g,repeat('f',64),1,2,35000,'AU-GROUP-'||g::text,124)='review','cannot overwrite invoice ID');
  perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_tripletex_claim(uuid,bigint,bigint,bigint,integer,text,uuid)','EXECUTE'),'no client claim grant');
+ perform pg_temp.require(public.draft_group_tripletex_payment_claim(g,1,123,4,day,85000,repeat('f',64),repeat('a',64),u)='review','deposit excluded from payment');
+ perform pg_temp.require(public.draft_group_tripletex_payment_claim(g,1,123,4,day,35000,repeat('f',64),repeat('a',64),u)='claimed','first payment registration');
+ perform pg_temp.require(public.draft_group_tripletex_payment_claim(g,1,123,4,day,35000,repeat('f',64),repeat('a',64),u)='existing','same payment cannot repeat');
+ perform pg_temp.require(public.draft_group_tripletex_payment_claim(g,1,123,5,day,35000,repeat('f',64),repeat('a',64),u)='review','changed payment type blocked');
+ perform pg_temp.require(public.draft_group_tripletex_payment_finish(g,123,repeat('a',64),true)='confirmed','payment readback recorded');
+ perform pg_temp.require(public.draft_group_tripletex_payment_finish(g,123,repeat('a',64),true)='existing','payment readback replay');
+ perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_tripletex_payment_claim(uuid,bigint,bigint,bigint,date,integer,text,text,uuid)','EXECUTE'),'no client payment grant');
  perform pg_temp.require((select stock_quantity=3 and reserved_quantity=0 from public.rental_consumables where id=goods),'sold consumables not returned to stock');
  perform pg_temp.require(not has_function_privilege('authenticated','public.draft_group_return_close(uuid,uuid,integer,text,text)','EXECUTE'),'client cannot close settlement');
 end $$;
