@@ -251,12 +251,7 @@ export default function RentalDetailPage(){
 
  function choosePeriod(startDate,endDate,pricing){
   setChosen({startDate,endDate,pricing});
-  const preferred=repeatFulfillment==="delivery"&&item.deliveryAvailable
-   ?"delivery"
-   :repeatFulfillment==="pickup"&&item.pickupAvailable
-   ?"pickup"
-   :item.pickupAvailable?"pickup":"delivery";
-  setFulfillment(preferred);
+  setFulfillment("pickup");
   setRepeatFulfillment("");
   setMessage("");
   setPaymentUrl("");
@@ -266,6 +261,7 @@ export default function RentalDetailPage(){
  async function book(e){
   e.preventDefault();
   if(!bookingOpen||!item||!chosen||booking)return;
+  if(!item.pickupAvailable||fulfillment!=="pickup"){setError("Levering må avtales separat.");return;}
   setBooking(true);
   setError("");
   try{
@@ -315,7 +311,7 @@ export default function RentalDetailPage(){
  if(!item)return <main className="catalogPage rentalPage"><CatalogHeader rental/><div className="catalogWrap rentalDetailState"><Link href="/utleie">← Tilbake til utleie</Link><h1>Utstyret ble ikke funnet</h1>{error&&<p>{error}</p>}</div><CatalogFooter rental/></main>;
 
  const images=item.imageUrls||[];
- const canFulfill=item.pickupAvailable||item.deliveryAvailable;
+ const canFulfill=item.pickupAvailable;
 
  return <main className="catalogPage rentalPage">
   <CatalogHeader rental/>
@@ -345,9 +341,10 @@ export default function RentalDetailPage(){
       <p className="rentalPriceNote">Leiepriser inkl. mva. Depositum er separat.</p>
       <div className="rentalFulfillment">
        {item.pickupAvailable&&<span>Henting</span>}
-       {item.deliveryAvailable&&<span>Levering</span>}
+       {item.deliveryAvailable&&<span>Levering etter avtale</span>}
       </div>
       {item.status!=="available"&&<div className="catalogNotice"><b>Midlertidig utilgjengelig</b><p>Dette utstyret kan ikke bookes akkurat nå.</p></div>}
+      {item.deliveryAvailable&&<p>Ønsker du levering eller henting hos deg? <Link href="/utleie/kontakt">Kontakt oss for avtale og transportpris.</Link></p>}
       {!canFulfill&&<div className="catalogNotice"><b>Kontakt oss om utlevering</b><p>Utleveringsmåte må avtales før booking.</p></div>}
      </div>
     </div>
@@ -360,7 +357,7 @@ export default function RentalDetailPage(){
   {!bookingOpen&&<div className="catalogWrap"><div className="catalogNotice"><b>Utleie åpner senere</b><p>Vi klargjør utstyr og betalingsløsning. Bestilling er ikke åpen ennå.</p><Link href="/utleie/kontakt">Kontakt oss</Link></div></div>}
   {bookingOpen&&canFulfill&&item.status==="available"&&<div className="catalogWrap rentalDetailCalendarWrap"><RentalCalendar key={item.id} item={item} onChoose={choosePeriod} onSelectionChange={()=>{setChosen(null);setAccepted(false);}} refreshKey={refreshKey}/></div>}
 
-  {bookingOpen&&chosen&&<section className="rentalBookingSection" id="booking">
+  {bookingOpen&&chosen&&canFulfill&&<section className="rentalBookingSection" id="booking">
    <div className="catalogWrap">
     <form className="rentalBookingCard" onSubmit={book}>
      <div className="rentalBookingIntro">
@@ -390,7 +387,7 @@ export default function RentalDetailPage(){
       </div>
       <label><span>E-post *</span><input autoComplete="email" required type="email" value={customer.email} onChange={e=>setCustomer({...customer,email:e.target.value})}/></label>
       <label><span>Adresse{fulfillment==="delivery"?" *":""}</span><input autoComplete="street-address" required={fulfillment==="delivery"} value={customer.address} onChange={e=>setCustomer({...customer,address:e.target.value})}/></label>
-      <label><span>Henting / levering</span><select value={fulfillment} onChange={e=>setFulfillment(e.target.value)}>{item.pickupAvailable&&<option value="pickup">Jeg henter selv</option>}{item.deliveryAvailable&&<option value="delivery">Jeg ønsker levering</option>}</select></label>
+      <label><span>Henting / levering</span><select value={fulfillment} onChange={e=>setFulfillment(e.target.value)}>{item.pickupAvailable&&<option value="pickup">Jeg henter selv</option>}</select></label>
       <div className="rentalTermsNotice"><b>Endring og avbestilling</b><span>Gratis frem til {RENTAL_CHANGE_DEADLINE_HOURS} timer før avtalt leiestart. Se vilkårene for detaljer.</span></div>
       <label className="rentalTerms"><input type="checkbox" required checked={accepted} onChange={e=>setAccepted(e.target.checked)}/><span>Jeg har lest og godtar <a href={RENTAL_TERMS_PATH} target="_blank" rel="noreferrer">utleiebetingelsene ({RENTAL_TERMS_VERSION})</a>, inkludert fristene for endring og avbestilling.</span></label>
       <p className="muted">Slik behandler vi kontakt- og bookingopplysninger: <a href="/personvern" target="_blank" rel="noreferrer">Personvernerklæring</a>.</p>

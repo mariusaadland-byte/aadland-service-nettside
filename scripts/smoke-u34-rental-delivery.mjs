@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {rentalDeliveryQuote} from "../lib/rentalDelivery.mjs";
+const v={service:"both",distance:"10,5",maxDistance:"30",kmRate:"8",base:"150",extras:"40",rent:"500",deposit:"1000",postcode:"5111",allowedPostcodes:"5111, 5113"};
+const q=rentalDeliveryQuote(v);assert.equal(q.drivingKm,42);assert.equal(q.transportOre,71600);assert.equal(q.totalOre,121600);assert.equal(q.depositOre,100000);
+assert.equal(rentalDeliveryQuote({...v,service:"collection"}).transportOre,35800);
+assert.equal(rentalDeliveryQuote({...v,maxDistance:"10"}).eligible,false);
+assert.equal(rentalDeliveryQuote({...v,postcode:"1234"}).eligible,false);
+assert.equal(rentalDeliveryQuote({...v,allowedPostcodes:"511"}),null);
+assert.equal(rentalDeliveryQuote({...v,kmRate:""}),null);
+assert.equal(rentalDeliveryQuote({...v,kmRate:"-1"}),null);
+const api=readFileSync("app/api/rental-bookings/route.js","utf8");
+assert.ok(api.indexOf('code:"RENTAL_DELIVERY_QUOTE_REQUIRED"')<api.indexOf('s.rpc("create_rental_booking_if_available"'));
+assert.ok(readFileSync("app/utleie/[slug]/page.js","utf8").includes("Levering etter avtale"));
+console.log("U-34 transport calculator, distance and postcode boundaries, separate deposit and delivery checkout guard passed.");
