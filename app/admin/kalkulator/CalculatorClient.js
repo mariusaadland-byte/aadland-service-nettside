@@ -234,7 +234,8 @@ export default function CalculatorClient(){
  }
 
  async function completeImport(data){
-   setImportError("");setImportMessage((data.imported||0)+" varer aktivert for "+(data.supplierName||importPreview.supplierName||"leverandøren")+(data.alreadyApplied?" (bekreftet fra importhistorikken).":"."));
+   if(data?.ok!==true||!Number.isSafeInteger(data.imported)||data.imported<1||data.imported>100000||data.supplierId!==importPreview?.supplierId)throw Error("Importresultatet kunne ikke bekreftes. Kontroller status før nytt forsøk.");
+   setImportError("");setImportMessage(data.imported+" varer aktivert for "+(data.supplierName||importPreview.supplierName||"leverandøren")+(data.alreadyApplied?" (bekreftet fra importhistorikken).":"."));
    setImportPreview(null);setImportPhrase("");setImportFile(null);setNewSupplierName("");setActivationAttempted(false);
    const input=document.getElementById("material-price-file");if(input)input.value="";
    const supplierId=data.supplierId||importPreview.supplierId||"";
