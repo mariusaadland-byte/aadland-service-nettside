@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import {unitReturnInput,resolutionInput,refundReviewDigest} from "../lib/groupReturn.mjs";
+const [g,b,u,a,r,e]=Array.from({length:6},(_,i)=>"00000000-0000-4000-8000-00000000000"+(i+1));
+const input={groupId:g,bookingId:b,unitId:u,receiptId:r,condition:"ok",note:"",checks:{equipment:true,condition:true,accessories:true}};
+assert.ok(unitReturnInput(input,a));assert.equal(unitReturnInput({...input,checks:{}},a),null);
+assert.equal(unitReturnInput({...input,condition:"damage"},a),null);assert.ok(unitReturnInput({...input,condition:"damage",note:"Defekt"},a));
+assert.ok(unitReturnInput({...input,condition:"uninspected",checks:{}},a));
+assert.equal(unitReturnInput({...input,unitId:"https://evil.invalid/"+u},a),null);
+assert.notEqual(unitReturnInput(input,a).digest,unitReturnInput({...input,note:"Endret"},a).digest);
+assert.ok(resolutionInput({...input,maintenanceEventId:e,confirmed:true},a));assert.ok(refundReviewDigest(g,r,a));
+console.log("U-39H return input and evidence binding passed");

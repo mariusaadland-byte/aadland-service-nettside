@@ -22,6 +22,7 @@ if [[ "${CI:-}" != true ]]; then echo "Run only in the dedicated disposable CI s
  cat docs/u24-rental-equipment-units.draft.sql
  cat docs/u25-rental-unit-maintenance.draft.sql
  sed -e '/^begin;$/d' -e '/^rollback;$/d' docs/u39g-handover-capture.draft.sql
+ sed -e '/^begin;$/d' -e '/^rollback;$/d' docs/u39h-unit-return.draft.sql
  cat scripts/sql/signing-test-cases.sql
  cat scripts/sql/group-signing-test-cases.sql
  cat scripts/sql/group-payment-test-cases.sql
