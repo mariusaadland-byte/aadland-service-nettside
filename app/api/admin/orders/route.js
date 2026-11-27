@@ -261,25 +261,33 @@ export async function PATCH(req){ const originError=sameOriginGuard(req); if(ori
 
   if(action==="set-delivery-radius"){
     if(typeof deliveryWithinRadius!=="boolean")return NextResponse.json({error:"Leveringskontrollen mangler gyldig verdi."},{status:400});
-    const {data:order,error:findError}=await s.from("orders").select("id,order_type,status,fulfillment_type").eq("id",id).single();
+    const {data:order,error:findError}=await s.from("orders").select("id,order_type,status,fulfillment_type,updated_at,archived_at").eq("id",id).single();
     if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
     if(order.order_type!=="order")return NextResponse.json({error:"Leveringskontroll gjelder produktbestillinger."},{status:400});
     if(order.fulfillment_type!=="delivery")return NextResponse.json({error:"Bestillingen er ikke satt opp for lokal levering."},{status:409});
-    if(order.status!=="new")return NextResponse.json({error:"Leveringsområdet må avklares før bestillingen bekreftes."},{status:409});
+    if(order.archived_at||order.status!=="new")return NextResponse.json({error:"Leveringsområdet må avklares før bestillingen bekreftes."},{status:409});
     const now=new Date().toISOString();
-    const {error:updateError}=await s.from("orders").update({delivery_within_radius:deliveryWithinRadius,updated_at:now}).eq("id",id);
+    let update=s.from("orders").update({delivery_within_radius:deliveryWithinRadius,updated_at:now}).eq("id",id).eq("status","new")
+      .eq("fulfillment_type","delivery").is("archived_at",null);
+    update=order.updated_at==null?update.is("updated_at",null):update.eq("updated_at",order.updated_at);
+    const {data:saved,error:updateError}=await update.select("id").maybeSingle();
+    if(!updateError&&!saved)return NextResponse.json({error:"Ordren ble endret. Oppdater oversikten før du prøver igjen."},{status:409});
     if(updateError)return NextResponse.json({error:"Leveringskontrollen kunne ikke lagres."},{status:500});
     return NextResponse.json({ok:true,deliveryWithinRadius});
   }
 
   if(action==="change-delivery-to-pickup"){
-    const {data:order,error:findError}=await s.from("orders").select("id,order_type,status,fulfillment_type").eq("id",id).single();
+    const {data:order,error:findError}=await s.from("orders").select("id,order_type,status,fulfillment_type,updated_at,archived_at").eq("id",id).single();
     if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
     if(order.order_type!=="order")return NextResponse.json({error:"Denne handlingen gjelder produktbestillinger."},{status:400});
     if(order.fulfillment_type!=="delivery")return NextResponse.json({error:"Bestillingen er ikke satt opp for lokal levering."},{status:409});
-    if(order.status!=="new")return NextResponse.json({error:"Leveringsmåten kan bare endres før bestillingen er bekreftet."},{status:409});
+    if(order.archived_at||order.status!=="new")return NextResponse.json({error:"Leveringsmåten kan bare endres før bestillingen er bekreftet."},{status:409});
     const now=new Date().toISOString();
-    const {error:updateError}=await s.from("orders").update({fulfillment_type:"pickup",delivery_within_radius:false,updated_at:now}).eq("id",id);
+    let update=s.from("orders").update({fulfillment_type:"pickup",delivery_within_radius:false,updated_at:now}).eq("id",id).eq("status","new")
+      .eq("fulfillment_type","delivery").is("archived_at",null);
+    update=order.updated_at==null?update.is("updated_at",null):update.eq("updated_at",order.updated_at);
+    const {data:saved,error:updateError}=await update.select("id").maybeSingle();
+    if(!updateError&&!saved)return NextResponse.json({error:"Ordren ble endret. Oppdater oversikten før du prøver igjen."},{status:409});
     if(updateError)return NextResponse.json({error:"Leveringsmåten kunne ikke endres."},{status:500});
     return NextResponse.json({ok:true,fulfillmentType:"pickup"});
   }
