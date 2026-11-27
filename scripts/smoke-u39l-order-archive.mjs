@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import {bankArchiveBytes,bankArchiveRows,groupAccountingReview} from "../lib/groupOrderArchive.mjs";
+import {bankImageDigest} from "../lib/groupBankEvidence.mjs";
+import {groupQuoteSnapshot} from "../lib/rentalGroupQuote.mjs";
+const id="00000000-0000-4000-8000-000000000001",today="2026-11-27",q=groupQuoteSnapshot({today,rentals:[{itemId:id,name:"Demo",startDate:today,endDate:today,quantity:1,available:true,totalOre:30000,depositOre:50000}]});
+const group={id,quote_snapshot:q.snapshot,quote_digest:q.digest,terms_version:q.snapshot.termsVersion,rental_ore:30000,sales_ore:0,deposit_ore:50000,payable_ore:30000};
+const bytes=Buffer.alloc(40);bytes.set([255,216,255]);const digest=bankImageDigest(bytes),row={group_id:id,kind:"deposit",digest,reference:"DEMO",amount_ore:50000,image_bytes:"\\x"+bytes.toString("hex")};
+assert.deepEqual(bankArchiveBytes(row,id,"deposit",digest),bytes);assert.equal(bankArchiveBytes({...row,image_bytes:Buffer.alloc(40)},id,"deposit",digest),null);
+const deposit={group_id:id,proof_digest:digest,reference:"DEMO",amount_ore:50000};
+const docs=bankArchiveRows({group,documents:[row],deposit});assert.equal(docs[0].used,true);assert.equal(docs[0].image_bytes,undefined);
+const a=groupAccountingReview({group,documents:docs,deposit});assert.equal(a.grossOre,30000);assert.equal(a.vatOre,6000);assert.equal(a.depositRecordedOre,50000);assert.equal(a.readyToPost,false);
+console.log("U-39L archive digest and separate accounting review passed");
