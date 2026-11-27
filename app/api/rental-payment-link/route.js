@@ -55,7 +55,7 @@ export async function POST(req){
  if(!s)return NextResponse.json({error:"Betaling er midlertidig utilgjengelig."},{status:503});
 
  const {data:booking,error}=await s.from("rental_bookings")
-  .select("id,booking_number,customer_user_id,customer,start_date,end_date,status,total_ore,deposit_ore,payment_status,payment_provider,payment_reference,payment_psp_reference,payment_reserved_ore,payment_captured_ore,payment_refunded_ore,payment_due_at,vipps_checkout_started_at,rental_items(name)")
+  .select("*,rental_items(name)")
   .eq("id",bookingId)
   .maybeSingle();
 
@@ -79,6 +79,7 @@ export async function POST(req){
   },{status:verification.reason==="expired"?410:403});
  }
 
+ if(booking.group_id||/^AUG-/i.test(String(booking.payment_reference||"")))return NextResponse.json({error:"Samlet ordre må håndteres samlet."},{status:409});
  if(action==="status"){
   const readiness=await vippsUnitReadiness(s,"rental");
   return NextResponse.json({

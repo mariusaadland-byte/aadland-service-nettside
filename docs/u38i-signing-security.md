@@ -1,0 +1,12 @@
+# U-38I – Sikkerhetsgjennomgang og prelaunch
+U-38H korrigert bygg var success før denne endringen. Gjennomgått U-38 signing archive, code workflow, commit adapter, group payment plan, customer/guest legacy routes and webhook. 
+## Fikset
+1. Ny checkFrozenGroupQuote rekonstruerer canonical snapshot fra JSONB, sjekker SHA-256 og alle fire lagrede sumfelter. Bruk historisk startdato ved validering av arkivert snapshot, ikke dagens dato. Signeringsbevisets quote-digest må matche gruppen; endrede beløp/varer/navn/depositum sperrer betalingsstart og utlevering. Test fixtures bruker ekte quote-digest.
+2. Legacy payment start rejects group_id or reserved AUG reference. Customer/guest select all server-side (only explicitly mapped public response); no dependency on new column before migration. Guest status also blocked for group. Authenticated webhook AUG prefix rejects wrong unit and returns 503 while group reconciliation unavailable; never falls through to legacy RPC. No live group payments allowed. Existing admin group child guard retained.
+## Blockers before activation (not complete)
+- No test DB or applied U-37/U-38 migrations. SQL drafts roll back. Verify with disposable Postgres, concurrent transactions, permissions and group availability.
+- Actual group checkout, current pointer creation, OTP issue/verify routes + store, signing outbox and payment transaction not connected. Need proper immutable group snapshot, agreement claim and atomic CAS, verification on every writer.
+- Verify all remaining legacy writers (cron expiry/reminders, deposits, receipt, return, sync payment snapshot, refund, booking availability). Current changes do not prove complete isolation; DB level enforcement required. No AUG payment should be created until reconciliation works.
+- Real Resend/Vipps test environment unavailable, no emails or payments performed. Verify provider APIs, capture timing, merchant/environment, event replay and refunds. Review code binding to consent and account-wide attempt limits, stale decisions and clock handling. 
+- Archive authorization tests, pagination, legal terms/consumer rights, privacy and retention, key management, Unicode and PDF visual testing required. Email OTP weaker than BankID, use physical ID where policy requires. 
+- No merge/main, production flags or live data changed. JS smoke and static guard checks are not E2E or database tests. Keep all feature gates off; do not report launch-ready.

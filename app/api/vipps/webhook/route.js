@@ -84,6 +84,12 @@ export async function POST(req){
   return NextResponse.json({ok:true,ignored:true});
  }
 
+ // Group references are reserved: no fallback to single-booking or product processing.
+ if(/^AUG-/i.test(reference)){
+  if(unit!=="rental")return NextResponse.json({error:"Group payment belongs to rental unit."},{status:409});
+  return NextResponse.json({error:"Group payment reconciliation unavailable."},{status:503});
+ }
+
  // Invoice payments belong to the service sales unit only. Never pass an invoice
  // reference to the ordinary rental/order webhook handler, even if it is signed
  // by another valid unit's webhook secret.
