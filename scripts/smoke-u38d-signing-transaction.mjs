@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {issueSigningChallenge} from "../lib/aadlandSigning.mjs";
+import {signingCommitPlan} from "../lib/aadlandSigningCommit.mjs";
+const expected={agreementId:"00000000-0000-4000-8000-000000000001",customerId:"00000000-0000-4000-8000-000000000002",email:"demo@example.invalid",documentDigest:"a".repeat(64),quoteDigest:"b".repeat(64),termsVersion:"2026-11-25"};
+const key=Buffer.alloc(32,8),now="2026-11-27T12:00:00Z";
+const {code,challenge}=issueSigningChallenge({...expected,key,now});
+const args={challenge,expected,key,keyId:"demo",now,code,input:{...expected,name:"Demo Kunde",accepted:true,paymentObligation:true},accountAttemptsAllowed:true};
+const result=signingCommitPlan(args);
+assert.equal(result.status,"commit_required");
+assert.equal(result.params.p_action,"consume_and_record");assert.equal(result.params.p_expected_mac,challenge.codeMac);
+assert.equal(result.params.p_expected_attempts,0);assert.equal(result.params.code,undefined);
+assert.equal(signingCommitPlan({...args,code:code==="000000"?"000001":"000000"}).params.p_action,"record_failure");
+assert.equal(signingCommitPlan({...args,accountAttemptsAllowed:false}).status,"limited");
+assert.equal(signingCommitPlan({...args,challenge:{...challenge,state:"consumed"}}).status,"closed");
+const sql=readFileSync("docs/u38d-signing-transaction.draft.sql","utf8");
+assert.match(sql,/p_expected_attempts/);assert.match(sql,/state='consumed',code_mac=null/);assert.match(sql,/insert into public.aadland_signing_evidence/);assert.match(sql,/rollback;\s*$/);
+console.log("U-38D commit plan and SQL structure tests passed (not DB execution)");
