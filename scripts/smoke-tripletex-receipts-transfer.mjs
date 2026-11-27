@@ -249,3 +249,9 @@ assert.ok(route.includes("existingRecipients.data.some(row=>row.recipient!==reci
 
 assert.ok(nav.includes('href="/admin/faktura/mva/tripletex"'));
 console.log("Tripletex overføring bestått: 18-bilag-vennlig CSV, eier/CSRF/test-sperre, ekte original-kontrollsum, ingen duplikat, usikker sending låst, status og brukerbekreftelse. Ingen e-post sendt.");
+
+assert.ok(ui.includes("Overført</small>"));
+assert.ok(ui.includes("Overføringsfeil / uklar status"));
+assert.ok(ui.includes('reply.status!=="accepted"')&&ui.includes('reply.id!==row.document.id')&&ui.includes('reply.recipient!==recipient'));
+assert.ok(!ui.includes("loadReconciliations")&&!ui.includes("bookedCount"));
+console.log("S05: confirmed transfer is final in Service; no mandatory accounting reconciliation or ambiguous success.");
