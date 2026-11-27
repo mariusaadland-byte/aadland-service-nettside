@@ -369,9 +369,10 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     const {data:order,error:findError}=await s.from("orders").select("*").eq("id",id).single();
     if(findError||!order)return NextResponse.json({error:"Bestillingen ble ikke funnet."},{status:404});
     if(order.order_type!=="order")return NextResponse.json({error:"Denne statusflyten gjelder produktbestillinger."},{status:400});
-    if(["completed","cancelled"].includes(order.status))return NextResponse.json({error:"En fullført eller kansellert bestilling kan ikke endres."},{status:409});
+    if(order.archived_at||["completed","cancelled"].includes(order.status))return NextResponse.json({error:"En arkivert, fullført eller kansellert bestilling kan ikke endres."},{status:409});
 
     const resendOnly=action==="resend-product-progress-notice";
+    let noticeOrder=order;
     if(!resendOnly){
       if(nextStatus==="confirmed"&&order.status!=="new")return NextResponse.json({error:"Bare nye bestillinger kan bekreftes med denne handlingen."},{status:409});
       if(nextStatus==="confirmed"&&order.fulfillment_type==="delivery"&&order.delivery_within_radius!==true){
@@ -386,11 +387,19 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
       const patch=nextStatus==="confirmed"
         ?{status:"confirmed",confirmed_at:order.confirmed_at||now,updated_at:now}
         :{status:"in_progress",in_progress_at:order.in_progress_at||now,updated_at:now};
-      const {error:updateError}=await s.from("orders").update(patch).eq("id",id);
+      let progressUpdate=s.from("orders").update(patch)
+        .eq("id",id).eq("status",order.status)
+        .eq("fulfillment_type",order.fulfillment_type).is("archived_at",null);
+      progressUpdate=order.updated_at==null
+        ?progressUpdate.is("updated_at",null)
+        :progressUpdate.eq("updated_at",order.updated_at);
+      if(nextStatus==="confirmed"&&order.fulfillment_type==="delivery"){
+        progressUpdate=progressUpdate.eq("delivery_within_radius",true);
+      }
+      const {data:updatedOrder,error:updateError}=await progressUpdate.select("*").maybeSingle();
       if(updateError)return NextResponse.json({error:"Statusen kunne ikke lagres."},{status:500});
-      order.status=nextStatus;
-      if(nextStatus==="confirmed")order.confirmed_at=patch.confirmed_at;
-      if(nextStatus==="in_progress")order.in_progress_at=patch.in_progress_at;
+      if(!updatedOrder)return NextResponse.json({error:"Ordren ble endret. Oppdater oversikten og kontroller status før du prøver igjen."},{status:409});
+      noticeOrder=updatedOrder;
     }else{
       const hasReached=nextStatus==="confirmed"
         ?Boolean(order.confirmed_at||order.confirmed_notice_sent_at)
@@ -401,11 +410,11 @@ ${accountUrl?`<a href="${esc(accountUrl)}" style="display:inline-block;margin-to
     try{
       const notice=await sendProductOrderProgressNotice({
         s,
-        order,
+        order:noticeOrder,
         kind:nextStatus,
         requestOrigin:new URL(req.url).origin
       });
-      return NextResponse.json({ok:true,status:order.status,...notice});
+      return NextResponse.json({ok:true,status:noticeOrder.status,...notice});
     }catch(error){
       console.error("ORDER PROGRESS NOTICE ERROR",error);
       const message=String(error?.message||"");
