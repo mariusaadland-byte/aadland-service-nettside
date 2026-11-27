@@ -1277,17 +1277,19 @@ function Orders({ orders, status, canUpdateOrders, isOwner=false, reload }) {
   setOpenId(null);
  }
  async function cancelOrder(order){
+  const resendCancellation=order.status==="cancelled";
   const reason=window.prompt("Kanseller bestillingen og varsle kunden. Skriv valgfri årsak her, eller la feltet stå tomt. Trykk Avbryt for å stoppe.","");
   if(reason===null)return;
   const paymentWarning=["paid","partial","authorized"].includes(order.paymentStatus)
    ?" Det er registrert betaling/reservasjon på ordren. Kansellering refunderer ikke pengene automatisk."
    :"";
-  if(!window.confirm("Kansellere "+order.orderNumber+" og sende beskjed til "+order.customerEmail+"?"+paymentWarning))return;
+  const question=resendCancellation?"Sende kanselleringsvarselet på nytt for ":"Kansellere og varsle kunden om ";
+  if(!window.confirm(question+order.orderNumber+" til "+order.customerEmail+"?"+paymentWarning))return;
   setSavingId(order.id);setMessage("");
   const response=await fetch("/api/admin/orders",{
    method:"PATCH",
    headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({id:order.id,action:"cancel-and-notify",cancellationReason:reason})
+   body:JSON.stringify({id:order.id,action:"cancel-and-notify",cancellationReason:reason,resendCancellation})
   });
   const data=await response.json().catch(()=>({}));
   setSavingId(null);
@@ -1297,7 +1299,7 @@ function Orders({ orders, status, canUpdateOrders, isOwner=false, reload }) {
    return;
   }
   const extra=data.paymentAttention?" Husk at registrert betaling/refusjon må håndteres separat.":"";
-  setMessage("Bestillingen er kansellert og kunden er varslet."+extra);
+  setMessage((data.warning||(resendCancellation?"Kanselleringsvarselet er sendt på nytt.":"Bestillingen er kansellert og kunden er varslet."))+extra);
   if(typeof reload==="function")await reload();
  }
  async function markReady(order){
