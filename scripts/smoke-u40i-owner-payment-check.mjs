@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import {ownerPaymentCheck} from "../lib/ownerGroupPaymentCheck.mjs";
+import {groupQuoteSnapshot} from "../lib/rentalGroupQuote.mjs";
+const id="00000000-0000-4000-8000-000000000001",ref="AUG-"+id,today="2026-11-27",q=groupQuoteSnapshot({today,rentals:[{itemId:id,name:"Demo",startDate:today,endDate:today,quantity:1,available:true,totalOre:30000,depositOre:50000}]});
+const group={id,status:"payment_pending",payment_reference:ref,payable_ore:30000,rental_ore:30000,sales_ore:0,deposit_ore:50000,quote_digest:q.digest,quote_snapshot:q.snapshot,terms_version:q.snapshot.termsVersion},claim={group_id:id,reference:ref,amount_ore:30000};
+const a=value=>({currency:"NOK",value}),payment={reference:ref,pspReference:"demo-psp",amount:a(30000),state:"AUTHORIZED",aggregate:{authorizedAmount:a(30000),cancelledAmount:a(0),capturedAmount:a(30000),refundedAmount:a(0)}};
+let calls=0,gets=0;const args={group,claim,provider:{get:async()=>{gets++;return payment;}},store:{confirm:async()=>{calls++;return "confirmed";}}};
+const p=await ownerPaymentCheck({...args,action:"check"});assert.equal(p.decision,"confirm");assert.equal(calls,0);
+assert.equal((await ownerPaymentCheck({...args,action:"apply",expected:"wrong"})).status,"changed");assert.equal(calls,0);
+assert.equal((await ownerPaymentCheck({...args,action:"apply",expected:p.digest})).status,"confirmed");assert.equal(calls,1);assert.equal(gets,3);
+assert.equal((await ownerPaymentCheck({...args,action:"apply",expected:p.digest,provider:{get:async()=>{throw Error("unknown")}}})).status,"unconfirmed");assert.equal(calls,1);
+const terminal={...payment,state:"ABORTED",aggregate:{...payment.aggregate,cancelledAmount:a(30000),capturedAmount:a(0)}};
+const b={...args,provider:{get:async()=>terminal},store:{release:async()=>{calls++;return "released"}}};
+assert.equal((await ownerPaymentCheck({...b,action:"check"})).decision,null);
+const t=await ownerPaymentCheck({...b,action:"check",terminalEnabled:true});assert.equal(t.decision,"release");assert.equal(calls,1);
+assert.equal((await ownerPaymentCheck({...b,action:"apply",expected:t.digest,terminalEnabled:true})).status,"released");assert.equal(calls,2);
+console.log("U40I read-only check, fresh compare, terminal gate and unknown result passed");
