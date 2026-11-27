@@ -3,12 +3,26 @@ begin;
 -- Serialize maintenance writes with assignment/release checks on the same unit.
 create function public.draft_unit_maintenance_lock()
 returns trigger language plpgsql security invoker set search_path=pg_catalog,public as $$
+declare item uuid;
 begin
+ select rental_item_id into item from public.rental_equipment_units where id=new.unit_id;
+ if not found then raise exception 'RENTAL_UNIT_NOT_FOUND';end if;
+ perform pg_advisory_xact_lock(hashtext(item::text));
  perform pg_advisory_xact_lock(hashtextextended(new.unit_id::text,4020));
+ new.created_at:=clock_timestamp();
  return new;
 end $$;
 revoke all on function public.draft_unit_maintenance_lock() from public,anon,authenticated,service_role;
 create trigger draft_unit_maintenance_before_insert before insert on public.rental_unit_maintenance_events for each row execute function public.draft_unit_maintenance_lock();
+-- Unit registration changes the same capacity and must serialize with booking.
+create function public.draft_unit_registration_lock()
+returns trigger language plpgsql security invoker set search_path=pg_catalog,public as $$
+begin
+ perform pg_advisory_xact_lock(hashtext(new.rental_item_id::text));
+ return new;
+end $$;
+revoke all on function public.draft_unit_registration_lock() from public,anon,authenticated,service_role;
+create trigger draft_unit_registration_before_insert before insert on public.rental_equipment_units for each row execute function public.draft_unit_registration_lock();
 create function public.draft_group_unit_receive(p_group uuid,p_booking uuid,p_unit uuid,p_receipt uuid,p_actor uuid,p_condition text,p_note text,p_digest text)
 returns text language plpgsql security invoker set search_path=pg_catalog,public as $$
 declare g public.rental_order_groups%rowtype; b public.rental_bookings%rowtype; a public.rental_group_unit_assignments%rowtype; result text; safe boolean;

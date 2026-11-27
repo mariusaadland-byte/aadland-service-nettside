@@ -8,7 +8,7 @@ create table public.rental_unit_maintenance_events(
  next_due_on date,
  note text not null check (length(btrim(note)) between 10 and 2000),
  created_by uuid not null,
- created_at timestamptz not null default now(),
+ created_at timestamptz not null default clock_timestamp(),
  check(next_due_on is null or next_due_on>=performed_on)
 );
 create index rental_unit_maintenance_events_unit_date_idx on public.rental_unit_maintenance_events(unit_id,performed_on desc,created_at desc);

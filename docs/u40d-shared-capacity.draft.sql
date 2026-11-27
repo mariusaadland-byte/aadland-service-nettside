@@ -6,6 +6,8 @@ language plpgsql security invoker set search_path=pg_catalog,public as $$
 declare i public.rental_items%rowtype; today date:=(clock_timestamp() at time zone 'Europe/Oslo')::date; buf integer; unsafe_count integer; registered integer;
 begin
  if p_item is null or p_start is null or p_end is null or p_end<p_start or p_end-p_start>=365 then return;end if;
+ -- Shared lock with reservations, unit registration, maintenance and return.
+ perform pg_advisory_xact_lock(hashtext(p_item::text));
  select * into i from public.rental_items where id=p_item;
  if not found then return;end if;
  buf:=greatest(0,coalesce(i.buffer_days,0));
