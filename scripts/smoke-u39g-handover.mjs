@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import {scanRentalUnit,handoverReport,controlledGroupCapture} from "../lib/groupHandover.mjs";
+const [g,b,u,a,r]=Array.from({length:5},(_,i)=>"00000000-0000-4000-8000-00000000000"+(i+1));
+assert.equal(scanRentalUnit("AU-"+u.toUpperCase()),u);assert.equal(scanRentalUnit("https://evil.invalid/"+u),null);
+const input={groupId:g,reportId:r,actorId:a,units:[{bookingId:b,unitId:u}],note:"",checks:{identity:true,condition:true,instructions:true}};
+assert.ok(handoverReport(input));assert.equal(handoverReport({...input,checks:{identity:true}}),null);assert.equal(handoverReport({...input,units:[...input.units,...input.units]}),null);
+const ref="AUG-"+g,group={id:g,status:"payment_pending",payment_reference:ref,payable_ore:30000},claim={group_id:g,reference:ref,amount_ore:30000};
+const amount=value=>({currency:"NOK",value}),payment={reference:ref,pspReference:"demo-psp",amount:amount(30000),state:"AUTHORIZED",aggregate:{authorizedAmount:amount(30000),capturedAmount:amount(0),cancelledAmount:amount(0),refundedAmount:amount(0)}};
+let count=0,claimed=false;
+const args={group,claim,reportId:r,actorId:a,provider:{get:async()=>payment,capture:async()=>{count++;throw Error("unknown outcome")}},store:{claim:async()=>{if(claimed)return "existing";claimed=true;return "claimed"}}};
+assert.equal((await controlledGroupCapture(args)).status,"unconfirmed");assert.equal((await controlledGroupCapture(args)).status,"reconcile");assert.equal(count,1);
+console.log("U-39G QR, report and one-shot capture guard passed");
